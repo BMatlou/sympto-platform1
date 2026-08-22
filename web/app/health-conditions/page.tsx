@@ -1,0 +1,261 @@
+"use client";
+
+import Link from "next/link";
+import {
+  Activity,
+  AlertCircle,
+  ArrowLeft,
+  CheckCircle2,
+  HeartPulse,
+} from "lucide-react";
+
+import ProtectedRoute from "@/components/auth/protected-route";
+import { useDashboard } from "@/hooks/use-dashboard";
+
+function formatEnum(value: unknown) {
+  if (!value) return "Not specified";
+
+  return String(value)
+    .replace(/_/g, " ")
+    .toLowerCase()
+    .replace(/\b\w/g, (letter) => letter.toUpperCase());
+}
+
+export default function HealthConditionsPage() {
+  const { data: dashboard, loading } = useDashboard();
+
+  const allergies = Array.isArray(dashboard?.allergies)
+    ? dashboard.allergies
+    : [];
+
+  const conditions = Array.isArray(dashboard?.conditions)
+    ? dashboard.conditions
+    : [];
+
+  const activeAllergies = allergies.filter(
+    (allergy: any) =>
+      allergy?.status === "ACTIVE" ||
+      !allergy?.status,
+  );
+
+  const activeConditions = conditions.filter(
+    (condition: any) =>
+      condition?.status === "ACTIVE" &&
+      !condition?.resolvedAt,
+  );
+
+  return (
+    <ProtectedRoute>
+      <main className="min-h-screen bg-[#F7F9FC]">
+        <header className="border-b border-slate-200 bg-white">
+          <div className="mx-auto flex h-16 max-w-7xl items-center px-4 sm:px-6 lg:px-8">
+            <Link
+              href="/dashboard"
+              className="inline-flex items-center gap-2 text-sm font-medium text-slate-600 hover:text-[#0B5CAD]"
+            >
+              <ArrowLeft className="h-4 w-4" />
+              Back to dashboard
+            </Link>
+          </div>
+        </header>
+
+        <div className="mx-auto max-w-6xl px-4 py-8 sm:px-6 lg:px-8">
+          <div className="mb-8">
+            <div className="mb-3 inline-flex items-center gap-2 rounded-full bg-[#EAF3FB] px-3 py-1 text-xs font-semibold text-[#0B5CAD]">
+              <HeartPulse className="h-3.5 w-3.5" />
+              Health information
+            </div>
+
+            <h1 className="text-3xl font-bold tracking-tight text-slate-950 sm:text-4xl">
+              Allergies & conditions
+            </h1>
+
+            <p className="mt-2 max-w-2xl text-slate-500">
+              Review the allergies and health conditions
+              currently recorded in your health profile.
+            </p>
+          </div>
+
+          {loading && (
+            <div className="mb-6 rounded-2xl border border-slate-200 bg-white p-5 text-sm text-slate-500">
+              Loading your health information...
+            </div>
+          )}
+
+          <div className="grid gap-6 lg:grid-cols-2">
+            {/* Allergies */}
+
+            <section className="rounded-2xl border border-slate-200 bg-white p-6">
+              <div className="flex items-center gap-3">
+                <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-rose-50 text-rose-600">
+                  <AlertCircle className="h-5 w-5" />
+                </div>
+
+                <div>
+                  <h2 className="font-semibold text-slate-900">
+                    Allergies
+                  </h2>
+
+                  <p className="text-sm text-slate-500">
+                    {activeAllergies.length} recorded
+                  </p>
+                </div>
+              </div>
+
+              {activeAllergies.length === 0 ? (
+                <div className="mt-6 rounded-xl bg-slate-50 p-5">
+                  <p className="text-sm text-slate-500">
+                    No allergies are currently recorded.
+                  </p>
+                </div>
+              ) : (
+                <div className="mt-6 space-y-3">
+                  {activeAllergies.map(
+                    (allergy: any) => {
+                      const name =
+                        allergy?.allergy?.name ||
+                        allergy?.name ||
+                        "Allergy";
+
+                      return (
+                        <div
+                          key={allergy?.id ?? name}
+                          className="rounded-xl border border-rose-100 bg-rose-50/50 p-4"
+                        >
+                          <div className="flex items-start justify-between gap-3">
+                            <div>
+                              <h3 className="font-semibold text-slate-900">
+                                {name}
+                              </h3>
+
+                              {allergy?.reaction && (
+                                <p className="mt-1 text-sm text-slate-500">
+                                  Reaction:{" "}
+                                  {allergy.reaction}
+                                </p>
+                              )}
+
+                              {allergy?.severity && (
+                                <p className="mt-1 text-xs text-slate-400">
+                                  Severity:{" "}
+                                  {formatEnum(
+                                    allergy.severity,
+                                  )}
+                                </p>
+                              )}
+                            </div>
+
+                            <AlertCircle className="h-5 w-5 shrink-0 text-rose-500" />
+                          </div>
+                        </div>
+                      );
+                    },
+                  )}
+                </div>
+              )}
+            </section>
+
+            {/* Conditions */}
+
+            <section className="rounded-2xl border border-slate-200 bg-white p-6">
+              <div className="flex items-center gap-3">
+                <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-blue-50 text-blue-600">
+                  <Activity className="h-5 w-5" />
+                </div>
+
+                <div>
+                  <h2 className="font-semibold text-slate-900">
+                    Active conditions
+                  </h2>
+
+                  <p className="text-sm text-slate-500">
+                    {activeConditions.length} recorded
+                  </p>
+                </div>
+              </div>
+
+              {activeConditions.length === 0 ? (
+                <div className="mt-6 rounded-xl bg-slate-50 p-5">
+                  <p className="text-sm text-slate-500">
+                    No active health conditions are
+                    currently recorded.
+                  </p>
+                </div>
+              ) : (
+                <div className="mt-6 space-y-3">
+                  {activeConditions.map(
+                    (condition: any) => {
+                      const name =
+                        condition?.condition?.name ||
+                        condition?.name ||
+                        "Health condition";
+
+                      return (
+                        <div
+                          key={
+                            condition?.id ?? name
+                          }
+                          className="rounded-xl border border-blue-100 bg-blue-50/50 p-4"
+                        >
+                          <div className="flex items-start justify-between gap-3">
+                            <div>
+                              <h3 className="font-semibold text-slate-900">
+                                {name}
+                              </h3>
+
+                              {condition?.diagnosedAt && (
+                                <p className="mt-1 text-sm text-slate-500">
+                                  Diagnosed:{" "}
+                                  {new Date(
+                                    condition.diagnosedAt,
+                                  ).toLocaleDateString(
+                                    "en-ZA",
+                                    {
+                                      day: "numeric",
+                                      month: "long",
+                                      year: "numeric",
+                                    },
+                                  )}
+                                </p>
+                              )}
+
+                              {condition?.notes && (
+                                <p className="mt-2 text-sm text-slate-500">
+                                  {condition.notes}
+                                </p>
+                              )}
+                            </div>
+
+                            <CheckCircle2 className="h-5 w-5 shrink-0 text-blue-500" />
+                          </div>
+                        </div>
+                      );
+                    },
+                  )}
+                </div>
+              )}
+            </section>
+          </div>
+
+          <div className="mt-6 rounded-2xl border border-[#D8E7F4] bg-[#F5FAFE] p-5">
+            <div className="flex gap-3">
+              <HeartPulse className="mt-0.5 h-5 w-5 shrink-0 text-[#0B5CAD]" />
+
+              <div>
+                <h2 className="font-semibold text-slate-900">
+                  Keep your information current
+                </h2>
+
+                <p className="mt-1 text-sm leading-6 text-slate-500">
+                  Make sure your allergies and conditions
+                  reflect your current health information so
+                  they can be available when you need care.
+                </p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </main>
+    </ProtectedRoute>
+  );
+}
