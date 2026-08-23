@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { Activity, CalendarDays, CheckCircle2, HeartPulse, LucideIcon, Pill, Scale, Target, Users, Watch, TriangleAlert, BookOpen, X } from "lucide-react";
+import { Activity, CalendarDays, CheckCircle2, HeartPulse, LucideIcon, Pill, Scale, Target, Users, Watch, TriangleAlert, X } from "lucide-react";
 import ProtectedRoute from "@/components/auth/protected-route";
 import { useDashboard } from "@/hooks/use-dashboard";
 import { healthHomeService } from "@/services/health-home.service";
@@ -27,12 +27,7 @@ export default function HealthHome() {
   const [weightError, setWeightError] = useState("");
 
   useEffect(() => { setGreetingText(greeting(new Date().getHours())); }, []);
-
-  useEffect(() => {
-    if (!data) return;
-    if (data.healthSnapshot.weightKg != null) setWeightKg(String(data.healthSnapshot.weightKg));
-    if (data.healthSnapshot.heightCm != null) setHeightCm(String(data.healthSnapshot.heightCm));
-  }, [data]);
+  useEffect(() => { if (!data) return; if (data.healthSnapshot.weightKg != null) setWeightKg(String(data.healthSnapshot.weightKg)); if (data.healthSnapshot.heightCm != null) setHeightCm(String(data.healthSnapshot.heightCm)); }, [data]);
 
   if (loading) return <ProtectedRoute><main className="min-h-screen bg-slate-50 p-6 sm:p-10"><div className="mx-auto max-w-7xl space-y-6" aria-busy="true"><div className="h-10 w-80 animate-pulse rounded-xl bg-slate-200" /><div className="grid gap-4 md:grid-cols-3">{Array.from({ length: 6 }).map((_, i) => <div key={i} className="h-36 animate-pulse rounded-2xl bg-white" />)}</div></div></main></ProtectedRoute>;
   if (error || !data) return <ProtectedRoute><main className="min-h-screen bg-slate-50 p-6 sm:p-10"><div className="mx-auto max-w-2xl rounded-2xl border border-red-200 bg-white p-6"><h1 className="text-xl font-bold text-[#0b2d54]">We couldn't load your Health Home</h1><p className="mt-2 text-sm text-slate-500">Your health data has not been changed. Please try again.</p><button onClick={reload} className="mt-5 rounded-xl bg-[#0b2d54] px-4 py-2 text-sm font-semibold text-white">Try again</button></div></main></ProtectedRoute>;
@@ -44,37 +39,8 @@ export default function HealthHome() {
   const bmi = healthSnapshot.bmi;
   const bmiCategory = formatBmiCategory(healthSnapshot.bmiCategory);
   const wearableMetric = (label: string, measurement?: { value: number | string; unit: string }) => <div key={label} className="rounded-xl bg-slate-50 p-2 text-center"><p className="text-[10px] font-medium text-slate-400">{label}</p><p className="mt-1 text-xs font-bold text-[#0b2d54]">{measurement ? `${text(measurement.value)} ${measurement.unit}` : "—"}</p></div>;
-
-  const openWeightModal = () => {
-    setWeightError("");
-    setWeightModalOpen(true);
-  };
-
-  const saveWeight = async () => {
-    const weight = Number(weightKg);
-    const height = Number(heightCm);
-    if (!Number.isFinite(weight) || weight <= 0) {
-      setWeightError("Enter a valid weight in kilograms.");
-      return;
-    }
-    if (!Number.isFinite(height) || height <= 0) {
-      setWeightError("Enter a valid height in centimetres so we can calculate BMI.");
-      return;
-    }
-
-    try {
-      setSavingWeight(true);
-      setWeightError("");
-      await healthHomeService.updateWeight(weight, height);
-      await reload();
-      setWeightModalOpen(false);
-    } catch (requestError) {
-      console.error("Failed to update weight:", requestError);
-      setWeightError("We couldn't update your weight. Please try again.");
-    } finally {
-      setSavingWeight(false);
-    }
-  };
+  const openWeightModal = () => { setWeightError(""); setWeightModalOpen(true); };
+  const saveWeight = async () => { const weight = Number(weightKg); const height = Number(heightCm); if (!Number.isFinite(weight) || weight <= 0) { setWeightError("Enter a valid weight in kilograms."); return; } if (!Number.isFinite(height) || height <= 0) { setWeightError("Enter a valid height in centimetres so we can calculate BMI."); return; } try { setSavingWeight(true); setWeightError(""); await healthHomeService.updateWeight(weight, height); await reload(); setWeightModalOpen(false); } catch (requestError) { console.error("Failed to update weight:", requestError); setWeightError("We couldn't update your weight. Please try again."); } finally { setSavingWeight(false); } };
 
   return <ProtectedRoute><main className="min-h-screen bg-slate-50">
     <header className="border-b border-slate-200 bg-white"><div className="mx-auto flex h-16 max-w-7xl items-center justify-between px-4 sm:px-6 lg:px-8"><img src="/logo-navbar.png" alt="Sympto" className="h-12 w-auto" /><span className="rounded-full bg-[#24c1c4]/10 px-3 py-1 text-xs font-semibold text-[#0b2d54]">Health Home</span></div></header>
@@ -93,8 +59,7 @@ export default function HealthHome() {
         <Card title="My goals" icon={Target} href="/health-goals">{goals.length === 0 ? <p className="text-sm text-slate-500">No active goals yet.</p> : <div className="space-y-4">{goals.slice(0, 3).map((goal) => { const percent = Math.min(100, Math.max(0, Number(goal.progressPercent) || 0)); return <div key={String(goal.id)}><div className="flex justify-between gap-3 text-sm"><span className="font-medium text-slate-800">{text(goal.title)}</span><span className="text-slate-500">{percent}%</span></div><div className="mt-2 h-2 overflow-hidden rounded-full bg-slate-100"><div className="h-full rounded-full bg-[#24c1c4] transition-[width] duration-500" style={{ width: `${percent}%` }} /></div>{goal.latestValue !== undefined && goal.unit && <p className="mt-1 text-[11px] text-slate-400">Current: {text(goal.latestValue)} {text(goal.unit)}</p>}</div>; })}</div>}</Card>
         <Card title="Family" icon={Users}>{family.length === 0 ? <p className="text-sm text-slate-500">No family members are being managed yet.</p> : <div className="space-y-2">{family.slice(0, 4).map((member) => <div key={String(member.id)} className="flex items-center justify-between rounded-xl bg-slate-50 px-3 py-2"><div><p className="text-sm font-medium text-slate-800">{text(member.name)}</p><p className="text-xs text-slate-500">{text(member.relationship)}</p></div>{member.canReceiveAlerts && <CheckCircle2 className="h-4 w-4 text-[#24c1c4]" />}</div>)}</div>}</Card>
       </div>
-      <section className="rounded-2xl border border-slate-200 bg-white p-5"><div className="flex items-center gap-2"><Activity className="h-5 w-5 text-[#24c1c4]" /><div><h2 className="font-semibold text-[#0b2d54]">Recent health activity</h2><p className="text-xs text-slate-400">Automatically collected from your connected health data</p></div></div><p className="mt-2 text-xs text-slate-400">Last updated {formatDate(data.generatedAt)}</p><div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">{wearables.latestMeasurements.slice(0, 4).map((measurement) => <div key={measurement.id} className="rounded-xl bg-slate-50 p-3"><p className="text-xs font-medium text-slate-500">{measurement.type.replace(/_/g, " ")}</p><p className="mt-1 font-semibold text-[#0b2d54]">{text(measurement.value)} {measurement.unit}</p><p className="mt-1 text-[11px] text-slate-400">{formatDate(measurement.measuredAt)}</p></div>)}</div></section>
-      <section className="rounded-2xl border border-[#24c1c4]/20 bg-gradient-to-r from-[#24c1c4]/10 via-white to-white p-6"><div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between"><div className="flex items-start gap-3"><BookOpen className="mt-0.5 h-5 w-5 shrink-0 text-[#24c1c4]" /><div><h2 className="font-semibold text-[#0b2d54]">Smart Journal</h2><p className="mt-1 text-sm leading-6 text-slate-600">Your journal is compiled automatically from your Sympto health record and connected devices. No manual journal entry is required.</p></div></div><Link href="/health-journal" className="inline-flex shrink-0 items-center justify-center rounded-xl bg-[#0b2d54] px-5 py-3 text-sm font-semibold text-white transition hover:bg-[#071f3a]">Open Smart Journal</Link></div></section>
+      <section className="rounded-2xl border border-slate-200 bg-white p-5"><div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between"><div className="flex items-center gap-2"><Activity className="h-5 w-5 text-[#24c1c4]" /><div><h2 className="font-semibold text-[#0b2d54]">Recent health activity</h2><p className="text-xs text-slate-400">Automatically collected from your connected health data</p><p className="mt-2 text-xs text-slate-400">Last updated {formatDate(data.generatedAt)}</p></div></div><Link href="/health-journal" className="inline-flex shrink-0 items-center justify-center rounded-xl bg-[#0b2d54] px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-[#071f3a]">Open Smart Health Journal</Link></div><div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">{wearables.latestMeasurements.slice(0, 4).map((measurement) => <div key={measurement.id} className="rounded-xl bg-slate-50 p-3"><p className="text-xs font-medium text-slate-500">{measurement.type.replace(/_/g, " ")}</p><p className="mt-1 font-semibold text-[#0b2d54]">{text(measurement.value)} {measurement.unit}</p><p className="mt-1 text-[11px] text-slate-400">{formatDate(measurement.measuredAt)}</p></div>)}</div></section>
     </div>
 
     {weightModalOpen && <div className="fixed inset-0 z-50 flex items-end justify-center bg-slate-950/45 p-0 sm:items-center sm:p-6" role="dialog" aria-modal="true" aria-labelledby="update-weight-title"><div className="w-full max-w-md rounded-t-3xl bg-white p-6 shadow-2xl sm:rounded-3xl"><div className="flex items-start justify-between gap-4"><div><p className="text-xs font-semibold uppercase tracking-wide text-[#24c1c4]">My Health</p><h2 id="update-weight-title" className="mt-1 text-xl font-bold text-[#0b2d54]">Update your weight</h2><p className="mt-1 text-sm leading-5 text-slate-500">We'll recalculate BMI and update any active weight goals automatically.</p></div><button type="button" onClick={() => setWeightModalOpen(false)} className="rounded-full p-2 text-slate-400 hover:bg-slate-100 hover:text-slate-700" aria-label="Close"><X className="h-5 w-5" /></button></div><div className="mt-6 space-y-4"><label className="block"><span className="text-sm font-semibold text-slate-700">Weight (kg)</span><div className="mt-2 flex items-center rounded-xl border border-slate-200 bg-white px-3 focus-within:border-[#24c1c4] focus-within:ring-2 focus-within:ring-[#24c1c4]/20"><input inputMode="decimal" type="number" min="1" step="0.1" value={weightKg} onChange={(event) => setWeightKg(event.target.value)} className="w-full border-0 py-3 text-lg font-semibold text-[#0b2d54] outline-none" placeholder="e.g. 82.5" /><span className="text-sm font-medium text-slate-400">kg</span></div></label><label className="block"><span className="text-sm font-semibold text-slate-700">Height (cm)</span><div className="mt-2 flex items-center rounded-xl border border-slate-200 bg-white px-3 focus-within:border-[#24c1c4] focus-within:ring-2 focus-within:ring-[#24c1c4]/20"><input inputMode="decimal" type="number" min="50" max="300" step="0.1" value={heightCm} onChange={(event) => setHeightCm(event.target.value)} className="w-full border-0 py-3 text-lg font-semibold text-[#0b2d54] outline-none" placeholder="e.g. 175" /><span className="text-sm font-medium text-slate-400">cm</span></div></label>{weightError && <p className="rounded-xl border border-red-100 bg-red-50 px-3 py-2 text-sm text-red-700">{weightError}</p>}<div className="rounded-xl bg-slate-50 p-3 text-xs leading-5 text-slate-500">BMI is calculated from your weight and height. For adults, standard BMI ranges are used as a screening measure; they are not a diagnosis.</div><div className="flex gap-3 pt-2"><button type="button" onClick={() => setWeightModalOpen(false)} className="flex-1 rounded-xl border border-slate-200 px-4 py-3 text-sm font-semibold text-slate-700 hover:bg-slate-50">Cancel</button><button type="button" onClick={saveWeight} disabled={savingWeight} className="flex-1 rounded-xl bg-[#0b2d54] px-4 py-3 text-sm font-semibold text-white hover:bg-[#071f3a] disabled:cursor-not-allowed disabled:opacity-60">{savingWeight ? "Updating…" : "Update health"}</button></div></div></div></div>}
