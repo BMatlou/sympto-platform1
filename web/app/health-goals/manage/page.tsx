@@ -6,7 +6,7 @@ import { useState } from "react";
 import { toast } from "sonner";
 
 import ProtectedRoute from "@/components/auth/protected-route";
-import { HealthGoalsStep } from "@/components/onboarding/HealthGoalsStep";
+import { HealthGoalsStep } from "@/components/onboarding/steps/HealthGoalsStep";
 import { useDashboard } from "@/hooks/use-dashboard";
 import { onboardingService } from "@/services/onboarding.service";
 import type { UpdateHealthGoalsDto } from "@/types/onboarding";
@@ -19,7 +19,7 @@ export default function ManageHealthGoalsPage() {
   const dashboardGoals = Array.isArray(data?.goals) ? data.goals : [];
   const currentValues: UpdateHealthGoalsDto = values ?? { goals: dashboardGoals };
 
-  async function handleChange(next: UpdateHealthGoalsDto) {
+  function handleChange(next: UpdateHealthGoalsDto) {
     setValues(next);
   }
 
@@ -46,7 +46,7 @@ export default function ManageHealthGoalsPage() {
     <ProtectedRoute>
       <main className="min-h-screen bg-slate-50">
         <header className="border-b border-slate-200 bg-white">
-          <div className="mx-auto flex h-16 max-w-5xl items-center justify-between px-4 sm:px-6 lg:px-8">
+          <div className="mx-auto flex h-16 max-w-5xl items-center justify-between gap-4 px-4 sm:px-6 lg:px-8">
             <Link href="/health-goals" className="inline-flex items-center gap-2 text-sm font-medium text-[#0b2d54] hover:text-[#24c1c4]">
               <ArrowLeft className="h-4 w-4" />
               Back to health goals
