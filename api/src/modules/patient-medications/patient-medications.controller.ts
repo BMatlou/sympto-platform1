@@ -7,6 +7,7 @@ import {
   Patch,
   Post,
   Query,
+  Req,
   UseGuards,
 } from '@nestjs/common';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
@@ -54,8 +55,13 @@ export class PatientMedicationsController {
   scheduleReminder(
     @Param('id') id: string,
     @Body() dto: CreateMedicationReminderDto,
+    @Req() request: { user?: { id?: string } },
   ) {
-    return this.patientMedicationsService.scheduleReminder(id, dto);
+    return this.patientMedicationsService.scheduleReminder(
+      id,
+      dto,
+      request.user?.id ?? '',
+    );
   }
 
   @Permissions('patient-medication.update')
