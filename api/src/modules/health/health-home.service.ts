@@ -35,12 +35,10 @@ export class HealthHomeService {
     return 'OBESITY_CLASS_III';
   }
 
-  private calculateWeightGoalProgress(startingWeight: number, currentWeight: number, targetWeight: number) {
-    const totalChange = Math.abs(targetWeight - startingWeight);
-    if (totalChange === 0) return currentWeight === targetWeight ? 100 : 0;
-    const direction = targetWeight < startingWeight ? -1 : 1;
-    const achievedChange = (currentWeight - startingWeight) * direction;
-    return Math.min(100, Math.max(0, Number(((achievedChange / totalChange) * 100).toFixed(2))));
+  private calculateWeightGoalProgress(startingWeight: number, currentWeight: number, targetLossKg: number) {
+    if (targetLossKg <= 0) return 0;
+    const lossAchieved = startingWeight - currentWeight;
+    return Math.min(100, Math.max(0, Number(((lossAchieved / targetLossKg) * 100).toFixed(2))));
   }
 
   private progressStatus(percent: number, achieved: boolean) {
@@ -67,24 +65,56 @@ export class HealthHomeService {
     const bmiCategory = this.adultBmiCategory(bmi, patient.person.dateOfBirth);
     const now = new Date();
     const result = await this.prisma.$transaction(async (tx) => {
+      // Current weight/height belong on Patient. The baseline is a historical
+      // reference point and must never be replaced by subsequent weigh-ins.
       await tx.patient.update({ where: { id: patient.id }, data: { weightKg, heightCm: resolvedHeight } });
-      await tx.patientBaseline.upsert({
-        where: { patientId: patient.id },
-        create: { patientId: patient.id, weightKg, heightCm: resolvedHeight, bmi, establishedAt: now },
-        update: { weightKg, heightCm: resolvedHeight, bmi, establishedAt: patient.baseline?.establishedAt ?? now },
-      });
+      if (patient.baseline) {
+        await tx.patientBaseline.update({
+          where: { patientId: patient.id },
+          data: { heightCm: resolvedHeight },
+        });
+      } else {
+        await tx.patientBaseline.create({
+          data: { patientId: patient.id, weightKg, heightCm: resolvedHeight, bmi: this.calculateBmi(weightKg, resolvedHeight), establishedAt: now },
+        });
+      }
+
       const weightGoals = patient.healthGoals.filter((goal) => String(goal.category) === 'WEIGHT');
       const updatedGoals: UpdatedGoal[] = [];
       for (const goal of weightGoals) {
-        const firstProgress = goal.progress[0];
-        const startingWeight = firstProgress?.currentValue != null ? Number(firstProgress.currentValue) : patient.weightKg != null ? Number(patient.weightKg) : weightKg;
-        const targetWeight = goal.targetValue != null ? Number(goal.targetValue) : null;
-        if (targetWeight == null || !Number.isFinite(targetWeight)) continue;
-        const progressPercent = this.calculateWeightGoalProgress(startingWeight, weightKg, targetWeight);
-        const achieved = Math.abs(weightKg - targetWeight) < 0.01 || progressPercent >= 100;
+        // For a "Lose weight" goal, targetValue is the number of kilograms
+        // to lose (e.g. 10), not the final body weight (e.g. 60).
+        // Prefer the immutable baseline as the starting point. If the baseline
+        // predates goal tracking, use the first recorded goal progress value.
+        const baselineWeight = patient.baseline?.weightKg != null ? Number(patient.baseline.weightKg) : null;
+        const firstProgressWeight = goal.progress[0]?.currentValue != null ? Number(goal.progress[0].currentValue) : null;
+        const startingWeight = baselineWeight && baselineWeight > 0 ? baselineWeight : firstProgressWeight && firstProgressWeight > 0 ? firstProgressWeight : patient.weightKg != null ? Number(patient.weightKg) : weightKg;
+        const targetLossKg = goal.targetValue != null ? Number(goal.targetValue) : 0;
+        if (!Number.isFinite(targetLossKg) || targetLossKg <= 0) continue;
+
+        const lossAchievedKg = Math.max(0, startingWeight - weightKg);
+        const progressPercent = this.calculateWeightGoalProgress(startingWeight, weightKg, targetLossKg);
+        const achieved = lossAchievedKg >= targetLossKg;
         const status = this.progressStatus(progressPercent, achieved);
-        await tx.healthGoal.update({ where: { id: goal.id }, data: { currentValue: weightKg, ...(achieved ? { status: 'ACHIEVED', achievedAt: now } : {}) } });
-        await tx.healthGoalProgress.create({ data: { healthGoalId: goal.id, currentValue: weightKg, progressPercent, status, measuredAt: now, notes: `Weight updated from My Health. BMI: ${bmi}.` } });
+        const goalTargetWeight = startingWeight - targetLossKg;
+
+        await tx.healthGoal.update({
+          where: { id: goal.id },
+          data: {
+            currentValue: weightKg,
+            ...(achieved ? { status: 'ACHIEVED', achievedAt: now } : {}),
+          },
+        });
+        await tx.healthGoalProgress.create({
+          data: {
+            healthGoalId: goal.id,
+            currentValue: weightKg,
+            progressPercent,
+            status,
+            measuredAt: now,
+            notes: `Weight updated from My Health. Starting weight: ${startingWeight} kg. Goal weight: ${goalTargetWeight} kg. ${lossAchievedKg.toFixed(1)} kg of ${targetLossKg.toFixed(1)} kg lost. BMI: ${bmi}.`,
+          },
+        });
         updatedGoals.push({ id: goal.id, progressPercent, currentValue: weightKg, status });
       }
       return { updatedGoals };
@@ -126,7 +156,9 @@ export class HealthHomeService {
     for (const notification of medicationNotifications.filter((item) => !['READ', 'DISMISSED', 'CANCELLED'].includes(item.status.toUpperCase()))) attention.push({ type: 'medication-notification', severity: notification.priority, title: notification.title, description: notification.body, actionUrl: notification.actionUrl ?? '/medications', actionLabel: notification.actionLabel ?? 'View medication' });
     const currentWeight = patient.weightKg != null ? Number(patient.weightKg) : null;
     const currentHeight = patient.heightCm != null ? Number(patient.heightCm) : patient.baseline?.heightCm != null ? Number(patient.baseline.heightCm) : null;
-    const currentBmi = patient.baseline?.bmi != null ? Number(patient.baseline.bmi) : currentWeight && currentHeight ? this.calculateBmi(currentWeight, currentHeight) : null;
+    // BMI on My Health is based on the user's current weight, not the
+    // historical baseline BMI.
+    const currentBmi = currentWeight && currentHeight ? this.calculateBmi(currentWeight, currentHeight) : null;
     return {
       generatedAt: new Date().toISOString(),
       patient: { id: patient.id, patientNumber: patient.patientNumber, name: patient.person.preferredName ?? patient.person.firstName, firstName: patient.person.firstName, lastName: patient.person.lastName, profileImageUrl: patient.person.profileImageUrl },
