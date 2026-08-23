@@ -2,102 +2,55 @@ import { api } from '@/lib/api';
 
 export interface HealthHomeResponse {
   generatedAt: string;
-  profile: {
-    preferredName?: string | null;
-    firstName?: string | null;
-    lastName?: string | null;
-    [key: string]: unknown;
-  } | null;
-  patient: Record<string, unknown> & {
-    healthPassport?: Record<string, unknown> | null;
-    healthJournalSettings?: Record<string, unknown> | null;
+  patient: {
+    id: string;
+    patientNumber?: string | null;
+    name: string;
+    firstName: string;
+    lastName: string;
+    profileImageUrl?: string | null;
   };
-  healthPassport: Record<string, unknown> | null;
   healthSnapshot: {
-    baseline: Record<string, unknown> | null;
+    activeConditions: Array<Record<string, unknown>>;
+    allergies: Array<Record<string, unknown>>;
+    bloodType?: string | null;
+    weightKg?: number | string | null;
+    heightCm?: number | string | null;
+  };
+  today: {
+    upcomingAppointments: Array<Record<string, unknown>>;
+    activeMedications: Array<Record<string, unknown>>;
+  };
+  goals: Array<Record<string, unknown>>;
+  family: Array<Record<string, unknown>>;
+  wearables: {
+    devices: Array<Record<string, unknown>>;
     latestMeasurements: Array<{
+      id: string;
       type: string;
-      value: number;
+      value: number | string;
       unit: string;
       measuredAt: string;
       source?: string | null;
-    }>;
-    connectedDevices: Array<{
-      id: string;
-      manufacturer: string;
-      model: string;
-      deviceType: string;
-      status: string;
-      lastSyncAt: string | null;
-      measurementCount: number;
     }>;
   };
   attention: Array<{
     type: string;
-    priority: string;
+    severity: string;
     title: string;
-    body: string;
-    actionUrl?: string | null;
+    description: string;
   }>;
-  today: {
-    notifications: unknown[];
-    upcomingAppointments: unknown[];
-    activeMedicationCount: number;
-    activeGoalCount: number;
-  };
-  medications: unknown[];
-  appointments: unknown[];
-  goals: unknown[];
-  healthGoals: unknown[];
-  family: unknown[];
-  allergies: unknown[];
-  conditions: unknown[];
-  immunizations: unknown[];
-  emergencyContacts: unknown[];
-  symptoms: unknown[];
-  recentResults: {
-    laboratory: unknown[];
-    imaging: unknown[];
-  };
-  carePlans: unknown[];
   journal: {
-    generatedAt: string;
-    sourceCount: number;
-    signals: Array<{
-      type: string;
-      value: number;
-      unit: string;
-      measuredAt: string;
-      source?: string | null;
-    }>;
-    recentSymptoms: unknown[];
-    medicationCount: number;
-    upcomingAppointmentCount: number;
+    mode: 'automatic';
+    userInputRequired: false;
+    sourceTypes: string[];
   };
-  ai: {
-    recentObservations: unknown[];
-  };
-  settings: Record<string, unknown> | null;
-  healthJournalSettings: Record<string, unknown> | null;
-}
-
-export interface GeneratedJournal {
-  id: string;
-  title: string;
-  journal: string;
-  createdAt: string;
-  updatedAt: string;
 }
 
 class HealthHomeService {
   async getHealthHome(): Promise<HealthHomeResponse> {
-    const { data } = await api.get('/health-home');
-    return data.data;
-  }
-
-  async generateDailyJournal(): Promise<GeneratedJournal> {
-    const { data } = await api.post('/health-home/journal/generate');
-    return data.data;
+    const { data } = await api.get<HealthHomeResponse>('/health-home');
+    return data;
   }
 }
 
