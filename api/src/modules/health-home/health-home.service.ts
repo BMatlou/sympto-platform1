@@ -25,6 +25,7 @@ export class HealthHomeService {
             healthPassport: true,
             baseline: true,
             healthJournalSettings: true,
+            emergencyContacts: true,
           },
         },
       },
@@ -60,13 +61,11 @@ export class HealthHomeService {
         include: { allergy: true },
         orderBy: { createdAt: 'desc' },
       }),
-
       this.prisma.patientCondition.findMany({
         where: { healthPassportId: healthPassportId ?? '' },
         include: { condition: true },
         orderBy: { createdAt: 'desc' },
       }),
-
       this.prisma.patientMedication.findMany({
         where: {
           healthPassportId: healthPassportId ?? '',
@@ -75,13 +74,11 @@ export class HealthHomeService {
         include: { medication: true },
         orderBy: { createdAt: 'desc' },
       }),
-
       this.prisma.patientImmunization.findMany({
         where: { healthPassportId: healthPassportId ?? '' },
         include: { immunization: true },
         orderBy: { administeredAt: 'desc' },
       }),
-
       this.prisma.healthGoal.findMany({
         where: { patientId, status: 'ACTIVE' },
         include: {
@@ -92,17 +89,13 @@ export class HealthHomeService {
         },
         orderBy: [{ priority: 'desc' }, { targetDate: 'asc' }],
       }),
-
       this.prisma.familyMember.findMany({
         where: { ownerPatientId: patientId },
         include: {
-          memberPatient: {
-            include: { person: true },
-          },
+          memberPatient: { include: { person: true } },
         },
         orderBy: { createdAt: 'desc' },
       }),
-
       this.prisma.appointment.findMany({
         where: {
           patientId,
@@ -117,20 +110,15 @@ export class HealthHomeService {
         orderBy: { scheduledStart: 'asc' },
         take: 10,
       }),
-
       this.prisma.notification.findMany({
         where: {
           userId,
           readAt: null,
           status: { in: ['PENDING', 'QUEUED', 'SENT', 'DELIVERED'] },
         },
-        orderBy: [
-          { priority: 'desc' },
-          { createdAt: 'desc' },
-        ],
+        orderBy: [{ priority: 'desc' }, { createdAt: 'desc' }],
         take: 10,
       }),
-
       this.prisma.wearableDevice.findMany({
         where: { patientId },
         orderBy: { lastSyncAt: 'desc' },
@@ -138,13 +126,11 @@ export class HealthHomeService {
           _count: { select: { measurements: true } },
         },
       }),
-
       this.prisma.deviceMeasurement.findMany({
         where: { device: { patientId } },
         orderBy: { measuredAt: 'desc' },
         take: 100,
       }),
-
       this.prisma.symptomLog.findMany({
         where: {
           clinicalEpisode: { patientId },
@@ -158,17 +144,13 @@ export class HealthHomeService {
         orderBy: { startedAt: 'desc' },
         take: 10,
       }),
-
       this.prisma.aIObservation.findMany({
         where: {
-          symptomLog: {
-            clinicalEpisode: { patientId },
-          },
+          symptomLog: { clinicalEpisode: { patientId } },
         },
         orderBy: { createdAt: 'desc' },
         take: 10,
       }),
-
       this.prisma.labOrder.findMany({
         where: { patientId },
         include: {
@@ -187,7 +169,6 @@ export class HealthHomeService {
         orderBy: { orderedAt: 'desc' },
         take: 10,
       }),
-
       this.prisma.imagingStudy.findMany({
         where: { patientId },
         include: {
@@ -197,7 +178,6 @@ export class HealthHomeService {
         orderBy: { createdAt: 'desc' },
         take: 10,
       }),
-
       this.prisma.carePlan.findMany({
         where: {
           patientId,
@@ -215,9 +195,8 @@ export class HealthHomeService {
 
     const latestMeasurements = new Map<string, (typeof measurements)[number]>();
     for (const measurement of measurements) {
-      const key = measurement.measurementType;
-      if (!latestMeasurements.has(key)) {
-        latestMeasurements.set(key, measurement);
+      if (!latestMeasurements.has(measurement.measurementType)) {
+        latestMeasurements.set(measurement.measurementType, measurement);
       }
     }
 
@@ -346,7 +325,7 @@ export class HealthHomeService {
       allergies,
       conditions,
       immunizations,
-      emergencyContacts: [],
+      emergencyContacts: user.patient.emergencyContacts,
       symptoms: symptomLogs,
       recentResults: {
         laboratory: labOrders,
@@ -354,9 +333,7 @@ export class HealthHomeService {
       },
       carePlans,
       journal: journalSignals,
-      ai: {
-        recentObservations: aiObservations,
-      },
+      ai: { recentObservations: aiObservations },
       settings: user.patient.healthJournalSettings,
       healthJournalSettings: user.patient.healthJournalSettings,
     };
