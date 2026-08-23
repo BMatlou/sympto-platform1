@@ -1,25 +1,26 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { onboardingService } from "@/services/onboarding.service";
+import {
+  healthHomeService,
+  type HealthHomeResponse,
+} from "@/services/health-home.service";
 
 export function useDashboard() {
-  const [data, setData] = useState<any>(null);
+  const [data, setData] = useState<HealthHomeResponse | null>(null);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<unknown>(null);
 
   const loadDashboard = useCallback(async () => {
     try {
       setLoading(true);
+      setError(null);
 
-      const result =
-        await onboardingService.getDashboardData();
-
-      setData(result.data);
-    } catch (error) {
-      console.error(
-        "Failed to load dashboard data:",
-        error,
-      );
+      const result = await healthHomeService.getHealthHome();
+      setData(result);
+    } catch (requestError) {
+      console.error("Failed to load Health Home:", requestError);
+      setError(requestError);
     } finally {
       setLoading(false);
     }
@@ -32,6 +33,7 @@ export function useDashboard() {
   return {
     data,
     loading,
+    error,
     reload: loadDashboard,
   };
 }
