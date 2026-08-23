@@ -91,6 +91,7 @@ export class HealthHomeService {
         baseline: user.patient.baseline,
         activeConditions,
         allergies: activeAllergies,
+        immunizations,
         bloodType: user.patient.healthPassport?.bloodType ?? null,
         rhesusFactor: user.patient.healthPassport?.rhesusFactor ?? null,
         latestMeasurements: journalSignals.signals,
