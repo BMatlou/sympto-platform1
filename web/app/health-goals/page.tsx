@@ -56,7 +56,9 @@ function getGoalPresentation(goal: any) {
 export default function HealthGoalsPage() {
   const { data: dashboard, loading, error, reload } = useDashboard();
   const healthGoals = Array.isArray(dashboard?.goals) ? dashboard.goals : [];
-  const visibleHealthGoals = healthGoals.filter((goal: any) => ["ACTIVE", "ACHIEVED"].includes(String(goal?.status ?? "").toUpperCase()));
+  // The API uses ON_TRACK / IMPROVING / STAGNANT as display progress states for active goals.
+  // They are still active goals and must remain visible on the Health Goals page.
+  const visibleHealthGoals = healthGoals.filter((goal: any) => ["ACTIVE", "ON_TRACK", "IMPROVING", "STAGNANT", "ACHIEVED"].includes(String(goal?.status ?? "").toUpperCase()));
 
   return <ProtectedRoute><main className="min-h-screen bg-slate-50">
     <header className="border-b border-slate-200 bg-white"><div className="mx-auto flex h-16 max-w-7xl items-center px-4 sm:px-6 lg:px-8"><Link href="/dashboard" className="inline-flex items-center gap-2 text-sm font-medium text-[#0b2d54] hover:text-[#24c1c4]"><ArrowLeft className="h-4 w-4" />Back to Health Home</Link></div></header>
