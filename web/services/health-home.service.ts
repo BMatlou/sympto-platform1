@@ -81,9 +81,22 @@ export interface HealthHomeResponse {
   healthJournalSettings: Record<string, unknown> | null;
 }
 
+export interface GeneratedJournal {
+  id: string;
+  title: string;
+  journal: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
 class HealthHomeService {
   async getHealthHome(): Promise<HealthHomeResponse> {
     const { data } = await api.get('/health-home');
+    return data.data;
+  }
+
+  async generateDailyJournal(): Promise<GeneratedJournal> {
+    const { data } = await api.post('/health-home/journal/generate');
     return data.data;
   }
 }
