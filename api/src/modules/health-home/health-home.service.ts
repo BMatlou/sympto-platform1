@@ -16,7 +16,14 @@ export class HealthHomeService {
         person: true,
         patient: {
           include: {
-            healthPassport: true,
+            healthPassport: {
+              include: {
+                immunizations: {
+                  include: { immunization: true },
+                  orderBy: { administeredAt: 'desc' },
+                },
+              },
+            },
             baseline: true,
             healthJournalSettings: true,
             emergencyContacts: true,
@@ -30,12 +37,12 @@ export class HealthHomeService {
     const patientId = user.patient.id;
     const healthPassportId = user.patient.healthPassport?.id;
     const now = new Date();
+    const immunizations = user.patient.healthPassport?.immunizations ?? [];
 
-    const [allergies, conditions, medications, immunizations, goals, family, appointments, notifications, devices, measurements, symptomLogs, aiObservations, labOrders, imagingStudies, carePlans] = await Promise.all([
+    const [allergies, conditions, medications, goals, family, appointments, notifications, devices, measurements, symptomLogs, aiObservations, labOrders, imagingStudies, carePlans] = await Promise.all([
       this.prisma.patientAllergy.findMany({ where: { healthPassportId: healthPassportId ?? '' }, include: { allergy: true }, orderBy: { createdAt: 'desc' } }),
       this.prisma.patientCondition.findMany({ where: { healthPassportId: healthPassportId ?? '' }, include: { condition: true }, orderBy: { createdAt: 'desc' } }),
       this.prisma.patientMedication.findMany({ where: { healthPassportId: healthPassportId ?? '', status: { in: [...ACTIVE_MEDICATION_STATUSES] } }, include: { medication: true }, orderBy: { createdAt: 'desc' } }),
-      this.prisma.patientImmunization.findMany({ where: { healthPassportId: healthPassportId ?? '' }, include: { immunization: true }, orderBy: { administeredAt: 'desc' } }),
       this.prisma.healthGoal.findMany({ where: { patientId, status: 'ACTIVE' }, include: { progress: { orderBy: { measuredAt: 'desc' }, take: 1 } }, orderBy: [{ priority: 'desc' }, { targetDate: 'asc' }] }),
       this.prisma.familyMember.findMany({ where: { ownerPatientId: patientId }, include: { memberPatient: { include: { person: true } } }, orderBy: { createdAt: 'desc' } }),
       this.prisma.appointment.findMany({ where: { patientId, status: { in: [...ACTIVE_APPOINTMENT_STATUSES] }, scheduledStart: { gte: now } }, include: { practitioner: { include: { person: true } }, practice: true, telemedicineSession: true }, orderBy: { scheduledStart: 'asc' }, take: 10 }),
