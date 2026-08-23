@@ -69,9 +69,7 @@ export class HealthHomeService {
     const activeGoals = patient.healthGoals.filter((goal) => String(goal.status) === 'ACTIVE');
 
     const goalProgress = activeGoals.map((goal) => {
-      const progress = [...goal.progress].sort(
-        (a, b) => new Date(a.recordedAt).getTime() - new Date(b.recordedAt).getTime(),
-      );
+      const progress = goal.progress;
       const latest = progress[progress.length - 1] as (typeof progress)[number] | undefined;
       const latestValue = latest?.value ?? goal.currentValue;
       const progressPercent = latest && 'progressPercent' in latest
