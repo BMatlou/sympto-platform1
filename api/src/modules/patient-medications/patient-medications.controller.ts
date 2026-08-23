@@ -50,7 +50,10 @@ export class PatientMedicationsController {
     return this.patientMedicationsService.findOne(id);
   }
 
-  @Permissions('patient-medication.update')
+  // Scheduling a reminder does not modify the prescription itself. The
+  // service separately verifies that the medication belongs to the
+  // authenticated patient before creating the notification.
+  @Permissions('patient-medication.read')
   @Post(':id/reminder')
   scheduleReminder(
     @Param('id') id: string,
