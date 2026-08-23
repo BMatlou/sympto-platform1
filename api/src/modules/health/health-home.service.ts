@@ -20,9 +20,7 @@ export class HealthHomeService {
         healthGoals: { include: { progress: true }, orderBy: { createdAt: 'desc' } },
         wearableDevices: true,
         ownedFamilyMembers: {
-          include: {
-            memberPatient: { include: { person: true } },
-          },
+          include: { memberPatient: { include: { person: true } } },
         },
       },
     });
@@ -31,12 +29,8 @@ export class HealthHomeService {
       throw new NotFoundException('Patient profile not found for the authenticated user.');
     }
 
-    const now = new Date();
     const upcomingAppointments = await this.prisma.appointment.findMany({
-      where: {
-        patientId: patient.id,
-        scheduledStart: { gte: now },
-      },
+      where: { patientId: patient.id, scheduledStart: { gte: new Date() } },
       include: { practitioner: { include: { person: true } }, practice: true },
       orderBy: { scheduledStart: 'asc' },
       take: 5,
@@ -61,17 +55,12 @@ export class HealthHomeService {
     const activeMedications = (patient.healthPassport?.medications ?? []).filter(
       (item) => String(item.status) === 'ACTIVE' && item.ongoing,
     );
-
     const activeConditions = (patient.healthPassport?.conditions ?? []).filter(
       (item) => String(item.status) === 'ACTIVE',
     );
-
-    const activeGoals = patient.healthGoals.filter(
-      (goal) => String(goal.status) === 'ACTIVE',
-    );
+    const activeGoals = patient.healthGoals.filter((goal) => String(goal.status) === 'ACTIVE');
 
     const attention: Array<{ type: string; severity: string; title: string; description: string }> = [];
-
     for (const measurement of recentMeasurements) {
       for (const alert of measurement.deviceAlerts) {
         if (!alert.acknowledged) {
@@ -133,9 +122,10 @@ export class HealthHomeService {
         priority: goal.priority,
         status: goal.status,
         targetValue: goal.targetValue,
-        targetUnit: goal.targetUnit,
-        startDate: goal.startDate,
+        currentValue: goal.currentValue,
+        unit: goal.unit,
         targetDate: goal.targetDate,
+        achievedAt: goal.achievedAt,
         progress: goal.progress,
       })),
       family: patient.ownedFamilyMembers.map((member) => ({
