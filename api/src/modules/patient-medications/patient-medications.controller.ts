@@ -20,6 +20,7 @@ import { PatientMedicationsService } from './patient-medications.service';
 import { CreatePatientMedicationDto } from './dto/create-patient-medication.dto';
 import { UpdatePatientMedicationDto } from './dto/update-patient-medication.dto';
 import { QueryPatientMedicationDto } from './dto/query-patient-medication.dto';
+import { CreateMedicationReminderDto } from './dto/create-medication-reminder.dto';
 
 @ApiTags('Patient Medications')
 @ApiBearerAuth()
@@ -46,6 +47,15 @@ export class PatientMedicationsController {
   @Get(':id')
   findOne(@Param('id') id: string) {
     return this.patientMedicationsService.findOne(id);
+  }
+
+  @Permissions('patient-medication.update')
+  @Post(':id/reminder')
+  scheduleReminder(
+    @Param('id') id: string,
+    @Body() dto: CreateMedicationReminderDto,
+  ) {
+    return this.patientMedicationsService.scheduleReminder(id, dto);
   }
 
   @Permissions('patient-medication.update')
