@@ -1,6 +1,13 @@
 import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
 import { PrismaService } from '../../database/prisma.service';
 
+type UpdatedGoal = {
+  id: string;
+  progressPercent: number;
+  currentValue: number;
+  status: 'ACHIEVED' | 'ON_TRACK' | 'IMPROVING' | 'STAGNANT';
+};
+
 @Injectable()
 export class HealthHomeService {
   constructor(private readonly prisma: PrismaService) {}
@@ -31,7 +38,6 @@ export class HealthHomeService {
   private calculateWeightGoalProgress(startingWeight: number, currentWeight: number, targetWeight: number) {
     const totalChange = Math.abs(targetWeight - startingWeight);
     if (totalChange === 0) return currentWeight === targetWeight ? 100 : 0;
-
     const direction = targetWeight < startingWeight ? -1 : 1;
     const achievedChange = (currentWeight - startingWeight) * direction;
     return Math.min(100, Math.max(0, Number(((achievedChange / totalChange) * 100).toFixed(2))));
@@ -48,85 +54,42 @@ export class HealthHomeService {
     if (!Number.isFinite(weightKg) || weightKg <= 0 || weightKg > 1000) {
       throw new BadRequestException('Please provide a valid weight in kilograms.');
     }
-
     const patient = await this.prisma.patient.findUnique({
       where: { userId },
       include: { person: true, baseline: true, healthGoals: { where: { status: 'ACTIVE' }, include: { progress: { orderBy: { measuredAt: 'asc' } } } } },
     });
-
     if (!patient) throw new NotFoundException('Patient profile not found for the authenticated user.');
-
     const resolvedHeight = heightCm ?? Number(patient.heightCm ?? patient.baseline?.heightCm ?? 0);
     if (!Number.isFinite(resolvedHeight) || resolvedHeight <= 0 || resolvedHeight > 300) {
       throw new BadRequestException('A valid height in centimetres is required to calculate BMI.');
     }
-
     const bmi = this.calculateBmi(weightKg, resolvedHeight);
     const bmiCategory = this.adultBmiCategory(bmi, patient.person.dateOfBirth);
     const now = new Date();
-
     const result = await this.prisma.$transaction(async (tx) => {
-      await tx.patient.update({
-        where: { id: patient.id },
-        data: { weightKg, heightCm: resolvedHeight },
-      });
-
+      await tx.patient.update({ where: { id: patient.id }, data: { weightKg, heightCm: resolvedHeight } });
       await tx.patientBaseline.upsert({
         where: { patientId: patient.id },
         create: { patientId: patient.id, weightKg, heightCm: resolvedHeight, bmi, establishedAt: now },
         update: { weightKg, heightCm: resolvedHeight, bmi, establishedAt: patient.baseline?.establishedAt ?? now },
       });
-
       const weightGoals = patient.healthGoals.filter((goal) => String(goal.category) === 'WEIGHT');
-      const updatedGoals = [];
-
+      const updatedGoals: UpdatedGoal[] = [];
       for (const goal of weightGoals) {
         const firstProgress = goal.progress[0];
-        const startingWeight = firstProgress?.currentValue != null
-          ? Number(firstProgress.currentValue)
-          : patient.weightKg != null
-            ? Number(patient.weightKg)
-            : weightKg;
+        const startingWeight = firstProgress?.currentValue != null ? Number(firstProgress.currentValue) : patient.weightKg != null ? Number(patient.weightKg) : weightKg;
         const targetWeight = goal.targetValue != null ? Number(goal.targetValue) : null;
         if (targetWeight == null || !Number.isFinite(targetWeight)) continue;
-
         const progressPercent = this.calculateWeightGoalProgress(startingWeight, weightKg, targetWeight);
         const achieved = Math.abs(weightKg - targetWeight) < 0.01 || progressPercent >= 100;
         const status = this.progressStatus(progressPercent, achieved);
-
-        await tx.healthGoal.update({
-          where: { id: goal.id },
-          data: {
-            currentValue: weightKg,
-            ...(achieved ? { status: 'ACHIEVED', achievedAt: now } : {}),
-          },
-        });
-
-        await tx.healthGoalProgress.create({
-          data: {
-            healthGoalId: goal.id,
-            currentValue: weightKg,
-            progressPercent,
-            status,
-            measuredAt: now,
-            notes: `Weight updated from My Health. BMI: ${bmi}.`,
-          },
-        });
-
+        await tx.healthGoal.update({ where: { id: goal.id }, data: { currentValue: weightKg, ...(achieved ? { status: 'ACHIEVED', achievedAt: now } : {}) } });
+        await tx.healthGoalProgress.create({ data: { healthGoalId: goal.id, currentValue: weightKg, progressPercent, status, measuredAt: now, notes: `Weight updated from My Health. BMI: ${bmi}.` } });
         updatedGoals.push({ id: goal.id, progressPercent, currentValue: weightKg, status });
       }
-
       return { updatedGoals };
     });
-
-    return {
-      weightKg,
-      heightCm: resolvedHeight,
-      bmi,
-      bmiCategory,
-      recordedAt: now.toISOString(),
-      goals: result.updatedGoals,
-    };
+    return { weightKg, heightCm: resolvedHeight, bmi, bmiCategory, recordedAt: now.toISOString(), goals: result.updatedGoals };
   }
 
   async getForUser(userId: string) {
@@ -134,219 +97,46 @@ export class HealthHomeService {
       where: { userId },
       include: {
         person: true,
-        healthPassport: {
-          include: {
-            allergies: { include: { allergy: true } },
-            conditions: { include: { condition: true } },
-            medications: { include: { medication: true } },
-          },
-        },
-        healthGoals: {
-          include: { progress: { orderBy: { measuredAt: 'asc' } } },
-          orderBy: { createdAt: 'desc' },
-        },
+        healthPassport: { include: { allergies: { include: { allergy: true } }, conditions: { include: { condition: true } }, medications: { include: { medication: true } } } },
+        healthGoals: { include: { progress: { orderBy: { measuredAt: 'asc' } } }, orderBy: { createdAt: 'desc' } },
         wearableDevices: true,
-        ownedFamilyMembers: {
-          include: { memberPatient: { include: { person: true } } },
-        },
+        ownedFamilyMembers: { include: { memberPatient: { include: { person: true } } } },
         baseline: true,
       },
     });
-
-    if (!patient) {
-      throw new NotFoundException('Patient profile not found for the authenticated user.');
-    }
-
+    if (!patient) throw new NotFoundException('Patient profile not found for the authenticated user.');
     const [upcomingAppointments, recentMeasurements, notifications] = await Promise.all([
-      this.prisma.appointment.findMany({
-        where: { patientId: patient.id, scheduledStart: { gte: new Date() } },
-        include: { practitioner: { include: { person: true } }, practice: true },
-        orderBy: { scheduledStart: 'asc' },
-        take: 5,
-      }),
-      patient.wearableDevices.length
-        ? this.prisma.deviceMeasurement.findMany({
-            where: { deviceId: { in: patient.wearableDevices.map((device) => device.id) } },
-            include: { device: true, deviceAlerts: true },
-            orderBy: { measuredAt: 'desc' },
-            take: 100,
-          })
-        : Promise.resolve([]),
-      this.prisma.notification.findMany({
-        where: { userId },
-        orderBy: { createdAt: 'desc' },
-        take: 20,
-      }),
+      this.prisma.appointment.findMany({ where: { patientId: patient.id, scheduledStart: { gte: new Date() } }, include: { practitioner: { include: { person: true } }, practice: true }, orderBy: { scheduledStart: 'asc' }, take: 5 }),
+      patient.wearableDevices.length ? this.prisma.deviceMeasurement.findMany({ where: { deviceId: { in: patient.wearableDevices.map((device) => device.id) } }, include: { device: true, deviceAlerts: true }, orderBy: { measuredAt: 'desc' }, take: 100 }) : Promise.resolve([]),
+      this.prisma.notification.findMany({ where: { userId }, orderBy: { createdAt: 'desc' }, take: 20 }),
     ]);
-
     const latestByType = new Map<string, (typeof recentMeasurements)[number]>();
-    for (const measurement of recentMeasurements) {
-      const type = String(measurement.measurementType);
-      if (!latestByType.has(type)) latestByType.set(type, measurement);
-    }
-
-    const activeMedications = (patient.healthPassport?.medications ?? []).filter(
-      (item) => String(item.status) === 'ACTIVE' && item.ongoing,
-    );
-    const activeConditions = (patient.healthPassport?.conditions ?? []).filter(
-      (item) => String(item.status) === 'ACTIVE',
-    );
+    for (const measurement of recentMeasurements) { const type = String(measurement.measurementType); if (!latestByType.has(type)) latestByType.set(type, measurement); }
+    const activeMedications = (patient.healthPassport?.medications ?? []).filter((item) => String(item.status) === 'ACTIVE' && item.ongoing);
+    const activeConditions = (patient.healthPassport?.conditions ?? []).filter((item) => String(item.status) === 'ACTIVE');
     const activeGoals = patient.healthGoals.filter((goal) => String(goal.status) === 'ACTIVE');
-
     const goalProgress = activeGoals.map((goal) => {
-      const progress = goal.progress;
-      const latest = progress[progress.length - 1];
-      const latestValue = latest?.currentValue ?? goal.currentValue;
-      const progressPercent = Number(latest?.progressPercent ?? 0);
-
-      return {
-        id: goal.id,
-        title: goal.title,
-        description: goal.description,
-        category: goal.category,
-        priority: goal.priority,
-        status: goal.status,
-        targetValue: goal.targetValue,
-        currentValue: goal.currentValue,
-        latestValue,
-        unit: goal.unit,
-        targetDate: goal.targetDate,
-        achievedAt: goal.achievedAt,
-        progress,
-        progressPercent: Math.min(100, Math.max(0, progressPercent)),
-      };
+      const progress = goal.progress; const latest = progress[progress.length - 1]; const latestValue = latest?.currentValue ?? goal.currentValue; const progressPercent = Number(latest?.progressPercent ?? 0);
+      return { id: goal.id, title: goal.title, description: goal.description, category: goal.category, priority: goal.priority, status: goal.status, targetValue: goal.targetValue, currentValue: goal.currentValue, latestValue, unit: goal.unit, targetDate: goal.targetDate, achievedAt: goal.achievedAt, progress, progressPercent: Math.min(100, Math.max(0, progressPercent)) };
     });
-
     const attention: Array<{ type: string; severity: string; title: string; description: string; actionUrl?: string; actionLabel?: string }> = [];
-    for (const measurement of recentMeasurements) {
-      for (const alert of measurement.deviceAlerts) {
-        if (!alert.acknowledged) {
-          attention.push({
-            type: 'wearable-alert',
-            severity: String(alert.severity),
-            title: alert.title,
-            description: alert.description ?? 'Your connected device has reported an alert.',
-          });
-        }
-      }
-    }
-
-    const recentNotifications = notifications.map((notification) => ({
-      id: notification.id,
-      type: String(notification.type),
-      title: notification.title,
-      body: notification.body,
-      channel: String(notification.channel),
-      status: String(notification.status),
-      priority: String(notification.priority),
-      actionUrl: notification.actionUrl,
-      actionLabel: notification.actionLabel,
-      scheduledFor: notification.scheduledFor,
-      createdAt: notification.createdAt,
-    }));
-
-    const medicationNotifications = recentNotifications.filter((notification) =>
-      notification.type.toUpperCase().includes('MEDICATION') ||
-      notification.title.toLowerCase().includes('medication') ||
-      notification.title.toLowerCase().includes('medicine') ||
-      notification.body.toLowerCase().includes('medication'),
-    );
-
-    for (const notification of medicationNotifications.filter((item) =>
-      !['READ', 'DISMISSED', 'CANCELLED'].includes(item.status.toUpperCase()),
-    )) {
-      attention.push({
-        type: 'medication-notification',
-        severity: notification.priority,
-        title: notification.title,
-        description: notification.body,
-        actionUrl: notification.actionUrl ?? '/medications',
-        actionLabel: notification.actionLabel ?? 'View medication',
-      });
-    }
-
+    for (const measurement of recentMeasurements) for (const alert of measurement.deviceAlerts) if (!alert.acknowledged) attention.push({ type: 'wearable-alert', severity: String(alert.severity), title: alert.title, description: alert.description ?? 'Your connected device has reported an alert.' });
+    const recentNotifications = notifications.map((notification) => ({ id: notification.id, type: String(notification.type), title: notification.title, body: notification.body, channel: String(notification.channel), status: String(notification.status), priority: String(notification.priority), actionUrl: notification.actionUrl, actionLabel: notification.actionLabel, scheduledFor: notification.scheduledFor, createdAt: notification.createdAt }));
+    const medicationNotifications = recentNotifications.filter((notification) => notification.type.toUpperCase().includes('MEDICATION') || notification.title.toLowerCase().includes('medication') || notification.title.toLowerCase().includes('medicine') || notification.body.toLowerCase().includes('medication'));
+    for (const notification of medicationNotifications.filter((item) => !['READ', 'DISMISSED', 'CANCELLED'].includes(item.status.toUpperCase()))) attention.push({ type: 'medication-notification', severity: notification.priority, title: notification.title, description: notification.body, actionUrl: notification.actionUrl ?? '/medications', actionLabel: notification.actionLabel ?? 'View medication' });
     const currentWeight = patient.weightKg != null ? Number(patient.weightKg) : null;
     const currentHeight = patient.heightCm != null ? Number(patient.heightCm) : patient.baseline?.heightCm != null ? Number(patient.baseline.heightCm) : null;
     const currentBmi = patient.baseline?.bmi != null ? Number(patient.baseline.bmi) : currentWeight && currentHeight ? this.calculateBmi(currentWeight, currentHeight) : null;
-
     return {
       generatedAt: new Date().toISOString(),
-      patient: {
-        id: patient.id,
-        patientNumber: patient.patientNumber,
-        name: patient.person.preferredName ?? patient.person.firstName,
-        firstName: patient.person.firstName,
-        lastName: patient.person.lastName,
-        profileImageUrl: patient.person.profileImageUrl,
-      },
-      healthSnapshot: {
-        activeConditions: activeConditions.map((item) => ({
-          id: item.id,
-          name: item.condition.name,
-          severity: item.severity,
-          chronic: item.chronic,
-        })),
-        allergies: (patient.healthPassport?.allergies ?? []).map((item) => ({
-          id: item.id,
-          name: item.allergy.name,
-          severity: item.severity,
-          reaction: item.reaction,
-        })),
-        bloodType: patient.healthPassport?.bloodType ?? null,
-        weightKg: currentWeight,
-        heightCm: currentHeight,
-        bmi: currentBmi,
-        bmiCategory: currentBmi != null ? this.adultBmiCategory(currentBmi, patient.person.dateOfBirth) : null,
-      },
-      today: {
-        upcomingAppointments,
-        activeMedications: activeMedications.map((item) => ({
-          id: item.id,
-          name: item.medication.name,
-          dosage: item.dosage,
-          frequency: item.frequency,
-          route: item.route,
-          instructions: item.instructions,
-          adherencePercentage: item.adherencePercentage,
-          missedDoses: item.missedDoses,
-        })),
-      },
+      patient: { id: patient.id, patientNumber: patient.patientNumber, name: patient.person.preferredName ?? patient.person.firstName, firstName: patient.person.firstName, lastName: patient.person.lastName, profileImageUrl: patient.person.profileImageUrl },
+      healthSnapshot: { activeConditions: activeConditions.map((item) => ({ id: item.id, name: item.condition.name, severity: item.severity, chronic: item.chronic })), allergies: (patient.healthPassport?.allergies ?? []).map((item) => ({ id: item.id, name: item.allergy.name, severity: item.severity, reaction: item.reaction })), bloodType: patient.healthPassport?.bloodType ?? null, weightKg: currentWeight, heightCm: currentHeight, bmi: currentBmi, bmiCategory: currentBmi != null ? this.adultBmiCategory(currentBmi, patient.person.dateOfBirth) : null },
+      today: { upcomingAppointments, activeMedications: activeMedications.map((item) => ({ id: item.id, name: item.medication.name, dosage: item.dosage, frequency: item.frequency, route: item.route, instructions: item.instructions, adherencePercentage: item.adherencePercentage, missedDoses: item.missedDoses })) },
       goals: goalProgress,
-      family: patient.ownedFamilyMembers.map((member) => ({
-        id: member.id,
-        patientId: member.memberPatientId,
-        relationship: member.relationship,
-        canViewRecords: member.canViewRecords,
-        canManageAppointments: member.canManageAppointments,
-        canReceiveAlerts: member.canReceiveAlerts,
-        name: member.memberPatient.person.preferredName ?? member.memberPatient.person.firstName,
-      })),
-      wearables: {
-        devices: patient.wearableDevices.map((device) => ({
-          id: device.id,
-          manufacturer: device.manufacturer,
-          model: device.model,
-          deviceType: device.deviceType,
-          status: device.status,
-          lastSyncAt: device.lastSyncAt,
-        })),
-        latestMeasurements: Array.from(latestByType.values()).map((measurement) => ({
-          id: measurement.id,
-          type: measurement.measurementType,
-          value: measurement.value,
-          unit: measurement.unit,
-          measuredAt: measurement.measuredAt,
-          source: measurement.source,
-        })),
-      },
-      notifications: recentNotifications,
-      medicationNotifications,
-      attention,
-      journal: {
-        mode: 'automatic',
-        userInputRequired: false,
-        sourceTypes: ['wearables', 'medications', 'appointments', 'goals', 'symptoms', 'clinical-events'],
-      },
+      family: patient.ownedFamilyMembers.map((member) => ({ id: member.id, patientId: member.memberPatientId, relationship: member.relationship, canViewRecords: member.canViewRecords, canManageAppointments: member.canManageAppointments, canReceiveAlerts: member.canReceiveAlerts, name: member.memberPatient.person.preferredName ?? member.memberPatient.person.firstName })),
+      wearables: { devices: patient.wearableDevices.map((device) => ({ id: device.id, manufacturer: device.manufacturer, model: device.model, deviceType: device.deviceType, status: device.status, lastSyncAt: device.lastSyncAt })), latestMeasurements: Array.from(latestByType.values()).map((measurement) => ({ id: measurement.id, type: measurement.measurementType, value: measurement.value, unit: measurement.unit, measuredAt: measurement.measuredAt, source: measurement.source })) },
+      notifications: recentNotifications, medicationNotifications, attention,
+      journal: { mode: 'automatic', userInputRequired: false, sourceTypes: ['wearables', 'medications', 'appointments', 'goals', 'symptoms', 'clinical-events'] },
     };
   }
 }
