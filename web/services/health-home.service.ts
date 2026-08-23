@@ -2,8 +2,16 @@ import { api } from '@/lib/api';
 
 export interface HealthHomeResponse {
   generatedAt: string;
-  profile: Record<string, unknown> | null;
-  patient: Record<string, unknown>;
+  profile: {
+    preferredName?: string | null;
+    firstName?: string | null;
+    lastName?: string | null;
+    [key: string]: unknown;
+  } | null;
+  patient: Record<string, unknown> & {
+    healthPassport?: Record<string, unknown> | null;
+    healthJournalSettings?: Record<string, unknown> | null;
+  };
   healthPassport: Record<string, unknown> | null;
   healthSnapshot: {
     baseline: Record<string, unknown> | null;
@@ -40,9 +48,12 @@ export interface HealthHomeResponse {
   medications: unknown[];
   appointments: unknown[];
   goals: unknown[];
+  healthGoals: unknown[];
   family: unknown[];
   allergies: unknown[];
   conditions: unknown[];
+  immunizations: unknown[];
+  emergencyContacts: unknown[];
   symptoms: unknown[];
   recentResults: {
     laboratory: unknown[];
@@ -67,6 +78,7 @@ export interface HealthHomeResponse {
     recentObservations: unknown[];
   };
   settings: Record<string, unknown> | null;
+  healthJournalSettings: Record<string, unknown> | null;
 }
 
 class HealthHomeService {
