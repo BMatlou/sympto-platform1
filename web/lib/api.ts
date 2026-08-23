@@ -1,8 +1,21 @@
 import axios from "axios";
 import { toast } from "sonner";
 
+function getApiBaseUrl() {
+  const configured = process.env.NEXT_PUBLIC_API_URL?.trim();
+
+  if (!configured) {
+    return "http://localhost:3001/api";
+  }
+
+  // NestJS is configured with a global `/api` prefix. Accept either
+  // `https://api.example.com` or `https://api.example.com/api` so the
+  // frontend cannot accidentally call the unprefixed route and receive 404.
+  return configured.replace(/\/+$/, "").replace(/\/api$/i, "") + "/api";
+}
+
 export const api = axios.create({
-  baseURL: process.env.NEXT_PUBLIC_API_URL,
+  baseURL: getApiBaseUrl(),
   headers: {
     "Content-Type": "application/json",
   },
@@ -57,7 +70,7 @@ api.interceptors.response.use(
           }
 
           const response = await axios.post(
-            `${process.env.NEXT_PUBLIC_API_URL}/auth/refresh`,
+            `${getApiBaseUrl()}/auth/refresh`,
             { refreshToken }
           );
           const tokens = unwrapResponseData<{
