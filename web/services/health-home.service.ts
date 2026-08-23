@@ -13,6 +13,8 @@ export interface HealthHomeResponse {
     baseline?: Record<string, unknown> | null;
     weightKg?: number | null;
     heightCm?: number | null;
+    bmi?: number | null;
+    bmiCategory?: string | null;
     latestMeasurements: Array<Record<string, unknown>>;
     connectedDevices: Array<Record<string, unknown>>;
   };
@@ -65,6 +67,15 @@ export interface HealthHomeResponse {
   healthJournalSettings?: Record<string, unknown> | null;
 }
 
+export interface UpdateWeightResponse {
+  weightKg: number;
+  heightCm: number;
+  bmi: number;
+  bmiCategory: string | null;
+  recordedAt: string;
+  goals: Array<{ id: string; progressPercent: number; currentValue: number; status: string }>;
+}
+
 class HealthHomeService {
   async getHealthHome(): Promise<HealthHomeResponse> {
     const response = await api.get<{ success: boolean; data: HealthHomeResponse }>('/health-home');
@@ -83,6 +94,14 @@ class HealthHomeService {
         })),
       },
     };
+  }
+
+  async updateWeight(weightKg: number, heightCm?: number): Promise<UpdateWeightResponse> {
+    const response = await api.post<{ success: boolean; data: UpdateWeightResponse }>('/health-home/weight', {
+      weightKg,
+      ...(heightCm !== undefined ? { heightCm } : {}),
+    });
+    return response.data.data;
   }
 }
 
