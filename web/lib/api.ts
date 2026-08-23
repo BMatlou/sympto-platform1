@@ -1,4 +1,5 @@
 import axios from "axios";
+import { toast } from "sonner";
 
 export const api = axios.create({
   baseURL: process.env.NEXT_PUBLIC_API_URL,
@@ -29,9 +30,16 @@ function unwrapResponseData<T>(response: { data: { data?: T } | T }): T {
     : payload as T;
 }
 
+function getApiErrorMessage(error: any) {
+  const message = error?.response?.data?.message;
+  if (Array.isArray(message)) return message.join(" ");
+  if (typeof message === "string" && message.trim()) return message;
+  if (error?.code === "ERR_NETWORK") return "Sympto could not reach the health service. Please try again.";
+  return "Something went wrong. Please try again.";
+}
+
 api.interceptors.response.use(
   (response) => response,
-
   async (error) => {
     const originalRequest = error.config;
 
@@ -42,8 +50,7 @@ api.interceptors.response.use(
         isRefreshing = true;
 
         refreshPromise = (async () => {
-          const refreshToken =
-            localStorage.getItem("refreshToken");
+          const refreshToken = localStorage.getItem("refreshToken");
 
           if (!refreshToken) {
             throw new Error("No refresh token available.");
@@ -51,24 +58,15 @@ api.interceptors.response.use(
 
           const response = await axios.post(
             `${process.env.NEXT_PUBLIC_API_URL}/auth/refresh`,
-            {
-              refreshToken,
-            }
+            { refreshToken }
           );
           const tokens = unwrapResponseData<{
             accessToken: string;
             refreshToken: string;
           }>(response);
 
-          localStorage.setItem(
-            "accessToken",
-            tokens.accessToken
-          );
-
-          localStorage.setItem(
-            "refreshToken",
-            tokens.refreshToken
-          );
+          localStorage.setItem("accessToken", tokens.accessToken);
+          localStorage.setItem("refreshToken", tokens.refreshToken);
           return tokens.accessToken;
         })();
       }
@@ -78,16 +76,21 @@ api.interceptors.response.use(
         originalRequest.headers.Authorization = `Bearer ${accessToken}`;
         return api(originalRequest);
       } catch {
-          localStorage.removeItem("accessToken");
-          localStorage.removeItem("refreshToken");
-          window.location.href = "/auth/sign-in";
+        localStorage.removeItem("accessToken");
+        localStorage.removeItem("refreshToken");
+        if (typeof window !== "undefined") window.location.href = "/auth/sign-in";
       } finally {
         isRefreshing = false;
         refreshPromise = null;
       }
     }
 
+    if (typeof window !== "undefined" && error.response?.status !== 401) {
+      toast.error("Sympto couldn't complete that action", {
+        description: getApiErrorMessage(error),
+      });
+    }
+
     return Promise.reject(error);
   }
-  
 );
