@@ -8,6 +8,7 @@ export interface HealthHomeResponse {
   healthSnapshot: {
     activeConditions: Array<Record<string, unknown>>;
     allergies: Array<Record<string, unknown>>;
+    immunizations: Array<Record<string, unknown>>;
     bloodType?: string | null;
     rhesusFactor?: string | null;
     baseline?: Record<string, unknown> | null;
@@ -31,6 +32,7 @@ export interface HealthHomeResponse {
   family: Array<Record<string, unknown>>;
   allergies?: Array<Record<string, unknown>>;
   conditions?: Array<Record<string, unknown>>;
+  immunizations?: Array<Record<string, unknown>>;
   emergencyContacts?: Array<Record<string, unknown>>;
   wearables: {
     devices: Array<Record<string, unknown>>;
