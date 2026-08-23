@@ -35,12 +35,14 @@ export class HealthHomeService {
     }
 
     const patientId = user.patient.id;
+    const healthPassportId = user.patient.healthPassport?.id;
     const now = new Date();
 
     const [
       allergies,
       conditions,
       medications,
+      immunizations,
       goals,
       family,
       appointments,
@@ -54,24 +56,30 @@ export class HealthHomeService {
       carePlans,
     ] = await Promise.all([
       this.prisma.patientAllergy.findMany({
-        where: { healthPassportId: user.patient.healthPassport?.id },
+        where: { healthPassportId: healthPassportId ?? '' },
         include: { allergy: true },
         orderBy: { createdAt: 'desc' },
       }),
 
       this.prisma.patientCondition.findMany({
-        where: { healthPassportId: user.patient.healthPassport?.id },
+        where: { healthPassportId: healthPassportId ?? '' },
         include: { condition: true },
         orderBy: { createdAt: 'desc' },
       }),
 
       this.prisma.patientMedication.findMany({
         where: {
-          healthPassportId: user.patient.healthPassport?.id,
+          healthPassportId: healthPassportId ?? '',
           status: { in: [...ACTIVE_MEDICATION_STATUSES] },
         },
         include: { medication: true },
         orderBy: { createdAt: 'desc' },
+      }),
+
+      this.prisma.patientImmunization.findMany({
+        where: { healthPassportId: healthPassportId ?? '' },
+        include: { immunization: true },
+        orderBy: { administeredAt: 'desc' },
       }),
 
       this.prisma.healthGoal.findMany({
@@ -132,9 +140,7 @@ export class HealthHomeService {
       }),
 
       this.prisma.deviceMeasurement.findMany({
-        where: {
-          device: { patientId },
-        },
+        where: { device: { patientId } },
         orderBy: { measuredAt: 'desc' },
         take: 100,
       }),
@@ -248,7 +254,9 @@ export class HealthHomeService {
                 type: resultItem.critical ? 'CRITICAL_RESULT' : 'ABNORMAL_RESULT',
                 priority: resultItem.critical ? 'URGENT' : 'HIGH',
                 title: `${resultItem.test.name} result needs review`,
-                body: resultItem.comments ?? 'A recent laboratory result is outside the expected range.',
+                body:
+                  resultItem.comments ??
+                  'A recent laboratory result is outside the expected range.',
                 actionUrl: '/tests-results',
               })),
           ),
@@ -294,6 +302,11 @@ export class HealthHomeService {
       upcomingAppointmentCount: appointments.length,
     };
 
+    const goalsWithProgress = goals.map((goal) => ({
+      ...goal,
+      latestProgress: goal.progress[0] ?? null,
+    }));
+
     return {
       generatedAt: now.toISOString(),
       profile: user.person,
@@ -327,13 +340,13 @@ export class HealthHomeService {
       },
       medications,
       appointments,
-      goals: goals.map((goal) => ({
-        ...goal,
-        latestProgress: goal.progress[0] ?? null,
-      })),
+      goals: goalsWithProgress,
+      healthGoals: goalsWithProgress,
       family,
       allergies,
       conditions,
+      immunizations,
+      emergencyContacts: [],
       symptoms: symptomLogs,
       recentResults: {
         laboratory: labOrders,
@@ -345,6 +358,7 @@ export class HealthHomeService {
         recentObservations: aiObservations,
       },
       settings: user.patient.healthJournalSettings,
+      healthJournalSettings: user.patient.healthJournalSettings,
     };
   }
 }
