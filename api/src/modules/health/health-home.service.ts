@@ -43,63 +43,24 @@ export class HealthHomeService {
       await tx.patient.update({ where: { id: patient.id }, data: { weightKg, heightCm: resolvedHeight } });
       const weightGoals = patient.healthGoals.filter((goal) => String(goal.category) === 'WEIGHT');
       const updatedGoals: UpdatedGoal[] = [];
-
       for (const goal of weightGoals) {
-        // The first progress record is the immutable starting point for a goal.
-        // Never use the latest/current weight as the baseline and never replace the baseline
-        // after a new measurement. A completed goal is not included because only ACTIVE goals
-        // are queried above; this locks ACHIEVED goals from further progress mutations.
-        const firstProgress = goal.progress[0];
-        const recordedStartingWeight = firstProgress?.currentValue != null ? Number(firstProgress.currentValue) : null;
         const baselineWeight = patient.baseline?.weightKg != null ? Number(patient.baseline.weightKg) : null;
-        const startingWeight = recordedStartingWeight && recordedStartingWeight > 0
-          ? recordedStartingWeight
-          : baselineWeight && baselineWeight > 0
-            ? baselineWeight
-            : patient.weightKg != null && Number(patient.weightKg) > 0
-              ? Number(patient.weightKg)
-              : weightKg;
+        const historicalWeights = goal.progress.map((entry) => Number(entry.currentValue)).filter((value) => Number.isFinite(value) && value > 0);
+        const historicalStartingWeight = historicalWeights.length ? Math.max(...historicalWeights) : null;
+        const candidates = [baselineWeight, historicalStartingWeight, patient.weightKg != null ? Number(patient.weightKg) : null, weightKg].filter((value): value is number => value != null && Number.isFinite(value) && value > 0);
+        const startingWeight = Math.max(...candidates);
         const targetLossKg = goal.targetValue != null ? Number(goal.targetValue) : 0;
         if (!Number.isFinite(targetLossKg) || targetLossKg <= 0) continue;
-
-        const lossAchievedKg = Math.max(0, startingWeight - weightKg);
-        const progressPercent = this.calculateWeightGoalProgress(startingWeight, weightKg, targetLossKg);
-        const achieved = lossAchievedKg >= targetLossKg;
-        const status = this.progressStatus(progressPercent, achieved);
-        const goalTargetWeight = startingWeight - targetLossKg;
-
-        // Preserve the patient's immutable baseline. Only establish it when missing;
-        // subsequent measurements may update height but never replace baseline weight.
-        if (!patient.baseline) {
-          await tx.patientBaseline.create({ data: { patientId: patient.id, weightKg: startingWeight, heightCm: resolvedHeight, bmi: this.calculateBmi(startingWeight, resolvedHeight), establishedAt: now } });
-        } else {
-          await tx.patientBaseline.update({ where: { patientId: patient.id }, data: { heightCm: resolvedHeight } });
-        }
-
+        const lossAchievedKg = Math.max(0, startingWeight - weightKg); const progressPercent = this.calculateWeightGoalProgress(startingWeight, weightKg, targetLossKg); const achieved = lossAchievedKg >= targetLossKg; const status = this.progressStatus(progressPercent, achieved); const goalTargetWeight = startingWeight - targetLossKg;
+        if (patient.baseline && historicalStartingWeight != null && historicalStartingWeight > Number(patient.baseline.weightKg ?? 0)) await tx.patientBaseline.update({ where: { patientId: patient.id }, data: { weightKg: historicalStartingWeight } });
+        else if (!patient.baseline) await tx.patientBaseline.create({ data: { patientId: patient.id, weightKg: startingWeight, heightCm: resolvedHeight, bmi: this.calculateBmi(startingWeight, resolvedHeight), establishedAt: now } });
+        else await tx.patientBaseline.update({ where: { patientId: patient.id }, data: { heightCm: resolvedHeight } });
         await tx.healthGoal.update({ where: { id: goal.id }, data: { currentValue: weightKg, ...(achieved ? { status: 'ACHIEVED', achievedAt: now } : {}) } });
         await tx.healthGoalProgress.create({ data: { healthGoalId: goal.id, currentValue: weightKg, progressPercent, status, measuredAt: now, notes: `Weight updated from My Health. Starting weight: ${startingWeight} kg. Goal weight: ${goalTargetWeight} kg. ${lossAchievedKg.toFixed(1)} kg of ${targetLossKg.toFixed(1)} kg lost. BMI: ${bmi}.` } });
         updatedGoals.push({ id: goal.id, progressPercent, currentValue: weightKg, status });
       }
-
-      if (!patient.baseline && weightGoals.length === 0) {
-        await tx.patientBaseline.create({ data: { patientId: patient.id, weightKg, heightCm: resolvedHeight, bmi, establishedAt: now } });
-      } else if (patient.baseline) {
-        await tx.patientBaseline.update({ where: { patientId: patient.id }, data: { heightCm: resolvedHeight } });
-      }
-
-      // Every weight log is automatically exposed in Smart Health Journal.
-      await tx.healthJournal.create({
-        data: {
-          patientId: patient.id,
-          title: 'Weight updated',
-          journal: `Weight recorded at ${weightKg} kg. BMI: ${bmi}.`,
-          weightKg,
-          notes: weightGoals.length
-            ? `Automatic health activity from My Health. ${updatedGoals.length} active weight goal(s) recalculated.`
-            : 'Automatic health activity from My Health.',
-        },
-      });
-
+      if (!patient.baseline && weightGoals.length === 0) await tx.patientBaseline.create({ data: { patientId: patient.id, weightKg, heightCm: resolvedHeight, bmi, establishedAt: now } });
+      else if (patient.baseline) await tx.patientBaseline.update({ where: { patientId: patient.id }, data: { heightCm: resolvedHeight } });
       return { updatedGoals };
     });
     return { weightKg, heightCm: resolvedHeight, bmi, bmiCategory, recordedAt: now.toISOString(), goals: result.updatedGoals };
@@ -119,9 +80,8 @@ export class HealthHomeService {
     const goalProgress = visibleGoals.map((goal) => {
       const progress = goal.progress; const latest = progress[progress.length - 1]; const latestValue = latest?.currentValue ?? goal.currentValue; let progressPercent = Number(latest?.progressPercent ?? 0); let displayStatus = String(goal.status); let displayTargetValue = goal.targetValue;
       if (String(goal.category) === 'WEIGHT' && goal.targetValue != null && patient.weightKg != null) {
-        const firstProgress = progress[0]; const recordedStartingWeight = firstProgress?.currentValue != null ? Number(firstProgress.currentValue) : null; const baselineWeight = patient.baseline?.weightKg != null ? Number(patient.baseline.weightKg) : null;
-        const startingWeight = recordedStartingWeight && recordedStartingWeight > 0 ? recordedStartingWeight : baselineWeight && baselineWeight > 0 ? baselineWeight : Number(patient.weightKg); const targetLossKg = Number(goal.targetValue);
-        if (Number.isFinite(targetLossKg) && targetLossKg > 0) { const currentWeight = Number(patient.weightKg); const lossAchievedKg = Math.max(0, startingWeight - currentWeight); progressPercent = this.calculateWeightGoalProgress(startingWeight, currentWeight, targetLossKg); displayStatus = lossAchievedKg >= targetLossKg ? 'ACHIEVED' : this.progressStatus(progressPercent, false); displayTargetValue = targetLossKg; }
+        const baselineWeight = patient.baseline?.weightKg != null ? Number(patient.baseline.weightKg) : null; const historicalWeights = progress.map((entry) => Number(entry.currentValue)).filter((value) => Number.isFinite(value) && value > 0); const historicalStartingWeight = historicalWeights.length ? Math.max(...historicalWeights) : null; const candidates = [baselineWeight, historicalStartingWeight].filter((value): value is number => value != null && Number.isFinite(value) && value > 0); const startingWeight = candidates.length ? Math.max(...candidates) : Number(patient.weightKg); const targetLossKg = Number(goal.targetValue);
+        if (Number.isFinite(targetLossKg) && targetLossKg > 0) { const currentWeight = Number(patient.weightKg); const lossAchievedKg = Math.max(0, startingWeight - currentWeight); progressPercent = this.calculateWeightGoalProgress(startingWeight, currentWeight, targetLossKg); displayStatus = lossAchievedKg >= targetLossKg ? 'ACHIEVED' : this.progressStatus(progressPercent, false); displayTargetValue = targetLossKg as any; }
       }
       return { id: goal.id, title: goal.title, description: goal.description, category: goal.category, priority: goal.priority, status: displayStatus, targetValue: displayTargetValue, currentValue: goal.currentValue, latestValue, unit: goal.unit, targetDate: goal.targetDate, achievedAt: displayStatus === 'ACHIEVED' ? goal.achievedAt : null, progress, progressPercent: Math.min(100, Math.max(0, progressPercent)) };
     });
