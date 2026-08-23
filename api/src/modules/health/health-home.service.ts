@@ -1,9 +1,133 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
 import { PrismaService } from '../../database/prisma.service';
 
 @Injectable()
 export class HealthHomeService {
   constructor(private readonly prisma: PrismaService) {}
+
+  private calculateBmi(weightKg: number, heightCm: number) {
+    const heightM = heightCm / 100;
+    if (!Number.isFinite(weightKg) || !Number.isFinite(heightCm) || heightCm <= 0 || weightKg <= 0) {
+      throw new BadRequestException('Weight and height must be positive numbers.');
+    }
+    return Number((weightKg / (heightM * heightM)).toFixed(2));
+  }
+
+  private adultBmiCategory(bmi: number, dateOfBirth?: Date | null) {
+    if (!dateOfBirth) return null;
+    const today = new Date();
+    let age = today.getFullYear() - dateOfBirth.getFullYear();
+    const monthDelta = today.getMonth() - dateOfBirth.getMonth();
+    if (monthDelta < 0 || (monthDelta === 0 && today.getDate() < dateOfBirth.getDate())) age--;
+    if (age < 18) return null;
+    if (bmi < 18.5) return 'UNDERWEIGHT';
+    if (bmi < 25) return 'NORMAL';
+    if (bmi < 30) return 'OVERWEIGHT';
+    if (bmi < 35) return 'OBESITY_CLASS_I';
+    if (bmi < 40) return 'OBESITY_CLASS_II';
+    return 'OBESITY_CLASS_III';
+  }
+
+  private calculateWeightGoalProgress(startingWeight: number, currentWeight: number, targetWeight: number) {
+    const totalChange = Math.abs(targetWeight - startingWeight);
+    if (totalChange === 0) return currentWeight === targetWeight ? 100 : 0;
+
+    const direction = targetWeight < startingWeight ? -1 : 1;
+    const achievedChange = (currentWeight - startingWeight) * direction;
+    return Math.min(100, Math.max(0, Number(((achievedChange / totalChange) * 100).toFixed(2))));
+  }
+
+  private progressStatus(percent: number, achieved: boolean) {
+    if (achieved) return 'ACHIEVED' as const;
+    if (percent >= 75) return 'ON_TRACK' as const;
+    if (percent > 0) return 'IMPROVING' as const;
+    return 'STAGNANT' as const;
+  }
+
+  async updateWeight(userId: string, weightKg: number, heightCm?: number) {
+    if (!Number.isFinite(weightKg) || weightKg <= 0 || weightKg > 1000) {
+      throw new BadRequestException('Please provide a valid weight in kilograms.');
+    }
+
+    const patient = await this.prisma.patient.findUnique({
+      where: { userId },
+      include: { person: true, baseline: true, healthGoals: { where: { status: 'ACTIVE' }, include: { progress: { orderBy: { measuredAt: 'asc' } } } } },
+    });
+
+    if (!patient) throw new NotFoundException('Patient profile not found for the authenticated user.');
+
+    const resolvedHeight = heightCm ?? Number(patient.heightCm ?? patient.baseline?.heightCm ?? 0);
+    if (!Number.isFinite(resolvedHeight) || resolvedHeight <= 0 || resolvedHeight > 300) {
+      throw new BadRequestException('A valid height in centimetres is required to calculate BMI.');
+    }
+
+    const bmi = this.calculateBmi(weightKg, resolvedHeight);
+    const bmiCategory = this.adultBmiCategory(bmi, patient.person.dateOfBirth);
+    const now = new Date();
+
+    const result = await this.prisma.$transaction(async (tx) => {
+      await tx.patient.update({
+        where: { id: patient.id },
+        data: { weightKg, heightCm: resolvedHeight },
+      });
+
+      await tx.patientBaseline.upsert({
+        where: { patientId: patient.id },
+        create: { patientId: patient.id, weightKg, heightCm: resolvedHeight, bmi, establishedAt: now },
+        update: { weightKg, heightCm: resolvedHeight, bmi, establishedAt: patient.baseline?.establishedAt ?? now },
+      });
+
+      const weightGoals = patient.healthGoals.filter((goal) => String(goal.category) === 'WEIGHT');
+      const updatedGoals = [];
+
+      for (const goal of weightGoals) {
+        const firstProgress = goal.progress[0];
+        const startingWeight = firstProgress?.currentValue != null
+          ? Number(firstProgress.currentValue)
+          : patient.weightKg != null
+            ? Number(patient.weightKg)
+            : weightKg;
+        const targetWeight = goal.targetValue != null ? Number(goal.targetValue) : null;
+        if (targetWeight == null || !Number.isFinite(targetWeight)) continue;
+
+        const progressPercent = this.calculateWeightGoalProgress(startingWeight, weightKg, targetWeight);
+        const achieved = Math.abs(weightKg - targetWeight) < 0.01 || progressPercent >= 100;
+        const status = this.progressStatus(progressPercent, achieved);
+
+        await tx.healthGoal.update({
+          where: { id: goal.id },
+          data: {
+            currentValue: weightKg,
+            ...(achieved ? { status: 'ACHIEVED', achievedAt: now } : {}),
+          },
+        });
+
+        await tx.healthGoalProgress.create({
+          data: {
+            healthGoalId: goal.id,
+            currentValue: weightKg,
+            progressPercent,
+            status,
+            measuredAt: now,
+            notes: `Weight updated from My Health. BMI: ${bmi}.`,
+          },
+        });
+
+        updatedGoals.push({ id: goal.id, progressPercent, currentValue: weightKg, status });
+      }
+
+      return { updatedGoals };
+    });
+
+    return {
+      weightKg,
+      heightCm: resolvedHeight,
+      bmi,
+      bmiCategory,
+      recordedAt: now.toISOString(),
+      goals: result.updatedGoals,
+    };
+  }
 
   async getForUser(userId: string) {
     const patient = await this.prisma.patient.findUnique({
@@ -18,13 +142,14 @@ export class HealthHomeService {
           },
         },
         healthGoals: {
-          include: { progress: true },
+          include: { progress: { orderBy: { measuredAt: 'asc' } } },
           orderBy: { createdAt: 'desc' },
         },
         wearableDevices: true,
         ownedFamilyMembers: {
           include: { memberPatient: { include: { person: true } } },
         },
+        baseline: true,
       },
     });
 
@@ -70,11 +195,9 @@ export class HealthHomeService {
 
     const goalProgress = activeGoals.map((goal) => {
       const progress = goal.progress;
-      const latest = progress[progress.length - 1] as (typeof progress)[number] | undefined;
-      const latestValue = latest?.value ?? goal.currentValue;
-      const progressPercent = latest && 'progressPercent' in latest
-        ? Number((latest as { progressPercent?: number }).progressPercent ?? 0)
-        : 0;
+      const latest = progress[progress.length - 1];
+      const latestValue = latest?.currentValue ?? goal.currentValue;
+      const progressPercent = Number(latest?.progressPercent ?? 0);
 
       return {
         id: goal.id,
@@ -142,6 +265,10 @@ export class HealthHomeService {
       });
     }
 
+    const currentWeight = patient.weightKg != null ? Number(patient.weightKg) : null;
+    const currentHeight = patient.heightCm != null ? Number(patient.heightCm) : patient.baseline?.heightCm != null ? Number(patient.baseline.heightCm) : null;
+    const currentBmi = patient.baseline?.bmi != null ? Number(patient.baseline.bmi) : currentWeight && currentHeight ? this.calculateBmi(currentWeight, currentHeight) : null;
+
     return {
       generatedAt: new Date().toISOString(),
       patient: {
@@ -166,8 +293,10 @@ export class HealthHomeService {
           reaction: item.reaction,
         })),
         bloodType: patient.healthPassport?.bloodType ?? null,
-        weightKg: patient.weightKg,
-        heightCm: patient.heightCm,
+        weightKg: currentWeight,
+        heightCm: currentHeight,
+        bmi: currentBmi,
+        bmiCategory: currentBmi != null ? this.adultBmiCategory(currentBmi, patient.person.dateOfBirth) : null,
       },
       today: {
         upcomingAppointments,
