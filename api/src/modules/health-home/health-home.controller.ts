@@ -2,6 +2,7 @@ import { Controller, Get, Post, Req, UseGuards } from '@nestjs/common';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
+import { DailyJournalService } from './daily-journal.service';
 import { HealthHomeService } from './health-home.service';
 
 @ApiTags('Health Home')
@@ -9,7 +10,10 @@ import { HealthHomeService } from './health-home.service';
 @Controller('health-home')
 @UseGuards(JwtAuthGuard)
 export class HealthHomeController {
-  constructor(private readonly healthHomeService: HealthHomeService) {}
+  constructor(
+    private readonly healthHomeService: HealthHomeService,
+    private readonly dailyJournalService: DailyJournalService,
+  ) {}
 
   @Get()
   getHealthHome(@Req() req: any) {
@@ -18,6 +22,6 @@ export class HealthHomeController {
 
   @Post('journal/generate')
   generateJournal(@Req() req: any) {
-    return this.healthHomeService.generateDailyJournal(req.user.sub);
+    return this.dailyJournalService.generate(req.user.sub);
   }
 }
