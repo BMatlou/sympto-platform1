@@ -17,7 +17,10 @@ export class HealthHomeService {
             medications: { include: { medication: true } },
           },
         },
-        healthGoals: { include: { progress: true }, orderBy: { createdAt: 'desc' } },
+        healthGoals: {
+          include: { progress: true },
+          orderBy: { createdAt: 'desc' },
+        },
         wearableDevices: true,
         ownedFamilyMembers: {
           include: { memberPatient: { include: { person: true } } },
@@ -29,22 +32,27 @@ export class HealthHomeService {
       throw new NotFoundException('Patient profile not found for the authenticated user.');
     }
 
-    const upcomingAppointments = await this.prisma.appointment.findMany({
-      where: { patientId: patient.id, scheduledStart: { gte: new Date() } },
-      include: { practitioner: { include: { person: true } }, practice: true },
-      orderBy: { scheduledStart: 'asc' },
-      take: 5,
-    });
-
-    const deviceIds = patient.wearableDevices.map((device) => device.id);
-    const recentMeasurements = deviceIds.length
-      ? await this.prisma.deviceMeasurement.findMany({
-          where: { deviceId: { in: deviceIds } },
-          include: { device: true, deviceAlerts: true },
-          orderBy: { measuredAt: 'desc' },
-          take: 100,
-        })
-      : [];
+    const [upcomingAppointments, recentMeasurements, notifications] = await Promise.all([
+      this.prisma.appointment.findMany({
+        where: { patientId: patient.id, scheduledStart: { gte: new Date() } },
+        include: { practitioner: { include: { person: true } }, practice: true },
+        orderBy: { scheduledStart: 'asc' },
+        take: 5,
+      }),
+      patient.wearableDevices.length
+        ? this.prisma.deviceMeasurement.findMany({
+            where: { deviceId: { in: patient.wearableDevices.map((device) => device.id) } },
+            include: { device: true, deviceAlerts: true },
+            orderBy: { measuredAt: 'desc' },
+            take: 100,
+          })
+        : Promise.resolve([]),
+      this.prisma.notification.findMany({
+        where: { userId },
+        orderBy: { createdAt: 'desc' },
+        take: 20,
+      }),
+    ]);
 
     const latestByType = new Map<string, (typeof recentMeasurements)[number]>();
     for (const measurement of recentMeasurements) {
@@ -60,7 +68,35 @@ export class HealthHomeService {
     );
     const activeGoals = patient.healthGoals.filter((goal) => String(goal.status) === 'ACTIVE');
 
-    const attention: Array<{ type: string; severity: string; title: string; description: string }> = [];
+    const goalProgress = activeGoals.map((goal) => {
+      const progress = [...goal.progress].sort(
+        (a, b) => new Date(a.recordedAt).getTime() - new Date(b.recordedAt).getTime(),
+      );
+      const latest = progress[progress.length - 1] as (typeof progress)[number] | undefined;
+      const latestValue = latest?.value ?? goal.currentValue;
+      const progressPercent = latest && 'progressPercent' in latest
+        ? Number((latest as { progressPercent?: number }).progressPercent ?? 0)
+        : 0;
+
+      return {
+        id: goal.id,
+        title: goal.title,
+        description: goal.description,
+        category: goal.category,
+        priority: goal.priority,
+        status: goal.status,
+        targetValue: goal.targetValue,
+        currentValue: goal.currentValue,
+        latestValue,
+        unit: goal.unit,
+        targetDate: goal.targetDate,
+        achievedAt: goal.achievedAt,
+        progress,
+        progressPercent: Math.min(100, Math.max(0, progressPercent)),
+      };
+    });
+
+    const attention: Array<{ type: string; severity: string; title: string; description: string; actionUrl?: string; actionLabel?: string }> = [];
     for (const measurement of recentMeasurements) {
       for (const alert of measurement.deviceAlerts) {
         if (!alert.acknowledged) {
@@ -72,6 +108,40 @@ export class HealthHomeService {
           });
         }
       }
+    }
+
+    const recentNotifications = notifications.map((notification) => ({
+      id: notification.id,
+      type: String(notification.type),
+      title: notification.title,
+      body: notification.body,
+      channel: String(notification.channel),
+      status: String(notification.status),
+      priority: String(notification.priority),
+      actionUrl: notification.actionUrl,
+      actionLabel: notification.actionLabel,
+      scheduledFor: notification.scheduledFor,
+      createdAt: notification.createdAt,
+    }));
+
+    const medicationNotifications = recentNotifications.filter((notification) =>
+      notification.type.toUpperCase().includes('MEDICATION') ||
+      notification.title.toLowerCase().includes('medication') ||
+      notification.title.toLowerCase().includes('medicine') ||
+      notification.body.toLowerCase().includes('medication'),
+    );
+
+    for (const notification of medicationNotifications.filter((item) =>
+      !['READ', 'DISMISSED', 'CANCELLED'].includes(item.status.toUpperCase()),
+    )) {
+      attention.push({
+        type: 'medication-notification',
+        severity: notification.priority,
+        title: notification.title,
+        description: notification.body,
+        actionUrl: notification.actionUrl ?? '/medications',
+        actionLabel: notification.actionLabel ?? 'View medication',
+      });
     }
 
     return {
@@ -114,20 +184,7 @@ export class HealthHomeService {
           missedDoses: item.missedDoses,
         })),
       },
-      goals: activeGoals.map((goal) => ({
-        id: goal.id,
-        title: goal.title,
-        description: goal.description,
-        category: goal.category,
-        priority: goal.priority,
-        status: goal.status,
-        targetValue: goal.targetValue,
-        currentValue: goal.currentValue,
-        unit: goal.unit,
-        targetDate: goal.targetDate,
-        achievedAt: goal.achievedAt,
-        progress: goal.progress,
-      })),
+      goals: goalProgress,
       family: patient.ownedFamilyMembers.map((member) => ({
         id: member.id,
         patientId: member.memberPatientId,
@@ -155,6 +212,8 @@ export class HealthHomeService {
           source: measurement.source,
         })),
       },
+      notifications: recentNotifications,
+      medicationNotifications,
       attention,
       journal: {
         mode: 'automatic',
