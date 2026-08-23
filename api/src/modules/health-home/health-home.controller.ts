@@ -1,4 +1,4 @@
-import { Controller, Get, Req, UseGuards } from '@nestjs/common';
+import { Controller, Get, Post, Req, UseGuards } from '@nestjs/common';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
@@ -14,5 +14,10 @@ export class HealthHomeController {
   @Get()
   getHealthHome(@Req() req: any) {
     return this.healthHomeService.getHealthHome(req.user.sub);
+  }
+
+  @Post('journal/generate')
+  generateJournal(@Req() req: any) {
+    return this.healthHomeService.generateDailyJournal(req.user.sub);
   }
 }
