@@ -1,7 +1,7 @@
 import {
   Body,
   Controller,
- Delete,
+  Delete,
   Get,
   Param,
   Patch,
@@ -36,13 +36,16 @@ export class EmergencyContactsController {
     return this.emergencyContactsService.create(dto);
   }
 
-  @Permissions('emergency-contact.read')
+  // PATIENT already receives patients.read. Keep emergency-contact-specific
+  // permissions for write operations, but allow the patient portal to read
+  // the emergency-contact records that belong to its selected patient.
+  @Permissions('patients.read')
   @Get()
   findAll(@Query() query: QueryEmergencyContactDto) {
     return this.emergencyContactsService.findAll(query);
   }
 
-  @Permissions('emergency-contact.read')
+  @Permissions('patients.read')
   @Get(':id')
   findOne(@Param('id') id: string) {
     return this.emergencyContactsService.findOne(id);
