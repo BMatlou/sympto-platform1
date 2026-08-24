@@ -42,6 +42,13 @@ export interface UpdateProfileDto {
     | 'OTHER'
     | 'PREFER_NOT_TO_SAY';
   profileImageUrl?: string;
+  addressLine1?: string;
+  addressLine2?: string | null;
+  suburb?: string;
+  city?: string;
+  province?: string;
+  postalCode?: string;
+  country?: string;
 }
 
 export interface UpdateIndividualProfileDto {
