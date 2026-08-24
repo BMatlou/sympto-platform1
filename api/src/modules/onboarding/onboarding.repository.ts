@@ -31,9 +31,6 @@ export class OnboardingRepository {
     private readonly prisma: PrismaService,
   ) {}
 
-  /**
-   * Update onboarding progress.
-   */
   private async updateOnboardingStep(
     tx: Prisma.TransactionClient,
     userId: string,
@@ -41,154 +38,79 @@ export class OnboardingRepository {
     completionPercentage: number,
   ) {
     return tx.onboardingProgress.update({
-      where: {
-        userId,
-      },
-      data: {
-        currentStep,
-        completionPercentage,
-        status: 'IN_PROGRESS',
-      },
+      where: { userId },
+      data: { currentStep, completionPercentage, status: 'IN_PROGRESS' },
     });
   }
 
-  /**
-   * Fetch patient together with Health Passport.
-   */
   private async getPatientWithPassport(
     tx: Prisma.TransactionClient,
     userId: string,
   ) {
     const patient = await tx.patient.findUnique({
-      where: {
-        userId,
-      },
-      include: {
-        healthPassport: true,
-      },
+      where: { userId },
+      include: { healthPassport: true },
     });
-
-    if (!patient) {
-      throw new NotFoundException(
-        'Patient not found.',
-      );
-    }
-
-    if (!patient.healthPassport) {
-      throw new NotFoundException(
-        'Health Passport not found.',
-      );
-    }
-
+    if (!patient) throw new NotFoundException('Patient not found.');
+    if (!patient.healthPassport) throw new NotFoundException('Health Passport not found.');
     return patient;
   }
 
   async findByUser(userId: string) {
-    return this.prisma.onboardingProgress.findUnique({
-      where: {
-        userId,
-      },
-    });
+    return this.prisma.onboardingProgress.findUnique({ where: { userId } });
   }
 
   async create(userId: string) {
-    return this.prisma.onboardingProgress.create({
-      data: {
-        userId,
-      },
-    });
+    return this.prisma.onboardingProgress.create({ data: { userId } });
   }
 
-  async update(
-    userId: string,
-    data: Prisma.OnboardingProgressUpdateInput,
-  ) {
-    return this.prisma.onboardingProgress.update({
-      where: {
-        userId,
-      },
-      data,
-    });
+  async update(userId: string, data: Prisma.OnboardingProgressUpdateInput) {
+    return this.prisma.onboardingProgress.update({ where: { userId }, data });
   }
 
-  /**
-   * STEP 1
-   * Personal Profile
-   */
-  async updatePersonProfile(
-    userId: string,
-    dto: UpdateProfileDto,
-  ) {
+  async updatePersonProfile(userId: string, dto: UpdateProfileDto) {
     return this.prisma.user.update({
-      where: {
-        id: userId,
-      },
+      where: { id: userId },
       data: {
         person: {
           update: {
             preferredName: dto.preferredName,
-            dateOfBirth: dto.dateOfBirth
-              ? new Date(dto.dateOfBirth)
-              : undefined,
+            dateOfBirth: dto.dateOfBirth ? new Date(dto.dateOfBirth) : undefined,
             gender: dto.gender,
+            profileImageUrl: dto.profileImageUrl,
           },
         },
       },
-      include: {
-        person: true,
-      },
+      include: { person: true },
     });
   }
 
-  /**
-   * STEP 2
-   * Health Profile
-   */
-  async updateIndividualProfile(
-    userId: string,
-    dto: UpdateIndividualProfileDto,
-  ) {
+  async updateIndividualProfile(userId: string, dto: UpdateIndividualProfileDto) {
     return this.prisma.$transaction(async (tx) => {
-      const patient = await tx.patient.findUnique({
-        where: {
-          userId,
-        },
-      });
-
-      if (!patient) {
-        throw new NotFoundException(
-          'Patient not found.',
-        );
-      }
+      const patient = await tx.patient.findUnique({ where: { userId } });
+      if (!patient) throw new NotFoundException('Patient not found.');
 
       await tx.patient.update({
-        where: {
-          id: patient.id,
-        },
+        where: { id: patient.id },
         data: {
           heightCm: dto.heightCm,
           weightKg: dto.weightKg,
           occupation: dto.occupation,
           dominantHand: dto.dominantHand,
           smokingStatus: dto.smokingStatus,
-          alcoholConsumption:
-            dto.alcoholConsumption,
-          exerciseFrequency:
-            dto.exerciseFrequency,
+          alcoholConsumption: dto.alcoholConsumption,
+          exerciseFrequency: dto.exerciseFrequency,
         },
       });
 
       await tx.healthPassport.upsert({
-        where: {
-          patientId: patient.id,
-        },
+        where: { patientId: patient.id },
         update: {
           bloodType: dto.bloodType,
           rhesusFactor: dto.rhesusFactor,
           organDonor: dto.organDonor ?? false,
           emergencyNotes: dto.emergencyNotes,
-          shareByDefault:
-            dto.shareByDefault ?? false,
+          shareByDefault: dto.shareByDefault ?? false,
         },
         create: {
           patientId: patient.id,
@@ -196,8 +118,7 @@ export class OnboardingRepository {
           rhesusFactor: dto.rhesusFactor,
           organDonor: dto.organDonor ?? false,
           emergencyNotes: dto.emergencyNotes,
-          shareByDefault:
-            dto.shareByDefault ?? false,
+          shareByDefault: dto.shareByDefault ?? false,
         },
       });
 
@@ -205,40 +126,18 @@ export class OnboardingRepository {
     });
   }
 
-    /**
-   * STEP 3
-   * Emergency Contact
-   */
-  async saveEmergencyContact(
-    userId: string,
-    dto: UpdateEmergencyContactDto,
-  ) {
+  async saveEmergencyContact(userId: string, dto: UpdateEmergencyContactDto) {
     return this.prisma.$transaction(async (tx) => {
-      const patient = await tx.patient.findUnique({
-        where: {
-          userId,
-        },
+      const patient = await tx.patient.findUnique({ where: { userId } });
+      if (!patient) throw new NotFoundException('Patient not found.');
+
+      const existingPrimary = await tx.emergencyContact.findFirst({
+        where: { patientId: patient.id, isPrimary: true },
       });
-
-      if (!patient) {
-        throw new NotFoundException(
-          'Patient not found.',
-        );
-      }
-
-      const existingPrimary =
-        await tx.emergencyContact.findFirst({
-          where: {
-            patientId: patient.id,
-            isPrimary: true,
-          },
-        });
 
       if (existingPrimary) {
         await tx.emergencyContact.update({
-          where: {
-            id: existingPrimary.id,
-          },
+          where: { id: existingPrimary.id },
           data: {
             fullName: dto.fullName,
             relationship: dto.relationship,
@@ -259,422 +158,157 @@ export class OnboardingRepository {
           },
         });
       }
-
       return this.updateOnboardingStep(tx, userId, 4, 30);
     });
   }
 
-  /**
-   * STEP 4
-   * Patient Allergies
-   */
-  async savePatientAllergies(
-    userId: string,
-    dto: UpdatePatientAllergiesDto,
-  ) {
+  async savePatientAllergies(userId: string, dto: UpdatePatientAllergiesDto) {
     return this.prisma.$transaction(async (tx) => {
-      const patient =
-        await this.getPatientWithPassport(
-          tx,
-          userId,
-        );
-
-      const healthPassportId =
-        patient.healthPassport!.id;
-
-      await tx.patientAllergy.deleteMany({
-        where: {
-          healthPassportId,
-        },
-      });
-
+      const patient = await this.getPatientWithPassport(tx, userId);
+      const healthPassportId = patient.healthPassport!.id;
+      await tx.patientAllergy.deleteMany({ where: { healthPassportId } });
       for (const allergy of dto.allergies) {
         await tx.patientAllergy.create({
           data: {
-  healthPassportId,
-
-  allergyId: allergy.allergyId,
-
-  severity: allergy.severity,
-
-  reaction: allergy.reaction,
-
-  reactionNotes: allergy.reactionNotes,
-
-  onsetDate: allergy.onsetDate
-    ? new Date(allergy.onsetDate)
-    : undefined,
-
-  lastReaction: allergy.lastReaction
-    ? new Date(allergy.lastReaction)
-    : undefined,
-
-  verified: allergy.verified ?? false,
-
-  verifiedBy: allergy.verifiedBy,
-
-  status:
-    allergy.status ??
-    AllergyStatus.ACTIVE,
-
-  notes: allergy.notes,
-},
+            healthPassportId,
+            allergyId: allergy.allergyId,
+            severity: allergy.severity,
+            reaction: allergy.reaction,
+            reactionNotes: allergy.reactionNotes,
+            onsetDate: allergy.onsetDate ? new Date(allergy.onsetDate) : undefined,
+            lastReaction: allergy.lastReaction ? new Date(allergy.lastReaction) : undefined,
+            verified: allergy.verified ?? false,
+            verifiedBy: allergy.verifiedBy,
+            status: allergy.status ?? AllergyStatus.ACTIVE,
+            notes: allergy.notes,
+          },
         });
       }
-
       return this.updateOnboardingStep(tx, userId, 5, 40);
     });
   }
 
-    /**
-   * STEP 5
-   * Patient Conditions
-   */
-  async savePatientConditions(
-    userId: string,
-    dto: UpdatePatientConditionsDto,
-  ) {
+  async savePatientConditions(userId: string, dto: UpdatePatientConditionsDto) {
     return this.prisma.$transaction(async (tx) => {
-      const patient =
-        await this.getPatientWithPassport(
-          tx,
-          userId,
-        );
-
-      const healthPassportId =
-        patient.healthPassport!.id;
-
-      await tx.patientCondition.deleteMany({
-        where: {
-          healthPassportId,
-        },
-      });
-
+      const patient = await this.getPatientWithPassport(tx, userId);
+      const healthPassportId = patient.healthPassport!.id;
+      await tx.patientCondition.deleteMany({ where: { healthPassportId } });
       for (const condition of dto.conditions) {
         await tx.patientCondition.create({
           data: {
-  healthPassportId,
-
-  conditionId: condition.conditionId,
-
-  diagnosedAt: condition.diagnosedAt
-    ? new Date(condition.diagnosedAt)
-    : undefined,
-
-  resolvedAt: condition.resolvedAt
-    ? new Date(condition.resolvedAt)
-    : undefined,
-
-  status:
-    condition.status ??
-    ConditionStatus.ACTIVE,
-
-  severity: condition.severity,
-
-  stage: condition.stage,
-
-  chronic:
-    condition.chronic ?? false,
-
-  primaryCondition:
-    condition.primaryCondition ?? false,
-
-  diagnosedBy:
-    condition.diagnosedBy,
-
-  treatmentPlan:
-    condition.treatmentPlan,
-
-  outcome:
-    condition.outcome,
-
-  notes:
-    condition.notes,
-},
+            healthPassportId,
+            conditionId: condition.conditionId,
+            diagnosedAt: condition.diagnosedAt ? new Date(condition.diagnosedAt) : undefined,
+            resolvedAt: condition.resolvedAt ? new Date(condition.resolvedAt) : undefined,
+            status: condition.status ?? ConditionStatus.ACTIVE,
+            severity: condition.severity,
+            stage: condition.stage,
+            chronic: condition.chronic ?? false,
+            primaryCondition: condition.primaryCondition ?? false,
+            diagnosedBy: condition.diagnosedBy,
+            treatmentPlan: condition.treatmentPlan,
+            outcome: condition.outcome,
+            notes: condition.notes,
+          },
         });
       }
-
       return this.updateOnboardingStep(tx, userId, 6, 50);
     });
   }
 
-  /**
-   * STEP 6
-   * Patient Medications
-   */
-  async savePatientMedications(
-    userId: string,
-    dto: UpdatePatientMedicationsDto,
-  ) {
+  async savePatientMedications(userId: string, dto: UpdatePatientMedicationsDto) {
     return this.prisma.$transaction(async (tx) => {
-      const patient =
-        await this.getPatientWithPassport(
-          tx,
-          userId,
-        );
-
-      const healthPassportId =
-        patient.healthPassport!.id;
-
-      await tx.patientMedication.deleteMany({
-        where: {
-          healthPassportId,
-        },
-      });
-
+      const patient = await this.getPatientWithPassport(tx, userId);
+      const healthPassportId = patient.healthPassport!.id;
+      await tx.patientMedication.deleteMany({ where: { healthPassportId } });
       for (const medication of dto.medications) {
         await tx.patientMedication.create({
           data: {
-  healthPassportId,
-
-  medicationId:
-    medication.medicationId,
-
-  dosage:
-    medication.dosage,
-
-  frequency:
-    medication.frequency,
-
-  route:
-    medication.route,
-
-  indication:
-    medication.indication,
-
-  instructions:
-    medication.instructions,
-
-  prescribedBy:
-    medication.prescribedBy,
-
-  startedAt:
-    medication.startedAt
-      ? new Date(
-          medication.startedAt,
-        )
-      : undefined,
-
-  endedAt:
-    medication.endedAt
-      ? new Date(
-          medication.endedAt,
-        )
-      : undefined,
-
-  ongoing:
-    medication.ongoing ?? false,
-
-  adherencePercentage:
-    medication.adherencePercentage,
-
-  missedDoses:
-    medication.missedDoses,
-
-  sideEffects:
-    medication.sideEffects,
-
-  effectiveness:
-    medication.effectiveness,
-
-  status:
-    medication.status ??
-    MedicationStatus.ACTIVE,
-
-  notes:
-    medication.notes,
-},
+            healthPassportId,
+            medicationId: medication.medicationId,
+            dosage: medication.dosage,
+            frequency: medication.frequency,
+            route: medication.route,
+            indication: medication.indication,
+            instructions: medication.instructions,
+            prescribedBy: medication.prescribedBy,
+            startedAt: medication.startedAt ? new Date(medication.startedAt) : undefined,
+            endedAt: medication.endedAt ? new Date(medication.endedAt) : undefined,
+            ongoing: medication.ongoing ?? false,
+            adherencePercentage: medication.adherencePercentage,
+            missedDoses: medication.missedDoses,
+            sideEffects: medication.sideEffects,
+            effectiveness: medication.effectiveness,
+            status: medication.status ?? MedicationStatus.ACTIVE,
+            notes: medication.notes,
+          },
         });
       }
-
       return this.updateOnboardingStep(tx, userId, 7, 60);
     });
   }
 
-    /**
-   /**
- * STEP 7
- * Patient Immunizations
- */
-async savePatientImmunizations(
-  userId: string,
-  dto: UpdatePatientImmunizationsDto,
-) {
-  return this.prisma.$transaction(async (tx) => {
-    const patient =
-      await this.getPatientWithPassport(
-        tx,
-        userId,
-      );
-
-    const healthPassportId =
-      patient.healthPassport!.id;
-
-    /**
-     * Replace immunization list.
-     */
-    await tx.patientImmunization.deleteMany({
-      where: {
-        healthPassportId,
-      },
-    });
-
-    /**
-     * Save immunizations.
-     */
-    for (const immunization of dto.immunizations) {
-      await tx.patientImmunization.create({
-        data: {
-          healthPassportId,
-
-          immunizationId:
-            immunization.immunizationId,
-
-          administeredAt:
-            immunization.administeredAt
-              ? new Date(
-                  immunization.administeredAt,
-                )
-              : undefined,
-
-          doseNumber:
-            immunization.doseNumber,
-
-          batchNumber:
-            immunization.batchNumber,
-
-          manufacturer:
-            immunization.manufacturer,
-
-          administeredBy:
-            immunization.administeredBy,
-
-          facility:
-            immunization.facility,
-
-          route:
-            immunization.route,
-
-          site:
-            immunization.site,
-
-          adverseReaction:
-            immunization.adverseReaction ??
-            false,
-
-          adverseReactionNotes:
-            immunization.adverseReactionNotes,
-
-          nextDueDate:
-            immunization.nextDueDate
-              ? new Date(
-                  immunization.nextDueDate,
-                )
-              : undefined,
-
-          notes:
-            immunization.notes,
-        },
-      });
-    }
-
-    return this.updateOnboardingStep(tx, userId, 8, 70);
-  });
-}
-
-    /**
-   * STEP 8
-   * Health Goals
-   */
-  async saveHealthGoals(
-    userId: string,
-    dto: UpdateHealthGoalsDto,
-  ) {
+  async savePatientImmunizations(userId: string, dto: UpdatePatientImmunizationsDto) {
     return this.prisma.$transaction(async (tx) => {
-      const patient = await tx.patient.findUnique({
-        where: {
-          userId,
-        },
-      });
-
-      if (!patient) {
-        throw new NotFoundException(
-          'Patient not found.',
-        );
+      const patient = await this.getPatientWithPassport(tx, userId);
+      const healthPassportId = patient.healthPassport!.id;
+      await tx.patientImmunization.deleteMany({ where: { healthPassportId } });
+      for (const immunization of dto.immunizations) {
+        await tx.patientImmunization.create({
+          data: {
+            healthPassportId,
+            immunizationId: immunization.immunizationId,
+            administeredAt: immunization.administeredAt ? new Date(immunization.administeredAt) : undefined,
+            doseNumber: immunization.doseNumber,
+            batchNumber: immunization.batchNumber,
+            manufacturer: immunization.manufacturer,
+            administeredBy: immunization.administeredBy,
+            facility: immunization.facility,
+            route: immunization.route,
+            site: immunization.site,
+            adverseReaction: immunization.adverseReaction ?? false,
+            adverseReactionNotes: immunization.adverseReactionNotes,
+            nextDueDate: immunization.nextDueDate ? new Date(immunization.nextDueDate) : undefined,
+            notes: immunization.notes,
+          },
+        });
       }
+      return this.updateOnboardingStep(tx, userId, 8, 70);
+    });
+  }
 
-      /**
-       * Replace existing goals.
-       */
-      await tx.healthGoal.deleteMany({
-        where: {
-          patientId: patient.id,
-        },
-      });
-
-      /**
-       * Save selected goals.
-       */
+  async saveHealthGoals(userId: string, dto: UpdateHealthGoalsDto) {
+    return this.prisma.$transaction(async (tx) => {
+      const patient = await tx.patient.findUnique({ where: { userId } });
+      if (!patient) throw new NotFoundException('Patient not found.');
+      await tx.healthGoal.deleteMany({ where: { patientId: patient.id } });
       for (const goal of dto.goals) {
         await tx.healthGoal.create({
-  data: {
-    patientId: patient.id,
-
-    title: goal.title,
-    description: goal.description,
-
-    category: goal.category,
-
-    priority: goal.priority ?? 'MEDIUM',
-
-    status: goal.status ?? 'ACTIVE',
-
-    targetValue: goal.targetValue,
-
-    currentValue: goal.currentValue,
-
-    unit: goal.unit,
-
-    targetDate: goal.targetDate
-      ? new Date(goal.targetDate)
-      : undefined,
-
-    achievedAt: goal.achievedAt
-      ? new Date(goal.achievedAt)
-      : undefined,
-  },
-});
+          data: {
+            patientId: patient.id,
+            title: goal.title,
+            description: goal.description,
+            category: goal.category,
+            priority: goal.priority ?? 'MEDIUM',
+            status: goal.status ?? 'ACTIVE',
+            targetValue: goal.targetValue,
+            currentValue: goal.currentValue,
+            unit: goal.unit,
+            targetDate: goal.targetDate ? new Date(goal.targetDate) : undefined,
+            achievedAt: goal.achievedAt ? new Date(goal.achievedAt) : undefined,
+          },
+        });
       }
-
       return this.updateOnboardingStep(tx, userId, 9, 80);
     });
   }
 
-    /**
-   * STEP 9
-   * Health Journal Settings
-   */
-  async saveHealthJournalSettings(
-    userId: string,
-    dto: UpdateHealthJournalSettingsDto,
-  ) {
+  async saveHealthJournalSettings(userId: string, dto: UpdateHealthJournalSettingsDto) {
     return this.prisma.$transaction(async (tx) => {
-      const patient = await tx.patient.findUnique({
-        where: {
-          userId,
-        },
-      });
-
-      if (!patient) {
-        throw new NotFoundException(
-          'Patient not found.',
-        );
-      }
-
+      const patient = await tx.patient.findUnique({ where: { userId } });
+      if (!patient) throw new NotFoundException('Patient not found.');
       await tx.healthJournalSettings.upsert({
-        where: {
-          patientId: patient.id,
-        },
+        where: { patientId: patient.id },
         update: {
           trackSymptoms: dto.trackSymptoms,
           trackMood: dto.trackMood,
@@ -684,294 +318,103 @@ async savePatientImmunizations(
           trackExercise: dto.trackExercise,
           trackMedications: dto.trackMedications,
           trackVitals: dto.trackVitals,
-
-          remindersEnabled:
-            dto.remindersEnabled,
-
-          morningReminder:
-            dto.morningReminder,
-
-          afternoonReminder:
-            dto.afternoonReminder,
-
-          eveningReminder:
-            dto.eveningReminder,
-
-          weeklySummary:
-            dto.weeklySummary,
-
-          monthlySummary:
-            dto.monthlySummary,
+          remindersEnabled: dto.remindersEnabled,
+          morningReminder: dto.morningReminder,
+          afternoonReminder: dto.afternoonReminder,
+          eveningReminder: dto.eveningReminder,
+          weeklySummary: dto.weeklySummary,
+          monthlySummary: dto.monthlySummary,
         },
-
         create: {
           patientId: patient.id,
-
-          trackSymptoms:
-            dto.trackSymptoms ?? true,
-
-          trackMood:
-            dto.trackMood ?? true,
-
-          trackSleep:
-            dto.trackSleep ?? true,
-
-          trackWater:
-            dto.trackWater ?? false,
-
-          trackNutrition:
-            dto.trackNutrition ?? false,
-
-          trackExercise:
-            dto.trackExercise ?? false,
-
-          trackMedications:
-            dto.trackMedications ?? true,
-
-          trackVitals:
-            dto.trackVitals ?? false,
-
-          remindersEnabled:
-            dto.remindersEnabled ?? true,
-
-          morningReminder:
-            dto.morningReminder,
-
-          afternoonReminder:
-            dto.afternoonReminder,
-
-          eveningReminder:
-            dto.eveningReminder,
-
-          weeklySummary:
-            dto.weeklySummary ?? true,
-
-          monthlySummary:
-            dto.monthlySummary ?? true,
+          trackSymptoms: dto.trackSymptoms ?? true,
+          trackMood: dto.trackMood ?? true,
+          trackSleep: dto.trackSleep ?? true,
+          trackWater: dto.trackWater ?? false,
+          trackNutrition: dto.trackNutrition ?? false,
+          trackExercise: dto.trackExercise ?? false,
+          trackMedications: dto.trackMedications ?? true,
+          trackVitals: dto.trackVitals ?? false,
+          remindersEnabled: dto.remindersEnabled ?? true,
+          morningReminder: dto.morningReminder,
+          afternoonReminder: dto.afternoonReminder,
+          eveningReminder: dto.eveningReminder,
+          weeklySummary: dto.weeklySummary ?? true,
+          monthlySummary: dto.monthlySummary ?? true,
         },
       });
-
       return this.updateOnboardingStep(tx, userId, 10, 90);
     });
   }
 
- /**
- * STEP 10
- * Save onboarding consent
- */
-async saveConsent(
-  userId: string,
-  dto: UpdateConsentDto,
-) {
-  return this.prisma.$transaction(async (tx) => {
-    const patient = await tx.patient.findUnique({
-      where: {
-        userId,
-      },
-    });
-
-    if (!patient) {
-      throw new NotFoundException(
-        'Patient not found.',
-      );
-    }
-
-    /**
-     * Remove previous onboarding consent.
-     */
-    await tx.consent.deleteMany({
-      where: {
-        patientId: patient.id,
-        type: {
-          in: [
-            'TERMS_AND_CONDITIONS',
-            'PRIVACY_POLICY',
-            'DATA_PROCESSING',
-            'MARKETING',
-          ],
+  async saveConsent(userId: string, dto: UpdateConsentDto) {
+    return this.prisma.$transaction(async (tx) => {
+      const patient = await tx.patient.findUnique({ where: { userId } });
+      if (!patient) throw new NotFoundException('Patient not found.');
+      await tx.consent.upsert({
+        where: { patientId_type: { patientId: patient.id, type: dto.type } },
+        update: {
+          status: dto.status,
+          grantedAt: dto.status === 'GRANTED' ? new Date() : null,
+          revokedAt: dto.status === 'REVOKED' ? new Date() : null,
+          expiresAt: dto.expiresAt ? new Date(dto.expiresAt) : null,
+          purpose: dto.purpose,
+          version: dto.version,
         },
-      },
-    });
-
-    /**
-     * Terms & Conditions
-     */
-    await tx.consent.create({
-      data: {
-        patientId: patient.id,
-        type: 'TERMS_AND_CONDITIONS',
-        purpose: 'Application Terms and Conditions',
-        granted: dto.acceptTerms,
-      },
-    });
-
-    /**
-     * Privacy Policy
-     */
-    await tx.consent.create({
-      data: {
-        patientId: patient.id,
-        type: 'PRIVACY_POLICY',
-        purpose: 'Privacy Policy',
-        granted: dto.acceptPrivacyPolicy,
-      },
-    });
-
-    /**
-     * Data Processing
-     */
-    await tx.consent.create({
-      data: {
-        patientId: patient.id,
-        type: 'DATA_PROCESSING',
-        purpose: 'Personal Data Processing',
-        granted: dto.acceptDataProcessing,
-      },
-    });
-
-    /**
-     * Marketing
-     */
-    await tx.consent.create({
-      data: {
-        patientId: patient.id,
-        type: 'MARKETING',
-        purpose: 'Marketing Communications',
-        granted: dto.acceptMarketing ?? false,
-      },
-    });
-
-    return this.updateOnboardingStep(tx, userId, 11, 95);
-  });
-}
-  /**
-   * STEP 11
-   * Complete onboarding
-   */
-  async completeOnboarding(
-    userId: string,
-  ) {
-    return this.prisma.onboardingProgress.update({
-      where: {
-        userId,
-      },
-      data: {
-        currentStep: 11,
-        completionPercentage: 100,
-        status: 'COMPLETED',
-        completedAt: new Date(),
-      },
+        create: {
+          patientId: patient.id,
+          type: dto.type,
+          status: dto.status,
+          grantedAt: dto.status === 'GRANTED' ? new Date() : null,
+          revokedAt: dto.status === 'REVOKED' ? new Date() : null,
+          expiresAt: dto.expiresAt ? new Date(dto.expiresAt) : null,
+          purpose: dto.purpose,
+          version: dto.version,
+        },
+      });
+      return this.updateOnboardingStep(tx, userId, 11, 100);
     });
   }
 
+  async completeOnboarding(userId: string) {
+    return this.prisma.$transaction(async (tx) => {
+      const progress = await tx.onboardingProgress.findUnique({ where: { userId } });
+      if (!progress) throw new NotFoundException('Onboarding progress not found.');
+      return tx.onboardingProgress.update({
+        where: { userId },
+        data: {
+          status: OnboardingStatus.COMPLETED,
+          completionPercentage: 100,
+          currentStep: 11,
+          completedAt: new Date(),
+        },
+      });
+    });
+  }
 
-    /**
-   * Get all health information needed by the dashboard.
-   */
   async getDashboardData(userId: string) {
     const user = await this.prisma.user.findUnique({
-      where: {
-        id: userId,
-      },
+      where: { id: userId },
       include: {
-        person: true,
-        patient: {
+        person: {
           include: {
-            healthPassport: true,
-            healthGoals: true,
-            healthJournalSettings: true,
-            emergencyContacts: true,
+            country: true,
+            personAddresses: {
+              where: { isPrimary: true },
+              orderBy: { createdAt: 'desc' },
+              take: 1,
+              include: { address: { include: { country: true } } },
+            },
           },
         },
+        patient: { include: { healthPassport: true } },
       },
     });
-
-    if (!user) {
-      throw new NotFoundException(
-        'User not found.',
-      );
-    }
-
-    const patientId = user.patient?.id;
-    const healthPassportId =
-      user.patient?.healthPassport?.id;
-
-    if (!patientId || !healthPassportId) {
-      throw new NotFoundException(
-        'Patient health information not found.',
-      );
-    }
-
-    const [
-      allergies,
-      conditions,
-      medications,
-      immunizations,
-    ] = await Promise.all([
-      this.prisma.patientAllergy.findMany({
-        where: {
-          healthPassportId,
-        },
-        include: {
-          allergy: true,
-        },
-      }),
-
-      this.prisma.patientCondition.findMany({
-        where: {
-          healthPassportId,
-        },
-        include: {
-          condition: true,
-        },
-      }),
-
-      this.prisma.patientMedication.findMany({
-        where: {
-          healthPassportId,
-        },
-        include: {
-          medication: true,
-        },
-      }),
-
-      this.prisma.patientImmunization.findMany({
-        where: {
-          healthPassportId,
-        },
-        include: {
-          immunization: true,
-        },
-      }),
-    ]);
-
-        const patient = user.patient;
-
-    if (!patient) {
-      throw new NotFoundException(
-        'Patient health information not found.',
-      );
-    }
-
+    if (!user) throw new NotFoundException('User not found.');
     return {
       profile: user.person,
-      patient,
-      healthPassport:
-        patient.healthPassport,
-
-      emergencyContacts:
-        patient.emergencyContacts,
-
-      allergies,
-      conditions,
-      medications,
-      immunizations,
-
-      healthGoals:
-        patient.healthGoals,
-
-      healthJournalSettings:
-        patient.healthJournalSettings,
+      patient: user.patient,
+      healthPassport: user.patient?.healthPassport ?? null,
     };
-}
+  }
 }
