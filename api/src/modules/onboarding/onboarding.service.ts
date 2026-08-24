@@ -1,5 +1,6 @@
-import { Injectable } from '@nestjs/common';
+import { BadRequestException, Injectable } from '@nestjs/common';
 
+import { PrismaService } from '../../database/prisma.service';
 import { OnboardingRepository } from './onboarding.repository';
 
 import { UpdateProfileDto } from './dto/update-profile.dto';
@@ -19,6 +20,7 @@ import { UpdateConsentDto } from './dto/update-consent.dto';
 export class OnboardingService {
   constructor(
     private readonly onboardingRepository: OnboardingRepository,
+    private readonly prisma: PrismaService,
   ) {}
 
   async getProgress(userId: string) {
@@ -36,6 +38,101 @@ export class OnboardingService {
     });
   }
 
+  private hasAddressUpdate(dto: UpdateProfileDto) {
+    return [
+      dto.addressLine1,
+      dto.addressLine2,
+      dto.suburb,
+      dto.city,
+      dto.province,
+      dto.postalCode,
+      dto.country,
+    ].some((value) => value !== undefined);
+  }
+
+  private async updatePrimaryAddress(userId: string, dto: UpdateProfileDto) {
+    if (!this.hasAddressUpdate(dto)) return;
+
+    await this.prisma.$transaction(async (tx) => {
+      const user = await tx.user.findUnique({
+        where: { id: userId },
+        select: { personId: true },
+      });
+
+      if (!user) {
+        throw new BadRequestException('User not found.');
+      }
+
+      let countryId: string | null | undefined;
+      if (dto.country !== undefined) {
+        if (!dto.country) {
+          countryId = null;
+        } else {
+          const country = await tx.country.findFirst({
+            where: {
+              OR: [
+                { iso2: dto.country.toUpperCase() },
+                { name: dto.country },
+              ],
+            },
+            select: { id: true },
+          });
+
+          if (!country) {
+            throw new BadRequestException('Selected country could not be found.');
+          }
+
+          countryId = country.id;
+        }
+      }
+
+      const primary = await tx.personAddress.findFirst({
+        where: {
+          personId: user.personId,
+          type: 'HOME',
+          isPrimary: true,
+        },
+        include: { address: true },
+      });
+
+      if (primary) {
+        await tx.address.update({
+          where: { id: primary.addressId },
+          data: {
+            line1: dto.addressLine1 ?? primary.address.line1,
+            line2: dto.addressLine2 !== undefined ? dto.addressLine2 : primary.address.line2,
+            suburb: dto.suburb !== undefined ? dto.suburb : primary.address.suburb,
+            city: dto.city ?? primary.address.city,
+            province: dto.province !== undefined ? dto.province : primary.address.province,
+            postalCode: dto.postalCode !== undefined ? dto.postalCode : primary.address.postalCode,
+            countryId,
+          },
+        });
+      } else {
+        const address = await tx.address.create({
+          data: {
+            line1: dto.addressLine1 ?? '',
+            line2: dto.addressLine2 ?? null,
+            suburb: dto.suburb ?? null,
+            city: dto.city ?? '',
+            province: dto.province ?? null,
+            postalCode: dto.postalCode ?? null,
+            countryId: countryId ?? null,
+          },
+        });
+
+        await tx.personAddress.create({
+          data: {
+            personId: user.personId,
+            addressId: address.id,
+            type: 'HOME',
+            isPrimary: true,
+          },
+        });
+      }
+    });
+  }
+
   /**
    * STEP 1 / personal profile.
    * A profile-picture-only update must not reset or advance onboarding progress.
@@ -45,9 +142,11 @@ export class OnboardingService {
       dto.profileImageUrl !== undefined &&
       dto.preferredName === undefined &&
       dto.dateOfBirth === undefined &&
-      dto.gender === undefined;
+      dto.gender === undefined &&
+      !this.hasAddressUpdate(dto);
 
     const profile = await this.onboardingRepository.updatePersonProfile(userId, dto);
+    await this.updatePrimaryAddress(userId, dto);
 
     if (isProfileImageOnly) {
       return profile;
@@ -101,6 +200,30 @@ export class OnboardingService {
   }
 
   async getDashboardData(userId: string) {
-    return this.onboardingRepository.getDashboardData(userId);
+    const dashboard = await this.onboardingRepository.getDashboardData(userId);
+
+    const personId = (dashboard.profile as { id?: string } | null)?.id;
+    if (!personId) return dashboard;
+
+    const primaryAddress = await this.prisma.personAddress.findFirst({
+      where: {
+        personId,
+        type: 'HOME',
+        isPrimary: true,
+      },
+      include: {
+        address: {
+          include: { country: true },
+        },
+      },
+    });
+
+    return {
+      ...dashboard,
+      profile: {
+        ...dashboard.profile,
+        address: primaryAddress?.address ?? null,
+      },
+    };
   }
 }
