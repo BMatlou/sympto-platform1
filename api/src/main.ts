@@ -12,6 +12,9 @@ import { AdminBootstrapService } from './modules/admin/admin.bootstrap.service';
 async function bootstrap() {
   const app = await NestFactory.create(AppModule, {
     bufferLogs: true,
+    // Register the JSON/urlencoded parsers below with an explicit limit so
+    // validated profile-image data URLs are not rejected by Express's 100 KB default.
+    bodyParser: false,
   });
 
   app.enableCors({
@@ -23,9 +26,8 @@ async function bootstrap() {
 
   app.enableShutdownHooks();
 
-  // Profile pictures are sent as validated data:image URLs. A 5 MB source
-  // image becomes larger after base64 encoding, so the default Express
-  // 100 KB JSON body limit is too small for legitimate profile uploads.
+  // A 5 MB source image becomes larger after base64 encoding. Keep this
+  // limit comfortably above the validated 7 MB profileImageUrl maximum.
   app.useBodyParser('json', { limit: '10mb' });
   app.useBodyParser('urlencoded', { limit: '10mb', extended: true });
 
