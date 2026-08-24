@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import { useSearchParams } from "next/navigation";
 import {
   healthHomeService,
   type HealthHomeResponse,
@@ -8,13 +9,9 @@ import {
 
 const REFRESH_INTERVAL_MS = 15_000;
 
-function getSelectedPatientId() {
-  if (typeof window === "undefined") return undefined;
-  const value = new URLSearchParams(window.location.search).get("patientId");
-  return value || undefined;
-}
-
 export function useDashboard() {
+  const searchParams = useSearchParams();
+  const patientId = searchParams.get("patientId") || undefined;
   const [data, setData] = useState<HealthHomeResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<unknown>(null);
@@ -25,7 +22,7 @@ export function useDashboard() {
       if (firstLoad.current) setLoading(true);
       setError(null);
 
-      const result = await healthHomeService.getHealthHome(getSelectedPatientId());
+      const result = await healthHomeService.getHealthHome(patientId);
       setData(result);
       firstLoad.current = false;
     } catch (requestError) {
@@ -34,9 +31,12 @@ export function useDashboard() {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [patientId]);
 
   useEffect(() => {
+    // Reload whenever the selected patient changes. Family-member navigation
+    // uses ?patientId=..., so the page must never retain another patient's data.
+    firstLoad.current = true;
     void loadDashboard();
 
     const handleNavigation = () => void loadDashboard();
