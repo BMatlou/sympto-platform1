@@ -14,6 +14,7 @@ import { JwtUser } from './interfaces/jwt-user.interface';
 
 import { AuthService } from './auth.service';
 import { JwtAuthGuard } from './guards/jwt-auth.guard';
+import { UsersService } from '../users/users.service';
 
 import { LoginDto } from './dto/login.dto';
 import { RegisterDto } from './dto/register.dto';
@@ -25,7 +26,7 @@ import { RefreshTokenDto } from './dto/refresh-token.dto';
 export class AuthController {
   constructor(
     private readonly authService: AuthService,
-    private readonly usersService: import('../users/users.service').UsersService,
+    private readonly usersService: UsersService,
   ) {}
 
   @Post('register')
