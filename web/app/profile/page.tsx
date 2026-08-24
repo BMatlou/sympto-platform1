@@ -93,10 +93,12 @@ function labelize(value: string) {
 export default function ProfilePage() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [imageSaving, setImageSaving] = useState(false);
   const [message, setMessage] = useState("");
   const [form, setForm] = useState<ProfileForm>(emptyForm);
   const [account, setAccount] = useState<unknown>(null);
   const [patientNumber, setPatientNumber] = useState("");
+  const [profileImageUrl, setProfileImageUrl] = useState("");
 
   useEffect(() => {
     Promise.all([healthPassportService.getHealthPassport(), authService.me()])
@@ -106,6 +108,7 @@ export default function ProfilePage() {
         const passport = dashboard.healthPassport ?? {};
         setAccount(me);
         setPatientNumber(valueOf(patient, "patientNumber"));
+        setProfileImageUrl(valueOf(nestedRecord(me, "person"), "profileImageUrl"));
         setForm({
           preferredName:
             valueOf(profile, "preferredName") || valueOf(patient, "preferredName"),
@@ -141,6 +144,38 @@ export default function ProfilePage() {
 
   const set = (key: keyof ProfileForm, value: string) =>
     setForm((current) => ({ ...current, [key]: value }));
+
+  async function handleProfileImageChange(file: File | undefined) {
+    if (!file) return;
+    if (!["image/png", "image/jpeg", "image/webp"].includes(file.type)) {
+      setMessage("Please choose a PNG, JPEG, or WebP image.");
+      return;
+    }
+    if (file.size > 5 * 1024 * 1024) {
+      setMessage("Profile pictures must be 5 MB or smaller.");
+      return;
+    }
+
+    try {
+      setImageSaving(true);
+      setMessage("");
+      const dataUrl = await new Promise<string>((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(String(reader.result));
+        reader.onerror = () => reject(new Error("Unable to read image."));
+        reader.readAsDataURL(file);
+      });
+
+      await onboardingService.updateProfile({ profileImageUrl: dataUrl });
+      setProfileImageUrl(dataUrl);
+      setMessage("Your profile picture has been saved.");
+    } catch (error: unknown) {
+      const response = (error as { response?: { data?: { message?: string } } })?.response;
+      setMessage(response?.data?.message || "We couldn't save your profile picture.");
+    } finally {
+      setImageSaving(false);
+    }
+  }
 
   async function save() {
     try {
@@ -179,7 +214,6 @@ export default function ProfilePage() {
   const middleName = valueOf(person, "middleName");
   const lastName = valueOf(person, "lastName") || nestedValue(account, "lastName", "familyName");
   const preferredName = valueOf(person, "preferredName") || form.preferredName;
-  const profileImageUrl = valueOf(person, "profileImageUrl");
   const email = nestedValue(account, "email", "emailAddress");
   const phone = nestedValue(account, "phoneNumber", "phone", "mobileNumber");
   const countryName = valueOf(country, "name");
@@ -203,17 +237,11 @@ export default function ProfilePage() {
       <main className="min-h-screen bg-slate-50">
         <div className="mx-auto max-w-6xl px-4 py-8 sm:px-6 lg:px-8">
           <div className="flex flex-wrap items-center justify-between gap-3">
-            <Link
-              href="/dashboard"
-              className="inline-flex items-center gap-2 text-sm font-semibold text-[#0b2d54] transition hover:text-[#24c1c4]"
-            >
+            <Link href="/dashboard" className="inline-flex items-center gap-2 text-sm font-semibold text-[#0b2d54] transition hover:text-[#24c1c4]">
               <ArrowLeft className="h-4 w-4" />
               Health Home
             </Link>
-            <Link
-              href="/settings"
-              className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-[#0b2d54] shadow-sm transition hover:border-[#24c1c4]"
-            >
+            <Link href="/settings" className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-[#0b2d54] shadow-sm transition hover:border-[#24c1c4]">
               <Settings className="h-4 w-4" />
               Account settings
             </Link>
@@ -223,14 +251,11 @@ export default function ProfilePage() {
             <div className="flex flex-col gap-6 sm:flex-row sm:items-center sm:justify-between">
               <div className="flex items-center gap-5">
                 <div className="relative flex h-20 w-20 shrink-0 items-center justify-center overflow-hidden rounded-2xl bg-white/10 text-xl font-bold ring-1 ring-white/20">
-                  {profileImageUrl ? (
-                    <img src={profileImageUrl} alt="Profile" className="h-full w-full object-cover" />
-                  ) : (
-                    initials
-                  )}
-                  <div className="absolute bottom-1 right-1 rounded-full bg-[#24c1c4] p-1 text-[#0b2d54]">
+                  {profileImageUrl ? <img src={profileImageUrl} alt="Profile" className="h-full w-full object-cover" /> : initials}
+                  <label className="absolute bottom-1 right-1 cursor-pointer rounded-full bg-[#24c1c4] p-1 text-[#0b2d54] shadow-sm transition hover:scale-105" title="Upload profile picture">
                     <Camera className="h-3 w-3" />
-                  </div>
+                    <input type="file" accept="image/png,image/jpeg,image/webp" className="sr-only" disabled={imageSaving} onChange={(event) => void handleProfileImageChange(event.target.files?.[0])} />
+                  </label>
                 </div>
                 <div>
                   <div className="mb-2 inline-flex items-center gap-2 rounded-full bg-white/10 px-3 py-1 text-xs font-semibold text-[#bff8f7]">
@@ -238,9 +263,12 @@ export default function ProfilePage() {
                     My profile
                   </div>
                   <h1 className="text-3xl font-bold tracking-tight sm:text-4xl">Personal profile</h1>
-                  <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-200">
-                    One place for your personal identity and baseline health information. Account security belongs in Settings; clinical records remain in Health Records.
-                  </p>
+                  <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-200">One place for your personal identity and baseline health information. Account security belongs in Settings; clinical records remain in Health Records.</p>
+                  <label className="mt-3 inline-flex cursor-pointer items-center gap-2 text-xs font-semibold text-[#bff8f7] hover:text-white">
+                    <Camera className="h-3.5 w-3.5" />
+                    {imageSaving ? "Saving picture…" : "Change profile picture"}
+                    <input type="file" accept="image/png,image/jpeg,image/webp" className="sr-only" disabled={imageSaving} onChange={(event) => void handleProfileImageChange(event.target.files?.[0])} />
+                  </label>
                 </div>
               </div>
               <div className="rounded-2xl bg-white/10 px-4 py-3 ring-1 ring-white/10">
@@ -263,17 +291,8 @@ export default function ProfilePage() {
                   </div>
                   <Link href="/settings" className="text-sm font-semibold text-[#0b2d54] hover:text-[#24c1c4]">Manage account →</Link>
                 </div>
-
                 <div className="mt-5 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-                  {[
-                    ["First name", firstName],
-                    ["Middle name", middleName],
-                    ["Last name", lastName],
-                    ["Preferred name", preferredName],
-                    ["Email", email],
-                    ["Phone", phone],
-                    ["Country", countryName],
-                  ].map(([label, value]) => (
+                  {[["First name", firstName], ["Middle name", middleName], ["Last name", lastName], ["Preferred name", preferredName], ["Email", email], ["Phone", phone], ["Country", countryName]].map(([label, value]) => (
                     <div key={label} className="rounded-xl bg-slate-50 p-4">
                       <p className="text-xs font-semibold uppercase tracking-wide text-slate-400">{label}</p>
                       <p className="mt-1 break-words font-medium text-slate-800">{value || "Not recorded yet"}</p>
@@ -291,11 +310,7 @@ export default function ProfilePage() {
                   </div>
                 </div>
                 <div className="mt-5 rounded-2xl border border-slate-100 bg-slate-50 p-5">
-                  {addressParts.length ? (
-                    <p className="leading-7 text-slate-800">{addressParts.join(", ")}</p>
-                  ) : (
-                    <p className="text-sm text-slate-500">No primary address has been recorded yet. Once address information is saved to your account, it will appear here automatically.</p>
-                  )}
+                  {addressParts.length ? <p className="leading-7 text-slate-800">{addressParts.join(", ")}</p> : <p className="text-sm text-slate-500">No primary address has been recorded yet. Once address information is saved to your account, it will appear here automatically.</p>}
                 </div>
               </section>
 
@@ -303,23 +318,9 @@ export default function ProfilePage() {
                 <h2 className="font-semibold text-[#0b2d54]">Personal details</h2>
                 <p className="mt-1 text-sm text-slate-500">These are the personal profile fields currently supported by the onboarding profile API.</p>
                 <div className="mt-5 grid gap-4 sm:grid-cols-2">
-                  <label className="block">
-                    <span className="text-sm font-medium text-slate-700">Preferred name</span>
-                    <input value={form.preferredName} onChange={(e) => set("preferredName", e.target.value)} placeholder="Add a preferred name" className="mt-2 w-full rounded-xl border border-slate-200 px-3 py-3 outline-none transition focus:border-[#24c1c4] focus:ring-2 focus:ring-[#24c1c4]/10" />
-                  </label>
-                  <label className="block">
-                    <span className="text-sm font-medium text-slate-700">Date of birth</span>
-                    <input type="date" value={form.dateOfBirth} onChange={(e) => set("dateOfBirth", e.target.value)} className="mt-2 w-full rounded-xl border border-slate-200 px-3 py-3 outline-none transition focus:border-[#24c1c4] focus:ring-2 focus:ring-[#24c1c4]/10" />
-                  </label>
-                  <label className="block sm:col-span-2">
-                    <span className="text-sm font-medium text-slate-700">Gender</span>
-                    <select value={form.gender} onChange={(e) => set("gender", e.target.value)} className="mt-2 w-full rounded-xl border border-slate-200 bg-white px-3 py-3 outline-none transition focus:border-[#24c1c4] focus:ring-2 focus:ring-[#24c1c4]/10">
-                      <option value="PREFER_NOT_TO_SAY">Prefer not to say</option>
-                      <option value="FEMALE">Female</option>
-                      <option value="MALE">Male</option>
-                      <option value="OTHER">Other</option>
-                    </select>
-                  </label>
+                  <label className="block"><span className="text-sm font-medium text-slate-700">Preferred name</span><input value={form.preferredName} onChange={(e) => set("preferredName", e.target.value)} placeholder="Add a preferred name" className="mt-2 w-full rounded-xl border border-slate-200 px-3 py-3 outline-none transition focus:border-[#24c1c4] focus:ring-2 focus:ring-[#24c1c4]/10" /></label>
+                  <label className="block"><span className="text-sm font-medium text-slate-700">Date of birth</span><input type="date" value={form.dateOfBirth} onChange={(e) => set("dateOfBirth", e.target.value)} className="mt-2 w-full rounded-xl border border-slate-200 px-3 py-3 outline-none transition focus:border-[#24c1c4] focus:ring-2 focus:ring-[#24c1c4]/10" /></label>
+                  <label className="block sm:col-span-2"><span className="text-sm font-medium text-slate-700">Gender</span><select value={form.gender} onChange={(e) => set("gender", e.target.value)} className="mt-2 w-full rounded-xl border border-slate-200 bg-white px-3 py-3 outline-none transition focus:border-[#24c1c4] focus:ring-2 focus:ring-[#24c1c4]/10"><option value="PREFER_NOT_TO_SAY">Prefer not to say</option><option value="FEMALE">Female</option><option value="MALE">Male</option><option value="OTHER">Other</option></select></label>
                 </div>
               </section>
 
@@ -347,14 +348,8 @@ export default function ProfilePage() {
               </section>
 
               <div className="flex flex-col gap-3 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:flex-row sm:items-center sm:justify-between">
-                <div className="flex items-start gap-3">
-                  <CheckCircle2 className="mt-0.5 h-5 w-5 shrink-0 text-[#24c1c4]" />
-                  <p className="max-w-2xl text-sm leading-6 text-slate-500">Saving this page writes through the existing onboarding profile endpoints, so Patient and Health Passport values stay in their respective backend tables. Account identity remains managed separately.</p>
-                </div>
-                <button onClick={save} disabled={saving} className="inline-flex shrink-0 items-center justify-center gap-2 rounded-xl bg-[#0b2d54] px-5 py-3 font-semibold text-white transition hover:bg-[#123e6d] disabled:cursor-not-allowed disabled:opacity-60">
-                  <Save className="h-4 w-4" />
-                  {saving ? "Saving…" : "Save profile"}
-                </button>
+                <div className="flex items-start gap-3"><CheckCircle2 className="mt-0.5 h-5 w-5 shrink-0 text-[#24c1c4]" /><p className="max-w-2xl text-sm leading-6 text-slate-500">Saving this page writes through the existing onboarding profile endpoints, so Patient and Health Passport values stay in their respective backend tables. Profile pictures are persisted on Person.profileImageUrl.</p></div>
+                <button onClick={save} disabled={saving || imageSaving} className="inline-flex shrink-0 items-center justify-center gap-2 rounded-xl bg-[#0b2d54] px-5 py-3 font-semibold text-white transition hover:bg-[#123e6d] disabled:cursor-not-allowed disabled:opacity-60"><Save className="h-4 w-4" />{saving ? "Saving…" : "Save profile"}</button>
               </div>
 
               {message && <div className="rounded-xl border border-[#24c1c4]/30 bg-[#24c1c4]/10 px-4 py-3 text-sm text-[#0b2d54]">{message}</div>}
