@@ -41,6 +41,7 @@ export interface UpdateProfileDto {
     | 'FEMALE'
     | 'OTHER'
     | 'PREFER_NOT_TO_SAY';
+  profileImageUrl?: string;
 }
 
 export interface UpdateIndividualProfileDto {
@@ -82,23 +83,14 @@ export interface UpdateEmergencyContactDto {
 
 export interface AllergyItem {
   allergyId: string;
-
   severity?: string;
-
   reaction?: string;
-
   reactionNotes?: string;
-
   onsetDate?: string;
-
   lastReaction?: string;
-
   verified?: boolean;
-
   verifiedBy?: string;
-
   status?: string;
-
   notes?: string;
 }
 
@@ -108,27 +100,16 @@ export interface UpdatePatientAllergiesDto {
 
 export interface ConditionItem {
   conditionId: string;
-
   diagnosedAt?: string;
-
   resolvedAt?: string;
-
   chronic?: boolean;
-
   severity?: string;
-
   stage?: string;
-
   primaryCondition?: boolean;
-
   diagnosedBy?: string;
-
   treatmentPlan?: string;
-
   outcome?: string;
-
   status?: string;
-
   notes?: string;
 }
 
@@ -138,35 +119,20 @@ export interface UpdatePatientConditionsDto {
 
 export interface MedicationItem {
   medicationId: string;
-
   dosage?: string;
-
   frequency?: string;
-
   route?: string;
-
   indication?: string;
-
   instructions?: string;
-
   prescribedBy?: string;
-
   startedAt?: string;
-
   endedAt?: string;
-
   ongoing?: boolean;
-
   adherencePercentage?: number;
-
   missedDoses?: number;
-
   sideEffects?: string;
-
   effectiveness?: string;
-
   status?: string;
-
   notes?: string;
 }
 
@@ -176,31 +142,18 @@ export interface UpdatePatientMedicationsDto {
 
 export interface ImmunizationItem {
   immunizationId: string;
-
   administeredAt?: string;
-
   doseNumber?: number;
-
   batchNumber?: string;
-
   manufacturer?: string;
-
   administeredBy?: string;
-
   facility?: string;
-
   route?: string;
-
   site?: string;
-
   adverseReaction?: boolean;
-
   adverseReactionNotes?: string;
-
   nextDueDate?: string;
-
   status?: string;
-
   notes?: string;
 }
 export interface UpdatePatientImmunizationsDto {
@@ -231,13 +184,10 @@ export interface UpdateHealthJournalSettingsDto {
   trackExercise?: boolean;
   trackMedications?: boolean;
   trackVitals?: boolean;
-
   remindersEnabled?: boolean;
-
- morningReminder?: string;
-afternoonReminder?: string;
-eveningReminder?: string;
-
+  morningReminder?: string;
+  afternoonReminder?: string;
+  eveningReminder?: string;
   weeklySummary?: boolean;
   monthlySummary?: boolean;
 }
