@@ -15,6 +15,7 @@ import { JwtUser } from './interfaces/jwt-user.interface';
 import { AuthService } from './auth.service';
 import { JwtAuthGuard } from './guards/jwt-auth.guard';
 import { UsersService } from '../users/users.service';
+import { PrismaService } from '../../database/prisma.service';
 
 import { LoginDto } from './dto/login.dto';
 import { RegisterDto } from './dto/register.dto';
@@ -27,6 +28,7 @@ export class AuthController {
   constructor(
     private readonly authService: AuthService,
     private readonly usersService: UsersService,
+    private readonly prisma: PrismaService,
   ) {}
 
   @Post('register')
@@ -53,7 +55,26 @@ export class AuthController {
   @Get('profile')
   async profile(@Req() req: Request) {
     const jwtUser = req.user as JwtUser;
-    const user = await this.usersService.findById(jwtUser.sub);
+    const user = await this.prisma.user.findUnique({
+      where: { id: jwtUser.sub },
+      include: {
+        person: {
+          include: {
+            country: true,
+            personAddresses: {
+              where: { isPrimary: true },
+              orderBy: { createdAt: 'desc' },
+              take: 1,
+              include: {
+                address: {
+                  include: { country: true },
+                },
+              },
+            },
+          },
+        },
+      },
+    });
 
     if (!user) {
       return {
@@ -65,6 +86,8 @@ export class AuthController {
       };
     }
 
+    const primaryAddress = user.person?.personAddresses?.[0]?.address ?? null;
+
     return {
       id: user.id,
       email: user.email,
@@ -74,8 +97,35 @@ export class AuthController {
         ? {
             id: user.person.id,
             firstName: user.person.firstName,
+            middleName: user.person.middleName,
             lastName: user.person.lastName,
             preferredName: user.person.preferredName,
+            profileImageUrl: user.person.profileImageUrl,
+            country: user.person.country
+              ? {
+                  id: user.person.country.id,
+                  name: user.person.country.name,
+                  iso2: user.person.country.iso2,
+                }
+              : null,
+            address: primaryAddress
+              ? {
+                  id: primaryAddress.id,
+                  line1: primaryAddress.line1,
+                  line2: primaryAddress.line2,
+                  suburb: primaryAddress.suburb,
+                  city: primaryAddress.city,
+                  province: primaryAddress.province,
+                  postalCode: primaryAddress.postalCode,
+                  country: primaryAddress.country
+                    ? {
+                        id: primaryAddress.country.id,
+                        name: primaryAddress.country.name,
+                        iso2: primaryAddress.country.iso2,
+                      }
+                    : null,
+                }
+              : null,
           }
         : null,
     };
