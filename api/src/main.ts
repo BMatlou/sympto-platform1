@@ -14,14 +14,20 @@ async function bootstrap() {
     bufferLogs: true,
   });
 
-   app.enableCors({
-    origin: "http://localhost:3000", // Points to your Next.js app
+  app.enableCors({
+    origin: "http://localhost:3000",
     credentials: true,
     methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
     allowedHeaders: ["Content-Type", "Authorization"],
   });
 
   app.enableShutdownHooks();
+
+  // Profile pictures are sent as validated data:image URLs. A 5 MB source
+  // image becomes larger after base64 encoding, so the default Express
+  // 100 KB JSON body limit is too small for legitimate profile uploads.
+  app.useBodyParser('json', { limit: '10mb' });
+  app.useBodyParser('urlencoded', { limit: '10mb', extended: true });
 
   app.setGlobalPrefix('api');
 
