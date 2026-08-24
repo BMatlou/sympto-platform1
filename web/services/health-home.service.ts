@@ -79,8 +79,10 @@ export interface UpdateWeightResponse {
 }
 
 class HealthHomeService {
-  async getHealthHome(): Promise<HealthHomeResponse> {
-    const response = await api.get<{ success: boolean; data: HealthHomeResponse }>('/health-home');
+  async getHealthHome(patientId?: string): Promise<HealthHomeResponse> {
+    const response = await api.get<{ success: boolean; data: HealthHomeResponse }>('/health-home', {
+      params: patientId ? { patientId } : undefined,
+    });
     const data = response.data.data;
     return {
       ...data,
@@ -98,10 +100,12 @@ class HealthHomeService {
     };
   }
 
-  async updateWeight(weightKg: number, heightCm?: number): Promise<UpdateWeightResponse> {
+  async updateWeight(weightKg: number, heightCm?: number, patientId?: string): Promise<UpdateWeightResponse> {
     const response = await api.post<{ success: boolean; data: UpdateWeightResponse }>('/health-home/weight', {
       weightKg,
       ...(heightCm !== undefined ? { heightCm } : {}),
+    }, {
+      params: patientId ? { patientId } : undefined,
     });
     return response.data.data;
   }
