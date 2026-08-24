@@ -6,6 +6,7 @@ import {
   Matches,
   MaxLength,
 } from 'class-validator';
+import { Transform } from 'class-transformer';
 
 import { Gender } from '@prisma/client';
 
@@ -62,5 +63,11 @@ export class UpdateProfileDto {
   /** ISO-2 country code, matching the registration country selector. */
   @IsOptional()
   @IsString()
+  @Matches(/^[A-Za-z]{2}$/, {
+    message: 'Country must be an ISO 2-letter country code such as ZA, US, GB, or CA.',
+  })
+  @Transform(({ value }) =>
+    typeof value === 'string' ? value.trim().toUpperCase() : value,
+  )
   country?: string;
 }
