@@ -65,24 +65,20 @@ export class OnboardingService {
 
       let countryId: string | null | undefined;
       if (dto.country !== undefined) {
-        if (!dto.country) {
+        const normalizedCountry = dto.country.trim().toUpperCase();
+
+        if (!normalizedCountry) {
           countryId = null;
         } else {
-          const normalizedCountry = dto.country.trim().toUpperCase();
-          let country = await tx.country.findFirst({
-            where: {
-              OR: [
-                { iso2: normalizedCountry },
-                { name: dto.country.trim() },
-              ],
-            },
+          // The web registration/profile selector uses ISO-2 values such as ZA.
+          // Always resolve the submitted value as an ISO-2 code first. For the
+          // existing South African registration path, repair the reference row
+          // when an older database was created without country reference data.
+          let country = await tx.country.findUnique({
+            where: { iso2: normalizedCountry },
             select: { id: true },
           });
 
-          // Signup stores the selected country as an ISO-2 code (for example ZA).
-          // Existing databases may not yet contain the reference row, so make the
-          // South Africa registration/profile path self-healing instead of rejecting
-          // a valid signup address with a 400.
           if (!country && normalizedCountry === 'ZA') {
             country = await tx.country.upsert({
               where: { iso2: 'ZA' },
@@ -110,7 +106,9 @@ export class OnboardingService {
           }
 
           if (!country) {
-            throw new BadRequestException('Selected country could not be found.');
+            throw new BadRequestException(
+              `Selected country could not be found for ISO-2 code ${normalizedCountry}.`,
+            );
           }
 
           countryId = country.id;
