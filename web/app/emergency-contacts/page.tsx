@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { ArrowLeft, Mail, Phone, Plus, RefreshCw, ShieldAlert, UserRound } from "lucide-react";
+import { useSearchParams } from "next/navigation";
 import { useDashboard } from "@/hooks/use-dashboard";
 
 function formatEnum(value: unknown) {
@@ -13,14 +14,23 @@ function formatEnum(value: unknown) {
 }
 
 export default function EmergencyContactsPage() {
+  const searchParams = useSearchParams();
+  const patientId = searchParams.get("patientId");
   const { data: dashboard, loading, error, reload } = useDashboard();
   const emergencyContacts = dashboard?.emergencyContacts ?? [];
+
+  const dashboardHref = patientId ? `/dashboard?patientId=${encodeURIComponent(patientId)}` : "/dashboard";
+  const onboardingHref = patientId ? `/onboarding?patientId=${encodeURIComponent(patientId)}` : "/onboarding";
+  const patientName = dashboard?.patient?.name ||
+    [dashboard?.profile?.preferredName || dashboard?.profile?.firstName, dashboard?.profile?.lastName]
+      .filter(Boolean)
+      .join(" ");
 
   return (
     <main className="min-h-screen bg-[#F7F9FC]">
       <header className="border-b border-slate-200 bg-white">
         <div className="mx-auto flex h-16 max-w-5xl items-center px-4 sm:px-6">
-          <Link href="/dashboard" className="inline-flex items-center gap-2 text-sm font-medium text-slate-600 hover:text-[#0B5CAD]">
+          <Link href={dashboardHref} className="inline-flex items-center gap-2 text-sm font-medium text-slate-600 hover:text-[#0B5CAD]">
             <ArrowLeft className="h-4 w-4" />
             Back to dashboard
           </Link>
@@ -36,10 +46,11 @@ export default function EmergencyContactsPage() {
             </div>
             <h1 className="text-3xl font-bold tracking-tight text-slate-950 sm:text-4xl">Emergency contacts</h1>
             <p className="mt-2 max-w-2xl text-slate-500">
+              {patientName ? `Trusted contacts for ${patientName}. ` : ""}
               Keep trusted contacts available in case someone needs to reach a person you have listed as an emergency contact.
             </p>
           </div>
-          <Link href="/onboarding" className="inline-flex items-center justify-center gap-2 rounded-xl bg-[#0B5CAD] px-4 py-2.5 text-sm font-semibold text-white hover:bg-[#084987]">
+          <Link href={onboardingHref} className="inline-flex items-center justify-center gap-2 rounded-xl bg-[#0B5CAD] px-4 py-2.5 text-sm font-semibold text-white hover:bg-[#084987]">
             <Plus className="h-4 w-4" />
             Manage contacts
           </Link>
@@ -74,15 +85,15 @@ export default function EmergencyContactsPage() {
         )}
 
         {!loading && !error && emergencyContacts.length === 0 && (
-          <div className="rounded-2xl border border-slate-200 bg-white p-10 text-center">
+          <div className="rounded-2xl border border-slate-200 bg-white p-10 text-center shadow-sm">
             <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-blue-50 text-blue-600">
               <UserRound className="h-7 w-7" />
             </div>
             <h2 className="mt-4 text-lg font-semibold text-slate-900">No emergency contacts saved yet</h2>
             <p className="mx-auto mt-2 max-w-md text-sm leading-6 text-slate-500">
-              Once you add an emergency contact through your profile/onboarding information, their real details will appear here automatically.
+              Once an emergency contact is saved in your profile, their real details will appear here automatically. This page never uses placeholder contact data.
             </p>
-            <Link href="/onboarding" className="mt-5 inline-flex items-center gap-2 rounded-xl bg-[#0B5CAD] px-4 py-2.5 text-sm font-semibold text-white hover:bg-[#084987]">
+            <Link href={onboardingHref} className="mt-5 inline-flex items-center gap-2 rounded-xl bg-[#0B5CAD] px-4 py-2.5 text-sm font-semibold text-white hover:bg-[#084987]">
               <Plus className="h-4 w-4" />
               Add emergency contact
             </Link>
@@ -92,7 +103,7 @@ export default function EmergencyContactsPage() {
         {!loading && !error && emergencyContacts.length > 0 && (
           <div className="grid gap-4 md:grid-cols-2">
             {emergencyContacts.map((contact) => (
-              <div key={contact.id ?? contact.fullName} className="rounded-2xl border border-slate-200 bg-white p-5 sm:p-6">
+              <div key={contact.id ?? contact.fullName} className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
                 <div className="flex items-start gap-4">
                   <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-blue-50 text-blue-600">
                     <UserRound className="h-6 w-6" />
@@ -133,7 +144,7 @@ export default function EmergencyContactsPage() {
               <div>
                 <h2 className="font-semibold text-slate-900">Keep your contact information current</h2>
                 <p className="mt-1 text-sm leading-6 text-slate-500">
-                  Use Manage contacts to update the same emergency-contact data used by your Health Home and Health Passport.
+                  Manage the same emergency-contact information used by Health Home and Health Passport. When viewing a family member, that member's real contact data stays selected through the page navigation.
                 </p>
               </div>
             </div>
