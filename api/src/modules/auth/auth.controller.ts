@@ -19,47 +19,71 @@ import { LoginDto } from './dto/login.dto';
 import { RegisterDto } from './dto/register.dto';
 import { RefreshTokenDto } from './dto/refresh-token.dto';
 
-
 @ApiTags('Auth')
+@ApiBearerAuth()
 @Controller('auth')
 export class AuthController {
-  constructor(private readonly authService: AuthService) {}
+  constructor(
+    private readonly authService: AuthService,
+    private readonly usersService: import('../users/users.service').UsersService,
+  ) {}
 
   @Post('register')
-async register(
-  @Body(new ValidationPipe()) dto: RegisterDto,
-) {
-  console.log('REGISTER DTO:');
-  console.log(JSON.stringify(dto, null, 2));
-
-  return this.authService.register(dto);
-}
+  async register(@Body(new ValidationPipe()) dto: RegisterDto) {
+    return this.authService.register(dto);
+  }
 
   @Post('login')
-  async login(
-    @Body(new ValidationPipe()) dto: LoginDto,
-  ) {
+  async login(@Body(new ValidationPipe()) dto: LoginDto) {
     return this.authService.login(dto);
   }
 
   @Post('refresh')
-async refresh(
-  @Body(new ValidationPipe()) dto: RefreshTokenDto,
-) {
-  return this.authService.refreshToken(dto.refreshToken);
-}
+  async refresh(@Body(new ValidationPipe()) dto: RefreshTokenDto) {
+    return this.authService.refreshToken(dto.refreshToken);
+  }
 
- @UseGuards(JwtAuthGuard)
-@Get('profile')
-async profile(@Req() req: Request) {
-  return req.user as JwtUser;
-}
+  /**
+   * Return the authenticated account's persisted identity details.
+   * The JWT intentionally only contains authentication claims, so profile
+   * data must be loaded from the database rather than inferred from the JWT.
+   */
+  @UseGuards(JwtAuthGuard)
+  @Get('profile')
+  async profile(@Req() req: Request) {
+    const jwtUser = req.user as JwtUser;
+    const user = await this.usersService.findById(jwtUser.sub);
 
-@UseGuards(JwtAuthGuard)
-@Post('logout')
-async logout(@Req() req: Request) {
-  const user = req.user as JwtUser;
+    if (!user) {
+      return {
+        id: jwtUser.sub,
+        email: jwtUser.email,
+        userType: jwtUser.userType,
+        person: null,
+        phoneNumber: null,
+      };
+    }
 
-  return this.authService.logout(user.sub);
-}
+    return {
+      id: user.id,
+      email: user.email,
+      phoneNumber: user.phoneNumber,
+      userType: user.userType,
+      person: user.person
+        ? {
+            id: user.person.id,
+            firstName: user.person.firstName,
+            lastName: user.person.lastName,
+            preferredName: user.person.preferredName,
+          }
+        : null,
+    };
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @Post('logout')
+  async logout(@Req() req: Request) {
+    const user = req.user as JwtUser;
+    return this.authService.logout(user.sub);
+  }
 }
