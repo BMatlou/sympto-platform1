@@ -135,20 +135,18 @@ export class OnboardingService {
 
   /**
    * STEP 1 / personal profile.
-   * A profile-picture-only update must not reset or advance onboarding progress.
+   * Picture and address edits are profile maintenance and must not reset or advance onboarding progress.
    */
   async updateProfile(userId: string, dto: UpdateProfileDto) {
-    const isProfileImageOnly =
-      dto.profileImageUrl !== undefined &&
-      dto.preferredName === undefined &&
-      dto.dateOfBirth === undefined &&
-      dto.gender === undefined &&
-      !this.hasAddressUpdate(dto);
+    const hasOnboardingProfileFields =
+      dto.preferredName !== undefined ||
+      dto.dateOfBirth !== undefined ||
+      dto.gender !== undefined;
 
     const profile = await this.onboardingRepository.updatePersonProfile(userId, dto);
     await this.updatePrimaryAddress(userId, dto);
 
-    if (isProfileImageOnly) {
+    if (!hasOnboardingProfileFields) {
       return profile;
     }
 
