@@ -9,7 +9,7 @@ const ACTIVE_MEDICATION_STATUSES = ['ACTIVE', 'PAUSED'] as const;
 export class HealthHomeService {
   constructor(private readonly prisma: PrismaService) {}
 
-  async getHealthHome(userId: string) {
+  async getHealthHome(userId: string, requestedPatientId?: string) {
     const user = await this.prisma.user.findUnique({
       where: { id: userId },
       include: {
@@ -27,6 +27,7 @@ export class HealthHomeService {
             baseline: true,
             healthJournalSettings: true,
             emergencyContacts: true,
+            person: true,
           },
         },
       },
@@ -34,19 +35,59 @@ export class HealthHomeService {
 
     if (!user?.patient) throw new NotFoundException('Patient health profile not found.');
 
-    const patientId = user.patient.id;
-    const healthPassportId = user.patient.healthPassport?.id;
+    const ownerPatient = user.patient;
+    let patient = ownerPatient;
+    let selectedUserId = userId;
+
+    if (requestedPatientId && requestedPatientId !== ownerPatient.id) {
+      const familyLink = await this.prisma.familyMember.findFirst({
+        where: {
+          ownerPatientId: ownerPatient.id,
+          memberPatientId: requestedPatientId,
+          canViewRecords: true,
+        },
+      });
+
+      if (!familyLink) {
+        throw new NotFoundException('You are not authorised to view this family member.');
+      }
+
+      const familyPatient = await this.prisma.patient.findUnique({
+        where: { id: requestedPatientId },
+        include: {
+          healthPassport: {
+            include: {
+              immunizations: {
+                include: { immunization: true },
+                orderBy: { administeredAt: 'desc' },
+              },
+            },
+          },
+          baseline: true,
+          healthJournalSettings: true,
+          emergencyContacts: true,
+          person: true,
+        },
+      });
+
+      if (!familyPatient) throw new NotFoundException('Family member health profile not found.');
+      patient = familyPatient;
+      selectedUserId = familyPatient.userId;
+    }
+
+    const patientId = patient.id;
+    const healthPassportId = patient.healthPassport?.id;
     const now = new Date();
-    const immunizations = user.patient.healthPassport?.immunizations ?? [];
+    const immunizations = patient.healthPassport?.immunizations ?? [];
 
     const [allergies, conditions, medications, goals, family, appointments, notifications, devices, measurements, symptomLogs, aiObservations, labOrders, imagingStudies, carePlans] = await Promise.all([
       this.prisma.patientAllergy.findMany({ where: { healthPassportId: healthPassportId ?? '' }, include: { allergy: true }, orderBy: { createdAt: 'desc' } }),
       this.prisma.patientCondition.findMany({ where: { healthPassportId: healthPassportId ?? '' }, include: { condition: true }, orderBy: { createdAt: 'desc' } }),
       this.prisma.patientMedication.findMany({ where: { healthPassportId: healthPassportId ?? '', status: { in: [...ACTIVE_MEDICATION_STATUSES] } }, include: { medication: true }, orderBy: { createdAt: 'desc' } }),
       this.prisma.healthGoal.findMany({ where: { patientId, status: 'ACTIVE' }, include: { progress: { orderBy: { measuredAt: 'desc' }, take: 1 } }, orderBy: [{ priority: 'desc' }, { targetDate: 'asc' }] }),
-      this.prisma.familyMember.findMany({ where: { ownerPatientId: patientId }, include: { memberPatient: { include: { person: true } } }, orderBy: { createdAt: 'desc' } }),
+      this.prisma.familyMember.findMany({ where: { ownerPatientId: ownerPatient.id }, include: { memberPatient: { include: { person: true } } }, orderBy: { createdAt: 'desc' } }),
       this.prisma.appointment.findMany({ where: { patientId, status: { in: [...ACTIVE_APPOINTMENT_STATUSES] }, scheduledStart: { gte: now } }, include: { practitioner: { include: { person: true } }, practice: true, telemedicineSession: true }, orderBy: { scheduledStart: 'asc' }, take: 10 }),
-      this.prisma.notification.findMany({ where: { userId, readAt: null, status: { in: ['PENDING', 'QUEUED', 'SENT', 'DELIVERED'] } }, orderBy: [{ priority: 'desc' }, { createdAt: 'desc' }], take: 10 }),
+      this.prisma.notification.findMany({ where: { userId: selectedUserId, readAt: null, status: { in: ['PENDING', 'QUEUED', 'SENT', 'DELIVERED'] } }, orderBy: [{ priority: 'desc' }, { createdAt: 'desc' }], take: 10 }),
       this.prisma.wearableDevice.findMany({ where: { patientId }, orderBy: { lastSyncAt: 'desc' }, include: { _count: { select: { measurements: true } } } }),
       this.prisma.deviceMeasurement.findMany({ where: { device: { patientId } }, orderBy: { measuredAt: 'desc' }, take: 100 }),
       this.prisma.symptomLog.findMany({ where: { clinicalEpisode: { patientId }, status: { in: ['ACTIVE', 'COMPLETED'] } }, include: { clinicalEpisode: true, symptoms: { include: { symptom: true } }, triggers: true }, orderBy: { startedAt: 'desc' }, take: 10 }),
@@ -76,31 +117,30 @@ export class HealthHomeService {
     };
 
     const goalsWithProgress = goals.map((goal) => ({ ...goal, latestProgress: goal.progress[0] ?? null }));
-
     const activeAllergies = allergies.filter((item) => item.status === 'ACTIVE' || !item.status);
     const activeConditions = conditions.filter((item) => item.status === 'ACTIVE' && !item.resolvedAt);
 
     return {
       generatedAt: now.toISOString(),
-      profile: user.person,
+      profile: patient.person,
       patient: {
         id: patientId,
-        patientNumber: user.patient.patientNumber,
-        firstName: user.person?.firstName ?? '',
-        lastName: user.person?.lastName ?? '',
-        name: [user.person?.firstName, user.person?.lastName].filter(Boolean).join(' '),
-        heightCm: user.patient.heightCm,
-        weightKg: user.patient.weightKg,
-        deceased: user.patient.deceased,
+        patientNumber: patient.patientNumber,
+        firstName: patient.person?.firstName ?? '',
+        lastName: patient.person?.lastName ?? '',
+        name: [patient.person?.firstName, patient.person?.lastName].filter(Boolean).join(' '),
+        heightCm: patient.heightCm,
+        weightKg: patient.weightKg,
+        deceased: patient.deceased,
       },
-      healthPassport: user.patient.healthPassport,
+      healthPassport: patient.healthPassport,
       healthSnapshot: {
-        baseline: user.patient.baseline,
+        baseline: patient.baseline,
         activeConditions,
         allergies: activeAllergies,
         immunizations,
-        bloodType: user.patient.healthPassport?.bloodType ?? null,
-        rhesusFactor: user.patient.healthPassport?.rhesusFactor ?? null,
+        bloodType: patient.healthPassport?.bloodType ?? null,
+        rhesusFactor: patient.healthPassport?.rhesusFactor ?? null,
         latestMeasurements: journalSignals.signals,
         connectedDevices: devices.map((device) => ({ id: device.id, manufacturer: device.manufacturer, model: device.model, deviceType: device.deviceType, status: device.status, lastSyncAt: device.lastSyncAt, measurementCount: device._count.measurements })),
       },
@@ -114,14 +154,14 @@ export class HealthHomeService {
       allergies,
       conditions,
       immunizations,
-      emergencyContacts: user.patient.emergencyContacts,
+      emergencyContacts: patient.emergencyContacts,
       symptoms: symptomLogs,
       recentResults: { laboratory: labOrders, imaging: imagingStudies },
       carePlans,
       journal: journalSignals,
       ai: { recentObservations: aiObservations },
-      settings: user.patient.healthJournalSettings,
-      healthJournalSettings: user.patient.healthJournalSettings,
+      settings: patient.healthJournalSettings,
+      healthJournalSettings: patient.healthJournalSettings,
     };
   }
 }
