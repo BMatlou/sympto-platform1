@@ -1,362 +1,128 @@
 "use client";
 
 import Link from "next/link";
-import {
-  ArrowLeft,
-  Camera,
-  CheckCircle2,
-  MapPin,
-  Save,
-  Settings,
-  UserRound,
-} from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
+import { ArrowLeft, Camera, CheckCircle2, Edit3, HeartPulse, MapPin, Settings, Users, ShieldAlert, X } from "lucide-react";
+import { useEffect, useState } from "react";
 import ProtectedRoute from "@/components/auth/protected-route";
 import { authService } from "@/services/auth.service";
 import { healthPassportService } from "@/services/health-passport.service";
 import { onboardingService } from "@/services/onboarding.service";
+import { profileService, type UpdateProfileRecord } from "@/services/profile.service";
 
-type ProfileForm = {
-  preferredName: string;
-  dateOfBirth: string;
-  gender: string;
-  heightCm: string;
-  weightKg: string;
-  bloodType: string;
-  rhesusFactor: string;
-  dominantHand: string;
-  occupation: string;
-  smokingStatus: string;
-  alcoholConsumption: string;
-  exerciseFrequency: string;
+type ProfileData = Record<string, unknown>;
+
+type IdentityForm = UpdateProfileRecord & {
+  firstName: string; middleName: string; lastName: string; preferredName: string;
+  email: string; phoneNumber: string;
 };
 
-const emptyForm: ProfileForm = {
-  preferredName: "",
-  dateOfBirth: "",
-  gender: "PREFER_NOT_TO_SAY",
-  heightCm: "",
-  weightKg: "",
-  bloodType: "",
-  rhesusFactor: "",
-  dominantHand: "",
-  occupation: "",
-  smokingStatus: "",
-  alcoholConsumption: "",
-  exerciseFrequency: "",
+type AddressForm = Required<Pick<UpdateProfileRecord, "addressLine1" | "addressLine2" | "suburb" | "city" | "province" | "postalCode" | "country">>;
+
+type HealthForm = {
+  dateOfBirth: string; gender: string; heightCm: string; weightKg: string; bloodType: string;
+  rhesusFactor: string; dominantHand: string; occupation: string; smokingStatus: string;
+  alcoholConsumption: string; exerciseFrequency: string;
 };
 
-function valueOf(source: unknown, ...keys: string[]): string {
-  if (!source || typeof source !== "object") return "";
-  const record = source as Record<string, unknown>;
-  for (const key of keys) {
-    const value = record[key];
-    if (value !== undefined && value !== null && value !== "") return String(value);
-  }
-  return "";
-}
+const emptyIdentity: IdentityForm = { firstName: "", middleName: "", lastName: "", preferredName: "", email: "", phoneNumber: "" };
+const emptyAddress: AddressForm = { addressLine1: "", addressLine2: "", suburb: "", city: "", province: "", postalCode: "", country: "" };
+const emptyHealth: HealthForm = { dateOfBirth: "", gender: "PREFER_NOT_TO_SAY", heightCm: "", weightKg: "", bloodType: "", rhesusFactor: "", dominantHand: "", occupation: "", smokingStatus: "", alcoholConsumption: "", exerciseFrequency: "" };
 
-function nestedValue(source: unknown, ...keys: string[]): string {
-  const direct = valueOf(source, ...keys);
-  if (direct) return direct;
-  if (!source || typeof source !== "object") return "";
-  const record = source as Record<string, unknown>;
-  for (const wrapper of ["user", "account", "person", "profile", "patient", "data"]) {
-    const found = valueOf(record[wrapper], ...keys);
-    if (found) return found;
-  }
-  return "";
-}
-
-function nestedRecord(source: unknown, key: string): Record<string, unknown> | null {
-  if (!source || typeof source !== "object") return null;
-  const record = source as Record<string, unknown>;
-  const direct = record[key];
-  if (direct && typeof direct === "object") return direct as Record<string, unknown>;
-  for (const wrapper of ["user", "account", "person", "profile", "patient", "data"]) {
-    const nested = record[wrapper];
-    if (nested && typeof nested === "object") {
-      const value = (nested as Record<string, unknown>)[key];
-      if (value && typeof value === "object") return value as Record<string, unknown>;
-    }
-  }
-  return null;
-}
-
-function labelize(value: string) {
-  return value
-    .replaceAll("_", " ")
-    .toLowerCase()
-    .replace(/\b\w/g, (letter) => letter.toUpperCase());
-}
+function str(value: unknown): string { return value === undefined || value === null ? "" : String(value); }
+function field(source: ProfileData | null | undefined, key: string): string { return source ? str(source[key]) : ""; }
+function label(value: string): string { return value.replaceAll("_", " ").toLowerCase().replace(/\\b\\w/g, c => c.toUpperCase()); }
 
 export default function ProfilePage() {
+  const [account, setAccount] = useState<ProfileData | null>(null);
+  const [patient, setPatient] = useState<ProfileData | null>(null);
+  const [passport, setPassport] = useState<ProfileData | null>(null);
   const [loading, setLoading] = useState(true);
+  const [editing, setEditing] = useState<"identity" | "address" | "health" | null>(null);
   const [saving, setSaving] = useState(false);
-  const [imageSaving, setImageSaving] = useState(false);
   const [message, setMessage] = useState("");
-  const [form, setForm] = useState<ProfileForm>(emptyForm);
-  const [account, setAccount] = useState<unknown>(null);
-  const [patientNumber, setPatientNumber] = useState("");
+  const [identity, setIdentity] = useState(emptyIdentity);
+  const [address, setAddress] = useState(emptyAddress);
+  const [health, setHealth] = useState(emptyHealth);
   const [profileImageUrl, setProfileImageUrl] = useState("");
 
-  useEffect(() => {
-    Promise.all([healthPassportService.getHealthPassport(), authService.me()])
-      .then(([dashboard, me]) => {
-        const profile = dashboard.profile ?? {};
-        const patient = dashboard.patient ?? {};
-        const passport = dashboard.healthPassport ?? {};
-        setAccount(me);
-        setPatientNumber(valueOf(patient, "patientNumber"));
-        setProfileImageUrl(valueOf(nestedRecord(me, "person"), "profileImageUrl"));
-        setForm({
-          preferredName:
-            valueOf(profile, "preferredName") || valueOf(patient, "preferredName"),
-          dateOfBirth: (
-            valueOf(profile, "dateOfBirth") || valueOf(patient, "dateOfBirth")
-          ).slice(0, 10),
-          gender:
-            valueOf(profile, "gender") ||
-            valueOf(patient, "gender") ||
-            "PREFER_NOT_TO_SAY",
-          heightCm: valueOf(profile, "heightCm") || valueOf(patient, "heightCm"),
-          weightKg: valueOf(profile, "weightKg") || valueOf(patient, "weightKg"),
-          bloodType:
-            valueOf(profile, "bloodType") ||
-            valueOf(patient, "bloodType") ||
-            valueOf(passport, "bloodType"),
-          rhesusFactor:
-            valueOf(profile, "rhesusFactor") ||
-            valueOf(patient, "rhesusFactor") ||
-            valueOf(passport, "rhesusFactor"),
-          dominantHand: valueOf(profile, "dominantHand") || valueOf(patient, "dominantHand"),
-          occupation: valueOf(profile, "occupation") || valueOf(patient, "occupation"),
-          smokingStatus: valueOf(profile, "smokingStatus") || valueOf(patient, "smokingStatus"),
-          alcoholConsumption:
-            valueOf(profile, "alcoholConsumption") || valueOf(patient, "alcoholConsumption"),
-          exerciseFrequency:
-            valueOf(profile, "exerciseFrequency") || valueOf(patient, "exerciseFrequency"),
-        });
-      })
-      .catch(() => setMessage("We couldn't load your profile right now."))
-      .finally(() => setLoading(false));
-  }, []);
+  async function load() {
+    setLoading(true);
+    try {
+      const [me, dashboard] = await Promise.all([authService.me(), healthPassportService.getHealthPassport()]);
+      const person = (me as ProfileData)?.person as ProfileData | null;
+      const addr = person?.address as ProfileData | null;
+      const p = dashboard.patient ?? {};
+      const hp = dashboard.healthPassport ?? {};
+      setAccount(me as ProfileData);
+      setPatient(p);
+      setPassport(hp);
+      setProfileImageUrl(field(person, "profileImageUrl"));
+      setIdentity({ firstName: field(person, "firstName"), middleName: field(person, "middleName"), lastName: field(person, "lastName"), preferredName: field(person, "preferredName"), email: field(me as ProfileData, "email"), phoneNumber: field(me as ProfileData, "phoneNumber") });
+      setAddress({ addressLine1: field(addr, "line1"), addressLine2: field(addr, "line2"), suburb: field(addr, "suburb"), city: field(addr, "city"), province: field(addr, "province"), postalCode: field(addr, "postalCode"), country: field((addr?.country as ProfileData | null), "name") || field(person?.country as ProfileData | null, "name") });
+      setHealth({ dateOfBirth: field(p, "dateOfBirth").slice(0, 10), gender: field(p, "gender") || "PREFER_NOT_TO_SAY", heightCm: field(p, "heightCm"), weightKg: field(p, "weightKg"), bloodType: field(hp, "bloodType") || field(p, "bloodType"), rhesusFactor: field(hp, "rhesusFactor") || field(p, "rhesusFactor"), dominantHand: field(p, "dominantHand"), occupation: field(p, "occupation"), smokingStatus: field(p, "smokingStatus"), alcoholConsumption: field(p, "alcoholConsumption"), exerciseFrequency: field(p, "exerciseFrequency") });
+    } catch { setMessage("We couldn't load your profile right now."); }
+    finally { setLoading(false); }
+  }
 
-  const set = (key: keyof ProfileForm, value: string) =>
-    setForm((current) => ({ ...current, [key]: value }));
+  useEffect(() => { void load(); }, []);
 
-  async function handleProfileImageChange(file: File | undefined) {
+  async function saveIdentity() {
+    setSaving(true); setMessage("");
+    try { await profileService.update(identity); setEditing(null); setMessage("Personal information saved."); await load(); }
+    catch (e: any) { setMessage(e?.response?.data?.message || "We couldn't save your personal information."); }
+    finally { setSaving(false); }
+  }
+
+  async function saveAddress() {
+    setSaving(true); setMessage("");
+    try { await profileService.update(address); setEditing(null); setMessage("Address saved."); await load(); }
+    catch (e: any) { setMessage(e?.response?.data?.message || "We couldn't save your address."); }
+    finally { setSaving(false); }
+  }
+
+  async function saveHealth() {
+    setSaving(true); setMessage("");
+    try {
+      await onboardingService.updateProfile({ dateOfBirth: health.dateOfBirth || undefined, gender: health.gender as any });
+      await onboardingService.updateIndividualProfile({ heightCm: health.heightCm ? Number(health.heightCm) : undefined, weightKg: health.weightKg ? Number(health.weightKg) : undefined, bloodType: health.bloodType || undefined, rhesusFactor: health.rhesusFactor || undefined, dominantHand: health.dominantHand || undefined, occupation: health.occupation || undefined, smokingStatus: health.smokingStatus || undefined, alcoholConsumption: health.alcoholConsumption || undefined, exerciseFrequency: health.exerciseFrequency || undefined });
+      setEditing(null); setMessage("Health profile saved."); await load();
+    } catch (e: any) { setMessage(e?.response?.data?.message || "We couldn't save your health profile."); }
+    finally { setSaving(false); }
+  }
+
+  async function uploadImage(file?: File) {
     if (!file) return;
-    if (!["image/png", "image/jpeg", "image/webp"].includes(file.type)) {
-      setMessage("Please choose a PNG, JPEG, or WebP image.");
-      return;
-    }
-    if (file.size > 5 * 1024 * 1024) {
-      setMessage("Profile pictures must be 5 MB or smaller.");
-      return;
-    }
-
-    try {
-      setImageSaving(true);
-      setMessage("");
-      const dataUrl = await new Promise<string>((resolve, reject) => {
-        const reader = new FileReader();
-        reader.onload = () => resolve(String(reader.result));
-        reader.onerror = () => reject(new Error("Unable to read image."));
-        reader.readAsDataURL(file);
-      });
-
-      await onboardingService.updateProfile({ profileImageUrl: dataUrl });
-      setProfileImageUrl(dataUrl);
-      setMessage("Your profile picture has been saved.");
-    } catch (error: unknown) {
-      const response = (error as { response?: { data?: { message?: string } } })?.response;
-      setMessage(response?.data?.message || "We couldn't save your profile picture.");
-    } finally {
-      setImageSaving(false);
-    }
+    if (!["image/png", "image/jpeg", "image/webp"].includes(file.type) || file.size > 5 * 1024 * 1024) { setMessage("Choose a PNG, JPEG, or WebP image up to 5 MB."); return; }
+    const dataUrl = await new Promise<string>((resolve, reject) => { const reader = new FileReader(); reader.onload = () => resolve(String(reader.result)); reader.onerror = reject; reader.readAsDataURL(file); });
+    setSaving(true);
+    try { await profileService.update({ profileImageUrl: dataUrl }); setProfileImageUrl(dataUrl); setMessage("Profile picture saved."); }
+    catch (e: any) { setMessage(e?.response?.data?.message || "We couldn't save your profile picture."); }
+    finally { setSaving(false); }
   }
 
-  async function save() {
-    try {
-      setSaving(true);
-      setMessage("");
-      await onboardingService.updateProfile({
-        preferredName: form.preferredName || undefined,
-        dateOfBirth: form.dateOfBirth || undefined,
-        gender: form.gender as "MALE" | "FEMALE" | "OTHER" | "PREFER_NOT_TO_SAY",
-      });
-      await onboardingService.updateIndividualProfile({
-        heightCm: form.heightCm ? Number(form.heightCm) : undefined,
-        weightKg: form.weightKg ? Number(form.weightKg) : undefined,
-        bloodType: form.bloodType || undefined,
-        rhesusFactor: form.rhesusFactor || undefined,
-        dominantHand: form.dominantHand || undefined,
-        occupation: form.occupation || undefined,
-        smokingStatus: form.smokingStatus || undefined,
-        alcoholConsumption: form.alcoholConsumption || undefined,
-        exerciseFrequency: form.exerciseFrequency || undefined,
-      });
-      setMessage("Your profile has been updated.");
-    } catch (error: unknown) {
-      const response = (error as { response?: { data?: { message?: string } } })?.response;
-      setMessage(response?.data?.message || "We couldn't update your profile.");
-    } finally {
-      setSaving(false);
-    }
-  }
+  const person = account?.person as ProfileData | null;
+  const addressText = [address.addressLine1, address.addressLine2, address.suburb, address.city, address.province, address.postalCode, address.country].filter(Boolean).join(", ");
+  const displayName = identity.preferredName || [identity.firstName, identity.lastName].filter(Boolean).join(" ") || "Your profile";
+  const patientNumber = field(patient, "patientNumber");
 
-  const person = nestedRecord(account, "person");
-  const address = nestedRecord(person, "address");
-  const country = nestedRecord(person, "country") || nestedRecord(address, "country");
+  const input = (value: string, onChange: (v: string) => void, type = "text") => <input type={type} value={value} onChange={e => onChange(e.target.value)} className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-800 outline-none focus:border-[#24c1c4] focus:ring-2 focus:ring-[#24c1c4]/15" />;
+  const select = (value: string, onChange: (v: string) => void, options: string[]) => <select value={value} onChange={e => onChange(e.target.value)} className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-800 outline-none focus:border-[#24c1c4]">{options.map(o => <option key={o} value={o}>{label(o)}</option>)}</select>;
 
-  const firstName = valueOf(person, "firstName") || nestedValue(account, "firstName", "givenName");
-  const middleName = valueOf(person, "middleName");
-  const lastName = valueOf(person, "lastName") || nestedValue(account, "lastName", "familyName");
-  const preferredName = valueOf(person, "preferredName") || form.preferredName;
-  const email = nestedValue(account, "email", "emailAddress");
-  const phone = nestedValue(account, "phoneNumber", "phone", "mobileNumber");
-  const countryName = valueOf(country, "name");
-  const initials = useMemo(
-    () => `${firstName.charAt(0)}${lastName.charAt(0)}`.toUpperCase() || "U",
-    [firstName, lastName],
-  );
+  return <ProtectedRoute><main className="min-h-screen bg-slate-50"><div className="mx-auto max-w-6xl px-4 py-8 sm:px-6 lg:px-8">
+    <div className="flex items-center justify-between gap-3"><Link href="/dashboard" className="inline-flex items-center gap-2 text-sm font-semibold text-[#0b2d54] hover:text-[#24c1c4]"><ArrowLeft className="h-4 w-4" />Health Home</Link><Link href="/settings" className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-[#0b2d54] shadow-sm hover:border-[#24c1c4]"><Settings className="h-4 w-4" />Account settings</Link></div>
 
-  const addressParts = [
-    valueOf(address, "line1"),
-    valueOf(address, "line2"),
-    valueOf(address, "suburb"),
-    valueOf(address, "city"),
-    valueOf(address, "province"),
-    valueOf(address, "postalCode"),
-    countryName,
-  ].filter(Boolean);
+    <header className="mt-7 rounded-3xl bg-[#0b2d54] p-6 text-white shadow-lg sm:p-8"><div className="flex flex-col gap-6 sm:flex-row sm:items-center sm:justify-between"><div className="flex items-center gap-5"><div className="relative flex h-20 w-20 items-center justify-center overflow-hidden rounded-2xl bg-white/10 text-2xl font-bold">{profileImageUrl ? <img src={profileImageUrl} alt="Profile" className="h-full w-full object-cover" /> : (identity.firstName?.[0] || "U") + (identity.lastName?.[0] || "") }<label className="absolute bottom-1 right-1 cursor-pointer rounded-full bg-[#24c1c4] p-1.5 text-[#0b2d54]"><Camera className="h-3.5 w-3.5" /><input type="file" accept="image/png,image/jpeg,image/webp" className="sr-only" disabled={saving} onChange={e => void uploadImage(e.target.files?.[0])} /></label></div><div><p className="text-xs font-semibold uppercase tracking-wider text-[#bff8f7]">My profile</p><h1 className="mt-1 text-3xl font-bold">{displayName}</h1><p className="mt-1 text-sm text-slate-300">Your personal identity and baseline health information.</p><label className="mt-3 inline-flex cursor-pointer items-center gap-2 text-xs font-semibold text-[#bff8f7]"><Camera className="h-3.5 w-3.5" />Change profile picture<input type="file" accept="image/png,image/jpeg,image/webp" className="sr-only" disabled={saving} onChange={e => void uploadImage(e.target.files?.[0])} /></label></div></div><div className="rounded-2xl bg-white/10 px-4 py-3"><p className="text-xs uppercase tracking-wide text-slate-300">Patient number</p><p className="mt-1 font-mono font-semibold">{patientNumber || "Not assigned yet"}</p><p className="mt-1 text-xs text-slate-300">Read-only identifier</p></div></div></header>
 
-  return (
-    <ProtectedRoute>
-      <main className="min-h-screen bg-slate-50">
-        <div className="mx-auto max-w-6xl px-4 py-8 sm:px-6 lg:px-8">
-          <div className="flex flex-wrap items-center justify-between gap-3">
-            <Link href="/dashboard" className="inline-flex items-center gap-2 text-sm font-semibold text-[#0b2d54] transition hover:text-[#24c1c4]">
-              <ArrowLeft className="h-4 w-4" />
-              Health Home
-            </Link>
-            <Link href="/settings" className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-[#0b2d54] shadow-sm transition hover:border-[#24c1c4]">
-              <Settings className="h-4 w-4" />
-              Account settings
-            </Link>
-          </div>
+    {message && <div className="mt-4 flex items-center gap-2 rounded-xl border border-[#24c1c4]/30 bg-[#24c1c4]/10 px-4 py-3 text-sm text-[#0b2d54]"><CheckCircle2 className="h-4 w-4" />{message}</div>}
+    {loading ? <div className="mt-5 rounded-2xl border border-slate-200 bg-white p-6 text-sm text-slate-500">Loading your real profile data…</div> : <div className="mt-5 grid gap-5 lg:grid-cols-2">
 
-          <header className="mt-8 overflow-hidden rounded-3xl bg-[#0b2d54] p-6 text-white shadow-lg sm:p-8">
-            <div className="flex flex-col gap-6 sm:flex-row sm:items-center sm:justify-between">
-              <div className="flex items-center gap-5">
-                <div className="relative flex h-20 w-20 shrink-0 items-center justify-center overflow-hidden rounded-2xl bg-white/10 text-xl font-bold ring-1 ring-white/20">
-                  {profileImageUrl ? <img src={profileImageUrl} alt="Profile" className="h-full w-full object-cover" /> : initials}
-                  <label className="absolute bottom-1 right-1 cursor-pointer rounded-full bg-[#24c1c4] p-1 text-[#0b2d54] shadow-sm transition hover:scale-105" title="Upload profile picture">
-                    <Camera className="h-3 w-3" />
-                    <input type="file" accept="image/png,image/jpeg,image/webp" className="sr-only" disabled={imageSaving} onChange={(event) => void handleProfileImageChange(event.target.files?.[0])} />
-                  </label>
-                </div>
-                <div>
-                  <div className="mb-2 inline-flex items-center gap-2 rounded-full bg-white/10 px-3 py-1 text-xs font-semibold text-[#bff8f7]">
-                    <UserRound className="h-3.5 w-3.5" />
-                    My profile
-                  </div>
-                  <h1 className="text-3xl font-bold tracking-tight sm:text-4xl">Personal profile</h1>
-                  <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-200">One place for your personal identity and baseline health information. Account security belongs in Settings; clinical records remain in Health Records.</p>
-                  <label className="mt-3 inline-flex cursor-pointer items-center gap-2 text-xs font-semibold text-[#bff8f7] hover:text-white">
-                    <Camera className="h-3.5 w-3.5" />
-                    {imageSaving ? "Saving picture…" : "Change profile picture"}
-                    <input type="file" accept="image/png,image/jpeg,image/webp" className="sr-only" disabled={imageSaving} onChange={(event) => void handleProfileImageChange(event.target.files?.[0])} />
-                  </label>
-                </div>
-              </div>
-              <div className="rounded-2xl bg-white/10 px-4 py-3 ring-1 ring-white/10">
-                <p className="text-xs font-semibold uppercase tracking-wide text-slate-300">Patient number</p>
-                <p className="mt-1 font-mono text-sm font-semibold text-white">{patientNumber || "Not assigned yet"}</p>
-                <p className="mt-1 text-xs text-slate-300">Read-only identifier</p>
-              </div>
-            </div>
-          </header>
+      <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm lg:col-span-2"><div className="flex items-start justify-between gap-4"><div><h2 className="font-semibold text-[#0b2d54]">Personal information</h2><p className="mt-1 text-sm text-slate-500">Name, preferred name and account contact details are saved to the appropriate Person and User records.</p></div>{editing !== "identity" && <button onClick={() => setEditing("identity")} className="inline-flex items-center gap-2 rounded-xl bg-[#0b2d54] px-3 py-2 text-sm font-semibold text-white hover:bg-[#123f70]"><Edit3 className="h-4 w-4" />Edit</button>}</div>{editing === "identity" ? <div className="mt-5 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">{([["First name", identity.firstName, v => setIdentity({...identity, firstName:v})],["Middle name", identity.middleName, v => setIdentity({...identity, middleName:v})],["Last name", identity.lastName, v => setIdentity({...identity, lastName:v})],["Preferred name", identity.preferredName, v => setIdentity({...identity, preferredName:v})],["Email", identity.email, v => setIdentity({...identity, email:v})],["Phone", identity.phoneNumber, v => setIdentity({...identity, phoneNumber:v})] ] as [string,string,(v:string)=>void][]).map(([l,v,c]) => <div key={l}><label className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-slate-400">{l}</label>{input(v,c)}</div>)}<div className="flex gap-2 sm:col-span-2 lg:col-span-3"><button disabled={saving} onClick={() => void saveIdentity()} className="rounded-xl bg-[#24c1c4] px-4 py-2.5 text-sm font-bold text-[#0b2d54]">{saving ? "Saving…" : "Save changes"}</button><button onClick={() => setEditing(null)} className="rounded-xl border border-slate-200 px-4 py-2.5 text-sm font-semibold"><X className="mr-1 inline h-4 w-4" />Cancel</button></div></div> : <div className="mt-5 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">{[["First name",identity.firstName],["Middle name",identity.middleName],["Last name",identity.lastName],["Preferred name",identity.preferredName],["Email",identity.email],["Phone",identity.phoneNumber]].map(([l,v]) => <div key={l} className="rounded-xl bg-slate-50 p-4"><p className="text-xs font-semibold uppercase tracking-wide text-slate-400">{l}</p><p className="mt-1 font-medium text-slate-800">{v || "Not recorded yet"}</p></div>)}</div>}</section>
 
-          {loading ? (
-            <div className="mt-5 rounded-2xl border border-slate-200 bg-white p-6 text-sm text-slate-500 shadow-sm">Loading your profile…</div>
-          ) : (
-            <div className="mt-5 space-y-5">
-              <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
-                <div className="flex flex-col gap-1 sm:flex-row sm:items-end sm:justify-between">
-                  <div>
-                    <h2 className="font-semibold text-[#0b2d54]">Identity & contact</h2>
-                    <p className="mt-1 text-sm text-slate-500">These values come from your persisted Person and User records. Email and phone are managed as account-level information.</p>
-                  </div>
-                  <Link href="/settings" className="text-sm font-semibold text-[#0b2d54] hover:text-[#24c1c4]">Manage account →</Link>
-                </div>
-                <div className="mt-5 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-                  {[["First name", firstName], ["Middle name", middleName], ["Last name", lastName], ["Preferred name", preferredName], ["Email", email], ["Phone", phone], ["Country", countryName]].map(([label, value]) => (
-                    <div key={label} className="rounded-xl bg-slate-50 p-4">
-                      <p className="text-xs font-semibold uppercase tracking-wide text-slate-400">{label}</p>
-                      <p className="mt-1 break-words font-medium text-slate-800">{value || "Not recorded yet"}</p>
-                    </div>
-                  ))}
-                </div>
-              </section>
+      <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm"><div className="flex items-start justify-between gap-4"><div><h2 className="font-semibold text-[#0b2d54]">Address</h2><p className="mt-1 text-sm text-slate-500">The primary address captured during registration.</p></div>{editing !== "address" && <button onClick={() => setEditing("address")} className="inline-flex items-center gap-2 rounded-xl bg-[#0b2d54] px-3 py-2 text-sm font-semibold text-white"><Edit3 className="h-4 w-4" />Edit</button>}</div>{editing === "address" ? <div className="mt-5 space-y-3">{([["Address line 1","addressLine1"],["Address line 2","addressLine2"],["Suburb","suburb"],["City","city"],["Province","province"],["Postal code","postalCode"],["Country","country"]] as [string,keyof AddressForm][]).map(([l,k]) => <div key={k}><label className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-slate-400">{l}</label>{input(address[k], v => setAddress({...address,[k]:v}))}</div>)}<div className="flex gap-2"><button disabled={saving} onClick={() => void saveAddress()} className="rounded-xl bg-[#24c1c4] px-4 py-2.5 text-sm font-bold text-[#0b2d54]">{saving ? "Saving…" : "Save changes"}</button><button onClick={() => setEditing(null)} className="rounded-xl border border-slate-200 px-4 py-2.5 text-sm font-semibold">Cancel</button></div></div> : <div className="mt-5 rounded-xl bg-slate-50 p-4"><MapPin className="mb-2 h-5 w-5 text-[#24c1c4]" /><p className="text-sm leading-6 text-slate-800">{addressText || "No address recorded yet. Add your address and it will be stored on your primary address record."}</p></div>}</section>
 
-              <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
-                <div className="flex items-start gap-3">
-                  <div className="rounded-xl bg-[#24c1c4]/10 p-2 text-[#0b2d54]"><MapPin className="h-5 w-5" /></div>
-                  <div>
-                    <h2 className="font-semibold text-[#0b2d54]">Address</h2>
-                    <p className="mt-1 text-sm text-slate-500">Your primary address recorded during sign-up. It is shown from the persisted PersonAddress record, not recreated in the frontend.</p>
-                  </div>
-                </div>
-                <div className="mt-5 rounded-2xl border border-slate-100 bg-slate-50 p-5">
-                  {addressParts.length ? <p className="leading-7 text-slate-800">{addressParts.join(", ")}</p> : <p className="text-sm text-slate-500">No primary address has been recorded yet. Once address information is saved to your account, it will appear here automatically.</p>}
-                </div>
-              </section>
+      <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm"><div className="flex items-start justify-between gap-4"><div><h2 className="font-semibold text-[#0b2d54]">Health profile</h2><p className="mt-1 text-sm text-slate-500">Baseline health details are stored against your Patient and Health Passport records.</p></div>{editing !== "health" && <button onClick={() => setEditing("health")} className="inline-flex items-center gap-2 rounded-xl bg-[#0b2d54] px-3 py-2 text-sm font-semibold text-white"><Edit3 className="h-4 w-4" />Edit</button>}</div>{editing === "health" ? <div className="mt-5 grid gap-4 sm:grid-cols-2">{([["Date of birth","dateOfBirth","date"],["Gender","gender","select"],["Height (cm)","heightCm","number"],["Weight (kg)","weightKg","number"],["Blood type","bloodType","select"],["Rhesus factor","rhesusFactor","select"],["Dominant hand","dominantHand","select"],["Occupation","occupation","text"],["Smoking status","smokingStatus","select"],["Alcohol consumption","alcoholConsumption","select"],["Exercise frequency","exerciseFrequency","select"]] as [string,keyof HealthForm,string][]).map(([l,k,t]) => <div key={k}><label className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-slate-400">{l}</label>{t === "select" ? select(health[k], v => setHealth({...health,[k]:v}), k === "gender" ? ["PREFER_NOT_TO_SAY","MALE","FEMALE","OTHER"] : k === "bloodType" ? ["A_POSITIVE","A_NEGATIVE","B_POSITIVE","B_NEGATIVE","AB_POSITIVE","AB_NEGATIVE","O_POSITIVE","O_NEGATIVE","UNKNOWN"] : k === "rhesusFactor" ? ["POSITIVE","NEGATIVE","UNKNOWN"] : k === "dominantHand" ? ["RIGHT","LEFT","AMBIDEXTROUS"] : k === "smokingStatus" ? ["NEVER","FORMER","CURRENT"] : k === "alcoholConsumption" ? ["NONE","OCCASIONAL","MODERATE","HEAVY"] : ["NEVER","RARELY","1_2_PER_WEEK","3_4_PER_WEEK","5_PLUS_PER_WEEK"]) : input(health[k], v => setHealth({...health,[k]:v}), t)}</div>)}<div className="flex gap-2 sm:col-span-2"><button disabled={saving} onClick={() => void saveHealth()} className="rounded-xl bg-[#24c1c4] px-4 py-2.5 text-sm font-bold text-[#0b2d54]">{saving ? "Saving…" : "Save changes"}</button><button onClick={() => setEditing(null)} className="rounded-xl border border-slate-200 px-4 py-2.5 text-sm font-semibold">Cancel</button></div></div> : <div className="mt-5 grid gap-3 sm:grid-cols-2">{[["Date of birth",health.dateOfBirth],["Gender",health.gender],["Height",health.heightCm ? `${health.heightCm} cm` : ""],["Weight",health.weightKg ? `${health.weightKg} kg` : ""],["Blood type",health.bloodType],["Rhesus factor",health.rhesusFactor],["Dominant hand",health.dominantHand],["Occupation",health.occupation],["Smoking",health.smokingStatus],["Alcohol",health.alcoholConsumption],["Exercise",health.exerciseFrequency]].map(([l,v]) => <div key={l} className="rounded-xl bg-slate-50 p-3.5"><p className="text-xs font-semibold uppercase tracking-wide text-slate-400">{l}</p><p className="mt-1 text-sm font-medium text-slate-800">{v ? label(v) : "Not recorded yet"}</p></div>)}</div>}</section>
 
-              <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
-                <h2 className="font-semibold text-[#0b2d54]">Personal details</h2>
-                <p className="mt-1 text-sm text-slate-500">These are the personal profile fields currently supported by the onboarding profile API.</p>
-                <div className="mt-5 grid gap-4 sm:grid-cols-2">
-                  <label className="block"><span className="text-sm font-medium text-slate-700">Preferred name</span><input value={form.preferredName} onChange={(e) => set("preferredName", e.target.value)} placeholder="Add a preferred name" className="mt-2 w-full rounded-xl border border-slate-200 px-3 py-3 outline-none transition focus:border-[#24c1c4] focus:ring-2 focus:ring-[#24c1c4]/10" /></label>
-                  <label className="block"><span className="text-sm font-medium text-slate-700">Date of birth</span><input type="date" value={form.dateOfBirth} onChange={(e) => set("dateOfBirth", e.target.value)} className="mt-2 w-full rounded-xl border border-slate-200 px-3 py-3 outline-none transition focus:border-[#24c1c4] focus:ring-2 focus:ring-[#24c1c4]/10" /></label>
-                  <label className="block sm:col-span-2"><span className="text-sm font-medium text-slate-700">Gender</span><select value={form.gender} onChange={(e) => set("gender", e.target.value)} className="mt-2 w-full rounded-xl border border-slate-200 bg-white px-3 py-3 outline-none transition focus:border-[#24c1c4] focus:ring-2 focus:ring-[#24c1c4]/10"><option value="PREFER_NOT_TO_SAY">Prefer not to say</option><option value="FEMALE">Female</option><option value="MALE">Male</option><option value="OTHER">Other</option></select></label>
-                </div>
-              </section>
-
-              <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
-                <h2 className="font-semibold text-[#0b2d54]">Health profile basics</h2>
-                <p className="mt-1 text-sm text-slate-500">Baseline information stored against the Patient and Health Passport records. Nothing is invented when a value is missing.</p>
-                <div className="mt-5 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-                  <label><span className="text-sm font-medium text-slate-700">Height (cm)</span><input type="number" min="0" value={form.heightCm} onChange={(e) => set("heightCm", e.target.value)} placeholder="Not recorded" className="mt-2 w-full rounded-xl border border-slate-200 px-3 py-3 outline-none focus:border-[#24c1c4]" /></label>
-                  <label><span className="text-sm font-medium text-slate-700">Weight (kg)</span><input type="number" min="0" value={form.weightKg} onChange={(e) => set("weightKg", e.target.value)} placeholder="Not recorded" className="mt-2 w-full rounded-xl border border-slate-200 px-3 py-3 outline-none focus:border-[#24c1c4]" /></label>
-                  <label><span className="text-sm font-medium text-slate-700">Blood type</span><input value={form.bloodType} onChange={(e) => set("bloodType", e.target.value)} placeholder="Not recorded" className="mt-2 w-full rounded-xl border border-slate-200 px-3 py-3 outline-none focus:border-[#24c1c4]" /></label>
-                  <label><span className="text-sm font-medium text-slate-700">Rhesus factor</span><input value={form.rhesusFactor} onChange={(e) => set("rhesusFactor", e.target.value)} placeholder="Not recorded" className="mt-2 w-full rounded-xl border border-slate-200 px-3 py-3 outline-none focus:border-[#24c1c4]" /></label>
-                  <label><span className="text-sm font-medium text-slate-700">Dominant hand</span><select value={form.dominantHand} onChange={(e) => set("dominantHand", e.target.value)} className="mt-2 w-full rounded-xl border border-slate-200 bg-white px-3 py-3 outline-none focus:border-[#24c1c4]"><option value="">Not recorded</option><option value="LEFT">Left</option><option value="RIGHT">Right</option><option value="AMBIDEXTROUS">Ambidextrous</option></select></label>
-                  <label><span className="text-sm font-medium text-slate-700">Occupation</span><input value={form.occupation} onChange={(e) => set("occupation", e.target.value)} placeholder="Not recorded" className="mt-2 w-full rounded-xl border border-slate-200 px-3 py-3 outline-none focus:border-[#24c1c4]" /></label>
-                </div>
-              </section>
-
-              <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
-                <h2 className="font-semibold text-[#0b2d54]">Lifestyle context</h2>
-                <p className="mt-1 text-sm text-slate-500">Optional information used by the health experience. Empty fields stay empty until the user provides real information.</p>
-                <div className="mt-5 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-                  <label><span className="text-sm font-medium text-slate-700">Smoking</span><select value={form.smokingStatus} onChange={(e) => set("smokingStatus", e.target.value)} className="mt-2 w-full rounded-xl border border-slate-200 bg-white px-3 py-3 outline-none focus:border-[#24c1c4]"><option value="">Not recorded</option><option value="NEVER">Never</option><option value="FORMER">Former</option><option value="OCCASIONAL">Occasional</option><option value="DAILY">Daily</option></select></label>
-                  <label><span className="text-sm font-medium text-slate-700">Alcohol</span><select value={form.alcoholConsumption} onChange={(e) => set("alcoholConsumption", e.target.value)} className="mt-2 w-full rounded-xl border border-slate-200 bg-white px-3 py-3 outline-none focus:border-[#24c1c4]"><option value="">Not recorded</option><option value="NEVER">Never</option><option value="OCCASIONAL">Occasional</option><option value="WEEKLY">Weekly</option><option value="DAILY">Daily</option></select></label>
-                  <label><span className="text-sm font-medium text-slate-700">Exercise frequency</span><select value={form.exerciseFrequency} onChange={(e) => set("exerciseFrequency", e.target.value)} className="mt-2 w-full rounded-xl border border-slate-200 bg-white px-3 py-3 outline-none focus:border-[#24c1c4]"><option value="">Not recorded</option><option value="NONE">None</option><option value="ONCE_PER_WEEK">Once per week</option><option value="TWO_TO_THREE_PER_WEEK">2–3 times/week</option><option value="FOUR_TO_FIVE_PER_WEEK">4–5 times/week</option><option value="DAILY">Daily</option></select></label>
-                </div>
-              </section>
-
-              <div className="flex flex-col gap-3 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:flex-row sm:items-center sm:justify-between">
-                <div className="flex items-start gap-3"><CheckCircle2 className="mt-0.5 h-5 w-5 shrink-0 text-[#24c1c4]" /><p className="max-w-2xl text-sm leading-6 text-slate-500">Saving this page writes through the existing onboarding profile endpoints, so Patient and Health Passport values stay in their respective backend tables. Profile pictures are persisted on Person.profileImageUrl.</p></div>
-                <button onClick={save} disabled={saving || imageSaving} className="inline-flex shrink-0 items-center justify-center gap-2 rounded-xl bg-[#0b2d54] px-5 py-3 font-semibold text-white transition hover:bg-[#123e6d] disabled:cursor-not-allowed disabled:opacity-60"><Save className="h-4 w-4" />{saving ? "Saving…" : "Save profile"}</button>
-              </div>
-
-              {message && <div className="rounded-xl border border-[#24c1c4]/30 bg-[#24c1c4]/10 px-4 py-3 text-sm text-[#0b2d54]">{message}</div>}
-            </div>
-          )}
-        </div>
-      </main>
-    </ProtectedRoute>
-  );
+      <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm lg:col-span-2"><div className="grid gap-4 md:grid-cols-3"><Link href="/emergency-contacts" className="rounded-2xl border border-slate-100 bg-slate-50 p-5 transition hover:border-[#24c1c4] hover:bg-white"><ShieldAlert className="h-6 w-6 text-[#24c1c4]" /><h3 className="mt-3 font-semibold text-[#0b2d54]">Emergency contacts</h3><p className="mt-1 text-sm text-slate-500">Manage the real trusted contacts attached to your patient record.</p><span className="mt-3 inline-block text-sm font-semibold text-[#0b2d54]">Manage →</span></Link><Link href="/family" className="rounded-2xl border border-slate-100 bg-slate-50 p-5 transition hover:border-[#24c1c4] hover:bg-white"><Users className="h-6 w-6 text-[#24c1c4]" /><h3 className="mt-3 font-semibold text-[#0b2d54]">Family members</h3><p className="mt-1 text-sm text-slate-500">Manage authorised family accounts and switch patient context.</p><span className="mt-3 inline-block text-sm font-semibold text-[#0b2d54]">Manage →</span></Link><Link href="/settings" className="rounded-2xl border border-slate-100 bg-slate-50 p-5 transition hover:border-[#24c1c4] hover:bg-white"><Settings className="h-6 w-6 text-[#24c1c4]" /><h3 className="mt-3 font-semibold text-[#0b2d54]">Account settings</h3><p className="mt-1 text-sm text-slate-500">Security, preferences and account-level controls live here.</p><span className="mt-3 inline-block text-sm font-semibold text-[#0b2d54]">Manage →</span></Link></div></section>
+    </div>}
+  </div></main></ProtectedRoute>;
 }
