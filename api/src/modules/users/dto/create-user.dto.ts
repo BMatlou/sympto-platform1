@@ -11,8 +11,8 @@ import { UserType } from '@prisma/client';
 
 export class CreateUserDto {
   @IsOptional()
-@IsEnum(['INDIVIDUAL', 'PRACTITIONER', 'ORGANIZATION'])
-accountType?: 'INDIVIDUAL' | 'PRACTITIONER' | 'ORGANIZATION';
+  @IsEnum(['INDIVIDUAL', 'PRACTITIONER', 'ORGANIZATION'])
+  accountType?: 'INDIVIDUAL' | 'PRACTITIONER' | 'ORGANIZATION';
 
   @IsString()
   @Length(2, 100)
@@ -83,6 +83,14 @@ accountType?: 'INDIVIDUAL' | 'PRACTITIONER' | 'ORGANIZATION';
 
   @IsOptional()
   @IsString()
+  addressLine2?: string;
+
+  @IsOptional()
+  @IsString()
+  suburb?: string;
+
+  @IsOptional()
+  @IsString()
   postalCode?: string;
 
   @IsOptional()
@@ -122,8 +130,6 @@ accountType?: 'INDIVIDUAL' | 'PRACTITIONER' | 'ORGANIZATION';
   })
   password!: string;
 
-
-  
   @IsEnum(UserType)
   userType!: UserType;
 }
