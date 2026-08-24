@@ -5,7 +5,7 @@ import Link from "next/link";
 import { ArrowLeft, CheckCircle2, UserPlus, Users, X } from "lucide-react";
 import ProtectedRoute from "@/components/auth/protected-route";
 import { useDashboard } from "@/hooks/use-dashboard";
-import api from "@/services/api";
+import { api } from "@/lib/api";
 
 export default function FamilyPage() {
   const { data, loading, reload } = useDashboard();
