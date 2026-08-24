@@ -68,15 +68,46 @@ export class OnboardingService {
         if (!dto.country) {
           countryId = null;
         } else {
-          const country = await tx.country.findFirst({
+          const normalizedCountry = dto.country.trim().toUpperCase();
+          let country = await tx.country.findFirst({
             where: {
               OR: [
-                { iso2: dto.country.toUpperCase() },
-                { name: dto.country },
+                { iso2: normalizedCountry },
+                { name: dto.country.trim() },
               ],
             },
             select: { id: true },
           });
+
+          // Signup stores the selected country as an ISO-2 code (for example ZA).
+          // Existing databases may not yet contain the reference row, so make the
+          // South Africa registration/profile path self-healing instead of rejecting
+          // a valid signup address with a 400.
+          if (!country && normalizedCountry === 'ZA') {
+            country = await tx.country.upsert({
+              where: { iso2: 'ZA' },
+              update: {
+                iso3: 'ZAF',
+                numericCode: '710',
+                name: 'South Africa',
+                officialName: 'Republic of South Africa',
+                phoneCode: '+27',
+                searchable: true,
+                active: true,
+              },
+              create: {
+                iso2: 'ZA',
+                iso3: 'ZAF',
+                numericCode: '710',
+                name: 'South Africa',
+                officialName: 'Republic of South Africa',
+                phoneCode: '+27',
+                searchable: true,
+                active: true,
+              },
+              select: { id: true },
+            });
+          }
 
           if (!country) {
             throw new BadRequestException('Selected country could not be found.');
@@ -133,10 +164,6 @@ export class OnboardingService {
     });
   }
 
-  /**
-   * STEP 1 / personal profile.
-   * Picture and address edits are profile maintenance and must not reset or advance onboarding progress.
-   */
   async updateProfile(userId: string, dto: UpdateProfileDto) {
     const hasOnboardingProfileFields =
       dto.preferredName !== undefined ||
