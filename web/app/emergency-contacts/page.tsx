@@ -115,8 +115,8 @@ export default function EmergencyContactsPage() {
 
         {!loading && !error && emergencyContacts.length > 0 && (
           <div className="grid gap-4 md:grid-cols-2">
-            {emergencyContacts.map((contact) => (
-              <article key={contact.id ?? contact.fullName ?? Math.random()} className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm transition hover:-translate-y-0.5 hover:border-[#24c1c4]/50 hover:shadow-md sm:p-6">
+            {emergencyContacts.map((contact, index) => (
+              <article key={contact.id ?? `${contact.fullName ?? "contact"}-${index}`} className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm transition hover:-translate-y-0.5 hover:border-[#24c1c4]/50 hover:shadow-md sm:p-6">
                 <div className="flex items-start gap-4">
                   <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-[#24c1c4]/10 text-[#0B2D54]">
                     <UserRound className="h-6 w-6" />
