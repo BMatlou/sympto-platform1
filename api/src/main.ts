@@ -1,6 +1,7 @@
 import { ValidationPipe } from '@nestjs/common';
 import { NestFactory } from '@nestjs/core';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
+import { json, urlencoded } from 'express';
 
 import { AppModule } from './app.module';
 import { HttpExceptionFilter } from './common/filters/http-exception.filter';
@@ -12,24 +13,21 @@ import { AdminBootstrapService } from './modules/admin/admin.bootstrap.service';
 async function bootstrap() {
   const app = await NestFactory.create(AppModule, {
     bufferLogs: true,
-    // Register the JSON/urlencoded parsers below with an explicit limit so
-    // validated profile-image data URLs are not rejected by Express's 100 KB default.
     bodyParser: false,
   });
 
   app.enableCors({
-    origin: "http://localhost:3000",
+    origin: 'http://localhost:3000',
     credentials: true,
-    methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
-    allowedHeaders: ["Content-Type", "Authorization"],
+    methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization'],
   });
 
   app.enableShutdownHooks();
 
-  // A 5 MB source image becomes larger after base64 encoding. Keep this
-  // limit comfortably above the validated 7 MB profileImageUrl maximum.
-  app.useBodyParser('json', { limit: '10mb' });
-  app.useBodyParser('urlencoded', { limit: '10mb', extended: true });
+  const httpAdapter = app.getHttpAdapter();
+  httpAdapter.getInstance().use(json({ limit: '10mb' }));
+  httpAdapter.getInstance().use(urlencoded({ limit: '10mb', extended: true }));
 
   app.setGlobalPrefix('api');
 
@@ -51,12 +49,6 @@ async function bootstrap() {
     new TransformResponseInterceptor(),
   );
 
-  /*
-  |--------------------------------------------------------------------------
-  | Swagger
-  |--------------------------------------------------------------------------
-  */
-
   const swaggerConfig = new DocumentBuilder()
     .setTitle('Sympto API')
     .setDescription('Sympto Healthcare Platform API')
@@ -64,24 +56,13 @@ async function bootstrap() {
     .addBearerAuth()
     .build();
 
-  const swaggerDocument = SwaggerModule.createDocument(
-    app,
-    swaggerConfig,
-  );
-
+  const swaggerDocument = SwaggerModule.createDocument(app, swaggerConfig);
   SwaggerModule.setup('api/docs', app, swaggerDocument);
-
-  /*
-  |--------------------------------------------------------------------------
-  | Bootstrap Default Administrator
-  |--------------------------------------------------------------------------
-  */
 
   const adminBootstrap = app.get(AdminBootstrapService);
   await adminBootstrap.bootstrap();
 
   const port = 3001;
-
   await app.listen(port);
 
   console.log(`🚀 Sympto API running at: http://localhost:${port}/api`);
