@@ -20,7 +20,24 @@ class HealthPassportService {
       data: HealthPassportDashboardData;
     }>('/onboarding/dashboard');
 
-    return response.data.data;
+    const data = response.data.data;
+    const profile = data.profile;
+    const patient = data.patient;
+
+    // The canonical date of birth is stored on the Person/profile record.
+    // The profile page also reads the Patient record, so expose the same
+    // value there without changing the underlying data model.
+    if (patient && !patient.dateOfBirth && profile?.dateOfBirth) {
+      return {
+        ...data,
+        patient: {
+          ...patient,
+          dateOfBirth: profile.dateOfBirth,
+        },
+      };
+    }
+
+    return data;
   }
 }
 
