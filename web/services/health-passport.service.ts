@@ -24,16 +24,20 @@ class HealthPassportService {
     const profile = data.profile;
     const patient = data.patient;
 
-    // The canonical date of birth is stored on the Person/profile record.
-    // The profile page also reads the Patient record, so expose the same
-    // value there without changing the underlying data model.
-    if (patient && !patient.dateOfBirth && profile?.dateOfBirth) {
+    // Person is the canonical source for profile-level identity data such as
+    // date of birth and gender. Some profile consumers read those values from
+    // the patient object, so expose the same persisted values there without
+    // changing the database model or duplicating ownership of the fields.
+    if (patient) {
+      const mirroredPatient = {
+        ...patient,
+        ...(patient.dateOfBirth ? {} : profile?.dateOfBirth ? { dateOfBirth: profile.dateOfBirth } : {}),
+        ...(patient.gender ? {} : profile?.gender ? { gender: profile.gender } : {}),
+      };
+
       return {
         ...data,
-        patient: {
-          ...patient,
-          dateOfBirth: profile.dateOfBirth,
-        },
+        patient: mirroredPatient,
       };
     }
 
