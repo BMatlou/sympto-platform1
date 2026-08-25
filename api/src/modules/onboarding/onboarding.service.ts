@@ -70,10 +70,6 @@ export class OnboardingService {
         if (!normalizedCountry) {
           countryId = null;
         } else {
-          // The web registration/profile selector uses ISO-2 values such as ZA.
-          // Always resolve the submitted value as an ISO-2 code first. For the
-          // existing South African registration path, repair the reference row
-          // when an older database was created without country reference data.
           let country = await tx.country.findUnique({
             where: { iso2: normalizedCountry },
             select: { id: true },
@@ -172,6 +168,12 @@ export class OnboardingService {
     await this.updatePrimaryAddress(userId, dto);
 
     if (!hasOnboardingProfileFields) {
+      return profile;
+    }
+
+    // Editing an already completed profile must never reopen onboarding.
+    const progress = await this.onboardingRepository.findByUser(userId);
+    if (progress?.status === 'COMPLETED') {
       return profile;
     }
 
