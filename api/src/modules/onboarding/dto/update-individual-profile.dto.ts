@@ -1,30 +1,41 @@
 import {
   IsBoolean,
-  IsDecimal,
-  IsNumber,
+  IsDateString,
   IsEnum,
+  IsNumber,
   IsOptional,
   IsString,
 } from 'class-validator';
 
 import {
-  AlcoholConsumption,
   ActivityLevel,
+  AlcoholConsumption,
   BloodType,
   DominantHand,
   ExerciseFrequency,
+  Gender,
   RhesusFactor,
   SmokingStatus,
-} from "@prisma/client";
+} from '@prisma/client';
 
 export class UpdateIndividualProfileDto {
+  /** Personal health-profile fields stored on Person. */
   @IsOptional()
-@IsNumber()
-heightCm?: number;
+  @IsDateString()
+  dateOfBirth?: string;
 
-@IsOptional()
-@IsNumber()
-weightKg?: number;
+  @IsOptional()
+  @IsEnum(Gender)
+  gender?: Gender;
+
+  /** Patient baseline health fields. */
+  @IsOptional()
+  @IsNumber()
+  heightCm?: number;
+
+  @IsOptional()
+  @IsNumber()
+  weightKg?: number;
 
   @IsOptional()
   @IsEnum(BloodType)
@@ -51,8 +62,8 @@ weightKg?: number;
   alcoholConsumption?: AlcoholConsumption;
 
   @IsOptional()
-@IsEnum(ActivityLevel)
-activityLevel?: ActivityLevel;
+  @IsEnum(ActivityLevel)
+  activityLevel?: ActivityLevel;
 
   @IsOptional()
   @IsEnum(ExerciseFrequency)
