@@ -56,12 +56,24 @@ class OnboardingService {
   async updateIndividualProfile(
     dto: UpdateIndividualProfileDto,
   ) {
+    const exerciseFrequencyMap: Record<string, string> = {
+      NONE: 'NONE',
+      NEVER: 'NONE',
+      RARELY: 'ONCE_PER_WEEK',
+      '1_2_PER_WEEK': 'TWO_TO_THREE_PER_WEEK',
+      '3_4_PER_WEEK': 'FOUR_TO_FIVE_PER_WEEK',
+      '5_PLUS_PER_WEEK': 'DAILY',
+      ONCE_PER_WEEK: 'ONCE_PER_WEEK',
+      TWO_TO_THREE_PER_WEEK: 'TWO_TO_THREE_PER_WEEK',
+      FOUR_TO_FIVE_PER_WEEK: 'FOUR_TO_FIVE_PER_WEEK',
+      DAILY: 'DAILY',
+    };
+
     const payload = {
       ...dto,
-      exerciseFrequency:
-        dto.exerciseFrequency === '3_4_PER_WEEK'
-          ? 'FOUR_TO_FIVE_PER_WEEK'
-          : dto.exerciseFrequency,
+      exerciseFrequency: dto.exerciseFrequency
+        ? exerciseFrequencyMap[dto.exerciseFrequency] ?? dto.exerciseFrequency
+        : dto.exerciseFrequency,
     };
 
     const { data } = await api.patch(
