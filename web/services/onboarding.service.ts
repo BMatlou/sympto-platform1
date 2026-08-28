@@ -56,9 +56,17 @@ class OnboardingService {
   async updateIndividualProfile(
     dto: UpdateIndividualProfileDto,
   ) {
+    const payload = {
+      ...dto,
+      exerciseFrequency:
+        dto.exerciseFrequency === '3_4_PER_WEEK'
+          ? 'FOUR_TO_FIVE_PER_WEEK'
+          : dto.exerciseFrequency,
+    };
+
     const { data } = await api.patch(
       '/onboarding/individual/profile',
-      dto,
+      payload,
     );
 
     return data;
@@ -104,17 +112,6 @@ class OnboardingService {
       },
     );
 
-    /*
-     * API response:
-     *
-     * {
-     *   success: true,
-     *   data: {
-     *     data: [...],
-     *     pagination: {...}
-     *   }
-     * }
-     */
     return data.data.data;
   }
 
@@ -144,17 +141,6 @@ class OnboardingService {
       },
     );
 
-    /*
-     * API response:
-     *
-     * {
-     *   success: true,
-     *   data: {
-     *     data: [...],
-     *     pagination: {...}
-     *   }
-     * }
-     */
     return data.data.data;
   }
 
