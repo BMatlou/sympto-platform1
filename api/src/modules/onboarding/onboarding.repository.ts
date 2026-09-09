@@ -186,8 +186,34 @@ export class OnboardingRepository {
   }
 
   async getDashboardData(userId: string) {
-    const user = await this.prisma.user.findUnique({ where: { id: userId }, include: { person: { include: { country: true, personAddresses: { where: { isPrimary: true }, orderBy: { createdAt: 'desc' }, take: 1, include: { address: { include: { country: true } } } } } }, patient: { include: { healthPassport: true } } } });
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+      include: {
+        person: { include: { country: true, personAddresses: { where: { isPrimary: true }, orderBy: { createdAt: 'desc' }, take: 1, include: { address: { include: { country: true } } } } } },
+        patient: {
+          include: {
+            healthPassport: {
+              include: {
+                immunizations: {
+                  include: { immunization: true },
+                  orderBy: { administeredAt: 'desc' },
+                },
+              },
+            },
+          },
+        },
+      },
+    });
     if (!user) throw new NotFoundException('User not found.');
-    return { profile: user.person, patient: user.patient, healthPassport: user.patient?.healthPassport ?? null };
+
+    const healthPassport = user.patient?.healthPassport ?? null;
+    const immunizations = healthPassport?.immunizations ?? [];
+
+    return {
+      profile: user.person,
+      patient: user.patient,
+      healthPassport,
+      immunizations,
+    };
   }
 }
