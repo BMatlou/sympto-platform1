@@ -1,6 +1,7 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 
 import { PrismaService } from '../../database/prisma.service';
+import { UpdateHealthWeightDto } from './dto/update-health-weight.dto';
 
 const ACTIVE_APPOINTMENT_STATUSES = ['PENDING', 'CONFIRMED', 'CHECKED_IN', 'IN_PROGRESS'] as const;
 const ACTIVE_MEDICATION_STATUSES = ['ACTIVE', 'PAUSED'] as const;
@@ -79,6 +80,10 @@ export class HealthHomeService {
     const healthPassportId = patient.healthPassport?.id;
     const now = new Date();
     const immunizations = patient.healthPassport?.immunizations ?? [];
+    const weightKg = patient.weightKg == null ? null : Number(patient.weightKg);
+    const heightCm = patient.heightCm == null ? null : Number(patient.heightCm);
+    const bmi = weightKg && heightCm ? Number((weightKg / ((heightCm / 100) ** 2)).toFixed(1)) : null;
+    const bmiCategory = bmi == null ? null : bmi < 18.5 ? 'UNDERWEIGHT' : bmi < 25 ? 'NORMAL' : bmi < 30 ? 'OVERWEIGHT' : 'OBESITY';
 
     const [allergies, conditions, medications, goals, family, appointments, notifications, devices, measurements, symptomLogs, aiObservations, labOrders, imagingStudies, carePlans] = await Promise.all([
       this.prisma.patientAllergy.findMany({ where: { healthPassportId: healthPassportId ?? '' }, include: { allergy: true }, orderBy: { createdAt: 'desc' } }),
@@ -129,8 +134,10 @@ export class HealthHomeService {
         firstName: patient.person?.firstName ?? '',
         lastName: patient.person?.lastName ?? '',
         name: [patient.person?.firstName, patient.person?.lastName].filter(Boolean).join(' '),
-        heightCm: patient.heightCm,
-        weightKg: patient.weightKg,
+        heightCm,
+        weightKg,
+        bmi,
+        bmiCategory,
         deceased: patient.deceased,
       },
       healthPassport: patient.healthPassport,
@@ -141,6 +148,10 @@ export class HealthHomeService {
         immunizations,
         bloodType: patient.healthPassport?.bloodType ?? null,
         rhesusFactor: patient.healthPassport?.rhesusFactor ?? null,
+        weightKg,
+        heightCm,
+        bmi,
+        bmiCategory,
         latestMeasurements: journalSignals.signals,
         connectedDevices: devices.map((device) => ({ id: device.id, manufacturer: device.manufacturer, model: device.model, deviceType: device.deviceType, status: device.status, lastSyncAt: device.lastSyncAt, measurementCount: device._count.measurements })),
       },
@@ -162,6 +173,50 @@ export class HealthHomeService {
       ai: { recentObservations: aiObservations },
       settings: patient.healthJournalSettings,
       healthJournalSettings: patient.healthJournalSettings,
+    };
+  }
+
+  async updateWeight(userId: string, dto: UpdateHealthWeightDto, requestedPatientId?: string) {
+    const owner = await this.prisma.user.findUnique({
+      where: { id: userId },
+      include: { patient: true },
+    });
+
+    if (!owner?.patient) throw new NotFoundException('Patient health profile not found.');
+
+    let patientId = owner.patient.id;
+    if (requestedPatientId && requestedPatientId !== patientId) {
+      const familyLink = await this.prisma.familyMember.findFirst({
+        where: {
+          ownerPatientId: patientId,
+          memberPatientId: requestedPatientId,
+          canViewRecords: true,
+        },
+      });
+      if (!familyLink) throw new NotFoundException('You are not authorised to update this family member.');
+      patientId = requestedPatientId;
+    }
+
+    const patient = await this.prisma.patient.update({
+      where: { id: patientId },
+      data: {
+        weightKg: dto.weightKg,
+        ...(dto.heightCm !== undefined ? { heightCm: dto.heightCm } : {}),
+      },
+    });
+
+    const weightKg = Number(patient.weightKg);
+    const heightCm = patient.heightCm == null ? null : Number(patient.heightCm);
+    const bmi = heightCm ? Number((weightKg / ((heightCm / 100) ** 2)).toFixed(1)) : 0;
+    const bmiCategory = bmi === 0 ? null : bmi < 18.5 ? 'UNDERWEIGHT' : bmi < 25 ? 'NORMAL' : bmi < 30 ? 'OVERWEIGHT' : 'OBESITY';
+
+    return {
+      weightKg,
+      heightCm,
+      bmi,
+      bmiCategory,
+      recordedAt: new Date().toISOString(),
+      goals: [],
     };
   }
 }
