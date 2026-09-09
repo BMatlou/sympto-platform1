@@ -38,17 +38,25 @@ export interface UpdateWeightResponse { weightKg: number; heightCm: number; bmi:
 
 class HealthHomeService {
   async getHealthHome(patientId?: string): Promise<HealthHomeResponse> {
-    const healthHomeResponse = await api.get<{ success: boolean; data: HealthHomeResponse }>('/health-home', { params: patientId ? { patientId } : undefined });
-    const healthHome = healthHomeResponse.data.data;
+    const response = await api.get('/health-home', { params: patientId ? { patientId } : undefined });
+    const payload: any = response.data;
+    const healthHome: HealthHomeResponse = payload?.data ?? payload;
+    if (!healthHome?.patient?.id) throw new Error('Health Home returned an invalid response.');
 
-    // Keep the original onboarding source for canonical profile/passport data,
-    // but keep Health Home as the source for aggregated clinical data such as
-    // emergency contacts.
+    // PatientImmunization is the source of truth for vaccines. Prefer the
+    // dedicated top-level collection returned by Health Home and only fall
+    // back to the snapshot when necessary. Never replace a populated list
+    // with an empty legacy/canonical list.
+    const healthHomeImmunizations = Array.isArray(healthHome.immunizations)
+      ? healthHome.immunizations
+      : (Array.isArray(healthHome.healthSnapshot?.immunizations) ? healthHome.healthSnapshot.immunizations : []);
+
     let canonical: any = null;
     if (!patientId || patientId === healthHome.patient?.id) {
       try {
-        const onboardingResponse = await api.get<{ success: boolean; data: any }>('/onboarding/dashboard');
-        canonical = onboardingResponse.data.data;
+        const onboardingResponse = await api.get('/onboarding/dashboard');
+        const onboardingPayload: any = onboardingResponse.data;
+        canonical = onboardingPayload?.data ?? onboardingPayload;
       } catch (error) {
         console.warn('Canonical onboarding dashboard unavailable; using Health Home data.', error);
       }
@@ -57,6 +65,8 @@ class HealthHomeService {
     if (!canonical || canonical.patient?.id !== healthHome.patient?.id) {
       return {
         ...healthHome,
+        immunizations: healthHomeImmunizations,
+        healthSnapshot: { ...healthHome.healthSnapshot, immunizations: healthHomeImmunizations },
         wearables: healthHome.wearables ?? {
           devices: healthHome.healthSnapshot.connectedDevices,
           latestMeasurements: healthHome.healthSnapshot.latestMeasurements.map((m: any, index) => ({ id: `${m.type}-${index}`, type: m.type, value: m.value, unit: m.unit, measuredAt: m.measuredAt, source: m.source })),
@@ -64,13 +74,10 @@ class HealthHomeService {
       };
     }
 
-    // EmergencyContact belongs to Patient.emergencyContacts. The current
-    // onboarding dashboard does not reliably include that relation, so an
-    // empty legacy value must never hide contacts already returned by Health Home.
+    const canonicalImmunizations = Array.isArray(canonical.immunizations) ? canonical.immunizations : [];
+    const immunizations = healthHomeImmunizations.length > 0 ? healthHomeImmunizations : canonicalImmunizations;
     const canonicalEmergencyContacts = Array.isArray(canonical.emergencyContacts) ? canonical.emergencyContacts : [];
-    const emergencyContacts = canonicalEmergencyContacts.length > 0
-      ? canonicalEmergencyContacts
-      : (healthHome.emergencyContacts ?? []);
+    const emergencyContacts = canonicalEmergencyContacts.length > 0 ? canonicalEmergencyContacts : (healthHome.emergencyContacts ?? []);
 
     return {
       ...healthHome,
@@ -81,14 +88,14 @@ class HealthHomeService {
       allergies: canonical.allergies ?? healthHome.allergies,
       conditions: canonical.conditions ?? healthHome.conditions,
       medications: canonical.medications ?? healthHome.medications,
-      immunizations: canonical.immunizations ?? healthHome.immunizations,
+      immunizations,
       healthGoals: canonical.healthGoals ?? healthHome.healthGoals,
       healthSnapshot: {
         ...healthHome.healthSnapshot,
         activeAllergies: canonical.allergies ?? healthHome.healthSnapshot.activeAllergies,
         activeConditions: canonical.conditions ?? healthHome.healthSnapshot.activeConditions,
         allergies: canonical.allergies ?? healthHome.healthSnapshot.allergies,
-        immunizations: canonical.immunizations ?? healthHome.healthSnapshot.immunizations,
+        immunizations,
         bloodType: canonical.healthPassport?.bloodType ?? healthHome.healthSnapshot.bloodType,
         rhesusFactor: canonical.healthPassport?.rhesusFactor ?? healthHome.healthSnapshot.rhesusFactor,
       },
@@ -105,7 +112,8 @@ class HealthHomeService {
 
   async updateWeight(weightKg: number, heightCm?: number, patientId?: string): Promise<UpdateWeightResponse> {
     const response = await api.post<{ success: boolean; data: UpdateWeightResponse }>('/health-home/weight', { weightKg, ...(heightCm !== undefined ? { heightCm } : {}) }, { params: patientId ? { patientId } : undefined });
-    return response.data.data;
+    const payload: any = response.data;
+    return payload?.data ?? payload;
   }
 }
 
