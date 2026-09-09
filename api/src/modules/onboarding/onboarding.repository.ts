@@ -61,27 +61,10 @@ export class OnboardingRepository {
       if (dto.dateOfBirth !== undefined || dto.gender !== undefined) {
         const user = await tx.user.findUnique({ where: { id: userId }, select: { personId: true } });
         if (!user?.personId) throw new NotFoundException('Person not found.');
-        await tx.person.update({
-          where: { id: user.personId },
-          data: {
-            dateOfBirth: dto.dateOfBirth !== undefined ? new Date(dto.dateOfBirth) : undefined,
-            gender: dto.gender,
-          },
-        });
+        await tx.person.update({ where: { id: user.personId }, data: { dateOfBirth: dto.dateOfBirth !== undefined ? new Date(dto.dateOfBirth) : undefined, gender: dto.gender } });
       }
 
-      await tx.patient.update({
-        where: { id: patient.id },
-        data: {
-          heightCm: dto.heightCm,
-          weightKg: dto.weightKg,
-          occupation: dto.occupation,
-          dominantHand: dto.dominantHand,
-          smokingStatus: dto.smokingStatus,
-          alcoholConsumption: dto.alcoholConsumption,
-          exerciseFrequency: dto.exerciseFrequency,
-        },
-      });
+      await tx.patient.update({ where: { id: patient.id }, data: { heightCm: dto.heightCm, weightKg: dto.weightKg, occupation: dto.occupation, dominantHand: dto.dominantHand, smokingStatus: dto.smokingStatus, alcoholConsumption: dto.alcoholConsumption, exerciseFrequency: dto.exerciseFrequency } });
 
       await tx.healthPassport.upsert({
         where: { patientId: patient.id },
@@ -98,11 +81,8 @@ export class OnboardingRepository {
       const patient = await tx.patient.findUnique({ where: { userId } });
       if (!patient) throw new NotFoundException('Patient not found.');
       const existingPrimary = await tx.emergencyContact.findFirst({ where: { patientId: patient.id, isPrimary: true } });
-      if (existingPrimary) {
-        await tx.emergencyContact.update({ where: { id: existingPrimary.id }, data: { fullName: dto.fullName, relationship: dto.relationship, phoneNumber: dto.phoneNumber, email: dto.email, isPrimary: dto.isPrimary ?? true } });
-      } else {
-        await tx.emergencyContact.create({ data: { patientId: patient.id, fullName: dto.fullName, relationship: dto.relationship, phoneNumber: dto.phoneNumber, email: dto.email, isPrimary: dto.isPrimary ?? true } });
-      }
+      if (existingPrimary) await tx.emergencyContact.update({ where: { id: existingPrimary.id }, data: { fullName: dto.fullName, relationship: dto.relationship, phoneNumber: dto.phoneNumber, email: dto.email, isPrimary: dto.isPrimary ?? true } });
+      else await tx.emergencyContact.create({ data: { patientId: patient.id, fullName: dto.fullName, relationship: dto.relationship, phoneNumber: dto.phoneNumber, email: dto.email, isPrimary: dto.isPrimary ?? true } });
       return this.updateOnboardingStep(tx, userId, 4, 30);
     });
   }
@@ -186,8 +166,59 @@ export class OnboardingRepository {
   }
 
   async getDashboardData(userId: string) {
-    const user = await this.prisma.user.findUnique({ where: { id: userId }, include: { person: { include: { country: true, personAddresses: { where: { isPrimary: true }, orderBy: { createdAt: 'desc' }, take: 1, include: { address: { include: { country: true } } } } } }, patient: { include: { healthPassport: true } } } });
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+      include: {
+        person: {
+          include: {
+            country: true,
+            personAddresses: {
+              where: { isPrimary: true },
+              orderBy: { createdAt: 'desc' },
+              take: 1,
+              include: { address: { include: { country: true } } },
+            },
+          },
+        },
+        patient: {
+          include: {
+            healthPassport: {
+              include: {
+                allergies: { include: { allergy: true }, orderBy: { createdAt: 'desc' } },
+                conditions: { include: { condition: true }, orderBy: { createdAt: 'desc' } },
+                medications: { include: { medication: true }, orderBy: { createdAt: 'desc' } },
+                immunizations: { include: { immunization: true }, orderBy: { administeredAt: 'desc' } },
+              },
+            },
+            emergencyContacts: true,
+          },
+        },
+      },
+    });
     if (!user) throw new NotFoundException('User not found.');
-    return { profile: user.person, patient: user.patient, healthPassport: user.patient?.healthPassport ?? null };
+
+    const patient = user.patient;
+    const healthPassport = patient?.healthPassport ?? null;
+    const consents = patient
+      ? await this.prisma.consent.findMany({ where: { patientId: patient.id }, orderBy: { createdAt: 'desc' } })
+      : [];
+
+    return {
+      profile: user.person,
+      patient,
+      healthPassport,
+      emergencyContacts: patient?.emergencyContacts ?? [],
+      allergies: healthPassport?.allergies ?? [],
+      conditions: healthPassport?.conditions ?? [],
+      medications: healthPassport?.medications ?? [],
+      immunizations: healthPassport?.immunizations ?? [],
+      healthGoals: patient
+        ? await this.prisma.healthGoal.findMany({ where: { patientId: patient.id }, orderBy: { createdAt: 'desc' } })
+        : [],
+      consents,
+      healthJournalSettings: patient
+        ? await this.prisma.healthJournalSettings.findUnique({ where: { patientId: patient.id } })
+        : null,
+    };
   }
 }
