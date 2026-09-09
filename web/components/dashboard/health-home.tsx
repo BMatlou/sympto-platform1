@@ -84,12 +84,14 @@ function CountPill({ icon, count, label }: { icon: ReactNode; count: number; lab
 
 function WeightBodySizeCard({ weightKg, heightCm, bmi, patientId, reload }: { weightKg: number | null | undefined; heightCm: number | null | undefined; bmi: number | null | undefined; patientId?: string; reload: () => Promise<void>; }) {
   const [editingWeight, setEditingWeight] = useState<number | null>(null);
+  const [weightInput, setWeightInput] = useState<string | null>(null);
   const [editingWeightInput, setEditingWeightInput] = useState(false);
   const [saveState, setSaveState] = useState<"idle" | "saving" | "saved" | "error">("idle");
   const canEdit = !patientId;
   const minWeight = 1;
   const maxWeight = 250;
-  const currentWeight = editingWeight ?? (weightKg != null ? Number(weightKg) : 60);
+  const savedWeight = weightKg != null && Number.isFinite(Number(weightKg)) ? Number(weightKg) : 60;
+  const currentWeight = editingWeight ?? savedWeight;
   const liveBmi = calculateBmi(currentWeight, heightCm != null ? Number(heightCm) : null) ?? (bmi != null ? Number(bmi) : null);
   const weightStatus = getWeightStatus(liveBmi);
   const sliderPercent = ((currentWeight - minWeight) / (maxWeight - minWeight)) * 100;
@@ -107,6 +109,13 @@ function WeightBodySizeCard({ weightKg, heightCm, bmi, patientId, reload }: { we
     ? `linear-gradient(to right, #f59e0b 0%, #f59e0b ${amberEnd}%, #eab308 ${amberEnd}%, #eab308 ${yellowEnd}%, #22c55e ${yellowEnd}%, #22c55e ${greenEnd}%, #f97316 ${greenEnd}%, #f97316 ${orangeEnd}%, #ef4444 ${orangeEnd}%, #ef4444 100%)`
     : "linear-gradient(to right, #f59e0b 0%, #f59e0b 20%, #eab308 20%, #eab308 35%, #22c55e 35%, #22c55e 55%, #f97316 55%, #f97316 70%, #ef4444 70%, #ef4444 100%)";
 
+  const beginWeightEdit = () => {
+    if (!canEdit || !heightCm) return;
+    setWeightInput(currentWeight.toString());
+    setEditingWeightInput(true);
+    setSaveState("idle");
+  };
+
   const persistWeight = async () => {
     if (!canEdit || editingWeight == null || saveState === "saving") return;
     if (!heightCm) { setSaveState("error"); return; }
@@ -115,6 +124,7 @@ function WeightBodySizeCard({ weightKg, heightCm, bmi, patientId, reload }: { we
       await healthHomeService.updateWeight(editingWeight, Number(heightCm));
       setSaveState("saved");
       setEditingWeightInput(false);
+      setWeightInput(null);
       await reload();
     } catch (error) {
       console.error("Failed to update weight:", error);
@@ -127,14 +137,35 @@ function WeightBodySizeCard({ weightKg, heightCm, bmi, patientId, reload }: { we
     if (!Number.isFinite(nextWeight)) return;
     const boundedWeight = Math.max(minWeight, Math.min(maxWeight, nextWeight));
     setEditingWeight(Number(boundedWeight.toFixed(1)));
+    setWeightInput(boundedWeight.toString());
     setSaveState("idle");
   };
 
   const handleWeightInputChange = (value: string) => {
-    if (value.trim() === "") return;
-    handleWeightChange(value);
+    setWeightInput(value);
+    setSaveState("idle");
+    if (value.trim() === "" || value === ".") return;
+    const nextWeight = Number(value);
+    if (!Number.isFinite(nextWeight)) return;
+    if (nextWeight < minWeight || nextWeight > maxWeight) return;
+    setEditingWeight(Number(nextWeight.toFixed(1)));
   };
 
+  const handleWeightInputBlur = () => {
+    const rawValue = weightInput?.trim() ?? "";
+    const nextWeight = Number(rawValue);
+    if (Number.isFinite(nextWeight) && nextWeight >= minWeight && nextWeight <= maxWeight) {
+      setEditingWeight(Number(nextWeight.toFixed(1)));
+      setWeightInput(nextWeight.toFixed(1));
+    } else if (rawValue === "") {
+      setWeightInput(currentWeight.toFixed(1));
+    } else {
+      setWeightInput(currentWeight.toFixed(1));
+    }
+    setEditingWeightInput(false);
+  };
+
+  const displayedInput = weightInput ?? currentWeight.toFixed(1);
   const statusMessage = saveState === "saving" ? "Saving your weight…" : saveState === "saved" ? "Weight saved" : saveState === "error" ? "Could not save. Try again." : canEdit ? "Click your weight to type it, or move the slider" : "Family health information is view-only";
 
   return (
@@ -159,25 +190,29 @@ function WeightBodySizeCard({ weightKg, heightCm, bmi, patientId, reload }: { we
             <div className="mt-2 flex items-center gap-3">
               <input
                 id="health-home-weight"
-                type="number"
+                type="text"
                 inputMode="decimal"
-                min={minWeight}
-                max={maxWeight}
-                step="0.1"
-                value={currentWeight}
+                value={displayedInput}
                 onChange={(event) => handleWeightInputChange(event.target.value)}
-                onBlur={() => setEditingWeightInput(false)}
+                onBlur={handleWeightInputBlur}
+                onKeyDown={(event) => {
+                  if (event.key === "Enter") {
+                    event.preventDefault();
+                    event.currentTarget.blur();
+                  }
+                }}
                 autoFocus
                 className="h-14 w-full rounded-xl border-2 border-[#24c1c4] bg-white px-4 text-2xl font-black text-[#0b2d54] outline-none focus:ring-2 focus:ring-[#24c1c4]/30"
+                aria-label="Weight in kilograms"
               />
               <span className="text-lg font-extrabold text-slate-400">kg</span>
             </div>
-            <p className="mt-2 text-xs font-medium text-slate-500">Your BMI and slider update as you type.</p>
+            <p className="mt-2 text-xs font-medium text-slate-500">Type 60, 70 or 76.2. Your BMI and slider update as you type.</p>
           </div>
         ) : (
           <button
             type="button"
-            onClick={() => canEdit && setEditingWeightInput(true)}
+            onClick={beginWeightEdit}
             disabled={!canEdit || !heightCm}
             className="flex w-full items-end gap-3 rounded-2xl bg-[#f5f8fb] px-4 py-3.5 text-left ring-1 ring-[#24c1c4]/10 transition hover:ring-[#24c1c4]/40 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#24c1c4] disabled:cursor-not-allowed"
             aria-label="Click to enter your weight"
