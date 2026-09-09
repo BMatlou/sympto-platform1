@@ -1,147 +1,54 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useState } from "react";
-import { ArrowLeft, ArrowRight, Droplets, HeartPulse, ShieldCheck, Syringe, UserRound } from "lucide-react";
-import { healthPassportService, type HealthPassportDashboardData } from "@/services/health-passport.service";
+import { ArrowLeft, HeartPulse, ShieldCheck, Syringe, Phone, Activity, CreditCard } from "lucide-react";
+import ProtectedRoute from "@/components/auth/protected-route";
+import { useDashboard } from "@/hooks/use-dashboard";
 
-function formatEnum(value: unknown) {
-  if (!value) return "Not recorded";
-  return String(value).toLowerCase().replace(/_/g, " ").replace(/\b\w/g, (letter) => letter.toUpperCase());
+const text = (value: unknown, fallback = "Not recorded") => value === null || value === undefined || value === "" ? fallback : String(value);
+const label = (value: unknown) => text(value).toLowerCase().replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
+const date = (value: unknown) => value ? new Date(String(value)).toLocaleDateString("en-ZA") : "Not recorded";
+
+function Section({ title, children }: { title: string; children: React.ReactNode }) {
+  return <section className="mb-5 rounded-3xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6"><h2 className="mb-4 text-lg font-bold text-[#0b2d54]">{title}</h2>{children}</section>;
 }
 
-function activeRecord(record: Record<string, any>) {
-  return record?.status !== "INACTIVE" && record?.status !== "RESOLVED" && !record?.resolvedAt;
-}
-
-function InfoCard({ label, value, description, href }: { label: string; value: string; description: string; href?: string }) {
-  const content = (
-    <div className={`rounded-2xl border border-slate-200 bg-white p-5 ${href ? "transition hover:border-[#24c1c4] hover:shadow-sm" : ""}`}>
-      <p className="text-xs font-medium text-slate-400">{label}</p>
-      <p className="mt-2 text-xl font-bold text-[#0b2d54]">{value}</p>
-      <p className="mt-1 text-sm text-slate-500">{description}</p>
-      {href && <span className="mt-3 inline-flex items-center gap-1 text-xs font-semibold text-[#0b2d54]">Manage <ArrowRight className="h-3 w-3" /></span>}
-    </div>
-  );
-
-  return href ? <Link href={href}>{content}</Link> : content;
-}
+function Empty({ children }: { children: React.ReactNode }) { return <p className="text-sm text-slate-500">{children}</p>; }
 
 export default function HealthPassportPage() {
-  const [data, setData] = useState<HealthPassportDashboardData | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const { data, loading, error, reload } = useDashboard();
 
-  async function load() {
-    try {
-      setLoading(true);
-      setError(null);
-      setData(await healthPassportService.getHealthPassport());
-    } catch (requestError) {
-      console.error("Failed to load Health Passport:", requestError);
-      setError("We couldn't load your health passport.");
-    } finally {
-      setLoading(false);
-    }
-  }
+  if (loading) return <ProtectedRoute><main className="min-h-screen bg-[#f5f8fb] p-6"><div className="mx-auto max-w-4xl space-y-4"><div className="h-36 animate-pulse rounded-3xl bg-white"/><div className="h-64 animate-pulse rounded-3xl bg-white"/></div></main></ProtectedRoute>;
+  if (error || !data) return <ProtectedRoute><main className="min-h-screen bg-[#f5f8fb] p-6"><div className="mx-auto max-w-xl rounded-3xl bg-white p-7"><h1 className="text-xl font-bold text-[#0b2d54]">We couldn't load your Clinic Card</h1><p className="mt-2 text-sm text-slate-500">Your saved health information has not been changed.</p><button onClick={reload} className="mt-5 rounded-xl bg-[#0b2d54] px-5 py-2.5 text-sm font-semibold text-white">Try again</button></div></main></ProtectedRoute>;
 
-  useEffect(() => {
-    void load();
-  }, []);
+  const passport = data.healthPassport as any;
+  const profile = data.profile as any;
+  const allergies = data.healthSnapshot.activeAllergies ?? data.healthSnapshot.allergies ?? [];
+  const conditions = data.healthSnapshot.activeConditions ?? [];
+  const immunizations = data.healthSnapshot.immunizations ?? [];
+  const emergencies = data.emergencyContacts ?? [];
+  const medications = data.medications ?? data.today.activeMedications ?? [];
+  const vitals = data.healthSnapshot.latestMeasurements ?? [];
+  const insurance = data.patientInsurances ?? [];
+  const firstName = profile?.preferredName || profile?.firstName || data.patient.firstName || "Patient";
+  const fullName = [firstName, profile?.lastName || data.patient.lastName].filter(Boolean).join(" ");
 
-  const profile = data?.profile as Record<string, any> | null | undefined;
-  const patient = data?.patient as Record<string, any> | null | undefined;
-  const healthPassport = data?.healthPassport as Record<string, any> | null | undefined;
-  const allergies = data?.allergies ?? [];
-  const conditions = data?.conditions ?? [];
-  const immunizations = data?.immunizations ?? [];
-  const emergencyContacts = data?.emergencyContacts ?? [];
-  const activeAllergies = allergies.filter(activeRecord);
-  const activeConditions = conditions.filter(activeRecord);
-  const firstName = profile?.preferredName || profile?.firstName || patient?.firstName || "Patient";
-  const fullName = [firstName, profile?.lastName || patient?.lastName].filter(Boolean).join(" ") || "Patient";
+  return <ProtectedRoute><main className="min-h-screen bg-[#f5f8fb] text-slate-800"><div className="mx-auto max-w-4xl px-4 py-6 sm:px-6 sm:py-8">
+    <Link href="/dashboard" className="mb-5 inline-flex items-center gap-2 text-sm font-semibold text-[#0b2d54]"><ArrowLeft className="h-4 w-4"/>Back to My Health</Link>
 
-  return (
-    <main className="min-h-screen bg-slate-50">
-      <div className="mx-auto max-w-6xl px-4 py-8 sm:px-6 lg:px-8">
-        <Link href="/dashboard" className="mb-6 inline-flex items-center gap-2 text-sm font-medium text-[#0b2d54] hover:text-[#24c1c4]">
-          <ArrowLeft className="h-4 w-4" />Back to Health Home
-        </Link>
+    <section className="mb-5 overflow-hidden rounded-[30px] bg-gradient-to-br from-rose-700 via-rose-600 to-[#0b2d54] p-6 text-white shadow-lg sm:p-8">
+      <div className="flex items-start justify-between gap-4"><div><div className="flex items-center gap-2 text-xs font-bold uppercase tracking-[0.18em] text-white/70"><ShieldCheck className="h-4 w-4"/>My Clinic Card</div><h1 className="mt-4 text-3xl font-bold">{fullName}</h1><p className="mt-2 text-sm text-white/75">Patient number: {text(data.patient.patientNumber)}</p></div><div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-white/10"><HeartPulse className="h-7 w-7"/></div></div>
+      <div className="mt-7 grid grid-cols-2 gap-3 sm:grid-cols-4"><div className="rounded-2xl bg-white/10 p-3"><p className="text-[11px] text-white/60">Date of birth</p><p className="mt-1 font-semibold">{date(profile?.dateOfBirth)}</p></div><div className="rounded-2xl bg-white/10 p-3"><p className="text-[11px] text-white/60">Blood</p><p className="mt-1 font-semibold">{label(passport?.bloodType)}</p></div><div className="rounded-2xl bg-white/10 p-3"><p className="text-[11px] text-white/60">Rhesus</p><p className="mt-1 font-semibold">{label(passport?.rhesusFactor)}</p></div><div className="rounded-2xl bg-white/10 p-3"><p className="text-[11px] text-white/60">Organ donor</p><p className="mt-1 font-semibold">{passport?.organDonor === true ? "Yes" : passport?.organDonor === false ? "No" : "Not recorded"}</p></div></div>
+    </section>
 
-        <div className="mb-8 flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
-          <div>
-            <div className="mb-3 inline-flex items-center gap-2 rounded-full bg-[#24c1c4]/10 px-3 py-1 text-xs font-semibold text-[#0b2d54]"><ShieldCheck className="h-3.5 w-3.5" />My health</div>
-            <h1 className="text-3xl font-bold tracking-tight text-[#0b2d54] sm:text-4xl">Health passport</h1>
-            <p className="mt-2 max-w-2xl text-slate-500">Your essential health information in one place.</p>
-          </div>
-          <div className="flex flex-wrap gap-2">
-            <Link href="/health-goals" className="rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-[#0b2d54] hover:border-[#24c1c4]">Health goals</Link>
-            <Link href="/health-journal" className="rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-[#0b2d54] hover:border-[#24c1c4]">Health journal</Link>
-            <Link href="/emergency-contacts" className="rounded-xl bg-[#0b2d54] px-4 py-2 text-sm font-semibold text-white hover:bg-[#071f3a]">Emergency contacts</Link>
-          </div>
-        </div>
+    <Section title="Allergies"><div className="flex flex-wrap gap-2">{allergies.length ? allergies.map((a: any) => <span key={a.id} className="rounded-full bg-rose-50 px-3 py-2 text-sm font-semibold text-rose-700">{text(a.allergy?.name || a.name)}</span>) : <Empty>No active allergies are recorded.</Empty>}</div></Section>
+    <Section title="Health conditions">{conditions.length ? <div className="grid gap-3 sm:grid-cols-2">{conditions.map((c: any) => <div key={c.id} className="rounded-2xl bg-slate-50 p-4"><p className="font-semibold text-[#0b2d54]">{text(c.condition?.name || c.name)}</p>{c.severity && <p className="mt-1 text-xs text-slate-500">Severity: {label(c.severity)}</p>}</div>)}</div> : <Empty>No active health conditions are recorded.</Empty>}</Section>
+    <Section title="Current medicines">{medications.length ? <div className="grid gap-3 sm:grid-cols-2">{medications.map((m: any) => <div key={m.id} className="rounded-2xl bg-slate-50 p-4"><p className="font-semibold text-[#0b2d54]">{text(m.medication?.name || m.name)}</p><p className="mt-1 text-sm text-slate-500">{text(m.dosage, "Dose not recorded")} · {text(m.frequency, "Frequency not recorded")}</p></div>)}</div> : <Empty>No current medicines are recorded.</Empty>}</Section>
+    <Section title="Immunisations"><div className="flex items-center gap-2 mb-4"><Syringe className="h-5 w-5 text-[#24c1c4]"/><span className="text-sm text-slate-500">{immunizations.length} recorded</span></div>{immunizations.length ? <div className="grid gap-3 sm:grid-cols-2">{immunizations.map((i: any) => <div key={i.id} className="rounded-2xl bg-slate-50 p-4"><p className="font-semibold text-[#0b2d54]">{text(i.immunization?.name || i.name)}</p><p className="mt-1 text-sm text-slate-500">{date(i.administeredAt)}{i.doseNumber != null ? ` · Dose ${i.doseNumber}` : ""}</p></div>)}</div> : <Empty>No immunisations are recorded.</Empty>}</Section>
+    <Section title="Latest vitals"><div className="grid gap-3 grid-cols-2 sm:grid-cols-4">{vitals.length ? vitals.map((v: any) => <div key={`${v.type}-${v.measuredAt}`} className="rounded-2xl bg-slate-50 p-4"><Activity className="h-4 w-4 text-[#24c1c4]"/><p className="mt-2 text-xs text-slate-500">{label(v.type)}</p><p className="mt-1 font-bold text-[#0b2d54]">{text(v.value)} <span className="text-xs font-medium text-slate-400">{text(v.unit, "")}</span></p></div>) : <Empty>No connected vital measurements are recorded.</Empty>}</div></Section>
+    <Section title="Emergency information">{passport?.emergencyNotes && <p className="mb-4 rounded-2xl bg-amber-50 p-4 text-sm text-amber-900">{passport.emergencyNotes}</p>}{emergencies.length ? <div className="grid gap-3 sm:grid-cols-2">{emergencies.map((c: any) => <div key={c.id} className="rounded-2xl bg-slate-50 p-4"><p className="font-semibold text-[#0b2d54]">{c.fullName}</p><p className="mt-1 text-sm text-slate-500">{label(c.relationship)}</p><p className="mt-2 flex items-center gap-2 text-sm font-semibold text-[#0b2d54]"><Phone className="h-4 w-4"/>{c.phoneNumber}</p></div>)}</div> : <Empty>No emergency contacts are recorded.</Empty>}</Section>
+    <Section title="Insurance / medical aid"><div className="flex items-center gap-2 mb-4"><CreditCard className="h-5 w-5 text-[#24c1c4]"/>{insurance.length ? <span className="text-sm text-slate-500">{insurance.length} policy record{insurance.length === 1 ? "" : "s"}</span> : null}</div>{insurance.length ? <div className="grid gap-3 sm:grid-cols-2">{insurance.map((p: any) => <div key={p.id} className="rounded-2xl bg-slate-50 p-4"><p className="font-semibold text-[#0b2d54]">{text(p.insurancePolicy?.name || p.name, "Medical aid / insurance")}</p><p className="mt-1 text-sm text-slate-500">Membership: {text(p.membershipNumber)}</p>{p.dependantCode && <p className="mt-1 text-sm text-slate-500">Dependant: {p.dependantCode}</p>}</div>)}</div> : <Empty>No insurance or medical-aid record is available.</Empty>}</Section>
 
-        {loading && <div className="mb-6 rounded-2xl border border-slate-200 bg-white p-5 text-sm text-slate-500">Loading your health passport...</div>}
-        {error && !loading && <div className="mb-6 rounded-2xl border border-red-200 bg-white p-6"><h2 className="font-semibold text-[#0b2d54]">{error}</h2><button onClick={() => void load()} className="mt-4 rounded-xl bg-[#0b2d54] px-4 py-2 text-sm font-semibold text-white">Try again</button></div>}
-
-        {data && (
-          <>
-            <section className="mb-6 rounded-2xl bg-[#0b2d54] p-6 text-white sm:p-8">
-              <div className="flex items-center gap-5">
-                <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-white/10"><UserRound className="h-8 w-8" /></div>
-                <div>
-                  <p className="text-sm text-slate-300">Health passport for</p>
-                  <h2 className="mt-1 text-2xl font-bold">{fullName}</h2>
-                  {profile?.dateOfBirth && <p className="mt-2 text-sm text-slate-300">Date of birth: {profile.dateOfBirth}</p>}
-                </div>
-              </div>
-            </section>
-
-            <section className="mb-6">
-              <h2 className="mb-4 text-lg font-semibold text-[#0b2d54]">Blood information</h2>
-              <div className="grid gap-4 sm:grid-cols-2">
-                <InfoCard label="Blood type" value={formatEnum(healthPassport?.bloodType)} description="Blood group" />
-                <InfoCard label="Rhesus factor" value={formatEnum(healthPassport?.rhesusFactor)} description="Rhesus status" />
-              </div>
-            </section>
-
-            <section className="mb-6">
-              <div className="mb-4 flex items-center justify-between gap-3"><h2 className="text-lg font-semibold text-[#0b2d54]">Important information</h2><Link href="/health-passport" className="text-xs font-semibold text-[#0b2d54]">Refresh data</Link></div>
-              <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-                <InfoCard label="Organ donor" value={healthPassport?.organDonor === true ? "Yes" : healthPassport?.organDonor === false ? "No" : "Not recorded"} description="Organ donation preference" />
-                <InfoCard label="Allergies" value={String(activeAllergies.length)} description={activeAllergies.length ? "Active allergies recorded" : "No active allergies recorded"} href="/health-passport#allergies" />
-                <InfoCard label="Health conditions" value={String(activeConditions.length)} description={activeConditions.length ? "Active conditions recorded" : "No active conditions recorded"} href="/health-conditions" />
-                <InfoCard label="Immunizations" value={String(immunizations.length)} description={immunizations.length ? "Immunizations recorded" : "No immunizations recorded"} href="/health-passport#immunizations" />
-                <InfoCard label="Emergency contacts" value={String(emergencyContacts.length)} description="Contacts available in an emergency" href="/emergency-contacts" />
-              </div>
-            </section>
-
-            <section id="allergies" className="mb-6 scroll-mt-6">
-              <h2 className="mb-4 text-lg font-semibold text-[#0b2d54]">Allergies</h2>
-              <div className="rounded-2xl border border-slate-200 bg-white p-6">{activeAllergies.length ? <div className="flex flex-wrap gap-2">{activeAllergies.map((allergy: any) => <span key={allergy?.id ?? allergy?.name} className="rounded-full bg-rose-50 px-3 py-1.5 text-sm font-medium text-rose-600">{allergy?.allergy?.name || allergy?.name || "Allergy"}</span>)}</div> : <p className="text-sm text-slate-500">No allergies are currently recorded.</p>}</div>
-            </section>
-
-            <section className="mb-6">
-              <h2 className="mb-4 text-lg font-semibold text-[#0b2d54]">Active conditions</h2>
-              <div className="rounded-2xl border border-slate-200 bg-white p-6">{activeConditions.length ? <div className="grid gap-3 sm:grid-cols-2">{activeConditions.map((condition: any) => <div key={condition?.id ?? condition?.name} className="rounded-xl bg-slate-50 p-4"><p className="font-medium text-[#0b2d54]">{condition?.condition?.name || condition?.name || "Health condition"}</p></div>)}</div> : <p className="text-sm text-slate-500">No active health conditions are currently recorded.</p>}</div>
-            </section>
-
-            <section id="immunizations" className="mb-6 scroll-mt-6">
-              <div className="mb-4 flex items-center justify-between gap-3"><div className="flex items-center gap-2"><Syringe className="h-5 w-5 text-[#24c1c4]" /><h2 className="text-lg font-semibold text-[#0b2d54]">Immunizations</h2></div><Link href="/onboarding" className="text-sm font-semibold text-[#0b2d54] hover:text-[#24c1c4]">Add or update</Link></div>
-              <div className="rounded-2xl border border-slate-200 bg-white p-6">
-                {immunizations.length ? <div className="grid gap-3 sm:grid-cols-2">{immunizations.map((item: any) => <div key={item?.id ?? `${item?.immunizationId}-${item?.doseNumber}`} className="rounded-xl bg-slate-50 p-4"><p className="font-medium text-[#0b2d54]">{item?.immunization?.name || item?.name || "Immunization"}</p>{item?.administeredAt && <p className="mt-1 text-sm text-slate-500">Administered: {new Date(item.administeredAt).toLocaleDateString("en-ZA")}</p>}{item?.doseNumber != null && <p className="mt-1 text-sm text-slate-500">Dose {item.doseNumber}</p>}{item?.facility && <p className="mt-1 text-sm text-slate-500">Facility: {item.facility}</p>}</div>)}</div> : <div className="flex items-center gap-3"><Syringe className="h-5 w-5 text-slate-400" /><p className="text-sm text-slate-500">No immunizations are currently recorded.</p></div>}
-              </div>
-            </section>
-
-            <section className="mb-6 grid gap-4 md:grid-cols-2">
-              <Link href="/health-goals" className="rounded-2xl border border-slate-200 bg-white p-5 transition hover:border-[#24c1c4]"><p className="text-xs font-medium text-slate-400">Personal health</p><h3 className="mt-1 text-lg font-semibold text-[#0b2d54]">Health goals</h3><p className="mt-1 text-sm text-slate-500">Review and manage the goals you're working toward.</p><span className="mt-3 inline-flex items-center gap-1 text-xs font-semibold text-[#0b2d54]">Open goals <ArrowRight className="h-3 w-3" /></span></Link>
-              <Link href="/health-journal" className="rounded-2xl border border-slate-200 bg-white p-5 transition hover:border-[#24c1c4]"><p className="text-xs font-medium text-slate-400">Daily tracking</p><h3 className="mt-1 text-lg font-semibold text-[#0b2d54]">Health journal</h3><p className="mt-1 text-sm text-slate-500">Record symptoms, mood, sleep, exercise and other health information.</p><span className="mt-3 inline-flex items-center gap-1 text-xs font-semibold text-[#0b2d54]">Open journal <ArrowRight className="h-3 w-3" /></span></Link>
-            </section>
-
-            <div className="mt-8 rounded-2xl border border-[#24c1c4]/20 bg-[#24c1c4]/5 p-5"><div className="flex gap-3"><ShieldCheck className="h-5 w-5 shrink-0 text-[#0b2d54]" /><div><h3 className="font-semibold text-[#0b2d54]">Your health passport is private</h3><p className="mt-1 text-sm leading-6 text-slate-500">Keep this information accurate and up to date. Changes made through the linked health pages use your authenticated patient Health Passport.</p></div></div></div>
-          </>
-        )}
-      </div>
-    </main>
-  );
+    <div className="rounded-3xl border border-[#24c1c4]/20 bg-[#24c1c4]/5 p-5 text-sm text-slate-600"><p className="font-semibold text-[#0b2d54]">Show this card when you need care.</p><p className="mt-1">It uses the health information saved in your authenticated patient record. Nothing here is made up for display.</p></div>
+  </div></main></ProtectedRoute>;
 }
