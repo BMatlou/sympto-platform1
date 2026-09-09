@@ -171,7 +171,6 @@ export class OnboardingService {
       return profile;
     }
 
-    // Editing an already completed profile must never reopen onboarding.
     const progress = await this.onboardingRepository.findByUser(userId);
     if (progress?.status === 'COMPLETED') {
       return profile;
@@ -243,12 +242,22 @@ export class OnboardingService {
       },
     });
 
+    const healthPassportId = (dashboard.healthPassport as { id?: string } | null)?.id;
+    const patientImmunizations = healthPassportId
+      ? await this.prisma.patientImmunization.findMany({
+          where: { healthPassportId },
+          include: { immunization: true },
+          orderBy: { administeredAt: 'desc' },
+        })
+      : [];
+
     return {
       ...dashboard,
       profile: {
         ...dashboard.profile,
         address: primaryAddress?.address ?? null,
       },
+      immunizations: patientImmunizations,
     };
   }
 }
