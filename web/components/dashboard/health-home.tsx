@@ -1,67 +1,152 @@
 "use client";
 
-import { useEffect, useState } from "react";
 import Link from "next/link";
-import { Activity, CalendarDays, CheckCircle2, HeartPulse, LucideIcon, Pill, Weight, Target, Users, Watch, TriangleAlert, X, ArrowUpRight } from "lucide-react";
+import { ArrowRight, CalendarDays, CheckCircle2, FileText, HeartPulse, History, Pill, Sparkles, TriangleAlert } from "lucide-react";
 import ProtectedRoute from "@/components/auth/protected-route";
 import { useDashboard } from "@/hooks/use-dashboard";
-import { healthHomeService } from "@/services/health-home.service";
 
-function text(value: unknown): string { return value === null || value === undefined || value === "" ? "—" : String(value); }
-function formatDate(value: unknown): string { if (!value) return "—"; const date = new Date(String(value)); if (Number.isNaN(date.getTime())) return String(value); return new Intl.DateTimeFormat("en-ZA", { dateStyle: "medium", timeStyle: "short" }).format(date); }
-function greeting(hour: number) { if (hour < 12) return "Good morning"; if (hour < 18) return "Good afternoon"; return "Good evening"; }
-function formatBmiCategory(value?: string | null) { if (!value) return null; return value.replace(/_/g, " ").toLowerCase().replace(/\b\w/g, (letter) => letter.toUpperCase()); }
+function ActionCard({
+  href,
+  title,
+  description,
+  icon: Icon,
+  tone,
+  detail,
+}: {
+  href: string;
+  title: string;
+  description: string;
+  icon: typeof HeartPulse;
+  tone: "today" | "passport" | "history";
+  detail?: React.ReactNode;
+}) {
+  const styles = {
+    today: "border-[#24c1c4]/25 bg-gradient-to-br from-white to-[#effcfc] hover:border-[#24c1c4]/50",
+    passport: "border-rose-200/70 bg-gradient-to-br from-white to-rose-50/50 hover:border-rose-300",
+    history: "border-blue-200/70 bg-gradient-to-br from-white to-blue-50/50 hover:border-blue-300",
+  }[tone];
+  const iconStyles = {
+    today: "bg-[#24c1c4]/15 text-[#0b2d54]",
+    passport: "bg-rose-100 text-rose-700",
+    history: "bg-blue-100 text-blue-700",
+  }[tone];
 
-function Card({ title, icon: Icon, href, children, className = "" }: { title: string; icon: LucideIcon; href?: string; children: React.ReactNode; className?: string }) {
-  const content = <section className={`group h-full rounded-3xl border border-slate-200/80 bg-white p-5 shadow-[0_8px_30px_rgba(11,45,84,0.05)] transition-all duration-200 ${href ? "hover:-translate-y-1 hover:border-[#24c1c4]/40 hover:shadow-[0_14px_35px_rgba(11,45,84,0.09)]" : ""} ${className}`}><div className="mb-5 flex items-center justify-between gap-3"><div className="flex items-center gap-3"><span className="flex h-10 w-10 items-center justify-center rounded-2xl bg-[#24c1c4]/10 text-[#0b2d54] ring-1 ring-[#24c1c4]/10"><Icon className="h-4.5 w-4.5" /></span><h2 className="font-semibold tracking-tight text-[#0b2d54]">{title}</h2></div>{href && <span className="flex items-center gap-1 text-xs font-semibold text-[#0b2d54] opacity-70 transition group-hover:opacity-100">View all <ArrowUpRight className="h-3.5 w-3.5" /></span>}</div>{children}</section>;
-  return href ? <Link href={href} className="block h-full rounded-3xl focus:outline-none focus-visible:ring-2 focus-visible:ring-[#24c1c4]/50">{content}</Link> : content;
+  return (
+    <Link
+      href={href}
+      className={`group block min-h-[190px] rounded-[28px] border p-6 shadow-[0_10px_35px_rgba(11,45,84,0.06)] transition-all duration-200 hover:-translate-y-1 hover:shadow-[0_18px_45px_rgba(11,45,84,0.10)] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#24c1c4]/60 ${styles}`}
+    >
+      <div className="flex items-start justify-between gap-4">
+        <span className={`flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl ${iconStyles}`}>
+          <Icon className="h-7 w-7" />
+        </span>
+        <span className="flex h-10 w-10 items-center justify-center rounded-full bg-white/80 text-[#0b2d54] shadow-sm transition-transform group-hover:translate-x-1">
+          <ArrowRight className="h-5 w-5" />
+        </span>
+      </div>
+      <h2 className="mt-6 text-xl font-bold tracking-tight text-[#0b2d54]">{title}</h2>
+      <p className="mt-2 max-w-md text-sm leading-6 text-slate-600">{description}</p>
+      {detail && <div className="mt-4">{detail}</div>}
+    </Link>
+  );
 }
 
 export default function HealthHome() {
   const { data, loading, error, reload } = useDashboard();
-  const [greetingText, setGreetingText] = useState("Hello");
-  const [weightModalOpen, setWeightModalOpen] = useState(false);
-  const [weightKg, setWeightKg] = useState("");
-  const [heightCm, setHeightCm] = useState("");
-  const [savingWeight, setSavingWeight] = useState(false);
-  const [weightError, setWeightError] = useState("");
 
-  useEffect(() => { setGreetingText(greeting(new Date().getHours())); }, []);
-  useEffect(() => { if (!data) return; if (data.healthSnapshot.weightKg != null) setWeightKg(String(data.healthSnapshot.weightKg)); if (data.healthSnapshot.heightCm != null) setHeightCm(String(data.healthSnapshot.heightCm)); }, [data]);
+  if (loading) {
+    return (
+      <ProtectedRoute>
+        <main className="min-h-screen bg-[#f5f8fb] p-4 sm:p-8">
+          <div className="mx-auto max-w-5xl space-y-5" aria-busy="true">
+            <div className="h-40 animate-pulse rounded-[28px] bg-white" />
+            <div className="grid gap-4 md:grid-cols-3">
+              {Array.from({ length: 3 }).map((_, index) => (
+                <div key={index} className="h-52 animate-pulse rounded-[28px] bg-white" />
+              ))}
+            </div>
+          </div>
+        </main>
+      </ProtectedRoute>
+    );
+  }
 
-  if (loading) return <ProtectedRoute><main className="min-h-screen bg-[#f5f8fb] p-6 sm:p-10"><div className="mx-auto max-w-7xl space-y-6" aria-busy="true"><div className="h-48 animate-pulse rounded-3xl bg-white" /><div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">{Array.from({ length: 8 }).map((_, i) => <div key={i} className="h-36 animate-pulse rounded-3xl bg-white" />)}</div></div></main></ProtectedRoute>;
-  if (error || !data) return <ProtectedRoute><main className="min-h-screen bg-[#f5f8fb] p-6 sm:p-10"><div className="mx-auto max-w-2xl rounded-3xl border border-red-200 bg-white p-7 shadow-sm"><div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-red-50 text-red-600"><TriangleAlert className="h-5 w-5" /></div><h1 className="mt-5 text-xl font-bold text-[#0b2d54]">We couldn't load your Health Home</h1><p className="mt-2 text-sm leading-6 text-slate-500">Your health data has not been changed. Please try again.</p><button onClick={reload} className="mt-5 rounded-xl bg-[#0b2d54] px-5 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-[#071f3a]">Try again</button></div></main></ProtectedRoute>;
+  if (error || !data) {
+    return (
+      <ProtectedRoute>
+        <main className="min-h-screen bg-[#f5f8fb] p-4 sm:p-8">
+          <div className="mx-auto max-w-xl rounded-[28px] border border-red-200 bg-white p-7 shadow-sm">
+            <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-red-50 text-red-600">
+              <TriangleAlert className="h-6 w-6" />
+            </div>
+            <h1 className="mt-5 text-xl font-bold text-[#0b2d54]">We couldn't load your health home</h1>
+            <p className="mt-2 text-sm leading-6 text-slate-500">Your health information has not been changed. Please try again.</p>
+            <button onClick={reload} className="mt-5 rounded-xl bg-[#0b2d54] px-5 py-2.5 text-sm font-semibold text-white hover:bg-[#071f3a]">Try again</button>
+          </div>
+        </main>
+      </ProtectedRoute>
+    );
+  }
 
-  const { patient, profile, healthSnapshot, today, goals, family, wearables, attention, medicationNotifications = [] } = data;
-  const firstName = patient.firstName || profile?.preferredName || profile?.firstName || "there";
-  const activeGoalCount = goals.filter((goal) => String(goal.status).toUpperCase() !== "ACHIEVED").length;
-  const findMeasurement = (type: string) => wearables.latestMeasurements.find((item) => item.type === type);
-  const nextAppointment = today.upcomingAppointments[0] as Record<string, unknown> | undefined;
-  const bmi = healthSnapshot.bmi;
-  const bmiCategory = formatBmiCategory(healthSnapshot.bmiCategory);
-  const wearableMetric = (label: string, measurement?: { value: number | string; unit: string }) => <div key={label} className="rounded-2xl border border-slate-200/70 bg-[#f7fafc] p-3 text-center"><p className="text-[10px] font-semibold uppercase tracking-wide text-slate-400">{label}</p><p className="mt-1 text-xs font-bold text-[#0b2d54]">{measurement ? `${text(measurement.value)} ${measurement.unit}` : "—"}</p></div>;
-  const openWeightModal = () => { setWeightError(""); setWeightModalOpen(true); };
-  const saveWeight = async () => { const weight = Number(weightKg); const height = Number(heightCm); if (!Number.isFinite(weight) || weight <= 0) { setWeightError("Enter a valid weight in kilograms."); return; } if (!Number.isFinite(height) || height <= 0) { setWeightError("Enter a valid height in centimetres so we can calculate BMI."); return; } try { setSavingWeight(true); setWeightError(""); await healthHomeService.updateWeight(weight, height); await reload(); setWeightModalOpen(false); } catch (requestError) { console.error("Failed to update weight:", requestError); setWeightError("We couldn't update your weight. Please try again."); } finally { setSavingWeight(false); } };
+  const firstName = data.patient?.firstName || data.profile?.preferredName || data.profile?.firstName || "there";
+  const medicationCount = data.today?.activeMedications?.length ?? 0;
+  const appointmentCount = data.today?.upcomingAppointments?.length ?? 0;
+  const goalCount = data.goals?.filter((goal) => String(goal.status).toUpperCase() !== "ACHIEVED").length ?? 0;
+  const attentionCount = data.attention?.length ?? 0;
 
-  return <ProtectedRoute><main className="min-h-screen bg-[#f5f8fb] text-slate-800">
-    <header className="border-b border-slate-200/80 bg-white/95 backdrop-blur"><div className="mx-auto flex h-[68px] max-w-7xl items-center justify-between px-4 sm:px-6 lg:px-8"><img src="/logo-navbar.png" alt="Sympto" className="h-11 w-auto" /><span className="rounded-full border border-[#24c1c4]/20 bg-[#24c1c4]/10 px-3.5 py-1.5 text-xs font-bold text-[#0b2d54]">Health Home</span></div></header>
-    <div className="mx-auto max-w-7xl space-y-7 px-4 py-7 sm:px-6 sm:py-9 lg:px-8">
-      <header className="relative overflow-hidden rounded-[28px] border border-[#24c1c4]/20 bg-gradient-to-br from-[#0b2d54] via-[#103e69] to-[#24c1c4] p-7 text-white shadow-[0_18px_45px_rgba(11,45,84,0.16)] sm:p-9"><div className="absolute -right-20 -top-24 h-64 w-64 rounded-full bg-white/10 blur-2xl" /><div className="absolute -bottom-28 right-20 h-56 w-56 rounded-full bg-[#24c1c4]/30 blur-3xl" /><div className="relative max-w-3xl"><div className="flex flex-wrap items-center gap-2"><span className="rounded-full bg-white/10 px-3 py-1 text-[11px] font-bold uppercase tracking-[0.18em] text-white/90">My Health</span><span className="h-1 w-1 rounded-full bg-[#24c1c4]" /><span className="text-xs font-medium text-white/70">Your health at a glance</span></div><h1 className="mt-4 text-3xl font-bold tracking-tight sm:text-4xl">{greetingText}, {firstName}</h1><p className="mt-3 max-w-2xl text-sm leading-6 text-white/75 sm:text-base">Your health information, care, goals and connected-device activity — brought together automatically.</p></div></header>
-      {attention.length > 0 && <Card title="Needs your attention" icon={TriangleAlert}><div className="space-y-3">{attention.slice(0, 3).map((item, index) => <div key={`${item.type}-${index}`} className="flex gap-3 rounded-2xl border border-amber-100 bg-amber-50/70 p-4"><div className="mt-0.5 h-8 w-8 shrink-0 rounded-xl bg-amber-100 p-2 text-amber-700"><TriangleAlert className="h-4 w-4" /></div><div><p className="text-sm font-semibold text-[#0b2d54]">{item.title}</p><p className="mt-1 text-xs leading-5 text-slate-600">{item.description}</p>{item.actionUrl && <Link href={item.actionUrl} className="mt-2 inline-block text-xs font-bold text-[#0b2d54] underline underline-offset-2">{item.actionLabel || "View"}</Link>}</div></div>)}</div></Card>}
-      <section><div className="mb-3 flex items-end justify-between"><div><p className="text-[11px] font-bold uppercase tracking-[0.16em] text-[#24c1c4]">Health overview</p><h2 className="mt-1 text-lg font-bold text-[#0b2d54]">Your essentials</h2></div></div><div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        <Card title="Health snapshot" icon={HeartPulse} href="/health-passport"><div className="grid grid-cols-3 gap-2"><div className="rounded-2xl bg-[#f7fafc] p-3"><p className="text-[10px] font-semibold uppercase tracking-wide text-slate-400">Conditions</p><p className="mt-1 text-xl font-bold text-[#0b2d54]">{healthSnapshot.activeConditions.length}</p></div><div className="rounded-2xl bg-[#f7fafc] p-3"><p className="text-[10px] font-semibold uppercase tracking-wide text-slate-400">Allergies</p><p className="mt-1 text-xl font-bold text-[#0b2d54]">{healthSnapshot.allergies.length}</p></div><div className="rounded-2xl bg-[#f7fafc] p-3"><p className="text-[10px] font-semibold uppercase tracking-wide text-slate-400">Blood</p><p className="mt-1 truncate text-sm font-bold text-[#0b2d54]">{text(healthSnapshot.bloodType)}</p></div></div></Card>
-        <button type="button" onClick={openWeightModal} className="group h-full rounded-3xl border border-slate-200/80 bg-white p-5 text-left shadow-[0_8px_30px_rgba(11,45,84,0.05)] transition-all duration-200 hover:-translate-y-1 hover:border-[#24c1c4]/40 hover:shadow-[0_14px_35px_rgba(11,45,84,0.09)] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#24c1c4]/50"><div className="mb-5 flex items-center justify-between gap-3"><div className="flex items-center gap-3"><span className="flex h-10 w-10 items-center justify-center rounded-2xl bg-[#24c1c4]/10 text-[#0b2d54]"><Weight className="h-4 w-4" /></span><h2 className="font-semibold tracking-tight text-[#0b2d54]">BMI</h2></div><span className="rounded-full bg-[#0b2d54]/5 px-2.5 py-1 text-[11px] font-bold text-[#0b2d54]">Update</span></div><div className="flex items-end justify-between"><div><p className="text-4xl font-bold tracking-tight text-[#0b2d54]">{bmi != null ? bmi.toFixed(1) : "—"}</p><p className="mt-1 text-sm font-medium text-slate-500">{bmiCategory || "Add your weight and height"}</p></div><div className="h-12 w-12 rounded-full border-[5px] border-[#24c1c4]/15 bg-[#24c1c4]/5" /></div><p className="mt-4 border-t border-slate-100 pt-3 text-xs text-slate-400">Current weight: <span className="font-semibold text-slate-600">{healthSnapshot.weightKg != null ? `${healthSnapshot.weightKg} kg` : "—"}</span></p></button>
-        <Card title="Medication" icon={Pill} href="/medications"><p className="text-3xl font-bold text-[#0b2d54]">{today.activeMedications.length}</p><p className="mt-1 text-sm text-slate-500">active medication{today.activeMedications.length === 1 ? "" : "s"}</p>{medicationNotifications.length > 0 && <p className="mt-4 rounded-xl border border-[#24c1c4]/10 bg-[#24c1c4]/10 px-3 py-2 text-xs font-bold text-[#0b2d54]">{medicationNotifications.length} notification{medicationNotifications.length === 1 ? "" : "s"} to review</p>}</Card>
-        <Card title="Appointments" icon={CalendarDays} href="/appointments">{nextAppointment ? <div className="rounded-2xl bg-[#f7fafc] p-4"><p className="text-sm font-bold text-[#0b2d54]">{text(nextAppointment.title || nextAppointment.type || "Appointment")}</p><p className="mt-2 text-sm text-slate-600">{formatDate(nextAppointment.scheduledStart)}</p></div> : <div className="rounded-2xl bg-[#f7fafc] p-4"><p className="text-sm font-medium text-slate-500">Nothing scheduled yet.</p><p className="mt-1 text-xs text-slate-400">Your upcoming appointments will appear here.</p></div>}</Card>
-      </div></section>
-      <div className="grid gap-6 lg:grid-cols-3">
-        <Card title="Your connected health" icon={Watch}>{wearables.devices.length === 0 ? <div className="rounded-2xl border border-dashed border-slate-200 bg-[#f8fafc] p-5"><p className="text-sm font-semibold text-[#0b2d54]">No wearable connected</p><p className="mt-1 text-xs leading-5 text-slate-500">Connect a device to automatically bring activity and measurements into your health record.</p></div> : <div className="space-y-4"><p className="text-sm font-semibold text-[#0b2d54]">{wearables.devices.length} connected device{wearables.devices.length === 1 ? "" : "s"}</p><div className="grid grid-cols-3 gap-2">{wearableMetric("Steps", findMeasurement("STEPS"))}{wearableMetric("Heart", findMeasurement("HEART_RATE"))}{wearableMetric("Sleep", findMeasurement("SLEEP"))}</div></div>}</Card>
-        <Card title="My goals" icon={Target} href="/health-goals">{goals.length === 0 ? <div className="rounded-2xl bg-[#f7fafc] p-5"><p className="text-sm font-semibold text-[#0b2d54]">No goals yet</p><p className="mt-1 text-xs text-slate-500">Add a health goal to start tracking progress.</p></div> : <div><div className="mb-5 flex items-center justify-between rounded-2xl bg-[#0b2d54] px-4 py-3 text-white"><div><p className="text-[10px] font-bold uppercase tracking-wide text-white/60">Progress tracking</p><p className="mt-0.5 text-sm font-semibold">{activeGoalCount} active goal{activeGoalCount === 1 ? "" : "s"}</p></div><Target className="h-5 w-5 text-[#24c1c4]" /></div><div className="space-y-5">{goals.slice(0, 3).map((goal) => { const percent = Math.min(100, Math.max(0, Number(goal.progressPercent) || 0)); return <div key={String(goal.id)}><div className="flex items-center justify-between gap-3"><span className="text-sm font-semibold text-slate-800">{text(goal.title)}</span><span className="text-sm font-bold text-[#0b2d54]">{percent}%</span></div><div className="mt-2.5 h-2.5 overflow-hidden rounded-full bg-slate-100"><div className="h-full rounded-full bg-gradient-to-r from-[#24c1c4] to-[#159fa4] transition-[width] duration-500" style={{ width: `${percent}%` }} /></div>{goal.latestValue !== undefined && goal.unit && <p className="mt-1.5 text-[11px] text-slate-400">Current: <span className="font-semibold text-slate-500">{text(goal.latestValue)} {text(goal.unit)}</span></p>}</div>; })}</div></div>}</Card>
-        <Card title="Family" icon={Users}>{family.length === 0 ? <div className="rounded-2xl border border-dashed border-slate-200 bg-[#f8fafc] p-5"><p className="text-sm font-semibold text-[#0b2d54]">No family members yet</p><p className="mt-1 text-xs leading-5 text-slate-500">Family members you manage will appear here.</p></div> : <div className="space-y-2">{family.slice(0, 4).map((member) => <div key={String(member.id)} className="flex items-center justify-between rounded-2xl bg-[#f7fafc] px-4 py-3"><div><p className="text-sm font-semibold text-slate-800">{text(member.name)}</p><p className="mt-0.5 text-xs text-slate-500">{text(member.relationship)}</p></div>{member.canReceiveAlerts && <span className="flex h-7 w-7 items-center justify-center rounded-full bg-[#24c1c4]/10"><CheckCircle2 className="h-4 w-4 text-[#24c1c4]" /></span>}</div>)}</div>}</Card>
-      </div>
-      <section className="overflow-hidden rounded-3xl border border-[#24c1c4]/15 bg-white shadow-[0_8px_30px_rgba(11,45,84,0.05)]"><div className="flex flex-col gap-5 bg-gradient-to-r from-[#0b2d54] to-[#103e69] p-6 text-white sm:flex-row sm:items-center sm:justify-between"><div className="flex items-start gap-3"><span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-[#24c1c4]/15 text-[#24c1c4]"><Activity className="h-5 w-5" /></span><div><h2 className="font-semibold">Recent health activity</h2><p className="mt-1 text-xs text-white/60">Automatically collected from your connected health data</p><p className="mt-2 text-[11px] text-white/45">Last updated {formatDate(data.generatedAt)}</p></div></div><Link href="/health-journal" className="inline-flex shrink-0 items-center justify-center gap-2 rounded-xl bg-[#24c1c4] px-4 py-2.5 text-sm font-bold text-[#0b2d54] shadow-sm transition hover:bg-[#58d4d6]">Open Smart Health Journal <ArrowUpRight className="h-4 w-4" /></Link></div><div className="p-5"><div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">{wearables.latestMeasurements.slice(0, 4).map((measurement) => <div key={measurement.id} className="rounded-2xl border border-slate-100 bg-[#f8fafc] p-4"><p className="text-[10px] font-bold uppercase tracking-wide text-slate-400">{measurement.type.replace(/_/g, " ")}</p><p className="mt-1.5 font-bold text-[#0b2d54]">{text(measurement.value)} {measurement.unit}</p><p className="mt-1 text-[11px] text-slate-400">{formatDate(measurement.measuredAt)}</p></div>)}</div></div></section>
-    </div>
+  return (
+    <ProtectedRoute>
+      <main className="min-h-screen bg-[#f5f8fb] text-slate-800">
+        <header className="border-b border-slate-200/80 bg-white">
+          <div className="mx-auto flex h-[68px] max-w-5xl items-center justify-between px-4 sm:px-6">
+            <img src="/logo-navbar.png" alt="Sympto" className="h-10 w-auto" />
+            <span className="rounded-full bg-[#0b2d54]/5 px-3.5 py-1.5 text-xs font-bold text-[#0b2d54]">My Health</span>
+          </div>
+        </header>
 
-    {weightModalOpen && <div className="fixed inset-0 z-50 flex items-end justify-center bg-[#061b31]/55 p-0 backdrop-blur-sm sm:items-center sm:p-6" role="dialog" aria-modal="true" aria-labelledby="update-weight-title"><div className="w-full max-w-md rounded-t-[28px] bg-white p-6 shadow-2xl sm:rounded-[28px]"><div className="flex items-start justify-between gap-4"><div><p className="text-xs font-bold uppercase tracking-[0.16em] text-[#24c1c4]">My Health</p><h2 id="update-weight-title" className="mt-1 text-xl font-bold text-[#0b2d54]">Update your weight</h2><p className="mt-1 text-sm leading-5 text-slate-500">We'll recalculate BMI and update any active weight goals automatically.</p></div><button type="button" onClick={() => setWeightModalOpen(false)} className="rounded-full p-2 text-slate-400 transition hover:bg-slate-100 hover:text-slate-700" aria-label="Close"><X className="h-5 w-5" /></button></div><div className="mt-6 space-y-4"><label className="block"><span className="text-sm font-semibold text-slate-700">Weight (kg)</span><div className="mt-2 flex items-center rounded-2xl border border-slate-200 bg-[#f8fafc] px-4 transition focus-within:border-[#24c1c4] focus-within:bg-white focus-within:ring-2 focus-within:ring-[#24c1c4]/15"><input inputMode="decimal" type="number" min="1" step="0.1" value={weightKg} onChange={(event) => setWeightKg(event.target.value)} className="w-full border-0 bg-transparent py-3.5 text-lg font-semibold text-[#0b2d54] outline-none" placeholder="e.g. 82.5" /><span className="text-sm font-bold text-slate-400">kg</span></div></label><label className="block"><span className="text-sm font-semibold text-slate-700">Height (cm)</span><div className="mt-2 flex items-center rounded-2xl border border-slate-200 bg-[#f8fafc] px-4 transition focus-within:border-[#24c1c4] focus-within:bg-white focus-within:ring-2 focus-within:ring-[#24c1c4]/15"><input inputMode="decimal" type="number" min="50" max="300" step="0.1" value={heightCm} onChange={(event) => setHeightCm(event.target.value)} className="w-full border-0 bg-transparent py-3.5 text-lg font-semibold text-[#0b2d54] outline-none" placeholder="e.g. 175" /><span className="text-sm font-bold text-slate-400">cm</span></div></label>{weightError && <p className="rounded-2xl border border-red-100 bg-red-50 px-4 py-3 text-sm text-red-700">{weightError}</p>}<div className="rounded-2xl border border-[#24c1c4]/10 bg-[#24c1c4]/5 p-4 text-xs leading-5 text-slate-500">BMI is calculated from your weight and height. For adults, standard BMI ranges are used as a screening measure; they are not a diagnosis.</div><div className="flex gap-3 pt-2"><button type="button" onClick={() => setWeightModalOpen(false)} className="flex-1 rounded-xl border border-slate-200 px-4 py-3 text-sm font-semibold text-slate-700 transition hover:bg-slate-50">Cancel</button><button type="button" onClick={saveWeight} disabled={savingWeight} className="flex-1 rounded-xl bg-[#0b2d54] px-4 py-3 text-sm font-semibold text-white shadow-sm transition hover:bg-[#071f3a] disabled:cursor-not-allowed disabled:opacity-60">{savingWeight ? "Updating…" : "Update health"}</button></div></div></div></div>}
-  </main></ProtectedRoute>;
+        <div className="mx-auto max-w-5xl px-4 py-7 sm:px-6 sm:py-10">
+          <section className="relative overflow-hidden rounded-[30px] bg-gradient-to-br from-[#0b2d54] via-[#103e69] to-[#24c1c4] p-7 text-white shadow-[0_20px_50px_rgba(11,45,84,0.16)] sm:p-10">
+            <div className="absolute -right-20 -top-24 h-64 w-64 rounded-full bg-white/10 blur-2xl" />
+            <div className="relative max-w-3xl">
+              <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-[0.18em] text-white/70">
+                <Sparkles className="h-4 w-4" />
+                My Health
+              </div>
+              <h1 className="mt-4 text-3xl font-bold tracking-tight sm:text-4xl">Hello, {firstName}</h1>
+              <p className="mt-3 max-w-xl text-sm leading-6 text-white/80 sm:text-base">Everything you need is organised for you. Just choose what you want to do.</p>
+            </div>
+          </section>
+
+          <section className="mt-7 grid gap-4 md:grid-cols-3">
+            <ActionCard
+              href="/today"
+              title="What do I do today?"
+              description="See what needs your attention now — medicines, clinic visits, goals and helpful reminders are brought together automatically."
+              icon={CheckCircle2}
+              tone="today"
+              detail={<div className="flex flex-wrap gap-2 text-xs font-semibold text-[#0b2d54]"><span className="rounded-full bg-white/80 px-3 py-1.5">{medicationCount} medicine{medicationCount === 1 ? "" : "s"}</span><span className="rounded-full bg-white/80 px-3 py-1.5">{appointmentCount} visit{appointmentCount === 1 ? "" : "s"}</span>{goalCount > 0 && <span className="rounded-full bg-white/80 px-3 py-1.5">{goalCount} goal{goalCount === 1 ? "" : "s"}</span>}{attentionCount > 0 && <span className="rounded-full bg-amber-100 px-3 py-1.5 text-amber-800">{attentionCount} needs attention</span>}</div>}
+            />
+            <ActionCard
+              href="/health-passport"
+              title="My Clinic Card"
+              description="Your important health information in one simple place. Show this to a nurse or doctor when you need care."
+              icon={HeartPulse}
+              tone="passport"
+              detail={<div className="flex items-center gap-2 text-xs font-semibold text-rose-800"><FileText className="h-4 w-4" /> Your health information stays organised automatically</div>}
+            />
+            <ActionCard
+              href="/health-journal"
+              title="My History & Files"
+              description="Your health story, visits and saved information are kept together in one simple timeline."
+              icon={History}
+              tone="history"
+              detail={<div className="flex items-center gap-2 text-xs font-semibold text-blue-800"><CalendarDays className="h-4 w-4" /> Your records build up automatically</div>}
+            />
+          </section>
+
+          <p className="mt-7 text-center text-xs text-slate-400">You don't need to understand medical terms. Sympto organises your health information for you.</p>
+        </div>
+      </main>
+    </ProtectedRoute>
+  );
 }
