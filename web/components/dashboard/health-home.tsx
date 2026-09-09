@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import type { ReactNode } from "react";
 import { useState } from "react";
-import { ArrowRight, CalendarDays, CheckCircle2, FolderOpen, HeartPulse, Pill, Scale, ShieldCheck, TriangleAlert, Watch } from "lucide-react";
+import { ArrowRight, CalendarDays, CheckCircle2, FolderOpen, HeartPulse, Pill, ShieldCheck, TriangleAlert, Watch, Weight } from "lucide-react";
 import ProtectedRoute from "@/components/auth/protected-route";
 import { useDashboard } from "@/hooks/use-dashboard";
 import { healthHomeService } from "@/services/health-home.service";
@@ -24,6 +24,8 @@ function CountPill({ icon, count, label }: { icon: ReactNode; count: number; lab
 
 function WeightBodySizeCard({ weightKg, heightCm, bmi, patientId, reload }: { weightKg: number | null | undefined; heightCm: number | null | undefined; bmi: number | null | undefined; patientId?: string; reload: () => Promise<void> }) {
   const [editingWeight, setEditingWeight] = useState<number | null>(null);
+  const [manualWeight, setManualWeight] = useState("");
+  const [inputOpen, setInputOpen] = useState(false);
   const [saveState, setSaveState] = useState<"idle" | "saving" | "saved" | "error">("idle");
   const canEdit = !patientId;
   const minWeight = 20;
@@ -37,22 +39,34 @@ function WeightBodySizeCard({ weightKg, heightCm, bmi, patientId, reload }: { we
   const normalEnd = thresholdPercent(24.9);
   const obeseEnd = thresholdPercent(29.9);
   const trackBackground = lowEnd != null && normalEnd != null && obeseEnd != null ? `linear-gradient(to right, #f59e0b 0%, #f59e0b ${lowEnd}%, #10b981 ${lowEnd}%, #10b981 ${normalEnd}%, #f97316 ${normalEnd}%, #f97316 ${obeseEnd}%, #ef4444 ${obeseEnd}%, #ef4444 100%)` : "linear-gradient(to right, #f59e0b 0%, #f59e0b 33%, #10b981 33%, #10b981 66%, #ef4444 66%, #ef4444 100%)";
-  const persistWeight = async () => {
-    if (!canEdit || editingWeight == null || saveState === "saving") return;
+  const persistWeight = async (weightOverride?: number) => {
+    const nextWeight = weightOverride ?? editingWeight;
+    if (!canEdit || nextWeight == null || saveState === "saving") return;
     if (!heightCm) { setSaveState("error"); return; }
-    try { setSaveState("saving"); await healthHomeService.updateWeight(editingWeight, Number(heightCm)); setSaveState("saved"); await reload(); }
+    try { setSaveState("saving"); await healthHomeService.updateWeight(nextWeight, Number(heightCm)); setSaveState("saved"); setInputOpen(false); await reload(); }
     catch (error) { console.error("Failed to update weight:", error); setSaveState("error"); }
   };
   const handleWeightChange = (value: string) => { const nextWeight = Number(value); if (!Number.isFinite(nextWeight)) return; setEditingWeight(Number(nextWeight.toFixed(1))); setSaveState("idle"); };
-  const statusMessage = saveState === "saving" ? "Saving your weight…" : saveState === "saved" ? "Weight saved" : saveState === "error" ? "Could not save. Try again." : canEdit ? "Move the slider to update your weight" : "Family health information is view-only";
+  const handleManualWeightChange = (value: string) => {
+    setManualWeight(value);
+    const nextWeight = Number(value);
+    if (!Number.isFinite(nextWeight) || nextWeight < minWeight || nextWeight > maxWeight) return;
+    setEditingWeight(Number(nextWeight.toFixed(1)));
+    setSaveState("idle");
+  };
+  const openInput = () => { if (!canEdit) return; setManualWeight(currentWeight.toString()); setInputOpen(true); setSaveState("idle"); };
+  const statusMessage = saveState === "saving" ? "Saving your weight…" : saveState === "saved" ? "Weight saved" : saveState === "error" ? "Could not save. Try again." : canEdit ? "Move the slider or select BMI to enter your weight" : "Family health information is view-only";
   return <div className={`mt-5 rounded-[28px] bg-white p-5 shadow-sm ring-2 ${weightStatus.activeClass} sm:p-6`}>
     <div className="flex flex-col gap-5">
-      <div className="flex items-start justify-between gap-4"><div className="flex min-w-0 items-center gap-4"><div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-[#0b2d54]/8 text-3xl" aria-hidden="true">⚖️</div><div><h3 className="text-xl font-black text-[#0b2d54]">Weight &amp; Body Size</h3><p className="mt-1 text-sm font-bold text-slate-500">Your current body weight</p></div></div><span className={`shrink-0 rounded-full px-3 py-1.5 text-xs font-black uppercase tracking-wide ${weightStatus.badgeClass}`}>{weightStatus.text.replace(/[()]/g, "")}</span></div>
-      <div className="rounded-3xl bg-slate-50 px-5 py-5 ring-1 ring-slate-100"><div className="flex flex-wrap items-end gap-x-4 gap-y-2"><div><p className="text-4xl font-black leading-none tracking-tight text-[#0b2d54] sm:text-5xl">{currentWeight.toFixed(1)} <span className="text-2xl font-extrabold text-slate-500">kg</span></p></div><div className="pb-0.5 text-lg font-black text-slate-400">BMI</div><div className={`pb-0.5 text-2xl font-black ${weightStatus.textClass}`}>{liveBmi != null ? liveBmi.toFixed(1) : "—"}<span className="ml-2 text-lg">{weightStatus.text}</span></div></div></div>
+      <div className="flex items-start justify-between gap-4"><div className="flex min-w-0 items-center gap-4"><div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-[#0b2d54]/8 text-3xl" aria-hidden="true"><Weight className="h-8 w-8 text-[#0b2d54]" /></div><div><h3 className="text-xl font-black text-[#0b2d54]">Weight &amp; Body Size</h3><p className="mt-1 text-sm font-bold text-slate-500">Your current body weight</p></div></div><span className={`shrink-0 rounded-full px-3 py-1.5 text-xs font-black uppercase tracking-wide ${weightStatus.badgeClass}`}>{weightStatus.text.replace(/[()]/g, "")}</span></div>
+      <button type="button" onClick={openInput} disabled={!canEdit} className="w-full rounded-3xl bg-slate-50 px-5 py-5 text-left ring-1 ring-slate-100 transition hover:ring-[#24c1c4]/40 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#24c1c4] disabled:cursor-default">
+        <div className="flex flex-wrap items-end justify-between gap-3"><div><p className="text-4xl font-black leading-none tracking-tight text-[#0b2d54] sm:text-5xl">{currentWeight.toFixed(1)} <span className="text-2xl font-extrabold text-slate-500">kg</span></p><p className="mt-2 text-xs font-extrabold uppercase tracking-wider text-slate-400">Weight</p></div><div className="text-right"><p className="text-sm font-black text-slate-400">BMI</p><p className={`text-3xl font-black ${weightStatus.textClass}`}>{liveBmi != null ? liveBmi.toFixed(1) : "—"}</p><p className={`text-sm font-extrabold ${weightStatus.textClass}`}>{weightStatus.text}</p></div></div>
+        {canEdit && <p className="mt-4 text-sm font-bold text-[#0b2d54]">Tap BMI to enter your weight</p>}
+      </button>
       <div className="relative pt-2"><div className="mb-3 flex items-center justify-between text-xs font-black uppercase tracking-wider text-slate-500"><span>LOW</span><span>JUST RIGHT</span><span>HIGH</span></div><div className="relative h-14 overflow-visible rounded-2xl"><div className="absolute inset-x-0 top-1/2 h-12 -translate-y-1/2 rounded-2xl shadow-inner" style={{ background: trackBackground }} aria-hidden="true" /><div className="pointer-events-none absolute top-1/2 z-10 h-[62px] w-[6px] -translate-x-1/2 -translate-y-1/2 rounded-full bg-[#0b2d54] shadow-[0_4px_12px_rgba(11,45,84,0.35)] ring-4 ring-white transition-[left] duration-75" style={{ left: `${Math.max(0, Math.min(100, sliderPercent))}%` }} aria-hidden="true"><span className="absolute -top-3 left-1/2 h-3 w-3 -translate-x-1/2 rounded-full bg-[#0b2d54] ring-2 ring-white" /></div><input type="range" min={minWeight} max={maxWeight} step="0.1" value={currentWeight} disabled={!canEdit || !heightCm} onChange={(event) => handleWeightChange(event.target.value)} onPointerUp={() => void persistWeight()} onKeyUp={(event) => { if (event.key === "ArrowLeft" || event.key === "ArrowRight" || event.key === "Home" || event.key === "End") void persistWeight(); }} onBlur={() => void persistWeight()} aria-label="Weight in kilograms" className="absolute inset-0 z-20 h-full w-full cursor-grab opacity-0 disabled:cursor-not-allowed" /></div><div className="mt-3 flex justify-between text-xs font-bold text-slate-400"><span>{minWeight} kg</span><span>{maxWeight} kg</span></div></div>
-      <p className="text-xl font-black leading-8 text-[#0b2d54] sm:text-2xl">⚖️ Weight &amp; Body Size: {currentWeight.toFixed(1)} kg <span className={weightStatus.textClass}>{weightStatus.text}</span></p>
       <div className="flex min-h-12 items-center justify-between gap-3 rounded-2xl bg-[#0b2d54]/5 px-4 py-3 text-sm font-bold"><span className={saveState === "error" ? "text-red-700" : saveState === "saved" ? "text-emerald-700" : "text-slate-600"}>{statusMessage}</span>{canEdit && <button type="button" onClick={() => void persistWeight()} disabled={editingWeight == null || saveState === "saving" || !heightCm} className="min-h-11 rounded-xl bg-[#0b2d54] px-4 py-2 font-black text-white shadow-sm transition hover:bg-[#071f3a] disabled:cursor-not-allowed disabled:opacity-40">{saveState === "saving" ? "Saving…" : "Save weight"}</button>}</div>
     </div>
+    {inputOpen && <div className="fixed inset-0 z-50 flex items-center justify-center bg-[#0b2d54]/45 p-4" role="dialog" aria-modal="true" aria-labelledby="bmi-weight-dialog-title"><div className="w-full max-w-md rounded-[28px] bg-white p-6 shadow-2xl"><div className="flex items-center gap-3"><div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-[#24c1c4]/12"><Weight className="h-6 w-6 text-[#0b2d54]" /></div><div><h4 id="bmi-weight-dialog-title" className="text-xl font-black text-[#0b2d54]">Update your weight</h4><p className="text-sm font-medium text-slate-500">Enter your weight in kilograms.</p></div></div><label className="mt-6 block text-sm font-extrabold text-[#0b2d54]">Weight (kg)<input type="number" inputMode="decimal" min={minWeight} max={maxWeight} step="0.1" value={manualWeight} onChange={(event) => handleManualWeightChange(event.target.value)} autoFocus className="mt-2 w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-4 text-2xl font-black text-[#0b2d54] outline-none focus:border-[#24c1c4] focus:ring-2 focus:ring-[#24c1c4]/20" placeholder="e.g. 60, 70 or 71" /></label><p className="mt-2 text-xs font-semibold text-slate-500">BMI: {liveBmi != null ? liveBmi.toFixed(1) : "—"} · {weightStatus.text}</p><div className="mt-6 flex justify-end gap-3"><button type="button" onClick={() => setInputOpen(false)} className="min-h-11 rounded-xl px-4 py-2 font-black text-slate-600 ring-1 ring-slate-200">Cancel</button><button type="button" onClick={() => void persistWeight(Number(manualWeight))} disabled={!manualWeight || Number(manualWeight) < minWeight || Number(manualWeight) > maxWeight || !heightCm || saveState === "saving"} className="min-h-11 rounded-xl bg-[#0b2d54] px-5 py-2 font-black text-white disabled:cursor-not-allowed disabled:opacity-40">{saveState === "saving" ? "Saving…" : "Save weight"}</button></div></div></div>}
   </div>;
 }
 
