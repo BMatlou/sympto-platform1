@@ -39,7 +39,7 @@ function calculateBmi(weightKg: number | null, heightCm: number | null): number 
 }
 
 function getWeightStatus(bmi?: number | null): {
-  text: "(Underweight)" | "(Normal weight)" | "(Obese)" | "(Extreme obese)";
+  text: "(Underweight)" | "(Normal weight)" | "(Overweight)" | "(Obese)" | "(Extreme obese)";
   textClass: string;
   badgeClass: string;
   activeClass: string;
@@ -48,16 +48,22 @@ function getWeightStatus(bmi?: number | null): {
   if (bmi == null || Number.isNaN(bmi)) {
     return { text: "(Normal weight)", textClass: "text-slate-500", badgeClass: "bg-slate-100 text-slate-600", activeClass: "ring-slate-300", markerClass: "bg-slate-500" };
   }
+  if (bmi < 16) {
+    return { text: "(Underweight)", textClass: "text-amber-700", badgeClass: "bg-amber-100 text-amber-800", activeClass: "ring-amber-300", markerClass: "bg-amber-500" };
+  }
   if (bmi < 18.5) {
-    return { text: "(Underweight)", textClass: "text-[#0b2d54]", badgeClass: "bg-[#0b2d54]/10 text-[#0b2d54]", activeClass: "ring-[#0b2d54]/30", markerClass: "bg-[#0b2d54]" };
+    return { text: "(Underweight)", textClass: "text-yellow-700", badgeClass: "bg-yellow-100 text-yellow-800", activeClass: "ring-yellow-300", markerClass: "bg-yellow-500" };
   }
   if (bmi <= 24.9) {
-    return { text: "(Normal weight)", textClass: "text-[#0b2d54]", badgeClass: "bg-[#24c1c4]/10 text-[#0b2d54]", activeClass: "ring-[#24c1c4]/40", markerClass: "bg-[#24c1c4]" };
+    return { text: "(Normal weight)", textClass: "text-emerald-700", badgeClass: "bg-emerald-100 text-emerald-800", activeClass: "ring-emerald-300", markerClass: "bg-emerald-500" };
   }
   if (bmi <= 29.9) {
-    return { text: "(Obese)", textClass: "text-[#0b2d54]", badgeClass: "bg-[#0b2d54]/10 text-[#0b2d54]", activeClass: "ring-[#0b2d54]/30", markerClass: "bg-[#0b2d54]" };
+    return { text: "(Overweight)", textClass: "text-orange-700", badgeClass: "bg-orange-100 text-orange-800", activeClass: "ring-orange-300", markerClass: "bg-orange-500" };
   }
-  return { text: "(Extreme obese)", textClass: "text-[#0b2d54]", badgeClass: "bg-[#24c1c4]/10 text-[#0b2d54]", activeClass: "ring-[#24c1c4]/40", markerClass: "bg-[#24c1c4]" };
+  if (bmi <= 39.9) {
+    return { text: "(Obese)", textClass: "text-red-700", badgeClass: "bg-red-100 text-red-800", activeClass: "ring-red-300", markerClass: "bg-red-500" };
+  }
+  return { text: "(Extreme obese)", textClass: "text-red-800", badgeClass: "bg-red-100 text-red-900", activeClass: "ring-red-400", markerClass: "bg-red-700" };
 }
 
 function LargeAction({ href, icon, label }: { href: string; icon: ReactNode; label: string }) {
@@ -92,12 +98,13 @@ function WeightBodySizeCard({ weightKg, heightCm, bmi, patientId, reload }: { we
     const thresholdWeight = bmiValue * Math.pow(Number(heightCm) / 100, 2);
     return Math.max(0, Math.min(100, ((thresholdWeight - minWeight) / (maxWeight - minWeight)) * 100));
   };
-  const lowEnd = thresholdPercent(18.5);
-  const normalEnd = thresholdPercent(24.9);
-  const obeseEnd = thresholdPercent(29.9);
-  const trackBackground = lowEnd != null && normalEnd != null && obeseEnd != null
-    ? `linear-gradient(to right, #0b2d54 0%, #0b2d54 ${lowEnd}%, #24c1c4 ${lowEnd}%, #24c1c4 ${normalEnd}%, #0b2d54 ${normalEnd}%, #0b2d54 ${obeseEnd}%, #24c1c4 ${obeseEnd}%, #24c1c4 100%)`
-    : "linear-gradient(to right, #0b2d54 0%, #0b2d54 33%, #24c1c4 33%, #24c1c4 66%, #0b2d54 66%, #0b2d54 100%)";
+  const amberEnd = thresholdPercent(16);
+  const yellowEnd = thresholdPercent(18.5);
+  const greenEnd = thresholdPercent(24.9);
+  const orangeEnd = thresholdPercent(29.9);
+  const trackBackground = amberEnd != null && yellowEnd != null && greenEnd != null && orangeEnd != null
+    ? `linear-gradient(to right, #f59e0b 0%, #f59e0b ${amberEnd}%, #eab308 ${amberEnd}%, #eab308 ${yellowEnd}%, #22c55e ${yellowEnd}%, #22c55e ${greenEnd}%, #f97316 ${greenEnd}%, #f97316 ${orangeEnd}%, #ef4444 ${orangeEnd}%, #ef4444 100%)`
+    : "linear-gradient(to right, #f59e0b 0%, #f59e0b 20%, #eab308 20%, #eab308 35%, #22c55e 35%, #22c55e 55%, #f97316 55%, #f97316 70%, #ef4444 70%, #ef4444 100%)";
 
   const persistWeight = async () => {
     if (!canEdit || editingWeight == null || saveState === "saving") return;
