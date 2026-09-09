@@ -11,7 +11,7 @@ export class HealthHomeService {
   async getHealthHome(userId: string, requestedPatientId?: string) {
     const user = await this.prisma.user.findUnique({
       where: { id: userId },
-      include: { person: true, patient: { include: { healthPassport: { include: { immunizations: { include: { immunization: true }, orderBy: { administeredAt: 'desc' } } } }, baseline: true, healthJournalSettings: true, emergencyContacts: true, person: true } } },
+      include: { person: true, patient: { include: { healthPassport: { include: { immunizations: { include: { immunization: true }, orderBy: { administeredAt: 'desc' } } } }, baseline: true, healthJournalSettings: true, emergencyContacts: true, medicalRecord: true, person: true } } },
     });
     if (!user?.patient) throw new NotFoundException('Patient health profile not found.');
 
@@ -24,7 +24,7 @@ export class HealthHomeService {
       if (!familyLink) throw new NotFoundException('You are not authorised to view this family member.');
       const familyPatient = await this.prisma.patient.findUnique({
         where: { id: requestedPatientId },
-        include: { healthPassport: { include: { immunizations: { include: { immunization: true }, orderBy: { administeredAt: 'desc' } } } }, baseline: true, healthJournalSettings: true, emergencyContacts: true, person: true },
+        include: { healthPassport: { include: { immunizations: { include: { immunization: true }, orderBy: { administeredAt: 'desc' } } } }, baseline: true, healthJournalSettings: true, emergencyContacts: true, medicalRecord: true, person: true },
       });
       if (!familyPatient) throw new NotFoundException('Family member health profile not found.');
       patient = familyPatient;
@@ -35,6 +35,7 @@ export class HealthHomeService {
     const healthPassportId = patient.healthPassport?.id;
     const now = new Date();
     const immunizations = patient.healthPassport?.immunizations ?? [];
+    const medicalRecord = patient.medicalRecord;
 
     const [allergies, conditions, medications, goals, family, appointments, notifications, devices, measurements, symptomLogs, aiObservations, labOrders, imagingStudies, carePlans, encounters, prescriptions, patientInsurances] = await Promise.all([
       this.prisma.patientAllergy.findMany({ where: { healthPassportId: healthPassportId ?? '' }, include: { allergy: true }, orderBy: { createdAt: 'desc' } }),
@@ -53,13 +54,13 @@ export class HealthHomeService {
       this.prisma.carePlan.findMany({ where: { patientId, status: { in: ['ACTIVE', 'DRAFT'] } }, include: { practitioner: { include: { person: true } }, goals: true, tasks: true }, orderBy: { createdAt: 'desc' }, take: 10 }),
       this.prisma.encounter.findMany({ where: { medicalRecord: { patientId } }, orderBy: { startedAt: 'desc' }, take: 50 }),
       this.prisma.prescription.findMany({ where: { patientId }, orderBy: { createdAt: 'desc' }, take: 50 }),
-      this.prisma.patientInsurance.findMany({ where: { patientId }, orderBy: { createdAt: 'desc' }, take: 10 }),
+      this.prisma.patientInsurance.findMany({ where: { patientId }, include: { insurancePolicy: { include: { provider: true } } }, orderBy: { createdAt: 'desc' }, take: 10 }),
     ]);
 
     const encounterIds = encounters.map((encounter) => encounter.id);
     const [attachments, clinicalVitals] = await Promise.all([
-      encounterIds.length ? this.prisma.attachment.findMany({ where: { encounterId: { in: encounterIds } }, orderBy: { createdAt: 'desc' }, take: 100 }) : Promise.resolve([]),
-      encounterIds.length ? this.prisma.clinicalVital.findMany({ where: { encounterId: { in: encounterIds } }, orderBy: { assessedAt: 'desc' }, take: 50 }) : Promise.resolve([]),
+      encounterIds.length ? this.prisma.attachment.findMany({ where: { encounterId: { in: encounterIds } }, orderBy: { uploadedAt: 'desc' }, take: 100 }) : Promise.resolve([]),
+      encounterIds.length ? this.prisma.clinicalVital.findMany({ where: { encounterId: { in: encounterIds } }, orderBy: { measuredAt: 'desc' }, include: { vitalType: true }, take: 50 }) : Promise.resolve([]),
     ]);
 
     const latestMeasurements = new Map<string, (typeof measurements)[number]>();
@@ -84,13 +85,16 @@ export class HealthHomeService {
     const goalsWithProgress = goals.map((goal) => ({ ...goal, latestProgress: goal.progress[0] ?? null }));
     const activeAllergies = allergies.filter((item) => item.status === 'ACTIVE' || !item.status);
     const activeConditions = conditions.filter((item) => item.status === 'ACTIVE' && !item.resolvedAt);
+    const bloodType = patient.healthPassport?.bloodType ?? medicalRecord?.bloodType ?? null;
+    const organDonor = patient.healthPassport?.organDonor ?? medicalRecord?.organDonor ?? false;
+    const emergencyNotes = patient.healthPassport?.emergencyNotes ?? null;
 
     return {
       generatedAt: now.toISOString(),
       profile: patient.person,
       patient: { id: patientId, patientNumber: patient.patientNumber, firstName: patient.person?.firstName ?? '', lastName: patient.person?.lastName ?? '', name: [patient.person?.firstName, patient.person?.lastName].filter(Boolean).join(' '), heightCm: patient.heightCm, weightKg: patient.weightKg, deceased: patient.deceased },
-      healthPassport: patient.healthPassport,
-      healthSnapshot: { baseline: patient.baseline, activeConditions, allergies: activeAllergies, immunizations, bloodType: patient.healthPassport?.bloodType ?? null, rhesusFactor: patient.healthPassport?.rhesusFactor ?? null, latestMeasurements: journalSignals.signals, connectedDevices: devices.map((device) => ({ id: device.id, manufacturer: device.manufacturer, model: device.model, deviceType: device.deviceType, status: device.status, lastSyncAt: device.lastSyncAt, measurementCount: device._count.measurements })) },
+      healthPassport: patient.healthPassport ? { ...patient.healthPassport, bloodType, organDonor, emergencyNotes } : medicalRecord ? { bloodType, organDonor, emergencyNotes, source: 'MEDICAL_RECORD' } : null,
+      healthSnapshot: { baseline: patient.baseline, activeConditions, activeAllergies, allergies: activeAllergies, immunizations, bloodType, rhesusFactor: patient.healthPassport?.rhesusFactor ?? null, latestMeasurements: journalSignals.signals, connectedDevices: devices.map((device) => ({ id: device.id, manufacturer: device.manufacturer, model: device.model, deviceType: device.deviceType, status: device.status, lastSyncAt: device.lastSyncAt, measurementCount: device._count.measurements })) },
       attention,
       today: { notifications, upcomingAppointments: appointments.slice(0, 5), activeMedications: medications, activeMedicationCount: medications.length, activeGoalCount: goals.length },
       medications, appointments, goals: goalsWithProgress, healthGoals: goalsWithProgress, family, allergies, conditions, immunizations,
@@ -104,6 +108,7 @@ export class HealthHomeService {
       attachments,
       clinicalVitals,
       patientInsurances,
+      medicalRecord,
       journal: journalSignals,
       ai: { recentObservations: aiObservations },
       settings: patient.healthJournalSettings,
