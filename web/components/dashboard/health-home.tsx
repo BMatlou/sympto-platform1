@@ -87,7 +87,7 @@ function WeightBodySizeCard({ weightKg, heightCm, bmi, patientId, reload }: { we
   const [editingWeightInput, setEditingWeightInput] = useState(false);
   const [saveState, setSaveState] = useState<"idle" | "saving" | "saved" | "error">("idle");
   const canEdit = !patientId;
-  const minWeight = 20;
+  const minWeight = 1;
   const maxWeight = 250;
   const currentWeight = editingWeight ?? (weightKg != null ? Number(weightKg) : 60);
   const liveBmi = calculateBmi(currentWeight, heightCm != null ? Number(heightCm) : null) ?? (bmi != null ? Number(bmi) : null);
