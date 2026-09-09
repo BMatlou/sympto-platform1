@@ -43,20 +43,21 @@ function getWeightStatus(bmi?: number | null): {
   textClass: string;
   badgeClass: string;
   activeClass: string;
+  markerClass: string;
 } {
   if (bmi == null || Number.isNaN(bmi)) {
-    return { text: "(Normal weight)", textClass: "text-slate-500", badgeClass: "bg-slate-100 text-slate-600", activeClass: "ring-slate-300" };
+    return { text: "(Normal weight)", textClass: "text-slate-500", badgeClass: "bg-slate-100 text-slate-600", activeClass: "ring-slate-300", markerClass: "bg-slate-500" };
   }
   if (bmi < 18.5) {
-    return { text: "(Underweight)", textClass: "text-[#0b2d54]", badgeClass: "bg-[#24c1c4]/10 text-[#0b2d54]", activeClass: "ring-[#24c1c4]/40" };
+    return { text: "(Underweight)", textClass: "text-[#0b2d54]", badgeClass: "bg-[#0b2d54]/10 text-[#0b2d54]", activeClass: "ring-[#0b2d54]/30", markerClass: "bg-[#0b2d54]" };
   }
   if (bmi <= 24.9) {
-    return { text: "(Normal weight)", textClass: "text-[#0b2d54]", badgeClass: "bg-[#24c1c4]/10 text-[#0b2d54]", activeClass: "ring-[#24c1c4]/40" };
+    return { text: "(Normal weight)", textClass: "text-[#0b2d54]", badgeClass: "bg-[#24c1c4]/10 text-[#0b2d54]", activeClass: "ring-[#24c1c4]/40", markerClass: "bg-[#24c1c4]" };
   }
   if (bmi <= 29.9) {
-    return { text: "(Obese)", textClass: "text-[#0b2d54]", badgeClass: "bg-[#24c1c4]/10 text-[#0b2d54]", activeClass: "ring-[#24c1c4]/40" };
+    return { text: "(Obese)", textClass: "text-[#0b2d54]", badgeClass: "bg-[#0b2d54]/10 text-[#0b2d54]", activeClass: "ring-[#0b2d54]/30", markerClass: "bg-[#0b2d54]" };
   }
-  return { text: "(Extreme obese)", textClass: "text-[#0b2d54]", badgeClass: "bg-[#24c1c4]/10 text-[#0b2d54]", activeClass: "ring-[#24c1c4]/40" };
+  return { text: "(Extreme obese)", textClass: "text-[#0b2d54]", badgeClass: "bg-[#24c1c4]/10 text-[#0b2d54]", activeClass: "ring-[#24c1c4]/40", markerClass: "bg-[#24c1c4]" };
 }
 
 function LargeAction({ href, icon, label }: { href: string; icon: ReactNode; label: string }) {
@@ -119,7 +120,7 @@ function WeightBodySizeCard({ weightKg, heightCm, bmi, patientId, reload }: { we
     setSaveState("idle");
   };
 
-  const statusMessage = saveState === "saving" ? "Saving your weight…" : saveState === "saved" ? "Weight saved" : saveState === "error" ? "Could not save. Try again." : canEdit ? "Move the slider to update your weight" : "Family health information is view-only";
+  const statusMessage = saveState === "saving" ? "Saving your weight…" : saveState === "saved" ? "Weight saved" : saveState === "error" ? "Could not save. Try again." : canEdit ? "Move the slider, then click Save weight" : "Family health information is view-only";
 
   return (
     <div className={`mt-4 rounded-[24px] border border-[#24c1c4]/15 bg-white p-4 shadow-sm ring-2 ${weightStatus.activeClass} sm:p-5`}>
@@ -147,15 +148,13 @@ function WeightBodySizeCard({ weightKg, heightCm, bmi, patientId, reload }: { we
           <div className="mb-2 flex items-center justify-between text-[10px] font-extrabold uppercase tracking-[0.12em] text-slate-500"><span>Low</span><span>Just right</span><span>High</span></div>
           <div className="relative h-12 overflow-visible rounded-xl">
             <div className="absolute inset-x-0 top-1/2 h-9 -translate-y-1/2 rounded-xl shadow-inner" style={{ background: trackBackground }} aria-hidden="true" />
-            <div className="pointer-events-none absolute top-1/2 z-10 h-[52px] w-1.5 -translate-x-1/2 -translate-y-1/2 rounded-full bg-[#24c1c4] shadow-[0_3px_10px_rgba(11,45,84,0.3)] ring-3 ring-white transition-[left] duration-75" style={{ left: `${Math.max(0, Math.min(100, sliderPercent))}%` }} aria-hidden="true">
-              <span className="absolute -top-1.5 left-1/2 h-2.5 w-2.5 -translate-x-1/2 rounded-full bg-[#24c1c4] ring-2 ring-white" />
+            <div className={`pointer-events-none absolute top-1/2 z-10 h-[52px] w-1.5 -translate-x-1/2 -translate-y-1/2 rounded-full ${weightStatus.markerClass} shadow-[0_3px_10px_rgba(11,45,84,0.3)] ring-3 ring-white transition-[left,background-color] duration-75`} style={{ left: `${Math.max(0, Math.min(100, sliderPercent))}%` }} aria-hidden="true">
+              <span className={`absolute -top-1.5 left-1/2 h-2.5 w-2.5 -translate-x-1/2 rounded-full ${weightStatus.markerClass} ring-2 ring-white`} />
             </div>
-            <input type="range" min={minWeight} max={maxWeight} step="0.1" value={currentWeight} disabled={!canEdit || !heightCm} onChange={(event) => handleWeightChange(event.target.value)} onPointerUp={() => void persistWeight()} onKeyUp={(event) => { if (["ArrowLeft", "ArrowRight", "Home", "End"].includes(event.key)) void persistWeight(); }} onBlur={() => void persistWeight()} aria-label="Weight in kilograms" className="absolute inset-0 z-20 h-full w-full cursor-grab opacity-0 disabled:cursor-not-allowed" />
+            <input type="range" min={minWeight} max={maxWeight} step="0.1" value={currentWeight} disabled={!canEdit || !heightCm} onChange={(event) => handleWeightChange(event.target.value)} aria-label="Weight in kilograms" className="absolute inset-0 z-20 h-full w-full cursor-grab opacity-0 disabled:cursor-not-allowed" />
           </div>
           <div className="mt-2 flex justify-between text-[10px] font-bold text-slate-400"><span>{minWeight} kg</span><span>{maxWeight} kg</span></div>
         </div>
-
-        <p className="text-sm font-extrabold leading-6 text-[#0b2d54]"><Weight className="mr-1.5 inline h-4 w-4 align-[-2px] text-[#24c1c4]" />Weight &amp; Body Size: {currentWeight.toFixed(1)} kg <span className={weightStatus.textClass}>{weightStatus.text}</span></p>
 
         <div className="flex min-h-10 items-center justify-between gap-3 rounded-xl bg-[#0b2d54]/[0.04] px-3 py-2.5">
           <span className={`text-xs font-bold ${saveState === "error" ? "text-red-700" : saveState === "saved" ? "text-emerald-700" : "text-slate-500"}`}>{statusMessage}</span>
