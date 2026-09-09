@@ -2,8 +2,7 @@
 
 import Link from "next/link";
 import type { ReactNode } from "react";
-import { useSearchParams } from "next/navigation";
-import { useState } from "react";
+import { useEffect, useSearchParams, useState } from "react";
 import { ArrowRight, CalendarDays, CheckCircle2, FolderOpen, HeartPulse, Pill, ShieldCheck, TriangleAlert, Watch, Weight } from "lucide-react";
 import ProtectedRoute from "@/components/auth/protected-route";
 import { useDashboard } from "@/hooks/use-dashboard";
@@ -35,16 +34,39 @@ function VaccinationDetails({ records }: { records: Array<Record<string, any>> }
 
 function WeightBodySizeCard({ weightKg, heightCm, reload, patientId }: { weightKg: number | null | undefined; heightCm: number | null | undefined; reload: () => Promise<void>; patientId?: string }) {
   const canEdit = !patientId;
-  const [value, setValue] = useState<number | null>(weightKg != null ? Number(weightKg) : null);
+  const [value, setValue] = useState<number>(weightKg != null ? Number(weightKg) : 60);
   const [editing, setEditing] = useState(false);
   const [saving, setSaving] = useState(false);
-  const currentWeight = value ?? 60;
-  const currentBmi = bmi(currentWeight, heightCm != null ? Number(heightCm) : null);
+
+  useEffect(() => {
+    if (weightKg != null && Number.isFinite(Number(weightKg))) setValue(Number(weightKg));
+  }, [weightKg]);
+
+  const currentBmi = bmi(value, heightCm != null ? Number(heightCm) : null);
   const status = bmiStatus(currentBmi);
-  const save = async () => { if (!canEdit || value == null || !heightCm || saving) return; try { setSaving(true); await healthHomeService.updateWeight(value, Number(heightCm)); await reload(); setEditing(false); } finally { setSaving(false); } };
-  return <div className="mt-4 rounded-[24px] border border-[#24c1c4]/15 bg-white p-4 shadow-sm sm:p-5"><div className="flex items-center justify-between gap-3"><div className="flex items-center gap-3"><div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-[#24c1c4]/12 text-[#0b2d54]"><Weight className="h-6 w-6" /></div><div><h3 className="text-base font-extrabold text-[#0b2d54]">Weight &amp; Body Size</h3><p className="text-xs font-medium text-slate-500">Your current body weight</p></div></div><span className={`rounded-full px-2.5 py-1 text-[10px] font-extrabold uppercase ${status.cls}`}>{status.label}</span></div>
-    <div className="mt-4 flex items-center gap-3 rounded-2xl bg-[#f5f8fb] p-4"><input aria-label="Weight in kilograms" type="number" min="1" max="250" step="0.1" disabled={!canEdit} value={currentWeight} onChange={(e) => { setValue(Number(e.target.value)); setEditing(true); }} className="w-32 bg-transparent text-3xl font-black text-[#0b2d54] outline-none disabled:opacity-100" /><span className="font-extrabold text-slate-400">kg</span><span className="text-xs font-extrabold uppercase text-slate-400">BMI</span><span className="font-black text-[#0b2d54]">{currentBmi ?? "—"}</span><span className="ml-auto text-xs font-bold text-slate-500">{canEdit ? "Edit weight" : "View only"}</span></div>
-    {canEdit && editing && <button type="button" onClick={() => void save()} disabled={saving || !heightCm || value == null} className="mt-3 min-h-10 rounded-xl bg-[#0b2d54] px-4 py-2 text-xs font-extrabold text-white disabled:opacity-50">{saving ? "Saving…" : "Save weight"}</button>}
+  const sliderPercent = Math.min(100, Math.max(0, ((value - 1) / 249) * 100));
+
+  const save = async () => {
+    if (!canEdit || !Number.isFinite(value) || value <= 0 || !heightCm || saving) return;
+    try {
+      setSaving(true);
+      await healthHomeService.updateWeight(value, Number(heightCm));
+      await reload();
+      setEditing(false);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return <div className="mt-4 rounded-[24px] border border-[#24c1c4]/15 bg-white p-4 shadow-sm sm:p-5">
+    <div className="flex items-center justify-between gap-3"><div className="flex items-center gap-3"><div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-[#24c1c4]/12 text-[#0b2d54]"><Weight className="h-6 w-6" /></div><div><h3 className="text-base font-extrabold text-[#0b2d54]">Weight &amp; Body Size</h3><p className="text-xs font-medium text-slate-500">Your current body weight</p></div></div><span className={`rounded-full px-2.5 py-1 text-[10px] font-extrabold uppercase ${status.cls}`}>{status.label}</span></div>
+    <div className="mt-4 flex items-center justify-between gap-3"><div><p className="text-3xl font-black text-[#0b2d54]">{value.toFixed(1)} <span className="text-base font-extrabold text-slate-400">kg</span></p><p className="mt-1 text-xs font-bold text-slate-500">BMI {currentBmi ?? "—"}</p></div><span className="text-xs font-bold text-slate-500">{canEdit ? "Adjust weight" : "View only"}</span></div>
+    <div className="mt-4">
+      <input aria-label="Weight slider in kilograms" type="range" min="1" max="250" step="0.1" disabled={!canEdit} value={value} onChange={(e) => { setValue(Number(e.target.value)); setEditing(true); }} className="h-2 w-full cursor-pointer appearance-none rounded-full disabled:cursor-default" style={{ background: `linear-gradient(to right, #24c1c4 0%, #24c1c4 ${sliderPercent}%, #e2e8f0 ${sliderPercent}%, #e2e8f0 100%)` }} />
+      <div className="mt-1 flex justify-between text-[10px] font-bold text-slate-400"><span>1 kg</span><span>250 kg</span></div>
+    </div>
+    <div className="mt-4 flex items-center gap-3 rounded-2xl bg-[#f5f8fb] p-3"><label htmlFor="weight-input" className="text-xs font-extrabold uppercase tracking-wide text-slate-500">Weight</label><input id="weight-input" aria-label="Weight in kilograms" type="number" min="1" max="250" step="0.1" disabled={!canEdit} value={value} onChange={(e) => { const next = Number(e.target.value); if (Number.isFinite(next)) { setValue(Math.min(250, Math.max(1, next))); setEditing(true); } }} className="w-28 bg-transparent text-2xl font-black text-[#0b2d54] outline-none disabled:opacity-100" /><span className="font-extrabold text-slate-400">kg</span></div>
+    {canEdit && editing && <button type="button" onClick={() => void save()} disabled={saving || !heightCm} className="mt-3 min-h-10 rounded-xl bg-[#0b2d54] px-4 py-2 text-xs font-extrabold text-white disabled:opacity-50">{saving ? "Saving…" : "Save weight"}</button>}
   </div>;
 }
 
