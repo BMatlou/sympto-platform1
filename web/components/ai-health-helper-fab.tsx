@@ -142,12 +142,12 @@ export default function AIHealthHelperFab() {
   return (
     <>
       <div className="pointer-events-none fixed inset-x-0 bottom-5 z-40 flex justify-center px-4 pb-[env(safe-area-inset-bottom)]">
-        <button type="button" onClick={openHelper} className="pointer-events-auto inline-flex min-h-14 items-center gap-3 rounded-full bg-slate-950 px-6 py-3 text-base font-extrabold text-white shadow-[0_12px_35px_rgba(11,45,84,0.28)] ring-1 ring-white/20 transition hover:-translate-y-0.5 hover:bg-[#0b2d54] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[#24c1c4]/50 active:translate-y-0" aria-label="Open AI Health Helper">
+        <button type="button" onClick={openHelper} className="pointer-events-auto inline-flex min-h-14 items-center gap-3 rounded-full bg-slate-950 px-6 py-3 text-base font-extrabold text-white shadow-[0_12px_35px_rgba(11,45,84,0.28)] ring-1 ring-white/20 transition hover:-translate-y-0.5 hover:bg-[#0b2d54] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[#24c1c4]/50 active:translate-y-0" aria-label="Talk to Sympto">
           <span className="relative flex h-9 w-9 items-center justify-center rounded-full bg-[#24c1c4] text-lg text-slate-950 shadow-[0_0_0_6px_rgba(36,193,196,0.12)]">
             <span className="absolute inset-0 animate-ping rounded-full bg-[#24c1c4]/50" aria-hidden="true" />
             <span className="relative">🎙️</span>
           </span>
-          <span>Talk to App</span>
+          <span>Talk to Sympto</span>
           <Sparkles className="h-5 w-5 text-[#24c1c4]" aria-hidden="true" />
         </button>
       </div>
@@ -158,7 +158,7 @@ export default function AIHealthHelperFab() {
             <header className="sticky top-0 z-10 flex items-center justify-between border-b border-slate-100 bg-white px-5 py-4 sm:px-6">
               <div>
                 <p className="text-xs font-extrabold uppercase tracking-[0.16em] text-[#24c1c4]">AI Health Helper</p>
-                <h2 id="ai-helper-title" className="mt-1 text-xl font-bold text-[#0b2d54]">Tell me how you feel</h2>
+                <h2 id="ai-helper-title" className="mt-1 text-xl font-bold text-[#0b2d54]">Talk to Sympto</h2>
               </div>
               <button type="button" onClick={closeHelper} className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl text-slate-500 hover:bg-slate-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#24c1c4]" aria-label="Close AI Health Helper">
                 <X className="h-6 w-6" aria-hidden="true" />
@@ -171,7 +171,7 @@ export default function AIHealthHelperFab() {
                   <Mic className={`h-10 w-10 ${listening ? "text-[#24c1c4]" : "text-white"}`} aria-hidden="true" />
                 </div>
                 <p className="mt-5 text-lg font-bold">{listening ? "I’m listening…" : "Speak naturally"}</p>
-                <p className="mx-auto mt-2 max-w-sm text-sm leading-6 text-white/70">{listening ? "Tell me what you are feeling, in your own words." : "No typing needed. Tap the microphone and tell me about your symptoms."}</p>
+                <p className="mx-auto mt-2 max-w-sm text-sm leading-6 text-white/70">{listening ? "Tell Sympto what you are feeling, in your own words." : "No typing needed. Tap the microphone and tell Sympto about your symptoms."}</p>
                 <button type="button" onClick={listening ? stopListening : startListening} className="mt-5 inline-flex min-h-14 min-w-40 items-center justify-center gap-2 rounded-full bg-[#24c1c4] px-6 text-sm font-extrabold text-slate-950 shadow-lg transition hover:bg-[#5edadd] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-white/40">
                   <Mic className="h-5 w-5" aria-hidden="true" />
                   {listening ? "Stop listening" : speechSupported ? "Start speaking" : "Simulate symptom"}
