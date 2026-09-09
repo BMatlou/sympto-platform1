@@ -38,9 +38,52 @@ export interface UpdateWeightResponse { weightKg: number; heightCm: number; bmi:
 
 class HealthHomeService {
   async getHealthHome(patientId?: string): Promise<HealthHomeResponse> {
-    const response = await api.get<{ success: boolean; data: HealthHomeResponse }>('/health-home', { params: patientId ? { patientId } : undefined });
-    const data = response.data.data;
-    return { ...data, wearables: data.wearables ?? { devices: data.healthSnapshot.connectedDevices, latestMeasurements: data.healthSnapshot.latestMeasurements.map((m: any, index) => ({ id: `${m.type}-${index}`, type: m.type, value: m.value, unit: m.unit, measuredAt: m.measuredAt, source: m.source })) } };
+    const [healthHomeResponse, onboardingResponse] = await Promise.all([
+      api.get<{ success: boolean; data: HealthHomeResponse }>('/health-home', { params: patientId ? { patientId } : undefined }),
+      api.get<{ success: boolean; data: any }>('/onboarding/dashboard'),
+    ]);
+
+    const healthHome = healthHomeResponse.data.data;
+    const canonical = onboardingResponse.data.data;
+
+    // The onboarding dashboard is the original canonical source for the patient's
+    // saved profile/passport records. Keep using it for those fields while Health
+    // Home supplies the newer aggregated clinical/dashboard data. This prevents
+    // the Health Home refactor from dropping data that already worked elsewhere.
+    const merged: HealthHomeResponse = {
+      ...healthHome,
+      profile: canonical?.profile ?? healthHome.profile,
+      patient: { ...healthHome.patient, ...(canonical?.patient ?? {}) },
+      healthPassport: canonical?.healthPassport ?? healthHome.healthPassport,
+      emergencyContacts: canonical?.emergencyContacts ?? healthHome.emergencyContacts,
+      allergies: canonical?.allergies ?? healthHome.allergies,
+      conditions: canonical?.conditions ?? healthHome.conditions,
+      medications: canonical?.medications ?? healthHome.medications,
+      immunizations: canonical?.immunizations ?? healthHome.immunizations,
+      healthGoals: canonical?.healthGoals ?? healthHome.healthGoals,
+      healthJournalSettings: canonical?.healthJournalSettings ?? healthHome.healthJournalSettings,
+      healthSnapshot: {
+        ...healthHome.healthSnapshot,
+        activeAllergies: canonical?.allergies ?? healthHome.healthSnapshot.activeAllergies,
+        activeConditions: canonical?.conditions ?? healthHome.healthSnapshot.activeConditions,
+        allergies: canonical?.allergies ?? healthHome.healthSnapshot.allergies,
+        immunizations: canonical?.immunizations ?? healthHome.healthSnapshot.immunizations,
+        bloodType: canonical?.healthPassport?.bloodType ?? healthHome.healthSnapshot.bloodType,
+        rhesusFactor: canonical?.healthPassport?.rhesusFactor ?? healthHome.healthSnapshot.rhesusFactor,
+      },
+      today: {
+        ...healthHome.today,
+        activeMedications: canonical?.medications ?? healthHome.today.activeMedications,
+      },
+    };
+
+    return {
+      ...merged,
+      wearables: merged.wearables ?? {
+        devices: merged.healthSnapshot.connectedDevices,
+        latestMeasurements: merged.healthSnapshot.latestMeasurements.map((m: any, index) => ({ id: `${m.type}-${index}`, type: m.type, value: m.value, unit: m.unit, measuredAt: m.measuredAt, source: m.source })),
+      },
+    };
   }
 
   async updateWeight(weightKg: number, heightCm?: number, patientId?: string): Promise<UpdateWeightResponse> {
