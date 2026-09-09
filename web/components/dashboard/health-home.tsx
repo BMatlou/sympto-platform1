@@ -1,9 +1,11 @@
 "use client";
 
 import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 import type { ReactNode } from "react";
-import { useEffect, useSearchParams, useState } from "react";
+import { useEffect, useState } from "react";
 import { ArrowRight, CalendarDays, CheckCircle2, FolderOpen, HeartPulse, Pill, ShieldCheck, TriangleAlert, Watch, Weight } from "lucide-react";
+
 import ProtectedRoute from "@/components/auth/protected-route";
 import { useDashboard } from "@/hooks/use-dashboard";
 import { healthHomeService } from "@/services/health-home.service";
