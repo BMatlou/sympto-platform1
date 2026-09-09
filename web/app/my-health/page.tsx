@@ -8,15 +8,16 @@ const sections = [
   { href: "/health-passport", label: "Health Passport", description: "Your core health identity, conditions, allergies, immunisations and emergency information.", icon: FileHeart },
   { href: "/health-records", label: "Health Records", description: "Your longitudinal medical record and supporting clinical information.", icon: ClipboardList },
   { href: "/health-timeline", label: "Health Timeline", description: "Episodes, encounters, notes and care history in chronological context.", icon: Activity },
+  { href: "/health-journal", label: "Health Journal", description: "Symptoms, daily signals, reflections and AI-supported health insights.", icon: Sparkles },
+  { href: "/medications", label: "Medications", description: "Current medicines, instructions, adherence and reminders.", icon: Pill },
+  { href: "/health-goals", label: "Health Goals", description: "Set, track and improve the goals that matter to you.", icon: Target },
+  { href: "/appointments", label: "Appointments", description: "Upcoming and previous appointments with your care team.", icon: CalendarDays },
+  { href: "/family", label: "Family", description: "Manage authorised family relationships and supported health journeys.", icon: Users },
+  { href: "/wearables", label: "Wearables", description: "Your connected devices, measurements and synchronisation history.", icon: Watch },
+  { href: "/vitals", label: "Vitals", description: "Review your latest measurements and the authorised sources contributing them.", icon: HeartPulse },
   { href: "/clinical-episodes", label: "Clinical Episodes", description: "Health events that connect symptoms, diagnoses, notes and treatment.", icon: HeartPulse },
   { href: "/encounters", label: "Encounters", description: "Consultations and clinical interactions recorded during your care.", icon: Stethoscope },
-  { href: "/medications", label: "Medications", description: "Current medicines, instructions, adherence and reminders.", icon: Pill },
-  { href: "/appointments", label: "Appointments", description: "Upcoming and previous appointments with your care team.", icon: CalendarDays },
-  { href: "/health-goals", label: "Health Goals", description: "Set, track and improve the goals that matter to you.", icon: Target },
-  { href: "/health-journal", label: "Smart Journal", description: "Symptoms, daily signals, reflections and AI-supported health insights.", icon: Sparkles },
-  { href: "/family", label: "Family Health", description: "Manage authorised family relationships and supported health journeys.", icon: Users },
-  { href: "/wearables", label: "Connected Health", description: "Your connected devices, measurements and synchronisation history.", icon: Watch },
-  { href: "/settings/privacy", label: "Privacy & Sharing", description: "Control how your health information is shared and who can access it.", icon: ShieldCheck },
+  { href: "/settings/privacy", label: "Privacy & Consent", description: "Review your consent choices and manage health-information sharing access.", icon: ShieldCheck },
 ];
 
 export default function MyHealthPage() {
