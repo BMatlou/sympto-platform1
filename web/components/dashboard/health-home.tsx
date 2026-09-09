@@ -1,7 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { ArrowRight, CalendarDays, CheckCircle2, FileText, HeartPulse, History, Pill, Sparkles, TriangleAlert } from "lucide-react";
+import type { ReactNode } from "react";
+import { ArrowRight, CalendarDays, CheckCircle2, FileText, HeartPulse, History, Sparkles, TriangleAlert } from "lucide-react";
 import ProtectedRoute from "@/components/auth/protected-route";
 import { useDashboard } from "@/hooks/use-dashboard";
 
@@ -18,7 +19,7 @@ function ActionCard({
   description: string;
   icon: typeof HeartPulse;
   tone: "today" | "passport" | "history";
-  detail?: React.ReactNode;
+  detail?: ReactNode;
 }) {
   const styles = {
     today: "border-[#24c1c4]/25 bg-gradient-to-br from-white to-[#effcfc] hover:border-[#24c1c4]/50",
