@@ -17,7 +17,35 @@ export class HealthHomeService {
     if (!patient) throw new NotFoundException('Patient profile not found for the authenticated user.');
     const resolvedHeight = heightCm ?? Number(patient.heightCm ?? patient.baseline?.heightCm ?? 0); if (!Number.isFinite(resolvedHeight) || resolvedHeight <= 0 || resolvedHeight > 300) throw new BadRequestException('A valid height in centimetres is required to calculate BMI.');
     const bmi = this.calculateBmi(weightKg, resolvedHeight); const bmiCategory = this.adultBmiCategory(bmi, patient.person.dateOfBirth); const now = new Date();
-    const result = await this.prisma.$transaction(async (tx) => { await tx.patient.update({ where: { id: patient.id }, data: { weightKg, heightCm: resolvedHeight } }); const weightGoals = patient.healthGoals.filter((goal) => String(goal.category) === 'WEIGHT'); const updatedGoals: UpdatedGoal[] = []; for (const goal of weightGoals) { const baselineWeight = patient.baseline?.weightKg != null ? Number(patient.baseline.weightKg) : null; const historicalWeights = goal.progress.map((entry) => Number(entry.currentValue)).filter((value) => Number.isFinite(value) && value > 0); const historicalStartingWeight = historicalWeights.length ? Math.max(...historicalWeights) : null; const candidates = [baselineWeight, historicalStartingWeight, patient.weightKg != null ? Number(patient.weightKg) : null, weightKg].filter((value): value is number => value != null && Number.isFinite(value) && value > 0); const startingWeight = Math.max(...candidates); const targetLossKg = goal.targetValue != null ? Number(goal.targetValue) : 0; if (!Number.isFinite(targetLossKg) || targetLossKg <= 0) continue; const lossAchievedKg = Math.max(0, startingWeight - weightKg); const progressPercent = this.calculateWeightGoalProgress(startingWeight, weightKg, targetLossKg); const achieved = lossAchievedKg >= targetLossKg; const status = this.progressStatus(progressPercent, achieved); const goalTargetWeight = startingWeight - targetLossKg; if (patient.baseline && historicalStartingWeight != null && historicalStartingWeight > Number(patient.baseline.weightKg ?? 0)) await tx.patientBaseline.update({ where: { patientId: patient.id }, data: { weightKg: historicalStartingWeight } }); else if (!patient.baseline) await tx.patientBaseline.create({ data: { patientId: patient.id, weightKg: startingWeight, heightCm: resolvedHeight, bmi: this.calculateBmi(startingWeight, resolvedHeight), establishedAt: now } }); else await tx.patientBaseline.update({ where: { patientId: patient.id }, data: { heightCm: resolvedHeight } }); await tx.healthGoal.update({ where: { id: goal.id }, data: { currentValue: weightKg, ...(achieved ? { status: 'ACHIEVED', achievedAt: now } : {}) } }); await tx.healthGoalProgress.create({ data: { healthGoalId: goal.id, currentValue: weightKg, progressPercent, status, measuredAt: now, notes: `Weight updated from My Health. Starting weight: ${startingWeight} kg. Goal weight: ${goalTargetWeight} kg. ${lossAchievedKg.toFixed(1)} kg of ${targetLossKg.toFixed(1)} kg lost. BMI: ${bmi}.` } }); updatedGoals.push({ id: goal.id, progressPercent, currentValue: weightKg, status }); } if (!patient.baseline && weightGoals.length === 0) await tx.patientBaseline.create({ data: { patientId: patient.id, weightKg, heightCm: resolvedHeight, bmi, establishedAt: now } }); else if (patient.baseline) await tx.patientBaseline.update({ where: { patientId: patient.id }, data: { heightCm: resolvedHeight } }); return { updatedGoals }; }); return { weightKg, heightCm: resolvedHeight, bmi, bmiCategory, recordedAt: now.toISOString(), goals: result.updatedGoals };
+    const result = await this.prisma.$transaction(async (tx) => {
+      await tx.patient.update({ where: { id: patient.id }, data: { weightKg, heightCm: resolvedHeight } });
+      const weightGoals = patient.healthGoals.filter((goal) => String(goal.category) === 'WEIGHT');
+      const updatedGoals: UpdatedGoal[] = [];
+      for (const goal of weightGoals) {
+        const baselineWeight = patient.baseline?.weightKg != null ? Number(patient.baseline.weightKg) : null;
+        const historicalWeights = goal.progress.map((entry) => Number(entry.currentValue)).filter((value) => Number.isFinite(value) && value > 0);
+        const historicalStartingWeight = historicalWeights.length ? Math.max(...historicalWeights) : null;
+        const candidates = [baselineWeight, historicalStartingWeight, patient.weightKg != null ? Number(patient.weightKg) : null, weightKg].filter((value): value is number => value != null && Number.isFinite(value) && value > 0);
+        const startingWeight = Math.max(...candidates);
+        const targetLossKg = goal.targetValue != null ? Number(goal.targetValue) : 0;
+        if (!Number.isFinite(targetLossKg) || targetLossKg <= 0) continue;
+        const lossAchievedKg = Math.max(0, startingWeight - weightKg);
+        const progressPercent = this.calculateWeightGoalProgress(startingWeight, weightKg, targetLossKg);
+        const achieved = lossAchievedKg >= targetLossKg;
+        const status = this.progressStatus(progressPercent, achieved);
+        const goalTargetWeight = startingWeight - targetLossKg;
+        if (!patient.baseline) await tx.patientBaseline.create({ data: { patientId: patient.id, weightKg: startingWeight, heightCm: resolvedHeight, bmi: this.calculateBmi(startingWeight, resolvedHeight), establishedAt: now } });
+        else await tx.patientBaseline.update({ where: { patientId: patient.id }, data: { heightCm: resolvedHeight } });
+        await tx.healthGoal.update({ where: { id: goal.id }, data: { currentValue: weightKg, ...(achieved ? { status: 'ACHIEVED', achievedAt: now } : {}) } });
+        await tx.healthGoalProgress.create({ data: { healthGoalId: goal.id, currentValue: weightKg, progressPercent, status, measuredAt: now, notes: `Weight updated from My Health. Starting weight: ${startingWeight} kg. Goal weight: ${goalTargetWeight} kg. ${lossAchievedKg.toFixed(1)} kg of ${targetLossKg.toFixed(1)} kg lost. BMI: ${bmi}.` } });
+        updatedGoals.push({ id: goal.id, progressPercent, currentValue: weightKg, status });
+      }
+      if (!patient.baseline && weightGoals.length === 0) await tx.patientBaseline.create({ data: { patientId: patient.id, weightKg, heightCm: resolvedHeight, bmi, establishedAt: now } });
+      else if (patient.baseline) await tx.patientBaseline.update({ where: { patientId: patient.id }, data: { heightCm: resolvedHeight } });
+      await tx.healthJournal.create({ data: { patientId: patient.id, title: 'Weight update', journal: `Weight updated from My Health to ${weightKg} kg. BMI: ${bmi}.`, weightKg, notes: 'Recorded from My Health weight tracker.' } });
+      return { updatedGoals };
+    });
+    return { weightKg, heightCm: resolvedHeight, bmi, bmiCategory, recordedAt: now.toISOString(), goals: result.updatedGoals };
   }
 
   async getForUser(userId: string) {
