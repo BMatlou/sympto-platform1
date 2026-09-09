@@ -21,6 +21,11 @@ export class HealthHomeController {
     return this.healthHomeService.getHealthHome(req.user.sub, patientId);
   }
 
+  @Get('timeline')
+  getTimeline(@Req() req: any, @Query('patientId') patientId?: string) {
+    return this.healthHomeService.getTimeline(req.user.sub, patientId);
+  }
+
   @Post('weight')
   updateWeight(
     @Req() req: any,
