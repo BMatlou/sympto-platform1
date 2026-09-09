@@ -41,11 +41,9 @@ class HealthHomeService {
     const healthHomeResponse = await api.get<{ success: boolean; data: HealthHomeResponse }>('/health-home', { params: patientId ? { patientId } : undefined });
     const healthHome = healthHomeResponse.data.data;
 
-    // Before the Health Home refactor, the dashboard loaded the patient's
-    // canonical saved profile/passport data from /onboarding/dashboard. Keep
-    // that source for the owner patient so the three-card refactor does not
-    // lose data that was already working, while Health Home remains the source
-    // for the newer aggregated dashboard/clinical data.
+    // Keep the original onboarding source for canonical profile/passport data,
+    // but keep Health Home as the source for aggregated clinical data such as
+    // emergency contacts.
     let canonical: any = null;
     if (!patientId || patientId === healthHome.patient?.id) {
       try {
@@ -66,12 +64,20 @@ class HealthHomeService {
       };
     }
 
+    // EmergencyContact belongs to Patient.emergencyContacts. The current
+    // onboarding dashboard does not reliably include that relation, so an
+    // empty legacy value must never hide contacts already returned by Health Home.
+    const canonicalEmergencyContacts = Array.isArray(canonical.emergencyContacts) ? canonical.emergencyContacts : [];
+    const emergencyContacts = canonicalEmergencyContacts.length > 0
+      ? canonicalEmergencyContacts
+      : (healthHome.emergencyContacts ?? []);
+
     return {
       ...healthHome,
       profile: canonical.profile ?? healthHome.profile,
       patient: { ...healthHome.patient, ...(canonical.patient ?? {}) },
       healthPassport: canonical.healthPassport ?? healthHome.healthPassport,
-      emergencyContacts: canonical.emergencyContacts ?? healthHome.emergencyContacts,
+      emergencyContacts,
       allergies: canonical.allergies ?? healthHome.allergies,
       conditions: canonical.conditions ?? healthHome.conditions,
       medications: canonical.medications ?? healthHome.medications,
