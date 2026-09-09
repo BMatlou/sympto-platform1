@@ -33,6 +33,7 @@ export default function HealthPassportPage() {
     if (!data) return;
     const p = data.profile as any;
     const passport = data.healthPassport as any;
+    const record = data.medicalRecord as any;
     const baseline = data.healthSnapshot.baseline as any;
     setForm({
       preferredName: text(p?.preferredName, ""),
@@ -40,9 +41,9 @@ export default function HealthPassportPage() {
       gender: text(p?.gender, ""),
       heightCm: baseline?.heightCm != null ? String(baseline.heightCm) : data.patient?.heightCm != null ? String(data.patient.heightCm) : "",
       weightKg: baseline?.weightKg != null ? String(baseline.weightKg) : data.patient?.weightKg != null ? String(data.patient.weightKg) : "",
-      bloodType: text(passport?.bloodType, ""),
+      bloodType: text(passport?.bloodType ?? record?.bloodType, ""),
       rhesusFactor: text(passport?.rhesusFactor, ""),
-      organDonor: passport?.organDonor == null ? "" : String(Boolean(passport.organDonor)),
+      organDonor: passport?.organDonor === true || record?.organDonor === true ? "true" : passport?.organDonor === false || record?.organDonor === false ? "false" : "",
       emergencyNotes: text(passport?.emergencyNotes, ""),
       shareByDefault: passport?.shareByDefault == null ? "" : String(Boolean(passport.shareByDefault)),
     });
@@ -82,13 +83,27 @@ export default function HealthPassportPage() {
 
   const passport = data.healthPassport as any;
   const profile = data.profile as any;
+  const medicalRecord = data.medicalRecord as any;
   const allergies = data.healthSnapshot.activeAllergies ?? data.healthSnapshot.allergies ?? [];
   const conditions = data.healthSnapshot.activeConditions ?? [];
   const immunizations = data.healthSnapshot.immunizations ?? [];
   const emergencies = data.emergencyContacts ?? [];
   const medications = data.medications ?? data.today.activeMedications ?? [];
-  const vitals = data.healthSnapshot.latestMeasurements ?? [];
+  const deviceVitals = data.healthSnapshot.latestMeasurements ?? [];
+  const clinicalVitals = data.clinicalVitals ?? [];
+  const vitalMap = new Map<string, any>();
+  for (const v of deviceVitals) vitalMap.set(String(v.type), v);
+  for (const v of clinicalVitals) {
+    const type = String(v.vitalType?.name || v.vitalType?.code || v.vitalTypeId);
+    const existing = vitalMap.get(type);
+    if (!existing || new Date(String(v.measuredAt)).getTime() > new Date(String(existing.measuredAt)).getTime()) vitalMap.set(type, { type, value: v.value, unit: v.vitalType?.unit || "", measuredAt: v.measuredAt, source: "Clinical record" });
+  }
+  const vitals = Array.from(vitalMap.values());
   const insurance = data.patientInsurances ?? [];
+  const bloodType = passport?.bloodType ?? medicalRecord?.bloodType;
+  const rhesusFactor = passport?.rhesusFactor;
+  const organDonor = passport?.organDonor === true || medicalRecord?.organDonor === true ? true : passport?.organDonor === false || medicalRecord?.organDonor === false ? false : null;
+  const immunizationNotes = medicalRecord?.immunizationNotes;
   const firstName = profile?.preferredName || profile?.firstName || data.patient.firstName || "Patient";
   const fullName = [firstName, profile?.lastName || data.patient.lastName].filter(Boolean).join(" ");
   const genderOptions = ["MALE", "FEMALE", "OTHER", "PREFER_NOT_TO_SAY"];
@@ -102,7 +117,7 @@ export default function HealthPassportPage() {
 
     <section className="mb-5 overflow-hidden rounded-[30px] bg-gradient-to-br from-rose-700 via-rose-600 to-[#0b2d54] p-6 text-white shadow-lg sm:p-8">
       <div className="flex items-start justify-between gap-4"><div><div className="flex items-center gap-2 text-xs font-bold uppercase tracking-[0.18em] text-white/70"><ShieldCheck className="h-4 w-4"/>My Clinic Card</div><h1 className="mt-4 text-3xl font-bold">{fullName}</h1><p className="mt-2 text-sm text-white/75">Patient number: {text(data.patient.patientNumber)}</p></div><div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-white/10"><HeartPulse className="h-7 w-7"/></div></div>
-      <div className="mt-7 grid grid-cols-2 gap-3 sm:grid-cols-4"><div className="rounded-2xl bg-white/10 p-3"><p className="text-[11px] text-white/60">Date of birth</p><p className="mt-1 font-semibold">{date(profile?.dateOfBirth)}</p></div><div className="rounded-2xl bg-white/10 p-3"><p className="text-[11px] text-white/60">Blood</p><p className="mt-1 font-semibold">{label(passport?.bloodType)}</p></div><div className="rounded-2xl bg-white/10 p-3"><p className="text-[11px] text-white/60">Rhesus</p><p className="mt-1 font-semibold">{label(passport?.rhesusFactor)}</p></div><div className="rounded-2xl bg-white/10 p-3"><p className="text-[11px] text-white/60">Organ donor</p><p className="mt-1 font-semibold">{passport?.organDonor === true ? "Yes" : passport?.organDonor === false ? "No" : "Not recorded"}</p></div></div>
+      <div className="mt-7 grid grid-cols-2 gap-3 sm:grid-cols-4"><div className="rounded-2xl bg-white/10 p-3"><p className="text-[11px] text-white/60">Date of birth</p><p className="mt-1 font-semibold">{date(profile?.dateOfBirth)}</p></div><div className="rounded-2xl bg-white/10 p-3"><p className="text-[11px] text-white/60">Blood</p><p className="mt-1 font-semibold">{label(bloodType)}</p></div><div className="rounded-2xl bg-white/10 p-3"><p className="text-[11px] text-white/60">Rhesus</p><p className="mt-1 font-semibold">{label(rhesusFactor)}</p></div><div className="rounded-2xl bg-white/10 p-3"><p className="text-[11px] text-white/60">Organ donor</p><p className="mt-1 font-semibold">{organDonor === true ? "Yes" : organDonor === false ? "No" : "Not recorded"}</p></div></div>
       <button onClick={() => { setSaveError(""); setSaveSuccess(""); setEditing(true); }} className="mt-5 inline-flex items-center gap-2 rounded-xl bg-white px-4 py-2.5 text-sm font-bold text-[#0b2d54] hover:bg-white/90"><Pencil className="h-4 w-4"/>Edit my information</button>
     </section>
 
@@ -111,10 +126,10 @@ export default function HealthPassportPage() {
     <Section title="Allergies"><div className="flex flex-wrap gap-2">{allergies.length ? allergies.map((a: any) => <span key={a.id} className="rounded-full bg-rose-50 px-3 py-2 text-sm font-semibold text-rose-700">{text(a.allergy?.name || a.name)}</span>) : <p className="text-sm text-slate-500">No active allergies are recorded.</p>}</div><Link href="/allergies" className="mt-4 inline-block text-xs font-bold text-[#0b2d54] underline">Manage allergies</Link></Section>
     <Section title="Health conditions"><>{conditions.length ? <div className="grid gap-3 sm:grid-cols-2">{conditions.map((c: any) => <div key={c.id} className="rounded-2xl bg-slate-50 p-4"><p className="font-semibold text-[#0b2d54]">{text(c.condition?.name || c.name)}</p>{c.severity && <p className="mt-1 text-xs text-slate-500">Severity: {label(c.severity)}</p>}</div>)}</div> : <p className="text-sm text-slate-500">No active health conditions are recorded.</p>}<Link href="/health-conditions" className="mt-4 inline-block text-xs font-bold text-[#0b2d54] underline">Manage conditions</Link></></Section>
     <Section title="Current medicines"><>{medications.length ? <div className="grid gap-3 sm:grid-cols-2">{medications.map((m: any) => <div key={m.id} className="rounded-2xl bg-slate-50 p-4"><p className="font-semibold text-[#0b2d54]">{text(m.medication?.name || m.name)}</p><p className="mt-1 text-sm text-slate-500">{text(m.dosage || m.dose, "Dose not recorded")} · {text(m.frequency, "Frequency not recorded")}</p></div>)}</div> : <p className="text-sm text-slate-500">No current medicines are recorded.</p>}<Link href="/medications" className="mt-4 inline-block text-xs font-bold text-[#0b2d54] underline">Manage medicines</Link></></Section>
-    <Section title="Immunisations"><div className="mb-4 flex items-center gap-2"><Syringe className="h-5 w-5 text-[#24c1c4]"/><span className="text-sm text-slate-500">{immunizations.length} recorded</span></div>{immunizations.length ? <div className="grid gap-3 sm:grid-cols-2">{immunizations.map((i: any) => <div key={i.id} className="rounded-2xl bg-slate-50 p-4"><p className="font-semibold text-[#0b2d54]">{text(i.immunization?.name || i.name)}</p><p className="mt-1 text-sm text-slate-500">{date(i.administeredAt)}{i.doseNumber != null ? ` · Dose ${i.doseNumber}` : ""}</p></div>)}</div> : <p className="text-sm text-slate-500">No immunisations are recorded.</p>}<Link href="/immunizations" className="mt-4 inline-block text-xs font-bold text-[#0b2d54] underline">Manage immunisations</Link></Section>
-    <Section title="Latest vitals"><div className="grid grid-cols-2 gap-3 sm:grid-cols-4">{vitals.length ? vitals.map((v: any) => <div key={`${v.type}-${v.measuredAt}`} className="rounded-2xl bg-slate-50 p-4"><Activity className="h-4 w-4 text-[#24c1c4]"/><p className="mt-2 text-xs text-slate-500">{label(v.type)}</p><p className="mt-1 font-bold text-[#0b2d54]">{text(v.value)} <span className="text-xs font-medium text-slate-400">{text(v.unit, "")}</span></p></div>) : <p className="text-sm text-slate-500">No connected vital measurements are recorded.</p>}</div></Section>
+    <Section title="Immunisations"><div className="mb-4 flex items-center gap-2"><Syringe className="h-5 w-5 text-[#24c1c4]"/><span className="text-sm text-slate-500">{immunizations.length ? `${immunizations.length} recorded` : immunizationNotes ? "Recorded in medical history" : "No record found"}</span></div>{immunizations.length ? <div className="grid gap-3 sm:grid-cols-2">{immunizations.map((i: any) => <div key={i.id} className="rounded-2xl bg-slate-50 p-4"><p className="font-semibold text-[#0b2d54]">{text(i.immunization?.name || i.name)}</p><p className="mt-1 text-sm text-slate-500">{date(i.administeredAt)}{i.doseNumber != null ? ` · Dose ${i.doseNumber}` : ""}</p></div>)}</div> : immunizationNotes ? <div className="rounded-2xl bg-slate-50 p-4 text-sm text-slate-600">{immunizationNotes}</div> : <p className="text-sm text-slate-500">No immunisations are recorded.</p>}<Link href="/immunizations" className="mt-4 inline-block text-xs font-bold text-[#0b2d54] underline">Manage immunisations</Link></Section>
+    <Section title="Latest vitals"><div className="grid grid-cols-2 gap-3 sm:grid-cols-4">{vitals.length ? vitals.map((v: any) => <div key={`${v.type}-${v.measuredAt}`} className="rounded-2xl bg-slate-50 p-4"><Activity className="h-4 w-4 text-[#24c1c4]"/><p className="mt-2 text-xs text-slate-500">{label(v.type)}</p><p className="mt-1 font-bold text-[#0b2d54]">{text(v.value)} <span className="text-xs font-medium text-slate-400">{text(v.unit, "")}</span></p></div>) : <p className="text-sm text-slate-500">No recorded vital measurements are available.</p>}</div></Section>
     <Section title="Emergency information"><div className="mb-4 flex justify-end"><Link href="/emergency-contacts" className="inline-flex items-center gap-1.5 rounded-xl border border-slate-200 px-3 py-2 text-xs font-bold text-[#0b2d54]"><Pencil className="h-3.5 w-3.5"/>Edit contacts</Link></div>{passport?.emergencyNotes && <p className="mb-4 rounded-2xl bg-amber-50 p-4 text-sm text-amber-900">{passport.emergencyNotes}</p>}{emergencies.length ? <div className="grid gap-3 sm:grid-cols-2">{emergencies.map((c: any) => <div key={c.id} className="rounded-2xl bg-slate-50 p-4"><p className="font-semibold text-[#0b2d54]">{c.fullName}</p><p className="mt-1 text-sm text-slate-500">{label(c.relationship)}</p><p className="mt-2 flex items-center gap-2 text-sm font-semibold text-[#0b2d54]"><Phone className="h-4 w-4"/>{c.phoneNumber}</p></div>)}</div> : <p className="text-sm text-slate-500">No emergency contacts are recorded.</p>}</Section>
-    <Section title="Insurance / medical aid"><div className="mb-4 flex items-center gap-2"><CreditCard className="h-5 w-5 text-[#24c1c4]"/>{insurance.length ? <span className="text-sm text-slate-500">{insurance.length} policy record{insurance.length === 1 ? "" : "s"}</span> : null}</div>{insurance.length ? <div className="grid gap-3 sm:grid-cols-2">{insurance.map((p: any) => <div key={p.id} className="rounded-2xl bg-slate-50 p-4"><p className="font-semibold text-[#0b2d54]">{text(p.insurancePolicy?.name || p.name, "Medical aid / insurance")}</p><p className="mt-1 text-sm text-slate-500">Membership: {text(p.membershipNumber)}</p>{p.dependantCode && <p className="mt-1 text-sm text-slate-500">Dependant: {p.dependantCode}</p>}</div>)}</div> : <p className="text-sm text-slate-500">No insurance or medical-aid record is available.</p>}</Section>
+    <Section title="Insurance / medical aid"><div className="mb-4 flex items-center gap-2"><CreditCard className="h-5 w-5 text-[#24c1c4]"/>{insurance.length ? <span className="text-sm text-slate-500">{insurance.length} policy record{insurance.length === 1 ? "" : "s"}</span> : null}</div>{insurance.length ? <div className="grid gap-3 sm:grid-cols-2">{insurance.map((p: any) => <div key={p.id} className="rounded-2xl bg-slate-50 p-4"><p className="font-semibold text-[#0b2d54]">{text(p.insurancePolicy?.name || p.name, "Medical aid / insurance")}</p>{p.insurancePolicy?.provider?.name && <p className="mt-1 text-sm text-slate-500">Provider: {p.insurancePolicy.provider.name}</p>}<p className="mt-1 text-sm text-slate-500">Membership: {text(p.membershipNumber)}</p>{p.dependantCode && <p className="mt-1 text-sm text-slate-500">Dependant: {p.dependantCode}</p>}</div>)}</div> : <p className="text-sm text-slate-500">No insurance or medical-aid record is available.</p>}</Section>
     <div className="rounded-3xl border border-[#24c1c4]/20 bg-[#24c1c4]/5 p-5 text-sm text-slate-600"><p className="font-semibold text-[#0b2d54]">Your Clinic Card uses your saved health record.</p><p className="mt-1">Clinical records such as laboratory results, prescriptions and imaging reports remain part of your medical history; they are not silently changed from this card.</p></div>
   </div></main></ProtectedRoute>;
 }
