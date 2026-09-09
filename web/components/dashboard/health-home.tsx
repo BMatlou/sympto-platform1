@@ -3,72 +3,56 @@
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import type { ReactNode } from "react";
-import { useEffect, useState } from "react";
-import { ArrowRight, CalendarDays, CheckCircle2, FolderOpen, HeartPulse, Pill, ShieldCheck, TriangleAlert, Watch, Weight } from "lucide-react";
-
+import { useState } from "react";
+import { ArrowRight, CalendarDays, CheckCircle2, FolderOpen, HeartPulse, Pill, Scale, ShieldCheck, TriangleAlert, Watch } from "lucide-react";
 import ProtectedRoute from "@/components/auth/protected-route";
 import { useDashboard } from "@/hooks/use-dashboard";
 import { healthHomeService } from "@/services/health-home.service";
 
 function display(value: unknown): string { return value === null || value === undefined || value === "" ? "—" : String(value); }
 function measurementValue(measurements: Array<Record<string, unknown>> | undefined, types: string[]) { return measurements?.find((item) => types.includes(String(item.type ?? item.measurementType ?? "").toUpperCase())); }
-function formatDate(value: unknown): string { if (!value) return ""; const date = new Date(String(value)); if (Number.isNaN(date.getTime())) return ""; return new Intl.DateTimeFormat("en-ZA", { day: "numeric", month: "short", year: "numeric" }).format(date); }
-function bmi(weight: number | null, height: number | null): number | null { if (!weight || !height || weight <= 0 || height <= 0) return null; return Number((weight / Math.pow(height / 100, 2)).toFixed(1)); }
-function bmiStatus(value: number | null) { if (value == null) return { label: "BMI not available", cls: "bg-slate-100 text-slate-600" }; if (value < 18.5) return { label: "Underweight", cls: "bg-amber-100 text-amber-800" }; if (value < 25) return { label: "Normal weight", cls: "bg-emerald-100 text-emerald-800" }; if (value < 30) return { label: "Overweight", cls: "bg-orange-100 text-orange-800" }; return { label: "Obese", cls: "bg-red-100 text-red-800" }; }
-
-function LargeAction({ href, icon, label }: { href: string; icon: ReactNode; label: string }) { return <Link href={href} className="inline-flex min-h-11 items-center justify-center gap-2 rounded-2xl border border-[#24c1c4]/20 bg-white px-4 py-2.5 text-sm font-bold text-[#0b2d54] shadow-sm transition hover:-translate-y-0.5 hover:border-[#24c1c4]/50 hover:shadow-md focus:outline-none focus-visible:ring-2 focus-visible:ring-[#24c1c4]">{icon}{label}</Link>; }
-function CountPill({ icon, count, label }: { icon: ReactNode; count: number; label: string }) { return <div className="flex min-h-11 items-center gap-2 rounded-2xl border border-[#24c1c4]/15 bg-white/90 px-4 py-2 text-[#0b2d54] shadow-sm">{icon}<span className="text-sm font-extrabold">{count}</span><span className="text-xs font-semibold text-slate-600">{label}</span></div>; }
-
-function VaccinationDetails({ records }: { records: Array<Record<string, any>> }) {
-  if (!records.length) return null;
-  return <div className="mt-3 rounded-2xl bg-[#f5f8fb] p-4 ring-1 ring-[#24c1c4]/10">
-    <div className="flex items-center justify-between gap-3"><div className="flex items-center gap-2"><CheckCircle2 className="h-5 w-5 text-[#24c1c4]" /><p className="text-xs font-extrabold uppercase tracking-wide text-slate-500">Vaccinations</p></div><span className="text-xs font-bold text-slate-400">Saved records</span></div>
-    <div className="mt-3 space-y-2">
-      {records.slice(0, 4).map((record, index) => <div key={record.id ?? `${record.name}-${index}`} className="rounded-xl bg-white px-3 py-2.5 ring-1 ring-slate-100">
-        <div className="flex items-start justify-between gap-3"><p className="min-w-0 text-sm font-extrabold text-[#0b2d54]">{record.name || "Vaccination"}</p>{record.doseNumber != null && <span className="shrink-0 text-[11px] font-bold text-slate-500">Dose {record.doseNumber}</span>}</div>
-        {record.administeredAt && <p className="mt-1 text-xs font-medium text-slate-500">Given {formatDate(record.administeredAt)}</p>}
-        {record.nextDueDate && <p className="mt-0.5 text-xs font-bold text-[#0b2d54]">Next due {formatDate(record.nextDueDate)}</p>}
-      </div>)}
-    </div>
-    {records.length > 4 && <p className="mt-2 text-xs font-bold text-slate-500">+{records.length - 4} more vaccination{records.length - 4 === 1 ? "" : "s"}</p>}
-  </div>;
+function calculateBmi(weightKg: number | null, heightCm: number | null): number | null { if (!weightKg || !heightCm || weightKg <= 0 || heightCm <= 0) return null; return Number((weightKg / Math.pow(heightCm / 100, 2)).toFixed(1)); }
+function getWeightStatus(bmi?: number | null): { text: "(Underweight)" | "(Normal weight)" | "(Obese)" | "(Extreme obese)"; textClass: string; badgeClass: string; activeClass: string; } {
+  if (bmi == null || Number.isNaN(bmi)) return { text: "(Normal weight)", textClass: "text-slate-500", badgeClass: "bg-slate-100 text-slate-600", activeClass: "ring-slate-300" };
+  if (bmi < 18.5) return { text: "(Underweight)", textClass: "text-amber-700", badgeClass: "bg-amber-100 text-amber-800", activeClass: "ring-amber-400" };
+  if (bmi <= 24.9) return { text: "(Normal weight)", textClass: "text-emerald-700", badgeClass: "bg-emerald-100 text-emerald-800", activeClass: "ring-emerald-400" };
+  if (bmi <= 29.9) return { text: "(Obese)", textClass: "text-orange-700", badgeClass: "bg-orange-100 text-orange-800", activeClass: "ring-orange-400" };
+  return { text: "(Extreme obese)", textClass: "text-red-700", badgeClass: "bg-red-100 text-red-800", activeClass: "ring-red-400" };
 }
+function LargeAction({ href, icon, label }: { href: string; icon: ReactNode; label: string }) { return <Link href={href} className="inline-flex min-h-12 items-center justify-center gap-2 rounded-2xl bg-white px-4 py-3 text-sm font-bold text-[#0b2d54] shadow-sm ring-1 ring-slate-200 transition hover:-translate-y-0.5 hover:shadow-md focus:outline-none focus-visible:ring-2 focus-visible:ring-[#24c1c4]">{icon}{label}</Link>; }
+function CountPill({ icon, count, label }: { icon: ReactNode; count: number; label: string }) { return <div className="flex min-h-12 items-center gap-2 rounded-2xl bg-white/90 px-4 py-2.5 text-[#0b2d54] shadow-sm ring-1 ring-slate-100">{icon}<span className="text-base font-extrabold">{count}</span><span className="text-sm font-semibold">{label}</span></div>; }
 
-function WeightBodySizeCard({ weightKg, heightCm, reload, patientId }: { weightKg: number | null | undefined; heightCm: number | null | undefined; reload: () => Promise<void>; patientId?: string }) {
+function WeightBodySizeCard({ weightKg, heightCm, bmi, patientId, reload }: { weightKg: number | null | undefined; heightCm: number | null | undefined; bmi: number | null | undefined; patientId?: string; reload: () => Promise<void> }) {
+  const [editingWeight, setEditingWeight] = useState<number | null>(null);
+  const [saveState, setSaveState] = useState<"idle" | "saving" | "saved" | "error">("idle");
   const canEdit = !patientId;
-  const [value, setValue] = useState<number>(weightKg != null ? Number(weightKg) : 60);
-  const [editing, setEditing] = useState(false);
-  const [saving, setSaving] = useState(false);
-
-  useEffect(() => {
-    if (weightKg != null && Number.isFinite(Number(weightKg))) setValue(Number(weightKg));
-  }, [weightKg]);
-
-  const currentBmi = bmi(value, heightCm != null ? Number(heightCm) : null);
-  const status = bmiStatus(currentBmi);
-  const sliderPercent = Math.min(100, Math.max(0, ((value - 1) / 249) * 100));
-
-  const save = async () => {
-    if (!canEdit || !Number.isFinite(value) || value <= 0 || !heightCm || saving) return;
-    try {
-      setSaving(true);
-      await healthHomeService.updateWeight(value, Number(heightCm));
-      await reload();
-      setEditing(false);
-    } finally {
-      setSaving(false);
-    }
+  const minWeight = 20;
+  const maxWeight = 250;
+  const currentWeight = editingWeight ?? (weightKg != null ? Number(weightKg) : 60);
+  const liveBmi = calculateBmi(currentWeight, heightCm != null ? Number(heightCm) : null) ?? (bmi != null ? Number(bmi) : null);
+  const weightStatus = getWeightStatus(liveBmi);
+  const sliderPercent = ((currentWeight - minWeight) / (maxWeight - minWeight)) * 100;
+  const thresholdPercent = (bmiValue: number) => { if (!heightCm) return null; const thresholdWeight = bmiValue * Math.pow(Number(heightCm) / 100, 2); return Math.max(0, Math.min(100, ((thresholdWeight - minWeight) / (maxWeight - minWeight)) * 100)); };
+  const lowEnd = thresholdPercent(18.5);
+  const normalEnd = thresholdPercent(24.9);
+  const obeseEnd = thresholdPercent(29.9);
+  const trackBackground = lowEnd != null && normalEnd != null && obeseEnd != null ? `linear-gradient(to right, #f59e0b 0%, #f59e0b ${lowEnd}%, #10b981 ${lowEnd}%, #10b981 ${normalEnd}%, #f97316 ${normalEnd}%, #f97316 ${obeseEnd}%, #ef4444 ${obeseEnd}%, #ef4444 100%)` : "linear-gradient(to right, #f59e0b 0%, #f59e0b 33%, #10b981 33%, #10b981 66%, #ef4444 66%, #ef4444 100%)";
+  const persistWeight = async () => {
+    if (!canEdit || editingWeight == null || saveState === "saving") return;
+    if (!heightCm) { setSaveState("error"); return; }
+    try { setSaveState("saving"); await healthHomeService.updateWeight(editingWeight, Number(heightCm)); setSaveState("saved"); await reload(); }
+    catch (error) { console.error("Failed to update weight:", error); setSaveState("error"); }
   };
-
-  return <div className="mt-4 rounded-[24px] border border-[#24c1c4]/15 bg-white p-4 shadow-sm sm:p-5">
-    <div className="flex items-center justify-between gap-3"><div className="flex items-center gap-3"><div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-[#24c1c4]/12 text-[#0b2d54]"><Weight className="h-6 w-6" /></div><div><h3 className="text-base font-extrabold text-[#0b2d54]">Weight &amp; Body Size</h3><p className="text-xs font-medium text-slate-500">Your current body weight</p></div></div><span className={`rounded-full px-2.5 py-1 text-[10px] font-extrabold uppercase ${status.cls}`}>{status.label}</span></div>
-    <div className="mt-4 flex items-center justify-between gap-3"><div><p className="text-3xl font-black text-[#0b2d54]">{value.toFixed(1)} <span className="text-base font-extrabold text-slate-400">kg</span></p><p className="mt-1 text-xs font-bold text-slate-500">BMI {currentBmi ?? "—"}</p></div><span className="text-xs font-bold text-slate-500">{canEdit ? "Adjust weight" : "View only"}</span></div>
-    <div className="mt-4">
-      <input aria-label="Weight slider in kilograms" type="range" min="1" max="250" step="0.1" disabled={!canEdit} value={value} onChange={(e) => { setValue(Number(e.target.value)); setEditing(true); }} className="h-2 w-full cursor-pointer appearance-none rounded-full disabled:cursor-default" style={{ background: `linear-gradient(to right, #24c1c4 0%, #24c1c4 ${sliderPercent}%, #e2e8f0 ${sliderPercent}%, #e2e8f0 100%)` }} />
-      <div className="mt-1 flex justify-between text-[10px] font-bold text-slate-400"><span>1 kg</span><span>250 kg</span></div>
+  const handleWeightChange = (value: string) => { const nextWeight = Number(value); if (!Number.isFinite(nextWeight)) return; setEditingWeight(Number(nextWeight.toFixed(1))); setSaveState("idle"); };
+  const statusMessage = saveState === "saving" ? "Saving your weight…" : saveState === "saved" ? "Weight saved" : saveState === "error" ? "Could not save. Try again." : canEdit ? "Move the slider to update your weight" : "Family health information is view-only";
+  return <div className={`mt-5 rounded-[28px] bg-white p-5 shadow-sm ring-2 ${weightStatus.activeClass} sm:p-6`}>
+    <div className="flex flex-col gap-5">
+      <div className="flex items-start justify-between gap-4"><div className="flex min-w-0 items-center gap-4"><div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-[#0b2d54]/8 text-3xl" aria-hidden="true">⚖️</div><div><h3 className="text-xl font-black text-[#0b2d54]">Weight &amp; Body Size</h3><p className="mt-1 text-sm font-bold text-slate-500">Your current body weight</p></div></div><span className={`shrink-0 rounded-full px-3 py-1.5 text-xs font-black uppercase tracking-wide ${weightStatus.badgeClass}`}>{weightStatus.text.replace(/[()]/g, "")}</span></div>
+      <div className="rounded-3xl bg-slate-50 px-5 py-5 ring-1 ring-slate-100"><div className="flex flex-wrap items-end gap-x-4 gap-y-2"><div><p className="text-4xl font-black leading-none tracking-tight text-[#0b2d54] sm:text-5xl">{currentWeight.toFixed(1)} <span className="text-2xl font-extrabold text-slate-500">kg</span></p></div><div className="pb-0.5 text-lg font-black text-slate-400">BMI</div><div className={`pb-0.5 text-2xl font-black ${weightStatus.textClass}`}>{liveBmi != null ? liveBmi.toFixed(1) : "—"}<span className="ml-2 text-lg">{weightStatus.text}</span></div></div></div>
+      <div className="relative pt-2"><div className="mb-3 flex items-center justify-between text-xs font-black uppercase tracking-wider text-slate-500"><span>LOW</span><span>JUST RIGHT</span><span>HIGH</span></div><div className="relative h-14 overflow-visible rounded-2xl"><div className="absolute inset-x-0 top-1/2 h-12 -translate-y-1/2 rounded-2xl shadow-inner" style={{ background: trackBackground }} aria-hidden="true" /><div className="pointer-events-none absolute top-1/2 z-10 h-[62px] w-[6px] -translate-x-1/2 -translate-y-1/2 rounded-full bg-[#0b2d54] shadow-[0_4px_12px_rgba(11,45,84,0.35)] ring-4 ring-white transition-[left] duration-75" style={{ left: `${Math.max(0, Math.min(100, sliderPercent))}%` }} aria-hidden="true"><span className="absolute -top-3 left-1/2 h-3 w-3 -translate-x-1/2 rounded-full bg-[#0b2d54] ring-2 ring-white" /></div><input type="range" min={minWeight} max={maxWeight} step="0.1" value={currentWeight} disabled={!canEdit || !heightCm} onChange={(event) => handleWeightChange(event.target.value)} onPointerUp={() => void persistWeight()} onKeyUp={(event) => { if (event.key === "ArrowLeft" || event.key === "ArrowRight" || event.key === "Home" || event.key === "End") void persistWeight(); }} onBlur={() => void persistWeight()} aria-label="Weight in kilograms" className="absolute inset-0 z-20 h-full w-full cursor-grab opacity-0 disabled:cursor-not-allowed" /></div><div className="mt-3 flex justify-between text-xs font-bold text-slate-400"><span>{minWeight} kg</span><span>{maxWeight} kg</span></div></div>
+      <p className="text-xl font-black leading-8 text-[#0b2d54] sm:text-2xl">⚖️ Weight &amp; Body Size: {currentWeight.toFixed(1)} kg <span className={weightStatus.textClass}>{weightStatus.text}</span></p>
+      <div className="flex min-h-12 items-center justify-between gap-3 rounded-2xl bg-[#0b2d54]/5 px-4 py-3 text-sm font-bold"><span className={saveState === "error" ? "text-red-700" : saveState === "saved" ? "text-emerald-700" : "text-slate-600"}>{statusMessage}</span>{canEdit && <button type="button" onClick={() => void persistWeight()} disabled={editingWeight == null || saveState === "saving" || !heightCm} className="min-h-11 rounded-xl bg-[#0b2d54] px-4 py-2 font-black text-white shadow-sm transition hover:bg-[#071f3a] disabled:cursor-not-allowed disabled:opacity-40">{saveState === "saving" ? "Saving…" : "Save weight"}</button>}</div>
     </div>
-    <div className="mt-4 flex items-center gap-3 rounded-2xl bg-[#f5f8fb] p-3"><label htmlFor="weight-input" className="text-xs font-extrabold uppercase tracking-wide text-slate-500">Weight</label><input id="weight-input" aria-label="Weight in kilograms" type="number" min="1" max="250" step="0.1" disabled={!canEdit} value={value} onChange={(e) => { const next = Number(e.target.value); if (Number.isFinite(next)) { setValue(Math.min(250, Math.max(1, next))); setEditing(true); } }} className="w-28 bg-transparent text-2xl font-black text-[#0b2d54] outline-none disabled:opacity-100" /><span className="font-extrabold text-slate-400">kg</span></div>
-    {canEdit && editing && <button type="button" onClick={() => void save()} disabled={saving || !heightCm} className="mt-3 min-h-10 rounded-xl bg-[#0b2d54] px-4 py-2 text-xs font-extrabold text-white disabled:opacity-50">{saving ? "Saving…" : "Save weight"}</button>}
   </div>;
 }
 
@@ -78,15 +62,12 @@ export default function HealthHome() {
   const patientId = searchParams.get("patientId") || undefined;
   if (loading) return <ProtectedRoute><main className="min-h-screen bg-[#f5f8fb] p-4 sm:p-8"><div className="mx-auto max-w-5xl space-y-4" aria-busy="true"><div className="h-32 animate-pulse rounded-[28px] bg-white" />{Array.from({ length: 3 }).map((_, i) => <div key={i} className="h-64 animate-pulse rounded-[28px] bg-white" />)}</div></main></ProtectedRoute>;
   if (error || !data) return <ProtectedRoute><main className="min-h-screen bg-[#f5f8fb] p-4 sm:p-8"><div className="mx-auto max-w-xl rounded-[28px] border border-red-200 bg-white p-6"><TriangleAlert className="h-6 w-6 text-red-600" /><h1 className="mt-4 text-xl font-extrabold text-[#0b2d54]">Your health screen could not load</h1><p className="mt-2 text-sm text-slate-500">Your health information has not been changed. Please try again.</p><button type="button" onClick={reload} className="mt-5 min-h-11 rounded-xl bg-[#0b2d54] px-5 text-sm font-extrabold text-white">Try again</button></div></main></ProtectedRoute>;
-
   const firstName = data.patient?.firstName || data.profile?.preferredName || data.profile?.firstName || "there";
   const medications = data.today?.activeMedications ?? [];
   const appointments = data.today?.upcomingAppointments ?? [];
   const activeGoals = (data.goals ?? []).filter((goal) => String(goal.status).toUpperCase() !== "ACHIEVED").length;
   const conditions = data.healthSnapshot?.activeConditions ?? [];
   const allergies = data.healthSnapshot?.allergies ?? [];
-  // IMPORTANT: this is PatientImmunization data returned by Health Home.
-  // Do not read the master Immunization catalogue or MedicalRecord notes here.
   const immunizations = Array.isArray(data.immunizations) ? data.immunizations : (data.healthSnapshot?.immunizations ?? []);
   const measurements = data.healthSnapshot?.latestMeasurements ?? [];
   const watchMeasurements = data.wearables?.latestMeasurements ?? [];
@@ -96,12 +77,11 @@ export default function HealthHome() {
   const bpValue = bloodPressure ? `${display(bloodPressure.value)} ${display(bloodPressure.unit)}` : "—";
   const heartValue = heart ? `${display(heart.value)} ${display(heart.unit)}` : "—";
   const watchConnected = devices.length > 0;
-
   return <ProtectedRoute><main className="min-h-screen bg-[#f5f8fb] text-slate-800"><header className="border-b border-[#24c1c4]/10 bg-white"><div className="mx-auto flex min-h-[68px] max-w-5xl items-center justify-between px-4 sm:px-6"><img src="/logo-navbar.png" alt="Sympto" className="h-10 w-auto" /><span className="rounded-full bg-[#24c1c4]/10 px-3 py-1.5 text-xs font-extrabold text-[#0b2d54]">My Health</span></div></header>
     <div className="mx-auto max-w-5xl space-y-4 px-4 py-5 sm:px-6 sm:py-7">
       <section className="relative overflow-hidden rounded-[28px] bg-gradient-to-br from-[#0b2d54] to-[#24c1c4] p-6 text-white shadow-[0_16px_40px_rgba(11,45,84,0.14)] sm:p-7"><p className="text-xs font-extrabold uppercase tracking-[0.16em] text-white/75">My Health</p><h1 className="mt-2 text-2xl font-black sm:text-3xl">Hello, {firstName} 👋</h1><p className="mt-2 max-w-2xl text-sm leading-6 text-white/85">Your important health information is organised for you. Just choose what you need.</p></section>
       <section className="overflow-hidden rounded-[28px] border border-[#24c1c4]/25 bg-white shadow-sm"><div className="p-5 sm:p-6"><div className="flex items-start justify-between gap-4"><div><div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-[#24c1c4]/12">🟢</div><h2 className="mt-4 text-2xl font-black text-[#0b2d54] sm:text-3xl">What do I do today?</h2><p className="mt-1 text-sm font-medium text-slate-600">Your medicines, clinic visits and care plan are here.</p></div><Link href="/today" className="flex h-11 w-11 items-center justify-center rounded-full bg-[#24c1c4]/10 text-[#0b2d54]"><ArrowRight className="h-5 w-5" /></Link></div><div className="mt-5 grid gap-2.5 sm:grid-cols-3"><LargeAction href="/medications" icon={<Pill className="h-5 w-5" />} label={`${medications.length} medicine${medications.length === 1 ? "" : "s"}`} /><LargeAction href="/appointments" icon={<CalendarDays className="h-5 w-5" />} label={`${appointments.length} clinic visit${appointments.length === 1 ? "" : "s"}`} /><LargeAction href="/health-goals" icon={<CheckCircle2 className="h-5 w-5" />} label={`${activeGoals} care goal${activeGoals === 1 ? "" : "s"}`} /></div><div className="mt-5 border-t border-[#24c1c4]/15 pt-4"><div className="flex items-center justify-between rounded-2xl bg-[#0b2d54] p-4 text-white"><div className="flex items-center gap-3"><Watch className="h-6 w-6" /><div><p className="text-base font-black">⌚ Link Watch</p><p className="text-xs text-white/70">{watchConnected ? "Your watch is connected" : "Bluetooth health watch"}</p></div></div><span className="rounded-xl bg-white/10 px-3 py-2 text-sm font-extrabold">{watchConnected ? "Connected" : "Not linked"}</span></div></div></div></section>
-      <section className="overflow-hidden rounded-[28px] border border-[#24c1c4]/25 bg-white shadow-sm"><div className="p-5 sm:p-6"><Link href="/health-passport" className="block"><div className="flex items-start justify-between gap-4"><div><div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-[#24c1c4]/12">🔴</div><h2 className="mt-4 text-2xl font-black text-[#0b2d54] sm:text-3xl">My Clinic Card</h2><p className="mt-1 text-sm font-medium text-slate-600">Show this information when you visit a nurse or doctor.</p></div><span className="flex h-11 w-11 items-center justify-center rounded-full bg-[#24c1c4]/10"><ArrowRight className="h-5 w-5" /></span></div><div className="mt-5 grid gap-3 sm:grid-cols-2"><div className="rounded-2xl bg-[#f5f8fb] p-4"><div className="flex items-center gap-2 text-xs font-bold text-slate-500"><HeartPulse className="h-5 w-5 text-[#24c1c4]" />BLOOD PRESSURE</div><p className="mt-2 text-3xl font-black text-[#0b2d54]">{bpValue}</p></div><div className="rounded-2xl bg-[#f5f8fb] p-4"><div className="flex items-center gap-2 text-xs font-bold text-slate-500"><Watch className="h-5 w-5 text-[#24c1c4]" />❤️ WATCH HEART</div><p className="mt-2 text-3xl font-black text-[#0b2d54]">{heartValue}</p></div></div><div className="mt-3 grid gap-2.5 sm:grid-cols-3"><CountPill icon={<ShieldCheck className="h-5 w-5 text-[#24c1c4]" />} count={conditions.length} label="conditions" /><CountPill icon={<TriangleAlert className="h-5 w-5 text-[#24c1c4]" />} count={allergies.length} label="allergies" /><CountPill icon={<CheckCircle2 className="h-5 w-5 text-[#24c1c4]" />} count={immunizations.length} label="vaccines" /></div><VaccinationDetails records={immunizations} /></Link><WeightBodySizeCard weightKg={data.healthSnapshot?.weightKg} heightCm={data.healthSnapshot?.heightCm} patientId={patientId} reload={reload} /></div></section>
+      <section className="overflow-hidden rounded-[28px] border border-[#24c1c4]/25 bg-white shadow-sm"><div className="p-5 sm:p-6"><Link href="/health-passport" className="block"><div className="flex items-start justify-between gap-4"><div><div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-[#24c1c4]/12">🔴</div><h2 className="mt-4 text-2xl font-black text-[#0b2d54] sm:text-3xl">My Clinic Card</h2><p className="mt-1 text-sm font-medium text-slate-600">Show this information when you visit a nurse or doctor.</p></div><span className="flex h-11 w-11 items-center justify-center rounded-full bg-[#24c1c4]/10"><ArrowRight className="h-5 w-5" /></span></div><div className="mt-5 grid gap-3 sm:grid-cols-2"><div className="rounded-2xl bg-[#f5f8fb] p-4"><div className="flex items-center gap-2 text-xs font-bold text-slate-500"><HeartPulse className="h-5 w-5 text-[#24c1c4]" />BLOOD PRESSURE</div><p className="mt-2 text-3xl font-black text-[#0b2d54]">{bpValue}</p></div><div className="rounded-2xl bg-[#f5f8fb] p-4"><div className="flex items-center gap-2 text-xs font-bold text-slate-500"><Watch className="h-5 w-5 text-[#24c1c4]" />❤️ WATCH HEART</div><p className="mt-2 text-3xl font-black text-[#0b2d54]">{heartValue}</p></div></div><div className="mt-3 grid gap-2.5 sm:grid-cols-3"><CountPill icon={<ShieldCheck className="h-5 w-5 text-[#24c1c4]" />} count={conditions.length} label="conditions" /><CountPill icon={<TriangleAlert className="h-5 w-5 text-[#24c1c4]" />} count={allergies.length} label="allergies" /><CountPill icon={<CheckCircle2 className="h-5 w-5 text-[#24c1c4]" />} count={immunizations.length} label="vaccines" /></div></Link><WeightBodySizeCard weightKg={data.healthSnapshot?.weightKg} heightCm={data.healthSnapshot?.heightCm} bmi={data.healthSnapshot?.bmi} patientId={patientId} reload={reload} /></div></section>
       <section className="overflow-hidden rounded-[28px] border border-[#24c1c4]/25 bg-white shadow-sm"><Link href="/health-journal" className="block p-5 sm:p-6"><div className="flex items-start justify-between gap-4"><div><div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-[#24c1c4]/12">🔵</div><h2 className="mt-4 text-2xl font-black text-[#0b2d54] sm:text-3xl">My History &amp; Papers</h2><p className="mt-1 text-sm font-medium text-slate-600">One simple folder for your health story and important papers.</p></div><span className="flex h-11 w-11 items-center justify-center rounded-full bg-[#24c1c4]/10"><ArrowRight className="h-5 w-5" /></span></div><div className="mt-5 rounded-2xl bg-[#f5f8fb] p-4"><div className="flex items-center gap-4"><FolderOpen className="h-7 w-7 text-[#24c1c4]" /><div><p className="text-base font-black text-[#0b2d54]">📁 Open my health folder</p><p className="mt-1 text-xs text-slate-500">Episodes · Encounters · Lab results · Imaging · Documents</p></div></div></div></Link></section>
     </div></main></ProtectedRoute>;
 }
