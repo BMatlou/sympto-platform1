@@ -5,7 +5,7 @@ export interface HealthHomeResponse {
   profile?: { firstName?: string | null; lastName?: string | null; preferredName?: string | null; dateOfBirth?: string | null; gender?: string | null; profileImageUrl?: string | null } | null;
   patient: { id: string; patientNumber?: string | null; name?: string; firstName?: string; lastName?: string; profileImageUrl?: string | null; heightCm?: number | null; weightKg?: number | null };
   healthPassport?: Record<string, unknown> | null;
-  healthSnapshot: { activeConditions: Array<Record<string, any>>; allergies: Array<Record<string, any>>; immunizations: Array<Record<string, any>>; bloodType?: string | null; rhesusFactor?: string | null; baseline?: Record<string, unknown> | null; weightKg?: number | null; heightCm?: number | null; bmi?: number | null; bmiCategory?: string | null; latestMeasurements: Array<Record<string, any>>; connectedDevices: Array<Record<string, any>> };
+  healthSnapshot: { activeAllergies?: Array<Record<string, any>>; activeConditions: Array<Record<string, any>>; allergies: Array<Record<string, any>>; immunizations: Array<Record<string, any>>; bloodType?: string | null; rhesusFactor?: string | null; baseline?: Record<string, unknown> | null; weightKg?: number | null; heightCm?: number | null; bmi?: number | null; bmiCategory?: string | null; latestMeasurements: Array<Record<string, any>>; connectedDevices: Array<Record<string, any>> };
   today: { upcomingAppointments: Array<Record<string, any>>; activeMedications: Array<Record<string, any>>; activeMedicationCount?: number; activeGoalCount?: number; notifications?: Array<Record<string, any>> };
   medications?: Array<Record<string, any>>;
   appointments?: Array<Record<string, any>>;
