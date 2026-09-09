@@ -84,6 +84,7 @@ function CountPill({ icon, count, label }: { icon: ReactNode; count: number; lab
 
 function WeightBodySizeCard({ weightKg, heightCm, bmi, patientId, reload }: { weightKg: number | null | undefined; heightCm: number | null | undefined; bmi: number | null | undefined; patientId?: string; reload: () => Promise<void>; }) {
   const [editingWeight, setEditingWeight] = useState<number | null>(null);
+  const [editingWeightInput, setEditingWeightInput] = useState(false);
   const [saveState, setSaveState] = useState<"idle" | "saving" | "saved" | "error">("idle");
   const canEdit = !patientId;
   const minWeight = 20;
@@ -113,6 +114,7 @@ function WeightBodySizeCard({ weightKg, heightCm, bmi, patientId, reload }: { we
       setSaveState("saving");
       await healthHomeService.updateWeight(editingWeight, Number(heightCm));
       setSaveState("saved");
+      setEditingWeightInput(false);
       await reload();
     } catch (error) {
       console.error("Failed to update weight:", error);
@@ -123,11 +125,17 @@ function WeightBodySizeCard({ weightKg, heightCm, bmi, patientId, reload }: { we
   const handleWeightChange = (value: string) => {
     const nextWeight = Number(value);
     if (!Number.isFinite(nextWeight)) return;
-    setEditingWeight(Number(nextWeight.toFixed(1)));
+    const boundedWeight = Math.max(minWeight, Math.min(maxWeight, nextWeight));
+    setEditingWeight(Number(boundedWeight.toFixed(1)));
     setSaveState("idle");
   };
 
-  const statusMessage = saveState === "saving" ? "Saving your weight…" : saveState === "saved" ? "Weight saved" : saveState === "error" ? "Could not save. Try again." : canEdit ? "Move the slider, then click Save weight" : "Family health information is view-only";
+  const handleWeightInputChange = (value: string) => {
+    if (value.trim() === "") return;
+    handleWeightChange(value);
+  };
+
+  const statusMessage = saveState === "saving" ? "Saving your weight…" : saveState === "saved" ? "Weight saved" : saveState === "error" ? "Could not save. Try again." : canEdit ? "Click your weight to type it, or move the slider" : "Family health information is view-only";
 
   return (
     <div className={`mt-4 rounded-[24px] border border-[#24c1c4]/15 bg-white p-4 shadow-sm ring-2 ${weightStatus.activeClass} sm:p-5`}>
@@ -145,11 +153,41 @@ function WeightBodySizeCard({ weightKg, heightCm, bmi, patientId, reload }: { we
           <span className={`shrink-0 rounded-full px-2.5 py-1 text-[10px] font-extrabold uppercase tracking-wide ${weightStatus.badgeClass}`}>{weightStatus.text.replace(/[()]/g, "")}</span>
         </div>
 
-        <div className="flex items-end gap-3 rounded-2xl bg-[#f5f8fb] px-4 py-3.5 ring-1 ring-[#24c1c4]/10">
-          <p className="text-3xl font-black leading-none tracking-tight text-[#0b2d54] sm:text-4xl">{currentWeight.toFixed(1)} <span className="text-lg font-extrabold text-slate-400">kg</span></p>
-          <div className="pb-0.5 text-xs font-extrabold uppercase tracking-wide text-slate-400">BMI</div>
-          <div className={`pb-0.5 text-base font-black ${weightStatus.textClass}`}>{liveBmi != null ? liveBmi.toFixed(1) : "—"}<span className="ml-1 font-semibold">{weightStatus.text}</span></div>
-        </div>
+        {editingWeightInput ? (
+          <div className="rounded-2xl bg-[#f5f8fb] px-4 py-3.5 ring-1 ring-[#24c1c4]/20">
+            <label htmlFor="health-home-weight" className="block text-xs font-extrabold uppercase tracking-wide text-slate-500">Enter your weight</label>
+            <div className="mt-2 flex items-center gap-3">
+              <input
+                id="health-home-weight"
+                type="number"
+                inputMode="decimal"
+                min={minWeight}
+                max={maxWeight}
+                step="0.1"
+                value={currentWeight}
+                onChange={(event) => handleWeightInputChange(event.target.value)}
+                onBlur={() => setEditingWeightInput(false)}
+                autoFocus
+                className="h-14 w-full rounded-xl border-2 border-[#24c1c4] bg-white px-4 text-2xl font-black text-[#0b2d54] outline-none focus:ring-2 focus:ring-[#24c1c4]/30"
+              />
+              <span className="text-lg font-extrabold text-slate-400">kg</span>
+            </div>
+            <p className="mt-2 text-xs font-medium text-slate-500">Your BMI and slider update as you type.</p>
+          </div>
+        ) : (
+          <button
+            type="button"
+            onClick={() => canEdit && setEditingWeightInput(true)}
+            disabled={!canEdit || !heightCm}
+            className="flex w-full items-end gap-3 rounded-2xl bg-[#f5f8fb] px-4 py-3.5 text-left ring-1 ring-[#24c1c4]/10 transition hover:ring-[#24c1c4]/40 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#24c1c4] disabled:cursor-not-allowed"
+            aria-label="Click to enter your weight"
+          >
+            <p className="text-3xl font-black leading-none tracking-tight text-[#0b2d54] sm:text-4xl">{currentWeight.toFixed(1)} <span className="text-lg font-extrabold text-slate-400">kg</span></p>
+            <div className="pb-0.5 text-xs font-extrabold uppercase tracking-wide text-slate-400">BMI</div>
+            <div className={`pb-0.5 text-base font-black ${weightStatus.textClass}`}>{liveBmi != null ? liveBmi.toFixed(1) : "—"}<span className="ml-1 font-semibold">{weightStatus.text}</span></div>
+            {canEdit && <span className="ml-auto pb-0.5 text-xs font-extrabold text-[#24c1c4]">Edit</span>}
+          </button>
+        )}
 
         <div className="relative pt-1">
           <div className="mb-2 flex items-center justify-between text-[10px] font-extrabold uppercase tracking-[0.12em] text-slate-500"><span>Low</span><span>Just right</span><span>High</span></div>
