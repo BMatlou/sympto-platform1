@@ -5,6 +5,7 @@ import { DatabaseModule } from './database/database.module';
 import { AuthModule } from './modules/auth/auth.module';
 import { UsersModule } from './modules/users/users.module';
 import { HealthModule } from './modules/health/health.module';
+import { HealthHomeModule } from './modules/health-home/health-home.module';
 import { AdminModule } from './modules/admin/admin.module';
 import { PatientsModule } from './modules/patients/patients.module';
 import { FamilyModule } from './modules/family/family.module';
@@ -181,17 +182,14 @@ import { RiskAssessmentResultsModule } from './modules/risk-assessment-results/r
 import { PatientBaselinesModule } from './modules/patient-baselines/patient-baselines.module';
 import { OnboardingModule } from './modules/onboarding/onboarding.module';
 
-
 @Module({
   imports: [
-    ConfigModule.forRoot({
-      isGlobal: true,
-    }),
-
+    ConfigModule.forRoot({ isGlobal: true }),
     DatabaseModule,
     AuthModule,
     UsersModule,
     HealthModule,
+    HealthHomeModule,
     AdminModule,
     PatientsModule,
     FamilyModule,
@@ -367,7 +365,6 @@ import { OnboardingModule } from './modules/onboarding/onboarding.module';
     RiskAssessmentResultsModule,
     PatientBaselinesModule,
     OnboardingModule,
-    
   ],
 })
 export class AppModule {}
