@@ -38,50 +38,61 @@ export interface UpdateWeightResponse { weightKg: number; heightCm: number; bmi:
 
 class HealthHomeService {
   async getHealthHome(patientId?: string): Promise<HealthHomeResponse> {
-    const [healthHomeResponse, onboardingResponse] = await Promise.all([
-      api.get<{ success: boolean; data: HealthHomeResponse }>('/health-home', { params: patientId ? { patientId } : undefined }),
-      api.get<{ success: boolean; data: any }>('/onboarding/dashboard'),
-    ]);
-
+    const healthHomeResponse = await api.get<{ success: boolean; data: HealthHomeResponse }>('/health-home', { params: patientId ? { patientId } : undefined });
     const healthHome = healthHomeResponse.data.data;
-    const canonical = onboardingResponse.data.data;
 
-    // The onboarding dashboard is the original canonical source for the patient's
-    // saved profile/passport records. Keep using it for those fields while Health
-    // Home supplies the newer aggregated clinical/dashboard data. This prevents
-    // the Health Home refactor from dropping data that already worked elsewhere.
-    const merged: HealthHomeResponse = {
+    // Before the Health Home refactor, the dashboard loaded the patient's
+    // canonical saved profile/passport data from /onboarding/dashboard. Keep
+    // that source for the owner patient so the three-card refactor does not
+    // lose data that was already working, while Health Home remains the source
+    // for the newer aggregated dashboard/clinical data.
+    let canonical: any = null;
+    if (!patientId || patientId === healthHome.patient?.id) {
+      try {
+        const onboardingResponse = await api.get<{ success: boolean; data: any }>('/onboarding/dashboard');
+        canonical = onboardingResponse.data.data;
+      } catch (error) {
+        console.warn('Canonical onboarding dashboard unavailable; using Health Home data.', error);
+      }
+    }
+
+    if (!canonical || canonical.patient?.id !== healthHome.patient?.id) {
+      return {
+        ...healthHome,
+        wearables: healthHome.wearables ?? {
+          devices: healthHome.healthSnapshot.connectedDevices,
+          latestMeasurements: healthHome.healthSnapshot.latestMeasurements.map((m: any, index) => ({ id: `${m.type}-${index}`, type: m.type, value: m.value, unit: m.unit, measuredAt: m.measuredAt, source: m.source })),
+        },
+      };
+    }
+
+    return {
       ...healthHome,
-      profile: canonical?.profile ?? healthHome.profile,
-      patient: { ...healthHome.patient, ...(canonical?.patient ?? {}) },
-      healthPassport: canonical?.healthPassport ?? healthHome.healthPassport,
-      emergencyContacts: canonical?.emergencyContacts ?? healthHome.emergencyContacts,
-      allergies: canonical?.allergies ?? healthHome.allergies,
-      conditions: canonical?.conditions ?? healthHome.conditions,
-      medications: canonical?.medications ?? healthHome.medications,
-      immunizations: canonical?.immunizations ?? healthHome.immunizations,
-      healthGoals: canonical?.healthGoals ?? healthHome.healthGoals,
-      healthJournalSettings: canonical?.healthJournalSettings ?? healthHome.healthJournalSettings,
+      profile: canonical.profile ?? healthHome.profile,
+      patient: { ...healthHome.patient, ...(canonical.patient ?? {}) },
+      healthPassport: canonical.healthPassport ?? healthHome.healthPassport,
+      emergencyContacts: canonical.emergencyContacts ?? healthHome.emergencyContacts,
+      allergies: canonical.allergies ?? healthHome.allergies,
+      conditions: canonical.conditions ?? healthHome.conditions,
+      medications: canonical.medications ?? healthHome.medications,
+      immunizations: canonical.immunizations ?? healthHome.immunizations,
+      healthGoals: canonical.healthGoals ?? healthHome.healthGoals,
       healthSnapshot: {
         ...healthHome.healthSnapshot,
-        activeAllergies: canonical?.allergies ?? healthHome.healthSnapshot.activeAllergies,
-        activeConditions: canonical?.conditions ?? healthHome.healthSnapshot.activeConditions,
-        allergies: canonical?.allergies ?? healthHome.healthSnapshot.allergies,
-        immunizations: canonical?.immunizations ?? healthHome.healthSnapshot.immunizations,
-        bloodType: canonical?.healthPassport?.bloodType ?? healthHome.healthSnapshot.bloodType,
-        rhesusFactor: canonical?.healthPassport?.rhesusFactor ?? healthHome.healthSnapshot.rhesusFactor,
+        activeAllergies: canonical.allergies ?? healthHome.healthSnapshot.activeAllergies,
+        activeConditions: canonical.conditions ?? healthHome.healthSnapshot.activeConditions,
+        allergies: canonical.allergies ?? healthHome.healthSnapshot.allergies,
+        immunizations: canonical.immunizations ?? healthHome.healthSnapshot.immunizations,
+        bloodType: canonical.healthPassport?.bloodType ?? healthHome.healthSnapshot.bloodType,
+        rhesusFactor: canonical.healthPassport?.rhesusFactor ?? healthHome.healthSnapshot.rhesusFactor,
       },
       today: {
         ...healthHome.today,
-        activeMedications: canonical?.medications ?? healthHome.today.activeMedications,
+        activeMedications: canonical.medications ?? healthHome.today.activeMedications,
       },
-    };
-
-    return {
-      ...merged,
-      wearables: merged.wearables ?? {
-        devices: merged.healthSnapshot.connectedDevices,
-        latestMeasurements: merged.healthSnapshot.latestMeasurements.map((m: any, index) => ({ id: `${m.type}-${index}`, type: m.type, value: m.value, unit: m.unit, measuredAt: m.measuredAt, source: m.source })),
+      wearables: healthHome.wearables ?? {
+        devices: healthHome.healthSnapshot.connectedDevices,
+        latestMeasurements: healthHome.healthSnapshot.latestMeasurements.map((m: any, index) => ({ id: `${m.type}-${index}`, type: m.type, value: m.value, unit: m.unit, measuredAt: m.measuredAt, source: m.source })),
       },
     };
   }
