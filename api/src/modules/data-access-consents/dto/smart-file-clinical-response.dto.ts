@@ -1,0 +1,30 @@
+export type SmartFileClinicalResponse = {
+  patient: {
+    id: string;
+    patientNumber: string | null;
+    firstName: string;
+    middleName: string | null;
+    lastName: string;
+    preferredName: string | null;
+    dateOfBirth: Date | null;
+    gender: string | null;
+  };
+  healthPassport: unknown;
+  conditions: unknown[];
+  allergies: unknown[];
+  immunisations: unknown[];
+  medications: unknown[];
+  prescriptions: unknown[];
+  encounters: unknown[];
+  episodes: unknown[];
+  vitals: unknown[];
+  symptoms: unknown[];
+  diagnoses: unknown[];
+  procedures: unknown[];
+  labResults: unknown[];
+  imaging: unknown[];
+  carePlans: unknown[];
+  referrals: unknown[];
+  clinicalDocuments: unknown[];
+  generatedAt: Date;
+};
