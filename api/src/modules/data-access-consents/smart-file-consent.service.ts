@@ -27,12 +27,7 @@ export class SmartFileConsentService {
         shortCode: credentials.shortCode,
         expiresAt: this.minutesFromNow(SHARE_WINDOW_MINUTES),
       },
-      select: {
-        id: true,
-        qrToken: true,
-        shortCode: true,
-        expiresAt: true,
-      },
+      select: { id: true, qrToken: true, shortCode: true, expiresAt: true },
     });
   }
 
@@ -47,12 +42,7 @@ export class SmartFileConsentService {
         shortCode: credentials.shortCode,
         expiresAt: this.minutesFromNow(SHARE_WINDOW_MINUTES),
       },
-      select: {
-        id: true,
-        qrToken: true,
-        shortCode: true,
-        expiresAt: true,
-      },
+      select: { id: true, qrToken: true, shortCode: true, expiresAt: true },
     });
   }
 
@@ -186,9 +176,7 @@ export class SmartFileConsentService {
     }
 
     const session = await this.prisma.smartFileShareSession.findFirst({
-      where: isQrToken
-        ? { qrToken: normalized }
-        : { shortCode: normalized },
+      where: isQrToken ? { qrToken: normalized } : { shortCode: normalized },
     });
 
     if (!session) {
@@ -196,18 +184,13 @@ export class SmartFileConsentService {
     }
 
     if (session.expiresAt <= new Date()) {
-      await this.prisma.smartFileShareSession.delete({
-        where: { id: session.id },
-      });
+      await this.prisma.smartFileShareSession.delete({ where: { id: session.id } });
       throw new BadRequestException('Smart File share session has expired.');
     }
 
     return this.prisma.$transaction(async (tx) => {
       const deleted = await tx.smartFileShareSession.deleteMany({
-        where: {
-          id: session.id,
-          expiresAt: { gt: new Date() },
-        },
+        where: { id: session.id, expiresAt: { gt: new Date() } },
       });
 
       if (deleted.count !== 1) {
@@ -234,25 +217,8 @@ export class SmartFileConsentService {
     canViewInsurance: boolean;
     canViewInvoices: boolean;
   }) {
-    const existing = await this.prisma.dataAccessConsent.findFirst({
-      where: {
-        patientId: data.patientId,
-        grantedToUserId: data.grantedToUserId,
-      },
-      orderBy: { grantedAt: 'desc' },
-    });
-
-    if (existing) {
-      return this.prisma.dataAccessConsent.update({
-        where: { id: existing.id },
-        data: {
-          ...data,
-          revokedAt: null,
-          grantedAt: new Date(),
-        },
-      });
-    }
-
+    // Create a new consent record for every explicit share. This prevents a
+    // clinical or pharmacy share from overwriting an unrelated financial consent.
     return this.prisma.dataAccessConsent.create({ data });
   }
 
@@ -263,34 +229,21 @@ export class SmartFileConsentService {
       where: {
         patientId,
         status: 'ACTIVE',
-        OR: [
-          { expiresAt: null },
-          { expiresAt: { gt: now } },
-        ],
+        OR: [{ expiresAt: null }, { expiresAt: { gt: now } }],
       },
       orderBy: { issuedAt: 'desc' },
       include: {
         items: {
           include: {
             medication: {
-              select: {
-                id: true,
-                name: true,
-                genericName: true,
-                brandName: true,
-              },
+              select: { id: true, name: true, genericName: true, brandName: true },
             },
           },
         },
         practitioner: {
           select: {
             registrationNumber: true,
-            person: {
-              select: {
-                firstName: true,
-                lastName: true,
-              },
-            },
+            person: { select: { firstName: true, lastName: true } },
           },
         },
       },
@@ -314,7 +267,7 @@ export class SmartFileConsentService {
         frequency: item.frequency,
         route: item.route,
         durationDays: item.durationDays,
-        quantity: item.quantity,
+        quantity: item.quantity?.toString() ?? null,
         refills: item.refills,
         instructions: item.instructions,
       })),
@@ -327,15 +280,11 @@ export class SmartFileConsentService {
       const shortCode = this.generateShortCode(prefix);
 
       const existing = await this.prisma.smartFileShareSession.findFirst({
-        where: {
-          OR: [{ qrToken }, { shortCode }],
-        },
+        where: { OR: [{ qrToken }, { shortCode }] },
         select: { id: true },
       });
 
-      if (!existing) {
-        return { qrToken, shortCode };
-      }
+      if (!existing) return { qrToken, shortCode };
     }
   }
 
