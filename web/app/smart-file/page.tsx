@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { ArrowLeft, Check, Clock3, Copy, Loader2, Pill, QrCode, RefreshCw, ShieldCheck, Stethoscope } from "lucide-react";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import ProtectedRoute from "@/components/auth/protected-route";
 import { api } from "@/lib/api";
 
@@ -21,17 +21,18 @@ function formatTime(ms: number) {
 
 export default function SmartFilePage() {
   const [share, setShare] = useState<Share | null>(null);
-  const [kind, setKind] = useState<ShareKind>("clinical");
+  const [kind, setKind] = useState<ShareKind | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [copied, setCopied] = useState(false);
   const [now, setNow] = useState(Date.now());
 
-  const createShare = useCallback(async (nextKind: ShareKind) => {
+  const createShare = async (nextKind: ShareKind) => {
     setLoading(true);
     setError("");
     setCopied(false);
     setKind(nextKind);
+    setShare(null);
     try {
       const response = await api.post(nextKind === "clinical" ? "/smart-file/share" : "/smart-file/prescription-share");
       const nextShare = unwrap<Share>(response.data);
@@ -44,11 +45,7 @@ export default function SmartFilePage() {
     } finally {
       setLoading(false);
     }
-  }, []);
-
-  useEffect(() => {
-    void createShare("clinical");
-  }, [createShare]);
+  };
 
   useEffect(() => {
     if (!share) return;
@@ -100,31 +97,37 @@ export default function SmartFilePage() {
                   </div>
                   <h1 className="mt-2 text-2xl font-black sm:text-3xl">Share Smart File</h1>
                   <p className="mt-2 text-sm leading-6 text-white/85">
-                    Show this temporary QR code or code to the healthcare professional you intend to share with.
+                    First choose who you want to share with. A temporary QR code and code will only be created after you make your choice.
                   </p>
                 </div>
               </div>
             </header>
 
             <div className="p-4 sm:p-7">
-              <div className="grid grid-cols-2 gap-3" aria-label="Share with">
+              <div className="mb-2">
+                <p className="text-[10px] font-black uppercase tracking-[0.16em] text-slate-400">Step 1</p>
+                <h2 className="mt-1 text-xl font-black text-[#0b2d54]">Who are you sharing with?</h2>
+                <p className="mt-1 text-sm font-semibold text-slate-500">Choose the access type before Sympto creates your temporary share.</p>
+              </div>
+
+              <div className="grid gap-3 sm:grid-cols-2" aria-label="Choose Smart File sharing scope">
                 <button
                   type="button"
                   onClick={() => void createShare("clinical")}
                   disabled={loading}
-                  className={`min-h-16 rounded-2xl border px-4 py-3 text-left transition focus:outline-none focus-visible:ring-2 focus-visible:ring-[#24c1c4] ${isClinical ? "border-[#24c1c4] bg-[#24c1c4]/8 ring-1 ring-[#24c1c4]/30" : "border-slate-200 bg-white hover:border-[#24c1c4]/50"}`}
+                  className={`min-h-28 rounded-2xl border px-5 py-4 text-left transition focus:outline-none focus-visible:ring-2 focus-visible:ring-[#24c1c4] ${isClinical ? "border-[#24c1c4] bg-[#24c1c4]/8 ring-1 ring-[#24c1c4]/30" : "border-slate-200 bg-white hover:border-[#24c1c4]/50 hover:bg-[#24c1c4]/5"}`}
                 >
-                  <span className="flex items-center gap-2 text-sm font-black text-[#0b2d54]"><Stethoscope className="h-5 w-5" /> Clinic / Doctor</span>
-                  <span className="mt-1 block text-[11px] font-semibold text-slate-500">Full clinical Smart File</span>
+                  <span className="flex items-center gap-3 text-base font-black text-[#0b2d54]"><Stethoscope className="h-6 w-6" /> Clinic / Doctor</span>
+                  <span className="mt-2 block text-xs font-semibold leading-5 text-slate-500">Share your clinical Smart File, including your Health Passport and authorised clinical history.</span>
                 </button>
                 <button
                   type="button"
                   onClick={() => void createShare("prescription")}
                   disabled={loading}
-                  className={`min-h-16 rounded-2xl border px-4 py-3 text-left transition focus:outline-none focus-visible:ring-2 focus-visible:ring-[#24c1c4] ${!isClinical ? "border-[#24c1c4] bg-[#24c1c4]/8 ring-1 ring-[#24c1c4]/30" : "border-slate-200 bg-white hover:border-[#24c1c4]/50"}`}
+                  className={`min-h-28 rounded-2xl border px-5 py-4 text-left transition focus:outline-none focus-visible:ring-2 focus-visible:ring-[#24c1c4] ${kind === "prescription" ? "border-[#24c1c4] bg-[#24c1c4]/8 ring-1 ring-[#24c1c4]/30" : "border-slate-200 bg-white hover:border-[#24c1c4]/50 hover:bg-[#24c1c4]/5"}`}
                 >
-                  <span className="flex items-center gap-2 text-sm font-black text-[#0b2d54]"><Pill className="h-5 w-5" /> Pharmacy</span>
-                  <span className="mt-1 block text-[11px] font-semibold text-slate-500">Prescriptions only</span>
+                  <span className="flex items-center gap-3 text-base font-black text-[#0b2d54]"><Pill className="h-6 w-6" /> Pharmacy</span>
+                  <span className="mt-2 block text-xs font-semibold leading-5 text-slate-500">Share prescription and medication information needed by the pharmacy only.</span>
                 </button>
               </div>
 
@@ -134,27 +137,19 @@ export default function SmartFilePage() {
                 </div>
               )}
 
-              {loading && !share ? (
+              {loading && (
                 <div className="mt-6 rounded-3xl border border-slate-200 bg-slate-50 p-10 text-center">
                   <Loader2 className="mx-auto h-8 w-8 animate-spin text-[#24c1c4]" />
-                  <p className="mt-3 text-sm font-bold text-[#0b2d54]">Creating your temporary share…</p>
+                  <p className="mt-3 text-sm font-bold text-[#0b2d54]">Creating your {scopeTitle.toLowerCase()} sharing session…</p>
                 </div>
-              ) : expired || !share ? (
-                <div className="mt-6 rounded-3xl border border-dashed border-slate-300 bg-slate-50 p-8 text-center">
-                  <Clock3 className="mx-auto h-10 w-10 text-slate-300" />
-                  <h2 className="mt-4 text-lg font-black text-[#0b2d54]">{expired ? "This share has expired" : "Create a temporary share"}</h2>
-                  <p className="mx-auto mt-2 max-w-md text-sm leading-6 text-slate-500">Generate a fresh one-time QR code and six-digit code for {scopeTitle.toLowerCase()} access.</p>
-                  <button type="button" onClick={() => void createShare(kind)} disabled={loading} className="mt-5 inline-flex min-h-12 items-center justify-center gap-2 rounded-2xl bg-[#0b2d54] px-6 py-3 text-sm font-black text-white shadow-sm transition hover:bg-[#071f3a] disabled:opacity-60">
-                    <RefreshCw className="h-4 w-4" />
-                    {loading ? "Creating…" : "Generate new share"}
-                  </button>
-                </div>
-              ) : (
+              )}
+
+              {!loading && share && !expired && (
                 <div className="mt-6 space-y-5">
                   <section className="rounded-[28px] border border-slate-200 bg-slate-50 p-4 text-center sm:p-6">
                     <div className="flex items-center justify-between gap-3 text-left">
                       <div>
-                        <p className="text-[10px] font-black uppercase tracking-[0.16em] text-slate-400">QR code</p>
+                        <p className="text-[10px] font-black uppercase tracking-[0.16em] text-slate-400">Step 2 · QR code</p>
                         <h2 className="mt-1 text-lg font-black text-[#0b2d54]">{scopeTitle} access</h2>
                       </div>
                       <span className="rounded-full bg-emerald-100 px-3 py-1.5 text-[10px] font-black uppercase tracking-wide text-emerald-800">Temporary</span>
@@ -166,7 +161,7 @@ export default function SmartFilePage() {
                   </section>
 
                   <section className="rounded-[28px] border border-[#24c1c4]/25 bg-[#24c1c4]/5 p-5 text-center sm:p-6">
-                    <p className="text-[10px] font-black uppercase tracking-[0.16em] text-[#0b2d54]/60">Laptop / receptionist code</p>
+                    <p className="text-[10px] font-black uppercase tracking-[0.16em] text-[#0b2d54]/60">Step 3 · Laptop / receptionist code</p>
                     <button type="button" onClick={copyCode} className="mt-2 inline-flex min-h-16 items-center gap-3 rounded-2xl px-4 text-3xl font-black tracking-[0.22em] text-[#0b2d54] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#24c1c4] sm:text-4xl" aria-label="Copy six-digit Smart File code">
                       {share.shortCode.slice(0, 3)} {share.shortCode.slice(3)}
                       {copied ? <Check className="h-5 w-5 text-emerald-700" /> : <Copy className="h-5 w-5" />}
@@ -199,6 +194,18 @@ export default function SmartFilePage() {
                     Code expires in {formatTime(remaining)}
                   </div>
                   <p className="text-center text-[11px] font-semibold leading-5 text-slate-400">This share is temporary and can only be redeemed once. Do not share the QR or code with anyone you do not intend to access your information.</p>
+                </div>
+              )}
+
+              {!loading && share && expired && (
+                <div className="mt-6 rounded-3xl border border-dashed border-slate-300 bg-slate-50 p-8 text-center">
+                  <Clock3 className="mx-auto h-10 w-10 text-slate-300" />
+                  <h2 className="mt-4 text-lg font-black text-[#0b2d54]">This share has expired</h2>
+                  <p className="mx-auto mt-2 max-w-md text-sm leading-6 text-slate-500">Generate a fresh one-time QR code and six-digit code for {scopeTitle.toLowerCase()} access.</p>
+                  <button type="button" onClick={() => { setShare(null); setKind(null); setError(""); }} className="mt-5 inline-flex min-h-12 items-center justify-center gap-2 rounded-2xl bg-[#0b2d54] px-6 py-3 text-sm font-black text-white shadow-sm transition hover:bg-[#071f3a]">
+                    <RefreshCw className="h-4 w-4" />
+                    Choose sharing type again
+                  </button>
                 </div>
               )}
             </div>
