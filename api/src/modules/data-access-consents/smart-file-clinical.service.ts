@@ -14,14 +14,8 @@ export class SmartFileClinicalService {
     practitionerUserId: string,
     consentId: string,
   ): Promise<SmartFileClinicalResponse> {
-    const consent = await this.prisma.dataAccessConsent.findUnique({
-      where: { id: consentId },
-    });
-
-    if (!consent) {
-      throw new NotFoundException('Clinical data access consent not found.');
-    }
-
+    const consent = await this.prisma.dataAccessConsent.findUnique({ where: { id: consentId } });
+    if (!consent) throw new NotFoundException('Clinical data access consent not found.');
     if (consent.grantedToUserId !== practitionerUserId) {
       throw new ForbiddenException('This consent is not granted to this practitioner.');
     }
@@ -30,7 +24,6 @@ export class SmartFileClinicalService {
     if (consent.revokedAt || (consent.expiresAt && consent.expiresAt <= now)) {
       throw new ForbiddenException('Clinical data access consent is no longer active.');
     }
-
     if (!consent.canViewMedicalRecords) {
       throw new ForbiddenException('Clinical medical-record access is not permitted.');
     }
@@ -39,7 +32,16 @@ export class SmartFileClinicalService {
       where: { id: consent.patientId },
       include: {
         person: true,
-        healthPassport: true,
+        healthPassport: {
+          include: {
+            allergies: { include: { allergy: true } },
+            conditions: { include: { condition: true } },
+            immunizations: { include: { immunization: true } },
+            medications: { include: { medication: true } },
+            patientDiagnoses: { include: { diagnosis: true } },
+            patientProcedures: { include: { procedure: true } },
+          },
+        },
         medicalRecord: true,
         identityDocuments: true,
         prescriptions: {
@@ -55,16 +57,17 @@ export class SmartFileClinicalService {
         procedures: true,
         referrals: true,
         healthJournals: true,
+        labOrders: { include: { items: true } },
       },
     });
 
-    if (!patient) {
-      throw new NotFoundException('Patient not found.');
-    }
+    if (!patient) throw new NotFoundException('Patient not found.');
+
+    const orderItemIds = patient.labOrders.flatMap((order) => order.items.map((item) => item.id));
 
     const [encounters, labResults, imagingStudies] = await Promise.all([
       this.prisma.encounter.findMany({
-        where: { medicalRecord: { patientId: patient.id } },
+        where: patient.medicalRecord ? { medicalRecordId: patient.medicalRecord.id } : { id: '__none__' },
         orderBy: { startedAt: 'desc' },
         include: {
           encounterType: true,
@@ -79,22 +82,13 @@ export class SmartFileClinicalService {
           clinicalNotes: true,
         },
       }),
-      this.prisma.labResult.findMany({
-        where: { orderItem: { order: { patientId: patient.id } } },
-        orderBy: { reportedAt: 'desc' },
-        include: {
-          items: { include: { test: true } },
-          attachments: true,
-        },
-      }),
-      this.prisma.imagingStudy.findMany({
-        where: { patientId: patient.id },
-        orderBy: { performedAt: 'desc' },
-        include: {
-          order: { include: { items: { include: { procedure: true } } } },
-        },
-      }),
+      orderItemIds.length
+        ? this.prisma.labResult.findMany({ where: { orderItemId: { in: orderItemIds } }, orderBy: { reportedAt: 'desc' } })
+        : Promise.resolve([]),
+      this.prisma.imagingStudy.findMany({ where: { patientId: patient.id }, orderBy: { performedAt: 'desc' } }),
     ]);
+
+    const passport = patient.healthPassport;
 
     return {
       patient: {
@@ -107,23 +101,26 @@ export class SmartFileClinicalService {
         dateOfBirth: patient.person.dateOfBirth,
         gender: patient.person.gender,
       },
-      healthPassport: consent.canViewHealthPassport ? patient.healthPassport : null,
-      conditions: patient.diagnoses,
-      allergies: patient.medicalRecord?.allergies ? [patient.medicalRecord.allergies] : [],
-      immunisations: [],
-      medications: patient.prescriptions.flatMap((p) => p.items),
+      healthPassport: consent.canViewHealthPassport ? passport : null,
+      conditions: passport?.conditions ?? [],
+      allergies: passport?.allergies ?? [],
+      immunisations: passport?.immunizations ?? [],
+      medications: consent.canViewPrescriptions ? passport?.medications ?? [] : [],
       prescriptions: consent.canViewPrescriptions ? patient.prescriptions : [],
-      encounters: consent.canViewMedicalRecords ? encounters : [],
+      encounters,
       episodes: patient.clinicalEpisodes,
-      vitals: encounters.flatMap((e) => e.clinicalVitals),
-      symptoms: encounters.flatMap((e) => e.symptomLogs),
+      vitals: encounters.flatMap((encounter) => encounter.clinicalVitals),
+      symptoms: encounters.flatMap((encounter) => encounter.symptomLogs),
       diagnoses: patient.diagnoses,
       procedures: patient.procedures,
       labResults: consent.canViewLabResults ? labResults : [],
       imaging: consent.canViewImaging ? imagingStudies : [],
       carePlans: patient.carePlans,
       referrals: patient.referrals,
-      clinicalDocuments: [],
+      clinicalDocuments: [
+        ...patient.identityDocuments,
+        ...encounters.flatMap((encounter) => encounter.clinicalNotes),
+      ],
       generatedAt: now,
     };
   }
