@@ -16,6 +16,7 @@ import {
 } from "lucide-react";
 import ProtectedRoute from "@/components/auth/protected-route";
 import { useDashboard } from "@/hooks/use-dashboard";
+import DailyHealthCheckIn from "@/components/dashboard/daily-health-check-in";
 
 function formatDate(value: unknown, includeTime = true) {
   if (!value) return "—";
@@ -355,6 +356,8 @@ export default function TodayPage() {
                 </p>
               </div>
             )}
+
+            <DailyHealthCheckIn embedded />
           </section>
 
           <section className="mt-5 grid gap-4 sm:grid-cols-2">
