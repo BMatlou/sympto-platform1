@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useParams } from "next/navigation";
-import { ArrowLeft, CalendarDays, Clock3, FileText, MapPin, Stethoscope } from "lucide-react";
+import { ArrowLeft, CalendarDays, Clock3, FileText, MapPin, MessageCircle, Stethoscope } from "lucide-react";
 import { useEffect, useState } from "react";
 import ProtectedRoute from "@/components/auth/protected-route";
 import { api } from "@/lib/api";
@@ -49,7 +49,8 @@ export default function AppointmentDetailPage() {
         {(appointment.practice?.name || appointment.practice?.address) && <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm"><div className="flex items-start gap-3"><MapPin className="mt-0.5 h-5 w-5 text-[#24c1c4]" /><div><p className="text-xs font-bold uppercase tracking-wider text-slate-400">Practice</p><p className="mt-1 text-base font-black text-[#0b2d54]">{appointment.practice?.name || "Healthcare practice"}</p>{appointment.practice?.address && <p className="mt-1 text-sm leading-6 text-slate-500">{typeof appointment.practice.address === "string" ? appointment.practice.address : [appointment.practice.address.line1, appointment.practice.address.suburb, appointment.practice.address.city].filter(Boolean).join(", ")}</p>}</div></div></div>}
         {(appointment.reason || appointment.notes) && <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm"><div className="flex items-start gap-3"><FileText className="mt-0.5 h-5 w-5 text-[#24c1c4]" /><div className="min-w-0"><p className="text-xs font-bold uppercase tracking-wider text-slate-400">Appointment notes</p>{appointment.reason && <p className="mt-2 text-sm font-semibold leading-6 text-[#0b2d54]">{appointment.reason}</p>}{appointment.notes && <p className="mt-2 whitespace-pre-wrap text-sm leading-6 text-slate-500">{appointment.notes}</p>}</div></div></div>}
       </section>
-      <div className="mt-6 rounded-2xl border border-[#24c1c4]/20 bg-[#24c1c4]/5 px-4 py-3 text-xs font-semibold leading-5 text-[#0b2d54]">Your appointment details are part of your Sympto health record. Clinical Smart File sharing remains a separate consent action.</div>
+      <div className="mt-6 grid gap-3 sm:grid-cols-2"><Link href="/messages" className="inline-flex min-h-12 items-center justify-center gap-2 rounded-2xl bg-[#0b2d54] px-5 py-3 text-sm font-black text-white shadow-sm transition hover:bg-[#071f3a] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#24c1c4]"><MessageCircle className="h-5 w-5" />Open care messages</Link><Link href="/smart-file" className="inline-flex min-h-12 items-center justify-center rounded-2xl border border-slate-200 bg-white px-5 py-3 text-sm font-black text-[#0b2d54] shadow-sm transition hover:border-[#24c1c4]/50 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#24c1c4]">Share Smart File</Link></div>
+      <div className="mt-4 rounded-2xl border border-[#24c1c4]/20 bg-[#24c1c4]/5 px-4 py-3 text-xs font-semibold leading-5 text-[#0b2d54]">Your appointment details are part of your Sympto health record. Clinical Smart File sharing remains a separate consent action.</div>
     </>}
   </div></main></ProtectedRoute>;
 }
