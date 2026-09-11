@@ -75,12 +75,11 @@ export default function HealthHome() {
   if (error || !data) return <ProtectedRoute><main className="min-h-screen bg-[#f4f9fb] p-4 sm:p-8"><div className="mx-auto max-w-xl rounded-[28px] border border-red-200 bg-white p-6"><TriangleAlert className="h-6 w-6 text-red-600" /><h1 className="mt-4 text-xl font-extrabold text-[#0b2d54]">Your health screen could not load</h1><p className="mt-2 text-sm text-slate-500">Your health information has not been changed. Please try again.</p><button type="button" onClick={reload} className="mt-5 min-h-11 rounded-xl bg-[#0b2d54] px-5 text-sm font-extrabold text-white">Try again</button></div></main></ProtectedRoute>;
 
   const firstName = data.patient?.firstName || data.profile?.preferredName || data.profile?.firstName || "there";
+  const hour = new Date().getHours();
+  const greeting = hour < 12 ? "Good morning" : hour < 14 ? "Good day" : hour < 18 ? "Good afternoon" : "Good evening";
   const medications = data.today?.activeMedications ?? [];
   const appointments = data.today?.upcomingAppointments ?? [];
   const activeGoals = (data.goals ?? []).filter((goal) => String(goal.status).toUpperCase() !== "ACHIEVED").length;
-  const conditions = data.healthSnapshot?.activeConditions ?? [];
-  const allergies = data.healthSnapshot?.allergies ?? [];
-  const immunizations = Array.isArray(data.immunizations) ? data.immunizations : (data.healthSnapshot?.immunizations ?? []);
   const devices = data.wearables?.devices ?? [];
   const watchConnected = devices.length > 0;
   const todayActionCount = medications.length + appointments.length + activeGoals;
@@ -95,7 +94,8 @@ export default function HealthHome() {
           <div className="relative grid items-center gap-8 lg:grid-cols-[1fr_250px] lg:gap-9">
             <div>
               <p className="text-[11px] font-black uppercase tracking-[0.21em] text-white/60">A calmer way to care for your health</p>
-              <h1 className="mt-4 max-w-3xl text-[42px] font-black leading-[0.98] tracking-[-0.065em] sm:text-5xl">Good day, {firstName}.</h1>
+              <p className="mt-4 text-base font-semibold text-white/80">{greeting}, {firstName}</p>
+              <h1 className="mt-2 max-w-3xl text-[34px] font-black leading-[1.02] tracking-[-0.055em] sm:text-4xl">Your health, made simpler.</h1>
               <p className="mt-4 max-w-[520px] text-[14px] leading-7 text-white/75 sm:text-[15px]">See what needs your attention, your key health information, and your health history in one place.</p>
               <div className="mt-6 flex flex-wrap gap-2.5"><Link href="/log-symptom" className="inline-flex min-h-12 items-center justify-center gap-2 rounded-[15px] bg-white px-4 py-3 text-xs font-black text-[#0b2d54] shadow-sm transition hover:-translate-y-0.5"><HeartPulse className="h-4 w-4" />Log a symptom</Link><Link href="/today" className="inline-flex min-h-12 items-center justify-center gap-2 rounded-[15px] border border-white/25 bg-white/10 px-4 py-3 text-xs font-extrabold text-white backdrop-blur-sm transition hover:bg-white/15">Open today <ArrowRight className="h-4 w-4" /></Link></div>
             </div>
