@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 import { Mic, Sparkles, X, Save, ClipboardPlus } from "lucide-react";
 import { useAuth } from "@/hooks/use-auth";
-import { healthJournalService } from "@/services/health-journal.service";
+import { healthJournalService, type TalkToSymptoResult } from "@/services/health-journal.service";
 
 type Insight = {
   tone: "calm" | "watch" | "urgent";
@@ -30,7 +30,7 @@ const DEMO_SYMPTOM = "I have a headache and feel tired today.";
 function createInsight(text: string): Insight {
   const normalized = text.toLowerCase();
 
-  if (/chest pain|can't breathe|cannot breathe|difficulty breathing|fainting|unconscious|severe bleeding/.test(normalized)) {
+  if (/chest pain|can't breathe|cannot breathe|difficulty breathing|fainting|unconscious|severe bleeding|stroke/.test(normalized)) {
     return { tone: "urgent", title: "Please get urgent help", message: "These symptoms can need immediate medical attention. If they are severe or getting worse, seek emergency care now." };
   }
 
@@ -47,6 +47,7 @@ export default function AIHealthHelperFab() {
   const [listening, setListening] = useState(false);
   const [transcript, setTranscript] = useState("");
   const [insight, setInsight] = useState<Insight | null>(null);
+  const [talkResult, setTalkResult] = useState<TalkToSymptoResult | null>(null);
   const [speechSupported, setSpeechSupported] = useState(false);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
@@ -97,6 +98,7 @@ export default function AIHealthHelperFab() {
     if (!Recognition) {
       setTranscript(DEMO_SYMPTOM);
       setInsight(createInsight(DEMO_SYMPTOM));
+      setTalkResult(null);
       setSaved(false);
       return;
     }
@@ -116,6 +118,7 @@ export default function AIHealthHelperFab() {
       recognitionRef.current = null;
       setTranscript(DEMO_SYMPTOM);
       setInsight(createInsight(DEMO_SYMPTOM));
+      setTalkResult(null);
       setSaved(false);
     };
     recognition.onresult = (event) => {
@@ -123,6 +126,7 @@ export default function AIHealthHelperFab() {
       if (!spoken) return;
       setTranscript(spoken);
       setInsight(createInsight(spoken));
+      setTalkResult(null);
       setSaved(false);
       setSaveError("");
       setListening(false);
@@ -136,6 +140,7 @@ export default function AIHealthHelperFab() {
     setOpen(true);
     setInsight(null);
     setTranscript("");
+    setTalkResult(null);
     setSaved(false);
     setSaveError("");
   };
@@ -153,14 +158,12 @@ export default function AIHealthHelperFab() {
     setSaving(true);
     setSaveError("");
     try {
-      await healthJournalService.create({
-        title: "Talk to Sympto — health update",
-        journal: transcript.trim(),
-        notes: insight ? `${insight.title}: ${insight.message}` : "Captured through Talk to Sympto.",
-      });
+      const result = await healthJournalService.talkToSympto(transcript.trim());
+      setTalkResult(result);
+      setInsight(result.intelligence.assessment);
       setSaved(true);
     } catch {
-      setSaveError("We could not save this update. Please try again.");
+      setSaveError("We could not connect this update to your health record. Please try again.");
     } finally {
       setSaving(false);
     }
@@ -221,10 +224,29 @@ export default function AIHealthHelperFab() {
                   <div className="flex items-start gap-3">
                     <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-white/70 text-xl" aria-hidden="true">✨</div>
                     <div>
-                      <p className="text-xs font-extrabold uppercase tracking-wide opacity-60">AI Insight</p>
+                      <p className="text-xs font-extrabold uppercase tracking-wide opacity-60">Sympto Insight</p>
                       <h3 className="mt-1 text-base font-extrabold">{insight.title}</h3>
                       <p className="mt-1 text-sm leading-6 opacity-80">{insight.message}</p>
                     </div>
+                  </div>
+                </div>
+              )}
+
+              {talkResult && (
+                <div className="mt-4 rounded-2xl border border-slate-200 bg-white p-4" aria-live="polite">
+                  <p className="text-xs font-extrabold uppercase tracking-wide text-slate-400">Connected context</p>
+                  <p className="mt-2 text-sm leading-6 text-slate-600">
+                    {talkResult.intelligence.context.activeMedicationCount} active medication{talkResult.intelligence.context.activeMedicationCount === 1 ? "" : "s"}, {talkResult.intelligence.context.conditionCount} condition{talkResult.intelligence.context.conditionCount === 1 ? "" : "s"}, {talkResult.intelligence.context.recentSymptomCount} recent symptom entr{talkResult.intelligence.context.recentSymptomCount === 1 ? "y" : "ies"}, and {talkResult.intelligence.context.recentAiAssessmentCount} previous AI assessment{talkResult.intelligence.context.recentAiAssessmentCount === 1 ? "" : "s"} are available for continuity.
+                  </p>
+                  {talkResult.intelligence.insights.length > 0 && (
+                    <ul className="mt-3 space-y-1 text-sm leading-6 text-slate-600">
+                      {talkResult.intelligence.insights.map((item, index) => <li key={index}>• {item}</li>)}
+                    </ul>
+                  )}
+                  <div className="mt-3 grid gap-2 sm:grid-cols-2">
+                    {talkResult.intelligence.actions.slice(0, 4).map((action) => (
+                      <Link key={`${action.href}-${action.label}`} href={action.href} onClick={closeHelper} className="flex min-h-12 items-center justify-center rounded-xl border-2 border-slate-200 px-3 text-center text-xs font-extrabold text-[#0b2d54] hover:border-[#24c1c4]">{action.label}</Link>
+                    ))}
                   </div>
                 </div>
               )}
@@ -233,7 +255,7 @@ export default function AIHealthHelperFab() {
                 <div className="mt-4 space-y-2">
                   <button type="button" onClick={saveToHealthRecord} disabled={saving || saved || !user?.id} className="flex min-h-14 w-full items-center justify-center gap-2 rounded-2xl bg-[#0b2d54] px-5 text-base font-extrabold text-white transition hover:bg-[#071f3a] disabled:cursor-not-allowed disabled:opacity-60 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[#24c1c4]/30">
                     <Save className="h-5 w-5" aria-hidden="true" />
-                    {saved ? "Saved to My Health Record" : saving ? "Saving…" : "Save to My Health Record"}
+                    {saved ? "Connected to My Health Record" : saving ? "Connecting your health information…" : "Save & connect to My Health Record"}
                   </button>
                   <Link href="/log-symptom" onClick={closeHelper} className="flex min-h-14 w-full items-center justify-center gap-2 rounded-2xl border-2 border-slate-200 bg-white px-5 text-base font-extrabold text-[#0b2d54] transition hover:border-[#24c1c4] hover:bg-slate-50">
                     <ClipboardPlus className="h-5 w-5" aria-hidden="true" />
@@ -243,7 +265,7 @@ export default function AIHealthHelperFab() {
                 </div>
               )}
 
-              <button type="button" onClick={closeHelper} className="mt-5 flex min-h-14 w-full items-center justify-center rounded-2xl border-2 border-slate-200 bg-white px-5 text-base font-extrabold text-[#0b2d54] transition hover:border-[#24c1c4] hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[#24c1c4]/30">
+              <button type="button" onClick={closeHelper} className="mt-5 flex min-h-14 w-full items-center justify-center rounded-2xl border-2 border-slate-200 bg-white px-5 text-base font-extrabold text-[#0b2d54] hover:border-[#24c1c4] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[#24c1c4]/30">
                 Done — Close AI Helper
               </button>
             </div>
