@@ -7,10 +7,15 @@ import { Prisma } from '@prisma/client';
 import { PrismaService } from '../../database/prisma.service';
 import { NotificationsService } from '../notifications/notifications.service';
 import { NotificationQueueService } from '../notification-queue/notification-queue.service';
+import { HealthGoalsService } from '../health-goals/health-goals.service';
 import { CreatePatientMedicationDto } from './dto/create-patient-medication.dto';
 import { UpdatePatientMedicationDto } from './dto/update-patient-medication.dto';
 import { QueryPatientMedicationDto } from './dto/query-patient-medication.dto';
 import { CreateMedicationReminderDto } from './dto/create-medication-reminder.dto';
+import {
+  MedicationAdherenceAction,
+  RecordMedicationAdherenceDto,
+} from '../medication-adherence/dto/record-medication-adherence.dto';
 import {
   MedicationStatus,
   NotificationChannel,
@@ -25,6 +30,7 @@ export class PatientMedicationsService {
     private readonly prisma: PrismaService,
     private readonly notificationsService: NotificationsService,
     private readonly notificationQueueService: NotificationQueueService,
+    private readonly healthGoalsService: HealthGoalsService,
   ) {}
 
   async create(dto: CreatePatientMedicationDto) {
@@ -104,6 +110,104 @@ export class PatientMedicationsService {
       },
       include: { medication: true, healthPassport: { include: { patient: { include: { person: true } } } } },
     });
+  }
+
+  async recordAdherence(
+    id: string,
+    dto: RecordMedicationAdherenceDto,
+    authenticatedUserId: string,
+  ) {
+    const existing = await this.findOne(id);
+    const patientId = existing.healthPassport.patient.id;
+    const ownerUserId = existing.healthPassport.patient.userId;
+
+    if (!authenticatedUserId || ownerUserId !== authenticatedUserId) {
+      throw new NotFoundException('Patient medication not found.');
+    }
+
+    const settings = await this.prisma.healthJournalSettings.findUnique({
+      where: { patientId },
+      select: { trackMedications: true },
+    });
+
+    if (settings && !settings.trackMedications) {
+      return {
+        tracked: false,
+        message: 'Medication tracking is disabled in your health tracking preferences.',
+        medication: existing,
+        affectedGoals: [],
+      };
+    }
+
+    const previousAdherence = existing.adherencePercentage == null
+      ? null
+      : Number(existing.adherencePercentage);
+    const previousMissed = existing.missedDoses ?? 0;
+
+    let previousTotal = 0;
+    let previousTaken = 0;
+
+    if (previousAdherence != null) {
+      if (previousAdherence >= 100) {
+        previousTotal = 1;
+        previousTaken = 1;
+      } else if (previousAdherence <= 0) {
+        previousTotal = Math.max(1, previousMissed);
+        previousTaken = 0;
+      } else {
+        previousTotal = Math.max(
+          1,
+          Math.round(previousMissed / (1 - previousAdherence / 100)),
+        );
+        previousTaken = Math.max(0, previousTotal - previousMissed);
+      }
+    }
+
+    const totalDoses = previousTotal + 1;
+    const takenDoses = previousTaken + (
+      dto.action === MedicationAdherenceAction.TAKEN ? 1 : 0
+    );
+    const missedDoses = previousMissed + (
+      dto.action === MedicationAdherenceAction.SKIPPED ? 1 : 0
+    );
+    const adherencePercentage = Number(((takenDoses / totalDoses) * 100).toFixed(2));
+
+    const medication = await this.prisma.patientMedication.update({
+      where: { id },
+      data: {
+        adherencePercentage,
+        missedDoses,
+      },
+      include: { medication: true, healthPassport: { include: { patient: { include: { person: true } } } } },
+    });
+
+    const medicationGoals = await this.prisma.healthGoal.findMany({
+      where: {
+        patientId,
+        category: 'MEDICATION',
+        status: { in: ['ACTIVE', 'ACHIEVED'] },
+      },
+    });
+
+    const affectedGoals = [];
+    for (const goal of medicationGoals) {
+      affectedGoals.push(
+        await this.healthGoalsService.recordProgress(goal.id, {
+          currentValue: String(adherencePercentage),
+          notes: `Medication adherence updated after ${dto.action.toLowerCase()} dose.`,
+        }),
+      );
+    }
+
+    return {
+      tracked: true,
+      action: dto.action,
+      scheduledFor: dto.scheduledFor ?? null,
+      medication,
+      adherencePercentage,
+      missedDoses,
+      affectedGoals,
+    };
   }
 
   async scheduleReminder(id: string, dto: CreateMedicationReminderDto, authenticatedUserId: string) {
