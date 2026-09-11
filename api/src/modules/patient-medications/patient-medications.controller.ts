@@ -51,7 +51,7 @@ export class PatientMedicationsController {
     return this.patientMedicationsService.findOne(id);
   }
 
-  @Permissions('patient-medication.update')
+  @Permissions('patient-medications.adherence')
   @Post(':id/adherence')
   recordAdherence(
     @Param('id') id: string,
