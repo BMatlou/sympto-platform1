@@ -1,24 +1,13 @@
 "use client";
 
 import Link from "next/link";
-import { ArrowLeft, ArrowRight, CalendarDays, Pill, Target, Sparkles } from "lucide-react";
+import { ArrowLeft, ArrowRight, Pill, Target, Sparkles } from "lucide-react";
 import ProtectedRoute from "@/components/auth/protected-route";
 import { useDashboard } from "@/hooks/use-dashboard";
 import DailyHealthCheckIn from "@/components/dashboard/daily-health-check-in";
 
 function text(value: unknown, fallback = "—") {
   return value === null || value === undefined || value === "" ? fallback : String(value);
-}
-
-function appointmentLabel(appointment: any) {
-  return text(appointment?.reason || appointment?.appointmentType, "Clinic visit").replaceAll("_", " ");
-}
-
-function formatDate(value: unknown) {
-  if (!value) return "—";
-  const date = new Date(String(value));
-  if (Number.isNaN(date.getTime())) return String(value);
-  return new Intl.DateTimeFormat("en-ZA", { dateStyle: "medium", timeStyle: "short" }).format(date);
 }
 
 export default function TodayPage() {
@@ -65,7 +54,6 @@ export default function TodayPage() {
   const goalsDueSoon = goals.filter((goal: any) => goal.targetDate && new Date(String(goal.targetDate)) <= new Date(Date.now() + 7 * 24 * 60 * 60 * 1000));
   const todayNotifications = data.today?.notifications ?? data.notifications ?? [];
   const attention = data.attention ?? [];
-  const nextAppointment = appointments[0] ?? null;
   const medicine = medications[0] ?? null;
   const totalTodayItems = attention.length + todayAppointments.length + goalsDueSoon.length + (medications.length > 0 ? 1 : 0) + todayNotifications.length;
 
@@ -127,17 +115,10 @@ export default function TodayPage() {
             <DailyHealthCheckIn embedded goals={goals} />
           </div>
 
-          <section className="mt-4 grid gap-[15px] sm:grid-cols-2">
-            <Link href="/appointments" className="relative overflow-hidden rounded-[27px] bg-[#0b2d54] p-[22px] text-white shadow-[0_16px_42px_rgba(11,45,84,.09)] transition hover:-translate-y-0.5">
-              <div className="pointer-events-none absolute -bottom-[115px] -right-[100px] h-[190px] w-[190px] rounded-full bg-[#24c1c4]/15" />
-              <div className="relative z-10"><h3 className="text-[17px] font-black">Next care visit</h3><p className="mt-2 max-w-md text-xs leading-[1.55] text-white/65">Your appointments will appear here when a visit is scheduled.</p><div className="mt-3.5 flex items-center gap-2.5 border-t border-white/10 py-3"><span className="grid h-8 w-8 place-items-center rounded-xl bg-white/10 text-[#24c1c4]"><CalendarDays className="h-4 w-4" /></span><div><b className="block text-xs">{nextAppointment ? appointmentLabel(nextAppointment) : "No visit scheduled"}</b><span className="mt-1 block text-[10px] text-white/55">{nextAppointment ? formatDate(nextAppointment.scheduledStart) : "Keep your care timeline up to date."}</span></div></div><span className="mt-2 inline-flex rounded-[13px] bg-[#24c1c4] px-3 py-2.5 text-[11px] font-black text-[#0b2d54]">View appointments →</span></div>
-            </Link>
-
-            <Link href="/health-goals" className="rounded-[27px] border border-[#dfebef] bg-white p-[22px] shadow-[0_6px_20px_rgba(11,45,84,.035)] transition hover:-translate-y-0.5">
-              <div className="flex items-start justify-between gap-4"><div><h3 className="text-[17px] font-black text-[#0b2d54]">Health goals</h3><p className="mt-2 text-xs leading-5 text-[#74859a]">Keep your longer-term goals moving.</p></div><span className="rounded-[11px] bg-[#edf4ff] px-2.5 py-2 text-[10px] font-black text-[#3f75bd]">{goals.length} active goal{goals.length === 1 ? "" : "s"}</span></div>
-              <div className="mt-4 flex items-center justify-between gap-3 border-t border-[#eef3f4] pt-4"><div className="flex items-center gap-3"><span className="grid h-9 w-9 place-items-center rounded-xl bg-[#edf4ff] text-[#3f75bd]"><Target className="h-4 w-4" /></span><div><b className="block text-sm text-[#0b2d54]">{goals[0]?.title ? text(goals[0].title) : "Build a healthier rhythm"}</b><span className="mt-1 block text-[11px] text-[#74859a]">Progress is built one day at a time.</span></div></div><ArrowRight className="h-4 w-4 text-[#0b2d54]" /></div>
-              <span className="mt-4 inline-block text-xs font-black text-[#0b2d54]">Open health goals →</span>
-            </Link>
+          <section className="mt-4 rounded-[27px] border border-[#dfebef] bg-white p-[22px] shadow-[0_6px_20px_rgba(11,45,84,.035)] transition hover:-translate-y-0.5">
+            <div className="flex items-start justify-between gap-4"><div><h3 className="text-[17px] font-black text-[#0b2d54]">Health goals</h3><p className="mt-2 text-xs leading-5 text-[#74859a]">Keep your longer-term goals moving.</p></div><Link href="/health-goals" className="rounded-[11px] bg-[#edf4ff] px-2.5 py-2 text-[10px] font-black text-[#3f75bd]">{goals.length} active goal{goals.length === 1 ? "" : "s"}</Link></div>
+            <div className="mt-4 flex items-center justify-between gap-3 border-t border-[#eef3f4] pt-4"><div className="flex items-center gap-3"><span className="grid h-9 w-9 place-items-center rounded-xl bg-[#edf4ff] text-[#3f75bd]"><Target className="h-4 w-4" /></span><div><b className="block text-sm text-[#0b2d54]">{goals[0]?.title ? text(goals[0].title) : "Build a healthier rhythm"}</b><span className="mt-1 block text-[11px] text-[#74859a]">Progress is built one day at a time.</span></div></div><ArrowRight className="h-4 w-4 text-[#0b2d54]" /></div>
+            <Link href="/health-goals" className="mt-4 inline-block text-xs font-black text-[#0b2d54]">Open health goals →</Link>
           </section>
 
           <div className="mt-6 flex items-center justify-center gap-2 text-[10px] text-[#74859a]">✦ <strong className="text-[#0b2d54]">Sympto</strong> keeps your health connected, understandable, and under your control.</div>
