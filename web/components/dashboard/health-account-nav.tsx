@@ -1,10 +1,10 @@
 "use client";
 
 import Link from "next/link";
-import { CalendarDays, ClipboardPlus, FileHeart, HeartPulse, Menu, MessageCircle, QrCode, Settings, ShieldCheck, UserRound, Users, Watch, X } from "lucide-react";
+import { CalendarDays, ClipboardPlus, FileHeart, HeartPulse, Menu, MessageCircle, QrCode, Settings, ShieldCheck, UserRound, Users, Watch, X, type LucideIcon } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 
-type NavItem = readonly [string, string, typeof CalendarDays];
+type NavItem = readonly [string, string, LucideIcon];
 type NavGroup = readonly [string, readonly NavItem[]];
 
 const groups: readonly NavGroup[] = [
