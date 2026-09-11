@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { ArrowRight, CalendarDays, Pill, Sparkles, Target } from "lucide-react";
+import { ArrowRight, CalendarDays, Pill, Target } from "lucide-react";
 import ProtectedRoute from "@/components/auth/protected-route";
 import { useDashboard } from "@/hooks/use-dashboard";
 import DailyHealthCheckIn from "@/components/dashboard/daily-health-check-in";
