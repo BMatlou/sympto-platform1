@@ -3,10 +3,10 @@ import { api } from '@/lib/api';
 export interface HealthHomeResponse {
   generatedAt: string;
   profile?: { firstName?: string | null; lastName?: string | null; preferredName?: string | null; dateOfBirth?: string | null; gender?: string | null; profileImageUrl?: string | null } | null;
-  patient: { id: string; patientNumber?: string | null; name?: string; firstName?: string; lastName?: string; profileImageUrl?: string | null; heightCm?: number | null; weightKg?: number | null };
+  patient: { id: string; patientNumber?: string | null; name?: string; firstName?: string; lastName?: string; profileImageUrl?: string | null; heightCm?: number | null; weightKg?: number | null; bmi?: number | null; bmiCategory?: string | null };
   healthPassport?: Record<string, unknown> | null;
   medicalRecord?: Record<string, any> | null;
-  healthSnapshot: { activeAllergies?: Array<Record<string, any>>; activeConditions: Array<Record<string, any>>; allergies: Array<Record<string, any>>; immunizations: Array<Record<string, any>>; bloodType?: string | null; rhesusFactor?: string | null; baseline?: Record<string, unknown> | null; weightKg?: number | null; heightCm?: number | null; bmi?: number | null; bmiCategory?: string | null; latestMeasurements: Array<Record<string, any>>; connectedDevices: Array<Record<string, any>> };
+  healthSnapshot: { activeAllergies?: Array<Record<string, any>>; activeConditions: Array<Record<string, any>>; allergies: Array<Record<string, any>>; immunizations: Array<Record<string, any>>; bloodType?: string | null; rhesusFactor?: string | null; baseline?: Record<string, unknown> | null; weightKg?: number | null; heightCm?: number | null; bmi?: number | null; bmiCategory?: string | null; latestMeasurements: Array<Record<string, any>>; normalizedVitals?: Array<Record<string, any>>; connectedDevices: Array<Record<string, any>> };
   today: { upcomingAppointments: Array<Record<string, any>>; activeMedications: Array<Record<string, any>>; activeMedicationCount?: number; activeGoalCount?: number; notifications?: Array<Record<string, any>> };
   medications?: Array<Record<string, any>>;
   appointments?: Array<Record<string, any>>;
@@ -17,7 +17,7 @@ export interface HealthHomeResponse {
   conditions?: Array<Record<string, any>>;
   immunizations?: Array<Record<string, any>>;
   emergencyContacts?: Array<Record<string, any>>;
-  wearables: { devices: Array<Record<string, any>>; latestMeasurements: Array<{ id: string; type: string; value: number | string; unit: string; measuredAt: string; source?: string | null }> };
+  wearables: { devices: Array<Record<string, any>>; latestMeasurements: Array<{ id?: string; type: string; value: number | string; unit: string; measuredAt: string; source?: string | null }> };
   notifications?: Array<Record<string, any>>;
   medicationNotifications?: Array<Record<string, any>>;
   attention: Array<{ type: string; severity: string; title: string; description: string; actionUrl?: string | null; actionLabel?: string | null }>;
@@ -34,7 +34,9 @@ export interface HealthHomeResponse {
   healthJournalSettings?: Record<string, unknown> | null;
 }
 
-export interface UpdateWeightResponse { weightKg: number; heightCm: number; bmi: number; bmiCategory: string | null; recordedAt: string; goals: Array<{ id: string; progressPercent: number; currentValue: number; status: string }> }
+export interface UpdateWeightResponse { weightKg: number; heightCm: number | null; bmi: number | null; bmiCategory: string | null; recordedAt: string }
+export interface ManualVitalsInput { systolicPressure?: number; diastolicPressure?: number; restingHeartRate?: number; respiratoryRate?: number; oxygenSaturation?: number; bodyTemperature?: number; weightKg?: number; heightCm?: number; measuredAt?: string }
+export interface ManualVitalsResponse { recordedAt: string; bmi: number | null; bmiCategory: string | null }
 
 class HealthHomeService {
   async getHealthHome(patientId?: string): Promise<HealthHomeResponse> {
@@ -43,10 +45,6 @@ class HealthHomeService {
     const healthHome: HealthHomeResponse = payload?.data ?? payload;
     if (!healthHome?.patient?.id) throw new Error('Health Home returned an invalid response.');
 
-    // PatientImmunization is the source of truth for vaccines. Prefer the
-    // dedicated top-level collection returned by Health Home and only fall
-    // back to the snapshot when necessary. Never replace a populated list
-    // with an empty legacy/canonical list.
     const healthHomeImmunizations = Array.isArray(healthHome.immunizations)
       ? healthHome.immunizations
       : (Array.isArray(healthHome.healthSnapshot?.immunizations) ? healthHome.healthSnapshot.immunizations : []);
@@ -63,15 +61,7 @@ class HealthHomeService {
     }
 
     if (!canonical || canonical.patient?.id !== healthHome.patient?.id) {
-      return {
-        ...healthHome,
-        immunizations: healthHomeImmunizations,
-        healthSnapshot: { ...healthHome.healthSnapshot, immunizations: healthHomeImmunizations },
-        wearables: healthHome.wearables ?? {
-          devices: healthHome.healthSnapshot.connectedDevices,
-          latestMeasurements: healthHome.healthSnapshot.latestMeasurements.map((m: any, index) => ({ id: `${m.type}-${index}`, type: m.type, value: m.value, unit: m.unit, measuredAt: m.measuredAt, source: m.source })),
-        },
-      };
+      return { ...healthHome, immunizations: healthHomeImmunizations, healthSnapshot: { ...healthHome.healthSnapshot, immunizations: healthHomeImmunizations }, wearables: healthHome.wearables ?? { devices: healthHome.healthSnapshot.connectedDevices, latestMeasurements: healthHome.healthSnapshot.latestMeasurements.map((m: any, index) => ({ id: `${m.type}-${index}`, type: m.type, value: m.value, unit: m.unit, measuredAt: m.measuredAt, source: m.source })) } };
     }
 
     const canonicalImmunizations = Array.isArray(canonical.immunizations) ? canonical.immunizations : [];
@@ -90,28 +80,20 @@ class HealthHomeService {
       medications: canonical.medications ?? healthHome.medications,
       immunizations,
       healthGoals: canonical.healthGoals ?? healthHome.healthGoals,
-      healthSnapshot: {
-        ...healthHome.healthSnapshot,
-        activeAllergies: canonical.allergies ?? healthHome.healthSnapshot.activeAllergies,
-        activeConditions: canonical.conditions ?? healthHome.healthSnapshot.activeConditions,
-        allergies: canonical.allergies ?? healthHome.healthSnapshot.allergies,
-        immunizations,
-        bloodType: canonical.healthPassport?.bloodType ?? healthHome.healthSnapshot.bloodType,
-        rhesusFactor: canonical.healthPassport?.rhesusFactor ?? healthHome.healthSnapshot.rhesusFactor,
-      },
-      today: {
-        ...healthHome.today,
-        activeMedications: canonical.medications ?? healthHome.today.activeMedications,
-      },
-      wearables: healthHome.wearables ?? {
-        devices: healthHome.healthSnapshot.connectedDevices,
-        latestMeasurements: healthHome.healthSnapshot.latestMeasurements.map((m: any, index) => ({ id: `${m.type}-${index}`, type: m.type, value: m.value, unit: m.unit, measuredAt: m.measuredAt, source: m.source })),
-      },
+      healthSnapshot: { ...healthHome.healthSnapshot, activeAllergies: canonical.allergies ?? healthHome.healthSnapshot.activeAllergies, activeConditions: canonical.conditions ?? healthHome.healthSnapshot.activeConditions, allergies: canonical.allergies ?? healthHome.healthSnapshot.allergies, immunizations, bloodType: canonical.healthPassport?.bloodType ?? healthHome.healthSnapshot.bloodType, rhesusFactor: canonical.healthPassport?.rhesusFactor ?? healthHome.healthSnapshot.rhesusFactor },
+      today: { ...healthHome.today, activeMedications: canonical.medications ?? healthHome.today.activeMedications },
+      wearables: healthHome.wearables ?? { devices: healthHome.healthSnapshot.connectedDevices, latestMeasurements: healthHome.healthSnapshot.latestMeasurements.map((m: any, index) => ({ id: `${m.type}-${index}`, type: m.type, value: m.value, unit: m.unit, measuredAt: m.measuredAt, source: m.source })) },
     };
   }
 
   async updateWeight(weightKg: number, heightCm?: number, patientId?: string): Promise<UpdateWeightResponse> {
     const response = await api.post<{ success: boolean; data: UpdateWeightResponse }>('/health-home/weight', { weightKg, ...(heightCm !== undefined ? { heightCm } : {}) }, { params: patientId ? { patientId } : undefined });
+    const payload: any = response.data;
+    return payload?.data ?? payload;
+  }
+
+  async recordManualVitals(input: ManualVitalsInput, patientId?: string): Promise<ManualVitalsResponse> {
+    const response = await api.post<{ success: boolean; data: ManualVitalsResponse }>('/health-home/manual-vitals', input, { params: patientId ? { patientId } : undefined });
     const payload: any = response.data;
     return payload?.data ?? payload;
   }
