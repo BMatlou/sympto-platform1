@@ -51,6 +51,14 @@ function sleepLabel(value?: SleepQuality) {
   return sleepOptions.find((option) => option.value === value)?.label ?? "";
 }
 
+function sleepQualityForHours(hours: number): SleepQuality {
+  if (hours <= 4) return "VERY_POOR";
+  if (hours < 6) return "POOR";
+  if (hours < 7) return "FAIR";
+  if (hours < 8) return "GOOD";
+  return "EXCELLENT";
+}
+
 function numberValue(value: unknown, fallback = 0) {
   const parsed = Number(value);
   return Number.isFinite(parsed) ? parsed : fallback;
@@ -155,6 +163,8 @@ export default function DailyHealthCheckIn({ embedded = false, goals = [] }: { e
   const waterRemaining = Math.max(0, waterGoalMl - waterIntakeMl);
   const movementProgress = Math.min(100, Math.round((exerciseMinutes / exerciseGoalMinutes) * 100));
   const sleepProgress = Math.min(100, Math.round((sleepHours / sleepGoalHours) * 100));
+  const derivedSleepQuality = sleepHours > 0 ? sleepQualityForHours(sleepHours) : null;
+  const effectiveSleepQuality = derivedSleepQuality ?? sleepQuality;
 
   const hasInput = useMemo(
     () => Boolean(mood || sleepQuality || sleepHours > 0 || exerciseMinutes > 0 || waterIntakeMl > 0 || stressTouched),
@@ -218,14 +228,14 @@ export default function DailyHealthCheckIn({ embedded = false, goals = [] }: { e
     setError("");
     setMessage("");
 
-    const journal = buildJournalText({ mood, sleepQuality, sleepHours, stressLevel, exerciseMinutes, waterIntakeMl, stressTouched });
+    const journal = buildJournalText({ mood, sleepQuality: effectiveSleepQuality, sleepHours, stressLevel, exerciseMinutes, waterIntakeMl, stressTouched });
 
     try {
       const payload = {
         title: "Daily Health Check-in",
         journal,
         mood: mood ?? undefined,
-        sleepQuality: sleepQuality ?? undefined,
+        sleepQuality: effectiveSleepQuality ?? undefined,
         sleepHours: sleepHours > 0 ? String(sleepHours) : undefined,
         stressLevel: stressTouched ? stressLevel : undefined,
         exerciseMinutes,
@@ -237,6 +247,7 @@ export default function DailyHealthCheckIn({ embedded = false, goals = [] }: { e
         : await healthJournalService.create({ ...payload, notes: "Captured from the What do I do today? health check-in." });
 
       setSavedJournal(saved);
+      setSleepQuality(saved.sleepQuality ?? effectiveSleepQuality);
       setMessage("Today’s health check-in and linked goal progress are saved.");
     } catch {
       setError("We couldn't save today's check-in. Please try again.");
@@ -290,8 +301,14 @@ export default function DailyHealthCheckIn({ embedded = false, goals = [] }: { e
           <div className="mt-5 border-t border-[#eef3f4] pt-4">
             <div className="flex items-center justify-between gap-4"><div className="flex items-center gap-3"><span className="grid h-9 w-9 place-items-center rounded-xl bg-[#f2efff] text-[#7356b2]"><Moon className="h-4 w-4" /></span><div><b className="block text-[18px] font-black tracking-[-.05em] text-[#0b2d54]">{sleepHours}h</b><span className="text-[11px] text-[#74859a]">Rest and recovery</span></div></div><span className="text-xs font-black text-[#7356b2]">{sleepProgress}%</span></div>
             {sleepGoal && <p className="mt-2 flex items-center gap-1.5 text-[10px] font-semibold text-[#7356b2]"><Target className="h-3 w-3" />{sleepGoal.title ?? "Sleep goal"} · {sleepGoalHours}h target</p>}
-            <div className="mt-3 flex flex-wrap gap-1.5">{sleepOptions.map((option) => <button key={option.value} type="button" onClick={() => setSleepQuality(option.value)} className={`rounded-xl border px-2 py-1.5 text-[9px] font-black ${sleepQuality === option.value ? "border-[#bdaee9] bg-[#f2efff] text-[#7356b2]" : "border-[#dfebef] bg-white text-[#74859a]"}`}>{option.label}</button>)}</div>
-            <div className="mt-3 flex items-center justify-between rounded-2xl bg-[#fbfdfe] px-3 py-2.5 ring-1 ring-[#e4edf0]"><span className="text-[9px] font-black uppercase tracking-[.14em] text-[#8797a8]">Hours slept</span><div className="flex items-center gap-2"><button type="button" aria-label="Decrease sleep hours" onClick={() => { const next = Math.max(0, Number((sleepHours - 0.5).toFixed(1))); setSleepHours(next); void syncGoal(sleepGoal, "SLEEP", next); }} className="grid h-8 w-8 place-items-center rounded-lg bg-[#f5f8fb] text-[#0b2d54]"><Minus className="h-3.5 w-3.5" /></button><span className="min-w-10 text-center text-sm font-black text-[#0b2d54]">{sleepHours}h</span><button type="button" aria-label="Increase sleep hours" onClick={() => { const next = Math.min(24, Number((sleepHours + 0.5).toFixed(1))); setSleepHours(next); void syncGoal(sleepGoal, "SLEEP", next); }} className="grid h-8 w-8 place-items-center rounded-lg bg-[#f5f8fb] text-[#0b2d54]"><Plus className="h-3.5 w-3.5" /></button></div></div>
+            <div className="mt-3 flex items-center justify-between gap-1.5" aria-label={`Sleep recovery level: ${effectiveSleepQuality ? sleepLabel(effectiveSleepQuality) : "Not set"}`}>
+              {sleepOptions.map((option) => {
+                const selected = effectiveSleepQuality === option.value;
+                return <span key={option.value} className={`flex-1 rounded-xl border px-1.5 py-1.5 text-center text-[9px] font-black transition ${selected ? "border-[#bdaee9] bg-[#f2efff] text-[#7356b2] shadow-[0_0_0_2px_rgba(115,86,178,.08)]" : "border-[#edf1f4] bg-[#fbfdfe] text-[#a0adba]"}`}>{option.label}</span>;
+              })}
+            </div>
+            <p className="mt-2 text-[10px] font-semibold text-[#8a97a6]">Your recovery level updates automatically as you change your hours.</p>
+            <div className="mt-3 flex items-center justify-between rounded-2xl bg-[#fbfdfe] px-3 py-2.5 ring-1 ring-[#e4edf0]"><span className="text-[9px] font-black uppercase tracking-[.14em] text-[#8797a8]">Hours slept</span><div className="flex items-center gap-2"><button type="button" aria-label="Decrease sleep hours" onClick={() => { const next = Math.max(0, Number((sleepHours - 0.5).toFixed(1))); const nextQuality = next > 0 ? sleepQualityForHours(next) : null; setSleepHours(next); setSleepQuality(nextQuality); void syncGoal(sleepGoal, "SLEEP", next); }} className="grid h-8 w-8 place-items-center rounded-lg bg-[#f5f8fb] text-[#0b2d54]"><Minus className="h-3.5 w-3.5" /></button><span className="min-w-10 text-center text-sm font-black text-[#0b2d54]">{sleepHours}h</span><button type="button" aria-label="Increase sleep hours" onClick={() => { const next = Math.min(24, Number((sleepHours + 0.5).toFixed(1))); const nextQuality = sleepQualityForHours(next); setSleepHours(next); setSleepQuality(nextQuality); void syncGoal(sleepGoal, "SLEEP", next); }} className="grid h-8 w-8 place-items-center rounded-lg bg-[#f5f8fb] text-[#0b2d54]"><Plus className="h-3.5 w-3.5" /></button></div></div>
           </div>
         </article>
 
