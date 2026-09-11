@@ -22,6 +22,7 @@ import { CreatePatientMedicationDto } from './dto/create-patient-medication.dto'
 import { UpdatePatientMedicationDto } from './dto/update-patient-medication.dto';
 import { QueryPatientMedicationDto } from './dto/query-patient-medication.dto';
 import { CreateMedicationReminderDto } from './dto/create-medication-reminder.dto';
+import { RecordMedicationAdherenceDto } from '../medication-adherence/dto/record-medication-adherence.dto';
 
 @ApiTags('Patient Medications')
 @ApiBearerAuth()
@@ -50,9 +51,20 @@ export class PatientMedicationsController {
     return this.patientMedicationsService.findOne(id);
   }
 
-  // Scheduling a reminder does not modify the prescription itself. The
-  // service separately verifies that the medication belongs to the
-  // authenticated patient before creating the notification.
+  @Permissions('patient-medication.update')
+  @Post(':id/adherence')
+  recordAdherence(
+    @Param('id') id: string,
+    @Body() dto: RecordMedicationAdherenceDto,
+    @Req() request: { user?: { id?: string } },
+  ) {
+    return this.patientMedicationsService.recordAdherence(
+      id,
+      dto,
+      request.user?.id ?? '',
+    );
+  }
+
   @Permissions('patient-medication.read')
   @Post(':id/reminder')
   scheduleReminder(
