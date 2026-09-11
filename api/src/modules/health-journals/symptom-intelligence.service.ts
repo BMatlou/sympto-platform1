@@ -72,7 +72,8 @@ export class SymptomIntelligenceService {
         data: {
           patientId: patient.id,
           title: `Symptom: ${symptomName}`,
-          description: 'Patient symptom tracking episode. Sympto links related observations and health information over time.',
+          description:
+            'Patient symptom tracking episode. Sympto links related observations and health information over time.',
           type: ClinicalEpisodeType.ACUTE,
           startedAt,
         },
@@ -177,7 +178,7 @@ export class SymptomIntelligenceService {
 
     return {
       assessment: {
-        tone: urgent ? 'urgent' as const : symptomMentioned ? 'watch' as const : 'calm' as const,
+        tone: urgent ? ('urgent' as const) : symptomMentioned ? ('watch' as const) : ('calm' as const),
         title: urgent ? 'Please get urgent help' : symptomMentioned ? 'Sympto has connected the context' : 'Health update noted',
         message: urgent
           ? 'This is safety guidance, not a diagnosis. Please seek appropriate medical care now if the symptom is severe or worsening.'
@@ -220,7 +221,10 @@ export class SymptomIntelligenceService {
       include: {
         healthPassport: {
           include: {
-            medications: { where: { active: true }, include: { medication: true } },
+            medications: {
+              where: { status: { in: ['ACTIVE', 'PAUSED'] } },
+              include: { medication: true },
+            },
             conditions: { include: { condition: true } },
             allergies: { include: { allergy: true } },
           },
@@ -238,12 +242,12 @@ export class SymptomIntelligenceService {
           take: 10,
         },
         appointments: {
-          where: { scheduledAt: { gte: now } },
-          orderBy: { scheduledAt: 'asc' },
+          where: { scheduledStart: { gte: now } },
+          orderBy: { scheduledStart: 'asc' },
           take: 1,
         },
         labOrders: {
-          orderBy: { createdAt: 'desc' },
+          orderBy: { orderedAt: 'desc' },
           take: 5,
         },
         imagingStudies: {
@@ -312,7 +316,7 @@ export class SymptomIntelligenceService {
         measuredAt: vital.measuredAt,
       })),
       wearableHeartRate,
-      upcomingAppointment: patient.appointments[0]?.scheduledAt ?? null,
+      upcomingAppointment: patient.appointments[0]?.scheduledStart ?? null,
       recentLabOrderCount: patient.labOrders.length,
       recentImagingCount: patient.imagingStudies.length,
       recentAiAssessmentCount: patient.aiSymptomAssessments.length,
@@ -385,7 +389,7 @@ export class SymptomIntelligenceService {
 
     return {
       assessment: {
-        tone: urgent ? 'urgent' as const : severe || insights.length > 1 ? 'watch' as const : 'calm' as const,
+        tone: urgent ? ('urgent' as const) : severe || insights.length > 1 ? ('watch' as const) : ('calm' as const),
         title: urgent ? 'Please get urgent help' : severe ? 'Symptom recorded — keep a closer watch' : 'Symptom connected to your health context',
         message: urgent
           ? 'This is safety guidance, not a diagnosis. Please seek appropriate medical care when needed.'
