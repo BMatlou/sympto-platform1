@@ -91,14 +91,18 @@ export default function HealthHome() {
         <section className="relative overflow-hidden rounded-[34px] bg-gradient-to-br from-[#08284a] via-[#0e4773] to-[#24babe] p-7 text-white shadow-[0_18px_52px_rgba(11,45,84,0.10)] sm:p-9 lg:p-10">
           <div className="pointer-events-none absolute -right-[205px] -top-[255px] h-[500px] w-[500px] rounded-full border border-white/15 shadow-[0_0_0_34px_rgba(255,255,255,0.035),0_0_0_68px_rgba(255,255,255,0.02)]" />
           <div className="pointer-events-none absolute bottom-[-180px] left-[42%] h-[230px] w-[230px] rounded-full bg-[#24c1c4]/30 blur-3xl" />
-          <div className="relative grid items-center gap-8 lg:grid-cols-[1fr_300px] lg:gap-10">
-            <div>
-              <p className="text-sm font-medium tracking-[-0.01em] text-white/85">{greeting}, {firstName}</p>
-              <h1 className="mt-2 max-w-xl text-2xl font-black tracking-[-0.045em] sm:text-3xl">Here’s what needs your attention today.</h1>
-              <p className="mt-2 max-w-lg text-sm leading-6 text-white/70">{todayActionCount > 0 ? `${todayActionCount} ${todayActionCount === 1 ? "item needs" : "items need"} your attention.` : "You have nothing urgent waiting for you today."}</p>
-              <div className="mt-6 flex flex-wrap gap-2.5"><Link href="/log-symptom" className="inline-flex min-h-12 items-center justify-center gap-2 rounded-[15px] bg-white px-4 py-3 text-xs font-black text-[#0b2d54] shadow-sm transition hover:-translate-y-0.5"><HeartPulse className="h-4 w-4" />Log a symptom</Link><Link href="/today" className="inline-flex min-h-12 items-center justify-center gap-2 rounded-[15px] border border-white/25 bg-white/10 px-4 py-3 text-xs font-extrabold text-white backdrop-blur-sm transition hover:bg-white/15">Open today <ArrowRight className="h-4 w-4" /></Link></div>
+          <div className="relative">
+            <p className="text-sm font-medium tracking-[-0.01em] text-white/80">{greeting}, {firstName}</p>
+            <div className="mt-3 flex flex-col gap-5 sm:flex-row sm:items-end sm:justify-between">
+              <div>
+                <p className="text-lg font-medium tracking-[-0.02em] text-white/95 sm:text-xl">{todayActionCount > 0 ? `${todayActionCount} ${todayActionCount === 1 ? "thing" : "things"} to take care of today.` : "Nothing urgent to take care of today."}</p>
+                <p className="mt-1 text-sm leading-6 text-white/60">{todayActionCount > 0 ? "Start with what matters most." : "You’re all caught up."}</p>
+              </div>
+              <div className="flex flex-wrap gap-2.5">
+                <Link href="/today" className="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl bg-white px-4 py-2 text-xs font-semibold text-[#0b2d54] shadow-sm transition hover:-translate-y-0.5"><span>View today</span><ArrowRight className="h-3.5 w-3.5" /></Link>
+                <Link href="/log-symptom" className="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl border border-white/20 bg-white/10 px-4 py-2 text-xs font-medium text-white backdrop-blur-sm transition hover:bg-white/15"><HeartPulse className="h-4 w-4" /><span>Log a symptom</span></Link>
+              </div>
             </div>
-            <div className="rounded-[26px] border border-white/15 bg-white/10 p-5 backdrop-blur-md lg:ml-auto lg:w-full"><p className="text-[10px] font-black uppercase tracking-[0.16em] text-white/55">Today</p><p className="mt-2 text-3xl font-black tracking-[-0.05em]">{todayActionCount}</p><p className="mt-1 text-sm font-bold text-white/90">{todayActionCount === 1 ? "thing needs" : "things need"} your attention</p><p className="mt-2 text-xs leading-5 text-white/60">Medication · Visit · Goal</p></div>
           </div>
         </section>
 
