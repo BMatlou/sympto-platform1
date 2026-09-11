@@ -1,4 +1,5 @@
 import {
+  BadRequestException,
   ConflictException,
   Injectable,
   NotFoundException,
@@ -125,6 +126,10 @@ export class PatientMedicationsService {
 
     if (!authenticatedUserId || ownerUserId !== authenticatedUserId) {
       throw new NotFoundException('Patient medication not found.');
+    }
+
+    if (dto.medicationId !== existing.medicationId) {
+      throw new BadRequestException('Medication does not match the patient medication record.');
     }
 
     const settings = await this.prisma.healthJournalSettings.findUnique({
