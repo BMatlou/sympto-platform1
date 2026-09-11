@@ -1,14 +1,4 @@
-import {
-  Body,
-  Controller,
-  Delete,
-  Get,
-  Param,
-  Patch,
-  Post,
-  Query,
-  UseGuards,
-} from '@nestjs/common';
+import { Controller, Delete, Get, Param, Patch, Post, Query, Req, UseGuards } from '@nestjs/common';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
@@ -16,7 +6,6 @@ import { PermissionsGuard } from '../auth/guards/permissions.guard';
 import { Permissions } from '../auth/decorators/permissions.decorator';
 
 import { AIAnalysesService } from './ai-analyses.service';
-
 import { CreateAIAnalysisDto } from './dto/create-ai-analysis.dto';
 import { UpdateAIAnalysisDto } from './dto/update-ai-analysis.dto';
 import { QueryAIAnalysisDto } from './dto/query-ai-analysis.dto';
@@ -24,63 +13,37 @@ import { QueryAIAnalysisDto } from './dto/query-ai-analysis.dto';
 @ApiTags('Ai Analyses')
 @ApiBearerAuth()
 @Controller('ai-analyses')
-@UseGuards(
-  JwtAuthGuard,
-  PermissionsGuard,
-)
+@UseGuards(JwtAuthGuard, PermissionsGuard)
 export class AIAnalysesController {
-  constructor(
-    private readonly aiAnalysesService: AIAnalysesService,
-  ) {}
+  constructor(private readonly aiAnalysesService: AIAnalysesService) {}
 
   @Permissions('ai-analysis.create')
   @Post()
-  create(
-    @Body()
-    dto: CreateAIAnalysisDto,
-  ) {
+  create(@Body() dto: CreateAIAnalysisDto) {
     return this.aiAnalysesService.create(dto);
   }
 
   @Permissions('ai-analysis.read')
   @Get()
-  findAll(
-    @Query()
-    query: QueryAIAnalysisDto,
-  ) {
-    return this.aiAnalysesService.findAll(query);
+  findAll(@Req() req: any, @Query() query: QueryAIAnalysisDto) {
+    return this.aiAnalysesService.findAll(query, req.user.sub);
   }
 
   @Permissions('ai-analysis.read')
   @Get(':id')
-  findOne(
-    @Param('id')
-    id: string,
-  ) {
+  findOne(@Param('id') id: string) {
     return this.aiAnalysesService.findOne(id);
   }
 
   @Permissions('ai-analysis.update')
   @Patch(':id')
-  update(
-    @Param('id')
-    id: string,
-
-    @Body()
-    dto: UpdateAIAnalysisDto,
-  ) {
-    return this.aiAnalysesService.update(
-      id,
-      dto,
-    );
+  update(@Param('id') id: string, @Body() dto: UpdateAIAnalysisDto) {
+    return this.aiAnalysesService.update(id, dto);
   }
 
   @Permissions('ai-analysis.delete')
   @Delete(':id')
-  remove(
-    @Param('id')
-    id: string,
-  ) {
+  remove(@Param('id') id: string) {
     return this.aiAnalysesService.remove(id);
   }
 }
