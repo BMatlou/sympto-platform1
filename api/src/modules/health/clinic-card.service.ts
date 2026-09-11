@@ -60,6 +60,12 @@ export class ClinicCardService {
       return person ? [person.preferredName ?? person.firstName, person.lastName].filter(Boolean).join(' ') : null;
     };
 
+    const heightCm = patient.heightCm != null ? Number(patient.heightCm) : patient.baseline?.heightCm != null ? Number(patient.baseline.heightCm) : null;
+    const weightKg = patient.weightKg != null ? Number(patient.weightKg) : patient.baseline?.weightKg != null ? Number(patient.baseline.weightKg) : null;
+    const calculatedBmi = heightCm && weightKg && heightCm > 0 && weightKg > 0
+      ? Number((weightKg / Math.pow(heightCm / 100, 2)).toFixed(2))
+      : null;
+
     const updatedDates = [
       passport?.updatedAt,
       ...activeAllergies.map((item) => item.updatedAt),
@@ -91,9 +97,9 @@ export class ClinicCardService {
         contacts: patient.emergencyContacts,
       },
       vitals: {
-        heightCm: patient.heightCm ?? patient.baseline?.heightCm ?? null,
-        weightKg: patient.weightKg ?? patient.baseline?.weightKg ?? null,
-        bmi: patient.baseline?.bmi ?? null,
+        heightCm,
+        weightKg,
+        bmi: calculatedBmi ?? (patient.baseline?.bmi != null ? Number(patient.baseline.bmi) : null),
       },
       allergies: activeAllergies.map((item) => ({
         id: item.id,
