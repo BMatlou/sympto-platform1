@@ -1,4 +1,14 @@
--- Grant the existing patient-medication.update permission to the PATIENT role.
+-- Ensure the existing patient-medication.update permission exists and grant it to PATIENT.
+INSERT INTO "Permission" ("id", "name", "description", "createdAt", "updatedAt")
+VALUES (
+  md5('patient-medication.update')::uuid,
+  'patient-medication.update',
+  'Update patient medication records and adherence.',
+  CURRENT_TIMESTAMP,
+  CURRENT_TIMESTAMP
+)
+ON CONFLICT ("name") DO NOTHING;
+
 INSERT INTO "RolePermission" ("id", "roleId", "permissionId")
 SELECT
   md5(r."id" || p."id")::uuid,
