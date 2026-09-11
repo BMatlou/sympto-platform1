@@ -1,14 +1,14 @@
 "use client";
 
 import Link from "next/link";
-import { Activity, CalendarDays, FileHeart, HeartPulse, Menu, MessageCircle, QrCode, Settings, ShieldCheck, UserRound, Users, Watch, X } from "lucide-react";
+import { Activity, CalendarDays, ClipboardPlus, FileHeart, HeartPulse, Menu, MessageCircle, QrCode, Settings, ShieldCheck, UserRound, Users, Watch, X } from "lucide-react";
 import { useState } from "react";
 
 export default function HealthAccountNav() {
   const [open, setOpen] = useState(false);
   const close = () => setOpen(false);
   const links = [
-    ["/appointments", "Appointments", CalendarDays], ["/care-plans", "Care Plans", HeartPulse], ["/health-goals", "Health Goals", HeartPulse], ["/wearables", "Link Watch", Watch], ["/notifications", "Notifications", ShieldCheck], ["/health-passport", "Health Passport", FileHeart], ["/health-records", "Health Records", FileHeart], ["/messages", "Messages", MessageCircle], ["/profile", "Profile", UserRound], ["/family", "Family", Users], ["/settings", "Settings", Settings],
+    ["/appointments", "Appointments", CalendarDays], ["/care-plans", "Care Plans", HeartPulse], ["/health-goals", "Health Goals", HeartPulse], ["/log-symptom", "Log symptom", ClipboardPlus], ["/wearables", "Link Watch", Watch], ["/notifications", "Notifications", ShieldCheck], ["/health-passport", "Health Passport", FileHeart], ["/health-records", "Health Records", FileHeart], ["/messages", "Messages", MessageCircle], ["/profile", "Profile", UserRound], ["/family", "Family", Users], ["/settings", "Settings", Settings],
   ] as const;
   return <div className="fixed right-4 top-4 z-50 flex items-center gap-2 sm:right-6 sm:top-5">
     <Link href="/smart-file" aria-label="Share Smart File" className="inline-flex min-h-12 items-center gap-2 rounded-2xl bg-[#0b2d54] px-4 py-3 text-xs font-black text-white shadow-[0_12px_35px_rgba(11,45,84,0.22)] ring-1 ring-white/60 transition hover:-translate-y-0.5 hover:bg-[#071f3a] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#24c1c4]"><QrCode className="h-5 w-5" aria-hidden="true" /><span className="hidden sm:inline">Share Smart File</span><span className="sm:hidden">Share</span></Link>
