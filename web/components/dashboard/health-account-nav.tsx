@@ -4,10 +4,6 @@ import Link from "next/link";
 import { CalendarDays, FileHeart, HeartPulse, Menu, MessageCircle, QrCode, Settings, ShieldCheck, UserRound, Users, X } from "lucide-react";
 import { useState } from "react";
 
-/**
- * Patient navigation. Core patient journeys live here so the Health Home
- * can remain intentionally limited to its three primary action cards.
- */
 export default function HealthAccountNav() {
   const [open, setOpen] = useState(false);
   const close = () => setOpen(false);
