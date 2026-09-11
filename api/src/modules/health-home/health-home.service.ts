@@ -4,6 +4,21 @@ import { PrismaService } from '../../database/prisma.service';
 const ACTIVE_APPOINTMENT_STATUSES = ['PENDING', 'CONFIRMED', 'CHECKED_IN', 'IN_PROGRESS'] as const;
 const ACTIVE_MEDICATION_STATUSES = ['ACTIVE', 'PAUSED'] as const;
 
+function calculateBmi(weightKg: number | null | undefined, heightCm: number | null | undefined): number | null {
+  if (!weightKg || !heightCm || weightKg <= 0 || heightCm <= 0) return null;
+  return Number((weightKg / Math.pow(heightCm / 100, 2)).toFixed(1));
+}
+
+function getBmiCategory(bmi: number | null): string | null {
+  if (bmi == null || Number.isNaN(bmi)) return null;
+  if (bmi < 18.5) return 'UNDERWEIGHT';
+  if (bmi < 25) return 'HEALTHY_WEIGHT';
+  if (bmi < 30) return 'OVERWEIGHT';
+  if (bmi < 35) return 'OBESITY_CLASS_1';
+  if (bmi < 40) return 'OBESITY_CLASS_2';
+  return 'OBESITY_CLASS_3';
+}
+
 @Injectable()
 export class HealthHomeService {
   constructor(private readonly prisma: PrismaService) {}
@@ -54,6 +69,37 @@ export class HealthHomeService {
     const latestMeasurements = new Map<string, (typeof measurements)[number]>();
     for (const measurement of measurements) if (!latestMeasurements.has(measurement.measurementType)) latestMeasurements.set(measurement.measurementType, measurement);
     const latest = (type: string) => latestMeasurements.get(type as never) ?? null;
+
+    const bmi = calculateBmi(
+      patient.weightKg != null ? Number(patient.weightKg) : patient.baseline?.weightKg != null ? Number(patient.baseline.weightKg) : null,
+      patient.heightCm != null ? Number(patient.heightCm) : patient.baseline?.heightCm != null ? Number(patient.baseline.heightCm) : null,
+    );
+    const bmiCategory = getBmiCategory(bmi);
+    const latestWeight = latest('WEIGHT');
+    const latestBmiMeasurement = latest('BMI');
+
+    const latestClinicalVitals = new Map<string, (typeof clinicalVitals)[number]>();
+    for (const vital of clinicalVitals) {
+      const code = String(vital.vitalType?.code ?? vital.vitalType?.name ?? '').toUpperCase();
+      if (code && !latestClinicalVitals.has(code)) latestClinicalVitals.set(code, vital);
+    }
+
+    const normalizedVitals = [
+      latestClinicalVitals.get('BLOOD_PRESSURE'),
+      latestClinicalVitals.get('HEART_RATE'),
+      latestClinicalVitals.get('OXYGEN_SATURATION'),
+      latestClinicalVitals.get('BODY_TEMPERATURE'),
+      latestClinicalVitals.get('RESPIRATORY_RATE'),
+      latestClinicalVitals.get('WEIGHT'),
+    ].filter(Boolean).map((vital: any) => ({
+      type: String(vital.vitalType?.code ?? vital.vitalType?.name ?? '').toUpperCase(),
+      name: vital.vitalType?.name ?? vital.vitalType?.code ?? 'Vital sign',
+      value: Number(vital.value),
+      unit: vital.vitalType?.unit ?? '',
+      measuredAt: vital.measuredAt,
+      source: 'CLINICAL_RECORD',
+    }));
+
     const attention = [
       ...notifications.filter((n) => n.priority === 'HIGH' || n.priority === 'URGENT').map((n) => ({ type: 'NOTIFICATION', severity: n.priority, title: n.title, description: n.body, actionUrl: n.actionUrl })),
       ...aiObservations.filter((o) => o.requiresAttention && !o.reviewed).map((o) => ({ type: 'AI_OBSERVATION', severity: 'HIGH', title: 'Sympto noticed something worth reviewing', description: o.observation, actionUrl: '/health-journal' })),
@@ -73,12 +119,16 @@ export class HealthHomeService {
     const bloodType = patient.healthPassport?.bloodType ?? medicalRecord?.bloodType ?? null;
     const organDonor = patient.healthPassport?.organDonor ?? medicalRecord?.organDonor ?? false;
     const emergencyNotes = patient.healthPassport?.emergencyNotes ?? null;
+    const heightCm = patient.heightCm != null ? Number(patient.heightCm) : patient.baseline?.heightCm != null ? Number(patient.baseline.heightCm) : null;
+    const weightKg = patient.weightKg != null ? Number(patient.weightKg) : latestWeight ? Number(latestWeight.value) : patient.baseline?.weightKg != null ? Number(patient.baseline.weightKg) : null;
+    const finalBmi = calculateBmi(weightKg, heightCm) ?? (latestBmiMeasurement ? Number(latestBmiMeasurement.value) : null);
+    const finalBmiCategory = getBmiCategory(finalBmi);
     return {
       generatedAt: now.toISOString(),
       profile: patient.person,
-      patient: { id: patientId, patientNumber: patient.patientNumber, firstName: patient.person?.firstName ?? '', lastName: patient.person?.lastName ?? '', name: [patient.person?.firstName, patient.person?.lastName].filter(Boolean).join(' '), heightCm: patient.heightCm, weightKg: patient.weightKg, deceased: patient.deceased },
+      patient: { id: patientId, patientNumber: patient.patientNumber, firstName: patient.person?.firstName ?? '', lastName: patient.person?.lastName ?? '', name: [patient.person?.firstName, patient.person?.lastName].filter(Boolean).join(' '), heightCm, weightKg, bmi: finalBmi, bmiCategory: finalBmiCategory, deceased: patient.deceased },
       healthPassport: patient.healthPassport ? { ...patient.healthPassport, bloodType, organDonor, emergencyNotes } : medicalRecord ? { bloodType, organDonor, emergencyNotes, source: 'MEDICAL_RECORD' } : null,
-      healthSnapshot: { baseline: patient.baseline, activeConditions, activeAllergies, allergies: activeAllergies, immunizations, bloodType, rhesusFactor: patient.healthPassport?.rhesusFactor ?? null, latestMeasurements: journalSignals.signals, connectedDevices: devices.map((device) => ({ id: device.id, manufacturer: device.manufacturer, model: device.model, deviceType: device.deviceType, status: device.status, lastSyncAt: device.lastSyncAt, measurementCount: device._count.measurements })) },
+      healthSnapshot: { baseline: patient.baseline, activeConditions, activeAllergies, allergies: activeAllergies, immunizations, bloodType, rhesusFactor: patient.healthPassport?.rhesusFactor ?? null, heightCm, weightKg, bmi: finalBmi, bmiCategory: finalBmiCategory, latestMeasurements: journalSignals.signals, normalizedVitals, connectedDevices: devices.map((device) => ({ id: device.id, manufacturer: device.manufacturer, model: device.model, deviceType: device.deviceType, status: device.status, lastSyncAt: device.lastSyncAt, measurementCount: device._count.measurements })) },
       attention,
       today: { notifications, upcomingAppointments: appointments.slice(0, 5), activeMedications: medications, activeMedicationCount: medications.length, activeGoalCount: goals.length },
       medications, appointments, goals: goalsWithProgress, healthGoals: goalsWithProgress, family, allergies, conditions, immunizations,
