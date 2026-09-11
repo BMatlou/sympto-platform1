@@ -55,13 +55,13 @@ export default function ClinicCardSummary({ patient, profile, healthPassport, he
       </div>
 
       <div className="grid gap-4 p-5 sm:p-6 lg:grid-cols-3">
-        <div className="rounded-2xl bg-rose-50/70 p-4 ring-1 ring-rose-100">
-          <p className="text-[9px] font-black uppercase tracking-[0.15em] text-rose-600">Allergies</p>
+        <div className="rounded-2xl bg-[#f3f8fc] p-4 ring-1 ring-[#dfeaed]">
+          <p className="text-[9px] font-black uppercase tracking-[0.15em] text-[#0b2d54]">Allergies</p>
           <div className="mt-3"><Chips values={names(allergies, "allergy")} empty="No active allergies recorded" /></div>
         </div>
 
-        <div className="rounded-2xl bg-amber-50/70 p-4 ring-1 ring-amber-100">
-          <p className="text-[9px] font-black uppercase tracking-[0.15em] text-amber-700">Conditions</p>
+        <div className="rounded-2xl bg-[#f6f9fb] p-4 ring-1 ring-[#dfeaed]">
+          <p className="text-[9px] font-black uppercase tracking-[0.15em] text-[#315b7f]">Conditions</p>
           <div className="mt-3"><Chips values={names(conditions, "condition")} empty="No active conditions recorded" /></div>
         </div>
 
