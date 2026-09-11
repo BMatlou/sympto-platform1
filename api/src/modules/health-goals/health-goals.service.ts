@@ -86,13 +86,14 @@ export class HealthGoalsService {
       throw new BadRequestException('Health goal progress value is invalid.');
     }
 
-    const supportedDailyGoal =
+    const supportedGoal =
       goal.category === HealthGoalCategory.HYDRATION ||
       goal.category === HealthGoalCategory.EXERCISE ||
-      goal.category === HealthGoalCategory.SLEEP;
+      goal.category === HealthGoalCategory.SLEEP ||
+      goal.category === HealthGoalCategory.MEDICATION;
 
-    if (!supportedDailyGoal) {
-      throw new BadRequestException('This goal type is not updated by the daily check-in.');
+    if (!supportedGoal) {
+      throw new BadRequestException('This goal type is not updated by automatic activity tracking.');
     }
 
     const unit = String(goal.unit ?? '').trim().toLowerCase();
