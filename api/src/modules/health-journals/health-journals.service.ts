@@ -6,6 +6,7 @@ import {
 import { Prisma } from '@prisma/client';
 
 import { PrismaService } from '../../database/prisma.service';
+import { HealthGoalIntelligenceService } from '../health-goals/health-goal-intelligence.service';
 
 import { CreateHealthJournalDto } from './dto/create-health-journal.dto';
 import { UpdateHealthJournalDto } from './dto/update-health-journal.dto';
@@ -15,6 +16,7 @@ import { QueryHealthJournalDto } from './dto/query-health-journal.dto';
 export class HealthJournalsService {
   constructor(
     private readonly prisma: PrismaService,
+    private readonly healthGoalIntelligence: HealthGoalIntelligenceService,
   ) {}
 
   /**
@@ -48,7 +50,7 @@ export class HealthJournalsService {
     const patientId =
       await this.getPatientId(userId);
 
-    return this.prisma.healthJournal.create({
+    const journal = await this.prisma.healthJournal.create({
       data: {
         ...dto,
         patientId,
@@ -60,6 +62,13 @@ export class HealthJournalsService {
         practitioner: true,
       },
     });
+
+    await this.healthGoalIntelligence.syncTodayFromJournal(
+      patientId,
+      journal.createdAt,
+    );
+
+    return journal;
   }
 
   async findAll(
@@ -177,7 +186,7 @@ export class HealthJournalsService {
       );
     }
 
-    return this.prisma.healthJournal.update({
+    const updatedJournal = await this.prisma.healthJournal.update({
       where: {
         id,
       },
@@ -190,6 +199,13 @@ export class HealthJournalsService {
         practitioner: true,
       },
     });
+
+    await this.healthGoalIntelligence.syncTodayFromJournal(
+      patientId,
+      updatedJournal.createdAt,
+    );
+
+    return updatedJournal;
   }
 
   async remove(
