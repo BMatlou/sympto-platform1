@@ -1,0 +1,7 @@
+model SmartFileShareSession {
+  id        String   @id @default(uuid())
+  patientId String
+  qrToken   String   @unique
+  shortCode String   @unique
+  expiresAt DateTime
+}

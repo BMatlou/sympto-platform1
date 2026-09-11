@@ -4,6 +4,7 @@ import "./globals.css";
 import { Toaster } from "sonner";
 
 import { cn } from "@/lib/utils";
+import AIHealthHelperFab from "@/components/ai-health-helper-fab";
 import QueryProvider from "@/providers/query-provider";
 import ThemeProvider from "@/providers/theme-provider";
 
@@ -70,17 +71,20 @@ export default function RootLayout({
         "font-sans"
       )}
     >
-      <body className="min-h-screen bg-background text-foreground">
+      <body className="min-h-screen bg-background pb-28 text-foreground">
         <ThemeProvider>
-  <QueryProvider>{children}</QueryProvider>
+          <QueryProvider>
+            {children}
+            <AIHealthHelperFab />
+          </QueryProvider>
 
-  <Toaster
-    richColors
-    position="top-right"
-    closeButton
-    duration={4000}
-  />
-</ThemeProvider>
+          <Toaster
+            richColors
+            position="top-right"
+            closeButton
+            duration={4000}
+          />
+        </ThemeProvider>
       </body>
     </html>
   );

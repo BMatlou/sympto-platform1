@@ -8,6 +8,7 @@ import { OnboardingService } from './onboarding.service';
 import { OnboardingRepository } from './onboarding.repository';
 import { ProfileRecordController } from './profile-record.controller';
 import { ProfileRecordService } from './profile-record.service';
+import { PatientHealthRecordController } from './patient-health-record.controller';
 
 @Module({
   imports: [
@@ -17,6 +18,7 @@ import { ProfileRecordService } from './profile-record.service';
   controllers: [
     OnboardingController,
     ProfileRecordController,
+    PatientHealthRecordController,
   ],
   providers: [
     OnboardingService,

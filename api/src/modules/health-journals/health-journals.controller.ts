@@ -17,10 +17,13 @@ import { PermissionsGuard } from '../auth/guards/permissions.guard';
 import { Permissions } from '../auth/decorators/permissions.decorator';
 
 import { HealthJournalsService } from './health-journals.service';
+import { SymptomIntelligenceService } from './symptom-intelligence.service';
 
 import { CreateHealthJournalDto } from './dto/create-health-journal.dto';
 import { UpdateHealthJournalDto } from './dto/update-health-journal.dto';
 import { QueryHealthJournalDto } from './dto/query-health-journal.dto';
+import { ProcessSymptomDto } from './dto/process-symptom.dto';
+import { TalkToSymptoDto } from './dto/talk-to-sympto.dto';
 
 @ApiTags('Health Journals')
 @ApiBearerAuth()
@@ -29,6 +32,7 @@ import { QueryHealthJournalDto } from './dto/query-health-journal.dto';
 export class HealthJournalsController {
   constructor(
     private readonly healthJournalsService: HealthJournalsService,
+    private readonly symptomIntelligenceService: SymptomIntelligenceService,
   ) {}
 
   @Permissions('health-journals.create')
@@ -41,6 +45,44 @@ export class HealthJournalsController {
       req.user.sub,
       dto,
     );
+  }
+
+  @Permissions('health-journals.create')
+  @Post('process-symptom')
+  processSymptom(
+    @Req() req: any,
+    @Body() dto: ProcessSymptomDto,
+  ) {
+    return this.symptomIntelligenceService.processSymptomLog(
+      req.user.sub,
+      dto,
+    );
+  }
+
+  @Permissions('health-journals.create')
+  @Post('talk-to-sympto')
+  async talkToSympto(
+    @Req() req: any,
+    @Body() dto: TalkToSymptoDto,
+  ) {
+    const journal = await this.healthJournalsService.create(
+      req.user.sub,
+      {
+        title: 'Talk to Sympto — health update',
+        journal: dto.message.trim(),
+        notes: 'Captured through Talk to Sympto.',
+      },
+    );
+
+    const intelligence = await this.symptomIntelligenceService.analyzeTalkUpdate(
+      req.user.sub,
+      dto.message,
+    );
+
+    return {
+      journal,
+      intelligence,
+    };
   }
 
   @Permissions('health-journals.read')

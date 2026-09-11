@@ -1,78 +1,108 @@
 "use client";
 
 import Link from "next/link";
-import { ArrowRight, CalendarDays, CheckCircle2, FolderOpen, HeartPulse, Pill, Scale, ShieldCheck, TriangleAlert, Watch } from "lucide-react";
+import { ArrowRight, CheckCircle2, FolderOpen, HeartPulse, ShieldCheck, TriangleAlert } from "lucide-react";
 import ProtectedRoute from "@/components/auth/protected-route";
 import { useDashboard } from "@/hooks/use-dashboard";
+import HealthVitalsSummary, { type DashboardVital } from "@/components/dashboard/health-vitals-summary";
 
 function display(value: unknown): string {
   return value === null || value === undefined || value === "" ? "—" : String(value);
 }
 
-function measurementValue(measurements: Array<Record<string, unknown>> | undefined, types: string[]) {
-  return measurements?.find((item) => types.includes(String(item.type ?? item.measurementType ?? "").toUpperCase()));
+function normalizeVitals(data: any): DashboardVital[] {
+  const deviceVitals = Array.isArray(data?.healthSnapshot?.latestMeasurements)
+    ? data.healthSnapshot.latestMeasurements.map((item: any) => ({ type: item.type ?? item.measurementType, name: item.name, value: item.value, unit: item.unit, measuredAt: item.measuredAt, source: item.source }))
+    : [];
+  const clinicalVitals = Array.isArray(data?.clinicalVitals)
+    ? data.clinicalVitals.map((item: any) => ({ type: item.vitalType?.code ?? item.vitalType?.name, name: item.vitalType?.name, value: item.value, unit: item.vitalType?.unit, measuredAt: item.measuredAt, source: "CLINICAL_RECORD" }))
+    : [];
+  const byType = new Map<string, DashboardVital>();
+  for (const vital of [...deviceVitals, ...clinicalVitals]) {
+    const key = String(vital.type ?? vital.name ?? "").toUpperCase();
+    if (!key) continue;
+    const previous = byType.get(key);
+    if (!previous || new Date(String(vital.measuredAt ?? 0)).getTime() > new Date(String(previous.measuredAt ?? 0)).getTime()) byType.set(key, vital);
+  }
+  return Array.from(byType.values());
 }
 
-function bmiPosition(category?: string | null, bmi?: number | null): number {
-  const normalized = String(category ?? "").toUpperCase();
-  if (normalized.includes("UNDER") || normalized.includes("LOW")) return 17;
-  if (normalized.includes("OVER") || normalized.includes("HIGH") || normalized.includes("OBES")) return 83;
-  if (bmi != null) return Math.min(82, Math.max(18, ((bmi - 18.5) / 6.5) * 64 + 18));
-  return 50;
+function itemNames(items: any[], kind: "allergy" | "condition" | "medication") {
+  return items.map((item) => kind === "allergy" ? item?.allergy?.name ?? item?.name : kind === "condition" ? item?.condition?.name ?? item?.name : item?.medication?.name ?? item?.name).filter(Boolean) as string[];
 }
 
-function LargeAction({ href, icon, label }: { href: string; icon: React.ReactNode; label: string }) {
-  return (
-    <Link href={href} className="inline-flex min-h-12 items-center justify-center gap-2 rounded-2xl bg-white px-4 py-3 text-sm font-bold text-[#0b2d54] shadow-sm ring-1 ring-slate-200 transition hover:-translate-y-0.5 hover:shadow-md focus:outline-none focus-visible:ring-2 focus-visible:ring-[#24c1c4]">
-      {icon}{label}
-    </Link>
-  );
-}
-
-function CountPill({ icon, count, label }: { icon: React.ReactNode; count: number; label: string }) {
-  return <div className="flex min-h-12 items-center gap-2 rounded-2xl bg-white/90 px-4 py-2.5 text-[#0b2d54] shadow-sm ring-1 ring-slate-100">{icon}<span className="text-base font-extrabold">{count}</span><span className="text-sm font-semibold">{label}</span></div>;
+function detailLabel(value: unknown, fallback = "Not recorded") {
+  return value === null || value === undefined || value === "" ? fallback : String(value).replaceAll("_", " ");
 }
 
 export default function HealthHome() {
   const { data, loading, error, reload } = useDashboard();
 
-  if (loading) return <ProtectedRoute><main className="min-h-screen bg-[#f5f8fb] p-4 sm:p-8"><div className="mx-auto max-w-5xl space-y-5" aria-busy="true"><div className="h-40 animate-pulse rounded-[32px] bg-white" />{Array.from({ length: 3 }).map((_, i) => <div key={i} className="h-72 animate-pulse rounded-[32px] bg-white" />)}</div></main></ProtectedRoute>;
+  if (loading) {
+    return <ProtectedRoute><main className="min-h-screen bg-[#f4f9fb] p-4 sm:p-8"><div className="mx-auto max-w-[1300px] space-y-4" aria-busy="true"><div className="h-80 animate-pulse rounded-[34px] bg-white" /><div className="grid gap-4 lg:grid-cols-3">{Array.from({ length: 3 }).map((_, i) => <div key={i} className="h-60 animate-pulse rounded-[27px] bg-white" />)}</div></div></main></ProtectedRoute>;
+  }
 
-  if (error || !data) return <ProtectedRoute><main className="min-h-screen bg-[#f5f8fb] p-4 sm:p-8"><div className="mx-auto max-w-xl rounded-[32px] border border-red-200 bg-white p-7 shadow-sm"><div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-red-50 text-red-600"><TriangleAlert className="h-7 w-7" /></div><h1 className="mt-5 text-2xl font-bold text-[#0b2d54]">Your health screen could not load</h1><p className="mt-2 text-base leading-7 text-slate-500">Your health information has not been changed. Please try again.</p><button onClick={reload} className="mt-6 min-h-12 rounded-2xl bg-[#0b2d54] px-6 py-3 text-base font-bold text-white shadow-sm hover:bg-[#071f3a]">Try again</button></div></main></ProtectedRoute>;
+  if (error || !data) {
+    return <ProtectedRoute><main className="min-h-screen bg-[#f4f9fb] p-4 sm:p-8"><div className="mx-auto max-w-xl rounded-[28px] border border-red-200 bg-white p-6"><TriangleAlert className="h-6 w-6 text-red-600" /><h1 className="mt-4 text-xl font-extrabold text-[#0b2d54]">Your health screen could not load</h1><p className="mt-2 text-sm text-slate-500">Your health information has not been changed. Please try again.</p><button type="button" onClick={reload} className="mt-5 min-h-11 rounded-xl bg-[#0b2d54] px-5 py-2 text-sm font-extrabold text-white">Try again</button></div></main></ProtectedRoute>;
+  }
 
   const firstName = data.patient?.firstName || data.profile?.preferredName || data.profile?.firstName || "there";
+  const hour = new Date().getHours();
+  const greeting = hour < 12 ? "Good morning" : hour < 14 ? "Good day" : hour < 18 ? "Good afternoon" : "Good evening";
   const medications = data.today?.activeMedications ?? [];
   const appointments = data.today?.upcomingAppointments ?? [];
   const activeGoals = (data.goals ?? []).filter((goal) => String(goal.status).toUpperCase() !== "ACHIEVED").length;
-  const attentionCount = data.attention?.length ?? 0;
-  const conditions = data.healthSnapshot?.activeConditions ?? [];
-  const allergies = data.healthSnapshot?.allergies ?? [];
-  const immunizations = data.healthSnapshot?.immunizations ?? [];
-  const measurements = data.healthSnapshot?.latestMeasurements ?? [];
-  const watchMeasurements = data.wearables?.latestMeasurements ?? [];
-  const devices = data.wearables?.devices ?? [];
-  const bloodPressure = measurementValue(measurements, ["BLOOD_PRESSURE", "BP"]);
-  const watchHeart = measurementValue(watchMeasurements as Array<Record<string, unknown>>, ["HEART_RATE", "HEART"]);
-  const fallbackHeart = measurementValue(measurements, ["HEART_RATE", "HEART"]);
-  const heart = watchHeart ?? fallbackHeart;
-  const bpValue = bloodPressure ? `${display(bloodPressure.value)} ${display(bloodPressure.unit)}` : "—";
-  const heartValue = heart ? `${display(heart.value)} ${display(heart.unit)}` : "—";
-  const bmi = data.healthSnapshot?.bmi;
-  const bmiCategory = data.healthSnapshot?.bmiCategory;
-  const bmiMarker = bmiPosition(bmiCategory, bmi);
-  const watchConnected = devices.length > 0;
+  const todayActionCount = medications.length + appointments.length + activeGoals;
+  const historyCount = (data.encounters?.length ?? 0) + (data.recentResults?.laboratory?.length ?? 0) + (data.recentResults?.imaging?.length ?? 0) + (data.attachments?.length ?? 0);
+  const bmi = data.healthSnapshot?.bmi ?? data.patient?.bmi ?? null;
+  const bmiCategory = data.healthSnapshot?.bmiCategory ?? data.patient?.bmiCategory ?? null;
+  const healthVitals = normalizeVitals(data);
+  const allergies = data.healthSnapshot?.activeAllergies ?? data.healthSnapshot?.allergies ?? data.allergies ?? [];
+  const conditions = data.healthSnapshot?.activeConditions ?? data.conditions ?? [];
+  const allergyNames = itemNames(allergies, "allergy");
+  const conditionNames = itemNames(conditions, "condition");
+  const bloodType = data.healthPassport?.bloodType ?? data.healthSnapshot?.bloodType ?? data.medicalRecord?.bloodType;
+  const rhesusFactor = data.healthPassport?.rhesusFactor ?? data.healthSnapshot?.rhesusFactor;
 
-  return <ProtectedRoute><main className="min-h-screen bg-[#f5f8fb] text-slate-800">
-    <header className="border-b border-slate-200 bg-white"><div className="mx-auto flex min-h-[72px] max-w-5xl items-center justify-between px-4 sm:px-6"><img src="/logo-navbar.png" alt="Sympto" className="h-11 w-auto" /><span className="rounded-full bg-[#0b2d54]/5 px-4 py-2 text-sm font-extrabold text-[#0b2d54]">My Health</span></div></header>
-    <div className="mx-auto max-w-5xl space-y-5 px-4 py-5 sm:px-6 sm:py-8">
-      <section className="relative overflow-hidden rounded-[32px] bg-gradient-to-br from-[#0b2d54] via-[#103e69] to-[#24c1c4] p-7 text-white shadow-[0_20px_50px_rgba(11,45,84,0.16)] sm:p-9"><div className="absolute -right-24 -top-24 h-72 w-72 rounded-full bg-white/10 blur-3xl" /><div className="relative"><p className="text-sm font-extrabold uppercase tracking-[0.18em] text-white/75">My Health</p><h1 className="mt-3 text-3xl font-black tracking-tight sm:text-4xl">Hello, {firstName} 👋</h1><p className="mt-3 max-w-2xl text-base leading-7 text-white/85">Your important health information is organised for you. Just choose what you need.</p></div></section>
+  return <ProtectedRoute>
+    <main className="min-h-screen bg-[#f4f9fb] text-[#14304d]">
+      <div className="mx-auto max-w-[1300px] px-4 py-5 sm:px-6 sm:py-7 lg:px-8">
+        <section className="relative overflow-hidden rounded-[34px] bg-gradient-to-br from-[#08284a] via-[#0e4773] to-[#24babe] p-7 text-white shadow-[0_18px_52px_rgba(11,45,84,0.10)] sm:p-9 lg:p-10">
+          <div className="pointer-events-none absolute -right-[205px] -top-[255px] h-[500px] w-[500px] rounded-full border border-white/15 shadow-[0_0_0_34px_rgba(255,255,255,0.035),0_0_0_68px_rgba(255,255,255,0.02)]" />
+          <div className="pointer-events-none absolute bottom-[-180px] left-[42%] h-[230px] w-[230px] rounded-full bg-[#24c1c4]/30 blur-3xl" />
+          <div className="relative">
+            <p className="text-sm font-medium tracking-[-0.01em] text-white/80">{greeting}, {firstName}</p>
+            <div className="mt-3 flex flex-col gap-5 sm:flex-row sm:items-end sm:justify-between">
+              <div>
+                <p className="text-lg font-medium tracking-[-0.02em] text-white/95 sm:text-xl">{todayActionCount > 0 ? `${todayActionCount} ${todayActionCount === 1 ? "thing" : "things"} to take care of today.` : "Nothing urgent to take care of today."}</p>
+                <p className="mt-1 text-sm leading-6 text-white/60">{todayActionCount > 0 ? "Start with what matters most." : "You’re all caught up."}</p>
+              </div>
+              <div className="flex flex-wrap gap-2.5">
+                <Link href="/today" className="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl bg-white px-4 py-2 text-xs font-semibold text-[#0b2d54] shadow-sm transition hover:-translate-y-0.5"><span>View today</span><ArrowRight className="h-3.5 w-3.5" /></Link>
+                <Link href="/log-symptom" className="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl border border-white/20 bg-white/10 px-4 py-2 text-xs font-medium text-white backdrop-blur-sm transition hover:bg-white/15"><HeartPulse className="h-4 w-4" /><span>Log a symptom</span></Link>
+              </div>
+            </div>
+          </div>
+        </section>
 
-      <section className="overflow-hidden rounded-[32px] border-2 border-[#24c1c4]/25 bg-gradient-to-br from-[#effcfc] via-white to-white shadow-[0_16px_45px_rgba(11,45,84,0.08)]"><div className="p-6 sm:p-8"><div className="flex items-start justify-between gap-4"><div><div className="flex h-16 w-16 items-center justify-center rounded-3xl bg-[#24c1c4]/15 text-4xl" aria-hidden="true">🟢</div><h2 className="mt-5 text-3xl font-black tracking-tight text-[#0b2d54] sm:text-4xl">What do I do today?</h2><p className="mt-2 text-base font-medium leading-7 text-slate-600">Your medicines, clinic visits and care plan are here.</p></div><Link href="/today" aria-label="Open what to do today" className="flex min-h-12 min-w-12 items-center justify-center rounded-full bg-white text-[#0b2d54] shadow-md ring-1 ring-slate-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#24c1c4]"><ArrowRight className="h-6 w-6" /></Link></div><div className="mt-7 grid gap-3 sm:grid-cols-3"><LargeAction href="/medications" icon={<Pill className="h-6 w-6" />} label={`${medications.length} medicine${medications.length === 1 ? "" : "s"}`} /><LargeAction href="/appointments" icon={<CalendarDays className="h-6 w-6" />} label={`${appointments.length} clinic visit${appointments.length === 1 ? "" : "s"}`} /><LargeAction href="/care-plans" icon={<CheckCircle2 className="h-6 w-6" />} label={`${activeGoals} care goal${activeGoals === 1 ? "" : "s"}`} /></div>{attentionCount > 0 && <Link href="/today" className="mt-4 flex min-h-12 items-center gap-3 rounded-2xl bg-amber-50 px-4 py-3 text-base font-bold text-amber-900 ring-1 ring-amber-200"><TriangleAlert className="h-6 w-6 shrink-0" /><span>{attentionCount} thing{attentionCount === 1 ? "" : "s"} may need your attention</span><ArrowRight className="ml-auto h-5 w-5" /></Link>}<div className="mt-7 border-t-2 border-[#24c1c4]/15 pt-5"><div className="flex flex-col gap-4 rounded-3xl bg-[#0b2d54] p-5 text-white sm:flex-row sm:items-center sm:justify-between"><div className="flex items-center gap-4"><div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-white/10"><Watch className="h-8 w-8" /></div><div><p className="text-lg font-black">⌚ Link Watch</p><p className="mt-1 text-sm font-medium text-white/70">{watchConnected ? "Your watch is connected" : "Bluetooth health watch"}</p></div></div><div className="flex min-h-12 items-center gap-3 rounded-2xl bg-white/10 px-4 py-3"><span className={`h-4 w-4 rounded-full ${watchConnected ? "bg-emerald-400" : "bg-slate-300"}`} aria-hidden="true" /><span className="text-base font-extrabold">{watchConnected ? "Connected" : "Not linked"}</span><span role="switch" aria-checked={watchConnected} aria-label={watchConnected ? "Watch connected" : "Watch not linked"} className={`relative ml-2 h-8 w-14 rounded-full p-1 ${watchConnected ? "bg-emerald-500" : "bg-white/20"}`}><span className={`block h-6 w-6 rounded-full bg-white shadow ${watchConnected ? "translate-x-6" : "translate-x-0"}`} /></span></div></div></div></div></section>
+        <div className="my-7 px-1"><p className="text-[11px] font-black uppercase tracking-[0.21em] text-[#71839a]">Your health, at a glance</p><p className="mt-1 text-sm font-semibold text-[#71839a]">Choose what you need. Sympto will take you there.</p></div>
 
-      <section className="overflow-hidden rounded-[32px] border-2 border-red-200 bg-gradient-to-br from-rose-50/70 via-white to-white shadow-[0_16px_45px_rgba(11,45,84,0.08)]"><div className="p-6 sm:p-8"><Link href="/health-passport" className="block rounded-3xl focus:outline-none focus-visible:ring-2 focus-visible:ring-red-400"><div className="flex items-start justify-between gap-4"><div><div className="flex h-16 w-16 items-center justify-center rounded-3xl bg-red-100 text-4xl" aria-hidden="true">🔴</div><h2 className="mt-5 text-3xl font-black tracking-tight text-[#0b2d54] sm:text-4xl">My Clinic Card</h2><p className="mt-2 text-base font-medium leading-7 text-slate-600">Show this information when you visit a nurse or doctor.</p></div><span className="flex h-12 w-12 items-center justify-center rounded-full bg-white text-[#0b2d54] shadow-md ring-1 ring-slate-200"><ArrowRight className="h-6 w-6" /></span></div><div className="mt-7 grid gap-4 sm:grid-cols-2"><div className="rounded-3xl bg-white p-5 shadow-sm ring-1 ring-red-100"><div className="flex items-center gap-3 text-sm font-bold text-slate-500"><HeartPulse className="h-6 w-6 text-red-500" /> BLOOD PRESSURE</div><p className="mt-3 text-4xl font-black tracking-tight text-[#0b2d54] sm:text-5xl">{bpValue}</p></div><div className="rounded-3xl bg-white p-5 shadow-sm ring-1 ring-red-100"><div className="flex items-center gap-3 text-sm font-bold text-slate-500"><Watch className="h-6 w-6 text-red-500" /> ❤️ WATCH HEART</div><p className="mt-3 text-4xl font-black tracking-tight text-[#0b2d54] sm:text-5xl">{heartValue}</p></div></div><div className="mt-4 grid gap-4 sm:grid-cols-3"><CountPill icon={<ShieldCheck className="h-5 w-5" />} count={conditions.length} label="conditions" /><CountPill icon={<TriangleAlert className="h-5 w-5" />} count={allergies.length} label="allergies" /><CountPill icon={<CheckCircle2 className="h-5 w-5" />} count={immunizations.length} label="vaccines" /></div></Link><div className="mt-5 rounded-3xl bg-white p-5 shadow-sm ring-1 ring-slate-200"><div className="flex items-center justify-between gap-3"><div className="flex items-center gap-3"><Scale className="h-7 w-7 text-[#0b2d54]" /><span className="text-lg font-black text-[#0b2d54]">⚖️ BMI / Weight</span></div><span className="text-lg font-black text-[#0b2d54]">{bmi != null ? bmi.toFixed(1) : "—"}</span></div><div className="relative mt-5 h-12 overflow-hidden rounded-2xl" aria-label="BMI scale: orange low, green just right, red high"><div className="grid h-full grid-cols-3"><div className="bg-orange-400" /><div className="bg-emerald-500" /><div className="bg-red-500" /></div><div className="absolute -top-1 h-14 w-1.5 rounded-full bg-[#0b2d54] shadow-lg" style={{ left: `${bmiMarker}%` }} aria-hidden="true" /><div className="pointer-events-none absolute inset-0 grid grid-cols-3 items-center text-center text-sm font-black text-white"><span>LOW</span><span>JUST RIGHT</span><span>HIGH</span></div></div><div className="mt-3 flex justify-between text-sm font-bold text-slate-500"><span>{data.healthSnapshot?.weightKg != null ? `${data.healthSnapshot.weightKg} kg` : "Weight not added"}</span><span>{bmiCategory ? display(bmiCategory) : "Add weight + height"}</span></div></div></div></section>
+        <section className="grid gap-[15px] lg:grid-cols-3">
+          <Link href="/today" aria-label="Open Today" className="group relative min-h-[220px] overflow-hidden rounded-[27px] border border-[#e0ebef] bg-gradient-to-br from-white via-white to-[#f2fcf8] p-6 shadow-[0_5px_18px_rgba(11,45,84,0.035)] transition duration-200 hover:-translate-y-1 hover:border-[#b9ddd1] hover:shadow-[0_16px_36px_rgba(11,45,84,0.10)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#24c1c4] focus-visible:ring-offset-2 after:absolute after:-bottom-[68px] after:-right-[58px] after:h-[145px] after:w-[145px] after:rounded-full after:bg-[#168660]/10 after:content-['']"><div className="relative z-10"><div className="flex items-start justify-between gap-3"><div className="grid h-11 w-11 place-items-center rounded-[15px] bg-[#e8f8f1] text-[#168660] transition-transform duration-200 group-hover:scale-105"><CheckCircle2 className="h-5 w-5" /></div><span className="text-[10px] font-black uppercase tracking-[0.14em] text-[#71839a]">Today</span></div><h3 className="mt-5 text-[19px] font-black tracking-[-0.04em] text-[#0b2d54]">What do I do today?</h3><p className="mt-2 max-w-[280px] text-xs leading-5 text-[#71839a]">{todayActionCount > 0 ? `${todayActionCount} ${todayActionCount === 1 ? "thing needs" : "things need"} your attention.` : "Nothing urgent is waiting for you today."}</p><div className="mt-4 flex flex-wrap gap-2 text-[11px] font-semibold text-[#0b2d54]"><span className="rounded-full bg-[#f4f8fa] px-2.5 py-1.5">Medication {medications.length}</span><span className="rounded-full bg-[#f4f8fa] px-2.5 py-1.5">Visit {appointments.length}</span><span className="rounded-full bg-[#f4f8fa] px-2.5 py-1.5">Goal {activeGoals}</span></div><div className="mt-5 flex items-center gap-2 text-[10px] font-black uppercase tracking-[0.14em] text-[#71839a] opacity-70 transition-all duration-200 group-hover:translate-x-1 group-hover:opacity-100"><span>Open</span><ArrowRight className="h-3.5 w-3.5" /></div></div></Link>
 
-      <section className="overflow-hidden rounded-[32px] border-2 border-blue-200 bg-gradient-to-br from-blue-50/80 via-white to-white shadow-[0_16px_45px_rgba(11,45,84,0.08)]"><Link href="/health-journal" className="block p-6 sm:p-8 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-400"><div className="flex items-start justify-between gap-4"><div><div className="flex h-16 w-16 items-center justify-center rounded-3xl bg-blue-100 text-4xl" aria-hidden="true">🔵</div><h2 className="mt-5 text-3xl font-black tracking-tight text-[#0b2d54] sm:text-4xl">My History &amp; Papers</h2><p className="mt-2 max-w-2xl text-base font-medium leading-7 text-slate-600">One simple folder for your health story and important papers.</p></div><span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-white text-[#0b2d54] shadow-md ring-1 ring-slate-200"><ArrowRight className="h-6 w-6" /></span></div><div className="mt-7 rounded-3xl bg-white p-6 shadow-sm ring-1 ring-blue-100"><div className="flex items-center gap-5"><div className="flex h-20 w-20 shrink-0 items-center justify-center rounded-3xl bg-blue-100 text-5xl" aria-hidden="true">📁</div><div><p className="text-2xl font-black text-[#0b2d54]">Open my health folder</p><p className="mt-1 text-base font-medium text-slate-500">Episodes · Visits · Lab results · Scans · Documents</p></div></div><div className="mt-6 flex min-h-14 items-center justify-center gap-3 rounded-2xl bg-[#0b2d54] px-5 py-3 text-base font-black text-white">Open folder <FolderOpen className="h-6 w-6" /></div></div></Link></section>
-      <p className="pb-5 text-center text-sm font-medium text-slate-400">Sympto keeps your health information together so you have less to remember.</p>
-    </div>
-  </main></ProtectedRoute>;
+          <Link href="/health-passport" aria-label="Open My Clinic Card" className="group relative min-h-[220px] overflow-hidden rounded-[27px] border border-[#eadede] bg-gradient-to-br from-white via-white to-[#fff6f6] p-6 shadow-[0_5px_18px_rgba(11,45,84,0.035)] transition duration-200 hover:-translate-y-1 hover:border-[#e5b8b8] hover:shadow-[0_16px_36px_rgba(11,45,84,0.10)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#24c1c4] focus-visible:ring-offset-2 after:absolute after:-bottom-[68px] after:-right-[58px] after:h-[145px] after:w-[145px] after:rounded-full after:bg-[rgb(220_38_38_/_0.10)] after:content-['']"><div className="relative z-10"><div className="flex items-start justify-between gap-3"><div className="grid h-11 w-11 place-items-center rounded-[15px] bg-[#fff0f0] text-[#c62828] transition-transform duration-200 group-hover:scale-105"><ShieldCheck className="h-5 w-5" /></div><span className="text-[10px] font-black uppercase tracking-[0.14em] text-[#71839a]">Essentials</span></div><h3 className="mt-5 text-[19px] font-black tracking-[-0.04em] text-[#0b2d54]">My Clinic Card</h3><p className="mt-2 text-xs leading-5 text-[#71839a]">Your essential health information for quick reference and care.</p><div className="mt-4 space-y-2.5"><div className="rounded-2xl bg-white px-3.5 py-3 ring-1 ring-[#e0ebef]"><p className="text-[9px] font-black uppercase tracking-wide text-[#71839a]">Allergies</p><p className="mt-1 truncate text-[11px] font-bold text-[#0b2d54]">{allergyNames.length ? allergyNames.slice(0, 2).join(" · ") : "No active allergies recorded"}{allergyNames.length > 2 ? ` +${allergyNames.length - 2}` : ""}</p></div><div className="rounded-2xl bg-white px-3.5 py-3 ring-1 ring-[#e0ebef]"><p className="text-[9px] font-black uppercase tracking-wide text-[#71839a]">Conditions</p><p className="mt-1 truncate text-[11px] font-bold text-[#0b2d54]">{conditionNames.length ? conditionNames.slice(0, 2).join(" · ") : "No active conditions recorded"}{conditionNames.length > 2 ? ` +${conditionNames.length - 2}` : ""}</p></div><div className="grid grid-cols-2 gap-2"><div className="rounded-2xl bg-white px-3 py-2.5 ring-1 ring-[#e0ebef]"><p className="text-[8px] font-black uppercase tracking-wide text-[#9aa8b7]">Blood</p><p className="mt-1 text-[11px] font-black text-[#0b2d54]">{detailLabel(bloodType)}</p></div><div className="rounded-2xl bg-white px-3 py-2.5 ring-1 ring-[#e0ebef]"><p className="text-[8px] font-black uppercase tracking-wide text-[#9aa8b7]">Rhesus</p><p className="mt-1 text-[11px] font-black text-[#0b2d54]">{detailLabel(rhesusFactor)}</p></div></div></div><div className="mt-4 flex items-center gap-2 text-[10px] font-black uppercase tracking-[0.14em] text-[#71839a] opacity-70 transition-all duration-200 group-hover:translate-x-1 group-hover:opacity-100"><span>Open</span><ArrowRight className="h-3.5 w-3.5" /></div></div></Link>
+
+          <Link href="/health-journal" aria-label="Open My History and Papers" className="group relative min-h-[220px] overflow-hidden rounded-[27px] border border-[#e0ebef] bg-gradient-to-br from-white via-white to-[#f2f7ff] p-6 shadow-[0_5px_18px_rgba(11,45,84,0.035)] transition duration-200 hover:-translate-y-1 hover:border-[#cddbf0] hover:shadow-[0_16px_36px_rgba(11,45,84,0.10)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#24c1c4] focus-visible:ring-offset-2 after:absolute after:-bottom-[68px] after:-right-[58px] after:h-[145px] after:w-[145px] after:rounded-full after:bg-[#3f75bd]/10 after:content-['']"><div className="relative z-10"><div className="flex items-start justify-between gap-3"><div className="grid h-11 w-11 place-items-center rounded-[15px] bg-[#edf4ff] text-[#3f75bd] transition-transform duration-200 group-hover:scale-105"><FolderOpen className="h-5 w-5" /></div><span className="text-[10px] font-black uppercase tracking-[0.14em] text-[#71839a]">History</span></div><h3 className="mt-5 text-[19px] font-black tracking-[-0.04em] text-[#0b2d54]">My History &amp; Papers</h3><p className="mt-2 text-xs leading-5 text-[#71839a]">Your health story, records, results, and documents in one place.</p><p className="mt-4 text-sm font-black text-[#0b2d54]">{historyCount} connected {historyCount === 1 ? "record" : "records"}</p><div className="mt-6 flex items-center gap-2 text-[10px] font-black uppercase tracking-[0.14em] text-[#71839a] opacity-70 transition-all duration-200 group-hover:translate-x-1 group-hover:opacity-100"><span>Open history</span><ArrowRight className="h-3.5 w-3.5" /></div></div></Link>
+        </section>
+
+        <HealthVitalsSummary
+          bmi={bmi}
+          bmiCategory={bmiCategory}
+          weightKg={data.healthSnapshot?.weightKg ?? data.patient?.weightKg ?? null}
+          heightCm={data.healthSnapshot?.heightCm ?? data.patient?.heightCm ?? null}
+          measurements={healthVitals}
+        />
+      </div>
+    </main>
+  </ProtectedRoute>;
 }
