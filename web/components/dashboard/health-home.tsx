@@ -93,10 +93,7 @@ export default function HealthHome() {
           <div className="pointer-events-none absolute bottom-[-180px] left-[42%] h-[230px] w-[230px] rounded-full bg-[#24c1c4]/30 blur-3xl" />
           <div className="relative grid items-center gap-8 lg:grid-cols-[1fr_250px] lg:gap-9">
             <div>
-              <p className="text-[11px] font-black uppercase tracking-[0.21em] text-white/60">A calmer way to care for your health</p>
-              <p className="mt-4 text-base font-semibold text-white/80">{greeting}, {firstName}</p>
-              <h1 className="mt-2 max-w-3xl text-[34px] font-black leading-[1.02] tracking-[-0.055em] sm:text-4xl">Your health, made simpler.</h1>
-              <p className="mt-4 max-w-[520px] text-[14px] leading-7 text-white/75 sm:text-[15px]">See what needs your attention, your key health information, and your health history in one place.</p>
+              <p className="text-sm font-medium tracking-[-0.01em] text-white/85">{greeting}, {firstName}</p>
               <div className="mt-6 flex flex-wrap gap-2.5"><Link href="/log-symptom" className="inline-flex min-h-12 items-center justify-center gap-2 rounded-[15px] bg-white px-4 py-3 text-xs font-black text-[#0b2d54] shadow-sm transition hover:-translate-y-0.5"><HeartPulse className="h-4 w-4" />Log a symptom</Link><Link href="/today" className="inline-flex min-h-12 items-center justify-center gap-2 rounded-[15px] border border-white/25 bg-white/10 px-4 py-3 text-xs font-extrabold text-white backdrop-blur-sm transition hover:bg-white/15">Open today <ArrowRight className="h-4 w-4" /></Link></div>
             </div>
             <div className="mx-auto grid h-[190px] w-full max-w-[190px] place-items-center rounded-[28px] border border-white/20 bg-white/10 backdrop-blur-md lg:ml-auto"><div className="grid h-[130px] w-[130px] place-items-center rounded-full border-[9px] border-[#24c1c4]/80 shadow-[0_0_34px_rgba(36,193,196,0.25)]"><div className="text-center"><b className="block text-[29px] font-black tracking-[-0.06em]">{todayActionCount}</b><span className="mt-1 block text-[10px] font-black uppercase tracking-[0.14em] text-white/70">today</span></div></div></div>
