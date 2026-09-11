@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { Activity, CalendarDays, ClipboardPlus, FileHeart, HeartPulse, Menu, MessageCircle, QrCode, Settings, ShieldCheck, UserRound, Users, Watch, X } from "lucide-react";
+import { CalendarDays, ClipboardPlus, FileHeart, HeartPulse, Menu, MessageCircle, QrCode, Settings, ShieldCheck, UserRound, Users, Watch, X } from "lucide-react";
 import { useState } from "react";
 
 export default function HealthAccountNav() {
