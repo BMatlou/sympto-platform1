@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
-import { Activity, ArrowLeft, ArrowRight, ChevronDown, ClipboardList, FileText, HeartPulse, Settings2, ShieldCheck, Sparkles } from "lucide-react";
+import { Activity, ArrowLeft, ArrowRight, ChevronDown, ClipboardList, FileText, HeartPulse, ShieldCheck, Sparkles } from "lucide-react";
 import ProtectedRoute from "@/components/auth/protected-route";
 import { useDashboard } from "@/hooks/use-dashboard";
 import { healthJournalService } from "@/services/health-journal.service";
@@ -22,16 +22,7 @@ const moodLabel: Record<string, string> = { VERY_BAD: "Very low", BAD: "Low", NE
 const sleepLabel: Record<string, string> = { VERY_POOR: "Very poor", POOR: "Poor", FAIR: "Fair", GOOD: "Good", EXCELLENT: "Excellent" };
 const energyLabel: Record<string, string> = { VERY_LOW: "Very low", LOW: "Low", NORMAL: "Normal", HIGH: "High", VERY_HIGH: "Very high" };
 
-type Event = {
-  id: string;
-  type: "symptom" | "measurement" | "journal";
-  title: string;
-  detail: string;
-  at: string;
-  href: string;
-  meta?: string[];
-  source?: string;
-};
+type Event = { id: string; type: "symptom" | "measurement" | "journal"; title: string; detail: string; at: string; href: string; meta?: string[]; source?: string };
 
 function clean(events: Event[]) {
   const sorted = [...events].sort((a, b) => new Date(b.at).getTime() - new Date(a.at).getTime());
@@ -57,9 +48,7 @@ export default function HealthJournalPage() {
   useEffect(() => {
     let active = true;
     setJournalError(false);
-    healthJournalService.getAll({ page: 1, limit: 100 })
-      .then(r => { if (active) setLogs(r.data ?? []); })
-      .catch(() => { if (active) setJournalError(true); });
+    healthJournalService.getAll({ page: 1, limit: 100 }).then(r => { if (active) setLogs(r.data ?? []); }).catch(() => { if (active) setJournalError(true); });
     return () => { active = false; };
   }, []);
 
@@ -69,13 +58,7 @@ export default function HealthJournalPage() {
     (data.symptoms ?? []).forEach((s: any) => {
       const at = s.startedAt || s.createdAt;
       if (!at) return;
-      all.push({
-        id: `s-${s.id}`,
-        type: "symptom",
-        title: s.title || "Symptom recorded",
-        detail: [s.overallSeverity ? `Severity: ${String(s.overallSeverity).toLowerCase()}` : null, ...(s.symptoms ?? []).map((x: any) => x.symptom?.name || x.name).filter(Boolean)].filter(Boolean).join(" · "),
-        at: String(at), href: "/log-symptom", source: "Symptom tracker",
-      });
+      all.push({ id: `s-${s.id}`, type: "symptom", title: s.title || "Symptom recorded", detail: [s.overallSeverity ? `Severity: ${String(s.overallSeverity).toLowerCase()}` : null, ...(s.symptoms ?? []).map((x: any) => x.symptom?.name || x.name).filter(Boolean)].filter(Boolean).join(" · "), at: String(at), href: "/log-symptom", source: "Symptom tracker" });
     });
     (data.clinicalVitals ?? []).forEach((v: any) => {
       if (!v.measuredAt) return;
@@ -118,9 +101,7 @@ export default function HealthJournalPage() {
   const visibleEvents = useMemo(() => filter === "all" ? events : events.filter(e => e.type === filter), [events, filter]);
   const grouped = visibleEvents.slice(0, visible).reduce<Record<string, Event[]>>((acc, e) => { (acc[dayKey(e.at)] ||= []).push(e); return acc; }, {});
   const journalCount = events.filter(e => e.type === "journal").length;
-  const symptomCount = events.filter(e => e.type === "symptom").length;
   const measurementCount = events.filter(e => e.type === "measurement").length;
-
   useEffect(() => { setVisible(10); setExpanded(null); }, [filter]);
 
   if (loading) return <ProtectedRoute><main className="min-h-screen bg-[#f4f9fb] p-6"><div className="mx-auto max-w-4xl space-y-4"><div className="h-40 animate-pulse rounded-[30px] bg-white"/><div className="h-[220px] animate-pulse rounded-[28px] bg-white"/><div className="h-[600px] animate-pulse rounded-[30px] bg-white"/></div></main></ProtectedRoute>;
@@ -132,7 +113,7 @@ export default function HealthJournalPage() {
 
     <section className="mt-5 grid gap-4 sm:grid-cols-3"><div className="rounded-[24px] border border-slate-200 bg-white p-5 shadow-[0_12px_35px_rgba(11,45,84,0.05)]"><p className="text-[10px] font-black uppercase tracking-[0.14em] text-slate-400">Total history</p><p className="mt-2 text-3xl font-black text-[#0b2d54]">{events.length}</p><p className="mt-1 text-xs text-slate-500">Meaningful activity items</p></div><div className="rounded-[24px] border border-slate-200 bg-white p-5 shadow-[0_12px_35px_rgba(11,45,84,0.05)]"><p className="text-[10px] font-black uppercase tracking-[0.14em] text-slate-400">Journal</p><p className="mt-2 text-3xl font-black text-[#0b2d54]">{journalCount}</p><p className="mt-1 text-xs text-slate-500">Personal and guided entries</p></div><div className="rounded-[24px] border border-slate-200 bg-white p-5 shadow-[0_12px_35px_rgba(11,45,84,0.05)]"><p className="text-[10px] font-black uppercase tracking-[0.14em] text-slate-400">Measurements</p><p className="mt-2 text-3xl font-black text-[#0b2d54]">{measurementCount}</p><p className="mt-1 text-xs text-slate-500">Vitals, weight and connected readings</p></div></section>
 
-    <section className="mt-5 rounded-[26px] border border-[#24c1c4]/20 bg-white p-5 shadow-[0_12px_35px_rgba(11,45,84,0.04)] sm:p-6"><div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between"><div className="flex items-start gap-3"><div className="grid h-10 w-10 shrink-0 place-items-center rounded-2xl bg-[#24c1c4]/10 text-[#0b2d54]"><Sparkles className="h-5 w-5"/></div><div><h2 className="font-black text-[#0b2d54]">How your history works</h2><p className="mt-1 max-w-2xl text-sm leading-6 text-slate-500">Symptom logs, journal entries, vitals, weight updates and connected measurements are brought into one timeline. Open an item to jump to the record behind it.</p></div></div><Link href="/health-journal/settings" className="inline-flex items-center gap-2 rounded-xl border border-slate-200 px-4 py-2.5 text-xs font-black text-[#0b2d54]"><Settings2 className="h-4 w-4"/>Journal settings</Link></div></section>
+    <section className="mt-5 rounded-[26px] border border-[#24c1c4]/20 bg-white p-5 shadow-[0_12px_35px_rgba(11,45,84,0.04)] sm:p-6"><div className="flex items-start gap-3"><div className="grid h-10 w-10 shrink-0 place-items-center rounded-2xl bg-[#24c1c4]/10 text-[#0b2d54]"><Sparkles className="h-5 w-5"/></div><div><h2 className="font-black text-[#0b2d54]">How your history works</h2><p className="mt-1 max-w-3xl text-sm leading-6 text-slate-500">Symptom logs, journal entries, vitals, weight updates and connected measurements are brought into one timeline. Open an item to jump to the record behind it.</p></div></div></section>
 
     {journalError && <div className="mt-4 flex items-start gap-3 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900"><ShieldCheck className="mt-0.5 h-4 w-4 shrink-0"/><p><span className="font-bold">Some personal journal entries could not be loaded.</span> Other available health activity is still shown below.</p></div>}
 
