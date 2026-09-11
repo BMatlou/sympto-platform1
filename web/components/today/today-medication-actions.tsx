@@ -34,13 +34,15 @@ export default function TodayMedicationActions({ medications, onUpdated }: Today
   const [states, setStates] = useState<Record<string, Action | undefined>>({});
 
   async function record(medication: any, action: Action) {
-    const medicationId = medication?.id;
-    if (!medicationId || savingKey) return;
+    const patientMedicationId = medication?.id;
+    const medicationId = medication?.medication?.id || medication?.medicationId;
+    if (!patientMedicationId || !medicationId || savingKey) return;
 
-    const key = String(medicationId);
+    const key = String(patientMedicationId);
     setSavingKey(`${key}:${action}`);
     try {
       const response = await api.post(`/patient-medications/${key}/adherence`, {
+        medicationId: String(medicationId),
         action,
         scheduledFor: new Date().toISOString(),
       });
