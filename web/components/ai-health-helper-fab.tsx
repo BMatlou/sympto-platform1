@@ -1,7 +1,10 @@
 "use client";
 
+import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
-import { Mic, Sparkles, X } from "lucide-react";
+import { Mic, Sparkles, X, Save, ClipboardPlus } from "lucide-react";
+import { useAuth } from "@/hooks/use-auth";
+import { healthJournalService } from "@/services/health-journal.service";
 
 type Insight = {
   tone: "calm" | "watch" | "urgent";
@@ -39,11 +42,15 @@ function createInsight(text: string): Insight {
 }
 
 export default function AIHealthHelperFab() {
+  const { user } = useAuth();
   const [open, setOpen] = useState(false);
   const [listening, setListening] = useState(false);
   const [transcript, setTranscript] = useState("");
   const [insight, setInsight] = useState<Insight | null>(null);
   const [speechSupported, setSpeechSupported] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [saved, setSaved] = useState(false);
+  const [saveError, setSaveError] = useState("");
   const recognitionRef = useRef<SpeechRecognitionLike | null>(null);
 
   useEffect(() => {
@@ -90,6 +97,7 @@ export default function AIHealthHelperFab() {
     if (!Recognition) {
       setTranscript(DEMO_SYMPTOM);
       setInsight(createInsight(DEMO_SYMPTOM));
+      setSaved(false);
       return;
     }
 
@@ -108,12 +116,15 @@ export default function AIHealthHelperFab() {
       recognitionRef.current = null;
       setTranscript(DEMO_SYMPTOM);
       setInsight(createInsight(DEMO_SYMPTOM));
+      setSaved(false);
     };
     recognition.onresult = (event) => {
       const spoken = Array.from(event.results).map((result) => result[0]?.transcript ?? "").join(" ").trim();
       if (!spoken) return;
       setTranscript(spoken);
       setInsight(createInsight(spoken));
+      setSaved(false);
+      setSaveError("");
       setListening(false);
     };
 
@@ -125,6 +136,8 @@ export default function AIHealthHelperFab() {
     setOpen(true);
     setInsight(null);
     setTranscript("");
+    setSaved(false);
+    setSaveError("");
   };
 
   function closeHelper() {
@@ -134,6 +147,24 @@ export default function AIHealthHelperFab() {
     setListening(false);
     setOpen(false);
   }
+
+  const saveToHealthRecord = async () => {
+    if (!transcript.trim() || !user?.id || saving || saved) return;
+    setSaving(true);
+    setSaveError("");
+    try {
+      await healthJournalService.create({
+        title: "Talk to Sympto — health update",
+        journal: transcript.trim(),
+        notes: insight ? `${insight.title}: ${insight.message}` : "Captured through Talk to Sympto.",
+      });
+      setSaved(true);
+    } catch {
+      setSaveError("We could not save this update. Please try again.");
+    } finally {
+      setSaving(false);
+    }
+  };
 
   const toneClasses = insight
     ? { calm: "border-[#24c1c4]/30 bg-[#24c1c4]/10 text-[#0b2d54]", watch: "border-amber-200 bg-amber-50 text-amber-950", urgent: "border-red-200 bg-red-50 text-red-950" }[insight.tone]
@@ -195,6 +226,20 @@ export default function AIHealthHelperFab() {
                       <p className="mt-1 text-sm leading-6 opacity-80">{insight.message}</p>
                     </div>
                   </div>
+                </div>
+              )}
+
+              {transcript && (
+                <div className="mt-4 space-y-2">
+                  <button type="button" onClick={saveToHealthRecord} disabled={saving || saved || !user?.id} className="flex min-h-14 w-full items-center justify-center gap-2 rounded-2xl bg-[#0b2d54] px-5 text-base font-extrabold text-white transition hover:bg-[#071f3a] disabled:cursor-not-allowed disabled:opacity-60 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[#24c1c4]/30">
+                    <Save className="h-5 w-5" aria-hidden="true" />
+                    {saved ? "Saved to My Health Record" : saving ? "Saving…" : "Save to My Health Record"}
+                  </button>
+                  <Link href="/log-symptom" onClick={closeHelper} className="flex min-h-14 w-full items-center justify-center gap-2 rounded-2xl border-2 border-slate-200 bg-white px-5 text-base font-extrabold text-[#0b2d54] transition hover:border-[#24c1c4] hover:bg-slate-50">
+                    <ClipboardPlus className="h-5 w-5" aria-hidden="true" />
+                    Log this as a symptom
+                  </Link>
+                  {saveError && <p className="text-center text-sm font-semibold text-red-600" role="alert">{saveError}</p>}
                 </div>
               )}
 
