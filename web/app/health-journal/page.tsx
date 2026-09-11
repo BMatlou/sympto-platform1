@@ -1,93 +1,67 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useState } from "react";
-import { Activity, ArrowLeft, ClipboardList, FileText, FlaskConical, HeartPulse, Image as ImageIcon, Pill, ShieldCheck, Sparkles, Stethoscope, Syringe } from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
+import { Activity, ArrowLeft, ArrowRight, ChevronDown, ClipboardList, FileText, HeartPulse, ShieldCheck, Sparkles } from "lucide-react";
 import ProtectedRoute from "@/components/auth/protected-route";
 import { useDashboard } from "@/hooks/use-dashboard";
 import { healthJournalService } from "@/services/health-journal.service";
-import type { HealthJournal } from "@/types/health-journal";
 
-const text = (value: unknown, fallback = "—") => value === null || value === undefined || value === "" ? fallback : String(value);
-const date = (value: unknown) => value ? new Intl.DateTimeFormat("en-ZA", { dateStyle: "medium", timeStyle: "short" }).format(new Date(String(value))) : "Date not recorded";
-
-function IconFor({ type }: { type: string }) { const cls = "h-5 w-5"; if (type === "visit") return <Stethoscope className={cls}/>; if (type === "symptom") return <Activity className={cls}/>; if (type === "lab") return <FlaskConical className={cls}/>; if (type === "imaging") return <ImageIcon className={cls}/>; if (type === "prescription") return <Pill className={cls}/>; if (type === "document") return <FileText className={cls}/>; if (type === "immunisation") return <Syringe className={cls}/>; if (type === "measurement") return <HeartPulse className={cls}/>; return <HeartPulse className={cls}/>; }
-
-const vitalName = (value: unknown) => {
-  const key = String(value ?? "Measurement").toUpperCase().replaceAll(" ", "_");
-  const labels: Record<string, string> = {
-    BLOOD_PRESSURE: "Blood pressure",
-    BLOODPRESSURE: "Blood pressure",
-    HEART_RATE: "Heart rate",
-    HEARTRATE: "Heart rate",
-    OXYGEN_SATURATION: "Oxygen saturation",
-    OXYGENSATURATION: "Oxygen saturation",
-    BODY_TEMPERATURE: "Temperature",
-    BODYTEMPERATURE: "Temperature",
-    RESPIRATORY_RATE: "Respiratory rate",
-    RESPIRATORYRATE: "Respiratory rate",
-    WEIGHT: "Weight",
-    BMI: "BMI",
-  };
-  return labels[key] ?? String(value ?? "Measurement").replaceAll("_", " ");
+const cfg: Record<string, { icon: typeof FileText; label: string }> = {
+  symptom: { icon: Activity, label: "Symptom" },
+  measurement: { icon: HeartPulse, label: "Measurement" },
+  journal: { icon: FileText, label: "Journal" },
 };
+
+const dayKey = (value: string) => { const d = new Date(value); return `${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`; };
+const dayLabel = (value: string) => { const d = new Date(value); const t = new Date(); const y = new Date(); y.setDate(t.getDate() - 1); const same = (a: Date, b: Date) => a.toDateString() === b.toDateString(); if (same(d, t)) return "Today"; if (same(d, y)) return "Yesterday"; return new Intl.DateTimeFormat("en-ZA", { day: "numeric", month: "long", year: "numeric" }).format(d); };
+const timeLabel = (value: string) => new Intl.DateTimeFormat("en-ZA", { hour: "2-digit", minute: "2-digit" }).format(new Date(value));
+
+type Event = { id: string; type: "symptom" | "measurement" | "journal"; title: string; detail: string; at: string; href: string };
+
+function clean(events: Event[]) {
+  const sorted = [...events].sort((a, b) => new Date(b.at).getTime() - new Date(a.at).getTime());
+  const seen = new Set<string>();
+  const out: Event[] = [];
+  for (const e of sorted) {
+    const key = `${e.type}|${e.title.toLowerCase()}|${e.detail.toLowerCase()}|${dayKey(e.at)}|${timeLabel(e.at)}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    out.push(e);
+  }
+  return out;
+}
 
 export default function HealthJournalPage() {
   const { data, loading, error, reload } = useDashboard();
-  const [logs, setLogs] = useState<HealthJournal[]>([]);
-  const [logsError, setLogsError] = useState("");
+  const [logs, setLogs] = useState<any[]>([]);
+  const [visible, setVisible] = useState(10);
+  const [expanded, setExpanded] = useState<string | null>(null);
 
-  useEffect(() => { healthJournalService.getAll({ page: 1, limit: 50 }).then((r) => setLogs(r.data ?? [])).catch(() => setLogsError("Some journal entries could not be loaded.")); }, []);
+  useEffect(() => { healthJournalService.getAll({ page: 1, limit: 100 }).then(r => setLogs(r.data ?? [])).catch(() => undefined); }, []);
 
-  if (loading) return <ProtectedRoute><main className="min-h-screen bg-[#f5f8fb] p-6"><div className="mx-auto max-w-4xl space-y-4"><div className="h-32 animate-pulse rounded-3xl bg-white"/><div className="h-96 animate-pulse rounded-3xl bg-white"/></div></main></ProtectedRoute>;
-  if (error || !data) return <ProtectedRoute><main className="min-h-screen bg-[#f5f8fb] p-6"><div className="mx-auto max-w-xl rounded-3xl bg-white p-7"><h1 className="text-xl font-bold text-[#0b2d54]">We couldn't load your history</h1><p className="mt-2 text-sm text-slate-500">Your saved health information has not been changed.</p><button onClick={reload} className="mt-5 rounded-xl bg-[#0b2d54] px-5 py-2.5 text-sm font-semibold text-white">Try again</button></div></main></ProtectedRoute>;
+  const events = useMemo(() => {
+    if (!data) return [] as Event[];
+    const all: Event[] = [];
+    (data.symptoms ?? []).forEach((s: any) => { const at = s.startedAt || s.createdAt; if (!at) return; all.push({ id: `s-${s.id}`, type: "symptom", title: s.title || "Symptom recorded", detail: [s.overallSeverity ? `Severity: ${String(s.overallSeverity).toLowerCase()}` : null, ...(s.symptoms ?? []).map((x: any) => x.symptom?.name || x.name).filter(Boolean)].filter(Boolean).join(" · "), at: String(at), href: "/log-symptom" }); });
+    (data.clinicalVitals ?? []).forEach((v: any) => { if (!v.measuredAt) return; all.push({ id: `v-${v.id}`, type: "measurement", title: v.vitalType?.name || v.vitalType?.code || "Measurement", detail: `${v.value ?? "—"}${v.unit || v.vitalType?.unit ? ` ${v.unit ?? v.vitalType.unit}` : ""}`, at: String(v.measuredAt), href: "/health-vitals" }); });
+    (data.healthSnapshot?.latestMeasurements ?? []).forEach((v: any, i: number) => { if (!v.measuredAt) return; all.push({ id: `d-${v.id ?? i}`, type: "measurement", title: v.name || v.type || "Measurement", detail: `${v.value ?? "—"}${v.unit ? ` ${v.unit}` : ""}`, at: String(v.measuredAt), href: "/health-vitals" }); });
+    logs.forEach((l: any) => { const at = l.createdAt || l.recordedAt; if (!at) return; const title = l.title || "Journal entry"; const detail = l.journal || l.notes || "Journal entry recorded."; if (title.toLowerCase().includes("weight update")) { all.push({ id: `w-${l.id}`, type: "measurement", title: "Weight", detail: detail.replace(/^Weight update\s*/i, ""), at: String(at), href: "/health-vitals" }); } else if (title.toLowerCase().includes("talk to sympto")) { all.push({ id: `m-${l.id}`, type: "journal", title: "Talk to Sympto", detail, at: String(at), href: "/messages" }); } else { all.push({ id: `j-${l.id}`, type: "journal", title, detail, at: String(at), href: "/health-journal" }); } });
+    return clean(all);
+  }, [data, logs]);
 
-  const timeline: Array<{ id: string; type: string; title: string; detail: string; at: string | null }> = [];
-  (data.encounters ?? []).forEach((e: any) => timeline.push({ id: `enc-${e.id}`, type: "visit", title: e.chiefComplaint || "Healthcare visit", detail: e.assessment || e.plan || e.notes || "Clinical encounter recorded", at: e.startedAt }));
-  (data.symptoms ?? []).forEach((s: any) => timeline.push({ id: `sym-${s.id}`, type: "symptom", title: s.title || "Symptom recorded", detail: [s.overallSeverity && `Severity: ${s.overallSeverity}`, ...(s.symptoms?.map((x: any) => x.symptom?.name || x.name) ?? [])].filter(Boolean).join(" · ") || "Symptom activity recorded", at: s.startedAt }));
-  (data.recentResults?.laboratory ?? []).forEach((o: any) => timeline.push({ id: `lab-${o.id}`, type: "lab", title: o.orderNumber ? `Laboratory order ${o.orderNumber}` : "Laboratory result", detail: o.items?.map((i: any) => i.test?.name).filter(Boolean).join(", ") || text(o.status, "Laboratory activity recorded"), at: o.orderedAt }));
-  (data.recentResults?.imaging ?? []).forEach((s: any) => timeline.push({ id: `img-${s.id}`, type: "imaging", title: s.imagingCenter?.name || "Imaging study", detail: s.reports?.[0]?.impression || s.reports?.[0]?.findings || text(s.status, "Imaging study recorded"), at: s.performedAt || s.createdAt }));
-  (data.prescriptions ?? []).forEach((p: any) => timeline.push({ id: `rx-${p.id}`, type: "prescription", title: "Prescription", detail: text(p.status, "Prescription recorded"), at: p.issuedAt || p.createdAt }));
-  (data.attachments ?? []).forEach((a: any) => timeline.push({ id: `doc-${a.id}`, type: "document", title: a.fileName || "Medical document", detail: text(a.mimeType, "Document saved to your health record"), at: a.createdAt }));
-  (data.immunizations ?? []).forEach((i: any) => timeline.push({ id: `imm-${i.id}`, type: "immunisation", title: i.immunization?.name || i.name || "Immunisation", detail: i.facility ? `Facility: ${i.facility}` : i.doseNumber != null ? `Dose ${i.doseNumber}` : "Immunisation recorded", at: i.administeredAt || i.createdAt }));
+  const grouped = events.slice(0, visible).reduce<Record<string, Event[]>>((acc, e) => { (acc[dayKey(e.at)] ||= []).push(e); return acc; }, {});
 
-  // Clinical vitals are full patient-record measurements. Device measurements
-  // are the latest values already surfaced by Health Home, so the timeline
-  // remains useful without pretending it has a full raw device history.
-  (data.clinicalVitals ?? []).forEach((v: any) => {
-    const type = v?.vitalType?.code ?? v?.type ?? v?.vitalType?.name ?? "MEASUREMENT";
-    const name = v?.vitalType?.name ?? vitalName(type);
-    const value = v?.value != null ? `${v.value}${v?.unit || v?.vitalType?.unit ? ` ${v.unit ?? v.vitalType.unit}` : ""}` : "Value not recorded";
-    const source = v?.source ? ` · ${v.source}` : " · Clinical record";
-    timeline.push({ id: `vital-clinical-${v.id}`, type: "measurement", title: name, detail: `${value}${source}`, at: v?.measuredAt ?? null });
-  });
-  (data.healthSnapshot?.latestMeasurements ?? []).forEach((v: any, index: number) => {
-    const type = v?.type ?? "MEASUREMENT";
-    const name = v?.name ?? vitalName(type);
-    const value = v?.value != null ? `${v.value}${v?.unit ? ` ${v.unit}` : ""}` : "Value not recorded";
-    const source = v?.source ? ` · ${v.source}` : " · Connected device";
-    timeline.push({ id: `vital-device-${v.id ?? `${type}-${index}`}`, type: "measurement", title: name, detail: `${value}${source}`, at: v?.measuredAt ?? null });
-  });
+  if (loading) return <ProtectedRoute><main className="min-h-screen bg-[#f4f9fb] p-6"><div className="mx-auto max-w-4xl space-y-4"><div className="h-40 animate-pulse rounded-[30px] bg-white"/><div className="h-[600px] animate-pulse rounded-[30px] bg-white"/></div></main></ProtectedRoute>;
+  if (error || !data) return <ProtectedRoute><main className="min-h-screen bg-[#f4f9fb] p-6"><div className="mx-auto max-w-xl rounded-[28px] bg-white p-6"><h1 className="text-xl font-black text-[#0b2d54]">We couldn't load your Health Journal</h1><button onClick={reload} className="mt-5 rounded-xl bg-[#0b2d54] px-5 py-3 text-sm font-black text-white">Try again</button></div></main></ProtectedRoute>;
 
-  logs.forEach((l: any) => timeline.push({ id: `journal-${l.id}`, type: "journal", title: l.title || "Health journal entry", detail: l.journal || l.notes || "Journal entry recorded", at: l.createdAt }));
-  timeline.sort((a, b) => new Date(b.at || 0).getTime() - new Date(a.at || 0).getTime());
-
-  const counts = [
-    { key: "visits", value: (data.encounters ?? []).length, href: "/appointments" },
-    { key: "symptoms", value: (data.symptoms ?? []).length, href: "/health-journal" },
-    { key: "labs", value: (data.recentResults?.laboratory ?? []).length, href: "/lab-results" },
-    { key: "imaging", value: (data.recentResults?.imaging ?? []).length, href: "/imaging" },
-    { key: "prescriptions", value: (data.prescriptions ?? []).length, href: "/medications" },
-    { key: "documents", value: (data.attachments ?? []).length, href: "/health-records" },
-  ];
-
-  return <ProtectedRoute><main className="min-h-screen bg-[#f5f8fb]"><div className="mx-auto max-w-4xl px-4 py-6 sm:px-6 sm:py-8">
-    <Link href="/dashboard" className="mb-5 inline-flex items-center gap-2 text-sm font-semibold text-[#0b2d54]"><ArrowLeft className="h-4 w-4"/>Back to My Health</Link>
-    <section className="mb-5 rounded-[30px] bg-gradient-to-br from-blue-700 via-blue-600 to-[#0b2d54] p-6 text-white shadow-lg sm:p-8"><div className="flex items-center gap-3"><div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-white/10"><Sparkles className="h-6 w-6"/></div><div><p className="text-xs font-bold uppercase tracking-[0.18em] text-white/65">My History & Files</p><h1 className="mt-1 text-3xl font-bold">Your health story</h1></div></div><p className="mt-4 max-w-2xl text-sm leading-6 text-white/75">Visits, symptoms, measurements, results, prescriptions and documents are brought together automatically from your health record.</p><div className="mt-6 grid grid-cols-2 gap-2 sm:grid-cols-6">{counts.map(({ key, value, href }) => <Link key={key} href={href} aria-label={`Open ${key}`} className="rounded-xl bg-white/10 p-3 transition hover:bg-white/20 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#24c1c4]"><p className="text-[10px] uppercase text-white/55">{key}</p><p className="mt-1 text-lg font-bold">{value}</p></Link>)}</div></section>
-    {logsError && <div className="mb-4 rounded-2xl bg-amber-50 p-4 text-sm text-amber-800">{logsError}</div>}
-    <section className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm sm:p-7"><div className="mb-6 flex items-center justify-between"><div><h2 className="text-xl font-bold text-[#0b2d54]">Timeline</h2><p className="mt-1 text-sm text-slate-500">Newest health activity appears first.</p></div><span className="rounded-full bg-[#0b2d54]/5 px-3 py-1.5 text-xs font-bold text-[#0b2d54]">{timeline.length} records</span></div>
-      {timeline.length === 0 ? <div className="rounded-2xl border border-dashed border-slate-200 p-10 text-center"><ClipboardList className="mx-auto h-9 w-9 text-slate-300"/><h3 className="mt-3 font-semibold text-[#0b2d54]">Your history will appear here</h3><p className="mt-1 text-sm text-slate-500">As information is saved to your health record, it will automatically join this timeline.</p></div> : <div className="space-y-3">{timeline.map((item) => <article key={item.id} className="flex gap-4 rounded-2xl border border-slate-100 bg-slate-50/70 p-4"><div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-white text-[#0b2d54] shadow-sm"><IconFor type={item.type}/></div><div className="min-w-0 flex-1"><div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between"><div><span className="text-[10px] font-bold uppercase tracking-wide text-[#24c1c4]">{item.type}</span><h3 className="mt-0.5 font-semibold text-[#0b2d54]">{item.title}</h3></div><time className="text-xs text-slate-400">{date(item.at)}</time></div><p className="mt-2 whitespace-pre-wrap text-sm leading-6 text-slate-600">{item.detail}</p></div></article>)}</div>}
+  return <ProtectedRoute><main className="min-h-screen bg-[#f4f9fb] text-[#14304d]"><div className="mx-auto max-w-4xl px-4 py-6 sm:px-6 sm:py-8">
+    <Link href="/dashboard" className="inline-flex items-center gap-2 text-sm font-bold text-[#0b2d54]"><ArrowLeft className="h-4 w-4"/>Back to My Health</Link>
+    <header className="mt-4 overflow-hidden rounded-[32px] bg-gradient-to-br from-[#08284a] via-[#0d4771] to-[#24babe] p-6 text-white shadow-[0_18px_50px_rgba(11,45,84,0.10)] sm:p-8"><div className="flex items-end justify-between gap-4"><div><p className="text-[10px] font-black uppercase tracking-[0.2em] text-white/65">My history</p><h1 className="mt-2 text-3xl font-black tracking-[-0.04em]">Your health story</h1><p className="mt-2 text-sm leading-6 text-white/75">A cleaner view of meaningful health activity, newest first.</p></div><Link href="/log-symptom" className="hidden min-h-11 items-center gap-2 rounded-xl bg-white px-4 text-xs font-black text-[#0b2d54] sm:inline-flex"><HeartPulse className="h-4 w-4"/>Add update</Link></div><div className="mt-5 inline-flex rounded-full bg-white/10 px-3 py-1.5 text-xs font-bold">{events.length} meaningful events</div></header>
+    <section className="mt-5 rounded-[30px] border border-slate-200 bg-white p-5 shadow-[0_16px_50px_rgba(11,45,84,0.06)] sm:p-7"><div className="mb-7 flex items-end justify-between"><div><h2 className="text-xl font-black text-[#0b2d54]">Timeline</h2><p className="mt-1 text-sm text-slate-500">Grouped by day so your health story is easy to scan.</p></div></div>
+      {events.length === 0 ? <div className="py-16 text-center"><ClipboardList className="mx-auto h-9 w-9 text-slate-300"/><h3 className="mt-4 font-black text-[#0b2d54]">Your story starts here</h3><p className="mt-2 text-sm text-slate-500">Health activity will appear here as it is recorded.</p></div> : <div className="space-y-9">{Object.entries(grouped).map(([k, items]) => <section key={k}><div className="mb-3 flex items-center gap-3"><span className="rounded-full bg-[#0b2d54] px-3 py-1.5 text-[10px] font-black uppercase text-white">{dayLabel(items[0].at)}</span><div className="h-px flex-1 bg-slate-100"/></div><div className="relative ml-2 border-l-2 border-slate-100 pl-6 sm:ml-3 sm:pl-8">{items.map((e) => { const C = cfg[e.type] || cfg.journal; const Icon = C.icon; const open = expanded === e.id; return <article key={e.id} className="relative pb-4 last:pb-0"><span className="absolute -left-[37px] top-3 grid h-7 w-7 place-items-center rounded-full border-4 border-white bg-[#e7f8f5] text-[#0b2d54] shadow-sm sm:-left-[45px]"><Icon className="h-3.5 w-3.5"/></span><button type="button" onClick={() => setExpanded(open ? null : e.id)} className="w-full rounded-[20px] border border-slate-100 bg-slate-50/70 p-4 text-left hover:bg-white hover:shadow-sm focus:outline-none focus-visible:ring-2 focus-visible:ring-[#24c1c4]"><div className="flex items-start gap-3"><div className="min-w-0 flex-1"><div className="flex flex-wrap items-center gap-2"><span className="text-[9px] font-black uppercase tracking-[0.14em] text-[#24aeb3]">{C.label}</span><span className="text-[10px] font-semibold text-slate-400">{timeLabel(e.at)}</span></div><h3 className="mt-1.5 text-sm font-black text-[#0b2d54]">{e.title}</h3><p className={`mt-1 text-sm leading-6 text-slate-600 ${open ? "" : "line-clamp-2"}`}>{e.detail}</p></div><ChevronDown className={`mt-1 h-4 w-4 shrink-0 text-slate-400 ${open ? "rotate-180" : ""}`}/></div>{open && <div className="mt-4 border-t border-slate-200 pt-3"><Link href={e.href} onClick={(ev) => ev.stopPropagation()} className="inline-flex items-center gap-1.5 rounded-lg bg-[#0b2d54] px-3 py-2 text-[10px] font-black text-white">Open related record <ArrowRight className="h-3.5 w-3.5"/></Link></div>}</button></article>; })}</div></section>)}</div>}
+      {visible < events.length && <div className="mt-7 flex justify-center border-t border-slate-100 pt-5"><button type="button" onClick={() => setVisible(v => v + 10)} className="rounded-xl border border-slate-200 bg-white px-5 py-3 text-xs font-black text-[#0b2d54]">Show older activity</button></div>}
     </section>
-    <section className="mt-5 rounded-3xl border border-[#24c1c4]/20 bg-[#24c1c4]/5 p-5"><div className="flex gap-3"><ShieldCheck className="h-5 w-5 shrink-0 text-[#0b2d54]"/><div><p className="font-semibold text-[#0b2d54]">Automatically organised</p><p className="mt-1 text-sm leading-6 text-slate-600">This timeline is built from your authenticated patient data. It does not create or invent medical records.</p></div></div></section>
+    <section className="mt-5 rounded-3xl border border-[#24c1c4]/20 bg-[#24c1c4]/5 p-5"><div className="flex gap-3"><ShieldCheck className="h-5 w-5 shrink-0 text-[#0b2d54]"/><div><p className="font-semibold text-[#0b2d54]">One health story, not a raw event log</p><p className="mt-1 text-sm leading-6 text-slate-600">Repeated technical entries are filtered so the patient sees the meaningful change rather than database noise.</p></div></div></section>
   </div></main></ProtectedRoute>;
 }
