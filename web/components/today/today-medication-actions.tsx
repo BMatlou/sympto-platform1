@@ -7,6 +7,7 @@ import { api } from "@/lib/api";
 
 interface TodayMedicationActionsProps {
   medications: any[];
+  onUpdated?: () => Promise<void> | void;
 }
 
 type Action = "TAKEN" | "SKIPPED";
@@ -28,7 +29,7 @@ function errorMessage(error: unknown) {
   return "We could not update this medication. Please try again.";
 }
 
-export default function TodayMedicationActions({ medications }: TodayMedicationActionsProps) {
+export default function TodayMedicationActions({ medications, onUpdated }: TodayMedicationActionsProps) {
   const [savingKey, setSavingKey] = useState<string | null>(null);
   const [states, setStates] = useState<Record<string, Action | undefined>>({});
 
@@ -49,6 +50,9 @@ export default function TodayMedicationActions({ medications }: TodayMedicationA
       toast.success(action === "TAKEN" ? "Medication marked taken" : "Medication marked skipped", {
         description: `${medicationName(medication)}${suffix}`,
       });
+
+      // Refresh the parent Today snapshot so medication-goal progress changes immediately.
+      await onUpdated?.();
     } catch (error) {
       toast.error("Medication update failed", { description: errorMessage(error) });
     } finally {
@@ -99,7 +103,7 @@ export default function TodayMedicationActions({ medications }: TodayMedicationA
                     className={`inline-flex min-h-10 items-center justify-center gap-1.5 rounded-xl px-3.5 py-2 text-xs font-black transition disabled:opacity-50 ${state === "TAKEN" ? "bg-[#168660] text-white" : "bg-[#0b2d54] text-white hover:bg-[#123e66]"}`}
                   >
                     <Check className="h-3.5 w-3.5" />
-                    {savingKey === `${key}:TAKEN` ? "Saving…" : state === "TAKEN" ? "Taken" : "Taken"}
+                    {savingKey === `${key}:TAKEN` ? "Saving…" : "Taken"}
                   </button>
                   <button
                     type="button"
