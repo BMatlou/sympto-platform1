@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { Menu, QrCode, Settings, UserRound, Users, X } from "lucide-react";
+import { Menu, MessageCircle, QrCode, Settings, UserRound, Users, X } from "lucide-react";
 import { useState } from "react";
 
 /**
@@ -36,9 +36,10 @@ export default function HealthAccountNav() {
       {open && (
         <div className="absolute right-0 top-14 w-60 overflow-hidden rounded-2xl border border-slate-200 bg-white p-2 shadow-[0_18px_45px_rgba(11,45,84,0.16)]">
           <p className="px-3 py-2 text-[10px] font-bold uppercase tracking-[0.16em] text-slate-400">Account</p>
+          <Link href="/messages" onClick={() => setOpen(false)} className="flex items-center gap-3 rounded-xl px-3 py-3 text-sm font-semibold text-[#0b2d54] hover:bg-[#24c1c4]/10"><MessageCircle className="h-4 w-4" />Messages</Link>
           <Link href="/profile" onClick={() => setOpen(false)} className="flex items-center gap-3 rounded-xl px-3 py-3 text-sm font-semibold text-[#0b2d54] hover:bg-[#24c1c4]/10"><UserRound className="h-4 w-4" />Profile</Link>
           <Link href="/family" onClick={() => setOpen(false)} className="flex items-center gap-3 rounded-xl px-3 py-3 text-sm font-semibold text-[#0b2d54] hover:bg-[#24c1c4]/10"><Users className="h-4 w-4" />Family</Link>
-          <Link href="/settings" onClick={() => setOpen(false)} className="flex items-center gap-3 rounded-xl px-3 py-3 text-sm font-semibold text-[#0b2d54] hover:bg-[#24c1c4]/10"><Settings className="h-4 w-4" />Settings</Link>
+          <Link href="/settings" onClick={() => setOpen(false)} className="flex items-center gap-3 rounded-xl px-3 py-3 text-sm font-semibold text-[#0b2d54] hover:bg-white"><Settings className="h-4 w-4" />Settings</Link>
         </div>
       )}
     </div>
