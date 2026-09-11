@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { Check, Minus, Plus, Save, Droplets, Dumbbell, Moon, Brain, Sparkles } from "lucide-react";
+import { Check, Minus, Plus, Save, Dumbbell, Moon, Sparkles } from "lucide-react";
 import { healthJournalService } from "@/services/health-journal.service";
 import type { HealthJournal, HealthJournalMood, SleepQuality } from "@/types/health-journal";
 
@@ -79,7 +79,7 @@ function MoodFace({ tone }: { tone: string }) {
   }[tone] ?? "M 18 31 L 30 31";
 
   return (
-    <svg viewBox="0 0 48 48" className="h-[27px] w-[27px] fill-none stroke-current stroke-[2.2] stroke-linecap-round stroke-linejoin-round" aria-hidden="true">
+    <svg viewBox="0 0 48 48" className="h-[27px] w-[27px] fill-none stroke-current [stroke-linecap:round] [stroke-linejoin:round] [stroke-width:2.2]" aria-hidden="true">
       <circle cx="24" cy="24" r="16" />
       <path d="M17 20h.01M31 20h.01" />
       <path d={mouth} />
@@ -235,7 +235,7 @@ export default function DailyHealthCheckIn({ embedded = false }: { embedded?: bo
                 great: "bg-[#fff5df] text-[#a26204]",
               }[option.tone];
               return (
-                <button key={option.value} type="button" aria-pressed={selected} onClick={() => setMood(option.value)} className={`min-w-0 rounded-2xl border bg-[#fbfdfe] px-1.5 py-2.5 text-center text-[10px] font-black transition ${selected ? "border-[#24c1c4] bg-[#e8f9f8] text-[#0b2d54] shadow-[0_0_0_3px_rgba(36,193,196,.10)]" : "border-[#dfebef] text-[#74859a] hover:-translate-y-0.5"}`}>
+                <button key={option.value} type="button" aria-pressed={selected} onClick={() => setMood(option.value)} className={`group min-w-0 rounded-2xl border bg-[#fbfdfe] px-1.5 py-2.5 text-center text-[10px] font-black transition ${selected ? "border-[#24c1c4] bg-[#e8f9f8] text-[#0b2d54] shadow-[0_0_0_3px_rgba(36,193,196,.10)]" : "border-[#dfebef] text-[#74859a] hover:-translate-y-0.5"}`}>
                   <span className={`mx-auto mb-2 grid h-[38px] w-[38px] place-items-center rounded-[14px] transition group-hover:-translate-y-0.5 ${selected ? "bg-[#24c1c4] text-[#0b2d54]" : iconTone}`}>
                     <MoodFace tone={option.tone} />
                   </span>
