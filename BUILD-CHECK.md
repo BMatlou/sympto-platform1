@@ -1,0 +1,1 @@
+Repository build verification is run by GitHub Actions for feature/fix branches and pull requests targeting main.
