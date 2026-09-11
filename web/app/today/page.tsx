@@ -33,6 +33,10 @@ function text(value: unknown, fallback = "—") {
   return value === null || value === undefined || value === "" ? fallback : String(value);
 }
 
+function appointmentLabel(appointment: any) {
+  return text(appointment?.reason || appointment?.appointmentType, "Clinic visit").replaceAll("_", " ");
+}
+
 function startOfDay(date = new Date()) {
   const value = new Date(date);
   value.setHours(0, 0, 0, 0);
@@ -158,7 +162,7 @@ export default function TodayPage() {
       key: `appointment-${appointment.id}`,
       href: "/appointments",
       label: "Visit",
-      title: text(appointment.title || appointment.type, "Clinic visit"),
+      title: appointmentLabel(appointment),
       detail: formatDate(appointment.scheduledStart),
       icon: CalendarDays,
       tone: "bg-[#edf4ff] text-[#3f75bd]",
@@ -366,7 +370,7 @@ export default function TodayPage() {
               </div>
               <p className="mt-4 text-[10px] font-black uppercase tracking-[0.16em] text-[#71839a]">Next care visit</p>
               <h3 className="mt-1 text-base font-black text-[#0b2d54]">
-                {nextAppointment ? text(nextAppointment.title || nextAppointment.type, "Clinic visit") : "No visit scheduled"}
+                {nextAppointment ? appointmentLabel(nextAppointment) : "No visit scheduled"}
               </h3>
               <p className="mt-1 text-xs leading-5 text-[#71839a]">
                 {nextAppointment ? formatDate(nextAppointment.scheduledStart) : "Your appointments will appear here."}
