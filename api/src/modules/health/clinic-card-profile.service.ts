@@ -1,5 +1,4 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
-import { Prisma } from '@prisma/client';
 import { PrismaService } from '../../database/prisma.service';
 
 export interface UpdateClinicCardProfileInput {
@@ -30,7 +29,6 @@ export class ClinicCardProfileService {
         update: { bloodType: input.bloodType as any, rhesusFactor: input.rhesusFactor as any, organDonor: input.organDonor !== undefined ? input.organDonor : undefined, emergencyNotes: input.emergencyNotes },
         create: { patientId: patient.id, bloodType: input.bloodType as any, rhesusFactor: input.rhesusFactor as any, organDonor: input.organDonor ?? false, emergencyNotes: input.emergencyNotes },
       });
-      if (input.organDonor !== undefined) await tx.$executeRaw(Prisma.sql`UPDATE "HealthPassport" SET "organDonorRecorded" = true WHERE "patientId" = ${patient.id}`);
       return { success: true };
     });
   }
