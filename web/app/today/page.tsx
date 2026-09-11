@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { ArrowRight, CalendarDays, Pill, Target } from "lucide-react";
+import { ArrowLeft, ArrowRight, CalendarDays, Pill, Target, Sparkles } from "lucide-react";
 import ProtectedRoute from "@/components/auth/protected-route";
 import { useDashboard } from "@/hooks/use-dashboard";
 import DailyHealthCheckIn from "@/components/dashboard/daily-health-check-in";
@@ -29,6 +29,7 @@ export default function TodayPage() {
       <ProtectedRoute>
         <main className="min-h-screen bg-[#f5fafb] p-4 sm:p-8">
           <div className="mx-auto max-w-[1260px] space-y-5" aria-busy="true">
+            <div className="h-[58px] animate-pulse rounded-[24px] bg-white" />
             <div className="h-[270px] animate-pulse rounded-[30px] bg-white" />
             <div className="h-32 animate-pulse rounded-[26px] bg-white" />
             <div className="h-[560px] animate-pulse rounded-[27px] bg-white" />
@@ -59,8 +60,7 @@ export default function TodayPage() {
   const todayAppointments = appointments.filter((appointment: any) => {
     if (!appointment?.scheduledStart) return false;
     const date = new Date(String(appointment.scheduledStart));
-    const now = new Date();
-    return date.toDateString() === now.toDateString();
+    return date.toDateString() === new Date().toDateString();
   });
   const goalsDueSoon = goals.filter((goal: any) => goal.targetDate && new Date(String(goal.targetDate)) <= new Date(Date.now() + 7 * 24 * 60 * 60 * 1000));
   const todayNotifications = data.today?.notifications ?? data.notifications ?? [];
@@ -73,31 +73,33 @@ export default function TodayPage() {
     <ProtectedRoute>
       <main className="min-h-screen bg-[#f5fafb] text-[#17314e]">
         <div className="mx-auto max-w-[1260px] px-4 pb-12 pt-4 sm:px-7 sm:pt-6">
-          <section className="mt-2 grid gap-[18px] lg:grid-cols-[1.35fr_.65fr]">
-            <div className="relative min-h-[255px] overflow-hidden rounded-[30px] bg-gradient-to-br from-[#0b2d54] via-[#154c76] to-[#239a9f] p-7 text-white shadow-[0_16px_42px_rgba(11,45,84,.09)] sm:p-[30px_33px]">
-              <div className="pointer-events-none absolute -right-[100px] -top-[150px] h-[360px] w-[360px] rounded-full border border-white/15 shadow-[0_0_0_26px_rgba(255,255,255,.035),0_0_0_52px_rgba(255,255,255,.02)]" />
-              <div className="relative z-10">
-                <p className="text-[10px] font-black uppercase tracking-[.18em] text-white/60">My health · Today</p>
-                <h1 className="mt-3 text-4xl font-black leading-none tracking-[-.065em]">Hi {firstName}.<br />What do I do today?</h1>
-                <p className="mt-3 max-w-[560px] text-sm leading-[1.6] text-white/75">Sympto has brought together the things that actually need your attention, without making you search for them.</p>
-                <div className="mt-6 flex flex-wrap gap-2.5">
-                  <Link href="/log-symptom" className="inline-flex items-center gap-2 rounded-[14px] bg-white px-4 py-3 text-xs font-black text-[#0b2d54]">✦ Log a symptom</Link>
-                  <Link href="/health-journal" className="inline-flex items-center gap-2 rounded-[14px] border border-white/25 bg-white/10 px-4 py-3 text-xs font-black text-white">See health story <ArrowRight className="h-3.5 w-3.5" /></Link>
+          <header className="mb-5 flex items-center justify-between">
+            <Link href="/dashboard" className="inline-flex min-h-10 items-center gap-2 rounded-xl px-2 text-sm font-semibold text-[#0b2d54] transition hover:bg-white">
+              <ArrowLeft className="h-4 w-4" />
+              My Health
+            </Link>
+            <span className="rounded-full bg-white px-3 py-1.5 text-[10px] font-black uppercase tracking-[0.16em] text-[#71839a] shadow-sm ring-1 ring-[#e0ebef]">Today</span>
+          </header>
+
+          <section className="relative overflow-hidden rounded-[30px] bg-gradient-to-br from-[#08284a] via-[#0e4773] to-[#24babe] p-7 text-white shadow-[0_20px_55px_rgba(11,45,84,0.12)] sm:p-9">
+            <div className="pointer-events-none absolute -right-24 -top-28 h-64 w-64 rounded-full border border-white/10 shadow-[0_0_0_24px_rgba(255,255,255,0.025)]" />
+            <div className="relative">
+              <p className="text-sm font-medium text-white/75">Hi {firstName}</p>
+              <div className="mt-3 flex flex-col gap-5 sm:flex-row sm:items-end sm:justify-between">
+                <div>
+                  <h1 className="text-3xl font-black tracking-[-0.04em] sm:text-4xl">What do I do today?</h1>
+                  <p className="mt-2 max-w-xl text-sm leading-6 text-white/70">Sympto has brought together the things that actually need your attention, without making you search for them.</p>
                 </div>
+                <Link href="/log-symptom" className="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl bg-white/12 px-4 py-2 text-xs font-bold text-white ring-1 ring-white/20 backdrop-blur-sm transition hover:bg-white/18">
+                  <Sparkles className="h-4 w-4" />
+                  Log a symptom
+                </Link>
+              </div>
+              <div className="mt-7 flex flex-wrap gap-2.5">
+                <span className="rounded-full bg-white/10 px-3 py-1.5 text-[11px] font-semibold text-white/85 ring-1 ring-white/10">{totalTodayItems} {totalTodayItems === 1 ? "item" : "items"} organised</span>
+                {attention.length > 0 && <span className="rounded-full bg-red-400/15 px-3 py-1.5 text-[11px] font-semibold text-white ring-1 ring-red-200/20">{attention.length} need review</span>}
               </div>
             </div>
-
-            <aside className="flex flex-col justify-between rounded-[30px] border border-[#dfebef] bg-white p-6 shadow-[0_6px_20px_rgba(11,45,84,.04)]">
-              <p className="text-[10px] font-black uppercase tracking-[.17em] text-[#74859a]">Your day, organised</p>
-              <div className="flex items-center gap-4">
-                <div className="grid h-[66px] w-[66px] place-items-center rounded-[23px] bg-[#e9f8f1] text-[31px] font-black tracking-[-.06em] text-[#168660]">{totalTodayItems}</div>
-                <div>
-                  <h2 className="text-[17px] font-black tracking-[-.03em] text-[#0b2d54]">{totalTodayItems === 1 ? "Item organised" : "Items organised"}</h2>
-                  <p className="mt-1 text-xs leading-[1.45] text-[#74859a]">{totalTodayItems === 0 ? "Nothing urgent is waiting for you." : `${totalTodayItems} clear health item${totalTodayItems === 1 ? "" : "s"} ready for you.`}</p>
-                </div>
-              </div>
-              <Link href="/health-journal" className="text-xs font-black text-[#0b2d54]">Open your plan →</Link>
-            </aside>
           </section>
 
           <div className="mt-7 flex items-end justify-between gap-5">
@@ -122,7 +124,7 @@ export default function TodayPage() {
           </div>
 
           <div className="mt-3.5">
-            <DailyHealthCheckIn embedded />
+            <DailyHealthCheckIn embedded goals={goals} />
           </div>
 
           <section className="mt-4 grid gap-[15px] sm:grid-cols-2">
