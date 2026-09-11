@@ -63,6 +63,10 @@ function vitalDate(value?: string) {
   return new Intl.DateTimeFormat("en-ZA", { dateStyle: "medium", timeStyle: "short" }).format(date);
 }
 
+function sourceLabel(value?: string | null) {
+  return value || "Health record";
+}
+
 export default function HealthVitalsSummary({ bmi, bmiCategory, weightKg, heightCm, measurements = [] }: Props) {
   const bloodPressure = measurement(measurements, ["BLOOD_PRESSURE", "BLOODPRESSURE"]);
   const heartRate = measurement(measurements, ["HEART_RATE", "HEARTRATE"]);
@@ -78,7 +82,7 @@ export default function HealthVitalsSummary({ bmi, bmiCategory, weightKg, height
           <h2 className="mt-1 text-xl font-black tracking-[-0.035em] text-[#0b2d54]">BMI &amp; vital signs</h2>
           <p className="mt-1 text-xs leading-5 text-[#71839a]">Your latest available measurements, brought together in one view.</p>
         </div>
-        <Link href="/health-journal" className="inline-flex min-h-10 items-center justify-center rounded-xl bg-[#0b2d54] px-4 py-2 text-[11px] font-black text-white transition hover:bg-[#071f3a]">View health journey</Link>
+        <Link href="/health-vitals" className="inline-flex min-h-10 items-center justify-center rounded-xl bg-[#0b2d54] px-4 py-2 text-[11px] font-black text-white transition hover:bg-[#071f3a]">Open measurements</Link>
       </div>
 
       <div className="mt-5 grid gap-4 lg:grid-cols-[1.1fr_1fr]">
@@ -103,23 +107,24 @@ export default function HealthVitalsSummary({ bmi, bmiCategory, weightKg, height
         </div>
 
         <div className="grid gap-3 sm:grid-cols-2">
-          <VitalTile icon={<HeartPulse className="h-4 w-4" />} label="Blood pressure" value={bloodPressure?.value != null ? `${bloodPressure.value} ${bloodPressure.unit ?? ""}`.trim() : "—"} recordedAt={vitalDate(bloodPressure?.measuredAt)} />
-          <VitalTile icon={<Activity className="h-4 w-4" />} label="Heart rate" value={heartRate?.value != null ? `${formatNumber(heartRate.value)} ${heartRate.unit ?? "bpm"}`.trim() : "—"} recordedAt={vitalDate(heartRate?.measuredAt)} />
-          <VitalTile icon={<Wind className="h-4 w-4" />} label="Oxygen saturation" value={oxygen?.value != null ? `${formatNumber(oxygen.value, 1)} ${oxygen.unit ?? "%"}`.trim() : "—"} recordedAt={vitalDate(oxygen?.measuredAt)} />
-          <VitalTile icon={<Thermometer className="h-4 w-4" />} label="Temperature" value={temperature?.value != null ? `${formatNumber(temperature.value, 1)} ${temperature.unit ?? "°C"}`.trim() : "—"} recordedAt={vitalDate(temperature?.measuredAt)} />
-          <VitalTile icon={<Wind className="h-4 w-4" />} label="Respiratory rate" value={respiratory?.value != null ? `${formatNumber(respiratory.value)} ${respiratory.unit ?? "/min"}`.trim() : "—"} recordedAt={vitalDate(respiratory?.measuredAt)} />
+          <VitalTile icon={<HeartPulse className="h-4 w-4" />} label="Blood pressure" value={bloodPressure?.value != null ? `${bloodPressure.value} ${bloodPressure.unit ?? ""}`.trim() : "—"} recordedAt={vitalDate(bloodPressure?.measuredAt)} source={sourceLabel(bloodPressure?.source)} />
+          <VitalTile icon={<Activity className="h-4 w-4" />} label="Heart rate" value={heartRate?.value != null ? `${formatNumber(heartRate.value)} ${heartRate.unit ?? "bpm"}`.trim() : "—"} recordedAt={vitalDate(heartRate?.measuredAt)} source={sourceLabel(heartRate?.source)} />
+          <VitalTile icon={<Wind className="h-4 w-4" />} label="Oxygen saturation" value={oxygen?.value != null ? `${formatNumber(oxygen.value, 1)} ${oxygen.unit ?? "%"}`.trim() : "—"} recordedAt={vitalDate(oxygen?.measuredAt)} source={sourceLabel(oxygen?.source)} />
+          <VitalTile icon={<Thermometer className="h-4 w-4" />} label="Temperature" value={temperature?.value != null ? `${formatNumber(temperature.value, 1)} ${temperature.unit ?? "°C"}`.trim() : "—"} recordedAt={vitalDate(temperature?.measuredAt)} source={sourceLabel(temperature?.source)} />
+          <VitalTile icon={<Wind className="h-4 w-4" />} label="Respiratory rate" value={respiratory?.value != null ? `${formatNumber(respiratory.value)} ${respiratory.unit ?? "/min"}`.trim() : "—"} recordedAt={vitalDate(respiratory?.measuredAt)} source={sourceLabel(respiratory?.source)} />
         </div>
       </div>
     </section>
   );
 }
 
-function VitalTile({ icon, label, value, recordedAt }: { icon: React.ReactNode; label: string; value: string; recordedAt: string }) {
+function VitalTile({ icon, label, value, recordedAt, source }: { icon: React.ReactNode; label: string; value: string; recordedAt: string; source: string }) {
   return (
     <div className="rounded-[20px] border border-[#e3ecef] bg-white p-4 ring-1 ring-transparent transition hover:ring-[#24c1c4]/20">
       <div className="flex items-center gap-2 text-[#0b2d54]"><span className="grid h-8 w-8 place-items-center rounded-xl bg-[#24c1c4]/10 text-[#0b2d54]">{icon}</span><p className="text-[10px] font-black uppercase tracking-wide text-[#71839a]">{label}</p></div>
       <p className="mt-3 text-xl font-black tracking-[-0.03em] text-[#0b2d54]">{value}</p>
       <p className="mt-1 text-[9px] font-semibold text-[#9aa8b7]">{recordedAt}</p>
+      <p className="mt-0.5 text-[9px] font-semibold text-[#9aa8b7]">Source: {source}</p>
     </div>
   );
 }
