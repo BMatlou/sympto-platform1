@@ -1,5 +1,4 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
-import { Prisma } from '@prisma/client';
 import { PrismaService } from '../../database/prisma.service';
 
 @Injectable()
@@ -59,10 +58,6 @@ export class ClinicCardService {
     const weightKg = patient.weightKg != null ? Number(patient.weightKg) : patient.baseline?.weightKg != null ? Number(patient.baseline.weightKg) : null;
     const calculatedBmi = heightCm && weightKg && heightCm > 0 && weightKg > 0 ? Number((weightKg / Math.pow(heightCm / 100, 2)).toFixed(2)) : null;
 
-    const organDonorMeta = await this.prisma.$queryRaw<Array<{ organDonorRecorded: boolean }>>(
-      Prisma.sql`SELECT "organDonorRecorded" FROM "HealthPassport" WHERE "patientId" = ${patient.id} LIMIT 1`,
-    );
-
     const updatedDates = [passport?.updatedAt, ...activeAllergies.map((item) => item.updatedAt), ...activeConditions.map((item) => item.updatedAt), ...activeMedications.map((item) => item.updatedAt), ...activeDiagnoses.map((item) => item.updatedAt), ...completedProcedures.map((item) => item.updatedAt)].filter(Boolean) as Date[];
 
     return {
@@ -83,7 +78,7 @@ export class ClinicCardService {
         bloodType: passport?.bloodType ?? patient.medicalRecord?.bloodType ?? null,
         rhesusFactor: passport?.rhesusFactor ?? null,
         organDonor: passport?.organDonor ?? patient.medicalRecord?.organDonor ?? false,
-        organDonorRecorded: organDonorMeta[0]?.organDonorRecorded === true,
+        organDonorRecorded: passport?.organDonor !== undefined && passport?.organDonor !== null,
         emergencyNotes: passport?.emergencyNotes ?? null,
         contacts: patient.emergencyContacts,
       },
