@@ -1,0 +1,1 @@
+CI is intentionally configured to validate feature and fix branches as well as main.
