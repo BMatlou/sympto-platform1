@@ -53,8 +53,6 @@ export class SmartFileClinicalService {
         },
         clinicalEpisodes: true,
         carePlans: true,
-        diagnoses: true,
-        procedures: true,
         referrals: true,
         healthJournals: true,
         labOrders: { include: { items: true } },
@@ -74,7 +72,6 @@ export class SmartFileClinicalService {
           practitioner: { include: { person: true } },
           diagnoses: true,
           procedures: true,
-          clinicalVitals: true,
           prescriptions: true,
           labOrders: true,
           labResults: true,
@@ -88,7 +85,24 @@ export class SmartFileClinicalService {
       this.prisma.imagingStudy.findMany({ where: { patientId: patient.id }, orderBy: { performedAt: 'desc' } }),
     ]);
 
+    const encounterIds = encounters.map((encounter) => encounter.id);
+    const clinicalVitals = encounterIds.length
+      ? await this.prisma.clinicalVital.findMany({
+          where: { encounterId: { in: encounterIds } },
+          orderBy: { measuredAt: 'desc' },
+          include: { vitalType: true },
+        })
+      : [];
+
     const passport = patient.healthPassport;
+    const diagnoses = [
+      ...(passport?.patientDiagnoses ?? []),
+      ...encounters.flatMap((encounter) => encounter.diagnoses),
+    ];
+    const procedures = [
+      ...(passport?.patientProcedures ?? []),
+      ...encounters.flatMap((encounter) => encounter.procedures),
+    ];
 
     return {
       patient: {
@@ -109,10 +123,10 @@ export class SmartFileClinicalService {
       prescriptions: consent.canViewPrescriptions ? patient.prescriptions : [],
       encounters,
       episodes: patient.clinicalEpisodes,
-      vitals: encounters.flatMap((encounter) => encounter.clinicalVitals),
+      vitals: clinicalVitals,
       symptoms: encounters.flatMap((encounter) => encounter.symptomLogs),
-      diagnoses: patient.diagnoses,
-      procedures: patient.procedures,
+      diagnoses,
+      procedures,
       labResults: consent.canViewLabResults ? labResults : [],
       imaging: consent.canViewImaging ? imagingStudies : [],
       carePlans: patient.carePlans,
