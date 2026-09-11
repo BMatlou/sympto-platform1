@@ -45,9 +45,18 @@ class HealthHomeService {
     const healthHome: HealthHomeResponse = payload?.data ?? payload;
     if (!healthHome?.patient?.id) throw new Error('Health Home returned an invalid response.');
 
-    const healthHomeImmunizations = Array.isArray(healthHome.immunizations)
+    const healthHomeImmunizations = Array.isArray(healthHome.immunizations) && healthHome.immunizations.length > 0
       ? healthHome.immunizations
       : (Array.isArray(healthHome.healthSnapshot?.immunizations) ? healthHome.healthSnapshot.immunizations : []);
+    const healthHomeAllergies = Array.isArray(healthHome.allergies) && healthHome.allergies.length > 0
+      ? healthHome.allergies
+      : (Array.isArray(healthHome.healthSnapshot?.activeAllergies) ? healthHome.healthSnapshot.activeAllergies : (healthHome.healthSnapshot?.allergies ?? []));
+    const healthHomeConditions = Array.isArray(healthHome.conditions) && healthHome.conditions.length > 0
+      ? healthHome.conditions
+      : (Array.isArray(healthHome.healthSnapshot?.activeConditions) ? healthHome.healthSnapshot.activeConditions : []);
+    const healthHomeMedications = Array.isArray(healthHome.medications) && healthHome.medications.length > 0
+      ? healthHome.medications
+      : (Array.isArray(healthHome.today?.activeMedications) ? healthHome.today.activeMedications : []);
 
     let canonical: any = null;
     if (!patientId || patientId === healthHome.patient?.id) {
@@ -61,13 +70,36 @@ class HealthHomeService {
     }
 
     if (!canonical || canonical.patient?.id !== healthHome.patient?.id) {
-      return { ...healthHome, immunizations: healthHomeImmunizations, healthSnapshot: { ...healthHome.healthSnapshot, immunizations: healthHomeImmunizations }, wearables: healthHome.wearables ?? { devices: healthHome.healthSnapshot.connectedDevices, latestMeasurements: healthHome.healthSnapshot.latestMeasurements.map((m: any, index) => ({ id: `${m.type}-${index}`, type: m.type, value: m.value, unit: m.unit, measuredAt: m.measuredAt, source: m.source })) } };
+      return {
+        ...healthHome,
+        allergies: healthHomeAllergies,
+        conditions: healthHomeConditions,
+        medications: healthHomeMedications,
+        immunizations: healthHomeImmunizations,
+        healthSnapshot: {
+          ...healthHome.healthSnapshot,
+          activeAllergies: healthHomeAllergies,
+          activeConditions: healthHomeConditions,
+          allergies: healthHomeAllergies,
+          immunizations: healthHomeImmunizations,
+        },
+        today: { ...healthHome.today, activeMedications: healthHomeMedications },
+        wearables: healthHome.wearables ?? { devices: healthHome.healthSnapshot.connectedDevices, latestMeasurements: healthHome.healthSnapshot.latestMeasurements.map((m: any, index) => ({ id: `${m.type}-${index}`, type: m.type, value: m.value, unit: m.unit, measuredAt: m.measuredAt, source: m.source })) },
+      };
     }
 
     const canonicalImmunizations = Array.isArray(canonical.immunizations) ? canonical.immunizations : [];
-    const immunizations = healthHomeImmunizations.length > 0 ? healthHomeImmunizations : canonicalImmunizations;
+    const immunizations = canonicalImmunizations.length > 0 ? canonicalImmunizations : healthHomeImmunizations;
     const canonicalEmergencyContacts = Array.isArray(canonical.emergencyContacts) ? canonical.emergencyContacts : [];
     const emergencyContacts = canonicalEmergencyContacts.length > 0 ? canonicalEmergencyContacts : (healthHome.emergencyContacts ?? []);
+    const canonicalAllergies = Array.isArray(canonical.allergies) ? canonical.allergies : [];
+    const canonicalConditions = Array.isArray(canonical.conditions) ? canonical.conditions : [];
+    const canonicalMedications = Array.isArray(canonical.medications) ? canonical.medications : [];
+    const allergies = canonicalAllergies.length > 0 ? canonicalAllergies : healthHomeAllergies;
+    const conditions = canonicalConditions.length > 0
+      ? canonicalConditions
+      : healthHomeConditions.map((condition: any) => condition?.status ? condition : { ...condition, status: 'ACTIVE' });
+    const medications = canonicalMedications.length > 0 ? canonicalMedications : healthHomeMedications;
 
     return {
       ...healthHome,
@@ -75,13 +107,21 @@ class HealthHomeService {
       patient: { ...healthHome.patient, ...(canonical.patient ?? {}) },
       healthPassport: canonical.healthPassport ?? healthHome.healthPassport,
       emergencyContacts,
-      allergies: canonical.allergies ?? healthHome.allergies,
-      conditions: canonical.conditions ?? healthHome.conditions,
-      medications: canonical.medications ?? healthHome.medications,
+      allergies,
+      conditions,
+      medications,
       immunizations,
       healthGoals: canonical.healthGoals ?? healthHome.healthGoals,
-      healthSnapshot: { ...healthHome.healthSnapshot, activeAllergies: canonical.allergies ?? healthHome.healthSnapshot.activeAllergies, activeConditions: canonical.conditions ?? healthHome.healthSnapshot.activeConditions, allergies: canonical.allergies ?? healthHome.healthSnapshot.allergies, immunizations, bloodType: canonical.healthPassport?.bloodType ?? healthHome.healthSnapshot.bloodType, rhesusFactor: canonical.healthPassport?.rhesusFactor ?? healthHome.healthSnapshot.rhesusFactor },
-      today: { ...healthHome.today, activeMedications: canonical.medications ?? healthHome.today.activeMedications },
+      healthSnapshot: {
+        ...healthHome.healthSnapshot,
+        activeAllergies: allergies,
+        activeConditions: conditions,
+        allergies,
+        immunizations,
+        bloodType: canonical.healthPassport?.bloodType ?? healthHome.healthSnapshot.bloodType,
+        rhesusFactor: canonical.healthPassport?.rhesusFactor ?? healthHome.healthSnapshot.rhesusFactor,
+      },
+      today: { ...healthHome.today, activeMedications: medications },
       wearables: healthHome.wearables ?? { devices: healthHome.healthSnapshot.connectedDevices, latestMeasurements: healthHome.healthSnapshot.latestMeasurements.map((m: any, index) => ({ id: `${m.type}-${index}`, type: m.type, value: m.value, unit: m.unit, measuredAt: m.measuredAt, source: m.source })) },
     };
   }
