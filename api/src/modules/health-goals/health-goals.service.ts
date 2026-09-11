@@ -30,7 +30,6 @@ export class HealthGoalsService {
   async findAll(query: QueryHealthGoalDto) {
     const { page, limit, patientId, practitionerId, carePlanId, category, priority, status } = query;
     const where: Prisma.HealthGoalWhereInput = { patientId, practitionerId, carePlanId, category, priority, status };
-
     const [data, total] = await this.prisma.$transaction([
       this.prisma.healthGoal.findMany({
         where,
@@ -46,11 +45,7 @@ export class HealthGoalsService {
       }),
       this.prisma.healthGoal.count({ where }),
     ]);
-
-    return {
-      data,
-      pagination: { page, limit, total, totalPages: Math.ceil(total / limit) },
-    };
+    return { data, pagination: { page, limit, total, totalPages: Math.ceil(total / limit) } };
   }
 
   async findOne(id: string) {
@@ -63,7 +58,6 @@ export class HealthGoalsService {
         progress: { orderBy: { measuredAt: 'desc' } },
       },
     });
-
     if (!healthGoal) throw new NotFoundException('Health goal not found.');
     return healthGoal;
   }
@@ -84,7 +78,7 @@ export class HealthGoalsService {
 
   async recordProgress(id: string, dto: RecordHealthGoalProgressDto) {
     const goal = await this.findOne(id);
-    const currentValue = Number(dto.currentValue);
+    let currentValue = Number(dto.currentValue);
     const targetValue = goal.targetValue == null ? null : Number(goal.targetValue);
     const previousValue = goal.currentValue == null ? null : Number(goal.currentValue);
 
@@ -99,6 +93,17 @@ export class HealthGoalsService {
 
     if (!supportedDailyGoal) {
       throw new BadRequestException('This goal type is not updated by the daily check-in.');
+    }
+
+    const unit = String(goal.unit ?? '').trim().toLowerCase();
+    if (goal.category === HealthGoalCategory.HYDRATION && ['l', 'liter', 'litre', 'liters', 'litres'].includes(unit)) {
+      currentValue /= 1000;
+    }
+    if (goal.category === HealthGoalCategory.EXERCISE && ['h', 'hr', 'hour', 'hours'].includes(unit)) {
+      currentValue /= 60;
+    }
+    if (goal.category === HealthGoalCategory.SLEEP && ['min', 'minute', 'minutes'].includes(unit)) {
+      currentValue *= 60;
     }
 
     const progressPercent =
