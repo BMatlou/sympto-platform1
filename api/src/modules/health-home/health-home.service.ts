@@ -143,6 +143,8 @@ export class HealthHomeService {
     const latestMeasurements = new Map<string, (typeof measurements)[number]>();
     for (const measurement of measurements) if (!latestMeasurements.has(measurement.measurementType)) latestMeasurements.set(measurement.measurementType, measurement);
     const latest = (type: string) => latestMeasurements.get(type as never) ?? null;
+    const latestWeight = latest('WEIGHT');
+    const latestBmiMeasurement = latest('BMI');
 
     const latestClinicalVitals = new Map<string, (typeof clinicalVitals)[number]>();
     for (const vital of clinicalVitals) {
