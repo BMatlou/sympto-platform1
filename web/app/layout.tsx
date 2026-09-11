@@ -73,7 +73,10 @@ export default function RootLayout({
     >
       <body className="min-h-screen bg-background pb-28 text-foreground">
         <ThemeProvider>
-          <QueryProvider>{children}</QueryProvider>
+          <QueryProvider>
+            {children}
+            <AIHealthHelperFab />
+          </QueryProvider>
 
           <Toaster
             richColors
@@ -81,8 +84,6 @@ export default function RootLayout({
             closeButton
             duration={4000}
           />
-
-          <AIHealthHelperFab />
         </ThemeProvider>
       </body>
     </html>
