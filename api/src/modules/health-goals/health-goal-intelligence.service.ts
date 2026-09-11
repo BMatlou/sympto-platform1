@@ -12,6 +12,8 @@ export type HealthActivitySnapshot = {
   sleepHours?: number | null;
 };
 
+type HealthGoalProgressResult = Awaited<ReturnType<HealthGoalsService['recordProgress']>>;
+
 @Injectable()
 export class HealthGoalIntelligenceService {
   constructor(
@@ -68,7 +70,7 @@ export class HealthGoalIntelligenceService {
     if (!settings) return [];
 
     const goals = await this.getActiveGoals(snapshot.patientId);
-    const updated = [];
+    const updated: HealthGoalProgressResult[] = [];
 
     for (const goal of goals) {
       if (
