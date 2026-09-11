@@ -1,27 +1,107 @@
 "use client";
 
 import Link from "next/link";
-import { Activity, AlertCircle, ArrowLeft, CheckCircle2, HeartPulse, Plus } from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
+import { Activity, AlertCircle, ArrowLeft, CheckCircle2, Edit3, Plus, RefreshCw, Save, X } from "lucide-react";
 import ProtectedRoute from "@/components/auth/protected-route";
 import { useDashboard } from "@/hooks/use-dashboard";
+import { api } from "@/lib/api";
 
-function formatEnum(value: unknown) { if (!value) return "Not specified"; return String(value).replace(/_/g, " ").toLowerCase().replace(/\b\w/g, (letter) => letter.toUpperCase()); }
+const formatEnum = (value: unknown) => !value ? "Not specified" : String(value).replace(/_/g, " ").toLowerCase().replace(/\b\w/g, (letter) => letter.toUpperCase());
+const displayDate = (value: unknown) => value ? new Date(String(value)).toLocaleDateString("en-ZA", { day: "numeric", month: "long", year: "numeric" }) : "Date not recorded";
+const unwrap = (payload: any) => Array.isArray(payload) ? payload : Array.isArray(payload?.data) ? payload.data : Array.isArray(payload?.data?.data) ? payload.data.data : [];
 
 export default function HealthConditionsPage() {
-  const { data: dashboard, loading } = useDashboard();
-  const allergies = Array.isArray(dashboard?.allergies) ? dashboard.allergies : [];
-  const conditions = Array.isArray(dashboard?.conditions) ? dashboard.conditions : [];
-  const activeAllergies = allergies.filter((allergy: any) => allergy?.status === "ACTIVE" || !allergy?.status);
-  const activeConditions = conditions.filter((condition: any) => condition?.status === "ACTIVE" && !condition?.resolvedAt);
+  const { data: dashboard, loading, reload } = useDashboard();
+  const [allergyCatalog, setAllergyCatalog] = useState<any[]>([]);
+  const [conditionCatalog, setConditionCatalog] = useState<any[]>([]);
+  const [clinicalDiagnoses, setClinicalDiagnoses] = useState<any[]>([]);
+  const [section, setSection] = useState<"allergy" | "condition" | null>(null);
+  const [editing, setEditing] = useState<any | null>(null);
+  const [saving, setSaving] = useState(false);
+  const [draft, setDraft] = useState<any>({});
+  const [message, setMessage] = useState("");
 
-  return <ProtectedRoute><main className="min-h-screen bg-[#F7F9FC]"><header className="border-b border-slate-200 bg-white"><div className="mx-auto flex h-16 max-w-7xl items-center justify-between px-4 sm:px-6 lg:px-8"><Link href="/dashboard" className="inline-flex items-center gap-2 text-sm font-medium text-slate-600 hover:text-[#0B5CAD]"><ArrowLeft className="h-4 w-4" />Back to dashboard</Link><Link href="/onboarding" className="inline-flex items-center gap-2 rounded-xl bg-[#0B5CAD] px-4 py-2.5 text-sm font-semibold text-white hover:bg-[#084987]"><Plus className="h-4 w-4" />Manage health information</Link></div></header>
-    <div className="mx-auto max-w-6xl px-4 py-8 sm:px-6 lg:px-8"><div className="mb-8"><div className="mb-3 inline-flex items-center gap-2 rounded-full bg-[#EAF3FB] px-3 py-1 text-xs font-semibold text-[#0B5CAD]"><HeartPulse className="h-3.5 w-3.5" />Health information</div><h1 className="text-3xl font-bold tracking-tight text-slate-950 sm:text-4xl">Allergies & conditions</h1><p className="mt-2 max-w-2xl text-slate-500">Review the allergies and health conditions currently recorded in your health profile.</p></div>
-      {loading && <div className="mb-6 rounded-2xl border border-slate-200 bg-white p-5 text-sm text-slate-500">Loading your health information...</div>}
-      <div className="grid gap-6 lg:grid-cols-2"><section className="rounded-2xl border border-slate-200 bg-white p-6"><div className="flex items-center justify-between gap-3"><div className="flex items-center gap-3"><div className="flex h-11 w-11 items-center justify-center rounded-xl bg-rose-50 text-rose-600"><AlertCircle className="h-5 w-5" /></div><div><h2 className="font-semibold text-slate-900">Allergies</h2><p className="text-sm text-slate-500">{activeAllergies.length} recorded</p></div></div><Link href="/onboarding" className="text-xs font-semibold text-[#0B5CAD] hover:underline">Manage</Link></div>
-        {activeAllergies.length === 0 ? <div className="mt-6 rounded-xl bg-slate-50 p-5"><p className="text-sm text-slate-500">No allergies are currently recorded.</p></div> : <div className="mt-6 space-y-3">{activeAllergies.map((allergy: any) => { const name = allergy?.allergy?.name || allergy?.name || "Allergy"; return <div key={allergy?.id ?? name} className="rounded-xl border border-rose-100 bg-rose-50/50 p-4"><div className="flex items-start justify-between gap-3"><div><h3 className="font-semibold text-slate-900">{name}</h3>{allergy?.reaction && <p className="mt-1 text-sm text-slate-500">Reaction: {allergy.reaction}</p>}{allergy?.severity && <p className="mt-1 text-xs text-slate-400">Severity: {formatEnum(allergy.severity)}</p>}</div><AlertCircle className="h-5 w-5 shrink-0 text-rose-500" /></div></div>; })}</div>}
-      </section><section className="rounded-2xl border border-slate-200 bg-white p-6"><div className="flex items-center justify-between gap-3"><div className="flex items-center gap-3"><div className="flex h-11 w-11 items-center justify-center rounded-xl bg-blue-50 text-blue-600"><Activity className="h-5 w-5" /></div><div><h2 className="font-semibold text-slate-900">Active conditions</h2><p className="text-sm text-slate-500">{activeConditions.length} recorded</p></div></div><Link href="/onboarding" className="text-xs font-semibold text-[#0B5CAD] hover:underline">Manage</Link></div>
-        {activeConditions.length === 0 ? <div className="mt-6 rounded-xl bg-slate-50 p-5"><p className="text-sm text-slate-500">No active health conditions are currently recorded.</p></div> : <div className="mt-6 space-y-3">{activeConditions.map((condition: any) => { const name = condition?.condition?.name || condition?.name || "Health condition"; return <div key={condition?.id ?? name} className="rounded-xl border border-blue-100 bg-blue-50/50 p-4"><div className="flex items-start justify-between gap-3"><div><h3 className="font-semibold text-slate-900">{name}</h3>{condition?.diagnosedAt && <p className="mt-1 text-sm text-slate-500">Diagnosed: {new Date(condition.diagnosedAt).toLocaleDateString("en-ZA", { day: "numeric", month: "long", year: "numeric" })}</p>}{condition?.notes && <p className="mt-2 text-sm text-slate-500">{condition.notes}</p>}</div><CheckCircle2 className="h-5 w-5 shrink-0 text-blue-500" /></div></div>; })}</div>}
-      </section></div>
-      <div className="mt-6 rounded-2xl border border-[#D8E7F4] bg-[#F5FAFE] p-5"><div className="flex gap-3"><HeartPulse className="mt-0.5 h-5 w-5 shrink-0 text-[#0B5CAD]" /><div><h2 className="font-semibold text-slate-900">Keep your information current</h2><p className="mt-1 text-sm leading-6 text-slate-500">Manage allergies and conditions through the same health profile used by Health Home and Health Passport.</p></div></div></div>
-    </div></main></ProtectedRoute>;
+  const allergies = useMemo(() => Array.isArray(dashboard?.allergies) ? dashboard.allergies : [], [dashboard?.allergies]);
+  const conditions = useMemo(() => Array.isArray(dashboard?.conditions) ? dashboard.conditions : [], [dashboard?.conditions]);
+  const activeAllergies = allergies.filter((item: any) => item?.status === "ACTIVE" || !item?.status);
+  const activeConditions = conditions.filter((item: any) => item?.status === "ACTIVE" && !item?.resolvedAt);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const [allergyResponse, conditionResponse, diagnosisResponse] = await Promise.allSettled([
+          api.get("/allergies?page=1&limit=50"),
+          api.get("/conditions?page=1&limit=50"),
+          api.get("/patient-diagnoses?page=1&limit=50"),
+        ]);
+        if (cancelled) return;
+        if (allergyResponse.status === "fulfilled") setAllergyCatalog(unwrap(allergyResponse.value.data));
+        if (conditionResponse.status === "fulfilled") setConditionCatalog(unwrap(conditionResponse.value.data));
+        if (diagnosisResponse.status === "fulfilled") setClinicalDiagnoses(unwrap(diagnosisResponse.value.data));
+      } catch {
+        // The dashboard remains usable even when optional catalog/clinical reads are unavailable.
+      }
+    })();
+    return () => { cancelled = true; };
+  }, []);
+
+  const openAdd = (kind: "allergy" | "condition") => {
+    setSection(kind); setEditing(null); setMessage("");
+    setDraft(kind === "allergy" ? { allergyId: "", severity: "", reaction: "", notes: "" } : { conditionId: "", diagnosedAt: "", chronic: false, status: "ACTIVE", notes: "" });
+  };
+
+  const openEdit = (kind: "allergy" | "condition", record: any) => {
+    setSection(kind); setEditing(record); setMessage("");
+    setDraft(kind === "allergy" ? { allergyId: record.allergyId, severity: record.severity ?? "", reaction: record.reaction ?? "", notes: record.notes ?? "" } : { conditionId: record.conditionId, diagnosedAt: record.diagnosedAt ? String(record.diagnosedAt).slice(0, 10) : "", chronic: Boolean(record.chronic), status: record.status ?? "ACTIVE", notes: record.notes ?? "" });
+  };
+
+  const save = async () => {
+    if (!section || !draft.allergyId && !draft.conditionId) return;
+    setSaving(true); setMessage("");
+    try {
+      if (section === "allergy") {
+        const next = allergies.filter((item: any) => item.id !== editing?.id).map((item: any) => ({ allergyId: item.allergyId, severity: item.severity, reaction: item.reaction, reactionNotes: item.reactionNotes, onsetDate: item.onsetDate, lastReaction: item.lastReaction, verified: item.verified, verifiedBy: item.verifiedBy, status: item.status, notes: item.notes }));
+        next.push({ allergyId: draft.allergyId, severity: draft.severity || undefined, reaction: draft.reaction || undefined, notes: draft.notes || undefined, status: "ACTIVE" });
+        await api.patch("/onboarding/individual/allergies", { allergies: next });
+      } else {
+        const next = conditions.filter((item: any) => item.id !== editing?.id).map((item: any) => ({ conditionId: item.conditionId, diagnosedAt: item.diagnosedAt, resolvedAt: item.resolvedAt, status: item.status, severity: item.severity, stage: item.stage, chronic: item.chronic, primaryCondition: item.primaryCondition, diagnosedBy: item.diagnosedBy, treatmentPlan: item.treatmentPlan, outcome: item.outcome, notes: item.notes }));
+        next.push({ conditionId: draft.conditionId, diagnosedAt: draft.diagnosedAt || undefined, chronic: Boolean(draft.chronic), status: draft.status || "ACTIVE", notes: draft.notes || undefined });
+        await api.patch("/onboarding/individual/conditions", { conditions: next });
+      }
+      setSection(null); setEditing(null); setDraft({}); setMessage("Your health information has been updated."); await reload();
+    } catch {
+      setMessage("We couldn't save that change. Please try again.");
+    } finally { setSaving(false); }
+  };
+
+  const remove = async (kind: "allergy" | "condition", record: any) => {
+    setSaving(true); setMessage("");
+    try {
+      if (kind === "allergy") {
+        const next = allergies.filter((item: any) => item.id !== record.id).map((item: any) => ({ allergyId: item.allergyId, severity: item.severity, reaction: item.reaction, reactionNotes: item.reactionNotes, onsetDate: item.onsetDate, lastReaction: item.lastReaction, verified: item.verified, verifiedBy: item.verifiedBy, status: item.status, notes: item.notes }));
+        await api.patch("/onboarding/individual/allergies", { allergies: next });
+      } else {
+        const next = conditions.filter((item: any) => item.id !== record.id).map((item: any) => ({ conditionId: item.conditionId, diagnosedAt: item.diagnosedAt, resolvedAt: item.resolvedAt, status: item.status, severity: item.severity, stage: item.stage, chronic: item.chronic, primaryCondition: item.primaryCondition, diagnosedBy: item.diagnosedBy, treatmentPlan: item.treatmentPlan, outcome: item.outcome, notes: item.notes }));
+        await api.patch("/onboarding/individual/conditions", { conditions: next });
+      }
+      setMessage("The patient-entered record has been removed."); await reload();
+    } catch { setMessage("We couldn't remove that record. Please try again."); } finally { setSaving(false); }
+  };
+
+  return <ProtectedRoute><main className="min-h-screen bg-[#F7F9FC] text-slate-800">
+    <header className="border-b border-slate-200 bg-white"><div className="mx-auto flex min-h-16 max-w-7xl items-center justify-between gap-4 px-4 sm:px-6 lg:px-8"><Link href="/dashboard" className="inline-flex items-center gap-2 text-sm font-semibold text-[#0B2D54]"><ArrowLeft className="h-4 w-4"/>Back to My Health</Link><Link href="/health-passport" className="text-sm font-semibold text-[#0B2D54] hover:underline">Open My Clinic Card</Link></div></header>
+    <div className="mx-auto max-w-6xl px-4 py-8 sm:px-6 lg:px-8">
+      <div className="mb-7"><div className="mb-3 inline-flex items-center gap-2 rounded-full bg-[#24c1c4]/10 px-3 py-1 text-xs font-bold text-[#0B2D54]"><HeartPulse className="h-3.5 w-3.5"/>Health information</div><h1 className="text-3xl font-bold tracking-tight text-[#0B2D54]">Allergies & conditions</h1><p className="mt-2 max-w-3xl text-sm leading-6 text-slate-500">You can keep your own health information up to date. Clinician-recorded diagnoses are also shown here automatically from your medical record.</p></div>
+      {message && <div className="mb-5 rounded-2xl border border-[#24c1c4]/20 bg-white px-4 py-3 text-sm font-semibold text-[#0B2D54]">{message}</div>}
+      <div className="grid gap-5 lg:grid-cols-2">
+        <section className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6"><div className="flex items-start justify-between gap-3"><div><div className="flex items-center gap-2"><div className="grid h-10 w-10 place-items-center rounded-xl bg-rose-50 text-rose-600"><AlertCircle className="h-5 w-5"/></div><div><h2 className="font-bold text-[#0B2D54]">Allergies</h2><p className="text-xs text-slate-500">{activeAllergies.length} active patient records</p></div></div></div><button onClick={() => openAdd("allergy")} className="inline-flex items-center gap-1.5 rounded-xl bg-[#0B2D54] px-3.5 py-2 text-xs font-bold text-white"><Plus className="h-3.5 w-3.5"/>Add</button></div><div className="mt-5 space-y-3">{activeAllergies.length ? activeAllergies.map((item: any) => <div key={item.id} className="rounded-2xl border border-rose-100 bg-rose-50/40 p-4"><div className="flex items-start justify-between gap-3"><div><p className="font-bold text-[#0B2D54]">{item.allergy?.name || item.name || "Allergy"}</p>{item.reaction && <p className="mt-1 text-sm text-slate-500">Reaction: {item.reaction}</p>}{item.severity && <p className="mt-1 text-xs text-slate-500">Severity: {formatEnum(item.severity)}</p>}<span className="mt-2 inline-flex rounded-full bg-white px-2.5 py-1 text-[10px] font-bold text-slate-500">{item.verified || item.verifiedBy ? "Clinician verified" : "Patient record"}</span></div><div className="flex gap-1"><button onClick={() => openEdit("allergy", item)} className="rounded-lg p-2 text-slate-500 hover:bg-white" aria-label="Edit allergy"><Edit3 className="h-4 w-4"/></button>{!(item.verified || item.verifiedBy) && <button onClick={() => remove("allergy", item)} className="rounded-lg p-2 text-slate-400 hover:bg-white" aria-label="Remove allergy"><X className="h-4 w-4"/></button>}</div></div></div>) : <p className="rounded-2xl bg-slate-50 p-4 text-sm text-slate-500">No active allergies recorded.</p>}</div></section>
+        <section className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6"><div className="flex items-start justify-between gap-3"><div><div className="flex items-center gap-2"><div className="grid h-10 w-10 place-items-center rounded-xl bg-blue-50 text-blue-600"><Activity className="h-5 w-5"/></div><div><h2 className="font-bold text-[#0B2D54]">Health conditions</h2><p className="text-xs text-slate-500">{activeConditions.length} active patient records</p></div></div></div><button onClick={() => openAdd("condition")} className="inline-flex items-center gap-1.5 rounded-xl bg-[#0B2D54] px-3.5 py-2 text-xs font-bold text-white"><Plus className="h-3.5 w-3.5"/>Add</button></div><div className="mt-5 space-y-3">{activeConditions.length ? activeConditions.map((item: any) => <div key={item.id} className="rounded-2xl border border-blue-100 bg-blue-50/40 p-4"><div className="flex items-start justify-between gap-3"><div><p className="font-bold text-[#0B2D54]">{item.condition?.name || item.name || "Health condition"}</p>{item.diagnosedAt && <p className="mt-1 text-sm text-slate-500">Recorded: {displayDate(item.diagnosedAt)}</p>}{item.notes && <p className="mt-1 text-sm text-slate-500">{item.notes}</p>}<span className="mt-2 inline-flex rounded-full bg-white px-2.5 py-1 text-[10px] font-bold text-slate-500">{item.diagnosedBy ? `Clinician: ${item.diagnosedBy}` : "Patient record"}</span></div><div className="flex gap-1"><button onClick={() => openEdit("condition", item)} className="rounded-lg p-2 text-slate-500 hover:bg-white" aria-label="Edit condition"><Edit3 className="h-4 w-4"/></button>{!item.diagnosedBy && !item.treatmentPlan && <button onClick={() => remove("condition", item)} className="rounded-lg p-2 text-slate-400 hover:bg-white" aria-label="Remove condition"><X className="h-4 w-4"/></button>}</div></div></div>) : <p className="rounded-2xl bg-slate-50 p-4 text-sm text-slate-500">No active patient-entered conditions recorded.</p>}</div></section>
+      </div>
+      <section className="mt-5 rounded-3xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6"><div className="flex items-center justify-between gap-3"><div><h2 className="font-bold text-[#0B2D54]">Clinical diagnoses</h2><p className="mt-1 text-xs text-slate-500">Diagnoses recorded by practitioners are read-only here and remain part of the clinical record.</p></div><RefreshCw className="h-4 w-4 text-slate-300"/></div><div className="mt-4 space-y-3">{clinicalDiagnoses.length ? clinicalDiagnoses.map((item: any) => <div key={item.id} className="flex items-start justify-between gap-4 rounded-2xl bg-slate-50 p-4"><div><p className="font-bold text-[#0B2D54]">{item.diagnosis?.name || item.diagnosis?.description || "Clinical diagnosis"}</p><p className="mt-1 text-xs text-slate-500">From clinical encounter · {displayDate(item.createdAt || item.encounter?.startedAt)}</p>{item.notes && <p className="mt-2 text-sm text-slate-600">{item.notes}</p>}</div><span className="rounded-full bg-white px-2.5 py-1 text-[10px] font-bold text-[#0B2D54]">Practitioner record</span></div>) : <p className="rounded-2xl bg-slate-50 p-4 text-sm text-slate-500">No practitioner diagnoses are available to display yet.</p>}</div></section>
+      <p className="mt-5 text-xs leading-5 text-slate-400">Patient-entered updates do not replace practitioner diagnoses. Practitioner records remain part of the clinical history and are displayed alongside your own records.</p>
+    </div>
+    {section && <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/40 p-4"><div className="w-full max-w-lg rounded-3xl bg-white p-6 shadow-2xl"><div className="flex items-start justify-between gap-3"><div><h2 className="text-xl font-bold text-[#0B2D54]">{editing ? "Edit" : "Add"} {section === "allergy" ? "allergy" : "health condition"}</h2><p className="mt-1 text-xs text-slate-500">Choose from Sympto's clinical reference list and add your patient information.</p></div><button onClick={() => setSection(null)} className="rounded-xl p-2 text-slate-400 hover:bg-slate-50"><X className="h-5 w-5"/></button></div><div className="mt-5 space-y-4"><label className="block"><span className="mb-1.5 block text-xs font-bold text-slate-500">{section === "allergy" ? "Allergy" : "Condition"}</span><select value={section === "allergy" ? draft.allergyId : draft.conditionId} onChange={(e) => setDraft((v: any) => ({ ...v, [section === "allergy" ? "allergyId" : "conditionId"]: e.target.value }))} className="w-full rounded-xl border border-slate-200 px-3 py-3 text-sm text-[#0B2D54]"><option value="">Select</option>{(section === "allergy" ? allergyCatalog : conditionCatalog).map((item: any) => <option key={item.id} value={item.id}>{item.name}</option>)}</select></label>{section === "allergy" ? <><label className="block"><span className="mb-1.5 block text-xs font-bold text-slate-500">Severity</span><select value={draft.severity} onChange={(e) => setDraft((v: any) => ({ ...v, severity: e.target.value }))} className="w-full rounded-xl border border-slate-200 px-3 py-3 text-sm"><option value="">Not specified</option><option value="MILD">Mild</option><option value="MODERATE">Moderate</option><option value="SEVERE">Severe</option><option value="LIFE_THREATENING">Life threatening</option></select></label><label className="block"><span className="mb-1.5 block text-xs font-bold text-slate-500">Reaction</span><input value={draft.reaction} onChange={(e) => setDraft((v: any) => ({ ...v, reaction: e.target.value }))} className="w-full rounded-xl border border-slate-200 px-3 py-3 text-sm" placeholder="e.g. Rash, swelling"/></label></> : <><label className="block"><span className="mb-1.5 block text-xs font-bold text-slate-500">Date diagnosed or first recorded</span><input type="date" value={draft.diagnosedAt} onChange={(e) => setDraft((v: any) => ({ ...v, diagnosedAt: e.target.value }))} className="w-full rounded-xl border border-slate-200 px-3 py-3 text-sm"/></label><label className="flex items-center gap-3 rounded-xl bg-slate-50 p-3 text-sm"><input type="checkbox" checked={draft.chronic} onChange={(e) => setDraft((v: any) => ({ ...v, chronic: e.target.checked }))}/><span>Long-term / chronic condition</span></label></>}<label className="block"><span className="mb-1.5 block text-xs font-bold text-slate-500">Notes</span><textarea value={draft.notes} onChange={(e) => setDraft((v: any) => ({ ...v, notes: e.target.value }))} rows={3} className="w-full rounded-xl border border-slate-200 px-3 py-3 text-sm" /></label></div><div className="mt-6 flex justify-end gap-3"><button onClick={() => setSection(null)} disabled={saving} className="rounded-xl border border-slate-200 px-4 py-2.5 text-sm font-semibold">Cancel</button><button onClick={save} disabled={saving || (!draft.allergyId && !draft.conditionId)} className="inline-flex items-center gap-2 rounded-xl bg-[#0B2D54] px-5 py-2.5 text-sm font-bold text-white disabled:opacity-50"><Save className="h-4 w-4"/>{saving ? "Saving…" : "Save"}</button></div></div></div>}
+  </main></ProtectedRoute>;
 }
