@@ -1,4 +1,5 @@
 import {
+  BadRequestException,
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
@@ -17,45 +18,18 @@ import { RecordHealthGoalProgressDto } from './dto/record-health-goal-progress.d
 
 @Injectable()
 export class HealthGoalsService {
-  constructor(
-    private readonly prisma: PrismaService,
-  ) {}
+  constructor(private readonly prisma: PrismaService) {}
 
   async create(dto: CreateHealthGoalDto) {
     return this.prisma.healthGoal.create({
-      data: {
-        ...dto,
-      },
-
-      include: {
-        patient: true,
-        practitioner: true,
-        carePlan: true,
-        progress: true,
-      },
+      data: { ...dto },
+      include: { patient: true, practitioner: true, carePlan: true, progress: true },
     });
   }
 
   async findAll(query: QueryHealthGoalDto) {
-    const {
-      page,
-      limit,
-      patientId,
-      practitionerId,
-      carePlanId,
-      category,
-      priority,
-      status,
-    } = query;
-
-    const where: Prisma.HealthGoalWhereInput = {
-      patientId,
-      practitionerId,
-      carePlanId,
-      category,
-      priority,
-      status,
-    };
+    const { page, limit, patientId, practitionerId, carePlanId, category, priority, status } = query;
+    const where: Prisma.HealthGoalWhereInput = { patientId, practitionerId, carePlanId, category, priority, status };
 
     const [data, total] = await this.prisma.$transaction([
       this.prisma.healthGoal.findMany({
@@ -64,13 +38,9 @@ export class HealthGoalsService {
           patient: true,
           practitioner: true,
           carePlan: true,
-          progress: {
-            orderBy: { measuredAt: 'desc' },
-          },
+          progress: { orderBy: { measuredAt: 'desc' } },
         },
-        orderBy: {
-          createdAt: 'desc',
-        },
+        orderBy: { createdAt: 'desc' },
         skip: (page - 1) * limit,
         take: limit,
       }),
@@ -79,12 +49,7 @@ export class HealthGoalsService {
 
     return {
       data,
-      pagination: {
-        page,
-        limit,
-        total,
-        totalPages: Math.ceil(total / limit),
-      },
+      pagination: { page, limit, total, totalPages: Math.ceil(total / limit) },
     };
   }
 
@@ -95,22 +60,16 @@ export class HealthGoalsService {
         patient: true,
         practitioner: true,
         carePlan: true,
-        progress: {
-          orderBy: { measuredAt: 'desc' },
-        },
+        progress: { orderBy: { measuredAt: 'desc' } },
       },
     });
 
-    if (!healthGoal) {
-      throw new NotFoundException('Health goal not found.');
-    }
-
+    if (!healthGoal) throw new NotFoundException('Health goal not found.');
     return healthGoal;
   }
 
   async update(id: string, dto: UpdateHealthGoalDto) {
     await this.findOne(id);
-
     return this.prisma.healthGoal.update({
       where: { id },
       data: { ...dto },
@@ -118,9 +77,7 @@ export class HealthGoalsService {
         patient: true,
         practitioner: true,
         carePlan: true,
-        progress: {
-          orderBy: { measuredAt: 'desc' },
-        },
+        progress: { orderBy: { measuredAt: 'desc' } },
       },
     });
   }
@@ -132,19 +89,22 @@ export class HealthGoalsService {
     const previousValue = goal.currentValue == null ? null : Number(goal.currentValue);
 
     if (!Number.isFinite(currentValue)) {
-      throw new NotFoundException('Health goal progress value is invalid.');
+      throw new BadRequestException('Health goal progress value is invalid.');
     }
 
-    const isTargetBasedDailyGoal =
+    const supportedDailyGoal =
       goal.category === HealthGoalCategory.HYDRATION ||
-      goal.category === HealthGoalCategory.EXERCISE;
+      goal.category === HealthGoalCategory.EXERCISE ||
+      goal.category === HealthGoalCategory.SLEEP;
+
+    if (!supportedDailyGoal) {
+      throw new BadRequestException('This goal type is not updated by the daily check-in.');
+    }
 
     const progressPercent =
-      targetValue != null && targetValue > 0 && isTargetBasedDailyGoal
+      targetValue != null && targetValue > 0
         ? Math.min(100, Math.max(0, (currentValue / targetValue) * 100))
-        : goal.currentValue != null && previousValue != null && previousValue > 0
-          ? Math.min(100, Math.max(0, Number(goal.currentValue)))
-          : 0;
+        : 0;
 
     let progressStatus: HealthGoalProgressStatus = HealthGoalProgressStatus.STAGNANT;
     if (targetValue != null && targetValue > 0 && currentValue >= targetValue) {
@@ -155,7 +115,7 @@ export class HealthGoalsService {
       progressStatus = HealthGoalProgressStatus.DECLINING;
     }
 
-    const updatedGoalStatus =
+    const updatedStatus =
       progressStatus === HealthGoalProgressStatus.ACHIEVED
         ? 'ACHIEVED'
         : goal.status === 'ACHIEVED'
@@ -167,7 +127,7 @@ export class HealthGoalsService {
         where: { id },
         data: {
           currentValue: String(currentValue),
-          status: updatedGoalStatus,
+          status: updatedStatus,
           ...(progressStatus === HealthGoalProgressStatus.ACHIEVED
             ? { achievedAt: new Date() }
             : { achievedAt: null }),
@@ -185,19 +145,21 @@ export class HealthGoalsService {
         },
       });
 
-      return this.findOne(id);
+      return tx.healthGoal.findUnique({
+        where: { id },
+        include: {
+          patient: true,
+          practitioner: true,
+          carePlan: true,
+          progress: { orderBy: { measuredAt: 'desc' } },
+        },
+      });
     });
   }
 
   async remove(id: string) {
     await this.findOne(id);
-
-    await this.prisma.healthGoal.delete({
-      where: { id },
-    });
-
-    return {
-      message: 'Health goal deleted successfully.',
-    };
+    await this.prisma.healthGoal.delete({ where: { id } });
+    return { message: 'Health goal deleted successfully.' };
   }
 }
