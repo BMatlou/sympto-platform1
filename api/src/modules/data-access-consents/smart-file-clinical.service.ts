@@ -51,7 +51,21 @@ export class SmartFileClinicalService {
             practitioner: { include: { person: true } },
           },
         },
-        clinicalEpisodes: true,
+        clinicalEpisodes: {
+          include: {
+            symptomLogs: {
+              orderBy: { startedAt: 'desc' },
+              include: {
+                symptoms: { include: { symptom: true } },
+                triggers: true,
+                medicationEffects: { include: { medication: true, prescription: true } },
+                observations: true,
+                attachments: true,
+              },
+            },
+          },
+          orderBy: { startedAt: 'desc' },
+        },
         carePlans: true,
         referrals: true,
         healthJournals: true,
@@ -101,6 +115,7 @@ export class SmartFileClinicalService {
       ...(passport?.patientProcedures ?? []),
       ...encounters.flatMap((encounter) => encounter.procedures),
     ];
+    const symptoms = patient.clinicalEpisodes.flatMap((episode) => episode.symptomLogs);
 
     return {
       patient: {
@@ -122,7 +137,7 @@ export class SmartFileClinicalService {
       encounters,
       episodes: patient.clinicalEpisodes,
       vitals: clinicalVitals,
-      symptoms: patient.healthJournals,
+      symptoms,
       diagnoses,
       procedures,
       labResults: consent.canViewLabResults ? labResults : [],
