@@ -6,13 +6,16 @@ import {
   Patch,
   Post,
   Query,
+  Req,
   UseGuards,
 } from '@nestjs/common';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
+import type { Request } from 'express';
 
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { PermissionsGuard } from '../auth/guards/permissions.guard';
 import { Permissions } from '../auth/decorators/permissions.decorator';
+import type { JwtUser } from '../auth/interfaces/jwt-user.interface';
 
 import { DataAccessConsentsService } from './data-access-consents.service';
 
@@ -23,54 +26,32 @@ import { QueryDataAccessConsentDto } from './dto/query-data-access-consent.dto';
 @ApiTags('Data Access Consents')
 @ApiBearerAuth()
 @Controller('data-access-consents')
-@UseGuards(
-  JwtAuthGuard,
-  PermissionsGuard,
-)
+@UseGuards(JwtAuthGuard, PermissionsGuard)
 export class DataAccessConsentsController {
-  constructor(
-    private readonly dataAccessConsentsService: DataAccessConsentsService,
-  ) {}
+  constructor(private readonly dataAccessConsentsService: DataAccessConsentsService) {}
 
   @Permissions('data-access-consent.create')
   @Post()
-  create(
-    @Body()
-    dto: CreateDataAccessConsentDto,
-  ) {
+  create(@Body() dto: CreateDataAccessConsentDto) {
     return this.dataAccessConsentsService.create(dto);
   }
 
   @Permissions('data-access-consent.read')
   @Get()
-  findAll(
-    @Query()
-    query: QueryDataAccessConsentDto,
-  ) {
+  findAll(@Query() query: QueryDataAccessConsentDto) {
     return this.dataAccessConsentsService.findAll(query);
   }
 
   @Permissions('data-access-consent.read')
   @Get(':id')
-  findOne(
-    @Param('id')
-    id: string,
-  ) {
+  findOne(@Param('id') id: string) {
     return this.dataAccessConsentsService.findOne(id);
   }
 
   @Permissions('data-access-consent.update')
   @Patch(':id')
-  update(
-    @Param('id')
-    id: string,
-
-    @Body()
-    dto: UpdateDataAccessConsentDto,
-  ) {
-    return this.dataAccessConsentsService.update(
-      id,
-      dto,
-    );
+  update(@Param('id') id: string, @Body() dto: UpdateDataAccessConsentDto, @Req() req: Request) {
+    const user = req.user as JwtUser;
+    return this.dataAccessConsentsService.update(id, dto, user.sub);
   }
 }
