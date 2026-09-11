@@ -20,6 +20,7 @@ import { HealthGoalsService } from './health-goals.service';
 import { CreateHealthGoalDto } from './dto/create-health-goal.dto';
 import { UpdateHealthGoalDto } from './dto/update-health-goal.dto';
 import { QueryHealthGoalDto } from './dto/query-health-goal.dto';
+import { RecordHealthGoalProgressDto } from './dto/record-health-goal-progress.dto';
 
 @ApiTags('Health Goals')
 @ApiBearerAuth()
@@ -35,60 +36,43 @@ export class HealthGoalsController {
 
   @Permissions('health-goals.create')
   @Post()
-  create(
-    @Body()
-    dto: CreateHealthGoalDto,
-  ) {
-    return this.healthGoalsService.create(
-      dto,
-    );
+  create(@Body() dto: CreateHealthGoalDto) {
+    return this.healthGoalsService.create(dto);
   }
 
   @Permissions('health-goals.read')
   @Get()
-  findAll(
-    @Query()
-    query: QueryHealthGoalDto,
-  ) {
-    return this.healthGoalsService.findAll(
-      query,
-    );
+  findAll(@Query() query: QueryHealthGoalDto) {
+    return this.healthGoalsService.findAll(query);
   }
 
   @Permissions('health-goals.read')
   @Get(':id')
-  findOne(
-    @Param('id')
-    id: string,
+  findOne(@Param('id') id: string) {
+    return this.healthGoalsService.findOne(id);
+  }
+
+  @Permissions('health-goals.update')
+  @Post(':id/progress')
+  recordProgress(
+    @Param('id') id: string,
+    @Body() dto: RecordHealthGoalProgressDto,
   ) {
-    return this.healthGoalsService.findOne(
-      id,
-    );
+    return this.healthGoalsService.recordProgress(id, dto);
   }
 
   @Permissions('health-goals.update')
   @Patch(':id')
   update(
-    @Param('id')
-    id: string,
-
-    @Body()
-    dto: UpdateHealthGoalDto,
+    @Param('id') id: string,
+    @Body() dto: UpdateHealthGoalDto,
   ) {
-    return this.healthGoalsService.update(
-      id,
-      dto,
-    );
+    return this.healthGoalsService.update(id, dto);
   }
 
   @Permissions('health-goals.delete')
   @Delete(':id')
-  remove(
-    @Param('id')
-    id: string,
-  ) {
-    return this.healthGoalsService.remove(
-      id,
-    );
+  remove(@Param('id') id: string) {
+    return this.healthGoalsService.remove(id);
   }
 }
