@@ -48,55 +48,20 @@ export class HealthHomeService {
     const bmi = calculateBmi(weightKg, nextHeightCm);
     const recordedAt = new Date();
 
-    await this.prisma.patient.update({
-      where: { id: patient.id },
-      data: { weightKg, ...(heightCm !== undefined ? { heightCm } : {}) },
-    });
+    await this.prisma.patient.update({ where: { id: patient.id }, data: { weightKg, ...(heightCm !== undefined ? { heightCm } : {}) } });
 
     await this.prisma.patientBaseline.upsert({
       where: { patientId: patient.id },
-      update: {
-        weightKg: String(weightKg),
-        ...(heightCm !== undefined ? { heightCm: String(heightCm) } : {}),
-        ...(bmi != null ? { bmi: String(bmi) } : {}),
-        establishedAt: recordedAt,
-      },
-      create: {
-        patientId: patient.id,
-        weightKg: String(weightKg),
-        ...(heightCm !== undefined ? { heightCm: String(heightCm) } : nextHeightCm != null ? { heightCm: String(nextHeightCm) } : {}),
-        ...(bmi != null ? { bmi: String(bmi) } : {}),
-        establishedAt: recordedAt,
-      },
+      update: { weightKg: String(weightKg), ...(heightCm !== undefined ? { heightCm: String(heightCm) } : {}), ...(bmi != null ? { bmi: String(bmi) } : {}), establishedAt: recordedAt },
+      create: { patientId: patient.id, weightKg: String(weightKg), ...(heightCm !== undefined ? { heightCm: String(heightCm) } : nextHeightCm != null ? { heightCm: String(nextHeightCm) } : {}), ...(bmi != null ? { bmi: String(bmi) } : {}), establishedAt: recordedAt },
     });
 
-    return {
-      weightKg,
-      heightCm: nextHeightCm,
-      bmi,
-      bmiCategory: getBmiCategory(bmi),
-      recordedAt: recordedAt.toISOString(),
-    };
+    return { weightKg, heightCm: nextHeightCm, bmi, bmiCategory: getBmiCategory(bmi), recordedAt: recordedAt.toISOString() };
   }
 
-  async recordManualVitals(
-    userId: string,
-    input: {
-      systolicPressure?: number;
-      diastolicPressure?: number;
-      restingHeartRate?: number;
-      respiratoryRate?: number;
-      oxygenSaturation?: number;
-      bodyTemperature?: number;
-      weightKg?: number;
-      heightCm?: number;
-      measuredAt?: string;
-    },
-    requestedPatientId?: string,
-  ) {
+  async recordManualVitals(userId: string, input: { systolicPressure?: number; diastolicPressure?: number; restingHeartRate?: number; respiratoryRate?: number; oxygenSaturation?: number; bodyTemperature?: number; weightKg?: number; heightCm?: number; measuredAt?: string }, requestedPatientId?: string) {
     const patient = await this.patientForWrite(userId, requestedPatientId);
-    const values = Object.values(input).filter((value) => value !== undefined);
-    if (values.length === 0) throw new BadRequestException('At least one vital must be entered.');
+    if (Object.values(input).every((value) => value === undefined)) throw new BadRequestException('At least one vital must be entered.');
 
     assertRange('Systolic pressure', input.systolicPressure, 40, 300);
     assertRange('Diastolic pressure', input.diastolicPressure, 20, 200);
@@ -106,10 +71,7 @@ export class HealthHomeService {
     assertRange('Body temperature', input.bodyTemperature, 25, 45);
     assertRange('Weight', input.weightKg, 1, 500);
     assertRange('Height', input.heightCm, 50, 250);
-
-    if ((input.systolicPressure != null && input.diastolicPressure == null) || (input.systolicPressure == null && input.diastolicPressure != null)) {
-      throw new BadRequestException('Enter both systolic and diastolic blood pressure.');
-    }
+    if ((input.systolicPressure != null && input.diastolicPressure == null) || (input.systolicPressure == null && input.diastolicPressure != null)) throw new BadRequestException('Enter both systolic and diastolic blood pressure.');
 
     const measuredAt = input.measuredAt ? new Date(input.measuredAt) : new Date();
     if (Number.isNaN(measuredAt.getTime())) throw new BadRequestException('Measurement date is invalid.');
@@ -118,49 +80,21 @@ export class HealthHomeService {
     const currentWeight = input.weightKg ?? (patient.weightKg != null ? Number(patient.weightKg) : patient.baseline?.weightKg != null ? Number(patient.baseline.weightKg) : null);
     const bmi = calculateBmi(currentWeight, currentHeight);
 
-    await this.prisma.patient.update({
-      where: { id: patient.id },
-      data: {
-        ...(input.weightKg !== undefined ? { weightKg: input.weightKg } : {}),
-        ...(input.heightCm !== undefined ? { heightCm: input.heightCm } : {}),
-      },
-    });
-
-    const updated = await this.prisma.patientBaseline.upsert({
+    await this.prisma.patient.update({ where: { id: patient.id }, data: { ...(input.weightKg !== undefined ? { weightKg: input.weightKg } : {}), ...(input.heightCm !== undefined ? { heightCm: input.heightCm } : {}) } });
+    const baseline = await this.prisma.patientBaseline.upsert({
       where: { patientId: patient.id },
       update: {
-        ...(input.weightKg !== undefined ? { weightKg: String(input.weightKg) } : {}),
-        ...(input.heightCm !== undefined ? { heightCm: String(input.heightCm) } : {}),
-        ...(bmi != null ? { bmi: String(bmi) } : {}),
-        ...(input.systolicPressure !== undefined ? { systolicPressure: input.systolicPressure } : {}),
-        ...(input.diastolicPressure !== undefined ? { diastolicPressure: input.diastolicPressure } : {}),
-        ...(input.restingHeartRate !== undefined ? { restingHeartRate: input.restingHeartRate } : {}),
-        ...(input.respiratoryRate !== undefined ? { respiratoryRate: input.respiratoryRate } : {}),
-        ...(input.oxygenSaturation !== undefined ? { oxygenSaturation: String(input.oxygenSaturation) } : {}),
-        ...(input.bodyTemperature !== undefined ? { bodyTemperature: String(input.bodyTemperature) } : {}),
-        establishedAt: measuredAt,
+        ...(input.weightKg !== undefined ? { weightKg: String(input.weightKg) } : {}), ...(input.heightCm !== undefined ? { heightCm: String(input.heightCm) } : {}), ...(bmi != null ? { bmi: String(bmi) } : {}),
+        ...(input.systolicPressure !== undefined ? { systolicPressure: input.systolicPressure } : {}), ...(input.diastolicPressure !== undefined ? { diastolicPressure: input.diastolicPressure } : {}), ...(input.restingHeartRate !== undefined ? { restingHeartRate: input.restingHeartRate } : {}), ...(input.respiratoryRate !== undefined ? { respiratoryRate: input.respiratoryRate } : {}), ...(input.oxygenSaturation !== undefined ? { oxygenSaturation: String(input.oxygenSaturation) } : {}), ...(input.bodyTemperature !== undefined ? { bodyTemperature: String(input.bodyTemperature) } : {}), establishedAt: measuredAt,
       },
       create: {
         patientId: patient.id,
-        ...(input.weightKg !== undefined ? { weightKg: String(input.weightKg) } : currentWeight != null ? { weightKg: String(currentWeight) } : {}),
-        ...(input.heightCm !== undefined ? { heightCm: String(input.heightCm) } : currentHeight != null ? { heightCm: String(currentHeight) } : {}),
-        ...(bmi != null ? { bmi: String(bmi) } : {}),
-        ...(input.systolicPressure !== undefined ? { systolicPressure: input.systolicPressure } : {}),
-        ...(input.diastolicPressure !== undefined ? { diastolicPressure: input.diastolicPressure } : {}),
-        ...(input.restingHeartRate !== undefined ? { restingHeartRate: input.restingHeartRate } : {}),
-        ...(input.respiratoryRate !== undefined ? { respiratoryRate: input.respiratoryRate } : {}),
-        ...(input.oxygenSaturation !== undefined ? { oxygenSaturation: String(input.oxygenSaturation) } : {}),
-        ...(input.bodyTemperature !== undefined ? { bodyTemperature: String(input.bodyTemperature) } : {}),
-        establishedAt: measuredAt,
+        ...(input.weightKg !== undefined ? { weightKg: String(input.weightKg) } : currentWeight != null ? { weightKg: String(currentWeight) } : {}), ...(input.heightCm !== undefined ? { heightCm: String(input.heightCm) } : currentHeight != null ? { heightCm: String(currentHeight) } : {}), ...(bmi != null ? { bmi: String(bmi) } : {}),
+        ...(input.systolicPressure !== undefined ? { systolicPressure: input.systolicPressure } : {}), ...(input.diastolicPressure !== undefined ? { diastolicPressure: input.diastolicPressure } : {}), ...(input.restingHeartRate !== undefined ? { restingHeartRate: input.restingHeartRate } : {}), ...(input.respiratoryRate !== undefined ? { respiratoryRate: input.respiratoryRate } : {}), ...(input.oxygenSaturation !== undefined ? { oxygenSaturation: String(input.oxygenSaturation) } : {}), ...(input.bodyTemperature !== undefined ? { bodyTemperature: String(input.bodyTemperature) } : {}), establishedAt: measuredAt,
       },
     });
 
-    return {
-      recordedAt: measuredAt.toISOString(),
-      bmi,
-      bmiCategory: getBmiCategory(bmi),
-      baseline: updated,
-    };
+    return { recordedAt: measuredAt.toISOString(), bmi, bmiCategory: getBmiCategory(bmi), baseline };
   }
 
   async getHealthHome(userId: string, requestedPatientId?: string) {
@@ -210,28 +144,20 @@ export class HealthHomeService {
     for (const measurement of measurements) if (!latestMeasurements.has(measurement.measurementType)) latestMeasurements.set(measurement.measurementType, measurement);
     const latest = (type: string) => latestMeasurements.get(type as never) ?? null;
 
-    const bmi = calculateBmi(
-      patient.weightKg != null ? Number(patient.weightKg) : patient.baseline?.weightKg != null ? Number(patient.baseline.weightKg) : null,
-      patient.heightCm != null ? Number(patient.heightCm) : patient.baseline?.heightCm != null ? Number(patient.baseline.heightCm) : null,
-    );
-    const bmiCategory = getBmiCategory(bmi);
-    const latestWeight = latest('WEIGHT');
-    const latestBmiMeasurement = latest('BMI');
-
-    const manualRecordedAt = patient.baseline?.establishedAt ?? patient.baseline?.updatedAt ?? null;
-    const manualVitals = [
-      patient.baseline?.systolicPressure != null && patient.baseline?.diastolicPressure != null ? { type: 'BLOOD_PRESSURE', name: 'Blood pressure', value: `${patient.baseline.systolicPressure}/${patient.baseline.diastolicPressure}`, unit: 'mmHg', measuredAt: manualRecordedAt, source: 'MANUAL_ENTRY' } : null,
-      patient.baseline?.restingHeartRate != null ? { type: 'HEART_RATE', name: 'Heart rate', value: Number(patient.baseline.restingHeartRate), unit: 'bpm', measuredAt: manualRecordedAt, source: 'MANUAL_ENTRY' } : null,
-      patient.baseline?.oxygenSaturation != null ? { type: 'OXYGEN_SATURATION', name: 'Oxygen saturation', value: Number(patient.baseline.oxygenSaturation), unit: '%', measuredAt: manualRecordedAt, source: 'MANUAL_ENTRY' } : null,
-      patient.baseline?.bodyTemperature != null ? { type: 'BODY_TEMPERATURE', name: 'Body temperature', value: Number(patient.baseline.bodyTemperature), unit: '°C', measuredAt: manualRecordedAt, source: 'MANUAL_ENTRY' } : null,
-      patient.baseline?.respiratoryRate != null ? { type: 'RESPIRATORY_RATE', name: 'Respiratory rate', value: Number(patient.baseline.respiratoryRate), unit: '/min', measuredAt: manualRecordedAt, source: 'MANUAL_ENTRY' } : null,
-    ].filter(Boolean) as Array<{ type: string; name: string; value: number | string; unit: string; measuredAt: Date | null; source: string }>;
-
     const latestClinicalVitals = new Map<string, (typeof clinicalVitals)[number]>();
     for (const vital of clinicalVitals) {
       const code = String(vital.vitalType?.code ?? vital.vitalType?.name ?? '').toUpperCase();
       if (code && !latestClinicalVitals.has(code)) latestClinicalVitals.set(code, vital);
     }
+
+    const baselineRecordedAt = patient.baseline?.establishedAt ?? patient.baseline?.updatedAt ?? null;
+    const manualVitals = [
+      patient.baseline?.systolicPressure != null && patient.baseline?.diastolicPressure != null ? { type: 'BLOOD_PRESSURE', name: 'Blood pressure', value: `${patient.baseline.systolicPressure}/${patient.baseline.diastolicPressure}`, unit: 'mmHg', measuredAt: baselineRecordedAt, source: 'MANUAL_ENTRY' } : null,
+      patient.baseline?.restingHeartRate != null ? { type: 'HEART_RATE', name: 'Heart rate', value: Number(patient.baseline.restingHeartRate), unit: 'bpm', measuredAt: baselineRecordedAt, source: 'MANUAL_ENTRY' } : null,
+      patient.baseline?.oxygenSaturation != null ? { type: 'OXYGEN_SATURATION', name: 'Oxygen saturation', value: Number(patient.baseline.oxygenSaturation), unit: '%', measuredAt: baselineRecordedAt, source: 'MANUAL_ENTRY' } : null,
+      patient.baseline?.bodyTemperature != null ? { type: 'BODY_TEMPERATURE', name: 'Body temperature', value: Number(patient.baseline.bodyTemperature), unit: '°C', measuredAt: baselineRecordedAt, source: 'MANUAL_ENTRY' } : null,
+      patient.baseline?.respiratoryRate != null ? { type: 'RESPIRATORY_RATE', name: 'Respiratory rate', value: Number(patient.baseline.respiratoryRate), unit: '/min', measuredAt: baselineRecordedAt, source: 'MANUAL_ENTRY' } : null,
+    ].filter(Boolean) as Array<{ type: string; name: string; value: number | string; unit: string; measuredAt: Date | null; source: string }>;
 
     const normalizedVitals = [
       latestClinicalVitals.get('BLOOD_PRESSURE'),
@@ -240,31 +166,34 @@ export class HealthHomeService {
       latestClinicalVitals.get('BODY_TEMPERATURE'),
       latestClinicalVitals.get('RESPIRATORY_RATE'),
       latestClinicalVitals.get('WEIGHT'),
-    ].filter(Boolean).map((vital: any) => ({
-      type: String(vital.vitalType?.code ?? vital.vitalType?.name ?? '').toUpperCase(),
-      name: vital.vitalType?.name ?? vital.vitalType?.code ?? 'Vital sign',
-      value: Number(vital.value),
-      unit: vital.vitalType?.unit ?? '',
-      measuredAt: vital.measuredAt,
-      source: 'CLINICAL_RECORD',
-    }));
+    ].filter(Boolean).map((vital: any) => ({ type: String(vital.vitalType?.code ?? vital.vitalType?.name ?? '').toUpperCase(), name: vital.vitalType?.name ?? vital.vitalType?.code ?? 'Vital sign', value: Number(vital.value), unit: vital.vitalType?.unit ?? '', measuredAt: vital.measuredAt, source: 'CLINICAL_RECORD' }));
 
-    const mergedManualVitals = manualVitals.map((vital) => ({ ...vital, measuredAt: vital.measuredAt?.toISOString() ?? null }));
-    const normalizedMap = new Map<string, any>();
-    for (const vital of [...normalizedVitals, ...mergedManualVitals]) {
-      const existing = normalizedMap.get(vital.type);
-      if (!existing || new Date(vital.measuredAt ?? 0).getTime() > new Date(existing.measuredAt ?? 0).getTime()) normalizedMap.set(vital.type, vital);
+    const deviceSignals = ['SLEEP', 'STEPS', 'HEART_RATE', 'BLOOD_PRESSURE', 'OXYGEN_SATURATION', 'BODY_TEMPERATURE', 'RESPIRATORY_RATE', 'WEIGHT'].map(latest).filter(Boolean).map((m) => ({ type: m!.measurementType, value: Number(m!.value), unit: m!.unit, measuredAt: m!.measuredAt, source: m!.source }));
+    const signalMap = new Map<string, any>();
+    for (const signal of [...deviceSignals, ...manualVitals.map((vital) => ({ ...vital, measuredAt: vital.measuredAt }))]) {
+      const existing = signalMap.get(signal.type);
+      if (!existing || new Date(signal.measuredAt ?? 0).getTime() > new Date(existing.measuredAt ?? 0).getTime()) signalMap.set(signal.type, signal);
     }
-
-    const deviceSignals = ['SLEEP', 'STEPS', 'HEART_RATE', 'BLOOD_PRESSURE', 'OXYGEN_SATURATION', 'BODY_TEMPERATURE', 'RESPIRATORY_RATE', 'WEIGHT'].map(latest).filter(Boolean).map((m: any) => ({ type: m.measurementType, value: Number(m.value), unit: m.unit, measuredAt: m.measuredAt, source: m.source }));
     const journalSignals = {
       generatedAt: now.toISOString(),
       sourceCount: measurements.length + appointments.length + symptomLogs.length + notifications.length + goals.length + encounters.length + labOrders.length + imagingStudies.length + prescriptions.length,
-      signals: [...deviceSignals, ...mergedManualVitals.filter((vital) => !deviceSignals.some((signal) => signal.type === vital.type))],
+      signals: Array.from(signalMap.values()),
       recentSymptoms: symptomLogs.slice(0, 10).map((log) => ({ id: log.id, title: log.title, severity: log.overallSeverity, progression: log.progression, startedAt: log.startedAt, symptoms: log.symptoms.map((item) => item.symptom.name) })),
       medicationCount: medications.length,
       upcomingAppointmentCount: appointments.length,
     };
+
+    const normalizedMap = new Map<string, any>();
+    for (const vital of [...normalizedVitals, ...manualVitals.map((vital) => ({ ...vital, measuredAt: vital.measuredAt?.toISOString() ?? null }))]) {
+      const existing = normalizedMap.get(vital.type);
+      if (!existing || new Date(vital.measuredAt ?? 0).getTime() > new Date(existing.measuredAt ?? 0).getTime()) normalizedMap.set(vital.type, vital);
+    }
+
+    const attention = [
+      ...notifications.filter((n) => n.priority === 'HIGH' || n.priority === 'URGENT').map((n) => ({ type: 'NOTIFICATION', severity: n.priority, title: n.title, description: n.body, actionUrl: n.actionUrl })),
+      ...aiObservations.filter((o) => o.requiresAttention && !o.reviewed).map((o) => ({ type: 'AI_OBSERVATION', severity: 'HIGH', title: 'Sympto noticed something worth reviewing', description: o.observation, actionUrl: '/health-journal' })),
+      ...labOrders.flatMap((order) => order.items.flatMap((item) => item.labResults.flatMap((result) => result.items.filter((ri) => ri.abnormal || ri.critical).map((ri) => ({ type: ri.critical ? 'CRITICAL_RESULT' : 'ABNORMAL_RESULT', severity: ri.critical ? 'URGENT' : 'HIGH', title: `${ri.test.name} result needs review`, description: ri.comments ?? 'A recent laboratory result is outside the expected range.', actionUrl: '/health-journal' }))))),
+    ].slice(0, 10);
     const goalsWithProgress = goals.map((goal) => ({ ...goal, latestProgress: goal.progress[0] ?? null }));
     const activeAllergies = allergies.filter((item) => item.status === 'ACTIVE' || !item.status);
     const activeConditions = conditions.filter((item) => item.status === 'ACTIVE' && !item.resolvedAt);
@@ -276,29 +205,14 @@ export class HealthHomeService {
     const finalBmi = calculateBmi(weightKg, heightCm) ?? (latestBmiMeasurement ? Number(latestBmiMeasurement.value) : patient.baseline?.bmi != null ? Number(patient.baseline.bmi) : null);
     const finalBmiCategory = getBmiCategory(finalBmi);
     return {
-      generatedAt: now.toISOString(),
-      profile: patient.person,
+      generatedAt: now.toISOString(), profile: patient.person,
       patient: { id: patientId, patientNumber: patient.patientNumber, firstName: patient.person?.firstName ?? '', lastName: patient.person?.lastName ?? '', name: [patient.person?.firstName, patient.person?.lastName].filter(Boolean).join(' '), heightCm, weightKg, bmi: finalBmi, bmiCategory: finalBmiCategory, deceased: patient.deceased },
       healthPassport: patient.healthPassport ? { ...patient.healthPassport, bloodType, organDonor, emergencyNotes } : medicalRecord ? { bloodType, organDonor, emergencyNotes, source: 'MEDICAL_RECORD' } : null,
       healthSnapshot: { baseline: patient.baseline, activeConditions, activeAllergies, allergies: activeAllergies, immunizations, bloodType, rhesusFactor: patient.healthPassport?.rhesusFactor ?? null, heightCm, weightKg, bmi: finalBmi, bmiCategory: finalBmiCategory, latestMeasurements: journalSignals.signals, normalizedVitals: Array.from(normalizedMap.values()), connectedDevices: devices.map((device) => ({ id: device.id, manufacturer: device.manufacturer, model: device.model, deviceType: device.deviceType, status: device.status, lastSyncAt: device.lastSyncAt, measurementCount: device._count.measurements })) },
-      attention,
-      today: { notifications, upcomingAppointments: appointments.slice(0, 5), activeMedications: medications, activeMedicationCount: medications.length, activeGoalCount: goals.length },
-      medications, appointments, goals: goalsWithProgress, healthGoals: goalsWithProgress, family, allergies, conditions, immunizations,
-      emergencyContacts: patient.emergencyContacts,
+      attention, today: { notifications, upcomingAppointments: appointments.slice(0, 5), activeMedications: medications, activeMedicationCount: medications.length, activeGoalCount: goals.length },
+      medications, appointments, goals: goalsWithProgress, healthGoals: goalsWithProgress, family, allergies, conditions, immunizations, emergencyContacts: patient.emergencyContacts,
       wearables: { devices: devices.map((device) => ({ id: device.id, manufacturer: device.manufacturer, model: device.model, deviceType: device.deviceType, status: device.status, lastSyncAt: device.lastSyncAt, measurementCount: device._count.measurements })), latestMeasurements: journalSignals.signals },
-      symptoms: symptomLogs,
-      recentResults: { laboratory: labOrders, imaging: imagingStudies },
-      carePlans,
-      encounters,
-      prescriptions,
-      attachments,
-      clinicalVitals,
-      patientInsurances,
-      medicalRecord,
-      journal: journalSignals,
-      ai: { recentObservations: aiObservations },
-      settings: patient.healthJournalSettings,
-      healthJournalSettings: patient.healthJournalSettings,
+      symptoms: symptomLogs, recentResults: { laboratory: labOrders, imaging: imagingStudies }, carePlans, encounters, prescriptions, attachments, clinicalVitals, patientInsurances, medicalRecord, journal: journalSignals, ai: { recentObservations: aiObservations }, settings: patient.healthJournalSettings, healthJournalSettings: patient.healthJournalSettings,
     };
   }
 }
