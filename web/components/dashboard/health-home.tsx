@@ -78,10 +78,8 @@ export default function HealthHome() {
   const bmi = data.healthSnapshot?.bmi ?? data.patient?.bmi ?? null;
   const bmiCategory = data.healthSnapshot?.bmiCategory ?? data.patient?.bmiCategory ?? null;
   const healthVitals = normalizeVitals(data);
-  const hasVitals = healthVitals.length > 0 || bmi != null;
   const allergies = data.healthSnapshot?.activeAllergies ?? data.healthSnapshot?.allergies ?? data.allergies ?? [];
   const conditions = data.healthSnapshot?.activeConditions ?? data.conditions ?? [];
-  const currentMedications = data.medications?.length ? data.medications : data.today?.activeMedications ?? [];
   const allergyNames = itemNames(allergies, "allergy");
   const conditionNames = itemNames(conditions, "condition");
   const bloodType = data.healthPassport?.bloodType ?? data.healthSnapshot?.bloodType ?? data.medicalRecord?.bloodType;
