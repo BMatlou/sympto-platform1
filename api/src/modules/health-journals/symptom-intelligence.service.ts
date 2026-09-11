@@ -1,5 +1,10 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
-import { SymptomLogStatus, SymptomSeverity, ClinicalEpisodeStatus, ClinicalEpisodeType } from '@prisma/client';
+import {
+  ClinicalEpisodeStatus,
+  ClinicalEpisodeType,
+  SymptomLogStatus,
+  SymptomSeverity,
+} from '@prisma/client';
 
 import { PrismaService } from '../../database/prisma.service';
 import { ProcessSymptomDto } from './dto/process-symptom.dto';
@@ -150,16 +155,16 @@ export class SymptomIntelligenceService {
 
     if (urgent) {
       insights.push('Your message includes a symptom that can require urgent medical attention. If it is severe, sudden, or getting worse, seek emergency care now.');
-      actions.push({ label: 'Get urgent help', href: '/emergency' });
+      actions.push({ label: 'Get urgent help', href: 'tel:112' });
     } else if (symptomMentioned) {
-      insights.push(`I can connect this update with your recorded health information instead of treating it as an isolated note.`);
+      insights.push('I can connect this update with your recorded health information instead of treating it as an isolated note.');
     }
 
     if (context.recentSymptomCount > 0) {
       insights.push(`You have ${context.recentSymptomCount} recent symptom tracking point${context.recentSymptomCount === 1 ? '' : 's'} available for comparison.`);
     }
     if (context.activeMedicationCount > 0) {
-      insights.push(`Your active medication record is available when looking at this update.`);
+      insights.push('Your active medication record is available when looking at this update.');
     }
     if (context.recentVitals.length > 0 || context.wearableHeartRate.length > 0) {
       insights.push('Recent vital and wearable measurements are available to help put this update in context.');
@@ -266,18 +271,18 @@ export class SymptomIntelligenceService {
       throw new NotFoundException('Patient not found.');
     }
 
-    const encounterIds = patient.medicalRecord
-      ? (await this.prisma.encounter.findMany({
+    const encounters = patient.medicalRecord
+      ? await this.prisma.encounter.findMany({
           where: { medicalRecordId: patient.medicalRecord.id },
           orderBy: { startedAt: 'desc' },
           take: 5,
           select: { id: true },
-        })).map((encounter) => encounter.id)
+        })
       : [];
 
-    const recentVitals = encounterIds.length
+    const recentVitals = encounters.length
       ? await this.prisma.clinicalVital.findMany({
-          where: { encounterId: { in: encounterIds } },
+          where: { encounterId: { in: encounters.map((encounter) => encounter.id) } },
           orderBy: { measuredAt: 'desc' },
           take: 8,
           include: { vitalType: true },
@@ -329,7 +334,7 @@ export class SymptomIntelligenceService {
 
     if (urgent) {
       insights.push('This symptom description includes a possible urgent warning sign. Sympto cannot diagnose you; seek urgent medical care if it is severe, sudden, or worsening.');
-      actions.push({ label: 'Get urgent help', href: '/emergency' });
+      actions.push({ label: 'Get urgent help', href: 'tel:112' });
     }
 
     if (context.recentSymptomCount > 1) {
