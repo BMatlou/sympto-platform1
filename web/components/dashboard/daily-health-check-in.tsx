@@ -3,11 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { Check, Minus, Plus, Save, Sparkles } from "lucide-react";
 import { healthJournalService } from "@/services/health-journal.service";
-import type {
-  HealthJournal,
-  HealthJournalMood,
-  SleepQuality,
-} from "@/types/health-journal";
+import type { HealthJournal, HealthJournalMood, SleepQuality } from "@/types/health-journal";
 
 const moodOptions: Array<{ value: HealthJournalMood; label: string; icon: string }> = [
   { value: "VERY_BAD", label: "Very bad", icon: "😞" },
@@ -31,11 +27,7 @@ const waterOptions = [250, 500, 750];
 function isToday(value: string) {
   const date = new Date(value);
   const now = new Date();
-  return (
-    date.getFullYear() === now.getFullYear() &&
-    date.getMonth() === now.getMonth() &&
-    date.getDate() === now.getDate()
-  );
+  return date.getFullYear() === now.getFullYear() && date.getMonth() === now.getMonth() && date.getDate() === now.getDate();
 }
 
 function moodLabel(value?: HealthJournalMood) {
@@ -46,14 +38,7 @@ function sleepLabel(value?: SleepQuality) {
   return sleepOptions.find((option) => option.value === value)?.label ?? "";
 }
 
-function buildJournalText(values: {
-  mood: HealthJournalMood | null;
-  sleepQuality: SleepQuality | null;
-  sleepHours: number;
-  stressLevel: number;
-  exerciseMinutes: number;
-  waterIntakeMl: number;
-}) {
+function buildJournalText(values: { mood: HealthJournalMood | null; sleepQuality: SleepQuality | null; sleepHours: number; stressLevel: number; exerciseMinutes: number; waterIntakeMl: number }) {
   const parts = [
     values.mood ? `Mood: ${moodLabel(values.mood)}.` : null,
     values.sleepQuality && values.sleepHours > 0
@@ -78,19 +63,20 @@ function sameCheckIn(journal: HealthJournal) {
 export default function DailyHealthCheckIn() {
   const [mood, setMood] = useState<HealthJournalMood | null>(null);
   const [sleepQuality, setSleepQuality] = useState<SleepQuality | null>(null);
-  const [sleepHours, setSleepHours] = useState(8);
+  const [sleepHours, setSleepHours] = useState(0);
   const [stressLevel, setStressLevel] = useState(5);
-  const [exerciseMinutes, setExerciseMinutes] = useState(30);
+  const [exerciseMinutes, setExerciseMinutes] = useState(0);
   const [waterIntakeMl, setWaterIntakeMl] = useState(0);
   const [savedJournal, setSavedJournal] = useState<HealthJournal | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [stressTouched, setStressTouched] = useState(false);
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
 
   const hasInput = useMemo(
-    () => Boolean(mood || sleepQuality || sleepHours > 0 || exerciseMinutes > 0 || waterIntakeMl > 0),
-    [mood, sleepQuality, sleepHours, exerciseMinutes, waterIntakeMl],
+    () => Boolean(mood || sleepQuality || sleepHours > 0 || exerciseMinutes > 0 || waterIntakeMl > 0 || stressTouched),
+    [mood, sleepQuality, sleepHours, exerciseMinutes, waterIntakeMl, stressTouched],
   );
 
   useEffect(() => {
@@ -107,6 +93,7 @@ export default function DailyHealthCheckIn() {
         setSleepQuality(existing.sleepQuality ?? null);
         setSleepHours(existing.sleepHours ? Number(existing.sleepHours) : 0);
         setStressLevel(existing.stressLevel ?? 5);
+        setStressTouched(existing.stressLevel != null);
         setExerciseMinutes(existing.exerciseMinutes ?? 0);
         setWaterIntakeMl(existing.waterIntakeMl ?? 0);
       } catch {
@@ -127,14 +114,7 @@ export default function DailyHealthCheckIn() {
     setError("");
     setMessage("");
 
-    const journal = buildJournalText({
-      mood,
-      sleepQuality,
-      sleepHours,
-      stressLevel,
-      exerciseMinutes,
-      waterIntakeMl,
-    });
+    const journal = buildJournalText({ mood, sleepQuality, sleepHours, stressLevel, exerciseMinutes, waterIntakeMl });
 
     try {
       let saved: HealthJournal;
@@ -182,10 +162,7 @@ export default function DailyHealthCheckIn() {
       <div className="border-b border-[#edf2f5] bg-gradient-to-r from-[#f7fcfc] to-white px-5 py-5 sm:px-6">
         <div className="flex items-start justify-between gap-4">
           <div>
-            <div className="flex items-center gap-2 text-[#0b7b80]">
-              <span className="grid h-9 w-9 place-items-center rounded-xl bg-[#e8f9fa]"><Sparkles className="h-4 w-4" /></span>
-              <p className="text-[10px] font-black uppercase tracking-[0.18em]">Daily health check-in</p>
-            </div>
+            <div className="flex items-center gap-2 text-[#0b7b80]"><span className="grid h-9 w-9 place-items-center rounded-xl bg-[#e8f9fa]"><Sparkles className="h-4 w-4" /></span><p className="text-[10px] font-black uppercase tracking-[0.18em]">Daily health check-in</p></div>
             <h2 className="mt-3 text-xl font-black tracking-[-0.03em] text-[#0b2d54]">How are you doing today?</h2>
             <p className="mt-1 max-w-2xl text-xs leading-5 text-[#71839a]">A few quick taps help Sympto understand your day. No journal writing is needed.</p>
           </div>
@@ -199,19 +176,14 @@ export default function DailyHealthCheckIn() {
           <div className="mt-3 grid grid-cols-5 gap-2">
             {moodOptions.map((option) => {
               const active = mood === option.value;
-              return (
-                <button key={option.value} type="button" onClick={() => setMood(option.value)} className={`rounded-2xl border px-2 py-3 text-center transition ${active ? "border-[#24babe] bg-[#e9fafb] ring-2 ring-[#24babe]/20" : "border-[#e3ecef] bg-white hover:bg-[#f8fbfc]"}`}>
-                  <span className="block text-xl">{option.icon}</span>
-                  <span className={`mt-1 block text-[9px] font-bold ${active ? "text-[#0b6f73]" : "text-[#71839a]"}`}>{option.label}</span>
-                </button>
-              );
+              return <button key={option.value} type="button" onClick={() => setMood(option.value)} className={`rounded-2xl border px-2 py-3 text-center transition ${active ? "border-[#24babe] bg-[#e9fafb] ring-2 ring-[#24babe]/20" : "border-[#e3ecef] bg-white hover:bg-[#f8fbfc]"}`}><span className="block text-xl">{option.icon}</span><span className={`mt-1 block text-[9px] font-bold ${active ? "text-[#0b6f73]" : "text-[#71839a]"}`}>{option.label}</span></button>;
             })}
           </div>
         </div>
 
         <div>
           <div className="flex items-center justify-between"><p className="text-xs font-black uppercase tracking-[0.14em] text-[#71839a]">Stress</p><span className="text-sm font-black text-[#0b2d54]">{stressLevel}/10</span></div>
-          <input aria-label="Stress level" type="range" min={1} max={10} value={stressLevel} onChange={(event) => setStressLevel(Number(event.target.value))} className="mt-3 w-full accent-[#24babe]" />
+          <input aria-label="Stress level" type="range" min={1} max={10} value={stressLevel} onChange={(event) => { setStressLevel(Number(event.target.value)); setStressTouched(true); }} className="mt-3 w-full accent-[#24babe]" />
           <div className="mt-1 flex justify-between text-[9px] font-semibold text-[#9aa8b7]"><span>Low</span><span>High</span></div>
         </div>
 
@@ -219,10 +191,7 @@ export default function DailyHealthCheckIn() {
           <p className="text-xs font-black uppercase tracking-[0.14em] text-[#71839a]">Sleep</p>
           <div className="mt-3 grid gap-4 lg:grid-cols-[1fr_auto] lg:items-center">
             <div className="grid grid-cols-5 gap-2">
-              {sleepOptions.map((option) => {
-                const active = sleepQuality === option.value;
-                return <button key={option.value} type="button" onClick={() => setSleepQuality(option.value)} className={`rounded-xl border px-2 py-2.5 text-[10px] font-bold transition ${active ? "border-[#24babe] bg-[#e9fafb] text-[#0b6f73]" : "border-[#e3ecef] text-[#71839a] hover:bg-[#f8fbfc]"}`}>{option.label}</button>;
-              })}
+              {sleepOptions.map((option) => { const active = sleepQuality === option.value; return <button key={option.value} type="button" onClick={() => setSleepQuality(option.value)} className={`rounded-xl border px-2 py-2.5 text-[10px] font-bold transition ${active ? "border-[#24babe] bg-[#e9fafb] text-[#0b6f73]" : "border-[#e3ecef] text-[#71839a] hover:bg-[#f8fbfc]"}`}>{option.label}</button>; })}
             </div>
             <div className="flex items-center justify-between rounded-2xl bg-[#f7fafb] px-3 py-2 ring-1 ring-[#e3ecef] lg:min-w-[150px]">
               <span className="text-[10px] font-black uppercase tracking-wide text-[#71839a]">Hours</span>
