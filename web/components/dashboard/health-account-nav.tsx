@@ -1,37 +1,41 @@
 "use client";
 
 import Link from "next/link";
-import { Activity, CalendarDays, ClipboardPlus, FileHeart, HeartPulse, Menu, MessageCircle, QrCode, Settings, ShieldCheck, UserRound, Users, Watch, X, type LucideIcon } from "lucide-react";
+import { Activity, CalendarDays, FileHeart, FileText, HeartPulse, Menu, MessageCircle, Pill, QrCode, Settings, ShieldCheck, UserRound, Users, Watch, X, CreditCard, ClipboardList } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 
-type NavItem = readonly [string, string, LucideIcon];
+type NavItem = readonly [string, string, React.ComponentType<{ className?: string }>];
 type NavGroup = readonly [string, readonly NavItem[]];
 
 const groups: readonly NavGroup[] = [
   [
-    "My care",
+    "Today & care",
     [
+      ["/today", "Today", ShieldCheck],
       ["/appointments", "Appointments", CalendarDays],
-      ["/care-plans", "Care Plans", HeartPulse],
+      ["/medications", "Medications", Pill],
+      ["/care-plans", "Care Plans", ClipboardList],
       ["/health-goals", "Health Goals", HeartPulse],
-      ["/log-symptom", "Log a symptom", ClipboardPlus],
-      ["/wearables", "Link a watch", Watch],
-      ["/notifications", "Notifications", ShieldCheck],
+      ["/log-symptom", "Log a symptom", HeartPulse],
     ],
   ],
   [
     "My health",
     [
+      ["/health-passport", "Clinic Card", FileHeart],
       ["/health-vitals", "Measurements", Activity],
-      ["/health-passport", "Health Passport", FileHeart],
-      ["/health-records", "Health Records", FileHeart],
+      ["/health-journal", "Health Journal", FileText],
+      ["/health-records", "Health Records", FileText],
       ["/messages", "Messages", MessageCircle],
+      ["/wearables", "Connected devices", Watch],
       ["/family", "Family", Users],
     ],
   ],
   [
-    "My account",
+    "My cover & account",
     [
+      ["/health-finance", "Medical aid & payments", CreditCard],
+      ["/emergency-contacts", "Emergency contacts", ShieldCheck],
       ["/profile", "Profile", UserRound],
       ["/settings", "Settings", Settings],
     ],
@@ -83,14 +87,10 @@ export default function HealthAccountNav() {
       </button>
 
       {open && (
-        <div
-          role="menu"
-          aria-label="Patient navigation"
-          className="absolute right-0 top-14 max-h-[calc(100vh-5.5rem)] w-[min(20rem,calc(100vw-2rem))] overflow-y-auto rounded-[24px] border border-slate-200 bg-white p-2 shadow-[0_24px_60px_rgba(11,45,84,0.18)] ring-1 ring-white"
-        >
+        <div role="menu" aria-label="Patient navigation" className="absolute right-0 top-14 max-h-[calc(100vh-5.5rem)] w-[min(22rem,calc(100vw-2rem))] overflow-y-auto rounded-[24px] border border-slate-200 bg-white p-2 shadow-[0_24px_60px_rgba(11,45,84,0.18)] ring-1 ring-white">
           <div className="px-3 pb-2 pt-3">
             <p className="text-[10px] font-black uppercase tracking-[0.18em] text-slate-400">Your health</p>
-            <p className="mt-1 text-sm font-bold text-[#0b2d54]">Everything in one simple menu</p>
+            <p className="mt-1 text-sm font-bold text-[#0b2d54]">Everything you need, organised around your health</p>
           </div>
 
           {groups.map(([title, items]) => (
@@ -98,16 +98,8 @@ export default function HealthAccountNav() {
               <p className="px-3 py-2 text-[10px] font-black uppercase tracking-[0.16em] text-slate-400">{title}</p>
               <div className="space-y-0.5">
                 {items.map(([href, label, Icon]) => (
-                  <Link
-                    key={href}
-                    href={href}
-                    role="menuitem"
-                    onClick={close}
-                    className="flex min-h-12 items-center gap-3 rounded-2xl px-3 py-3 text-sm font-bold text-[#0b2d54] transition hover:bg-[#24c1c4]/10 focus:bg-[#24c1c4]/10 focus:outline-none"
-                  >
-                    <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-[#0b2d54]/[0.06] text-[#0b2d54]">
-                      <Icon className="h-4 w-4" aria-hidden="true" />
-                    </span>
+                  <Link key={href} href={href} role="menuitem" onClick={close} className="flex min-h-12 items-center gap-3 rounded-2xl px-3 py-3 text-sm font-bold text-[#0b2d54] transition hover:bg-[#24c1c4]/10 focus:bg-[#24c1c4]/10 focus:outline-none">
+                    <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-[#0b2d54]/[0.06] text-[#0b2d54]"><Icon className="h-4 w-4" aria-hidden="true" /></span>
                     <span>{label}</span>
                   </Link>
                 ))}
