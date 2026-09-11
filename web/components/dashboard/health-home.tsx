@@ -4,7 +4,8 @@ import Link from "next/link";
 import { ArrowRight, CheckCircle2, FolderOpen, HeartPulse, ShieldCheck, TriangleAlert } from "lucide-react";
 import ProtectedRoute from "@/components/auth/protected-route";
 import { useDashboard } from "@/hooks/use-dashboard";
-import HealthVitalsSummary, { type DashboardVital } from "@/components/dashboard/health-vitals-summary";
+import ClinicCardSummary from "@/components/dashboard/clinic-card-summary";
+import type { DashboardVital } from "@/components/dashboard/health-vitals-summary";
 
 function display(value: unknown): string {
   return value === null || value === undefined || value === "" ? "—" : String(value);
@@ -90,20 +91,22 @@ export default function HealthHome() {
         <section className="grid gap-[15px] lg:grid-cols-3">
           <article className="relative min-h-[220px] overflow-hidden rounded-[27px] border border-[#e0ebef] bg-gradient-to-br from-white via-white to-[#f2fcf8] p-6 shadow-[0_5px_18px_rgba(11,45,84,0.035)] after:absolute after:-bottom-[68px] after:-right-[58px] after:h-[145px] after:w-[145px] after:rounded-full after:bg-[#168660]/10 after:content-['']"><div className="relative z-10"><div className="flex items-start justify-between gap-3"><div className="grid h-11 w-11 place-items-center rounded-[15px] bg-[#e8f8f1] text-[#168660]"><CheckCircle2 className="h-5 w-5" /></div><span className="text-[10px] font-black uppercase tracking-[0.14em] text-[#71839a]">Today</span></div><h3 className="mt-5 text-[19px] font-black tracking-[-0.04em] text-[#0b2d54]">What do I do today?</h3><p className="mt-2 max-w-[280px] text-xs leading-5 text-[#71839a]">{todayActionCount > 0 ? `${todayActionCount} ${todayActionCount === 1 ? "thing needs" : "things need"} your attention.` : "Nothing urgent is waiting for you today."}</p><p className="mt-3 text-[11px] font-bold text-[#0b2d54]">Medication · Visit · Goal</p><Link href="/today" className="mt-6 flex min-h-11 items-center justify-between rounded-xl bg-[#0b2d54] px-4 py-2 text-[11px] font-black text-white transition hover:bg-[#071f3a]"><span>Open today</span><ArrowRight className="h-3.5 w-3.5" /></Link></div></article>
 
-          <article className="relative min-h-[220px] overflow-hidden rounded-[27px] border border-[#e0ebef] bg-gradient-to-br from-white via-white to-[#f5fbff] p-6 shadow-[0_5px_18px_rgba(11,45,84,0.035)] after:absolute after:-bottom-[68px] after:-right-[58px] after:h-[145px] after:w-[145px] after:rounded-full after:bg-[#24c1c4]/10 after:content-['']"><div className="relative z-10"><div className="flex items-start justify-between gap-3"><div className="grid h-11 w-11 place-items-center rounded-[15px] bg-[#eaf9fa] text-[#0b2d54]"><ShieldCheck className="h-5 w-5" /></div><span className="text-[10px] font-black uppercase tracking-[0.14em] text-[#71839a]">Current</span></div><h3 className="mt-5 text-[19px] font-black tracking-[-0.04em] text-[#0b2d54]">How is my health?</h3><p className="mt-2 text-xs leading-5 text-[#71839a]">{hasVitals ? `BMI ${display(bmi)} · ${bmiCategory ? String(bmiCategory).replaceAll("_", " ").toLowerCase() : "vitals available"}` : "Your latest health measurements will appear here."}</p><div className="mt-4 grid grid-cols-2 gap-2"><div className="rounded-2xl bg-white px-3 py-3 ring-1 ring-[#e0ebef]"><p className="text-[9px] font-black uppercase tracking-wide text-[#71839a]">BMI</p><p className="mt-1 text-sm font-black text-[#0b2d54]">{display(bmi)}</p></div><div className="rounded-2xl bg-white px-3 py-3 ring-1 ring-[#e0ebef]"><p className="text-[9px] font-black uppercase tracking-wide text-[#71839a]">Vitals</p><p className="mt-1 text-sm font-black text-[#0b2d54]">{healthVitals.length || 0} latest</p></div></div><Link href="#health-vitals" className="mt-4 flex min-h-11 items-center justify-between rounded-xl bg-[#0b2d54] px-4 py-2 text-[11px] font-black text-white transition hover:bg-[#071f3a]"><span>View BMI &amp; vitals</span><ArrowRight className="h-3.5 w-3.5" /></Link></div></article>
+          <article className="relative min-h-[220px] overflow-hidden rounded-[27px] border border-[#e0ebef] bg-gradient-to-br from-white via-white to-[#f5fbff] p-6 shadow-[0_5px_18px_rgba(11,45,84,0.035)] after:absolute after:-bottom-[68px] after:-right-[58px] after:h-[145px] after:w-[145px] after:rounded-full after:bg-[#24c1c4]/10 after:content-['']"><div className="relative z-10"><div className="flex items-start justify-between gap-3"><div className="grid h-11 w-11 place-items-center rounded-[15px] bg-[#eaf9fa] text-[#0b2d54]"><ShieldCheck className="h-5 w-5" /></div><span className="text-[10px] font-black uppercase tracking-[0.14em] text-[#71839a]">Current</span></div><h3 className="mt-5 text-[19px] font-black tracking-[-0.04em] text-[#0b2d54]">How is my health?</h3><p className="mt-2 text-xs leading-5 text-[#71839a]">{hasVitals ? `BMI ${display(bmi)} · ${bmiCategory ? String(bmiCategory).replaceAll("_", " ").toLowerCase() : "vitals available"}` : "Your latest health measurements will appear here."}</p><div className="mt-4 grid grid-cols-2 gap-2"><div className="rounded-2xl bg-white px-3 py-3 ring-1 ring-[#e0ebef]"><p className="text-[9px] font-black uppercase tracking-wide text-[#71839a]">BMI</p><p className="mt-1 text-sm font-black text-[#0b2d54]">{display(bmi)}</p></div><div className="rounded-2xl bg-white px-3 py-3 ring-1 ring-[#e0ebef]"><p className="text-[9px] font-black uppercase tracking-wide text-[#71839a]">Vitals</p><p className="mt-1 text-sm font-black text-[#0b2d54]">{healthVitals.length || 0} latest</p></div></div><Link href="/health-vitals" className="mt-4 flex min-h-11 items-center justify-between rounded-xl bg-[#0b2d54] px-4 py-2 text-[11px] font-black text-white transition hover:bg-[#071f3a]"><span>Open measurements</span><ArrowRight className="h-3.5 w-3.5" /></Link></div></article>
 
           <article className="relative min-h-[220px] overflow-hidden rounded-[27px] border border-[#e0ebef] bg-gradient-to-br from-white via-white to-[#f2f7ff] p-6 shadow-[0_5px_18px_rgba(11,45,84,0.035)] after:absolute after:-bottom-[68px] after:-right-[58px] after:h-[145px] after:w-[145px] after:rounded-full after:bg-[#3f75bd]/10 after:content-['']"><div className="relative z-10"><div className="flex items-start justify-between gap-3"><div className="grid h-11 w-11 place-items-center rounded-[15px] bg-[#edf4ff] text-[#3f75bd]"><FolderOpen className="h-5 w-5" /></div><span className="text-[10px] font-black uppercase tracking-[0.14em] text-[#71839a]">History</span></div><h3 className="mt-5 text-[19px] font-black tracking-[-0.04em] text-[#0b2d54]">My History &amp; Papers</h3><p className="mt-2 text-xs leading-5 text-[#71839a]">Your health story, records, results, and documents in one place.</p><p className="mt-4 text-sm font-black text-[#0b2d54]">{historyCount} connected {historyCount === 1 ? "record" : "records"}</p><Link href="/health-journal" className="mt-6 flex min-h-11 items-center justify-between rounded-xl bg-[#0b2d54] px-4 py-2 text-[11px] font-black text-white transition hover:bg-[#071f3a]"><span>Open health history</span><ArrowRight className="h-3.5 w-3.5" /></Link></div></article>
         </section>
 
-        <div id="health-vitals" className="scroll-mt-6">
-          <HealthVitalsSummary
-            bmi={bmi}
-            bmiCategory={bmiCategory}
-            weightKg={data.healthSnapshot?.weightKg ?? data.patient?.weightKg ?? null}
-            heightCm={data.healthSnapshot?.heightCm ?? data.patient?.heightCm ?? null}
-            measurements={healthVitals}
-          />
-        </div>
+        <ClinicCardSummary
+          patient={data.patient}
+          profile={data.profile}
+          healthPassport={data.healthPassport}
+          healthSnapshot={data.healthSnapshot}
+          medicalRecord={data.medicalRecord}
+          allergies={data.healthSnapshot?.activeAllergies ?? data.healthSnapshot?.allergies ?? data.allergies ?? []}
+          conditions={data.healthSnapshot?.activeConditions ?? data.conditions ?? []}
+          medications={data.medications?.length ? data.medications : data.today?.activeMedications ?? []}
+          emergencyContacts={data.emergencyContacts ?? []}
+        />
       </div>
     </main>
   </ProtectedRoute>;
