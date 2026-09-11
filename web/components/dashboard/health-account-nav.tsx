@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { CalendarDays, ClipboardPlus, FileHeart, HeartPulse, Menu, MessageCircle, QrCode, Settings, ShieldCheck, UserRound, Users, Watch, X, type LucideIcon } from "lucide-react";
+import { Activity, CalendarDays, ClipboardPlus, FileHeart, HeartPulse, Menu, MessageCircle, QrCode, Settings, ShieldCheck, UserRound, Users, Watch, X, type LucideIcon } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 
 type NavItem = readonly [string, string, LucideIcon];
@@ -22,6 +22,7 @@ const groups: readonly NavGroup[] = [
   [
     "My health",
     [
+      ["/health-vitals", "Measurements", Activity],
       ["/health-passport", "Health Passport", FileHeart],
       ["/health-records", "Health Records", FileHeart],
       ["/messages", "Messages", MessageCircle],
