@@ -1,15 +1,17 @@
 "use client";
 
 import Link from "next/link";
-import { Menu, MessageCircle, QrCode, Settings, UserRound, Users, X } from "lucide-react";
+import { CalendarDays, FileHeart, HeartPulse, Menu, MessageCircle, QrCode, Settings, ShieldCheck, UserRound, Users, X } from "lucide-react";
 import { useState } from "react";
 
 /**
- * Keeps account tools in the hamburger while making Smart File a direct,
- * high-visibility action in the dashboard header.
+ * Patient navigation. Core patient journeys live here so the Health Home
+ * can remain intentionally limited to its three primary action cards.
  */
 export default function HealthAccountNav() {
   const [open, setOpen] = useState(false);
+
+  const close = () => setOpen(false);
 
   return (
     <div className="fixed right-4 top-4 z-50 flex items-center gap-2 sm:right-6 sm:top-5">
@@ -34,12 +36,44 @@ export default function HealthAccountNav() {
       </button>
 
       {open && (
-        <div className="absolute right-0 top-14 w-60 overflow-hidden rounded-2xl border border-slate-200 bg-white p-2 shadow-[0_18px_45px_rgba(11,45,84,0.16)]">
+        <div className="absolute right-0 top-14 w-72 overflow-hidden rounded-2xl border border-slate-200 bg-white p-2 shadow-[0_18px_45px_rgba(11,45,84,0.16)]">
+          <p className="px-3 py-2 text-[10px] font-bold uppercase tracking-[0.16em] text-slate-400">My Care</p>
+          <Link href="/appointments" onClick={close} className="flex items-center gap-3 rounded-xl px-3 py-3 text-sm font-semibold text-[#0b2d54] hover:bg-[#24c1c4]/10">
+            <CalendarDays className="h-4 w-4" /> Appointments
+          </Link>
+          <Link href="/care-plans" onClick={close} className="flex items-center gap-3 rounded-xl px-3 py-3 text-sm font-semibold text-[#0b2d54] hover:bg-[#24c1c4]/10">
+            <HeartPulse className="h-4 w-4" /> Care Plans
+          </Link>
+          <Link href="/health-goals" onClick={close} className="flex items-center gap-3 rounded-xl px-3 py-3 text-sm font-semibold text-[#0b2d54] hover:bg-[#24c1c4]/10">
+            <HeartPulse className="h-4 w-4" /> Health Goals
+          </Link>
+          <Link href="/notifications" onClick={close} className="flex items-center gap-3 rounded-xl px-3 py-3 text-sm font-semibold text-[#0b2d54] hover:bg-[#24c1c4]/10">
+            <ShieldCheck className="h-4 w-4" /> Notifications
+          </Link>
+
+          <div className="my-2 border-t border-slate-100" />
+          <p className="px-3 py-2 text-[10px] font-bold uppercase tracking-[0.16em] text-slate-400">My Health</p>
+          <Link href="/health-passport" onClick={close} className="flex items-center gap-3 rounded-xl px-3 py-3 text-sm font-semibold text-[#0b2d54] hover:bg-[#24c1c4]/10">
+            <FileHeart className="h-4 w-4" /> Health Passport
+          </Link>
+          <Link href="/health-records" onClick={close} className="flex items-center gap-3 rounded-xl px-3 py-3 text-sm font-semibold text-[#0b2d54] hover:bg-[#24c1c4]/10">
+            <FileHeart className="h-4 w-4" /> Health Records
+          </Link>
+          <Link href="/messages" onClick={close} className="flex items-center gap-3 rounded-xl px-3 py-3 text-sm font-semibold text-[#0b2d54] hover:bg-[#24c1c4]/10">
+            <MessageCircle className="h-4 w-4" /> Messages
+          </Link>
+
+          <div className="my-2 border-t border-slate-100" />
           <p className="px-3 py-2 text-[10px] font-bold uppercase tracking-[0.16em] text-slate-400">Account</p>
-          <Link href="/messages" onClick={() => setOpen(false)} className="flex items-center gap-3 rounded-xl px-3 py-3 text-sm font-semibold text-[#0b2d54] hover:bg-[#24c1c4]/10"><MessageCircle className="h-4 w-4" />Messages</Link>
-          <Link href="/profile" onClick={() => setOpen(false)} className="flex items-center gap-3 rounded-xl px-3 py-3 text-sm font-semibold text-[#0b2d54] hover:bg-[#24c1c4]/10"><UserRound className="h-4 w-4" />Profile</Link>
-          <Link href="/family" onClick={() => setOpen(false)} className="flex items-center gap-3 rounded-xl px-3 py-3 text-sm font-semibold text-[#0b2d54] hover:bg-[#24c1c4]/10"><Users className="h-4 w-4" />Family</Link>
-          <Link href="/settings" onClick={() => setOpen(false)} className="flex items-center gap-3 rounded-xl px-3 py-3 text-sm font-semibold text-[#0b2d54] hover:bg-white"><Settings className="h-4 w-4" />Settings</Link>
+          <Link href="/profile" onClick={close} className="flex items-center gap-3 rounded-xl px-3 py-3 text-sm font-semibold text-[#0b2d54] hover:bg-[#24c1c4]/10">
+            <UserRound className="h-4 w-4" /> Profile
+          </Link>
+          <Link href="/family" onClick={close} className="flex items-center gap-3 rounded-xl px-3 py-3 text-sm font-semibold text-[#0b2d54] hover:bg-[#24c1c4]/10">
+            <Users className="h-4 w-4" /> Family
+          </Link>
+          <Link href="/settings" onClick={close} className="flex items-center gap-3 rounded-xl px-3 py-3 text-sm font-semibold text-[#0b2d54] hover:bg-slate-50">
+            <Settings className="h-4 w-4" /> Settings
+          </Link>
         </div>
       )}
     </div>
