@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { Check, Minus, Plus, Save, Sparkles, Droplets, Dumbbell, Moon, Brain, Smile } from "lucide-react";
+import { Check, Minus, Plus, Save, Sparkles, Droplets, Dumbbell, Moon, Brain } from "lucide-react";
 import { healthJournalService } from "@/services/health-journal.service";
 import type { HealthJournal, HealthJournalMood, SleepQuality } from "@/types/health-journal";
 
@@ -39,7 +39,7 @@ function sleepLabel(value?: SleepQuality) {
   return sleepOptions.find((option) => option.value === value)?.label ?? "";
 }
 
-function buildJournalText(values: { mood: HealthJournalMood | null; sleepQuality: SleepQuality | null; sleepHours: number; stressLevel: number; exerciseMinutes: number; waterIntakeMl: number }) {
+function buildJournalText(values: { mood: HealthJournalMood | null; sleepQuality: SleepQuality | null; sleepHours: number; stressLevel: number; exerciseMinutes: number; waterIntakeMl: number; stressTouched: boolean }) {
   const parts = [
     values.mood ? `Mood: ${moodLabel(values.mood)}.` : null,
     values.sleepQuality && values.sleepHours > 0
@@ -49,7 +49,7 @@ function buildJournalText(values: { mood: HealthJournalMood | null; sleepQuality
         : values.sleepHours > 0
           ? `Sleep: ${values.sleepHours} hours.`
           : null,
-    `Stress: ${values.stressLevel}/10.`,
+    values.stressTouched ? `Stress: ${values.stressLevel}/10.` : null,
     values.exerciseMinutes > 0 ? `Exercise: ${values.exerciseMinutes} minutes.` : null,
     values.waterIntakeMl > 0 ? `Water: ${values.waterIntakeMl} ml.` : null,
   ].filter(Boolean);
@@ -61,7 +61,7 @@ function sameCheckIn(journal: HealthJournal) {
   return journal.title === "Daily Health Check-in" && isToday(journal.createdAt);
 }
 
-export default function DailyHealthCheckIn() {
+export default function DailyHealthCheckIn({ embedded = false }: { embedded?: boolean }) {
   const [mood, setMood] = useState<HealthJournalMood | null>(null);
   const [sleepQuality, setSleepQuality] = useState<SleepQuality | null>(null);
   const [sleepHours, setSleepHours] = useState(0);
@@ -81,6 +81,7 @@ export default function DailyHealthCheckIn() {
   );
 
   const waterPercent = Math.min(100, Math.round((waterIntakeMl / DAILY_WATER_GOAL) * 100));
+  const waterRemaining = Math.max(0, DAILY_WATER_GOAL - waterIntakeMl);
 
   useEffect(() => {
     let active = true;
@@ -115,7 +116,7 @@ export default function DailyHealthCheckIn() {
     setError("");
     setMessage("");
 
-    const journal = buildJournalText({ mood, sleepQuality, sleepHours, stressLevel, exerciseMinutes, waterIntakeMl });
+    const journal = buildJournalText({ mood, sleepQuality, sleepHours, stressLevel, exerciseMinutes, waterIntakeMl, stressTouched });
 
     try {
       let saved: HealthJournal;
@@ -127,7 +128,7 @@ export default function DailyHealthCheckIn() {
           mood: mood ?? undefined,
           sleepQuality: sleepQuality ?? undefined,
           sleepHours: sleepHours > 0 ? String(sleepHours) : undefined,
-          stressLevel,
+          stressLevel: stressTouched ? stressLevel : undefined,
           exerciseMinutes,
           waterIntakeMl,
         });
@@ -138,7 +139,7 @@ export default function DailyHealthCheckIn() {
           mood: mood ?? undefined,
           sleepQuality: sleepQuality ?? undefined,
           sleepHours: sleepHours > 0 ? String(sleepHours) : undefined,
-          stressLevel,
+          stressLevel: stressTouched ? stressLevel : undefined,
           exerciseMinutes,
           waterIntakeMl,
           notes: "Captured from the What do I do today? health check-in.",
@@ -155,24 +156,35 @@ export default function DailyHealthCheckIn() {
   }
 
   if (loading) {
-    return <section className="mt-5 h-[520px] animate-pulse rounded-[30px] border border-[#dfe9ef] bg-white shadow-[0_18px_45px_rgba(11,45,84,0.07)]" />;
+    return <div className={embedded ? "h-[520px] animate-pulse bg-white" : "mt-5 h-[520px] animate-pulse rounded-[30px] border border-[#dfe9ef] bg-white shadow-[0_18px_45px_rgba(11,45,84,0.07)]"} />;
   }
 
+  const headerClass = embedded
+    ? "relative overflow-hidden border-t border-[#edf2f5] bg-gradient-to-r from-[#f7fcfd] via-white to-[#effafb] px-5 py-6 sm:px-6 sm:py-7"
+    : "relative overflow-hidden bg-gradient-to-br from-[#08284a] via-[#0d466f] to-[#20b9ba] px-6 py-7 text-white sm:px-8 sm:py-8";
+  const headerTextClass = embedded ? "text-[#0b2d54]" : "text-white";
+  const subTextClass = embedded ? "text-[#71839a]" : "text-white/70";
+
   return (
-    <section className="mt-5 overflow-hidden rounded-[30px] border border-[#dfe9ef] bg-white shadow-[0_18px_45px_rgba(11,45,84,0.07)]">
-      <div className="relative overflow-hidden bg-gradient-to-br from-[#08284a] via-[#0d466f] to-[#20b9ba] px-6 py-7 text-white sm:px-8 sm:py-8">
-        <div className="pointer-events-none absolute -right-24 -top-28 h-64 w-64 rounded-full border border-white/10 shadow-[0_0_0_24px_rgba(255,255,255,0.025)]" />
-        <div className="relative flex flex-col gap-5 sm:flex-row sm:items-end sm:justify-between">
+    <section className={embedded ? "overflow-hidden" : "mt-5 overflow-hidden rounded-[30px] border border-[#dfe9ef] bg-white shadow-[0_18px_45px_rgba(11,45,84,0.07)]"}>
+      <div className={headerClass}>
+        {!embedded && <div className="pointer-events-none absolute -right-24 -top-28 h-64 w-64 rounded-full border border-white/10 shadow-[0_0_0_24px_rgba(255,255,255,0.025)]" />}
+        <div className="relative flex flex-col gap-5 sm:flex-row sm:items-center sm:justify-between">
           <div>
-            <div className="flex items-center gap-2 text-white/75"><span className="grid h-9 w-9 place-items-center rounded-xl bg-white/10 ring-1 ring-white/10"><Sparkles className="h-4 w-4" /></span><p className="text-[10px] font-black uppercase tracking-[0.18em]">Daily health check-in</p></div>
-            <h2 className="mt-4 text-2xl font-black tracking-[-0.04em] sm:text-[29px]">How are you feeling today?</h2>
-            <p className="mt-2 max-w-2xl text-sm leading-6 text-white/70">A few quick taps give Sympto a better picture of your day without turning your health into homework.</p>
+            <div className={`flex items-center gap-2 ${embedded ? "text-[#0b7b80]" : "text-white/75"}`}>
+              <span className={`grid h-9 w-9 place-items-center rounded-xl ${embedded ? "bg-[#e9f9fa] text-[#0b7b80] ring-1 ring-[#d4eff1]" : "bg-white/10 text-white ring-1 ring-white/10"}`}>
+                <Sparkles className="h-4 w-4" />
+              </span>
+              <p className={`text-[10px] font-black uppercase tracking-[0.18em] ${embedded ? "text-[#6b8a98]" : ""}`}>Daily health check-in</p>
+            </div>
+            <h2 className={`mt-3 text-2xl font-black tracking-[-0.04em] sm:text-[29px] ${headerTextClass}`}>How are you feeling today?</h2>
+            <p className={`mt-2 max-w-2xl text-sm leading-6 ${subTextClass}`}>A few quick taps give Sympto a better picture of your day without turning your health into homework.</p>
           </div>
-          {savedJournal && <span className="inline-flex items-center gap-1.5 self-start rounded-full bg-white/10 px-3 py-1.5 text-[10px] font-black uppercase tracking-[0.12em] text-white ring-1 ring-white/15"><Check className="h-3.5 w-3.5" />Saved today</span>}
+          {savedJournal && <span className={`inline-flex items-center gap-1.5 self-start rounded-full px-3 py-1.5 text-[10px] font-black uppercase tracking-[0.12em] ${embedded ? "bg-[#edf9f2] text-[#168660] ring-1 ring-[#d7efdf]" : "bg-white/10 text-white ring-1 ring-white/15"}`}><Check className="h-3.5 w-3.5" />Saved today</span>}
         </div>
       </div>
 
-      <div className="space-y-8 px-5 py-6 sm:px-8 sm:py-8">
+      <div className={`space-y-8 px-5 py-6 sm:px-6 sm:py-7 ${embedded ? "border-b border-[#edf2f5]" : "sm:px-8 sm:py-8"}`}>
         <div>
           <div className="flex items-end justify-between gap-3"><div><p className="text-[10px] font-black uppercase tracking-[0.17em] text-[#8797a8]">Mood</p><p className="mt-1 text-sm font-semibold text-[#0b2d54]">How does today feel?</p></div>{mood && <span className="rounded-full bg-[#e8f8f1] px-3 py-1.5 text-[10px] font-black text-[#168660]">{moodLabel(mood)}</span>}</div>
           <div className="mt-4 grid grid-cols-5 gap-2.5">
@@ -214,8 +226,8 @@ export default function DailyHealthCheckIn() {
                 <div className="absolute left-1/2 top-0 h-4 w-12 -translate-x-1/2 rounded-t-lg border-2 border-b-0 border-[#8dcbd0] bg-white/80" />
               </div>
               <div className="min-w-0 flex-1">
-                <div className="flex items-end justify-between gap-3"><div><p className="text-2xl font-black tracking-[-0.04em] text-[#0b2d54]">{waterPercent}%</p><p className="text-[10px] font-semibold text-[#71839a]">of a 2 L daily goal</p></div><span className="rounded-full bg-white px-2.5 py-1 text-[9px] font-black text-[#0b7b80] ring-1 ring-[#cfe8eb]">{Math.max(0, DAILY_WATER_GOAL - waterIntakeMl).toLocaleString("en-ZA")} ml left</span></div>
-                <div className="mt-4 flex flex-wrap gap-2">{waterOptions.map((amount) => <button key={amount} type="button" onClick={() => setWaterIntakeMl((value) => Math.min(DAILY_WATER_GOAL, value + amount))} className="rounded-full bg-white px-3 py-2 text-[10px] font-black text-[#0b6f73] shadow-sm ring-1 ring-[#d8ecef] transition hover:-translate-y-0.5 hover:bg-[#f6feff]">+{amount} ml</button>)}<button type="button" onClick={() => setWaterIntakeMl(0)} className="rounded-full bg-white/70 px-3 py-2 text-[10px] font-bold text-[#71839a] ring-1 ring-[#dce8eb]">Reset</button></div>
+                <div className="flex items-end justify-between gap-3"><div><p className="text-2xl font-black tracking-[-0.04em] text-[#0b2d54]">{waterPercent}%</p><p className="text-[10px] font-semibold text-[#71839a]">of a 2 L daily goal</p></div><span className="rounded-full bg-white px-2.5 py-1 text-[9px] font-black text-[#0b7b80] ring-1 ring-[#cfe8eb]">{waterRemaining.toLocaleString("en-ZA")} ml left</span></div>
+                <div className="mt-4 flex flex-wrap gap-2">{waterOptions.map((amount) => <button key={amount} type="button" onClick={() => setWaterIntakeMl((value) => value + amount)} className="rounded-full bg-white px-3 py-2 text-[10px] font-black text-[#0b6f73] shadow-sm ring-1 ring-[#d8ecef] transition hover:-translate-y-0.5 hover:bg-[#f6feff]">+{amount} ml</button>)}<button type="button" onClick={() => setWaterIntakeMl(0)} className="rounded-full bg-white/70 px-3 py-2 text-[10px] font-bold text-[#71839a] ring-1 ring-[#dce8eb]">Reset</button></div>
                 <p className="mt-3 text-[9px] leading-4 text-[#7e98a3]">Each tap fills your glass and updates today’s total.</p>
               </div>
             </div>
