@@ -78,7 +78,7 @@ export default function SmartFilePage() {
   return (
     <ProtectedRoute>
       <main className="min-h-screen bg-[#f5f8fb] text-slate-800">
-        <div className="mx-auto max-w-2xl px-4 py-5 sm:px-6 sm:py-8">
+        <div className="mx-auto max-w-5xl px-4 py-5 sm:px-6 sm:py-8">
           <Link href="/dashboard" className="mb-4 inline-flex min-h-11 items-center gap-2 rounded-xl px-2 text-sm font-bold text-[#0b2d54] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#24c1c4]">
             <ArrowLeft className="h-4 w-4" />
             Back to My Health
@@ -126,17 +126,27 @@ export default function SmartFilePage() {
               {loading && <div className="mt-6 rounded-3xl border border-slate-200 bg-slate-50 p-10 text-center"><Loader2 className="mx-auto h-8 w-8 animate-spin text-[#24c1c4]" /><p className="mt-3 text-sm font-bold text-[#0b2d54]">Creating your {scopeTitle.toLowerCase()} sharing session…</p></div>}
 
               {!loading && share && !expired && (
-                <div className="mt-6 space-y-5">
+                <div className="mt-6 grid gap-5 lg:grid-cols-[minmax(0,1.35fr)_minmax(280px,0.65fr)] lg:items-stretch">
                   <section className="rounded-[28px] border border-slate-200 bg-slate-50 p-4 text-center sm:p-6">
                     <div className="flex items-center justify-between gap-3 text-left"><div><p className="text-[10px] font-black uppercase tracking-[0.16em] text-slate-400">Step 2 · QR code</p><h2 className="mt-1 text-lg font-black text-[#0b2d54]">{scopeTitle} access</h2></div><span className="rounded-full bg-emerald-100 px-3 py-1.5 text-[10px] font-black uppercase tracking-wide text-emerald-800">Temporary</span></div>
-                    <div className="mx-auto mt-5 w-fit rounded-[24px] border border-slate-200 bg-white p-3 shadow-sm"><img src={qrUrl} alt={`Temporary ${scopeTitle} Smart File QR code`} className="h-64 w-64 sm:h-72 sm:w-72" /></div>
+                    <div className="mx-auto mt-5 w-fit rounded-[24px] border border-slate-200 bg-white p-3 shadow-sm"><img src={qrUrl} alt={`Temporary ${scopeTitle} Smart File QR code`} className="h-64 w-64 sm:h-72 sm:w-72 lg:h-80 lg:w-80" /></div>
                     <p className="mt-4 text-xs font-semibold leading-5 text-slate-500">The QR contains only a secure temporary token. Your medical information is not stored inside it.</p>
                   </section>
 
-                  <section className="rounded-[28px] border border-[#24c1c4]/25 bg-[#24c1c4]/5 p-5 text-center sm:p-6"><p className="text-[10px] font-black uppercase tracking-[0.16em] text-[#0b2d54]/60">Step 3 · Laptop / receptionist code</p><button type="button" onClick={copyCode} className="mt-2 inline-flex min-h-16 items-center gap-3 rounded-2xl px-4 text-3xl font-black tracking-[0.22em] text-[#0b2d54] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#24c1c4] sm:text-4xl" aria-label="Copy six-digit Smart File code">{share.shortCode.slice(0, 3)} {share.shortCode.slice(3)}{copied ? <Check className="h-5 w-5 text-emerald-700" /> : <Copy className="h-5 w-5" />}</button><p className="mx-auto mt-1 max-w-sm text-xs font-semibold leading-5 text-slate-500">Show this six-digit code to the receptionist or doctor if scanning isn't available.</p></section>
+                  <div className="flex flex-col gap-4">
+                    <section className="rounded-[28px] border border-[#24c1c4]/25 bg-[#24c1c4]/5 p-5 text-center sm:p-6">
+                      <p className="text-[10px] font-black uppercase tracking-[0.16em] text-[#0b2d54]/60">Step 3 · Laptop / receptionist code</p>
+                      <button type="button" onClick={copyCode} className="mt-3 inline-flex min-h-16 items-center gap-3 rounded-2xl px-4 text-3xl font-black tracking-[0.22em] text-[#0b2d54] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#24c1c4] sm:text-4xl" aria-label="Copy six-digit Smart File code">{share.shortCode.slice(0, 3)} {share.shortCode.slice(3)}{copied ? <Check className="h-5 w-5 text-emerald-700" /> : <Copy className="h-5 w-5" />}</button>
+                      <p className="mx-auto mt-1 max-w-sm text-xs font-semibold leading-5 text-slate-500">Show this six-digit code to the receptionist or doctor if scanning isn't available.</p>
+                    </section>
 
-                  <div className="flex items-center justify-center gap-2 rounded-2xl bg-[#0b2d54]/5 px-4 py-3 text-xs font-black text-[#0b2d54]"><Clock3 className="h-4 w-4" />Code expires in {formatTime(remaining)}</div>
-                  <p className="text-center text-[11px] font-semibold leading-5 text-slate-400">This share is temporary and can only be redeemed once. Do not share the QR or code with anyone you do not intend to access your information.</p>
+                    <div className="flex min-h-14 items-center justify-center gap-2 rounded-2xl bg-[#0b2d54]/5 px-4 py-3 text-xs font-black text-[#0b2d54]"><Clock3 className="h-4 w-4" />Code expires in {formatTime(remaining)}</div>
+
+                    <div className="flex flex-1 items-start gap-3 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-4 text-left text-[11px] font-semibold leading-5 text-amber-900">
+                      <ShieldCheck className="mt-0.5 h-4 w-4 shrink-0" />
+                      <p>This share is temporary and can only be redeemed once. Do not share the QR or code with anyone you do not intend to access your information.</p>
+                    </div>
+                  </div>
                 </div>
               )}
 
