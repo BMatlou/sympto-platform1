@@ -1,6 +1,6 @@
 import { Body, Controller, Get, Post, Query, Req, UseGuards } from '@nestjs/common';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
-import { IsDateString, IsNumber, IsNumberString, IsOptional } from 'class-validator';
+import { IsDateString, IsNumber, IsOptional } from 'class-validator';
 
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { DailyJournalService } from './daily-journal.service';
@@ -16,41 +16,15 @@ class UpdateWeightDto {
 }
 
 class RecordManualVitalsDto {
-  @IsOptional()
-  @IsNumber()
-  systolicPressure?: number;
-
-  @IsOptional()
-  @IsNumber()
-  diastolicPressure?: number;
-
-  @IsOptional()
-  @IsNumber()
-  restingHeartRate?: number;
-
-  @IsOptional()
-  @IsNumber()
-  respiratoryRate?: number;
-
-  @IsOptional()
-  @IsNumber()
-  oxygenSaturation?: number;
-
-  @IsOptional()
-  @IsNumber()
-  bodyTemperature?: number;
-
-  @IsOptional()
-  @IsNumber()
-  weightKg?: number;
-
-  @IsOptional()
-  @IsNumber()
-  heightCm?: number;
-
-  @IsOptional()
-  @IsDateString()
-  measuredAt?: string;
+  @IsOptional() @IsNumber() systolicPressure?: number;
+  @IsOptional() @IsNumber() diastolicPressure?: number;
+  @IsOptional() @IsNumber() restingHeartRate?: number;
+  @IsOptional() @IsNumber() respiratoryRate?: number;
+  @IsOptional() @IsNumber() oxygenSaturation?: number;
+  @IsOptional() @IsNumber() bodyTemperature?: number;
+  @IsOptional() @IsNumber() weightKg?: number;
+  @IsOptional() @IsNumber() heightCm?: number;
+  @IsOptional() @IsDateString() measuredAt?: string;
 }
 
 @ApiTags('Health Home')
