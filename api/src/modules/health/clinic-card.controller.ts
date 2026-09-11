@@ -1,8 +1,9 @@
-import { Controller, Get, Req, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, Patch, Req, UseGuards } from '@nestjs/common';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 import { Request } from 'express';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { ClinicCardService } from './clinic-card.service';
+import { ClinicCardProfileService, UpdateClinicCardProfileInput } from './clinic-card-profile.service';
 import { PatientContextService } from './patient-context.service';
 
 type AuthenticatedRequest = Request & { user: { sub: string } };
@@ -21,5 +22,12 @@ export class ClinicCardController {
   async get(@Req() request: AuthenticatedRequest) {
     const userId = await this.patientContextService.resolvePatientUserId(request.user.sub, undefined, 'VIEW_RECORDS');
     return this.clinicCardService.getForUser(userId);
+  }
+
+  @Patch('profile')
+  async updateProfile(@Req() request: AuthenticatedRequest, @Body() body: UpdateClinicCardProfileInput) {
+    const userId = await this.patientContextService.resolvePatientUserId(request.user.sub, undefined, 'VIEW_RECORDS');
+    const profileService = new ClinicCardProfileService((this.clinicCardService as any).prisma);
+    return profileService.update(userId, body);
   }
 }
