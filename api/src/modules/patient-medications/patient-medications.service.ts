@@ -24,6 +24,8 @@ import {
   NotificationType,
 } from '@prisma/client';
 
+type HealthGoalProgressResult = Awaited<ReturnType<HealthGoalsService['recordProgress']>>;
+
 @Injectable()
 export class PatientMedicationsService {
   constructor(
@@ -189,7 +191,7 @@ export class PatientMedicationsService {
       },
     });
 
-    const affectedGoals = [];
+    const affectedGoals: HealthGoalProgressResult[] = [];
     for (const goal of medicationGoals) {
       affectedGoals.push(
         await this.healthGoalsService.recordProgress(goal.id, {
