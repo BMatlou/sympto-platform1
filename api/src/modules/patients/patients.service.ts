@@ -5,6 +5,7 @@ import {
 } from '@nestjs/common';
 
 import { PrismaService } from '../../database/prisma.service';
+import { GoalsEngineService } from '../health-goals/goals-engine-v3.service';
 
 import { CreatePatientDto } from './dto/create-patient.dto';
 import { UpdatePatientDto } from './dto/update-patient.dto';
@@ -14,52 +15,48 @@ import { QueryPatientDto } from './dto/query-patient.dto';
 export class PatientsService {
   constructor(
     private readonly prisma: PrismaService,
+    private readonly goalsEngine: GoalsEngineService,
   ) {}
 
   async create(dto: CreatePatientDto) {
+    const existing = await this.prisma.patient.findFirst({
+      where: {
+        OR: [
+          { personId: dto.personId },
+          { userId: dto.userId },
+          ...(dto.patientNumber
+            ? [{ patientNumber: dto.patientNumber }]
+            : []),
+        ],
+      },
+    });
 
-  const existing = await this.prisma.patient.findFirst({
-    where: {
-      OR: [
-        { personId: dto.personId },
-        { userId: dto.userId },
-        ...(dto.patientNumber
-          ? [{ patientNumber: dto.patientNumber }]
-          : []),
-      ],
-    },
-  });
+    if (existing) {
+      throw new BadRequestException(
+        'Patient already exists.',
+      );
+    }
 
-  if (existing) {
-    throw new BadRequestException(
-      'Patient already exists.',
-    );
+    return this.prisma.patient.create({
+      data: {
+        userId: dto.userId,
+        personId: dto.personId,
+        patientNumber: dto.patientNumber,
+        heightCm: dto.heightCm,
+        weightKg: dto.weightKg,
+        dateOfDeath: dto.dateOfDeath
+          ? new Date(dto.dateOfDeath)
+          : undefined,
+      },
+      include: {
+        person: true,
+        user: true,
+      },
+    });
   }
 
-  return this.prisma.patient.create({
-    data: {
-      userId: dto.userId,
-      personId: dto.personId,
-      patientNumber: dto.patientNumber,
-      heightCm: dto.heightCm,
-      weightKg: dto.weightKg,
-      dateOfDeath: dto.dateOfDeath
-        ? new Date(dto.dateOfDeath)
-        : undefined,
-    },
-    include: {
-      person: true,
-      user: true,
-    },
-  });
-}
-
   async findAll(query: QueryPatientDto) {
-    const {
-      page,
-      limit,
-      search,
-    } = query;
+    const { page, limit, search } = query;
 
     const where = search
       ? {
@@ -90,33 +87,24 @@ export class PatientsService {
         }
       : {};
 
-    const [patients, total] =
-      await this.prisma.$transaction([
-        this.prisma.patient.findMany({
-          where,
-
-          include: {
-            person: true,
-            user: true,
-          },
-
-          skip: (page - 1) * limit,
-
-          take: limit,
-
-          orderBy: {
-            createdAt: 'desc',
-          },
-        }),
-
-        this.prisma.patient.count({
-          where,
-        }),
-      ]);
+    const [patients, total] = await this.prisma.$transaction([
+      this.prisma.patient.findMany({
+        where,
+        include: {
+          person: true,
+          user: true,
+        },
+        skip: (page - 1) * limit,
+        take: limit,
+        orderBy: {
+          createdAt: 'desc',
+        },
+      }),
+      this.prisma.patient.count({ where }),
+    ]);
 
     return {
       data: patients,
-
       pagination: {
         page,
         limit,
@@ -128,9 +116,7 @@ export class PatientsService {
 
   async findOne(id: string) {
     const patient = await this.prisma.patient.findUnique({
-      where: {
-        id,
-      },
+      where: { id },
       include: {
         person: true,
         user: {
@@ -146,9 +132,7 @@ export class PatientsService {
     });
 
     if (!patient) {
-      throw new NotFoundException(
-        'Patient not found.',
-      );
+      throw new NotFoundException('Patient not found.');
     }
 
     return patient;
@@ -162,25 +146,19 @@ export class PatientsService {
    * AI engine and wearable integrations.
    */
   async getProfile(id: string) {
-    const patient =
-      await this.prisma.patient.findUnique({
-        where: {
-          id,
-        },
-
-        include: {
-          person: true,
-
-          user: {
-            include: {
-              roles: {
-                include: {
-                  role: {
-                    include: {
-                      permissions: {
-                        include: {
-                          permission: true,
-                        },
+    const patient = await this.prisma.patient.findUnique({
+      where: { id },
+      include: {
+        person: true,
+        user: {
+          include: {
+            roles: {
+              include: {
+                role: {
+                  include: {
+                    permissions: {
+                      include: {
+                        permission: true,
                       },
                     },
                   },
@@ -188,45 +166,28 @@ export class PatientsService {
               },
             },
           },
-
-          medicalRecord: true,
-
-          healthPassport: true,
-
-          appointments: true,
-
-          wearableDevices: true,
-
-          aianalyses: true,
-
-          emergencyContacts: true,
-
-          identityDocuments: true,
-
-          patientInsurances: true,
-
-          insurancePolicies: true,
-
-          carePlans: true,
-
-          referrals: true,
-
-          labOrders: true,
-
-          imagingStudies: true,
-
-          telemedicineConsents: true,
-
-          publicHealthReports: true,
-
-          dataAccessConsents: true,
         },
-      });
+        medicalRecord: true,
+        healthPassport: true,
+        appointments: true,
+        wearableDevices: true,
+        aianalyses: true,
+        emergencyContacts: true,
+        identityDocuments: true,
+        patientInsurances: true,
+        insurancePolicies: true,
+        carePlans: true,
+        referrals: true,
+        labOrders: true,
+        imagingStudies: true,
+        telemedicineConsents: true,
+        publicHealthReports: true,
+        dataAccessConsents: true,
+      },
+    });
 
     if (!patient) {
-      throw new NotFoundException(
-        'Patient not found.',
-      );
+      throw new NotFoundException('Patient not found.');
     }
 
     return {
@@ -234,78 +195,37 @@ export class PatientsService {
         id: patient.id,
         patientNumber: patient.patientNumber,
         deceased: patient.deceased,
-
         person: patient.person,
-
         user: patient.user,
-
-        emergencyContacts:
-          patient.emergencyContacts,
-
-        identityDocuments:
-          patient.identityDocuments,
+        emergencyContacts: patient.emergencyContacts,
+        identityDocuments: patient.identityDocuments,
       },
-
-      medicalRecord:
-        patient.medicalRecord,
-
-      healthPassport:
-        patient.healthPassport,
-
-      appointments:
-        patient.appointments,
-
-      wearableDevices:
-        patient.wearableDevices,
-
-      aiAnalyses:
-        patient.aianalyses,
-
+      medicalRecord: patient.medicalRecord,
+      healthPassport: patient.healthPassport,
+      appointments: patient.appointments,
+      wearableDevices: patient.wearableDevices,
+      aiAnalyses: patient.aianalyses,
       insurance: {
-        patientInsurances:
-          patient.patientInsurances,
-
-        insurancePolicies:
-          patient.insurancePolicies,
+        patientInsurances: patient.patientInsurances,
+        insurancePolicies: patient.insurancePolicies,
       },
-
-      carePlans:
-        patient.carePlans,
-
-      referrals:
-        patient.referrals,
-
-      labOrders:
-        patient.labOrders,
-
-      imagingStudies:
-        patient.imagingStudies,
-
-      telemedicine:
-        patient.telemedicineConsents,
-
-      publicHealthReports:
-        patient.publicHealthReports,
-
-      dataAccessConsents:
-        patient.dataAccessConsents,
-
+      carePlans: patient.carePlans,
+      referrals: patient.referrals,
+      labOrders: patient.labOrders,
+      imagingStudies: patient.imagingStudies,
+      telemedicine: patient.telemedicineConsents,
+      publicHealthReports: patient.publicHealthReports,
+      dataAccessConsents: patient.dataAccessConsents,
       familyMembers: [],
-
       aiSummary: null,
     };
   }
 
-  async update(
-    id: string,
-    dto: UpdatePatientDto,
-  ) {
-    await this.findOne(id);
+  async update(id: string, dto: UpdatePatientDto) {
+    const patient = await this.findOne(id);
 
-    return this.prisma.patient.update({
-      where: {
-        id,
-      },
+    const updated = await this.prisma.patient.update({
+      where: { id },
       data: {
         patientNumber: dto.patientNumber,
         heightCm: dto.heightCm,
@@ -319,20 +239,35 @@ export class PatientsService {
         user: true,
       },
     });
+
+    if (
+      dto.weightKg !== undefined &&
+      dto.weightKg !== null &&
+      Number.isFinite(Number(dto.weightKg)) &&
+      Number(dto.weightKg) !== Number(patient.weightKg)
+    ) {
+      await this.goalsEngine.recordMetricEvent({
+        patientId: id,
+        metricType: 'WEIGHT',
+        metricKey: 'weight.kg',
+        loggedValue: Number(dto.weightKg),
+        source: 'patient-profile',
+        sourceId: 'profile',
+      });
+    }
+
+    return updated;
   }
 
   async remove(id: string) {
     await this.findOne(id);
 
     await this.prisma.patient.delete({
-      where: {
-        id,
-      },
+      where: { id },
     });
 
     return {
-      message:
-        'Patient deleted successfully.',
+      message: 'Patient deleted successfully.',
     };
   }
 }
