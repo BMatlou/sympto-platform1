@@ -1,7 +1,7 @@
 -- Exact metadata that tells the goal engine what a goal listens to.
 CREATE TABLE "HealthGoalMetricConfig" (
   "id" UUID NOT NULL DEFAULT gen_random_uuid(),
-  "healthGoalId" UUID NOT NULL,
+  "healthGoalId" TEXT NOT NULL,
   "metricType" VARCHAR(64) NOT NULL,
   "metricKey" VARCHAR(128) NOT NULL,
   "frequency" VARCHAR(16) NOT NULL DEFAULT 'DAILY',
@@ -24,7 +24,7 @@ CREATE INDEX "HealthGoalMetricConfig_metric_lookup_idx"
 -- while this table provides one predictable stream for contextual goal matching.
 CREATE TABLE "HealthGoalMetricEvent" (
   "id" UUID NOT NULL DEFAULT gen_random_uuid(),
-  "patientId" UUID NOT NULL,
+  "patientId" TEXT NOT NULL,
   "metricType" VARCHAR(64) NOT NULL,
   "metricKey" VARCHAR(128) NOT NULL,
   "loggedValue" NUMERIC(12,2) NOT NULL,
