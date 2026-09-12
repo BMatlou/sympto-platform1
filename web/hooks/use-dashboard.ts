@@ -6,8 +6,42 @@ import {
   healthHomeService,
   type HealthHomeResponse,
 } from "@/services/health-home.service";
+import { healthGoalsService } from "@/services/health-goals.service";
 
 const REFRESH_INTERVAL_MS = 15_000;
+
+function normalizeGoals(result: HealthHomeResponse, fullGoals: any[]) {
+  const patientWeight = result.patient?.weightKg != null ? Number(result.patient.weightKg) : null;
+
+  return fullGoals.map((goal: any) => {
+    const progress = Array.isArray(goal?.progress) ? goal.progress : [];
+    const historicalAchievement = progress.find(
+      (item: any) => String(item?.status ?? "").toUpperCase() === "ACHIEVED",
+    );
+    const isWeightGoal = String(goal?.category ?? "").toUpperCase() === "WEIGHT";
+
+    if (!historicalAchievement && String(goal?.status ?? "").toUpperCase() !== "ACHIEVED") {
+      return goal;
+    }
+
+    const currentValue = isWeightGoal && Number.isFinite(patientWeight)
+      ? patientWeight
+      : goal?.currentValue ?? historicalAchievement?.currentValue ?? null;
+
+    return {
+      ...goal,
+      status: "ACHIEVED",
+      currentValue,
+      achievedAt: goal?.achievedAt ?? historicalAchievement?.measuredAt ?? new Date().toISOString(),
+      latestProgress: {
+        ...(historicalAchievement ?? {}),
+        currentValue,
+        progressPercent: 100,
+        status: "ACHIEVED",
+      },
+    };
+  });
+}
 
 export function useDashboard() {
   const searchParams = useSearchParams();
@@ -23,7 +57,25 @@ export function useDashboard() {
       setError(null);
 
       const result = await healthHomeService.getHealthHome(patientId);
-      setData(result);
+      const fullGoalsResponse = await healthGoalsService.list(result.patient.id);
+      const fullGoals = Array.isArray(fullGoalsResponse?.data)
+        ? fullGoalsResponse.data
+        : Array.isArray(fullGoalsResponse)
+          ? fullGoalsResponse
+          : [];
+      const normalizedGoals = normalizeGoals(result, fullGoals);
+
+      setData({
+        ...result,
+        goals: normalizedGoals,
+        healthGoals: normalizedGoals,
+        today: {
+          ...result.today,
+          activeGoalCount: normalizedGoals.filter(
+            (goal: any) => String(goal?.status ?? "").toUpperCase() === "ACTIVE",
+          ).length,
+        },
+      });
       firstLoad.current = false;
     } catch (requestError) {
       console.error("Failed to load Health Home:", requestError);
