@@ -22,6 +22,14 @@ function medicationSchedule(medication: any) {
   return `${dose} · ${frequency}`;
 }
 
+function patientMedicationId(medication: any) {
+  return medication?.patientMedicationId || medication?.patientMedication?.id || medication?.id || null;
+}
+
+function medicationId(medication: any) {
+  return medication?.medicationId || medication?.medication?.id || medication?.medication?.medicationId || null;
+}
+
 function errorMessage(error: unknown) {
   const message = (error as { response?: { data?: { message?: string | string[] } } })?.response?.data?.message;
   if (Array.isArray(message)) return message.join(" ");
@@ -34,26 +42,38 @@ export default function TodayMedicationActions({ medications, onUpdated }: Today
   const [states, setStates] = useState<Record<string, Action | undefined>>({});
 
   async function record(medication: any, action: Action) {
-    const patientMedicationId = medication?.id;
-    const medicationId = medication?.medication?.id || medication?.medicationId;
-    if (!patientMedicationId || !medicationId || savingKey) return;
+    const patientMedicationRecordId = patientMedicationId(medication);
+    const underlyingMedicationId = medicationId(medication);
 
-    const key = String(patientMedicationId);
+    if (savingKey) return;
+
+    if (!patientMedicationRecordId || !underlyingMedicationId) {
+      toast.error("Medication record is incomplete", {
+        description: "The medication record does not contain the IDs required to record adherence.",
+      });
+      return;
+    }
+
+    const key = String(patientMedicationRecordId);
     setSavingKey(`${key}:${action}`);
+
     try {
       const response = await api.post(`/patient-medications/${key}/adherence`, {
-        medicationId: String(medicationId),
+        medicationId: String(underlyingMedicationId),
         action,
         scheduledFor: new Date().toISOString(),
       });
+
       setStates((current) => ({ ...current, [key]: action }));
       const nextAdherence = response.data?.adherencePercentage;
-      const suffix = typeof nextAdherence === "number" ? ` · ${Math.round(nextAdherence)}% overall adherence` : "";
+      const suffix = typeof nextAdherence === "number"
+        ? ` · ${Math.round(nextAdherence)}% overall adherence`
+        : "";
+
       toast.success(action === "TAKEN" ? "Medication marked taken" : "Medication marked skipped", {
         description: `${medicationName(medication)}${suffix}`,
       });
 
-      // Refresh the parent Today snapshot so medication-goal progress changes immediately.
       await onUpdated?.();
     } catch (error) {
       toast.error("Medication update failed", { description: errorMessage(error) });
@@ -87,8 +107,10 @@ export default function TodayMedicationActions({ medications, onUpdated }: Today
 
       <div className="divide-y divide-[#e8eff1]">
         {medications.map((medication, index) => {
-          const key = String(medication?.id ?? index);
+          const key = String(patientMedicationId(medication) ?? index);
           const state = states[key];
+          const hasIdentifiers = Boolean(patientMedicationId(medication) && medicationId(medication));
+
           return (
             <div key={key} className="px-4 py-3.5">
               <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
@@ -100,18 +122,18 @@ export default function TodayMedicationActions({ medications, onUpdated }: Today
                 <div className="flex shrink-0 gap-2">
                   <button
                     type="button"
-                    disabled={Boolean(savingKey)}
+                    disabled={Boolean(savingKey) || !hasIdentifiers}
                     onClick={() => record(medication, "TAKEN")}
-                    className={`inline-flex min-h-10 items-center justify-center gap-1.5 rounded-xl px-3.5 py-2 text-xs font-black transition disabled:opacity-50 ${state === "TAKEN" ? "bg-[#168660] text-white" : "bg-[#0b2d54] text-white hover:bg-[#123e66]"}`}
+                    className={`inline-flex min-h-10 items-center justify-center gap-1.5 rounded-xl px-3.5 py-2 text-xs font-black transition disabled:cursor-not-allowed disabled:opacity-50 ${state === "TAKEN" ? "bg-[#168660] text-white" : "bg-[#0b2d54] text-white hover:bg-[#123e66]"}`}
                   >
                     <Check className="h-3.5 w-3.5" />
                     {savingKey === `${key}:TAKEN` ? "Saving…" : "Taken"}
                   </button>
                   <button
                     type="button"
-                    disabled={Boolean(savingKey)}
+                    disabled={Boolean(savingKey) || !hasIdentifiers}
                     onClick={() => record(medication, "SKIPPED")}
-                    className={`inline-flex min-h-10 items-center justify-center gap-1.5 rounded-xl border px-3.5 py-2 text-xs font-black transition disabled:opacity-50 ${state === "SKIPPED" ? "border-amber-300 bg-amber-50 text-amber-700" : "border-[#d4e1e5] bg-white text-[#526779] hover:bg-[#f2f7f8]"}`}
+                    className={`inline-flex min-h-10 items-center justify-center gap-1.5 rounded-xl border px-3.5 py-2 text-xs font-black transition disabled:cursor-not-allowed disabled:opacity-50 ${state === "SKIPPED" ? "border-amber-300 bg-amber-50 text-amber-700" : "border-[#d4e1e5] bg-white text-[#526779] hover:bg-[#f2f7f8]"}`}
                   >
                     <CircleSlash2 className="h-3.5 w-3.5" />
                     {savingKey === `${key}:SKIPPED` ? "Saving…" : "Skipped"}
