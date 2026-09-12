@@ -1,10 +1,11 @@
 "use client";
 
 import { Check, CircleSlash2, Pill } from "lucide-react";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 import { api } from "@/lib/api";
 import { useDashboard } from "@/hooks/use-dashboard";
+import { healthGoalsService } from "@/services/health-goals.service";
 
 interface TodayMedicationActionsProps {
   medications: any[];
@@ -12,7 +13,6 @@ interface TodayMedicationActionsProps {
 }
 
 type Action = "TAKEN" | "SKIPPED";
-
 type PerformanceStatus = "WORKING_WELL" | "PARTIALLY_ON_TRACK" | "NEEDS_ATTENTION";
 
 function medicationName(medication: any) {
@@ -41,11 +41,7 @@ function formatTargetDate(value: unknown): string {
   if (!value) return "Not set";
   const date = new Date(String(value));
   if (Number.isNaN(date.getTime())) return String(value);
-  return new Intl.DateTimeFormat("en-ZA", {
-    day: "numeric",
-    month: "long",
-    year: "numeric",
-  }).format(date);
+  return new Intl.DateTimeFormat("en-ZA", { day: "numeric", month: "long", year: "numeric" }).format(date);
 }
 
 function daysUntilTarget(value: unknown): number | null {
@@ -75,10 +71,17 @@ function errorMessage(error: unknown) {
   return "We could not update this medication. Please try again.";
 }
 
+function todayBounds() {
+  const start = new Date();
+  start.setHours(0, 0, 0, 0);
+  const end = new Date(start);
+  end.setDate(end.getDate() + 1);
+  return { start, end };
+}
+
 export default function TodayMedicationActions({ medications, onUpdated }: TodayMedicationActionsProps) {
   const { data: dashboard } = useDashboard();
   const [dosesLoggedToday, setDosesLoggedToday] = useState(0);
-  const [lastStatus, setLastStatus] = useState<Action | null>(null);
   const [isSyncing, setIsSyncing] = useState(false);
   const [savingKey, setSavingKey] = useState<string | null>(null);
   const [states, setStates] = useState<Record<string, Action | undefined>>({});
@@ -95,11 +98,31 @@ export default function TodayMedicationActions({ medications, onUpdated }: Today
   const goalProgress = getGoalProgress(medicationGoal);
   const targetDaysRemaining = daysUntilTarget(medicationGoal?.targetDate);
 
-  const performance = useMemo((): {
-    status: PerformanceStatus;
-    label: string;
-    detail: string;
-  } => {
+  async function loadTodayEvents() {
+    if (!medications.length) {
+      setDosesLoggedToday(0);
+      return;
+    }
+    try {
+      const { start, end } = todayBounds();
+      const result = await healthGoalsService.getMetricEvents(
+        "MEDICATION",
+        "medication.adherence",
+        start,
+        end,
+        "medication-adherence",
+      );
+      setDosesLoggedToday(Math.min(totalRequiredDosesPerDay, result.count));
+    } catch {
+      // Preserve the current display when the event history cannot be loaded.
+    }
+  }
+
+  useEffect(() => {
+    void loadTodayEvents();
+  }, [medications.length, totalRequiredDosesPerDay]);
+
+  const performance = useMemo((): { status: PerformanceStatus; label: string; detail: string } => {
     if (targetDaysRemaining !== null && targetDaysRemaining < 0) {
       return {
         status: "NEEDS_ATTENTION",
@@ -107,7 +130,6 @@ export default function TodayMedicationActions({ medications, onUpdated }: Today
         detail: "The target date has passed. Review the goal and update the plan if needed.",
       };
     }
-
     if (dosesLoggedToday >= totalRequiredDosesPerDay) {
       return {
         status: "WORKING_WELL",
@@ -117,7 +139,6 @@ export default function TodayMedicationActions({ medications, onUpdated }: Today
           : `${targetDaysRemaining} day${targetDaysRemaining === 1 ? "" : "s"} left to the target date. Keep this consistency going.`,
       };
     }
-
     if (dosesLoggedToday > 0) {
       return {
         status: "PARTIALLY_ON_TRACK",
@@ -125,7 +146,6 @@ export default function TodayMedicationActions({ medications, onUpdated }: Today
         detail: `${dosesLoggedToday}/${totalRequiredDosesPerDay} doses logged today. Complete the remaining dose${totalRequiredDosesPerDay - dosesLoggedToday === 1 ? "" : "s"} to stay on track.`,
       };
     }
-
     return {
       status: "NEEDS_ATTENTION",
       label: "Needs attention",
@@ -152,9 +172,7 @@ export default function TodayMedicationActions({ medications, onUpdated }: Today
 
     const patientMedicationRecordId = patientMedicationId(medication);
     if (!patientMedicationRecordId) {
-      toast.error("Medication record is incomplete", {
-        description: "This medicine does not have a patient medication record ID.",
-      });
+      toast.error("Medication record is incomplete", { description: "This medicine does not have a patient medication record ID." });
       return;
     }
 
@@ -168,15 +186,11 @@ export default function TodayMedicationActions({ medications, onUpdated }: Today
         scheduledFor: new Date().toISOString(),
       });
 
-      setDosesLoggedToday((current) => Math.min(totalRequiredDosesPerDay, current + 1));
-      setLastStatus(action);
       setStates((current) => ({ ...current, [key]: action }));
+      await loadTodayEvents();
 
       const nextAdherence = response.data?.adherencePercentage;
-      const suffix = typeof nextAdherence === "number"
-        ? ` · ${Math.round(nextAdherence)}% overall adherence`
-        : "";
-
+      const suffix = typeof nextAdherence === "number" ? ` · ${Math.round(nextAdherence)}% overall adherence` : "";
       toast.success(action === "TAKEN" ? "Medication marked taken" : "Medication marked skipped", {
         description: `${medicationName(medication)}${suffix}`,
       });
@@ -199,16 +213,11 @@ export default function TodayMedicationActions({ medications, onUpdated }: Today
     );
   }
 
-  const trackedMedicationKey = String(patientMedicationId(trackedMedication) ?? 0);
-  const trackedState = states[trackedMedicationKey];
-
   return (
     <div className="relative z-20 mt-4 overflow-hidden rounded-[20px] border border-[#e0ecef] bg-[#f8fbfc] pointer-events-auto">
       <div className="border-b border-[#e7eff1] px-4 py-3">
         <div className="flex items-center gap-2.5">
-          <span className="grid h-9 w-9 place-items-center rounded-xl bg-[#e5f7f6] text-[#0b6f73]">
-            <Pill className="h-4 w-4" />
-          </span>
+          <span className="grid h-9 w-9 place-items-center rounded-xl bg-[#e5f7f6] text-[#0b6f73]"><Pill className="h-4 w-4" /></span>
           <div>
             <p className="text-xs font-black uppercase tracking-[0.12em] text-[#0b6f73]">Today&apos;s medication</p>
             <p className="mt-0.5 text-[11px] text-[#74859a]">Mark each medicine Taken or Skipped.</p>
@@ -217,17 +226,13 @@ export default function TodayMedicationActions({ medications, onUpdated }: Today
         <div className="mt-3 rounded-xl bg-white px-3 py-2.5 ring-1 ring-[#dce9ec]">
           <div className="flex flex-wrap items-center justify-between gap-2">
             <p className="text-[11px] font-black text-[#0b2d54]">🎯 Target Date: {targetGoalDate} ({medicationGoal ? "1 active goal" : "no active goal found"})</p>
-            <span className={`rounded-full px-2.5 py-1 text-[10px] font-black ring-1 ${performanceClasses[performance.status]}`}>
-              {performance.label}
-            </span>
+            <span className={`rounded-full px-2.5 py-1 text-[10px] font-black ring-1 ${performanceClasses[performance.status]}`}>{performance.label}</span>
           </div>
           <div className="mt-2 flex items-center justify-between text-[10px] font-bold text-[#71839a]">
             <span>{progressPercentage}% today</span>
             <span>{goalProgress}% goal progress · {dosesLoggedToday}/{totalRequiredDosesPerDay} doses</span>
           </div>
-          <div className="mt-2 h-2 overflow-hidden rounded-full bg-[#edf2f5]">
-            <div className="h-full rounded-full bg-[#24c1c4] transition-all duration-300" style={{ width: `${progressPercentage}%` }} />
-          </div>
+          <div className="mt-2 h-2 overflow-hidden rounded-full bg-[#edf2f5]"><div className="h-full rounded-full bg-[#24c1c4] transition-all duration-300" style={{ width: `${progressPercentage}%` }} /></div>
           <p className="mt-2 text-[10px] leading-4 text-[#74859a]">{performance.detail}</p>
         </div>
       </div>
@@ -238,7 +243,6 @@ export default function TodayMedicationActions({ medications, onUpdated }: Today
           const state = states[key];
           const isTrackedMedication = index === 0;
           const buttonsDisabled = !isTrackedMedication || dosesLoggedToday >= totalRequiredDosesPerDay || isSyncing;
-
           return (
             <div key={key} className="relative z-20 px-4 py-3.5">
               <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
@@ -249,23 +253,11 @@ export default function TodayMedicationActions({ medications, onUpdated }: Today
                   {state && <p className="mt-1.5 text-[10px] font-bold text-[#168660]">{state === "TAKEN" ? "Marked taken today" : "Marked skipped today"}</p>}
                 </div>
                 <div className="relative z-30 flex shrink-0 gap-2 pointer-events-auto">
-                  <button
-                    type="button"
-                    disabled={buttonsDisabled}
-                    onClick={() => void record(medication, "TAKEN")}
-                    className={`relative z-30 inline-flex min-h-10 cursor-pointer items-center justify-center gap-1.5 rounded-xl px-3.5 py-2 text-xs font-black transition disabled:cursor-not-allowed disabled:opacity-50 ${state === "TAKEN" ? "bg-[#168660] text-white" : "bg-[#0b2d54] text-white hover:bg-[#123e66]"}`}
-                  >
-                    <Check className="h-3.5 w-3.5" />
-                    {savingKey === `${key}:TAKEN` ? "Saving…" : "Taken"}
+                  <button type="button" disabled={buttonsDisabled} onClick={() => void record(medication, "TAKEN")} className={`relative z-30 inline-flex min-h-10 cursor-pointer items-center justify-center gap-1.5 rounded-xl px-3.5 py-2 text-xs font-black transition disabled:cursor-not-allowed disabled:opacity-50 ${state === "TAKEN" ? "bg-[#168660] text-white" : "bg-[#0b2d54] text-white hover:bg-[#123e66]"}`}>
+                    <Check className="h-3.5 w-3.5" />{savingKey === `${key}:TAKEN` ? "Saving…" : "Taken"}
                   </button>
-                  <button
-                    type="button"
-                    disabled={buttonsDisabled}
-                    onClick={() => void record(medication, "SKIPPED")}
-                    className={`relative z-30 inline-flex min-h-10 cursor-pointer items-center justify-center gap-1.5 rounded-xl border px-3.5 py-2 text-xs font-black transition disabled:cursor-not-allowed disabled:opacity-50 ${state === "SKIPPED" ? "border-amber-300 bg-amber-50 text-amber-700" : "border-[#d4e1e5] bg-white text-[#526779] hover:bg-[#f2f7f8]"}`}
-                  >
-                    <CircleSlash2 className="h-3.5 w-3.5" />
-                    {savingKey === `${key}:SKIPPED` ? "Saving…" : "Skipped"}
+                  <button type="button" disabled={buttonsDisabled} onClick={() => void record(medication, "SKIPPED")} className={`relative z-30 inline-flex min-h-10 cursor-pointer items-center justify-center gap-1.5 rounded-xl border px-3.5 py-2 text-xs font-black transition disabled:cursor-not-allowed disabled:opacity-50 ${state === "SKIPPED" ? "border-amber-300 bg-amber-50 text-amber-700" : "border-[#d4e1e5] bg-white text-[#526779] hover:bg-[#f2f7f8]"}`}>
+                    <CircleSlash2 className="h-3.5 w-3.5" />{savingKey === `${key}:SKIPPED` ? "Saving…" : "Skipped"}
                   </button>
                 </div>
               </div>
