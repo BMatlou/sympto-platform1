@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import { HealthGoalProgressStatus } from '@prisma/client';
+import { HealthGoalProgressStatus, Prisma } from '@prisma/client';
 import { PrismaService } from '../../database/prisma.service';
 
 export type GoalMetricEventInput = {
