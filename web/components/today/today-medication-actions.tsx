@@ -92,7 +92,7 @@ export default function TodayMedicationActions({ medications, onUpdated }: Today
   }
 
   return (
-    <div className="mt-4 overflow-hidden rounded-[20px] border border-[#e0ecef] bg-[#f8fbfc]">
+    <div className="relative z-20 mt-4 overflow-hidden rounded-[20px] border border-[#e0ecef] bg-[#f8fbfc] pointer-events-auto">
       <div className="flex items-center justify-between gap-3 border-b border-[#e7eff1] px-4 py-3">
         <div className="flex items-center gap-2.5">
           <span className="grid h-9 w-9 place-items-center rounded-xl bg-[#e5f7f6] text-[#0b6f73]">
@@ -109,31 +109,30 @@ export default function TodayMedicationActions({ medications, onUpdated }: Today
         {medications.map((medication, index) => {
           const key = String(patientMedicationId(medication) ?? index);
           const state = states[key];
-          const hasIdentifiers = Boolean(patientMedicationId(medication) && medicationId(medication));
 
           return (
-            <div key={key} className="px-4 py-3.5">
+            <div key={key} className="relative z-20 px-4 py-3.5">
               <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                 <div className="min-w-0">
                   <p className="truncate text-sm font-black text-[#0b2d54]">{medicationName(medication)}</p>
                   <p className="mt-1 text-[11px] text-[#74859a]">{medicationSchedule(medication)}</p>
                   {state && <p className="mt-1.5 text-[10px] font-bold text-[#168660]">{state === "TAKEN" ? "Marked taken today" : "Marked skipped today"}</p>}
                 </div>
-                <div className="flex shrink-0 gap-2">
+                <div className="relative z-30 flex shrink-0 gap-2 pointer-events-auto">
                   <button
                     type="button"
-                    disabled={Boolean(savingKey) || !hasIdentifiers}
-                    onClick={() => record(medication, "TAKEN")}
-                    className={`inline-flex min-h-10 items-center justify-center gap-1.5 rounded-xl px-3.5 py-2 text-xs font-black transition disabled:cursor-not-allowed disabled:opacity-50 ${state === "TAKEN" ? "bg-[#168660] text-white" : "bg-[#0b2d54] text-white hover:bg-[#123e66]"}`}
+                    disabled={Boolean(savingKey)}
+                    onClick={() => void record(medication, "TAKEN")}
+                    className={`relative z-30 inline-flex min-h-10 cursor-pointer items-center justify-center gap-1.5 rounded-xl px-3.5 py-2 text-xs font-black transition disabled:cursor-wait disabled:opacity-50 ${state === "TAKEN" ? "bg-[#168660] text-white" : "bg-[#0b2d54] text-white hover:bg-[#123e66]"}`}
                   >
                     <Check className="h-3.5 w-3.5" />
                     {savingKey === `${key}:TAKEN` ? "Saving…" : "Taken"}
                   </button>
                   <button
                     type="button"
-                    disabled={Boolean(savingKey) || !hasIdentifiers}
-                    onClick={() => record(medication, "SKIPPED")}
-                    className={`inline-flex min-h-10 items-center justify-center gap-1.5 rounded-xl border px-3.5 py-2 text-xs font-black transition disabled:cursor-not-allowed disabled:opacity-50 ${state === "SKIPPED" ? "border-amber-300 bg-amber-50 text-amber-700" : "border-[#d4e1e5] bg-white text-[#526779] hover:bg-[#f2f7f8]"}`}
+                    disabled={Boolean(savingKey)}
+                    onClick={() => void record(medication, "SKIPPED")}
+                    className={`relative z-30 inline-flex min-h-10 cursor-pointer items-center justify-center gap-1.5 rounded-xl border px-3.5 py-2 text-xs font-black transition disabled:cursor-wait disabled:opacity-50 ${state === "SKIPPED" ? "border-amber-300 bg-amber-50 text-amber-700" : "border-[#d4e1e5] bg-white text-[#526779] hover:bg-[#f2f7f8]"}`}
                   >
                     <CircleSlash2 className="h-3.5 w-3.5" />
                     {savingKey === `${key}:SKIPPED` ? "Saving…" : "Skipped"}
