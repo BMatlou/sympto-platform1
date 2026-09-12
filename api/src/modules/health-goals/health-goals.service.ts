@@ -24,51 +24,57 @@ export class HealthGoalsService {
   ) {}
 
   async create(dto: CreateHealthGoalDto) {
+    const {
+      metricType,
+      metricKey,
+      frequency,
+      frequencyTarget,
+      guidanceText,
+      ...goalData
+    } = dto;
+
     const goal = await this.prisma.healthGoal.create({
-      data: { ...dto },
+      data: { ...goalData },
       include: { patient: true, practitioner: true, carePlan: true, progress: true },
     });
 
-    const defaults = this.metricDefaults(goal.category);
-    await this.prisma.$executeRaw`
-      INSERT INTO "HealthGoalMetricConfig"
-        ("healthGoalId", "metricType", "metricKey", "frequency", "frequencyTarget")
-      VALUES
-        (${goal.id}, ${defaults.metricType}, ${defaults.metricKey}, 'DAILY', ${goal.targetValue ?? null})
-      ON CONFLICT ("healthGoalId") DO NOTHING
-    `;
-
-    await this.goalsEngine.backfillJournalMetrics(goal.patientId);
-    if (defaults.metricType) {
-      await this.goalsEngine.recomputeMatchingGoals(
-        goal.patientId,
-        defaults.metricType,
-        defaults.metricKey,
-      );
-    }
+    await this.configureMetric(goal.id, {
+      metricType,
+      metricKey,
+      frequency,
+      frequencyTarget: frequencyTarget == null ? Number(goal.targetValue ?? 0) : Number(frequencyTarget),
+      guidanceText,
+    });
 
     return this.findOne(goal.id);
   }
 
-  async configureMetric(id: string, config: {
-    metricType?: string;
-    metricKey?: string;
-    frequency?: 'DAILY' | 'WEEKLY' | 'TOTAL';
-    frequencyTarget?: number | null;
-    guidanceText?: string | null;
-  }) {
+  async configureMetric(
+    id: string,
+    config: {
+      metricType?: string;
+      metricKey?: string;
+      frequency?: 'DAILY' | 'WEEKLY' | 'TOTAL';
+      frequencyTarget?: number | null;
+      guidanceText?: string | null;
+    },
+  ) {
     const goal = await this.findOne(id);
     const defaults = this.metricDefaults(goal.category);
-    const metricType = config.metricType ?? defaults.metricType;
-    const metricKey = config.metricKey ?? defaults.metricKey;
-    const frequency = config.frequency ?? 'DAILY';
-    const frequencyTarget = config.frequencyTarget ?? Number(goal.targetValue ?? 0);
+    const resolvedMetricType = config.metricType ?? defaults.metricType;
+    const resolvedMetricKey = config.metricKey ?? defaults.metricKey;
+    const resolvedFrequency = config.frequency ?? 'DAILY';
+    const resolvedTarget = config.frequencyTarget ?? Number(goal.targetValue ?? 0);
+
+    if (!(resolvedTarget > 0)) {
+      throw new BadRequestException('A positive frequency target is required for an automatic goal.');
+    }
 
     await this.prisma.$executeRaw`
       INSERT INTO "HealthGoalMetricConfig"
         ("healthGoalId", "metricType", "metricKey", "frequency", "frequencyTarget", "guidanceText")
       VALUES
-        (${id}, ${metricType}, ${metricKey}, ${frequency}, ${frequencyTarget || null}, ${config.guidanceText ?? null})
+        (${id}, ${resolvedMetricType}, ${resolvedMetricKey}, ${resolvedFrequency}, ${resolvedTarget}, ${config.guidanceText ?? null})
       ON CONFLICT ("healthGoalId") DO UPDATE SET
         "metricType" = EXCLUDED."metricType",
         "metricKey" = EXCLUDED."metricKey",
@@ -79,6 +85,8 @@ export class HealthGoalsService {
     `;
 
     await this.goalsEngine.backfillJournalMetrics(goal.patientId);
+    await this.goalsEngine.recomputeMatchingGoals(goal.patientId, resolvedMetricType, resolvedMetricKey);
+
     return this.findOne(id);
   }
 
