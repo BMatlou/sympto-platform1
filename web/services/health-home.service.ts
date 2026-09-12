@@ -38,6 +38,14 @@ export interface UpdateWeightResponse { weightKg: number; heightCm: number | nul
 export interface ManualVitalsInput { systolicPressure?: number; diastolicPressure?: number; restingHeartRate?: number; respiratoryRate?: number; oxygenSaturation?: number; bodyTemperature?: number; weightKg?: number; heightCm?: number; measuredAt?: string }
 export interface ManualVitalsResponse { recordedAt: string; bmi: number | null; bmiCategory: string | null }
 
+function normalizeMedications(medications: any[]): any[] {
+  return medications.map((medication: any) => ({
+    ...medication,
+    patientMedicationId: medication?.patientMedicationId ?? medication?.id ?? null,
+    medicationId: medication?.medicationId ?? medication?.medication?.id ?? medication?.medication?.medicationId ?? null,
+  }));
+}
+
 class HealthHomeService {
   async getHealthHome(patientId?: string): Promise<HealthHomeResponse> {
     const response = await api.get('/health-home', { params: patientId ? { patientId } : undefined });
@@ -57,6 +65,7 @@ class HealthHomeService {
     const healthHomeMedications = Array.isArray(healthHome.medications) && healthHome.medications.length > 0
       ? healthHome.medications
       : (Array.isArray(healthHome.today?.activeMedications) ? healthHome.today.activeMedications : []);
+    const normalizedHealthHomeMedications = normalizeMedications(healthHomeMedications);
 
     let canonical: any = null;
     if (!patientId || patientId === healthHome.patient?.id) {
@@ -74,7 +83,7 @@ class HealthHomeService {
         ...healthHome,
         allergies: healthHomeAllergies,
         conditions: healthHomeConditions,
-        medications: healthHomeMedications,
+        medications: normalizedHealthHomeMedications,
         immunizations: healthHomeImmunizations,
         healthSnapshot: {
           ...healthHome.healthSnapshot,
@@ -83,7 +92,7 @@ class HealthHomeService {
           allergies: healthHomeAllergies,
           immunizations: healthHomeImmunizations,
         },
-        today: { ...healthHome.today, activeMedications: healthHomeMedications },
+        today: { ...healthHome.today, activeMedications: normalizedHealthHomeMedications },
         wearables: healthHome.wearables ?? { devices: healthHome.healthSnapshot.connectedDevices, latestMeasurements: healthHome.healthSnapshot.latestMeasurements.map((m: any, index) => ({ id: `${m.type}-${index}`, type: m.type, value: m.value, unit: m.unit, measuredAt: m.measuredAt, source: m.source })) },
       };
     }
@@ -99,7 +108,7 @@ class HealthHomeService {
     const conditions = canonicalConditions.length > 0
       ? canonicalConditions
       : healthHomeConditions.map((condition: any) => condition?.status ? condition : { ...condition, status: 'ACTIVE' });
-    const medications = canonicalMedications.length > 0 ? canonicalMedications : healthHomeMedications;
+    const medications = normalizeMedications(canonicalMedications.length > 0 ? canonicalMedications : normalizedHealthHomeMedications);
 
     return {
       ...healthHome,
