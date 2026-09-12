@@ -81,6 +81,33 @@ export class HealthGoalsService {
     return this.goalsEngine.recordMetricEvent({ patientId: patient.id, ...input });
   }
 
+  async getMetricEventsForUser(userId: string, input: { metricType: string; metricKey: string; source?: string; from: Date; to: Date }) {
+    const patient = await this.prisma.patient.findUnique({ where: { userId }, select: { id: true } });
+    if (!patient) throw new NotFoundException('Patient not found.');
+    if (Number.isNaN(input.from.getTime()) || Number.isNaN(input.to.getTime())) throw new BadRequestException('Metric event date range is invalid.');
+    const rows = await this.prisma.$queryRaw<Array<{ id: string; loggedValue: Prisma.Decimal; occurredAt: Date; source: string; sourceId: string | null }>>`
+      SELECT "id", "loggedValue", "occurredAt", "source", "sourceId"
+      FROM "HealthGoalMetricEvent"
+      WHERE "patientId" = ${patient.id}
+        AND "metricType" = ${input.metricType}
+        AND "metricKey" = ${input.metricKey}
+        AND ${input.source ? Prisma.sql`"source" = ${input.source}` : Prisma.sql`TRUE`}
+        AND "occurredAt" >= ${input.from}
+        AND "occurredAt" < ${input.to}
+      ORDER BY "occurredAt" ASC
+    `;
+    return {
+      count: rows.length,
+      events: rows.map((row) => ({
+        id: row.id,
+        loggedValue: Number(row.loggedValue),
+        occurredAt: row.occurredAt,
+        source: row.source,
+        sourceId: row.sourceId,
+      })),
+    };
+  }
+
   async findAll(query: QueryHealthGoalDto) {
     const { page, limit, patientId, practitionerId, carePlanId, category, priority, status } = query;
     const where: Prisma.HealthGoalWhereInput = { patientId, practitionerId, carePlanId, category, priority, status };
