@@ -1,7 +1,7 @@
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { HealthGoalProgressStatus, Prisma } from '@prisma/client';
 import { PrismaService } from '../../database/prisma.service';
-import { GoalsEngineService } from './goals-engine-v2.service';
+import { GoalsEngineService } from './goals-engine-v3.service';
 import { goalRuleFor } from './goal-metric-rules';
 import { CreateHealthGoalDto } from './dto/create-health-goal.dto';
 import { UpdateHealthGoalDto } from './dto/update-health-goal.dto';
@@ -13,7 +13,7 @@ export class HealthGoalsService {
   constructor(private readonly prisma: PrismaService, private readonly goalsEngine: GoalsEngineService) {}
 
   async create(dto: CreateHealthGoalDto) {
-    const { metricType, metricKey, frequency, frequencyTarget, guidanceText, ...goalData } = dto;
+    const { metricType, metricKey, frequency, frequencyTarget, aggregation, comparison, guidanceText, ...goalData } = dto;
     const goal = await this.prisma.healthGoal.create({
       data: { ...goalData },
       include: { patient: true, practitioner: true, carePlan: true, progress: true },
@@ -24,6 +24,8 @@ export class HealthGoalsService {
       metricKey,
       frequency,
       frequencyTarget: frequencyTarget == null ? undefined : Number(frequencyTarget),
+      aggregation,
+      comparison,
       guidanceText,
     });
     return this.findOne(goal.id);
@@ -47,9 +49,7 @@ export class HealthGoalsService {
     const resolvedAggregation = config.aggregation ?? defaults.aggregation;
     const resolvedComparison = config.comparison ?? defaults.comparison;
 
-    if (!(resolvedTarget > 0)) {
-      throw new BadRequestException('A positive target is required for an automatic goal.');
-    }
+    if (!(resolvedTarget > 0)) throw new BadRequestException('A positive target is required for an automatic goal.');
 
     await this.prisma.$executeRaw`
       INSERT INTO "HealthGoalMetricConfig"
@@ -73,18 +73,9 @@ export class HealthGoalsService {
     return this.findOne(id);
   }
 
-  async getActiveSnapshot(patientId: string) {
-    return this.goalsEngine.snapshot(patientId);
-  }
+  async getActiveSnapshot(patientId: string) { return this.goalsEngine.snapshot(patientId); }
 
-  async syncMetricEventForUser(userId: string, input: {
-    metricType: string;
-    metricKey: string;
-    loggedValue: number;
-    occurredAt?: Date;
-    source?: string;
-    sourceId?: string;
-  }) {
+  async syncMetricEventForUser(userId: string, input: { metricType: string; metricKey: string; loggedValue: number; occurredAt?: Date; source?: string; sourceId?: string }) {
     const patient = await this.prisma.patient.findUnique({ where: { userId }, select: { id: true } });
     if (!patient) throw new NotFoundException('Patient not found.');
     return this.goalsEngine.recordMetricEvent({ patientId: patient.id, ...input });
@@ -117,16 +108,10 @@ export class HealthGoalsService {
     const targetValue = goal.targetValue == null ? null : Number(goal.targetValue);
     const previousValue = goal.currentValue == null ? null : Number(goal.currentValue);
     if (!Number.isFinite(currentValue)) throw new BadRequestException('Health goal progress value is invalid.');
-
     const progressPercent = targetValue != null && targetValue > 0 ? Math.min(100, Math.max(0, (currentValue / targetValue) * 100)) : 0;
     const progressStatus: HealthGoalProgressStatus = targetValue != null && targetValue > 0 && currentValue >= targetValue
       ? HealthGoalProgressStatus.ACHIEVED
-      : previousValue == null || currentValue > previousValue
-        ? HealthGoalProgressStatus.IMPROVING
-        : currentValue < previousValue
-          ? HealthGoalProgressStatus.DECLINING
-          : HealthGoalProgressStatus.STAGNANT;
-
+      : previousValue == null || currentValue > previousValue ? HealthGoalProgressStatus.IMPROVING : currentValue < previousValue ? HealthGoalProgressStatus.DECLINING : HealthGoalProgressStatus.STAGNANT;
     return this.prisma.$transaction(async (tx) => {
       await tx.healthGoal.update({ where: { id }, data: { currentValue: String(currentValue), status: progressStatus === HealthGoalProgressStatus.ACHIEVED ? 'ACHIEVED' : goal.status, achievedAt: progressStatus === HealthGoalProgressStatus.ACHIEVED ? new Date() : null } });
       await tx.healthGoalProgress.create({ data: { healthGoalId: id, currentValue: String(currentValue), progressPercent: String(progressPercent.toFixed(2)), status: progressStatus, notes: dto.notes, measuredAt: new Date() } });
