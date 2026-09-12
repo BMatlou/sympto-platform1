@@ -26,7 +26,64 @@ export type HealthGoalMetricEventsResponse = {
   }>;
 };
 
+export type HealthGoalInput = {
+  patientId: string;
+  practitionerId?: string;
+  carePlanId?: string;
+  title: string;
+  description?: string;
+  category: string;
+  priority?: string;
+  status?: string;
+  targetValue?: string;
+  currentValue?: string;
+  unit?: string;
+  targetDate?: string;
+  metricType?: string;
+  metricKey?: string;
+  frequency?: "DAILY" | "WEEKLY" | "TOTAL";
+  frequencyTarget?: string;
+  aggregation?: "SUM" | "LATEST" | "AVERAGE" | "MIN" | "MAX";
+  comparison?: "AT_LEAST" | "AT_MOST" | "CLOSEST" | "INCREASE_TO" | "DECREASE_TO";
+  guidanceText?: string;
+};
+
+export type HealthGoalListResponse = {
+  data: any[];
+  pagination?: { page: number; limit: number; total: number; totalPages: number };
+};
+
 class HealthGoalsService {
+  async list(patientId: string): Promise<HealthGoalListResponse> {
+    const response = await api.get("/health-goals", {
+      params: { patientId, page: 1, limit: 100 },
+    });
+    return response.data?.data ?? response.data;
+  }
+
+  async create(input: HealthGoalInput) {
+    const response = await api.post("/health-goals", input);
+    return response.data?.data ?? response.data;
+  }
+
+  async update(id: string, input: Partial<HealthGoalInput>) {
+    const response = await api.patch(`/health-goals/${id}`, input);
+    return response.data?.data ?? response.data;
+  }
+
+  async configureMetric(
+    id: string,
+    config: Pick<HealthGoalInput, "metricType" | "metricKey" | "frequency" | "frequencyTarget" | "aggregation" | "comparison" | "guidanceText">,
+  ) {
+    const response = await api.patch(`/health-goals/${id}/metric-config`, config);
+    return response.data?.data ?? response.data;
+  }
+
+  async remove(id: string) {
+    const response = await api.delete(`/health-goals/${id}`);
+    return response.data?.data ?? response.data;
+  }
+
   async recordProgress(
     goalId: string,
     currentValue: number,
