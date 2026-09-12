@@ -120,7 +120,27 @@ export class PatientMedicationsService {
     dto: RecordMedicationAdherenceDto,
     authenticatedUserId: string,
   ) {
-    const existing = await this.findOne(id);
+    // Look up the medication strictly by its primary key. Do not combine the
+    // id with tenant/session/global filters here; authorization is checked
+    // separately against the patient's owning user below.
+    const existing = await this.prisma.patientMedication.findUnique({
+      where: { id },
+      include: {
+        medication: true,
+        healthPassport: {
+          include: {
+            patient: {
+              include: { person: true },
+            },
+          },
+        },
+      },
+    });
+
+    if (!existing) {
+      throw new NotFoundException('Patient medication not found.');
+    }
+
     const patientId = existing.healthPassport.patient.id;
     const ownerUserId = existing.healthPassport.patient.userId;
 
