@@ -25,10 +25,7 @@ import { RecordHealthGoalProgressDto } from './dto/record-health-goal-progress.d
 @ApiTags('Health Goals')
 @ApiBearerAuth()
 @Controller('health-goals')
-@UseGuards(
-  JwtAuthGuard,
-  PermissionsGuard,
-)
+@UseGuards(JwtAuthGuard, PermissionsGuard)
 export class HealthGoalsController {
   constructor(
     private readonly healthGoalsService: HealthGoalsService,
@@ -38,6 +35,12 @@ export class HealthGoalsController {
   @Post()
   create(@Body() dto: CreateHealthGoalDto) {
     return this.healthGoalsService.create(dto);
+  }
+
+  @Permissions('health-goals.read')
+  @Get('active-snapshot')
+  activeSnapshot(@Query('patientId') patientId: string) {
+    return this.healthGoalsService.getActiveSnapshot(patientId);
   }
 
   @Permissions('health-goals.read')
@@ -59,6 +62,21 @@ export class HealthGoalsController {
     @Body() dto: RecordHealthGoalProgressDto,
   ) {
     return this.healthGoalsService.recordProgress(id, dto);
+  }
+
+  @Permissions('health-goals.update')
+  @Patch(':id/metric-config')
+  configureMetric(
+    @Param('id') id: string,
+    @Body() config: {
+      metricType?: string;
+      metricKey?: string;
+      frequency?: 'DAILY' | 'WEEKLY' | 'TOTAL';
+      frequencyTarget?: number | null;
+      guidanceText?: string | null;
+    },
+  ) {
+    return this.healthGoalsService.configureMetric(id, config);
   }
 
   @Permissions('health-goals.update')
