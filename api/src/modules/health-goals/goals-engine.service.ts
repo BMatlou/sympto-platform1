@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
-import { PrismaService } from '../../database/prisma.service';
 import { HealthGoalProgressStatus } from '@prisma/client';
+import { PrismaService } from '../../database/prisma.service';
 
 export type GoalMetricEventInput = {
   patientId: string;
@@ -28,6 +28,8 @@ export class GoalsEngineService {
   async recordMetricEvent(input: GoalMetricEventInput) {
     const occurredAt = input.occurredAt ?? new Date();
     const source = input.source ?? 'unknown';
+
+    if (!Number.isFinite(input.loggedValue)) return [];
 
     await this.prisma.$executeRaw`
       DELETE FROM "HealthGoalMetricEvent"
@@ -68,17 +70,17 @@ export class GoalsEngineService {
     for (const config of configs) {
       const goal = await this.prisma.healthGoal.findUnique({ where: { id: config.healthGoalId } });
       if (!goal) continue;
-
       if (goal.targetDate && goal.targetDate < now) continue;
 
       const start = this.windowStart(config.frequency, goal.createdAt, now);
-      const end = now;
-      const value = await this.aggregateMetric(metricType, patientId, metricKey, start, end);
-      const target = config.frequencyTarget ?? Number(goal.targetValue ?? 0);
+      const value = await this.aggregateMetric(metricType, patientId, metricKey, start, now);
+      const target = Number(config.frequencyTarget ?? goal.targetValue ?? 0);
       if (!(target > 0)) continue;
 
       const progressPercent = Math.min(100, Math.max(0, (value / target) * 100));
-      const status = value >= target ? HealthGoalProgressStatus.ACHIEVED : HealthGoalProgressStatus.IMPROVING;
+      const status = value >= target
+        ? HealthGoalProgressStatus.ACHIEVED
+        : HealthGoalProgressStatus.IMPROVING;
 
       await this.prisma.$transaction(async (tx) => {
         await tx.healthGoal.update({
@@ -102,7 +104,16 @@ export class GoalsEngineService {
         });
       });
 
-      updated.push({ goalId: goal.id, currentValue: value, progressPercent, status });
+      updated.push({
+        goalId: goal.id,
+        metricType: config.metricType,
+        metricKey: config.metricKey,
+        frequency: config.frequency,
+        target,
+        currentValue: value,
+        progressPercent,
+        status,
+      });
     }
 
     return updated;
@@ -140,15 +151,29 @@ export class GoalsEngineService {
   }
 
   async snapshot(patientId: string) {
-    return this.prisma.healthGoal.findMany({
+    const goals = await this.prisma.healthGoal.findMany({
       where: { patientId, status: 'ACTIVE' },
       include: { progress: { orderBy: { measuredAt: 'desc' }, take: 1 } },
       orderBy: { createdAt: 'asc' },
     });
+
+    const configs = await this.prisma.$queryRaw<GoalConfigRow[]>`
+      SELECT "healthGoalId", "metricType", "metricKey", "frequency", "frequencyTarget", "guidanceText"
+      FROM "HealthGoalMetricConfig"
+      WHERE "healthGoalId" = ANY(${goals.map((goal) => goal.id)})
+    `;
+
+    const configByGoal = new Map(configs.map((config) => [config.healthGoalId, config]));
+
+    return goals.map((goal) => ({
+      ...goal,
+      metricConfig: configByGoal.get(goal.id) ?? null,
+    }));
   }
 
   private windowStart(frequency: string, goalCreatedAt: Date, now: Date) {
     if (frequency === 'TOTAL') return goalCreatedAt;
+
     const start = new Date(now);
     if (frequency === 'WEEKLY') {
       const day = start.getDay();
