@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { ArrowLeft, ArrowRight, Bell, CalendarDays, CheckCircle2, ClipboardCheck, Pill, Target, Sparkles } from "lucide-react";
+import { ArrowLeft, ArrowRight, Bell, CalendarDays, CheckCircle2, ClipboardCheck, Pill, Target, Sparkles, Activity, Apple, Brain, Droplets, HeartPulse, Moon, Scale, ShieldCheck, Wine, Cigarette, Footprints } from "lucide-react";
 import ProtectedRoute from "@/components/auth/protected-route";
 import { useDashboard } from "@/hooks/use-dashboard";
 import DailyHealthCheckIn from "@/components/dashboard/daily-health-check-in";
@@ -26,13 +26,74 @@ function goalProgress(goal: any) {
   return Number.isFinite(percent) ? Math.max(0, Math.min(100, Math.round(percent))) : 0;
 }
 
-function goalAction(goal: any) {
-  const category = String(goal?.category ?? "").toUpperCase();
-  if (category === "MEDICATION") return { title: "Keep your medication plan on track", detail: "Today: mark each dose Taken or Skipped below.", href: null, cta: null };
-  if (category === "EXERCISE") return { title: "Complete your exercise activity", detail: "Record today’s exercise in the daily check-in.", href: "#daily-health-check-in", cta: "Log exercise" };
-  if (category === "HYDRATION") return { title: "Keep drinking toward your water target", detail: "Add water in the daily check-in as you go.", href: "#daily-health-check-in", cta: "Add water" };
-  if (category === "SLEEP") return { title: "Record last night’s sleep", detail: "Add your sleep details in the daily check-in.", href: "#daily-health-check-in", cta: "Log sleep" };
-  return { title: "Keep working on this goal", detail: "Open the goal when you need its full details.", href: "/health-goals", cta: "View goal" };
+const GOAL_META: Record<string, { label: string; icon: typeof Target; frequency: string; accent: string; surface: string }> = {
+  WEIGHT: { label: "Weight", icon: Scale, frequency: "Total target", accent: "text-violet-700", surface: "bg-violet-50" },
+  EXERCISE: { label: "Exercise", icon: Footprints, frequency: "Daily", accent: "text-emerald-700", surface: "bg-emerald-50" },
+  NUTRITION: { label: "Nutrition", icon: Apple, frequency: "Daily", accent: "text-orange-700", surface: "bg-orange-50" },
+  BLOOD_PRESSURE: { label: "Blood pressure", icon: HeartPulse, frequency: "Daily", accent: "text-rose-700", surface: "bg-rose-50" },
+  BLOOD_GLUCOSE: { label: "Blood glucose", icon: Activity, frequency: "Daily", accent: "text-amber-700", surface: "bg-amber-50" },
+  CHOLESTEROL: { label: "Cholesterol", icon: ShieldCheck, frequency: "Total target", accent: "text-blue-700", surface: "bg-blue-50" },
+  MEDICATION: { label: "Medication", icon: Pill, frequency: "Weekly", accent: "text-cyan-700", surface: "bg-cyan-50" },
+  SLEEP: { label: "Sleep", icon: Moon, frequency: "Daily", accent: "text-indigo-700", surface: "bg-indigo-50" },
+  MENTAL_HEALTH: { label: "Mental health", icon: Brain, frequency: "Daily", accent: "text-fuchsia-700", surface: "bg-fuchsia-50" },
+  HYDRATION: { label: "Hydration", icon: Droplets, frequency: "Daily", accent: "text-cyan-700", surface: "bg-cyan-50" },
+  SMOKING: { label: "Smoking", icon: Cigarette, frequency: "Total target", accent: "text-slate-700", surface: "bg-slate-100" },
+  ALCOHOL: { label: "Alcohol", icon: Wine, frequency: "Weekly", accent: "text-purple-700", surface: "bg-purple-50" },
+  HEART_RATE: { label: "Heart rate", icon: HeartPulse, frequency: "Daily", accent: "text-red-700", surface: "bg-red-50" },
+  OTHER: { label: "Personal goal", icon: Target, frequency: "Total target", accent: "text-[#0b2d54]", surface: "bg-[#edf4ff]" },
+};
+
+const GOAL_FREQUENCY_LABELS: Record<string, string> = {
+  DAILY: "Daily",
+  WEEKLY: "Weekly",
+  TOTAL: "Overall",
+};
+
+function goalMeta(goal: any) {
+  const category = String(goal?.category ?? "OTHER").toUpperCase();
+  return GOAL_META[category] ?? GOAL_META.OTHER;
+}
+
+function goalFrequency(goal: any) {
+  const configured = String(goal?.metricConfig?.frequency ?? goal?.frequency ?? "").toUpperCase();
+  if (configured && GOAL_FREQUENCY_LABELS[configured]) return GOAL_FREQUENCY_LABELS[configured];
+  return goalMeta(goal).frequency;
+}
+
+function goalTarget(goal: any) {
+  const configuredTarget = goal?.metricConfig?.frequencyTarget ?? goal?.frequencyTarget;
+  const rawTarget = configuredTarget ?? goal?.targetValue;
+  const target = Number(rawTarget);
+  if (!Number.isFinite(target)) return "Target not set";
+  const unit = text(goal?.unit, "").trim();
+  return `${target % 1 === 0 ? target.toFixed(0) : target.toFixed(1)}${unit ? ` ${unit}` : ""}`;
+}
+
+function goalCurrent(goal: any) {
+  const current = Number(goal?.currentValue);
+  if (!Number.isFinite(current)) return null;
+  const unit = text(goal?.unit, "").trim();
+  return `${current % 1 === 0 ? current.toFixed(0) : current.toFixed(1)}${unit ? ` ${unit}` : ""}`;
+}
+
+function goalStatus(goal: any, progress: number) {
+  const status = String(goal?.status ?? "ACTIVE").toUpperCase();
+  if (status === "ACHIEVED" || progress >= 100) return "Achieved";
+  if (progress >= 75) return "Strong progress";
+  if (progress > 0) return "In progress";
+  return "Ready to start";
+}
+
+function goalDetail(goal: any, progress: number) {
+  const category = String(goal?.category ?? "OTHER").toUpperCase();
+  const frequency = goalFrequency(goal);
+  const target = goalTarget(goal);
+  const current = goalCurrent(goal);
+  if (category === "BLOOD_PRESSURE") return current ? `${frequency} · Latest ${current} · Target ${target}` : `${frequency} · Target ${target}`;
+  if (category === "BLOOD_GLUCOSE" || category === "CHOLESTEROL" || category === "HEART_RATE") return current ? `${frequency} · Latest ${current} · Target ${target}` : `${frequency} · Target ${target}`;
+  if (category === "WEIGHT") return current ? `${frequency} · Current ${current} · Target ${target}` : `${frequency} · Target ${target}`;
+  if (progress >= 100) return `${frequency} · Target ${target}`;
+  return `${frequency} · Target ${target}`;
 }
 
 export default function TodayPage() {
@@ -44,6 +105,8 @@ export default function TodayPage() {
   const medications = data.today?.activeMedications ?? [];
   const appointments = data.today?.upcomingAppointments ?? [];
   const goals = (data.goals ?? []).filter((goal: any) => String(goal.status).toUpperCase() === "ACTIVE");
+  const medicationGoals = goals.filter((goal: any) => String(goal?.category ?? "").toUpperCase() === "MEDICATION");
+  const displayGoals = goals.filter((goal: any) => String(goal?.category ?? "").toUpperCase() !== "MEDICATION");
   const today = new Date();
   const todayAppointments = appointments.filter((appointment: any) => appointment?.scheduledStart && new Date(String(appointment.scheduledStart)).toDateString() === today.toDateString());
   const carePlans = data.carePlans ?? [];
@@ -68,7 +131,41 @@ export default function TodayPage() {
     <div className="mt-7 flex items-end justify-between gap-5"><h2 className="text-xl font-black tracking-[-.045em] text-[#0b2d54]">Today, organised</h2><p className="text-right text-[11px] text-[#74859a]">A small check-in gives Sympto a better picture of your day.</p></div>
     <section className="mt-3.5 overflow-hidden rounded-[26px] border border-[#dfebef] bg-white shadow-[0_6px_20px_rgba(11,45,84,.035)]"><div className="grid items-center gap-3.5 p-5 sm:grid-cols-2 sm:p-[22px]"><div className="flex items-center gap-3.5"><div className="grid h-12 w-12 place-items-center rounded-2xl bg-[#e5f7f6] text-[#0b2d54]"><Pill className="h-5 w-5" /></div><div><h3 className="text-[17px] font-black text-[#0b2d54]">Your plan</h3><p className="mt-1 text-xs text-[#74859a]">{medicine ? "One important treatment to keep in view." : "Your current treatment plan will appear here."}</p></div></div><div className="rounded-[19px] bg-[#f5fafb] px-4 py-3.5"><div className="text-[13px] font-black text-[#0b2d54]">{medicine ? `Medicine · ${text(medicine?.medication?.name, "Your medicine")}` : "Medicine · No active medicine"}</div><div className="mt-1 text-[11px] text-[#74859a]">{medicine ? `${text(medicine?.dosage, "Dose not recorded")} · ${text(medicine?.frequency, "Schedule not recorded")}` : "Your medication plan will appear here."}</div></div></div>{actionItems.length > 0 && <div className="divide-y divide-[#edf2f5] border-t border-[#edf2f5]">{actionItems.map((item: any) => <Link key={item.key} href={item.href} className="group flex items-center gap-4 px-5 py-4 transition hover:bg-[#f8fbfc] sm:px-[22px]"><span className={`grid h-10 w-10 shrink-0 place-items-center rounded-2xl ${item.tone}`}>{item.label === "Appointment" ? <CalendarDays className="h-4 w-4" /> : item.label === "Care plan" ? <ClipboardCheck className="h-4 w-4" /> : item.label === "Reminder" ? <Bell className="h-4 w-4" /> : item.label === "Medicine" ? <Pill className="h-4 w-4" /> : item.label === "Goal" ? <Target className="h-4 w-4" /> : <CheckCircle2 className="h-4 w-4" />}</span><span className="min-w-0 flex-1"><span className="block text-[10px] font-black uppercase tracking-[0.14em] text-[#8a99a8]">{item.label}</span><span className="mt-1 block text-sm font-bold text-[#0b2d54]">{item.title}</span><span className="mt-1 block truncate text-[11px] text-[#74859a]">{item.detail}</span></span><ArrowRight className="h-4 w-4 shrink-0 text-[#91a0ad] transition group-hover:translate-x-1 group-hover:text-[#0b2d54]" /></Link>)}</div>}</section>
     <div id="daily-health-check-in" className="mt-7 flex items-end justify-between gap-5"><h2 className="text-xl font-black tracking-[-.045em] text-[#0b2d54]">Daily health check-in</h2><p className="text-right text-[11px] text-[#74859a]">Your answers become structured Health Journal data.</p></div><div className="mt-3.5"><DailyHealthCheckIn embedded goals={goals} /></div>
-    <section className="mt-4 rounded-[27px] border border-[#dfebef] bg-white p-[22px] shadow-[0_6px_20px_rgba(11,45,84,.035)]"><div className="flex items-start justify-between gap-4"><div><h3 className="text-[17px] font-black text-[#0b2d54]">Health goals</h3><p className="mt-2 text-xs leading-5 text-[#74859a]">Keep your longer-term goals moving.</p></div><Link href="/health-goals" className="rounded-[11px] bg-[#edf4ff] px-2.5 py-2 text-[10px] font-black text-[#3f75bd]">{goals.length} active goal{goals.length === 1 ? "" : "s"}</Link></div>{goals.length > 0 ? <div className="mt-4 divide-y divide-[#eef3f4] border-t border-[#eef3f4]">{goals.map((goal: any) => { const action = goalAction(goal); const isMedicationGoal = String(goal?.category ?? "").toUpperCase() === "MEDICATION"; const progress = goalProgress(goal); return <div key={String(goal.id)} className="py-5 first:pt-4 last:pb-1"><div className="flex items-start justify-between gap-4"><div className="min-w-0 flex-1"><div className="flex items-center gap-2"><span className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-[#edf4ff] text-[#3f75bd]"><Target className="h-4 w-4" /></span><div><b className="block text-sm text-[#0b2d54]">{text(goal.title, "Health goal")}</b><span className="mt-0.5 block text-[11px] text-[#74859a]">{progress}% progress</span></div></div><div className="mt-3 h-2 overflow-hidden rounded-full bg-[#edf2f5]"><div className="h-full rounded-full bg-[#24c1c4] transition-all" style={{ width: `${progress}%` }} /></div><p className="mt-3 text-sm font-bold text-[#0b2d54]">{action.title}</p><p className="mt-1 text-xs leading-5 text-[#74859a]">{action.detail}</p>{isMedicationGoal && <TodayMedicationActions medications={medications} onUpdated={reload} />}</div>{action.href && <Link href={action.href} className="shrink-0 rounded-xl bg-[#0b2d54] px-3.5 py-2.5 text-[10px] font-black text-white">{action.cta} →</Link>}</div></div>; })}</div> : <div className="mt-4 border-t border-[#eef3f4] pt-4"><p className="text-sm text-[#74859a]">Create a health goal to start tracking meaningful progress.</p></div>}<Link href="/health-goals" className="mt-4 inline-block text-xs font-black text-[#0b2d54]">Open health goals →</Link></section>
+
+    <section className="mt-4 overflow-hidden rounded-[30px] border border-[#dce9ee] bg-white shadow-[0_18px_48px_rgba(11,45,84,.055)]">
+      <div className="relative border-b border-[#edf2f5] bg-gradient-to-br from-white via-white to-[#f4fbfb] px-5 py-5 sm:px-7 sm:py-6">
+        <div className="absolute right-[-50px] top-[-55px] h-36 w-36 rounded-full bg-[#24c1c4]/10 blur-2xl" />
+        <div className="relative flex flex-col gap-5 sm:flex-row sm:items-end sm:justify-between">
+          <div>
+            <div className="flex items-center gap-2.5"><span className="grid h-10 w-10 place-items-center rounded-2xl bg-[#0b2d54] text-white shadow-sm"><Target className="h-4.5 w-4.5" /></span><div><p className="text-[10px] font-black uppercase tracking-[0.16em] text-[#6f8295]">Your longer-term health</p><h3 className="mt-1 text-xl font-black tracking-[-.045em] text-[#0b2d54]">Health goals</h3></div></div>
+            <p className="mt-3 max-w-2xl text-xs leading-5 text-[#74859a]">A clean view of the goals that matter most — whatever you are tracking, how often you track it, and where you stand against the target.</p>
+          </div>
+          <div className="flex items-center gap-2">
+            {medicationGoals.length > 0 && <span className="rounded-full bg-[#e9f9fa] px-3 py-1.5 text-[10px] font-black text-[#0b6f73]">Medication tracked separately</span>}
+            <Link href="/health-goals" className="inline-flex items-center gap-1.5 rounded-xl bg-[#0b2d54] px-3.5 py-2.5 text-[10px] font-black text-white shadow-sm transition hover:bg-[#123d63]">{goals.length} active goal{goals.length === 1 ? "" : "s"}<ArrowRight className="h-3.5 w-3.5" /></Link>
+          </div>
+        </div>
+      </div>
+
+      {displayGoals.length > 0 ? <div className="grid gap-3.5 p-4 sm:grid-cols-2 sm:p-5 lg:grid-cols-3">{displayGoals.map((goal: any) => {
+        const progress = goalProgress(goal);
+        const meta = goalMeta(goal);
+        const Icon = meta.icon;
+        const status = goalStatus(goal, progress);
+        return <Link key={String(goal.id)} href={`/health-goals/${String(goal.id)}`} className="group relative overflow-hidden rounded-[23px] border border-[#e1ebee] bg-white p-4.5 transition duration-200 hover:-translate-y-0.5 hover:border-[#cbdde2] hover:shadow-[0_14px_34px_rgba(11,45,84,.08)]">
+          <div className="flex items-start justify-between gap-3"><span className={`grid h-10 w-10 shrink-0 place-items-center rounded-2xl ${meta.surface} ${meta.accent}`}><Icon className="h-4.5 w-4.5" /></span><span className="rounded-full bg-[#f4f7f9] px-2.5 py-1 text-[9px] font-black uppercase tracking-[0.12em] text-[#708193]">{meta.label}</span></div>
+          <div className="mt-4 min-w-0"><h4 className="truncate text-[15px] font-black text-[#0b2d54]">{text(goal.title, "Health goal")}</h4><p className="mt-1 text-[11px] font-semibold text-[#74859a]">{goalDetail(goal, progress)}</p></div>
+          <div className="mt-4 flex items-end justify-between gap-4"><div><p className="text-[10px] font-black uppercase tracking-[0.12em] text-[#91a0ad]">Progress</p><p className="mt-1 text-2xl font-black tracking-[-.05em] text-[#0b2d54]">{progress}%</p></div><div className="text-right"><p className="text-[10px] font-black uppercase tracking-[0.12em] text-[#91a0ad]">Status</p><p className="mt-1 text-[11px] font-black text-[#0b6f73]">{status}</p></div></div>
+          <div className="mt-3 h-2 overflow-hidden rounded-full bg-[#edf2f5]"><div className="h-full rounded-full bg-gradient-to-r from-[#0b6f73] to-[#24c1c4] transition-all duration-500" style={{ width: `${progress}%` }} /></div>
+          <div className="mt-3 flex items-center justify-between gap-3 text-[10px] font-semibold text-[#74859a]"><span>{goal?.targetDate ? `Target ${formatDate(goal.targetDate, false)}` : "No target date"}</span><span className="shrink-0">{goalFrequency(goal)} · {goalTarget(goal)}</span></div>
+          <ArrowRight className="absolute bottom-4 right-4 h-3.5 w-3.5 text-[#a2afb9] transition group-hover:translate-x-0.5 group-hover:text-[#0b2d54]" />
+        </Link>;
+      })}</div> : <div className="px-5 py-8 sm:px-7"><div className="rounded-[22px] border border-dashed border-[#d6e5e9] bg-[#f8fbfc] px-5 py-7 text-center"><Target className="mx-auto h-7 w-7 text-[#8ca3af]" /><p className="mt-3 text-sm font-bold text-[#0b2d54]">No non-medication goals are active yet.</p><p className="mx-auto mt-1 max-w-md text-xs leading-5 text-[#74859a]">Create a goal for weight, exercise, nutrition, blood pressure, glucose, cholesterol, sleep, mental health, hydration, smoking, alcohol, heart rate, or another personal target.</p><Link href="/health-goals" className="mt-4 inline-flex items-center gap-2 rounded-xl bg-[#0b2d54] px-4 py-2.5 text-[10px] font-black text-white">Create or manage goals <ArrowRight className="h-3.5 w-3.5" /></Link></div></div>}
+      <div className="flex items-center justify-between gap-4 border-t border-[#edf2f5] px-5 py-4 sm:px-7"><p className="text-[10px] font-semibold text-[#8393a1]">Targets and cadence come from each goal&apos;s tracking configuration when available.</p><Link href="/health-goals" className="shrink-0 text-[10px] font-black text-[#0b2d54]">Open all goals →</Link></div>
+    </section>
+
+    {medicationGoals.length > 0 && <section className="mt-4 overflow-hidden rounded-[28px] border border-[#dce9ee] bg-white shadow-[0_12px_34px_rgba(11,45,84,.045)]"><div className="px-5 pt-5 sm:px-7 sm:pt-6"><div className="flex items-start justify-between gap-4"><div><p className="text-[10px] font-black uppercase tracking-[0.16em] text-[#0b6f73]">Medication adherence</p><h3 className="mt-1 text-lg font-black tracking-[-.04em] text-[#0b2d54]">Today&apos;s medication</h3><p className="mt-1 text-xs text-[#74859a]">Mark each medicine Taken or Skipped. Your saved activity remains connected to the medication goal.</p></div><div className="hidden h-10 w-10 place-items-center rounded-2xl bg-[#e5f7f6] text-[#0b6f73] sm:grid"><Pill className="h-4.5 w-4.5" /></div></div></div><div className="px-5 pb-5 sm:px-7 sm:pb-6"><TodayMedicationActions medications={medications} onUpdated={reload} /></div></section>}
+
     <div className="mt-6 flex items-center justify-center gap-2 text-[10px] text-[#74859a]">✦ <strong className="text-[#0b2d54]">Sympto</strong> keeps your health connected, understandable, and under your control.</div>
   </div></main></ProtectedRoute>;
 }
