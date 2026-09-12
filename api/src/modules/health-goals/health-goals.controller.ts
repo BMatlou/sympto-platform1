@@ -28,6 +28,26 @@ export class HealthGoalsController {
   activeSnapshot(@Query('patientId') patientId: string) { return this.healthGoalsService.getActiveSnapshot(patientId); }
 
   @Permissions('health-goals.read')
+  @Get('metric-events')
+  metricEvents(
+    @Query('metricType') metricType: string,
+    @Query('metricKey') metricKey: string,
+    @Query('source') source: string | undefined,
+    @Query('from') from: string,
+    @Query('to') to: string,
+    @Req() request: AuthenticatedRequest,
+  ) {
+    const userId = request.user?.sub ?? request.user?.id ?? '';
+    return this.healthGoalsService.getMetricEventsForUser(userId, {
+      metricType,
+      metricKey,
+      source,
+      from: new Date(from),
+      to: new Date(to),
+    });
+  }
+
+  @Permissions('health-goals.read')
   @Get()
   findAll(@Query() query: QueryHealthGoalDto) { return this.healthGoalsService.findAll(query); }
 
