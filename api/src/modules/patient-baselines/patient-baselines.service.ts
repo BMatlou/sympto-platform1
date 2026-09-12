@@ -13,8 +13,17 @@ export class PatientBaselinesService {
   private async syncWeight(patientId: string, weightKg: unknown) {
     if (weightKg == null || !Number.isFinite(Number(weightKg))) return;
     const value = Number(weightKg);
+    const recordedAt = new Date();
     await this.prisma.patient.update({ where: { id: patientId }, data: { weightKg: String(value) } });
-    await this.goalsEngine.recordMetricEvent({ patientId, metricType: 'WEIGHT', metricKey: 'weight.kg', loggedValue: value, source: 'patient-profile', sourceId: 'profile' });
+    await this.goalsEngine.recordMetricEvent({
+      patientId,
+      metricType: 'WEIGHT',
+      metricKey: 'weight.kg',
+      loggedValue: value,
+      occurredAt: recordedAt,
+      source: 'patient-profile',
+      sourceId: `baseline:${recordedAt.toISOString()}`,
+    });
   }
 
   async create(dto: CreatePatientBaselineDto) {
