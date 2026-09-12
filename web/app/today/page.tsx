@@ -80,7 +80,6 @@ function goalInsight(goal: any, progress: number) {
   const frequency = goalFrequency(goal);
   const target = goalTarget(goal);
   const current = goalCurrent(goal);
-
   if (category === "WEIGHT") return current ? `${current} now · ${target} target` : `${target} target`;
   if (["BLOOD_PRESSURE", "BLOOD_GLUCOSE", "CHOLESTEROL", "HEART_RATE"].includes(category)) return current ? `${current} latest · ${target} target` : `${target} target`;
   if (category === "SMOKING") return current ? `${current} current · ${target} target` : `${target} target`;
@@ -133,11 +132,6 @@ export default function TodayPage() {
     <div id="daily-health-check-in" className="mt-7 flex items-end justify-between gap-5"><h2 className="text-xl font-black tracking-[-.045em] text-[#0b2d54]">Daily health check-in</h2><p className="text-right text-[11px] text-[#74859a]">Your answers become structured Health Journal data.</p></div><div className="mt-3.5"><DailyHealthCheckIn embedded goals={goals} /></div>
 
     <section className="mt-4 overflow-hidden rounded-[30px] border border-[#dce9ee] bg-white shadow-[0_18px_48px_rgba(11,45,84,.055)]">
-      <div className="relative overflow-hidden border-b border-[#edf2f5] bg-gradient-to-br from-[#08284a] via-[#0b385d] to-[#0e6874] px-5 py-6 text-white sm:px-7 sm:py-7">
-        <div className="absolute right-[-60px] top-[-80px] h-48 w-48 rounded-full bg-white/10 blur-3xl" /><div className="absolute bottom-[-110px] left-[35%] h-48 w-48 rounded-full bg-[#24c1c4]/15 blur-3xl" />
-        <div className="relative flex flex-col gap-5 sm:flex-row sm:items-end sm:justify-between"><div className="max-w-2xl"><div className="flex items-center gap-3"><span className="grid h-11 w-11 place-items-center rounded-2xl bg-white/12 text-white ring-1 ring-white/15"><Target className="h-5 w-5" /></span><div><p className="text-[10px] font-black uppercase tracking-[0.18em] text-white/60">Your longer-term health</p><h3 className="mt-1 text-2xl font-black tracking-[-.05em]">Health goals</h3></div></div><p className="mt-3 text-xs leading-5 text-white/72">Each goal adapts to what you are measuring — its own target, rhythm, progress and status.</p></div><Link href="/health-goals" className="inline-flex shrink-0 items-center gap-2 rounded-xl bg-white px-4 py-2.5 text-[10px] font-black text-[#0b2d54] shadow-sm transition hover:bg-white/90">{goals.length ? `${goals.length} active ${goals.length === 1 ? "goal" : "goals"}` : "Create a goal"}<ArrowRight className="h-3.5 w-3.5" /></Link></div>
-      </div>
-
       {displayGoals.length > 0 ? <div className="grid gap-4 p-4 sm:grid-cols-2 sm:p-5 xl:grid-cols-3">{displayGoals.map((goal: any) => {
         const progress = goalProgress(goal); const meta = goalMeta(goal); const Icon = meta.icon; const status = goalStatus(goal, progress); const current = goalCurrent(goal);
         return <Link key={String(goal.id)} href="/health-goals" className="group relative overflow-hidden rounded-[25px] border border-[#e0ebee] bg-gradient-to-br from-white via-white to-[#f7fbfc] p-5 transition duration-200 hover:-translate-y-0.5 hover:border-[#c8dce1] hover:shadow-[0_18px_38px_rgba(11,45,84,.09)]">
