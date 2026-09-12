@@ -246,13 +246,15 @@ export class PatientsService {
       Number.isFinite(Number(dto.weightKg)) &&
       Number(dto.weightKg) !== Number(patient.weightKg)
     ) {
+      const recordedAt = new Date();
       await this.goalsEngine.recordMetricEvent({
         patientId: id,
         metricType: 'WEIGHT',
         metricKey: 'weight.kg',
         loggedValue: Number(dto.weightKg),
+        occurredAt: recordedAt,
         source: 'patient-profile',
-        sourceId: 'profile',
+        sourceId: `profile:${recordedAt.toISOString()}`,
       });
     }
 
