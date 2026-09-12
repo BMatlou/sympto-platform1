@@ -43,13 +43,12 @@ export default function TodayMedicationActions({ medications, onUpdated }: Today
 
   async function record(medication: any, action: Action) {
     const patientMedicationRecordId = patientMedicationId(medication);
-    const underlyingMedicationId = medicationId(medication);
 
     if (savingKey) return;
 
-    if (!patientMedicationRecordId || !underlyingMedicationId) {
+    if (!patientMedicationRecordId) {
       toast.error("Medication record is incomplete", {
-        description: "The medication record does not contain the IDs required to record adherence.",
+        description: "This medicine does not have a patient medication record ID.",
       });
       return;
     }
@@ -58,6 +57,14 @@ export default function TodayMedicationActions({ medications, onUpdated }: Today
     setSavingKey(`${key}:${action}`);
 
     try {
+      const recordResponse = await api.get(`/patient-medications/${key}`);
+      const patientMedication = recordResponse.data;
+      const underlyingMedicationId = medicationId(patientMedication);
+
+      if (!underlyingMedicationId) {
+        throw new Error("The patient medication record does not contain its medication ID.");
+      }
+
       const response = await api.post(`/patient-medications/${key}/adherence`, {
         medicationId: String(underlyingMedicationId),
         action,
@@ -71,7 +78,7 @@ export default function TodayMedicationActions({ medications, onUpdated }: Today
         : "";
 
       toast.success(action === "TAKEN" ? "Medication marked taken" : "Medication marked skipped", {
-        description: `${medicationName(medication)}${suffix}`,
+        description: `${medicationName(patientMedication)}${suffix}`,
       });
 
       await onUpdated?.();
