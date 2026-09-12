@@ -9,16 +9,49 @@ import {
 import { healthGoalsService } from "@/services/health-goals.service";
 
 const REFRESH_INTERVAL_MS = 15_000;
+const DEFAULT_MEDICATION_TARGET = 90;
 
 function normalizeGoals(result: HealthHomeResponse, fullGoals: any[]) {
   const patientWeight = result.patient?.weightKg != null ? Number(result.patient.weightKg) : null;
+  const medications = Array.isArray(result.medications) ? result.medications : [];
+  const adherenceValues = medications
+    .map((medication: any) => Number(medication?.adherencePercentage))
+    .filter((value: number) => Number.isFinite(value));
+  const medicationAdherence = adherenceValues.length
+    ? Number((adherenceValues.reduce((sum, value) => sum + value, 0) / adherenceValues.length).toFixed(2))
+    : null;
 
   return fullGoals.map((goal: any) => {
+    const category = String(goal?.category ?? "").toUpperCase();
     const progress = Array.isArray(goal?.progress) ? goal.progress : [];
     const historicalAchievement = progress.find(
       (item: any) => String(item?.status ?? "").toUpperCase() === "ACHIEVED",
     );
-    const isWeightGoal = String(goal?.category ?? "").toUpperCase() === "WEIGHT";
+    const isWeightGoal = category === "WEIGHT";
+    const isMedicationGoal = category === "MEDICATION";
+
+    if (isMedicationGoal) {
+      const targetValue = Number(goal?.targetValue ?? goal?.metricConfig?.frequencyTarget ?? DEFAULT_MEDICATION_TARGET);
+      const target = Number.isFinite(targetValue) && targetValue > 0 ? targetValue : DEFAULT_MEDICATION_TARGET;
+      const currentValue = medicationAdherence;
+      const achieved = currentValue != null && currentValue >= target;
+      const progressPercent = currentValue == null ? 0 : Math.min(100, Math.max(0, Math.round((currentValue / target) * 100)));
+
+      return {
+        ...goal,
+        unit: "%",
+        targetValue: target,
+        currentValue,
+        status: achieved ? "ACHIEVED" : "ACTIVE",
+        achievedAt: achieved ? goal?.achievedAt ?? new Date().toISOString() : goal?.achievedAt ?? null,
+        latestProgress: {
+          ...(historicalAchievement ?? progress[0] ?? {}),
+          currentValue,
+          progressPercent,
+          status: achieved ? "ACHIEVED" : "IMPROVING",
+        },
+      };
+    }
 
     if (!historicalAchievement && String(goal?.status ?? "").toUpperCase() !== "ACHIEVED") {
       return goal;
