@@ -17,11 +17,11 @@ import { PermissionsGuard } from '../auth/guards/permissions.guard';
 import { Permissions } from '../auth/decorators/permissions.decorator';
 
 import { PatientMedicationsService } from './patient-medications.service';
-
 import { CreatePatientMedicationDto } from './dto/create-patient-medication.dto';
 import { UpdatePatientMedicationDto } from './dto/update-patient-medication.dto';
 import { QueryPatientMedicationDto } from './dto/query-patient-medication.dto';
 import { CreateMedicationReminderDto } from './dto/create-medication-reminder.dto';
+import { RecordMedicationAdherenceDto } from './dto/record-medication-adherence.dto';
 
 @ApiTags('Patient Medications')
 @ApiBearerAuth()
@@ -45,26 +45,37 @@ export class PatientMedicationsController {
   }
 
   @Permissions('patient-medication.read')
-  @Get(':id')
-  findOne(@Param('id') id: string) {
-    return this.patientMedicationsService.findOne(id);
+  @Post(':id/adherence')
+  recordAdherence(
+    @Param('id') id: string,
+    @Body() dto: RecordMedicationAdherenceDto,
+    @Req() request: { user?: { id?: string; sub?: string } },
+  ) {
+    return this.patientMedicationsService.recordAdherence(
+      id,
+      dto,
+      request.user?.id ?? request.user?.sub ?? '',
+    );
   }
 
-  // Scheduling a reminder does not modify the prescription itself. The
-  // service separately verifies that the medication belongs to the
-  // authenticated patient before creating the notification.
   @Permissions('patient-medication.read')
   @Post(':id/reminder')
   scheduleReminder(
     @Param('id') id: string,
     @Body() dto: CreateMedicationReminderDto,
-    @Req() request: { user?: { id?: string } },
+    @Req() request: { user?: { id?: string; sub?: string } },
   ) {
     return this.patientMedicationsService.scheduleReminder(
       id,
       dto,
-      request.user?.id ?? '',
+      request.user?.id ?? request.user?.sub ?? '',
     );
+  }
+
+  @Permissions('patient-medication.read')
+  @Get(':id')
+  findOne(@Param('id') id: string) {
+    return this.patientMedicationsService.findOne(id);
   }
 
   @Permissions('patient-medication.update')
