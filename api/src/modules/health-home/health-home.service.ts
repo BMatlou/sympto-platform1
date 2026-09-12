@@ -1,5 +1,6 @@
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../../database/prisma.service';
+import { GoalsEngineService } from '../health-goals/goals-engine-v3.service';
 
 const ACTIVE_APPOINTMENT_STATUSES = ['PENDING', 'CONFIRMED', 'CHECKED_IN', 'IN_PROGRESS'] as const;
 const ACTIVE_MEDICATION_STATUSES = ['ACTIVE', 'PAUSED'] as const;
@@ -28,7 +29,10 @@ function assertRange(name: string, value: number | undefined, min: number, max: 
 
 @Injectable()
 export class HealthHomeService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly goalsEngine: GoalsEngineService,
+  ) {}
 
   private async patientForWrite(userId: string, requestedPatientId?: string) {
     const patient = await this.prisma.patient.findUnique({ where: { userId }, include: { baseline: true } });
@@ -54,6 +58,16 @@ export class HealthHomeService {
       where: { patientId: patient.id },
       update: { weightKg: String(weightKg), ...(heightCm !== undefined ? { heightCm: String(heightCm) } : {}), ...(bmi != null ? { bmi: String(bmi) } : {}), establishedAt: recordedAt },
       create: { patientId: patient.id, weightKg: String(weightKg), ...(heightCm !== undefined ? { heightCm: String(heightCm) } : nextHeightCm != null ? { heightCm: String(nextHeightCm) } : {}), ...(bmi != null ? { bmi: String(bmi) } : {}), establishedAt: recordedAt },
+    });
+
+    await this.goalsEngine.recordMetricEvent({
+      patientId: patient.id,
+      metricType: 'WEIGHT',
+      metricKey: 'weight.kg',
+      loggedValue: weightKg,
+      occurredAt: recordedAt,
+      source: 'patient-profile',
+      sourceId: 'profile',
     });
 
     return { weightKg, heightCm: nextHeightCm, bmi, bmiCategory: getBmiCategory(bmi), recordedAt: recordedAt.toISOString() };
@@ -94,6 +108,18 @@ export class HealthHomeService {
       },
     });
 
+    if (input.weightKg !== undefined) {
+      await this.goalsEngine.recordMetricEvent({
+        patientId: patient.id,
+        metricType: 'WEIGHT',
+        metricKey: 'weight.kg',
+        loggedValue: input.weightKg,
+        occurredAt: measuredAt,
+        source: 'patient-profile',
+        sourceId: 'profile',
+      });
+    }
+
     return { recordedAt: measuredAt.toISOString(), bmi, bmiCategory: getBmiCategory(bmi), baseline };
   }
 
@@ -112,6 +138,18 @@ export class HealthHomeService {
       selectedUserId = familyPatient.userId;
     }
     const patientId = patient.id;
+
+    if (patient.weightKg != null) {
+      await this.goalsEngine.recordMetricEvent({
+        patientId,
+        metricType: 'WEIGHT',
+        metricKey: 'weight.kg',
+        loggedValue: Number(patient.weightKg),
+        source: 'patient-profile',
+        sourceId: 'profile',
+      });
+    }
+
     const healthPassportId = patient.healthPassport?.id;
     const now = new Date();
     const immunizations = patient.healthPassport?.immunizations ?? [];
@@ -120,7 +158,7 @@ export class HealthHomeService {
       this.prisma.patientAllergy.findMany({ where: { healthPassportId: healthPassportId ?? '' }, include: { allergy: true }, orderBy: { createdAt: 'desc' } }),
       this.prisma.patientCondition.findMany({ where: { healthPassportId: healthPassportId ?? '' }, include: { condition: true }, orderBy: { createdAt: 'desc' } }),
       this.prisma.patientMedication.findMany({ where: { healthPassportId: healthPassportId ?? '', status: { in: [...ACTIVE_MEDICATION_STATUSES] } }, include: { medication: true }, orderBy: { createdAt: 'desc' } }),
-      this.prisma.healthGoal.findMany({ where: { patientId, status: 'ACTIVE' }, include: { progress: { orderBy: { measuredAt: 'desc' }, take: 1 } }, orderBy: [{ priority: 'desc' }, { targetDate: 'asc' }] }),
+      this.prisma.healthGoal.findMany({ where: { patientId, status: { in: ['ACTIVE', 'ACHIEVED'] } }, include: { progress: { orderBy: { measuredAt: 'desc' }, take: 1 } }, orderBy: [{ priority: 'desc' }, { targetDate: 'asc' }] }),
       this.prisma.familyMember.findMany({ where: { ownerPatientId: ownerPatient.id }, include: { memberPatient: { include: { person: true } } }, orderBy: { createdAt: 'desc' } }),
       this.prisma.appointment.findMany({ where: { patientId, status: { in: [...ACTIVE_APPOINTMENT_STATUSES] }, scheduledStart: { gte: now } }, include: { practitioner: { include: { person: true } }, practice: true, telemedicineSession: true }, orderBy: { scheduledStart: 'asc' }, take: 10 }),
       this.prisma.notification.findMany({ where: { userId: selectedUserId, readAt: null, status: { in: ['PENDING', 'QUEUED', 'SENT', 'DELIVERED'] } }, orderBy: [{ priority: 'desc' }, { createdAt: 'desc' }], take: 10 }),
