@@ -7,10 +7,12 @@ import { Prisma } from '@prisma/client';
 import { PrismaService } from '../../database/prisma.service';
 import { NotificationsService } from '../notifications/notifications.service';
 import { NotificationQueueService } from '../notification-queue/notification-queue.service';
+import { GoalsEngineService } from '../health-goals/goals-engine.service';
 import { CreatePatientMedicationDto } from './dto/create-patient-medication.dto';
 import { UpdatePatientMedicationDto } from './dto/update-patient-medication.dto';
 import { QueryPatientMedicationDto } from './dto/query-patient-medication.dto';
 import { CreateMedicationReminderDto } from './dto/create-medication-reminder.dto';
+import { RecordMedicationAdherenceDto } from './dto/record-medication-adherence.dto';
 import {
   MedicationStatus,
   NotificationChannel,
@@ -25,6 +27,7 @@ export class PatientMedicationsService {
     private readonly prisma: PrismaService,
     private readonly notificationsService: NotificationsService,
     private readonly notificationQueueService: NotificationQueueService,
+    private readonly goalsEngine: GoalsEngineService,
   ) {}
 
   async create(dto: CreatePatientMedicationDto) {
@@ -103,6 +106,36 @@ export class PatientMedicationsService {
         notes: dto.notes?.trim(),
       },
       include: { medication: true, healthPassport: { include: { patient: { include: { person: true } } } } },
+    });
+  }
+
+  async recordAdherence(
+    id: string,
+    dto: RecordMedicationAdherenceDto,
+    authenticatedUserId: string,
+  ) {
+    const medication = await this.findOne(id);
+    const patient = medication.healthPassport.patient;
+    if (patient.userId !== authenticatedUserId) {
+      throw new NotFoundException('Patient medication not found.');
+    }
+
+    const occurredAt = dto.occurredAt ? new Date(dto.occurredAt) : new Date();
+    const loggedValue = dto.taken === false ? 0 : dto.loggedValue;
+
+    return this.goalsEngine.recordMetricEvent({
+      patientId: patient.id,
+      metricType: 'MEDICATION',
+      metricKey: `medication.adherence:${id}`,
+      loggedValue,
+      occurredAt,
+      source: 'medication-adherence',
+      sourceId: id,
+      metadata: {
+        patientMedicationId: id,
+        medicationId: medication.medicationId,
+        taken: dto.taken ?? loggedValue > 0,
+      },
     });
   }
 
