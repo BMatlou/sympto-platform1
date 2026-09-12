@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import { GoalsEngineService } from './goals-engine-v2.service';
+import { GoalsEngineService } from './goals-engine-v3.service';
 
 export type HealthActivitySnapshot = {
   patientId: string;
