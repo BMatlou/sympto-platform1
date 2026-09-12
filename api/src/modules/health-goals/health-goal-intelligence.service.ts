@@ -55,6 +55,21 @@ export class HealthGoalIntelligenceService {
 
   async syncTodayFromJournal(patientId: string, date = new Date()) {
     void date;
-    return this.goalsEngine.backfillJournalMetrics(patientId);
+    await this.goalsEngine.backfillJournalMetrics(patientId);
+    const updated: any[] = [];
+
+    for (const metric of [
+      ['EXERCISE', 'exercise.minutes'],
+      ['HYDRATION', 'hydration.ml'],
+      ['SLEEP', 'sleep.hours'],
+    ]) {
+      updated.push(...await this.goalsEngine.recomputeMatchingGoals(
+        patientId,
+        metric[0],
+        metric[1],
+      ));
+    }
+
+    return updated;
   }
 }
