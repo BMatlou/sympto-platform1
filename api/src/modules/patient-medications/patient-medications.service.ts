@@ -216,12 +216,40 @@ export class PatientMedicationsService {
       },
     });
 
+    const measuredAt = dto.scheduledFor ? new Date(dto.scheduledFor) : new Date();
+    const effectiveMeasuredAt = Number.isNaN(measuredAt.getTime()) ? new Date() : measuredAt;
+
     const affectedGoals: HealthGoalProgressResult[] = [];
     for (const goal of medicationGoals) {
+      const targetValue = goal.targetValue == null ? null : Number(goal.targetValue);
+      let goalCurrentValue = adherencePercentage;
+      let goalProgressNote = `Medication adherence updated after ${dto.action.toLowerCase()} dose.`;
+
+      // Medication goals can have a deadline. In that case progress represents
+      // both adherence and how far the user has travelled through the goal window:
+      // 100% adherence on day 1 of a 30-day goal is ~3.3% progress, while 100%
+      // adherence at the deadline reaches 100%. Without a target date we preserve
+      // the previous behaviour and use adherence percentage directly.
+      if (goal.targetDate && targetValue != null && targetValue > 0) {
+        const goalStart = goal.createdAt.getTime();
+        const goalEnd = goal.targetDate.getTime();
+        const duration = goalEnd - goalStart;
+        const elapsed = effectiveMeasuredAt.getTime() - goalStart;
+        const timeProgress = duration > 0
+          ? Math.min(1, Math.max(0, elapsed / duration))
+          : effectiveMeasuredAt.getTime() >= goalEnd
+            ? 1
+            : 0;
+
+        const adherenceRatio = Math.min(1, Math.max(0, adherencePercentage / 100));
+        goalCurrentValue = Number((targetValue * adherenceRatio * timeProgress).toFixed(2));
+        goalProgressNote = `Medication ${dto.action.toLowerCase()} at ${effectiveMeasuredAt.toISOString()}; ${adherencePercentage}% adherence across ${Math.round(timeProgress * 100)}% of the goal window.`;
+      }
+
       affectedGoals.push(
         await this.healthGoalsService.recordProgress(goal.id, {
-          currentValue: String(adherencePercentage),
-          notes: `Medication adherence updated after ${dto.action.toLowerCase()} dose.`,
+          currentValue: String(goalCurrentValue),
+          notes: goalProgressNote,
         }),
       );
     }
