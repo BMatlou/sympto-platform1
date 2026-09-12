@@ -4,15 +4,8 @@ import {
 } from '@nestjs/common';
 
 import { Prisma } from '@prisma/client';
-
+import { AllergyStatus, ConditionStatus, MedicationStatus, OnboardingStatus } from '@prisma/client';
 import { PrismaService } from '../../database/prisma.service';
-import {
-  AllergyStatus,
-  ConditionStatus,
-  MedicationStatus,
-  OnboardingStatus,
-} from '@prisma/client';
-
 import { UpdateProfileDto } from './dto/update-profile.dto';
 import { UpdateIndividualProfileDto } from './dto/update-individual-profile.dto';
 import { UpdateEmergencyContactDto } from './dto/update-emergency-contact.dto';
@@ -26,9 +19,7 @@ import { UpdateConsentDto } from './dto/update-consent.dto';
 
 @Injectable()
 export class OnboardingRepository {
-  constructor(
-    private readonly prisma: PrismaService,
-  ) {}
+  constructor(private readonly prisma: PrismaService) {}
 
   private async updateOnboardingStep(tx: Prisma.TransactionClient, userId: string, currentStep: number, completionPercentage: number) {
     return tx.onboardingProgress.update({ where: { userId }, data: { currentStep, completionPercentage, status: 'IN_PROGRESS' } });
@@ -46,49 +37,20 @@ export class OnboardingRepository {
   async update(userId: string, data: Prisma.OnboardingProgressUpdateInput) { return this.prisma.onboardingProgress.update({ where: { userId }, data }); }
 
   async updatePersonProfile(userId: string, dto: UpdateProfileDto) {
-    return this.prisma.user.update({
-      where: { id: userId },
-      data: { person: { update: { preferredName: dto.preferredName, dateOfBirth: dto.dateOfBirth ? new Date(dto.dateOfBirth) : undefined, gender: dto.gender, profileImageUrl: dto.profileImageUrl } } },
-      include: { person: true },
-    });
+    return this.prisma.user.update({ where: { id: userId }, data: { person: { update: { preferredName: dto.preferredName, dateOfBirth: dto.dateOfBirth ? new Date(dto.dateOfBirth) : undefined, gender: dto.gender, profileImageUrl: dto.profileImageUrl } } }, include: { person: true } });
   }
 
   async updateIndividualProfile(userId: string, dto: UpdateIndividualProfileDto) {
     return this.prisma.$transaction(async (tx) => {
       const patient = await tx.patient.findUnique({ where: { userId } });
       if (!patient) throw new NotFoundException('Patient not found.');
-
       if (dto.dateOfBirth !== undefined || dto.gender !== undefined) {
         const user = await tx.user.findUnique({ where: { id: userId }, select: { personId: true } });
         if (!user?.personId) throw new NotFoundException('Person not found.');
-        await tx.person.update({
-          where: { id: user.personId },
-          data: {
-            dateOfBirth: dto.dateOfBirth !== undefined ? new Date(dto.dateOfBirth) : undefined,
-            gender: dto.gender,
-          },
-        });
+        await tx.person.update({ where: { id: user.personId }, data: { dateOfBirth: dto.dateOfBirth !== undefined ? new Date(dto.dateOfBirth) : undefined, gender: dto.gender } });
       }
-
-      await tx.patient.update({
-        where: { id: patient.id },
-        data: {
-          heightCm: dto.heightCm,
-          weightKg: dto.weightKg,
-          occupation: dto.occupation,
-          dominantHand: dto.dominantHand,
-          smokingStatus: dto.smokingStatus,
-          alcoholConsumption: dto.alcoholConsumption,
-          exerciseFrequency: dto.exerciseFrequency,
-        },
-      });
-
-      await tx.healthPassport.upsert({
-        where: { patientId: patient.id },
-        update: { bloodType: dto.bloodType, rhesusFactor: dto.rhesusFactor, organDonor: dto.organDonor ?? false, emergencyNotes: dto.emergencyNotes, shareByDefault: dto.shareByDefault ?? false },
-        create: { patientId: patient.id, bloodType: dto.bloodType, rhesusFactor: dto.rhesusFactor, organDonor: dto.organDonor ?? false, emergencyNotes: dto.emergencyNotes, shareByDefault: dto.shareByDefault ?? false },
-      });
-
+      await tx.patient.update({ where: { id: patient.id }, data: { heightCm: dto.heightCm, weightKg: dto.weightKg, occupation: dto.occupation, dominantHand: dto.dominantHand, smokingStatus: dto.smokingStatus, alcoholConsumption: dto.alcoholConsumption, exerciseFrequency: dto.exerciseFrequency } });
+      await tx.healthPassport.upsert({ where: { patientId: patient.id }, update: { bloodType: dto.bloodType, rhesusFactor: dto.rhesusFactor, organDonor: dto.organDonor ?? false, emergencyNotes: dto.emergencyNotes, shareByDefault: dto.shareByDefault ?? false }, create: { patientId: patient.id, bloodType: dto.bloodType, rhesusFactor: dto.rhesusFactor, organDonor: dto.organDonor ?? false, emergencyNotes: dto.emergencyNotes, shareByDefault: dto.shareByDefault ?? false } });
       return this.updateOnboardingStep(tx, userId, 3, 20);
     });
   }
@@ -98,11 +60,8 @@ export class OnboardingRepository {
       const patient = await tx.patient.findUnique({ where: { userId } });
       if (!patient) throw new NotFoundException('Patient not found.');
       const existingPrimary = await tx.emergencyContact.findFirst({ where: { patientId: patient.id, isPrimary: true } });
-      if (existingPrimary) {
-        await tx.emergencyContact.update({ where: { id: existingPrimary.id }, data: { fullName: dto.fullName, relationship: dto.relationship, phoneNumber: dto.phoneNumber, email: dto.email, isPrimary: dto.isPrimary ?? true } });
-      } else {
-        await tx.emergencyContact.create({ data: { patientId: patient.id, fullName: dto.fullName, relationship: dto.relationship, phoneNumber: dto.phoneNumber, email: dto.email, isPrimary: dto.isPrimary ?? true } });
-      }
+      if (existingPrimary) await tx.emergencyContact.update({ where: { id: existingPrimary.id }, data: { fullName: dto.fullName, relationship: dto.relationship, phoneNumber: dto.phoneNumber, email: dto.email, isPrimary: dto.isPrimary ?? true } });
+      else await tx.emergencyContact.create({ data: { patientId: patient.id, fullName: dto.fullName, relationship: dto.relationship, phoneNumber: dto.phoneNumber, email: dto.email, isPrimary: dto.isPrimary ?? true } });
       return this.updateOnboardingStep(tx, userId, 4, 30);
     });
   }
@@ -163,17 +122,8 @@ export class OnboardingRepository {
   async saveConsent(userId: string, dto: UpdateConsentDto) {
     return this.prisma.$transaction(async (tx) => {
       const patient = await tx.patient.findUnique({ where: { userId } }); if (!patient) throw new NotFoundException('Patient not found.');
-      const consents = [
-        { type: 'TERMS', granted: dto.acceptTerms, purpose: 'Terms and conditions' },
-        { type: 'PRIVACY_POLICY', granted: dto.acceptPrivacyPolicy, purpose: 'Privacy policy' },
-        { type: 'DATA_PROCESSING', granted: dto.acceptDataProcessing, purpose: 'Health data processing' },
-        { type: 'MARKETING', granted: dto.acceptMarketing ?? false, purpose: 'Marketing communications' },
-      ];
-      for (const consent of consents) {
-        const existing = await tx.consent.findFirst({ where: { patientId: patient.id, type: consent.type } }); const now = new Date();
-        if (existing) await tx.consent.update({ where: { id: existing.id }, data: { granted: consent.granted, purpose: consent.purpose, grantedAt: consent.granted ? existing.grantedAt : now, revokedAt: consent.granted ? null : now } });
-        else await tx.consent.create({ data: { patientId: patient.id, type: consent.type, granted: consent.granted, purpose: consent.purpose, grantedAt: now, revokedAt: consent.granted ? null : now } });
-      }
+      const consents = [{ type: 'TERMS', granted: dto.acceptTerms, purpose: 'Terms and conditions' }, { type: 'PRIVACY_POLICY', granted: dto.acceptPrivacyPolicy, purpose: 'Privacy policy' }, { type: 'DATA_PROCESSING', granted: dto.acceptDataProcessing, purpose: 'Health data processing' }, { type: 'MARKETING', granted: dto.acceptMarketing ?? false, purpose: 'Marketing communications' }];
+      for (const consent of consents) { const existing = await tx.consent.findFirst({ where: { patientId: patient.id, type: consent.type } }); const now = new Date(); if (existing) await tx.consent.update({ where: { id: existing.id }, data: { granted: consent.granted, purpose: consent.purpose, grantedAt: consent.granted ? existing.grantedAt : now, revokedAt: consent.granted ? null : now } }); else await tx.consent.create({ data: { patientId: patient.id, type: consent.type, granted: consent.granted, purpose: consent.purpose, grantedAt: now, revokedAt: consent.granted ? null : now } }); }
       return this.updateOnboardingStep(tx, userId, 11, 100);
     });
   }
@@ -186,8 +136,56 @@ export class OnboardingRepository {
   }
 
   async getDashboardData(userId: string) {
-    const user = await this.prisma.user.findUnique({ where: { id: userId }, include: { person: { include: { country: true, personAddresses: { where: { isPrimary: true }, orderBy: { createdAt: 'desc' }, take: 1, include: { address: { include: { country: true } } } } } }, patient: { include: { healthPassport: true } } } });
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+      include: {
+        person: { include: { country: true, personAddresses: { where: { isPrimary: true }, orderBy: { createdAt: 'desc' }, take: 1, include: { address: { include: { country: true } } } } } },
+        patient: {
+          include: {
+            healthPassport: {
+              include: {
+                allergies: { include: { allergy: true }, orderBy: { createdAt: 'desc' } },
+                conditions: { include: { condition: true }, orderBy: { createdAt: 'desc' } },
+                medications: { include: { medication: true }, orderBy: { createdAt: 'desc' } },
+                immunizations: { include: { immunization: true }, orderBy: { administeredAt: 'desc' } },
+                patientDiagnoses: { include: { diagnosis: true }, orderBy: { diagnosedAt: 'desc' } },
+                patientProcedures: { include: { procedure: true }, orderBy: { performedAt: 'desc' } },
+              },
+            },
+            emergencyContacts: true,
+            medicalRecord: true,
+            appointments: { orderBy: { scheduledStart: 'desc' }, take: 20 },
+            wearableDevices: true,
+            carePlans: true,
+            labOrders: true,
+            imagingStudies: true,
+          },
+        },
+      },
+    });
     if (!user) throw new NotFoundException('User not found.');
-    return { profile: user.person, patient: user.patient, healthPassport: user.patient?.healthPassport ?? null };
+
+    const patient = user.patient;
+    const healthPassport = patient?.healthPassport ?? null;
+    const consents = patient ? await this.prisma.consent.findMany({ where: { patientId: patient.id }, orderBy: { createdAt: 'desc' } }) : [];
+
+    return {
+      profile: user.person,
+      patient,
+      healthPassport,
+      emergencyContacts: patient?.emergencyContacts ?? [],
+      allergies: healthPassport?.allergies ?? [],
+      conditions: healthPassport?.conditions ?? [],
+      medications: healthPassport?.medications ?? [],
+      immunizations: healthPassport?.immunizations ?? [],
+      diagnoses: healthPassport?.patientDiagnoses ?? [],
+      procedures: healthPassport?.patientProcedures ?? [],
+      labOrders: patient?.labOrders ?? [],
+      imagingStudies: patient?.imagingStudies ?? [],
+      carePlans: patient?.carePlans ?? [],
+      healthGoals: patient ? await this.prisma.healthGoal.findMany({ where: { patientId: patient.id }, orderBy: { createdAt: 'desc' } }) : [],
+      consents,
+      healthJournalSettings: patient ? await this.prisma.healthJournalSettings.findUnique({ where: { patientId: patient.id } }) : null,
+    };
   }
 }

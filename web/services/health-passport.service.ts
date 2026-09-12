@@ -9,8 +9,14 @@ export interface HealthPassportDashboardData {
   conditions: Array<Record<string, unknown>>;
   medications: Array<Record<string, unknown>>;
   immunizations: Array<Record<string, unknown>>;
+  diagnoses: Array<Record<string, unknown>>;
+  procedures: Array<Record<string, unknown>>;
+  labOrders: Array<Record<string, unknown>>;
+  imagingStudies: Array<Record<string, unknown>>;
+  carePlans: Array<Record<string, unknown>>;
   healthGoals: Array<Record<string, unknown>>;
   healthJournalSettings: Record<string, unknown> | null;
+  consents: Array<Record<string, unknown>>;
 }
 
 class HealthPassportService {
@@ -24,10 +30,6 @@ class HealthPassportService {
     const profile = data.profile;
     const patient = data.patient;
 
-    // Person is the canonical source for profile-level identity data such as
-    // date of birth and gender. Mirror those persisted values onto the patient
-    // object returned to profile consumers so the Health Profile card uses the
-    // same source of truth as onboarding without changing database ownership.
     if (patient) {
       const mirroredPatient = {
         ...patient,

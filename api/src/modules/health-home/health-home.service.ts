@@ -1,6 +1,7 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 
 import { PrismaService } from '../../database/prisma.service';
+import { UpdateHealthWeightDto } from './dto/update-health-weight.dto';
 
 const ACTIVE_APPOINTMENT_STATUSES = ['PENDING', 'CONFIRMED', 'CHECKED_IN', 'IN_PROGRESS'] as const;
 const ACTIVE_MEDICATION_STATUSES = ['ACTIVE', 'PAUSED'] as const;
@@ -8,6 +9,28 @@ const ACTIVE_MEDICATION_STATUSES = ['ACTIVE', 'PAUSED'] as const;
 @Injectable()
 export class HealthHomeService {
   constructor(private readonly prisma: PrismaService) {}
+
+  private async resolvePatient(userId: string, requestedPatientId?: string) {
+    const owner = await this.prisma.user.findUnique({
+      where: { id: userId },
+      include: { patient: true },
+    });
+    if (!owner?.patient) throw new NotFoundException('Patient health profile not found.');
+
+    if (!requestedPatientId || requestedPatientId === owner.patient.id) {
+      return { ownerPatient: owner.patient, patientId: owner.patient.id };
+    }
+
+    const familyLink = await this.prisma.familyMember.findFirst({
+      where: {
+        ownerPatientId: owner.patient.id,
+        memberPatientId: requestedPatientId,
+        canViewRecords: true,
+      },
+    });
+    if (!familyLink) throw new NotFoundException('You are not authorised to view this family member.');
+    return { ownerPatient: owner.patient, patientId: requestedPatientId };
+  }
 
   async getHealthHome(userId: string, requestedPatientId?: string) {
     const user = await this.prisma.user.findUnique({
@@ -48,9 +71,7 @@ export class HealthHomeService {
         },
       });
 
-      if (!familyLink) {
-        throw new NotFoundException('You are not authorised to view this family member.');
-      }
+      if (!familyLink) throw new NotFoundException('You are not authorised to view this family member.');
 
       const familyPatient = await this.prisma.patient.findUnique({
         where: { id: requestedPatientId },
@@ -79,6 +100,10 @@ export class HealthHomeService {
     const healthPassportId = patient.healthPassport?.id;
     const now = new Date();
     const immunizations = patient.healthPassport?.immunizations ?? [];
+    const weightKg = patient.weightKg == null ? null : Number(patient.weightKg);
+    const heightCm = patient.heightCm == null ? null : Number(patient.heightCm);
+    const bmi = weightKg && heightCm ? Number((weightKg / ((heightCm / 100) ** 2)).toFixed(1)) : null;
+    const bmiCategory = bmi == null ? null : bmi < 18.5 ? 'UNDERWEIGHT' : bmi < 25 ? 'NORMAL' : bmi < 30 ? 'OVERWEIGHT' : 'OBESITY';
 
     const [allergies, conditions, medications, goals, family, appointments, notifications, devices, measurements, symptomLogs, aiObservations, labOrders, imagingStudies, carePlans] = await Promise.all([
       this.prisma.patientAllergy.findMany({ where: { healthPassportId: healthPassportId ?? '' }, include: { allergy: true }, orderBy: { createdAt: 'desc' } }),
@@ -123,45 +148,50 @@ export class HealthHomeService {
     return {
       generatedAt: now.toISOString(),
       profile: patient.person,
-      patient: {
-        id: patientId,
-        patientNumber: patient.patientNumber,
-        firstName: patient.person?.firstName ?? '',
-        lastName: patient.person?.lastName ?? '',
-        name: [patient.person?.firstName, patient.person?.lastName].filter(Boolean).join(' '),
-        heightCm: patient.heightCm,
-        weightKg: patient.weightKg,
-        deceased: patient.deceased,
-      },
+      patient: { id: patientId, patientNumber: patient.patientNumber, firstName: patient.person?.firstName ?? '', lastName: patient.person?.lastName ?? '', name: [patient.person?.firstName, patient.person?.lastName].filter(Boolean).join(' '), heightCm, weightKg, bmi, bmiCategory, deceased: patient.deceased },
       healthPassport: patient.healthPassport,
-      healthSnapshot: {
-        baseline: patient.baseline,
-        activeConditions,
-        allergies: activeAllergies,
-        immunizations,
-        bloodType: patient.healthPassport?.bloodType ?? null,
-        rhesusFactor: patient.healthPassport?.rhesusFactor ?? null,
-        latestMeasurements: journalSignals.signals,
-        connectedDevices: devices.map((device) => ({ id: device.id, manufacturer: device.manufacturer, model: device.model, deviceType: device.deviceType, status: device.status, lastSyncAt: device.lastSyncAt, measurementCount: device._count.measurements })),
-      },
+      healthSnapshot: { baseline: patient.baseline, activeConditions, allergies: activeAllergies, immunizations, bloodType: patient.healthPassport?.bloodType ?? null, rhesusFactor: patient.healthPassport?.rhesusFactor ?? null, weightKg, heightCm, bmi, bmiCategory, latestMeasurements: journalSignals.signals, connectedDevices: devices.map((device) => ({ id: device.id, manufacturer: device.manufacturer, model: device.model, deviceType: device.deviceType, status: device.status, lastSyncAt: device.lastSyncAt, measurementCount: device._count.measurements })) },
       attention,
       today: { notifications, upcomingAppointments: appointments.slice(0, 5), activeMedications: medications, activeMedicationCount: medications.length, activeGoalCount: goals.length },
-      medications,
-      appointments,
-      goals: goalsWithProgress,
-      healthGoals: goalsWithProgress,
-      family,
-      allergies,
-      conditions,
-      immunizations,
-      emergencyContacts: patient.emergencyContacts,
-      symptoms: symptomLogs,
-      recentResults: { laboratory: labOrders, imaging: imagingStudies },
-      carePlans,
-      journal: journalSignals,
-      ai: { recentObservations: aiObservations },
-      settings: patient.healthJournalSettings,
-      healthJournalSettings: patient.healthJournalSettings,
+      medications, appointments, goals: goalsWithProgress, healthGoals: goalsWithProgress, family, allergies, conditions, immunizations, emergencyContacts: patient.emergencyContacts, symptoms: symptomLogs, recentResults: { laboratory: labOrders, imaging: imagingStudies }, carePlans, journal: journalSignals, ai: { recentObservations: aiObservations }, settings: patient.healthJournalSettings, healthJournalSettings: patient.healthJournalSettings,
     };
+  }
+
+  async getTimeline(userId: string, requestedPatientId?: string) {
+    const { patientId } = await this.resolvePatient(userId, requestedPatientId);
+    const medicalRecord = await this.prisma.medicalRecord.findUnique({ where: { patientId } });
+
+    const [episodes, encounters] = await Promise.all([
+      this.prisma.clinicalEpisode.findMany({
+        where: { patientId },
+        include: { practitioner: { include: { person: true } }, encounter: { include: { encounterType: true } }, appointment: true, symptomLogs: { orderBy: { startedAt: 'desc' }, take: 5 }, diagnoses: true, clinicalNotes: { orderBy: { createdAt: 'desc' }, take: 5 } },
+        orderBy: { startedAt: 'desc' },
+        take: 50,
+      }),
+      medicalRecord ? this.prisma.encounter.findMany({
+        where: { medicalRecordId: medicalRecord.id },
+        include: { encounterType: true, practitioner: { include: { person: true } }, clinicalNotes: { orderBy: { createdAt: 'desc' }, take: 5 }, vitals: { include: { vitalType: true }, orderBy: { measuredAt: 'desc' }, take: 20 }, diagnoses: { include: { diagnosis: true } }, procedures: { include: { procedure: true } } },
+        orderBy: { startedAt: 'desc' },
+        take: 50,
+      }) : [],
+    ]);
+
+    return {
+      patientId,
+      medicalRecordId: medicalRecord?.id ?? null,
+      episodes,
+      encounters,
+      counts: { episodes: episodes.length, encounters: encounters.length },
+    };
+  }
+
+  async updateWeight(userId: string, dto: UpdateHealthWeightDto, requestedPatientId?: string) {
+    const { patientId } = await this.resolvePatient(userId, requestedPatientId);
+    const patient = await this.prisma.patient.update({ where: { id: patientId }, data: { weightKg: dto.weightKg, ...(dto.heightCm !== undefined ? { heightCm: dto.heightCm } : {}) } });
+    const weightKg = Number(patient.weightKg);
+    const heightCm = patient.heightCm == null ? null : Number(patient.heightCm);
+    const bmi = heightCm ? Number((weightKg / ((heightCm / 100) ** 2)).toFixed(1)) : 0;
+    const bmiCategory = bmi === 0 ? null : bmi < 18.5 ? 'UNDERWEIGHT' : bmi < 25 ? 'NORMAL' : bmi < 30 ? 'OVERWEIGHT' : 'OBESITY';
+    return { weightKg, heightCm, bmi, bmiCategory, recordedAt: new Date().toISOString(), goals: [] };
   }
 }
