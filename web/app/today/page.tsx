@@ -143,7 +143,7 @@ export default function TodayPage() {
       </Link>;
     })}</div></section>}
 
-    {medicationGoals.length > 0 && <div className="mt-4"><TodayMedicationActions medications={medications} onUpdated={reload} /></div>}
+    {medicationGoals.length > 0 && <div className="mt-4"><TodayMedicationActions medications={medications} goal={medicationGoals[0]} onUpdated={reload} /></div>}
 
     <Link href="/health-goals" className="mt-4 inline-flex min-h-10 items-center gap-2 rounded-xl bg-[#0b2d54] px-4 py-2.5 text-[10px] font-black text-white shadow-sm transition hover:bg-[#123d63]">Manage health goals <ArrowRight className="h-3.5 w-3.5" /></Link>
 
