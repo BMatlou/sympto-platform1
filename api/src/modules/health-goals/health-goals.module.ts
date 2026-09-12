@@ -3,12 +3,22 @@ import { DatabaseModule } from '../../database/database.module';
 import { HealthGoalsController } from './health-goals.controller';
 import { HealthGoalsService } from './health-goals.service';
 import { HealthGoalIntelligenceService } from './health-goal-intelligence.service';
-import { GoalsEngineService } from './goals-engine.service';
+import { GoalsEngineService } from './goals-engine-v3.service';
+import { GoalsEngineService as CategoryAwareGoalsEngineService } from './goals-engine-v2.service';
 
 @Module({
   imports: [DatabaseModule],
   controllers: [HealthGoalsController],
-  providers: [HealthGoalsService, HealthGoalIntelligenceService, GoalsEngineService],
-  exports: [HealthGoalsService, HealthGoalIntelligenceService, GoalsEngineService],
+  providers: [
+    CategoryAwareGoalsEngineService,
+    GoalsEngineService,
+    HealthGoalsService,
+    HealthGoalIntelligenceService,
+  ],
+  exports: [
+    GoalsEngineService,
+    HealthGoalsService,
+    HealthGoalIntelligenceService,
+  ],
 })
 export class HealthGoalsModule {}
