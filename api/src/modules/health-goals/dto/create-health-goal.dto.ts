@@ -7,11 +7,25 @@ import {
 import {
   IsDateString,
   IsEnum,
+  IsIn,
   IsNumberString,
   IsOptional,
   IsString,
   IsUUID,
 } from 'class-validator';
+
+const GOAL_METRIC_TYPES = [
+  'MEDICATION',
+  'EXERCISE',
+  'HYDRATION',
+  'SMOKING_CESSATION',
+] as const;
+
+const GOAL_FREQUENCIES = [
+  'DAILY',
+  'WEEKLY',
+  'TOTAL',
+] as const;
 
 export class CreateHealthGoalDto {
   @IsUUID()
@@ -62,4 +76,24 @@ export class CreateHealthGoalDto {
   @IsOptional()
   @IsDateString()
   achievedAt?: string;
+
+  @IsOptional()
+  @IsIn(GOAL_METRIC_TYPES)
+  metricType?: (typeof GOAL_METRIC_TYPES)[number];
+
+  @IsOptional()
+  @IsString()
+  metricKey?: string;
+
+  @IsOptional()
+  @IsIn(GOAL_FREQUENCIES)
+  frequency?: (typeof GOAL_FREQUENCIES)[number];
+
+  @IsOptional()
+  @IsNumberString()
+  frequencyTarget?: string;
+
+  @IsOptional()
+  @IsString()
+  guidanceText?: string;
 }
