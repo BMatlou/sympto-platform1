@@ -1,11 +1,7 @@
-import {
-  Injectable,
-  NotFoundException,
-} from '@nestjs/common';
+import { Injectable, NotFoundException } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 
 import { PrismaService } from '../../database/prisma.service';
-
 import { CreateHealthGoalDto } from './dto/create-health-goal.dto';
 import { UpdateHealthGoalDto } from './dto/update-health-goal.dto';
 import { QueryHealthGoalDto } from './dto/query-health-goal.dto';
@@ -24,10 +20,7 @@ export class HealthGoalsService {
       select: { id: true },
     });
 
-    if (!patient) {
-      throw new NotFoundException('Patient not found.');
-    }
-
+    if (!patient) throw new NotFoundException('Patient not found.');
     return patient.id;
   }
 
@@ -48,12 +41,7 @@ export class HealthGoalsService {
         targetDate: dto.targetDate,
         achievedAt: dto.achievedAt,
       },
-      include: {
-        patient: true,
-        practitioner: true,
-        carePlan: true,
-        progress: true,
-      },
+      include: { patient: true, practitioner: true, carePlan: true, progress: true },
     });
 
     if (dto.metricType && dto.metricKey) {
@@ -66,7 +54,6 @@ export class HealthGoalsService {
     }
 
     await this.goalsEngine.backfillPatientJournalEvents(dto.patientId);
-
     return healthGoal;
   }
 
@@ -74,18 +61,19 @@ export class HealthGoalsService {
     return this.goalsEngine.getActiveSnapshot(patientId);
   }
 
-  async syncMetricEventForUser(
-    userId: string,
-    input: {
-      metricType: string;
-      metricKey: string;
-      loggedValue: number;
-      occurredAt?: string;
-      source?: string;
-      sourceId?: string;
-      metadata?: Record<string, unknown>;
-    },
-  ) {
+  async getActiveSnapshotForUser(userId: string) {
+    return this.goalsEngine.getActiveSnapshot(await this.getPatientIdForUser(userId));
+  }
+
+  async syncMetricEventForUser(userId: string, input: {
+    metricType: string;
+    metricKey: string;
+    loggedValue: number;
+    occurredAt?: string;
+    source?: string;
+    sourceId?: string;
+    metadata?: Record<string, unknown>;
+  }) {
     const patientId = await this.getPatientIdForUser(userId);
     return this.goalsEngine.recordMetricEvent({
       patientId,
@@ -100,86 +88,35 @@ export class HealthGoalsService {
   }
 
   async findAll(query: QueryHealthGoalDto) {
-    const {
-      page,
-      limit,
-      patientId,
-      practitionerId,
-      carePlanId,
-      category,
-      priority,
-      status,
-    } = query;
-
-    const where: Prisma.HealthGoalWhereInput = {
-      patientId,
-      practitionerId,
-      carePlanId,
-      category,
-      priority,
-      status,
-    };
-
+    const { page, limit, patientId, practitionerId, carePlanId, category, priority, status } = query;
+    const where: Prisma.HealthGoalWhereInput = { patientId, practitionerId, carePlanId, category, priority, status };
     const [data, total] = await this.prisma.$transaction([
       this.prisma.healthGoal.findMany({
         where,
-        include: {
-          patient: true,
-          practitioner: true,
-          carePlan: true,
-          progress: true,
-        },
-        orderBy: {
-          createdAt: 'desc',
-        },
+        include: { patient: true, practitioner: true, carePlan: true, progress: true },
+        orderBy: { createdAt: 'desc' },
         skip: (page - 1) * limit,
         take: limit,
       }),
-      this.prisma.healthGoal.count({
-        where,
-      }),
+      this.prisma.healthGoal.count({ where }),
     ]);
 
-    return {
-      data,
-      pagination: {
-        page,
-        limit,
-        total,
-        totalPages: Math.ceil(total / limit),
-      },
-    };
+    return { data, pagination: { page, limit, total, totalPages: Math.ceil(total / limit) } };
   }
 
   async findOne(id: string) {
     const healthGoal = await this.prisma.healthGoal.findUnique({
-      where: {
-        id,
-      },
-      include: {
-        patient: true,
-        practitioner: true,
-        carePlan: true,
-        progress: true,
-      },
+      where: { id },
+      include: { patient: true, practitioner: true, carePlan: true, progress: true },
     });
-
-    if (!healthGoal) {
-      throw new NotFoundException(
-        'Health goal not found.',
-      );
-    }
-
+    if (!healthGoal) throw new NotFoundException('Health goal not found.');
     return healthGoal;
   }
 
   async update(id: string, dto: UpdateHealthGoalDto) {
     await this.findOne(id);
-
     const healthGoal = await this.prisma.healthGoal.update({
-      where: {
-        id,
-      },
+      where: { id },
       data: {
         patientId: dto.patientId,
         practitionerId: dto.practitionerId,
@@ -195,12 +132,7 @@ export class HealthGoalsService {
         targetDate: dto.targetDate,
         achievedAt: dto.achievedAt,
       },
-      include: {
-        patient: true,
-        practitioner: true,
-        carePlan: true,
-        progress: true,
-      },
+      include: { patient: true, practitioner: true, carePlan: true, progress: true },
     });
 
     if (dto.metricType && dto.metricKey) {
@@ -224,13 +156,7 @@ export class HealthGoalsService {
 
   async remove(id: string) {
     await this.findOne(id);
-    await this.prisma.healthGoal.delete({
-      where: {
-        id,
-      },
-    });
-    return {
-      message: 'Health goal deleted successfully.',
-    };
+    await this.prisma.healthGoal.delete({ where: { id } });
+    return { message: 'Health goal deleted successfully.' };
   }
 }
