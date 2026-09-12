@@ -1,6 +1,6 @@
 "use client";
 
-import { Check, CircleSlash2, Pill } from "lucide-react";
+import { Check, CircleSlash2, Pill, Target } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 import { api } from "@/lib/api";
@@ -8,6 +8,7 @@ import { healthGoalsService } from "@/services/health-goals.service";
 
 interface TodayMedicationActionsProps {
   medications: any[];
+  goal?: any;
   onUpdated?: () => Promise<void> | void;
 }
 
@@ -54,7 +55,7 @@ function todayBounds() {
   return { start, end };
 }
 
-export default function TodayMedicationActions({ medications, onUpdated }: TodayMedicationActionsProps) {
+export default function TodayMedicationActions({ medications, goal, onUpdated }: TodayMedicationActionsProps) {
   const [dosesLoggedToday, setDosesLoggedToday] = useState(0);
   const [isSyncing, setIsSyncing] = useState(false);
   const [savingKey, setSavingKey] = useState<string | null>(null);
@@ -116,16 +117,43 @@ export default function TodayMedicationActions({ medications, onUpdated }: Today
     }
   }
 
+  const goalTitle = goal?.title || "Medication adherence";
+
   if (!medications.length) {
-    return <div className="overflow-hidden rounded-[28px] border border-[#dce9ee] bg-white shadow-[0_12px_34px_rgba(11,45,84,.045)]"><div className="p-6 sm:p-7"><p className="text-[10px] font-black uppercase tracking-[0.16em] text-[#0b6f73]">Health goals</p><h3 className="mt-1 text-xl font-black tracking-[-.04em] text-[#0b2d54]">Today&apos;s medication</h3><p className="mt-2 text-xs text-[#74859a]">No active medicine is scheduled for today.</p></div></div>;
+    return (
+      <section className="overflow-hidden rounded-[28px] border border-[#dce9ee] bg-white shadow-[0_12px_34px_rgba(11,45,84,.045)]">
+        <div className="p-6 sm:p-7">
+          <div className="flex items-start gap-3.5">
+            <span className="grid h-11 w-11 shrink-0 place-items-center rounded-2xl bg-[#edf4ff] text-[#0b2d54]"><Target className="h-5 w-5" /></span>
+            <div className="min-w-0">
+              <p className="text-[10px] font-black uppercase tracking-[0.16em] text-[#0b6f73]">Health goals</p>
+              <p className="mt-1 text-[10px] font-black uppercase tracking-[0.14em] text-[#8a99a8]">Current goal</p>
+              <h3 className="mt-1 truncate text-xl font-black tracking-[-.04em] text-[#0b2d54]">{goalTitle}</h3>
+              <p className="mt-1 text-xs text-[#74859a]">Medication · No active medicine is scheduled for today.</p>
+            </div>
+          </div>
+        </div>
+      </section>
+    );
   }
 
   return (
     <section className="overflow-hidden rounded-[28px] border border-[#dce9ee] bg-white shadow-[0_12px_34px_rgba(11,45,84,.045)]">
       <div className="relative overflow-hidden border-b border-[#edf2f5] bg-gradient-to-br from-[#f7fcfc] via-white to-[#eef8f8] px-5 py-5 sm:px-7">
         <div className="absolute right-[-40px] top-[-70px] h-40 w-40 rounded-full bg-[#24c1c4]/10 blur-3xl" />
-        <div className="relative flex items-center justify-between gap-4">
-          <div className="flex min-w-0 items-center gap-3.5"><span className="grid h-11 w-11 shrink-0 place-items-center rounded-2xl bg-[#e5f7f6] text-[#0b6f73]"><Pill className="h-5 w-5" /></span><div><p className="text-[10px] font-black uppercase tracking-[0.16em] text-[#0b6f73]">Health goals</p><h3 className="mt-0.5 text-xl font-black tracking-[-.04em] text-[#0b2d54]">Today&apos;s medication</h3><p className="mt-1 text-xs text-[#74859a]">Mark each medicine Taken or Skipped.</p></div></div>
+        <div className="relative flex items-start justify-between gap-4">
+          <div className="flex min-w-0 items-start gap-3.5">
+            <span className="grid h-11 w-11 shrink-0 place-items-center rounded-2xl bg-[#e5f7f6] text-[#0b6f73]"><Target className="h-5 w-5" /></span>
+            <div className="min-w-0">
+              <p className="text-[10px] font-black uppercase tracking-[0.16em] text-[#0b6f73]">Health goals</p>
+              <div className="mt-1 flex flex-wrap items-center gap-2">
+                <span className="rounded-full bg-[#edf4ff] px-2.5 py-1 text-[9px] font-black uppercase tracking-[0.12em] text-[#3f75bd]">Current goal</span>
+                <span className="text-[10px] font-black uppercase tracking-[0.12em] text-[#8a99a8]">Medication</span>
+              </div>
+              <h3 className="mt-1.5 text-xl font-black tracking-[-.04em] text-[#0b2d54]">{goalTitle}</h3>
+              <p className="mt-1 text-xs text-[#74859a]">Today&apos;s action · Mark each medicine Taken or Skipped.</p>
+            </div>
+          </div>
           <div className="shrink-0 rounded-2xl bg-white px-3.5 py-2.5 text-center shadow-sm ring-1 ring-[#e0ecef]"><p className="text-lg font-black leading-none text-[#0b2d54]">{doseLabel}</p><p className="mt-1 text-[9px] font-black uppercase tracking-[0.12em] text-[#7d8f9e]">{percent}% complete</p></div>
         </div>
       </div>
