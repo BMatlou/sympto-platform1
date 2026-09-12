@@ -128,7 +128,7 @@ export class PatientMedicationsService {
       throw new NotFoundException('Patient medication not found.');
     }
 
-    if (dto.medicationId !== existing.medicationId) {
+    if (dto.medicationId && dto.medicationId !== existing.medicationId) {
       throw new BadRequestException('Medication does not match the patient medication record.');
     }
 

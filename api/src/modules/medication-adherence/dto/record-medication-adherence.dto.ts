@@ -6,8 +6,9 @@ export enum MedicationAdherenceAction {
 }
 
 export class RecordMedicationAdherenceDto {
+  @IsOptional()
   @IsUUID()
-  medicationId!: string;
+  medicationId?: string;
 
   @IsEnum(MedicationAdherenceAction)
   action!: MedicationAdherenceAction;

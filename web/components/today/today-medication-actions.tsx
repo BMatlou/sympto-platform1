@@ -26,10 +26,6 @@ function patientMedicationId(medication: any) {
   return medication?.patientMedicationId || medication?.patientMedication?.id || medication?.id || null;
 }
 
-function medicationId(medication: any) {
-  return medication?.medicationId || medication?.medication?.id || medication?.medication?.medicationId || null;
-}
-
 function errorMessage(error: unknown) {
   const message = (error as { response?: { data?: { message?: string | string[] } } })?.response?.data?.message;
   if (Array.isArray(message)) return message.join(" ");
@@ -57,16 +53,7 @@ export default function TodayMedicationActions({ medications, onUpdated }: Today
     setSavingKey(`${key}:${action}`);
 
     try {
-      const recordResponse = await api.get(`/patient-medications/${key}`);
-      const patientMedication = recordResponse.data;
-      const underlyingMedicationId = medicationId(patientMedication);
-
-      if (!underlyingMedicationId) {
-        throw new Error("The patient medication record does not contain its medication ID.");
-      }
-
       const response = await api.post(`/patient-medications/${key}/adherence`, {
-        medicationId: String(underlyingMedicationId),
         action,
         scheduledFor: new Date().toISOString(),
       });
@@ -78,7 +65,7 @@ export default function TodayMedicationActions({ medications, onUpdated }: Today
         : "";
 
       toast.success(action === "TAKEN" ? "Medication marked taken" : "Medication marked skipped", {
-        description: `${medicationName(patientMedication)}${suffix}`,
+        description: `${medicationName(medication)}${suffix}`,
       });
 
       await onUpdated?.();
