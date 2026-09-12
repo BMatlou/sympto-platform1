@@ -110,6 +110,14 @@ export class GoalsEngineService {
   }
 
   private async evaluateValue(patientId: string, config: GoalConfig, start: Date, end: Date, value: number, target: number) {
+    if (config.metricType === 'WEIGHT' && config.comparison === 'DECREASE_TO') {
+      const startingValue = await this.firstMetricValue(patientId, config.metricType, config.metricKey, start, end) ?? value;
+      const lowest = await this.minimumMetricValue(patientId, config.metricType, config.metricKey, start, end) ?? value;
+      const targetWeight = startingValue - target;
+      const actualLoss = startingValue - lowest;
+      const progressPercent = target > 0 ? this.cap((actualLoss / target) * 100) : lowest <= targetWeight ? 100 : 0;
+      return { currentValue: value, progressPercent, achieved: lowest <= targetWeight };
+    }
     if (config.comparison === 'INCREASE_TO' || config.comparison === 'DECREASE_TO') {
       const baseline = await this.firstMetricValue(patientId, config.metricType, config.metricKey, start, end);
       const startingValue = baseline ?? value;
@@ -141,6 +149,11 @@ export class GoalsEngineService {
   private async firstMetricValue(patientId: string, metricType: string, metricKey: string, start: Date, end: Date) {
     const rows = await this.prisma.$queryRaw<Array<{ loggedValue: number }>>`SELECT "loggedValue" FROM "HealthGoalMetricEvent" WHERE "patientId" = ${patientId} AND "metricType" = ${metricType} AND "metricKey" = ${metricKey} AND "occurredAt" BETWEEN ${start} AND ${end} ORDER BY "occurredAt" ASC LIMIT 1`;
     return rows.length ? Number(rows[0].loggedValue) : null;
+  }
+
+  private async minimumMetricValue(patientId: string, metricType: string, metricKey: string, start: Date, end: Date) {
+    const rows = await this.prisma.$queryRaw<Array<{ value: number | null }>>`SELECT MIN("loggedValue") AS value FROM "HealthGoalMetricEvent" WHERE "patientId" = ${patientId} AND "metricType" = ${metricType} AND "metricKey" = ${metricKey} AND "occurredAt" BETWEEN ${start} AND ${end}`;
+    return rows[0]?.value == null ? null : Number(rows[0].value);
   }
 
   private windowStart(frequency: 'DAILY' | 'WEEKLY' | 'TOTAL', createdAt: Date, now: Date) {
