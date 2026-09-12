@@ -1,5 +1,9 @@
 -- Multi-goal contextual matching metadata.
 -- Uses TEXT foreign keys because existing Sympto IDs are Prisma String/TEXT columns.
+-- Drop only these feature-owned tables so a previously interrupted local prototype can be recovered safely.
+DROP TABLE IF EXISTS "HealthGoalMetricEvent" CASCADE;
+DROP TABLE IF EXISTS "HealthGoalMetricConfig" CASCADE;
+
 CREATE TABLE "HealthGoalMetricConfig" (
   "id" UUID NOT NULL DEFAULT gen_random_uuid(),
   "healthGoalId" TEXT NOT NULL,
@@ -21,8 +25,6 @@ CREATE TABLE "HealthGoalMetricConfig" (
 CREATE INDEX "HealthGoalMetricConfig_metric_lookup_idx"
   ON "HealthGoalMetricConfig" ("metricType", "metricKey");
 
--- Normalized metric events. Domain modules keep their rich records;
--- this table is the predictable stream consumed by the contextual goal engine.
 CREATE TABLE "HealthGoalMetricEvent" (
   "id" UUID NOT NULL DEFAULT gen_random_uuid(),
   "patientId" TEXT NOT NULL,
