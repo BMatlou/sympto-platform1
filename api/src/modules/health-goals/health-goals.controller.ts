@@ -26,10 +26,7 @@ import { SyncGoalMetricDto } from './dto/sync-goal-metric.dto';
 @ApiTags('Health Goals')
 @ApiBearerAuth()
 @Controller('health-goals')
-@UseGuards(
-  JwtAuthGuard,
-  PermissionsGuard,
-)
+@UseGuards(JwtAuthGuard, PermissionsGuard)
 export class HealthGoalsController {
   constructor(
     private readonly healthGoalsService: HealthGoalsService,
@@ -38,7 +35,7 @@ export class HealthGoalsController {
   @Permissions('health-goals.read')
   @Get('active-snapshot')
   async activeSnapshot(@Req() req: any) {
-    const result = await this.healthGoalsService.getActiveSnapshot(req.user.sub);
+    const result = await this.healthGoalsService.getActiveSnapshotForUser(req.user.sub);
     return { data: result };
   }
 
@@ -48,17 +45,8 @@ export class HealthGoalsController {
     @Req() req: any,
     @Body() dto: SyncGoalMetricDto,
   ) {
-    const patient = await this.healthGoalsService['prisma'].patient.findUnique({
-      where: { userId: req.user.sub },
-      select: { id: true },
-    });
-
-    if (!patient) {
-      return { data: { updatedGoals: [] } };
-    }
-
-    const result = await this.healthGoalsService.syncMetricEvent(
-      patient.id,
+    const result = await this.healthGoalsService.syncMetricEventForUser(
+      req.user.sub,
       dto,
     );
 
@@ -67,60 +55,34 @@ export class HealthGoalsController {
 
   @Permissions('health-goals.create')
   @Post()
-  create(
-    @Body()
-    dto: CreateHealthGoalDto,
-  ) {
-    return this.healthGoalsService.create(
-      dto,
-    );
+  create(@Body() dto: CreateHealthGoalDto) {
+    return this.healthGoalsService.create(dto);
   }
 
   @Permissions('health-goals.read')
   @Get()
-  findAll(
-    @Query()
-    query: QueryHealthGoalDto,
-  ) {
-    return this.healthGoalsService.findAll(
-      query,
-    );
+  findAll(@Query() query: QueryHealthGoalDto) {
+    return this.healthGoalsService.findAll(query);
   }
 
   @Permissions('health-goals.update')
   @Patch(':id')
   update(
-    @Param('id')
-    id: string,
-
-    @Body()
-    dto: UpdateHealthGoalDto,
+    @Param('id') id: string,
+    @Body() dto: UpdateHealthGoalDto,
   ) {
-    return this.healthGoalsService.update(
-      id,
-      dto,
-    );
+    return this.healthGoalsService.update(id, dto);
   }
 
   @Permissions('health-goals.delete')
   @Delete(':id')
-  remove(
-    @Param('id')
-    id: string,
-  ) {
-    return this.healthGoalsService.remove(
-      id,
-    );
+  remove(@Param('id') id: string) {
+    return this.healthGoalsService.remove(id);
   }
 
   @Permissions('health-goals.read')
   @Get(':id')
-  findOne(
-    @Param('id')
-    id: string,
-  ) {
-    return this.healthGoalsService.findOne(
-      id,
-    );
+  findOne(@Param('id') id: string) {
+    return this.healthGoalsService.findOne(id);
   }
 }
