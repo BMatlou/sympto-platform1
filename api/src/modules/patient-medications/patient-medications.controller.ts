@@ -24,6 +24,13 @@ import { QueryPatientMedicationDto } from './dto/query-patient-medication.dto';
 import { CreateMedicationReminderDto } from './dto/create-medication-reminder.dto';
 import { RecordMedicationAdherenceDto } from '../medication-adherence/dto/record-medication-adherence.dto';
 
+interface AuthenticatedRequest {
+  user?: {
+    id?: string;
+    sub?: string;
+  };
+}
+
 @ApiTags('Patient Medications')
 @ApiBearerAuth()
 @Controller('patient-medications')
@@ -45,23 +52,20 @@ export class PatientMedicationsController {
     return this.patientMedicationsService.findAll(query);
   }
 
-  @Permissions('patient-medication.read')
-  @Get(':id')
-  findOne(@Param('id') id: string) {
-    return this.patientMedicationsService.findOne(id);
-  }
-
+  // Specific action routes are declared before the generic :id route.
   @Permissions('patient-medication.update')
   @Post(':id/adherence')
   recordAdherence(
     @Param('id') id: string,
     @Body() dto: RecordMedicationAdherenceDto,
-    @Req() request: { user?: { id?: string } },
+    @Req() request: AuthenticatedRequest,
   ) {
+    const authenticatedUserId = request.user?.sub ?? request.user?.id ?? '';
+
     return this.patientMedicationsService.recordAdherence(
       id,
       dto,
-      request.user?.id ?? '',
+      authenticatedUserId,
     );
   }
 
@@ -70,13 +74,21 @@ export class PatientMedicationsController {
   scheduleReminder(
     @Param('id') id: string,
     @Body() dto: CreateMedicationReminderDto,
-    @Req() request: { user?: { id?: string } },
+    @Req() request: AuthenticatedRequest,
   ) {
+    const authenticatedUserId = request.user?.sub ?? request.user?.id ?? '';
+
     return this.patientMedicationsService.scheduleReminder(
       id,
       dto,
-      request.user?.id ?? '',
+      authenticatedUserId,
     );
+  }
+
+  @Permissions('patient-medication.read')
+  @Get(':id')
+  findOne(@Param('id') id: string) {
+    return this.patientMedicationsService.findOne(id);
   }
 
   @Permissions('patient-medication.update')
