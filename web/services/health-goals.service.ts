@@ -15,6 +15,17 @@ export type HealthGoalProgressUpdate = {
   }>;
 };
 
+export type HealthGoalMetricEventsResponse = {
+  count: number;
+  events: Array<{
+    id: string;
+    loggedValue: number;
+    occurredAt: string;
+    source: string;
+    sourceId?: string | null;
+  }>;
+};
+
 class HealthGoalsService {
   async recordProgress(
     goalId: string,
@@ -30,6 +41,25 @@ class HealthGoalsService {
     );
 
     return data.data ?? data;
+  }
+
+  async getMetricEvents(
+    metricType: string,
+    metricKey: string,
+    from: Date,
+    to: Date,
+    source?: string,
+  ): Promise<HealthGoalMetricEventsResponse> {
+    const response = await api.get(`/health-goals/metric-events`, {
+      params: {
+        metricType,
+        metricKey,
+        from: from.toISOString(),
+        to: to.toISOString(),
+        ...(source ? { source } : {}),
+      },
+    });
+    return response.data?.data ?? response.data;
   }
 }
 
