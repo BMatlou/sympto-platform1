@@ -18,6 +18,19 @@ export class HealthGoalsService {
     private readonly goalsEngine: GoalsEngineService,
   ) {}
 
+  private async getPatientIdForUser(userId: string) {
+    const patient = await this.prisma.patient.findUnique({
+      where: { userId },
+      select: { id: true },
+    });
+
+    if (!patient) {
+      throw new NotFoundException('Patient not found.');
+    }
+
+    return patient.id;
+  }
+
   async create(dto: CreateHealthGoalDto) {
     const healthGoal = await this.prisma.healthGoal.create({
       data: {
@@ -52,9 +65,6 @@ export class HealthGoalsService {
       `;
     }
 
-    // New goals must see qualifying history that was already recorded before
-    // the goal was created. This also keeps a newly-added goal from looking
-    // artificially empty when the patient has been tracking the same metric.
     await this.goalsEngine.backfillPatientJournalEvents(dto.patientId);
 
     return healthGoal;
@@ -64,8 +74,8 @@ export class HealthGoalsService {
     return this.goalsEngine.getActiveSnapshot(patientId);
   }
 
-  async syncMetricEvent(
-    patientId: string,
+  async syncMetricEventForUser(
+    userId: string,
     input: {
       metricType: string;
       metricKey: string;
@@ -76,6 +86,7 @@ export class HealthGoalsService {
       metadata?: Record<string, unknown>;
     },
   ) {
+    const patientId = await this.getPatientIdForUser(userId);
     return this.goalsEngine.recordMetricEvent({
       patientId,
       metricType: input.metricType,
@@ -163,7 +174,7 @@ export class HealthGoalsService {
   }
 
   async update(id: string, dto: UpdateHealthGoalDto) {
-    const existing = await this.findOne(id);
+    await this.findOne(id);
 
     const healthGoal = await this.prisma.healthGoal.update({
       where: {
@@ -208,15 +219,7 @@ export class HealthGoalsService {
       `;
     }
 
-    if (dto.metricType || dto.metricKey || dto.frequency || dto.frequencyTarget || dto.guidanceText) {
-      await this.goalsEngine.processMetricEvent(
-        healthGoal.patientId,
-        dto.metricType ?? 'UNMAPPED',
-        dto.metricKey ?? '',
-      );
-    }
-
-    return { ...healthGoal, previousGoal: existing };
+    return healthGoal;
   }
 
   async remove(id: string) {
