@@ -50,12 +50,47 @@ export class GoalsEngineService {
     await this.prisma.$executeRaw`DELETE FROM "HealthGoalMetricEvent" WHERE "patientId" = ${patientId} AND "source" = ${source} AND "sourceId" = ${sourceId}`;
   }
 
+  private async restoreHistoricalAchievements(patientId: string, metricType: string, metricKey: string, now: Date) {
+    const legacy = await this.prisma.$queryRaw<Array<{ healthGoalId: string }>>`SELECT c."healthGoalId" FROM "HealthGoalMetricConfig" c INNER JOIN "HealthGoal" g ON g."id" = c."healthGoalId" WHERE g."patientId" = ${patientId} AND g."status" = 'ACTIVE' AND c."metricType" = ${metricType} AND c."metricKey" = ${metricKey} AND EXISTS (SELECT 1 FROM "HealthGoalProgress" p WHERE p."healthGoalId" = g."id" AND p."status" = 'ACHIEVED')`;
+    if (!legacy.length) return;
+
+    const currentRows = await this.prisma.$queryRaw<Array<{ loggedValue: number | null }>>`SELECT "loggedValue" FROM "HealthGoalMetricEvent" WHERE "patientId" = ${patientId} AND "metricType" = ${metricType} AND "metricKey" = ${metricKey} AND "occurredAt" <= ${now} ORDER BY "occurredAt" DESC LIMIT 1`;
+    const currentValue = currentRows[0]?.loggedValue == null ? null : Number(currentRows[0].loggedValue);
+
+    for (const goal of legacy) {
+      await this.prisma.$transaction(async (tx) => {
+        await tx.healthGoal.update({
+          where: { id: goal.healthGoalId },
+          data: {
+            status: 'ACHIEVED',
+            achievedAt: now,
+            ...(currentValue != null ? { currentValue: String(currentValue) } : {}),
+          },
+        });
+        await tx.healthGoalProgress.create({
+          data: {
+            healthGoalId: goal.healthGoalId,
+            currentValue: currentValue == null ? null : String(currentValue),
+            progressPercent: '100.00',
+            status: HealthGoalProgressStatus.ACHIEVED,
+            notes: `Preserved historical achievement from ${metricKey}.`,
+            measuredAt: now,
+          },
+        });
+      });
+    }
+  }
+
   async recomputeMatchingGoals(patientId: string, metricType: string, metricKey: string, now = new Date()) {
+    await this.restoreHistoricalAchievements(patientId, metricType, metricKey, now);
     const configs = await this.prisma.$queryRaw<GoalConfig[]>`SELECT c."healthGoalId", c."metricType", c."metricKey", c."frequency", c."frequencyTarget", c."guidanceText", c."aggregation", c."comparison" FROM "HealthGoalMetricConfig" c INNER JOIN "HealthGoal" g ON g."id" = c."healthGoalId" WHERE g."patientId" = ${patientId} AND g."status" = 'ACTIVE' AND NOT EXISTS (SELECT 1 FROM "HealthGoalProgress" p WHERE p."healthGoalId" = g."id" AND p."status" = 'ACHIEVED') AND c."metricType" = ${metricType} AND c."metricKey" = ${metricKey}`;
     return this.evaluateConfigs(patientId, configs, now);
   }
 
   async recomputeAllMatchingGoals(patientId: string, now = new Date()) {
+    for (const metric of [['WEIGHT', 'weight.kg'], ['EXERCISE', 'exercise.minutes'], ['NUTRITION', 'nutrition.calories'], ['BLOOD_PRESSURE', 'blood_pressure.systolic'], ['BLOOD_PRESSURE', 'blood_pressure.diastolic'], ['BLOOD_GLUCOSE', 'blood_glucose.value'], ['CHOLESTEROL', 'cholesterol.total'], ['MEDICATION', 'medication.adherence'], ['SLEEP', 'sleep.hours'], ['MENTAL_HEALTH', 'mental.stress'], ['HYDRATION', 'hydration.ml'], ['SMOKING', 'smoking.status'], ['ALCOHOL', 'alcohol.frequency'], ['HEART_RATE', 'heart_rate.bpm']] as const) {
+      await this.restoreHistoricalAchievements(patientId, metric[0], metric[1], now);
+    }
     const configs = await this.prisma.$queryRaw<GoalConfig[]>`SELECT c."healthGoalId", c."metricType", c."metricKey", c."frequency", c."frequencyTarget", c."guidanceText", c."aggregation", c."comparison" FROM "HealthGoalMetricConfig" c INNER JOIN "HealthGoal" g ON g."id" = c."healthGoalId" WHERE g."patientId" = ${patientId} AND g."status" = 'ACTIVE' AND NOT EXISTS (SELECT 1 FROM "HealthGoalProgress" p WHERE p."healthGoalId" = g."id" AND p."status" = 'ACHIEVED')`;
     return this.evaluateConfigs(patientId, configs, now);
   }
