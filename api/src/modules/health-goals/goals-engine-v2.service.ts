@@ -31,6 +31,16 @@ export class GoalsEngineService {
     const occurredAt = input.occurredAt ?? new Date();
     const source = input.source ?? 'unknown';
     if (!Number.isFinite(input.loggedValue)) return [];
+
+    if (source === 'patient-profile' && input.sourceId === 'profile') {
+      const latest = await this.prisma.$queryRaw<Array<{ loggedValue: number | null }>>`SELECT "loggedValue" FROM "HealthGoalMetricEvent" WHERE "patientId" = ${input.patientId} AND "metricType" = ${input.metricType} AND "metricKey" = ${input.metricKey} AND "source" = ${source} AND "sourceId" = ${input.sourceId} ORDER BY "occurredAt" DESC LIMIT 1`;
+      if (latest.length && latest[0]?.loggedValue != null && Number(latest[0].loggedValue) === input.loggedValue) {
+        return this.recomputeMatchingGoals(input.patientId, input.metricType, input.metricKey, occurredAt);
+      }
+      await this.prisma.$executeRaw`INSERT INTO "HealthGoalMetricEvent" ("patientId", "metricType", "metricKey", "loggedValue", "occurredAt", "source", "sourceId") VALUES (${input.patientId}, ${input.metricType}, ${input.metricKey}, ${input.loggedValue}, ${occurredAt}, ${source}, ${input.sourceId})`;
+      return this.recomputeMatchingGoals(input.patientId, input.metricType, input.metricKey, occurredAt);
+    }
+
     await this.prisma.$executeRaw`DELETE FROM "HealthGoalMetricEvent" WHERE "patientId" = ${input.patientId} AND "metricType" = ${input.metricType} AND "metricKey" = ${input.metricKey} AND "source" = ${source} AND COALESCE("sourceId", '') = COALESCE(${input.sourceId ?? null}, '')`;
     await this.prisma.$executeRaw`INSERT INTO "HealthGoalMetricEvent" ("patientId", "metricType", "metricKey", "loggedValue", "occurredAt", "source", "sourceId") VALUES (${input.patientId}, ${input.metricType}, ${input.metricKey}, ${input.loggedValue}, ${occurredAt}, ${source}, ${input.sourceId ?? null})`;
     return this.recomputeMatchingGoals(input.patientId, input.metricType, input.metricKey, occurredAt);
