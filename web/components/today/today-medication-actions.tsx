@@ -13,6 +13,8 @@ interface TodayMedicationActionsProps {
 
 type Action = "TAKEN" | "SKIPPED";
 
+type PerformanceStatus = "WORKING_WELL" | "PARTIALLY_ON_TRACK" | "NEEDS_ATTENTION";
+
 function medicationName(medication: any) {
   return medication?.medication?.name || medication?.medication?.genericName || medication?.name || "Your medicine";
 }
@@ -46,6 +48,22 @@ function formatTargetDate(value: unknown): string {
   }).format(date);
 }
 
+function daysUntilTarget(value: unknown): number | null {
+  if (!value) return null;
+  const target = new Date(String(value));
+  if (Number.isNaN(target.getTime())) return null;
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  target.setHours(0, 0, 0, 0);
+  return Math.ceil((target.getTime() - today.getTime()) / (24 * 60 * 60 * 1000));
+}
+
+function getGoalProgress(goal: any): number {
+  const latestProgress = goal?.latestProgress ?? goal?.progress?.[0] ?? null;
+  const rawProgress = Number(latestProgress?.progressPercent ?? goal?.progressPercent ?? 0);
+  return Number.isFinite(rawProgress) ? Math.max(0, Math.min(100, Math.round(rawProgress))) : 0;
+}
+
 function patientMedicationId(medication: any) {
   return medication?.patientMedicationId || medication?.patientMedication?.id || medication?.id || null;
 }
@@ -74,6 +92,54 @@ export default function TodayMedicationActions({ medications, onUpdated }: Today
     [dashboard?.goals],
   );
   const targetGoalDate = formatTargetDate(medicationGoal?.targetDate);
+  const goalProgress = getGoalProgress(medicationGoal);
+  const targetDaysRemaining = daysUntilTarget(medicationGoal?.targetDate);
+
+  const performance = useMemo((): {
+    status: PerformanceStatus;
+    label: string;
+    detail: string;
+  } => {
+    if (targetDaysRemaining !== null && targetDaysRemaining < 0) {
+      return {
+        status: "NEEDS_ATTENTION",
+        label: "Behind target date",
+        detail: "The target date has passed. Review the goal and update the plan if needed.",
+      };
+    }
+
+    if (dosesLoggedToday >= totalRequiredDosesPerDay) {
+      return {
+        status: "WORKING_WELL",
+        label: "Working well toward the target",
+        detail: targetDaysRemaining === null
+          ? "You completed today’s required doses. Keep the pattern going."
+          : `${targetDaysRemaining} day${targetDaysRemaining === 1 ? "" : "s"} left to the target date. Keep this consistency going.`,
+      };
+    }
+
+    if (dosesLoggedToday > 0) {
+      return {
+        status: "PARTIALLY_ON_TRACK",
+        label: "Partially on track",
+        detail: `${dosesLoggedToday}/${totalRequiredDosesPerDay} doses logged today. Complete the remaining dose${totalRequiredDosesPerDay - dosesLoggedToday === 1 ? "" : "s"} to stay on track.`,
+      };
+    }
+
+    return {
+      status: "NEEDS_ATTENTION",
+      label: "Needs attention",
+      detail: targetDaysRemaining === null
+        ? "No dose has been logged today. Start with your first scheduled dose."
+        : `${targetDaysRemaining} day${targetDaysRemaining === 1 ? "" : "s"} left to the target date. Start today’s medication check-in.`,
+    };
+  }, [dosesLoggedToday, targetDaysRemaining, totalRequiredDosesPerDay]);
+
+  const performanceClasses = {
+    WORKING_WELL: "bg-[#e9f8f1] text-[#168660] ring-[#cdeedf]",
+    PARTIALLY_ON_TRACK: "bg-amber-50 text-amber-700 ring-amber-200",
+    NEEDS_ATTENTION: "bg-red-50 text-red-700 ring-red-200",
+  } as const;
 
   const getGuidanceMessage = () => {
     if (dosesLoggedToday === 0) return "Today: mark each dose Taken or Skipped below.";
@@ -149,14 +215,20 @@ export default function TodayMedicationActions({ medications, onUpdated }: Today
           </div>
         </div>
         <div className="mt-3 rounded-xl bg-white px-3 py-2.5 ring-1 ring-[#dce9ec]">
-          <p className="text-[11px] font-black text-[#0b2d54]">🎯 Target Date: {targetGoalDate} ({medicationGoal ? "1 active goal" : "no active goal found"})</p>
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <p className="text-[11px] font-black text-[#0b2d54]">🎯 Target Date: {targetGoalDate} ({medicationGoal ? "1 active goal" : "no active goal found"})</p>
+            <span className={`rounded-full px-2.5 py-1 text-[10px] font-black ring-1 ${performanceClasses[performance.status]}`}>
+              {performance.label}
+            </span>
+          </div>
           <div className="mt-2 flex items-center justify-between text-[10px] font-bold text-[#71839a]">
-            <span>{progressPercentage}% progress</span>
-            <span>{dosesLoggedToday}/{totalRequiredDosesPerDay} doses logged today</span>
+            <span>{progressPercentage}% today</span>
+            <span>{goalProgress}% goal progress · {dosesLoggedToday}/{totalRequiredDosesPerDay} doses</span>
           </div>
           <div className="mt-2 h-2 overflow-hidden rounded-full bg-[#edf2f5]">
             <div className="h-full rounded-full bg-[#24c1c4] transition-all duration-300" style={{ width: `${progressPercentage}%` }} />
           </div>
+          <p className="mt-2 text-[10px] leading-4 text-[#74859a]">{performance.detail}</p>
         </div>
       </div>
 
