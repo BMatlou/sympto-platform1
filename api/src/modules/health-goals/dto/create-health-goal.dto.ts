@@ -7,6 +7,7 @@ import {
 import {
   IsDateString,
   IsEnum,
+  IsIn,
   IsNumberString,
   IsOptional,
   IsString,
@@ -62,4 +63,24 @@ export class CreateHealthGoalDto {
   @IsOptional()
   @IsDateString()
   achievedAt?: string;
+
+  @IsOptional()
+  @IsString()
+  metricType?: string;
+
+  @IsOptional()
+  @IsString()
+  metricKey?: string;
+
+  @IsOptional()
+  @IsIn(['DAILY', 'WEEKLY', 'TOTAL'])
+  frequency?: 'DAILY' | 'WEEKLY' | 'TOTAL';
+
+  @IsOptional()
+  @IsNumberString()
+  frequencyTarget?: string;
+
+  @IsOptional()
+  @IsString()
+  guidanceText?: string;
 }
