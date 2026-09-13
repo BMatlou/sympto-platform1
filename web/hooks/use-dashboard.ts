@@ -29,6 +29,31 @@ function normalizeGoals(result: HealthHomeResponse, fullGoals: any[]) {
     );
     const isWeightGoal = category === "WEIGHT";
     const isMedicationGoal = category === "MEDICATION";
+    const isSmokingGoal = category === "SMOKING";
+
+    if (isSmokingGoal) {
+      const targetValue = Number(goal?.targetValue ?? 0);
+      const currentValue = goal?.currentValue == null ? null : Number(goal.currentValue);
+      const target = Number.isFinite(targetValue) && targetValue > 0 ? targetValue : 0;
+      const hasReachedTarget = currentValue != null && Number.isFinite(currentValue) && target > 0 && currentValue <= target;
+      const storedAsFalseAchievement = String(goal?.status ?? "").toUpperCase() === "ACHIEVED"
+        && !hasReachedTarget;
+
+      if (storedAsFalseAchievement) {
+        return {
+          ...goal,
+          status: "ACTIVE",
+          currentValue: null,
+          achievedAt: null,
+          latestProgress: {
+            currentValue: null,
+            progressPercent: 0,
+            status: "IMPROVING",
+            notes: "Smoking target awaiting a daily cigarette-count measurement.",
+          },
+        };
+      }
+    }
 
     if (isMedicationGoal) {
       const targetValue = Number(goal?.targetValue ?? goal?.metricConfig?.frequencyTarget ?? DEFAULT_MEDICATION_TARGET);
@@ -91,11 +116,11 @@ export function useDashboard() {
 
       const result = await healthHomeService.getHealthHome(patientId);
       const fullGoalsResponse = await healthGoalsService.list(result.patient.id);
-      const fullGoals = Array.isArray(fullGoalsResponse?.data)
+      const fullGoals = (Array.isArray(fullGoalsResponse?.data)
         ? fullGoalsResponse.data
         : Array.isArray(fullGoalsResponse)
           ? fullGoalsResponse
-          : [];
+          : []).filter((goal: any) => String(goal?.status ?? "").toUpperCase() !== "CANCELLED");
       const normalizedGoals = normalizeGoals(result, fullGoals);
 
       setData({
