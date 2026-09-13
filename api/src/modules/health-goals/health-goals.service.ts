@@ -1,4 +1,4 @@
-import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, Injectable, NotFoundException, ForbiddenException } from '@nestjs/common';
 import { HealthGoalProgressStatus, Prisma } from '@prisma/client';
 import { PrismaService } from '../../database/prisma.service';
 import { GoalsEngineService } from './goals-engine-v3.service';
@@ -13,6 +13,11 @@ const DEFAULT_MEDICATION_TARGET = 90;
 @Injectable()
 export class HealthGoalsService {
   constructor(private readonly prisma: PrismaService, private readonly goalsEngine: GoalsEngineService) {}
+
+  async findPatientForUser(userId: string) {
+    if (!userId) return null;
+    return this.prisma.patient.findUnique({ where: { userId }, select: { id: true, userId: true } });
+  }
 
   async create(dto: CreateHealthGoalDto) {
     const { metricType, metricKey, frequency, frequencyTarget, aggregation, comparison, guidanceText, ...goalData } = dto;
