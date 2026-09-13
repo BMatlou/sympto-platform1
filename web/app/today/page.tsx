@@ -272,7 +272,7 @@ export default function TodayPage() {
               return <article className="flex h-full flex-col rounded-[24px] border border-[#dfe9ed] bg-white shadow-[0_5px_18px_rgba(11,45,84,.035)]">
                 <div className="flex-1 p-5 sm:p-6">
                   <div className="flex items-start justify-between gap-3">
-                    <div className="flex min-w-0 items-center gap-3"><span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-slate-100 text-slate-700"><Cigarette className="h-4 w-4" /></span><div className="min-w-0"><p className="text-[9px] font-black uppercase tracking-[0.15em] text-[#7d8c98]">Smoking cessation tracker</p><h3 className="mt-1 truncate text-[17px] font-black tracking-[-.025em] text-[#0b2d54]">{text(smokingGoal.title, "Smoking")}</h3></div></div>
+                    <div className="flex min-w-0 items-center gap-3"><span className="grid h-11 w-11 shrink-0 place-items-center rounded-2xl bg-[#e5f7f6] text-[#0b6f73]"><Cigarette className="h-5 w-5" /></span><div className="min-w-0"><p className="text-[9px] font-black uppercase tracking-[0.15em] text-[#7d8c98]">Smoking cessation tracker</p><h3 className="mt-1 truncate text-[17px] font-black tracking-[-.025em] text-[#0b2d54]">{text(smokingGoal.title, "Smoking")}</h3></div></div>
                     {todayLogged !== null && <span className={`shrink-0 rounded-full px-2.5 py-1 text-[9px] font-black ${targetReached ? "bg-slate-100 text-slate-600" : exceeded ? "bg-amber-50 text-amber-800" : "bg-emerald-50 text-emerald-700"}`}>{targetReached ? "Daily target reached" : exceeded ? "Above today’s target" : "On track today"}</span>}
                   </div>
 
