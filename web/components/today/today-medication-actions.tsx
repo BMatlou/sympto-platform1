@@ -55,6 +55,15 @@ function todayBounds() {
   return { start, end };
 }
 
+function journeyProgress(goal: any) {
+  const startDate = new Date(String(goal?.createdAt ?? Date.now()));
+  const targetDateValue = goal?.targetDate;
+  const targetDate = targetDateValue ? new Date(String(targetDateValue)) : null;
+  const journeyDay = Number.isNaN(startDate.getTime()) ? 1 : Math.max(1, Math.floor((Date.now() - startDate.getTime()) / 86400000) + 1);
+  const daysLeft = !targetDate || Number.isNaN(targetDate.getTime()) ? null : Math.max(0, Math.ceil((targetDate.getTime() - Date.now()) / 86400000));
+  return { journeyDay, daysLeft };
+}
+
 export default function TodayMedicationActions({ medications, goal, onUpdated }: TodayMedicationActionsProps) {
   const [dosesLoggedToday, setDosesLoggedToday] = useState(0);
   const [isSyncing, setIsSyncing] = useState(false);
@@ -85,6 +94,7 @@ export default function TodayMedicationActions({ medications, goal, onUpdated }:
   }, [medications.length, totalRequiredDosesPerDay]);
 
   const doseLabel = useMemo(() => (totalRequiredDosesPerDay === 1 ? "1 dose" : `${totalRequiredDosesPerDay} doses`), [totalRequiredDosesPerDay]);
+  const { journeyDay, daysLeft } = journeyProgress(goal);
 
   async function record(medication: any, action: Action) {
     if (dosesLoggedToday >= totalRequiredDosesPerDay || isSyncing) return;
@@ -159,7 +169,11 @@ export default function TodayMedicationActions({ medications, goal, onUpdated }:
       </div>
 
       <div className="border-t border-[#edf2f5] bg-[#fbfdfd] px-5 py-3">
-        <p className="text-[11px] font-semibold text-[#74859a]">{dosesLoggedToday >= totalRequiredDosesPerDay ? "✓ All doses logged today." : `${totalRequiredDosesPerDay - dosesLoggedToday} dose${totalRequiredDosesPerDay - dosesLoggedToday === 1 ? "" : "s"} remaining.`}</p>
+        <div className="flex items-center justify-between gap-3 text-[10px] text-[#74859a]">
+          <span>Day {journeyDay} of your journey</span>
+          {daysLeft !== null && <span>{daysLeft} days left</span>}
+        </div>
+        <p className="mt-1.5 text-[11px] font-semibold text-[#74859a]">{dosesLoggedToday >= totalRequiredDosesPerDay ? "✓ All doses logged today." : `${totalRequiredDosesPerDay - dosesLoggedToday} dose${totalRequiredDosesPerDay - dosesLoggedToday === 1 ? "" : "s"} remaining.`}</p>
       </div>
     </section>
   );
