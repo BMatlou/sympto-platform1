@@ -126,6 +126,7 @@ export const AlcoholGoalCard: React.FC<AlcoholGoalCardProps> = ({ goal, onUpdate
     ? Math.round((thisWeekLogged / weeklyTarget) * 100)
     : 0;
   const isAboveBudget = hasTarget && thisWeekLogged > weeklyTarget;
+  const remaining = Math.max(0, weeklyTarget - thisWeekLogged);
   const programDay = currentProgramDay(goal.startedAt || goal.createdAt || new Date().toISOString());
   const week = currentWeekNumber(goal.startedAt || goal.createdAt || new Date().toISOString());
   const targetDaysLeft = useMemo(() => daysUntilTarget(goal.targetDate), [goal.targetDate]);
@@ -148,90 +149,91 @@ export const AlcoholGoalCard: React.FC<AlcoholGoalCardProps> = ({ goal, onUpdate
   }
 
   return (
-    <div className="flex h-full max-w-md flex-col space-y-4 rounded-xl border border-gray-100 bg-white p-4 shadow-sm">
+    <div className="flex h-full max-w-md flex-col rounded-2xl border border-[#dfebef] bg-white p-4 shadow-sm">
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
           <div className="flex items-center gap-2">
-            <Wine className="h-4 w-4 text-emerald-700" />
-            <h3 className="text-xs font-bold uppercase tracking-wide text-gray-400">Alcohol Moderation</h3>
+            <Wine className="h-4 w-4 text-purple-700" />
+            <h3 className="text-xs font-black uppercase tracking-wide text-[#51677f]">Alcohol Moderation</h3>
           </div>
-          <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-[10px] font-semibold text-gray-500">
-            <span>Day {programDay} of your program</span>
-            <span aria-hidden="true" className="text-gray-300">•</span>
-            <span>Week {week}</span>
-          </div>
+          <p className="mt-1 text-[10px] font-semibold text-[#7b8da1]">
+            Day {programDay} of your program <span className="px-1 text-[#c1cbd4]">•</span> Week {week}
+          </p>
         </div>
         <span
-          className={`shrink-0 rounded-md border px-2 py-1 text-[9px] font-bold tracking-wide ${
-            isAboveBudget
-              ? "border-red-200 bg-red-50 text-red-700"
-              : "border-emerald-200 bg-emerald-50 text-emerald-700"
+          className={`shrink-0 whitespace-nowrap text-[9px] font-black uppercase tracking-wide ${
+            isAboveBudget ? "text-red-600" : "text-emerald-700"
           }`}
         >
-          {isAboveBudget ? "⚠️ ABOVE WEEKLY TARGET" : "🟢 ON TRACK THIS WEEK"}
+          {isAboveBudget ? "⚠️ Above weekly target" : "🟢 On track this week"}
         </span>
       </div>
 
-      {isAboveBudget ? (
-        <div className="rounded-xl border border-red-100 bg-red-50/50 p-3 text-xs font-medium leading-normal text-red-900">
-          You are <strong>{formatNumber(Math.abs(differenceDelta))} drinks</strong> above this week&apos;s budget. Every choice from here still counts.
-        </div>
-      ) : (
-        <div className="rounded-xl border border-emerald-100 bg-emerald-50/50 p-3 text-xs font-semibold leading-normal text-emerald-900">
-          ✓ On track this week — <strong>{formatNumber(Math.max(0, weeklyTarget - thisWeekLogged))} drinks remaining</strong>.
-        </div>
-      )}
+      <div className={`mt-4 text-sm font-semibold ${isAboveBudget ? "text-red-800" : "text-emerald-800"}`}>
+        {isAboveBudget ? (
+          <>You are <strong>{formatNumber(Math.abs(differenceDelta))} drinks</strong> above this week&apos;s budget.</>
+        ) : (
+          <>✓ On track this week — <strong>{formatNumber(remaining)} drinks remaining.</strong></>
+        )}
+      </div>
 
-      <div className="grid grid-cols-3 gap-3 border-b border-t border-dashed border-gray-100 py-3 text-center text-xs">
-        <div className="min-w-0">
-          <span className="block text-[10px] font-medium uppercase text-gray-400">This week</span>
-          <span className="mt-1 block font-bold text-gray-900">{formatNumber(thisWeekLogged)} drinks</span>
+      <div className="mt-4 grid grid-cols-3 divide-x divide-[#e6eef1] border-y border-[#e6eef1] py-3">
+        <div className="px-2 text-center first:pl-0">
+          <span className="block text-[9px] font-bold uppercase tracking-wide text-[#91a0ae]">This week</span>
+          <span className="mt-1 block text-sm font-black text-[#17314e]">{formatNumber(thisWeekLogged)} drinks</span>
         </div>
-        <div className="min-w-0">
-          <span className="block text-[10px] font-medium uppercase text-gray-400">Weekly target</span>
-          <span className="mt-1 block font-bold text-gray-900">≤ {formatNumber(weeklyTarget)} drinks</span>
+        <div className="px-2 text-center">
+          <span className="block text-[9px] font-bold uppercase tracking-wide text-[#91a0ae]">Weekly target</span>
+          <span className="mt-1 block text-sm font-black text-[#17314e]">≤ {formatNumber(weeklyTarget)}</span>
         </div>
-        <div className="min-w-0">
-          <span className="block text-[10px] font-medium uppercase text-gray-400">Budget used</span>
-          <span className={`mt-1 block font-mono font-bold ${isAboveBudget ? "text-red-600" : "text-emerald-600"}`}>
+        <div className="px-2 text-center last:pr-0">
+          <span className="block text-[9px] font-bold uppercase tracking-wide text-[#91a0ae]">Budget used</span>
+          <span className={`mt-1 block text-sm font-black ${isAboveBudget ? "text-red-600" : "text-emerald-700"}`}>
             {budgetUsedPercentage}%
           </span>
         </div>
       </div>
 
-      <div className="space-y-2">
-        <div className="relative h-2.5 w-full overflow-hidden rounded-full bg-gray-100">
+      <div className="mt-4">
+        <div className="flex items-end justify-between gap-3 text-[10px]">
+          <span className="font-medium text-[#8a9aaa]">0 drinks</span>
+          <span className="font-bold text-[#667b91]">Weekly budget: {formatNumber(weeklyTarget)} drinks</span>
+        </div>
+        <div className="relative mt-2 h-2.5 overflow-hidden rounded-full bg-[#edf2f4]">
           <div
-            className={`h-full transition-all duration-500 ease-out ${isAboveBudget ? "bg-red-500" : "bg-emerald-500"}`}
+            className={`h-full rounded-full transition-all duration-500 ${isAboveBudget ? "bg-red-500" : "bg-emerald-500"}`}
             style={{ width: `${Math.min(budgetUsedPercentage, 100)}%` }}
           />
-          <span className="absolute inset-y-0 right-0 w-px bg-[#0b2d54]/40" aria-hidden="true" />
+          <span className="absolute inset-y-[-2px] right-0 w-px bg-[#0b2d54]/35" aria-hidden="true" />
         </div>
-        <div className="flex items-center justify-between gap-3 text-[10px] text-gray-400">
-          <span>0 drinks</span>
-          <span className="font-semibold text-gray-500">Weekly budget: {formatNumber(weeklyTarget)} drinks</span>
-          {isAboveBudget && <span className="font-bold text-red-500">{formatNumber(thisWeekLogged)} logged</span>}
-        </div>
+        <p className="mt-1.5 text-right text-[9px] font-medium text-[#96a3ae]">
+          {isAboveBudget ? `${formatNumber(thisWeekLogged)} drinks logged` : `${formatNumber(remaining)} drinks remaining`}
+        </p>
       </div>
 
-      <div className="rounded-xl border border-slate-100 bg-slate-50 p-3 text-[11px] font-normal leading-relaxed text-slate-700">
+      <p className="mt-3 text-[11px] leading-relaxed text-[#687d91]">
         {isAboveBudget ? (
-          <>You have gone past your weekly budget of {formatNumber(weeklyTarget)} drinks. Focus on stopping further intake for the remainder of the week cycle. Your weekly budget resets on <strong>Monday at 00:00</strong>.</>
+          <>You have gone past your weekly budget. Focus on stopping further intake for the rest of this week. Your budget resets Monday at 00:00.</>
         ) : (
-          <>You are managing your weekly budget well. You have <strong>{formatNumber(Math.max(0, weeklyTarget - thisWeekLogged))} drinks remaining</strong>. Pace yourself through the remaining days and keep your entries honest.</>
+          <>Pace yourself through the remaining days and keep your entries honest.</>
         )}
-      </div>
+      </p>
 
-      <div className="rounded-xl border border-gray-100 bg-white px-3 py-2.5 text-center">
-        <div className="text-[9px] font-bold uppercase tracking-[0.14em] text-gray-400">Target date</div>
-        <div className="mt-0.5 text-sm font-bold text-[#0b2d54]">{targetDateLabel}</div>
-        <div className="mt-0.5 text-[10px] font-medium text-gray-500">
-          {targetDaysLeft === 0 ? "Target date is today" : `${targetDaysLeft} days left to target`}
+      <div className="mt-4 flex items-center justify-between border-t border-[#edf1f3] pt-3">
+        <div>
+          <p className="text-[9px] font-bold uppercase tracking-[0.12em] text-[#91a0ae]">Target date</p>
+          <p className="mt-0.5 text-xs font-black text-[#17314e]">{targetDateLabel}</p>
+          <p className="text-[9px] font-medium text-[#7b8da1]">
+            {targetDaysLeft === 0 ? "Target date is today" : `${targetDaysLeft} days left to target`}
+          </p>
         </div>
+        <Link href="/health-goals" className="inline-flex items-center gap-1 text-[10px] font-black text-[#0b2d54]">
+          View goal <ArrowRight className="h-3 w-3" />
+        </Link>
       </div>
 
       {logOpen && (
-        <div className="rounded-xl bg-[#f7fafb] p-3">
+        <div className="mt-3 rounded-xl bg-[#f7fafb] p-3">
           <label htmlFor="alcohol-goal-drinks" className="text-[9px] font-black uppercase tracking-[0.14em] text-[#74859a]">
             Drinks to add
           </label>
@@ -261,18 +263,15 @@ export const AlcoholGoalCard: React.FC<AlcoholGoalCardProps> = ({ goal, onUpdate
         </div>
       )}
 
-      <div className="grid grid-cols-2 gap-2 pt-1">
+      {!logOpen && (
         <button
           type="button"
-          onClick={() => setLogOpen((current) => !current)}
-          className="inline-flex min-h-10 items-center justify-center rounded-xl bg-[#0b2d54] px-3 py-2 text-[10px] font-black text-white"
+          onClick={() => setLogOpen(true)}
+          className="mt-3 inline-flex min-h-10 w-full items-center justify-center rounded-xl bg-[#0b2d54] px-3 py-2 text-[10px] font-black text-white"
         >
-          {logOpen ? "Close log" : "Log drinks"}
+          Log drinks
         </button>
-        <Link href="/health-goals" className="inline-flex min-h-10 items-center justify-center gap-1 rounded-xl border border-[#d7e4e8] bg-white px-3 py-2 text-[10px] font-black text-[#0b2d54]">
-          View goal <ArrowRight className="h-3 w-3" />
-        </Link>
-      </div>
+      )}
     </div>
   );
 };
