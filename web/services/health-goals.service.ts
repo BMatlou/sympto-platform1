@@ -56,8 +56,6 @@ export type HealthGoalListResponse = {
 const normalizeGoalInput = (input: HealthGoalInput | Partial<HealthGoalInput>) => {
   if (String(input.category ?? "").toUpperCase() !== "SMOKING") return input;
 
-  // Smoking goals measure actual cigarettes smoked per day, not the profile's
-  // smoking-status enum (NEVER/OCCASIONAL/DAILY).
   return {
     ...input,
     metricType: "SMOKING",
@@ -105,8 +103,11 @@ class HealthGoalsService {
     return response.data?.data ?? response.data;
   }
 
-  async logSmoking(id: string, cigarettes: number) {
-    const response = await api.post(`/patient-health-goals/${id}/smoking-log`, { cigarettes });
+  async logSmoking(id: string, cigarettes: number, dayKey: string) {
+    const response = await api.post(`/patient-health-goals/${id}/smoking-log`, {
+      cigarettes,
+      dayKey,
+    });
     return response.data?.data ?? response.data;
   }
 
