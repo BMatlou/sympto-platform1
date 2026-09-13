@@ -53,6 +53,22 @@ export type HealthGoalListResponse = {
   pagination?: { page: number; limit: number; total: number; totalPages: number };
 };
 
+const normalizeGoalInput = (input: HealthGoalInput | Partial<HealthGoalInput>) => {
+  if (String(input.category ?? "").toUpperCase() !== "SMOKING") return input;
+
+  // Smoking goals measure actual cigarettes smoked per day, not the profile's
+  // smoking-status enum (NEVER/OCCASIONAL/DAILY).
+  return {
+    ...input,
+    metricType: "SMOKING",
+    metricKey: "smoking.cigarettes",
+    frequency: "DAILY" as const,
+    aggregation: "LATEST" as const,
+    comparison: "AT_MOST" as const,
+    unit: input.unit || "cigarettes/day",
+  };
+};
+
 class HealthGoalsService {
   async list(patientId: string): Promise<HealthGoalListResponse> {
     const response = await api.get("/health-goals", {
@@ -62,12 +78,12 @@ class HealthGoalsService {
   }
 
   async create(input: HealthGoalInput) {
-    const response = await api.post("/patient-health-goals", input);
+    const response = await api.post("/patient-health-goals", normalizeGoalInput(input));
     return response.data?.data ?? response.data;
   }
 
   async update(id: string, input: Partial<HealthGoalInput>) {
-    const response = await api.patch(`/patient-health-goals/${id}`, input);
+    const response = await api.patch(`/patient-health-goals/${id}`, normalizeGoalInput(input));
     return response.data?.data ?? response.data;
   }
 
@@ -75,7 +91,17 @@ class HealthGoalsService {
     id: string,
     config: Pick<HealthGoalInput, "metricType" | "metricKey" | "frequency" | "frequencyTarget" | "aggregation" | "comparison" | "guidanceText">,
   ) {
-    const response = await api.patch(`/patient-health-goals/${id}/metric-config`, config);
+    const normalized = String((config as any).metricType ?? "").toUpperCase() === "SMOKING"
+      ? {
+          ...config,
+          metricType: "SMOKING",
+          metricKey: "smoking.cigarettes",
+          frequency: "DAILY" as const,
+          aggregation: "LATEST" as const,
+          comparison: "AT_MOST" as const,
+        }
+      : config;
+    const response = await api.patch(`/patient-health-goals/${id}/metric-config`, normalized);
     return response.data?.data ?? response.data;
   }
 
