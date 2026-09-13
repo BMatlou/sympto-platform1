@@ -156,12 +156,13 @@ export class PatientHealthGoalsController {
       throw new BadRequestException('Cigarettes must be a number greater than or equal to 0.');
     }
 
+    const dayKey = new Date().toISOString().slice(0, 10);
     return this.healthGoalsService.syncMetricEventForUser(this.userId(request), {
       metricType: 'SMOKING',
       metricKey: 'smoking.cigarettes',
       loggedValue: cigarettes,
       source: 'patient-smoking-log',
-      sourceId: id,
+      sourceId: `${id}:${dayKey}`,
     });
   }
 
