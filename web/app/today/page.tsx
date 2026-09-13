@@ -39,6 +39,24 @@ function goalProgress(goal: any) {
   return Number.isFinite(percent) ? Math.max(0, Math.min(100, Math.round(percent))) : 0;
 }
 
+function getCurrentTimelineMetrics(goal: any, currentDate = new Date()) {
+  const startDateValue = goal?.createdAt ?? "2026-08-21T00:00:00Z";
+  const targetDateValue = goal?.targetDate ?? "2026-09-30T00:00:00Z";
+  const startDate = new Date(String(startDateValue));
+  const targetDate = new Date(String(targetDateValue));
+
+  if (Number.isNaN(startDate.getTime()) || Number.isNaN(targetDate.getTime())) {
+    return { currentDayOfJourney: 1, daysLeft: 0, targetDate };
+  }
+
+  const totalDurationDiff = currentDate.getTime() - startDate.getTime();
+  const remainingDurationDiff = targetDate.getTime() - currentDate.getTime();
+  const currentDayOfJourney = Math.max(1, Math.floor(totalDurationDiff / (1000 * 60 * 60 * 24)) + 1);
+  const daysLeft = Math.max(0, Math.ceil(remainingDurationDiff / (1000 * 60 * 60 * 24)));
+
+  return { currentDayOfJourney, daysLeft, targetDate };
+}
+
 const GOAL_META: Record<string, { label: string; icon: typeof Target; accent: string; surface: string; tint: string }> = {
   WEIGHT: { label: "Weight", icon: Scale, accent: "text-violet-700", surface: "bg-violet-50", tint: "from-violet-500/12 to-violet-500/0" },
   EXERCISE: { label: "Exercise", icon: Footprints, accent: "text-emerald-700", surface: "bg-emerald-50", tint: "from-emerald-500/12 to-emerald-500/0" },
@@ -203,7 +221,7 @@ export default function TodayPage() {
     {medicationGoals.length > 0 && <div className="mt-4"><TodayMedicationActions medications={medications} goal={medicationGoals[0]} onUpdated={reload} /></div>}
 
     {displayGoals.length > 0 && <section className="mt-4 overflow-hidden rounded-[30px] border border-[#dce9ee] bg-white shadow-[0_18px_48px_rgba(11,45,84,.055)]"><div className="grid gap-4 p-4 sm:grid-cols-2 sm:p-5 xl:grid-cols-3">{displayGoals.map((goal: any) => {
-      const progress = goalProgress(goal); const meta = goalMeta(goal); const Icon = meta.icon; const status = goalStatus(goal, progress); const current = goalCurrent(goal); const isSmoking = String(goal?.category ?? "").toUpperCase() === "SMOKING"; const todaySmoking = isSmoking ? smokingToday[String(goal.id)] ?? null : null; const smokingTarget = Number(goal?.metricConfig?.frequencyTarget ?? goal?.frequencyTarget ?? goal?.targetValue ?? 0);
+      const progress = goalProgress(goal); const meta = goalMeta(goal); const Icon = meta.icon; const status = goalStatus(goal, progress); const current = goalCurrent(goal); const isSmoking = String(goal?.category ?? "").toUpperCase() === "SMOKING"; const todaySmoking = isSmoking ? smokingToday[String(goal.id)] ?? null : null; const smokingTarget = Number(goal?.metricConfig?.frequencyTarget ?? goal?.frequencyTarget ?? goal?.targetValue ?? 0); const smokingDelta = todaySmoking === null ? null : todaySmoking - smokingTarget; const smokingTimeline = isSmoking ? getCurrentTimelineMetrics(goal) : null;
       const smokingStatus = todaySmoking === null ? { label: "Not logged today", tone: "text-[#617487] bg-[#f4f7f9]" } : todaySmoking <= smokingTarget ? { label: "On target today", tone: "text-[#0b6f73] bg-[#e9f9fa]" } : { label: "Above today’s target", tone: "text-red-700 bg-red-50" };
       return <article key={String(goal.id)} className="group relative overflow-hidden rounded-[25px] border border-[#e0ebee] bg-gradient-to-br from-white via-white to-[#f7fbfc] p-5 transition duration-200 hover:-translate-y-0.5 hover:border-[#c8dce1] hover:shadow-[0_18px_38px_rgba(11,45,84,.09)]">
         <div className={`pointer-events-none absolute inset-x-0 top-0 h-24 bg-gradient-to-b ${meta.tint} opacity-70`} />
@@ -212,10 +230,12 @@ export default function TodayPage() {
 
         {isSmoking ? <div className="relative mt-5 rounded-[19px] border border-[#e7eff1] bg-white/90 p-4">
           <div className="flex items-end justify-between gap-3"><div><p className="text-[9px] font-black uppercase tracking-[0.14em] text-[#9aa7b2]">Today</p><p className="mt-1 text-2xl font-black tracking-[-.05em] text-[#0b2d54]">{todaySmoking === null ? "Not logged" : `${formatNumber(todaySmoking)} cigarettes`}</p></div><div className="text-right"><p className="text-[9px] font-black uppercase tracking-[0.14em] text-[#9aa7b2]">Daily target</p><p className="mt-1 text-[11px] font-black text-[#0b2d54]">{formatNumber(smokingTarget)} cigarettes</p></div></div>
+          {todaySmoking !== null && <p className={`mt-3 text-[11px] font-black ${smokingDelta !== null && smokingDelta > 0 ? "text-red-700" : "text-[#0b6f73]"}`}>{smokingDelta === null ? "" : smokingDelta > 0 ? `${formatNumber(smokingDelta)} above today’s target` : smokingDelta === 0 ? "At today’s target" : `${formatNumber(Math.abs(smokingDelta))} below today’s target`}</p>}
           <button type="button" onClick={() => { setOpenSmokingGoalId(String(goal.id)); setSmokingDrafts((currentDrafts) => ({ ...currentDrafts, [String(goal.id)]: todaySmoking === null ? "" : String(todaySmoking) })); }} className="mt-4 inline-flex min-h-10 w-full items-center justify-center gap-2 rounded-xl bg-[#0b2d54] px-4 py-2.5 text-[10px] font-black text-white transition hover:bg-[#123d63]">{todaySmoking === null ? "Log today’s cigarettes" : "Update today’s log"}<ArrowRight className="h-3.5 w-3.5" /></button>
           {openSmokingGoalId === String(goal.id) && <div className="mt-3 rounded-2xl border border-[#dce9ee] bg-[#f5fafb] p-3"><label className="text-[9px] font-black uppercase tracking-[0.14em] text-[#74859a]" htmlFor={`smoking-${goal.id}`}>Cigarettes smoked today</label><div className="mt-2 flex gap-2"><input id={`smoking-${goal.id}`} type="number" min="0" step="1" inputMode="numeric" value={smokingDrafts[String(goal.id)] ?? ""} onChange={(event) => setSmokingDrafts((currentDrafts) => ({ ...currentDrafts, [String(goal.id)]: event.target.value }))} placeholder="0" className="min-h-10 min-w-0 flex-1 rounded-xl border border-[#d7e4e8] bg-white px-3 text-sm font-bold text-[#0b2d54] outline-none focus:border-[#24c1c4] focus:ring-2 focus:ring-[#24c1c4]/15" /><button type="button" disabled={savingSmokingGoalId === String(goal.id)} onClick={() => void saveSmokingToday(goal)} className="min-h-10 rounded-xl bg-[#24c1c4] px-4 text-[10px] font-black text-white disabled:opacity-50">{savingSmokingGoalId === String(goal.id) ? "Saving…" : "Save"}</button></div><button type="button" onClick={() => setOpenSmokingGoalId(null)} className="mt-2 text-[10px] font-bold text-[#74859a]">Cancel</button></div>}
         </div> : <div className="relative mt-5 rounded-[19px] border border-[#e7eff1] bg-white/80 p-3.5"><div className="flex items-end justify-between gap-4"><div><p className="text-[9px] font-black uppercase tracking-[0.14em] text-[#9aa7b2]">Progress</p><p className="mt-1 text-3xl font-black tracking-[-.06em] text-[#0b2d54]">{progress}<span className="text-base text-[#7b8d9d]">%</span></p></div><div className="text-right"><p className="text-[9px] font-black uppercase tracking-[0.14em] text-[#9aa7b2]">Target</p><p className="mt-1 max-w-[120px] text-[11px] font-black leading-4 text-[#0b2d54]">{goalTarget(goal)}</p></div></div><div className="mt-3 h-2 overflow-hidden rounded-full bg-[#edf2f5]"><div className="h-full rounded-full bg-gradient-to-r from-[#0b6f73] to-[#24c1c4] transition-all duration-500" style={{ width: `${progress}%` }} /></div></div>}
 
+        {isSmoking && smokingTimeline ? <div className="relative mt-4 rounded-[18px] border border-[#edf2f5] bg-[#f8fbfc] px-3.5 py-3"><div className="text-[10px] font-black text-[#0b2d54]">📅 Journey Timeline: Day {smokingTimeline.currentDayOfJourney} of your program</div><div className="mt-1 text-[10px] font-semibold text-[#74859a]">⏳ {smokingTimeline.daysLeft} days left until your target date ({formatDate(smokingTimeline.targetDate, false)})</div></div> : null}
         <div className="relative mt-3 flex items-center justify-between gap-3 text-[10px] font-semibold text-[#74859a]"><span>{isSmoking ? (todaySmoking === null ? "Daily check-in needed" : `Today ${formatNumber(todaySmoking)} cigarettes`) : current ? `Current ${current}` : goalFrequency(goal)}</span><span className="shrink-0">{goal?.targetDate ? formatDate(goal.targetDate, false) : "No date"}</span></div>
         <div className="relative mt-4 flex items-center justify-between border-t border-[#edf2f5] pt-3"><Link href="/health-goals" className="text-[10px] font-black text-[#0b2d54] hover:underline">View goal</Link><ArrowRight className="h-3.5 w-3.5 text-[#91a0ad]" /></div>
       </article>;
