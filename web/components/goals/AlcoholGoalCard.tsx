@@ -91,7 +91,7 @@ export const AlcoholGoalCard: React.FC<AlcoholGoalCardProps> = ({ goal, onUpdate
     goal?.metricConfig?.frequencyTarget ?? goal?.frequencyTarget ?? goal?.targetValue ?? 0,
   );
   const hasTarget = Number.isFinite(weeklyTarget) && weeklyTarget > 0;
-  const [thisWeekLogged, setThisWeekLogged] = useState(Number(goal?.currentValue ?? 0));
+  const [thisWeekLogged, setThisWeekLogged] = useState(0);
   const [saving, setSaving] = useState(false);
   const [draft, setDraft] = useState("");
   const [logOpen, setLogOpen] = useState(false);
@@ -100,26 +100,31 @@ export const AlcoholGoalCard: React.FC<AlcoholGoalCardProps> = ({ goal, onUpdate
     if (!goal?.id) return;
 
     const weekKey = southAfricanWeekKey();
-    const storageKey = `sympto:alcohol-week:${goal.id}`;
-    const previousWeekKey = window.localStorage.getItem(storageKey);
+    const weekKeyStorage = `sympto:alcohol-week:${goal.id}`;
+    const totalStorage = `sympto:alcohol-total:${goal.id}`;
+    const previousWeekKey = window.localStorage.getItem(weekKeyStorage);
+    const storedTotal = window.localStorage.getItem(totalStorage);
 
     const syncWeekBaseline = async () => {
-      if (previousWeekKey && previousWeekKey !== weekKey) {
-        try {
-          await healthGoalsService.update(goal.id!, { currentValue: "0" });
-          setThisWeekLogged(0);
-        } catch {
-          setThisWeekLogged(Number(goal.currentValue ?? 0));
-        }
-      } else {
-        setThisWeekLogged(Number(goal.currentValue ?? 0));
+      if (previousWeekKey === weekKey && storedTotal !== null) {
+        const localTotal = Math.max(0, Number(storedTotal));
+        setThisWeekLogged(Number.isFinite(localTotal) ? localTotal : 0);
+        return;
       }
 
-      window.localStorage.setItem(storageKey, weekKey);
+      try {
+        await healthGoalsService.update(goal.id!, { currentValue: "0" });
+      } catch {
+        // Keep the UI at zero for a new/unknown weekly baseline.
+      }
+
+      setThisWeekLogged(0);
+      window.localStorage.setItem(weekKeyStorage, weekKey);
+      window.localStorage.setItem(totalStorage, "0");
     };
 
     void syncWeekBaseline();
-  }, [goal?.id, goal?.currentValue]);
+  }, [goal?.id]);
 
   const differenceDelta = thisWeekLogged - weeklyTarget;
   const budgetUsedPercentage = hasTarget
@@ -140,7 +145,9 @@ export const AlcoholGoalCard: React.FC<AlcoholGoalCardProps> = ({ goal, onUpdate
     try {
       setSaving(true);
       await healthGoalsService.logAlcohol(goal.id, thisWeekLogged, drinks);
-      setThisWeekLogged((current) => current + drinks);
+      const nextTotal = thisWeekLogged + drinks;
+      setThisWeekLogged(nextTotal);
+      window.localStorage.setItem(`sympto:alcohol-total:${goal.id}`, String(nextTotal));
       setDraft("");
       setLogOpen(false);
       await onUpdated?.();
