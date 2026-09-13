@@ -174,9 +174,9 @@ export default function TodayPage() {
     : 0;
   const smokingExceeded = todaySmoking !== null && smokingTarget > 0 && todaySmoking > smokingTarget;
   const smokingDifference = todaySmoking !== null ? todaySmoking - smokingTarget : 0;
-  const smokingTargetPosition = todaySmoking !== null && todaySmoking > 0 && smokingTarget > 0
-    ? Math.min(94, Math.max(8, (smokingTarget / todaySmoking) * 86 + 4))
-    : 50;
+  const smokingScaleMax = Math.max(todaySmoking ?? 0, smokingTarget, 1);
+  const smokingTodayPosition = todaySmoking === null ? 0 : Math.min(100, Math.max(0, (todaySmoking / smokingScaleMax) * 100));
+  const smokingTargetPosition = Math.min(100, Math.max(0, (smokingTarget / smokingScaleMax) * 100));
 
   async function saveSmokingToday() {
     if (!smokingGoal) return;
@@ -250,28 +250,51 @@ export default function TodayPage() {
                         <span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-slate-100 text-slate-700"><Cigarette className="h-4 w-4" /></span>
                         <div className="min-w-0"><p className="text-[9px] font-black uppercase tracking-[0.15em] text-[#7d8c98]">Smoking</p><h3 className="mt-1 truncate text-[17px] font-black tracking-[-.025em] text-[#0b2d54]">{text(smokingGoal.title, "Smoking")}</h3></div>
                       </div>
-                      {smokingExceeded && <span className="shrink-0 rounded-full bg-red-50 px-2.5 py-1 text-[9px] font-black text-red-700">Above target</span>}
+                      {todaySmoking !== null && <span className={`shrink-0 rounded-full px-2.5 py-1 text-[9px] font-black ${smokingExceeded ? "bg-red-50 text-red-700" : "bg-[#e9f9fa] text-[#0b6f73]"}`}>{smokingExceeded ? `${smokingDifference} above target` : "On target"}</span>}
                     </div>
 
                     <div className="mt-5 flex items-end justify-between gap-4">
-                      <div><p className="text-4xl font-black tracking-[-.06em] text-[#0b2d54]">{todaySmoking === null ? "—" : todaySmoking}</p><p className="mt-1 text-[10px] font-semibold text-[#74859a]">cigarettes today</p></div>
-                      {todaySmoking !== null && <div className="text-right"><p className={`text-sm font-black ${smokingExceeded ? "text-[#842832]" : "text-[#0b6f73]"}`}>{smokingExceeded ? `${smokingDifference} above` : "On target"}</p><p className="mt-1 text-[10px] text-[#74859a]">Target {numberText(smokingTarget)}</p></div>}
-                    </div>
-
-                    <div className="mt-5">
-                      <div className="relative h-[62px] overflow-visible rounded-2xl border border-[#dfebef] bg-gradient-to-b from-[#f8fbfc] to-[#edf4f6] px-3">
-                        <div className="absolute inset-x-3 top-1/2 flex h-6 -translate-y-1/2 items-stretch drop-shadow-[0_4px_6px_rgba(11,45,84,.12)]">
-                          <div className="relative w-[17%] min-w-[42px] rounded-l-md bg-gradient-to-r from-[#bd7e48] via-[#efd0a0] to-[#b77546]" />
-                          <div className="relative flex-1 rounded-r-md border border-l-0 border-[#cedddd] bg-gradient-to-b from-white via-[#f0f4f2] to-[#d8e3e2]"><span className="absolute right-[18px] top-[-1px] bottom-[-1px] w-[5px] bg-gradient-to-r from-[#b95d36] via-[#f19b55] to-[#793e31] shadow-[0_0_8px_rgba(238,117,45,.5)]" /></div>
-                          <div className="relative h-6 w-[22px] rounded-r-lg bg-[radial-gradient(circle_at_25%_50%,#fff7a7_0_8%,#ffcb55_18%,#ef6b2d_48%,#8f3e32_80%)] shadow-[0_0_5px_#ffb02e,0_0_12px_rgba(255,94,35,.85)] animate-pulse"><span className="absolute right-1 top-[-10px] h-3 w-2 rotate-[25deg] rounded-full bg-gradient-to-b from-[#fff09c] to-[#ff8a32]" /><span className="absolute right-1 top-[-18px] h-5 w-2 border-l-2 border-slate-400/40 rounded-full opacity-60" /></div>
-                        </div>
-                        <span className="absolute bottom-1 left-[var(--smoking-target)] top-1.5 w-0.5 rounded-full bg-[#0b2d54]" style={{ "--smoking-target": `${smokingTargetPosition}%` } as React.CSSProperties} />
-                        <span className={`absolute bottom-1 h-2 w-2 rounded-full ${smokingExceeded ? "bg-[#de6c5f] shadow-[0_0_0_4px_rgba(222,108,95,.12),0_0_12px_rgba(222,108,95,.48)]" : "bg-[#24c1c4] shadow-[0_0_0_4px_rgba(36,193,196,.14),0_0_12px_rgba(36,193,196,.45)]"}`} style={{ left: "95%" }} />
+                      <div>
+                        <p className="text-4xl font-black tracking-[-0.06em] text-[#0b2d54]">{todaySmoking === null ? "—" : todaySmoking}</p>
+                        <p className="mt-1 text-[10px] font-semibold text-[#74859a]">cigarettes today</p>
                       </div>
-                      <div className="mt-2 flex items-center justify-between text-[9px] font-semibold text-[#8795a0]"><span>0</span><span className="font-black text-[#0b2d54]">Target {numberText(smokingTarget)}</span><span className={smokingExceeded ? "font-black text-[#de6c5f]" : "font-black text-[#0b6f73]"}>{todaySmoking === null ? "Not logged" : `${todaySmoking} today`}</span></div>
+                      {todaySmoking !== null && <div className="text-right"><p className="text-sm font-black text-[#0b2d54]">Target {numberText(smokingTarget)}</p><p className="mt-1 text-[10px] text-[#74859a]">daily goal</p></div>}
                     </div>
 
-                    {smokingExceeded && <p className="mt-3 text-[10px] font-semibold text-[#842832]">You&apos;re {smokingDifference} cigarette{smokingDifference === 1 ? "" : "s"} above your target today.</p>}
+                    <div className="mt-5 rounded-2xl border border-[#e1ebee] bg-[#f8fbfc] p-4">
+                      <div className="flex items-center justify-between">
+                        <p className="text-[9px] font-black uppercase tracking-[0.15em] text-[#7d8c98]">Daily comparison</p>
+                        <p className="text-[10px] font-semibold text-[#74859a]">Lower is better</p>
+                      </div>
+
+                      <div className="mt-5 px-1">
+                        <div className="relative h-3 rounded-full bg-[#e3ecef]">
+                          <div
+                            className={`absolute inset-y-0 left-0 rounded-full ${smokingExceeded ? "bg-[#d96b5e]" : "bg-[#24babe]"}`}
+                            style={{ width: `${smokingTodayPosition}%` }}
+                          />
+                          {smokingTarget > 0 && (
+                            <span
+                              aria-hidden="true"
+                              className="absolute top-1/2 h-5 w-5 -translate-x-1/2 -translate-y-1/2 rounded-full border-4 border-white bg-[#0b2d54] shadow-[0_2px_8px_rgba(11,45,84,.2)]"
+                              style={{ left: `${smokingTargetPosition}%` }}
+                            />
+                          )}
+                          {todaySmoking !== null && (
+                            <span
+                              aria-hidden="true"
+                              className={`absolute top-1/2 h-5 w-5 -translate-x-1/2 -translate-y-1/2 rounded-full border-4 border-white shadow-[0_2px_8px_rgba(11,45,84,.18)] ${smokingExceeded ? "bg-[#d96b5e]" : "bg-[#24babe]"}`}
+                              style={{ left: `${smokingTodayPosition}%` }}
+                            />
+                          )}
+                        </div>
+
+                        <div className="mt-3 flex items-center justify-between text-[10px] font-semibold text-[#74859a]">
+                          <span className="inline-flex items-center gap-1.5"><span className="h-2.5 w-2.5 rounded-full bg-[#0b2d54]" />Target {numberText(smokingTarget)}</span>
+                          <span className={`inline-flex items-center gap-1.5 font-black ${smokingExceeded ? "text-[#b84f45]" : "text-[#0b6f73]"}`}><span className={`h-2.5 w-2.5 rounded-full ${smokingExceeded ? "bg-[#d96b5e]" : "bg-[#24babe]"}`} />Today {todaySmoking ?? "—"}</span>
+                        </div>
+                      </div>
+                    </div>
 
                     {editingSmoking === String(smokingGoal.id) && (
                       <div className="mt-4 rounded-xl bg-[#f7fafb] p-3">
