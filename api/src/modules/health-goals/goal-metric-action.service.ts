@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, NotFoundException } from '@nestjs/common';
 
 import { PrismaService } from '../../database/prisma.service';
 import { GoalsEngineService } from './goals-engine.service';
@@ -19,6 +19,17 @@ export class GoalMetricActionService {
     private readonly prisma: PrismaService,
     private readonly goalsEngine: GoalsEngineService,
   ) {}
+
+  async syncForUser(userId: string, input: MetricActionInput) {
+    const patient = await this.prisma.patient.findUnique({
+      where: { userId },
+      select: { id: true },
+    });
+
+    if (!patient) throw new NotFoundException('Patient not found.');
+
+    return this.sync(patient.id, input);
+  }
 
   async sync(patientId: string, input: MetricActionInput) {
     await this.ensureMetricConfig(patientId, input.metricType, input.metricKey);
