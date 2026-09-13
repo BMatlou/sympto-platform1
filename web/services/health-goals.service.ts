@@ -112,15 +112,10 @@ class HealthGoalsService {
     return response.data?.data ?? response.data;
   }
 
-  async logAlcohol(drinks: number) {
-    const occurredAt = new Date().toISOString();
-    const response = await api.post("/health-goals/metric-event", {
-      metricType: "ALCOHOL",
-      metricKey: "alcohol.drinks",
-      loggedValue: drinks,
-      occurredAt,
-      source: "patient-alcohol-log",
-      sourceId: `patient-alcohol-log:${occurredAt}`,
+  async logAlcohol(id: string, currentWeekTotal: number, drinks: number) {
+    const nextTotal = Math.max(0, Number(currentWeekTotal) + Number(drinks));
+    const response = await api.patch(`/patient-health-goals/${id}`, {
+      currentValue: String(nextTotal),
     });
     return response.data?.data ?? response.data;
   }
