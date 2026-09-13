@@ -1,5 +1,4 @@
 import type { Metadata, Viewport } from "next";
-import { Geist, Geist_Mono, Inter } from "next/font/google";
 import "./globals.css";
 import { Toaster } from "sonner";
 
@@ -7,21 +6,6 @@ import { cn } from "@/lib/utils";
 import AIHealthHelperFab from "@/components/ai-health-helper-fab";
 import QueryProvider from "@/providers/query-provider";
 import ThemeProvider from "@/providers/theme-provider";
-
-const inter = Inter({
-  subsets: ["latin"],
-  variable: "--font-sans",
-});
-
-const geistSans = Geist({
-  variable: "--font-geist-sans",
-  subsets: ["latin"],
-});
-
-const geistMono = Geist_Mono({
-  variable: "--font-geist-mono",
-  subsets: ["latin"],
-});
 
 export const metadata: Metadata = {
   title: {
@@ -62,14 +46,7 @@ export default function RootLayout({
     <html
       lang="en"
       suppressHydrationWarning
-      className={cn(
-        "h-full",
-        "antialiased",
-        geistSans.variable,
-        geistMono.variable,
-        inter.variable,
-        "font-sans"
-      )}
+      className={cn("h-full", "antialiased", "font-sans")}
     >
       <body className="min-h-screen bg-background pb-28 text-foreground">
         <ThemeProvider>
