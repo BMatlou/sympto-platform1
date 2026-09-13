@@ -47,20 +47,43 @@ function southAfricanWeekKey(date = new Date()) {
   return localDate.toISOString().slice(0, 10);
 }
 
-function formatDate(value: string | Date) {
+function calendarMidnight(value: string | Date) {
   const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return "—";
-  return date.toLocaleDateString("en-ZA");
+  if (Number.isNaN(date.getTime())) return null;
+  return new Date(date.getFullYear(), date.getMonth(), date.getDate());
+}
+
+function formatTargetDate(value: string | Date) {
+  const date = calendarMidnight(value);
+  if (!date) return "—";
+  return new Intl.DateTimeFormat("en-ZA", {
+    day: "numeric",
+    month: "short",
+    year: "numeric",
+  }).format(date);
+}
+
+function currentProgramDay(startedAt: string) {
+  const start = calendarMidnight(startedAt);
+  const today = calendarMidnight(new Date());
+  if (!start || !today) return 1;
+  const days = Math.floor((today.getTime() - start.getTime()) / 86400000);
+  return Math.max(1, days + 1);
 }
 
 function currentWeekNumber(startedAt: string) {
-  const start = new Date(startedAt);
-  if (Number.isNaN(start.getTime())) return 1;
-  const startWeekKey = southAfricanWeekKey(start);
-  const nowWeekKey = southAfricanWeekKey();
-  const startWeek = new Date(`${startWeekKey}T00:00:00Z`);
-  const nowWeek = new Date(`${nowWeekKey}T00:00:00Z`);
-  return Math.max(1, Math.floor((nowWeek.getTime() - startWeek.getTime()) / (7 * 86400000)) + 1);
+  const start = calendarMidnight(startedAt);
+  const today = calendarMidnight(new Date());
+  if (!start || !today) return 1;
+  const days = Math.max(0, Math.floor((today.getTime() - start.getTime()) / 86400000));
+  return Math.max(1, Math.floor(days / 7) + 1);
+}
+
+function daysUntilTarget(targetDate: string) {
+  const target = calendarMidnight(targetDate);
+  const today = calendarMidnight(new Date());
+  if (!target || !today) return 0;
+  return Math.max(0, Math.ceil((target.getTime() - today.getTime()) / 86400000));
 }
 
 export const AlcoholGoalCard: React.FC<AlcoholGoalCardProps> = ({ goal, onUpdated }) => {
@@ -103,13 +126,10 @@ export const AlcoholGoalCard: React.FC<AlcoholGoalCardProps> = ({ goal, onUpdate
     ? Math.round((thisWeekLogged / weeklyTarget) * 100)
     : 0;
   const isAboveBudget = hasTarget && thisWeekLogged > weeklyTarget;
-  const daysLeft = useMemo(() => {
-    const currentDate = new Date();
-    const deadlineDate = new Date(goal.targetDate);
-    if (Number.isNaN(deadlineDate.getTime())) return 0;
-    return Math.max(0, Math.ceil((deadlineDate.getTime() - currentDate.getTime()) / 86400000));
-  }, [goal.targetDate]);
+  const programDay = currentProgramDay(goal.startedAt || goal.createdAt || new Date().toISOString());
   const week = currentWeekNumber(goal.startedAt || goal.createdAt || new Date().toISOString());
+  const targetDaysLeft = useMemo(() => daysUntilTarget(goal.targetDate), [goal.targetDate]);
+  const targetDateLabel = useMemo(() => formatTargetDate(goal.targetDate), [goal.targetDate]);
 
   async function addDrinks() {
     const drinks = Number(draft);
@@ -129,16 +149,20 @@ export const AlcoholGoalCard: React.FC<AlcoholGoalCardProps> = ({ goal, onUpdate
 
   return (
     <div className="flex h-full max-w-md flex-col space-y-4 rounded-xl border border-gray-100 bg-white p-4 shadow-sm">
-      <div className="flex items-center justify-between gap-3">
-        <div>
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0">
           <div className="flex items-center gap-2">
             <Wine className="h-4 w-4 text-emerald-700" />
             <h3 className="text-xs font-bold uppercase tracking-wide text-gray-400">Alcohol Moderation</h3>
           </div>
-          <p className="mt-0.5 text-[10px] font-medium text-gray-500">📅 Week {week} of your program</p>
+          <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-[10px] font-semibold text-gray-500">
+            <span>Day {programDay} of your program</span>
+            <span aria-hidden="true" className="text-gray-300">•</span>
+            <span>Week {week}</span>
+          </div>
         </div>
         <span
-          className={`rounded-md border px-2 py-0.5 text-[10px] font-bold ${
+          className={`shrink-0 rounded-md border px-2 py-1 text-[9px] font-bold tracking-wide ${
             isAboveBudget
               ? "border-red-200 bg-red-50 text-red-700"
               : "border-emerald-200 bg-emerald-50 text-emerald-700"
@@ -150,60 +174,60 @@ export const AlcoholGoalCard: React.FC<AlcoholGoalCardProps> = ({ goal, onUpdate
 
       {isAboveBudget ? (
         <div className="rounded-xl border border-red-100 bg-red-50/50 p-3 text-xs font-medium leading-normal text-red-900">
-          ❗ You are <strong>{differenceDelta} drinks</strong> above this week&apos;s budget. Every choice from here still counts.
+          You are <strong>{formatNumber(Math.abs(differenceDelta))} drinks</strong> above this week&apos;s budget. Every choice from here still counts.
         </div>
       ) : (
         <div className="rounded-xl border border-emerald-100 bg-emerald-50/50 p-3 text-xs font-semibold leading-normal text-emerald-900">
-          ✓ On track this week — {formatNumber(Math.max(0, weeklyTarget - thisWeekLogged))} drinks remaining.
+          ✓ On track this week — <strong>{formatNumber(Math.max(0, weeklyTarget - thisWeekLogged))} drinks remaining</strong>.
         </div>
       )}
 
-      <div className="grid grid-cols-3 gap-2 border-b border-t border-dashed border-gray-100 py-3 text-center text-xs">
-        <div>
+      <div className="grid grid-cols-3 gap-3 border-b border-t border-dashed border-gray-100 py-3 text-center text-xs">
+        <div className="min-w-0">
           <span className="block text-[10px] font-medium uppercase text-gray-400">This week</span>
-          <span className="mt-0.5 block font-bold text-gray-900">{formatNumber(thisWeekLogged)} drinks</span>
+          <span className="mt-1 block font-bold text-gray-900">{formatNumber(thisWeekLogged)} drinks</span>
         </div>
-        <div>
-          <span className="block text-[10px] font-medium uppercase text-gray-400">Weekly Target</span>
-          <span className="mt-0.5 block font-bold text-gray-900">≤ {formatNumber(weeklyTarget)} drinks</span>
+        <div className="min-w-0">
+          <span className="block text-[10px] font-medium uppercase text-gray-400">Weekly target</span>
+          <span className="mt-1 block font-bold text-gray-900">≤ {formatNumber(weeklyTarget)} drinks</span>
         </div>
-        <div>
-          <span className="block text-[10px] font-medium uppercase text-gray-400">Budget Used</span>
-          <span className={`mt-0.5 block font-mono font-bold ${isAboveBudget ? "text-red-600" : "text-emerald-600"}`}>
+        <div className="min-w-0">
+          <span className="block text-[10px] font-medium uppercase text-gray-400">Budget used</span>
+          <span className={`mt-1 block font-mono font-bold ${isAboveBudget ? "text-red-600" : "text-emerald-600"}`}>
             {budgetUsedPercentage}%
           </span>
         </div>
       </div>
 
-      <div className="space-y-1">
-        <div className="relative h-2 w-full overflow-hidden rounded-full bg-gray-100">
+      <div className="space-y-2">
+        <div className="relative h-2.5 w-full overflow-hidden rounded-full bg-gray-100">
           <div
             className={`h-full transition-all duration-500 ease-out ${isAboveBudget ? "bg-red-500" : "bg-emerald-500"}`}
             style={{ width: `${Math.min(budgetUsedPercentage, 100)}%` }}
           />
           <span className="absolute inset-y-0 right-0 w-px bg-[#0b2d54]/40" aria-hidden="true" />
         </div>
-        <div className="flex justify-between gap-2 font-mono text-[9px] text-gray-400">
+        <div className="flex items-center justify-between gap-3 text-[10px] text-gray-400">
           <span>0 drinks</span>
-          <span>Budget: {formatNumber(weeklyTarget)} max</span>
-          {isAboveBudget && <span className="font-bold text-red-500">Current: {formatNumber(thisWeekLogged)}</span>}
+          <span className="font-semibold text-gray-500">Weekly budget: {formatNumber(weeklyTarget)} drinks</span>
+          {isAboveBudget && <span className="font-bold text-red-500">{formatNumber(thisWeekLogged)} logged</span>}
         </div>
       </div>
 
       <div className="rounded-xl border border-slate-100 bg-slate-50 p-3 text-[11px] font-normal leading-relaxed text-slate-700">
         {isAboveBudget ? (
-          <>
-            You have gone past your weekly budget of {formatNumber(weeklyTarget)} drinks. Focus on stopping further intake for the remainder of the week cycle. Sympto will automatically reset your budget on <strong>Monday morning at 00:00</strong> to help you start fresh.
-          </>
+          <>You have gone past your weekly budget of {formatNumber(weeklyTarget)} drinks. Focus on stopping further intake for the remainder of the week cycle. Your weekly budget resets on <strong>Monday at 00:00</strong>.</>
         ) : (
-          <>
-            You are managing your budget well. Your weekly allowance is {formatNumber(weeklyTarget)} drinks. Pace yourself through the remaining days while keeping your entries honest.
-          </>
+          <>You are managing your weekly budget well. You have <strong>{formatNumber(Math.max(0, weeklyTarget - thisWeekLogged))} drinks remaining</strong>. Pace yourself through the remaining days and keep your entries honest.</>
         )}
       </div>
 
-      <div className="text-right font-mono text-[10px] text-gray-400">
-        ⏳ {daysLeft} days left until your target date ({formatDate(goal.targetDate)})
+      <div className="rounded-xl border border-gray-100 bg-white px-3 py-2.5 text-center">
+        <div className="text-[9px] font-bold uppercase tracking-[0.14em] text-gray-400">Target date</div>
+        <div className="mt-0.5 text-sm font-bold text-[#0b2d54]">{targetDateLabel}</div>
+        <div className="mt-0.5 text-[10px] font-medium text-gray-500">
+          {targetDaysLeft === 0 ? "Target date is today" : `${targetDaysLeft} days left to target`}
+        </div>
       </div>
 
       {logOpen && (
