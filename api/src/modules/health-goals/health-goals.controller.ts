@@ -17,6 +17,7 @@ import { PermissionsGuard } from '../auth/guards/permissions.guard';
 import { Permissions } from '../auth/decorators/permissions.decorator';
 
 import { HealthGoalsService } from './health-goals.service';
+import { GoalMetricActionService } from './goal-metric-action.service';
 
 import { CreateHealthGoalDto } from './dto/create-health-goal.dto';
 import { UpdateHealthGoalDto } from './dto/update-health-goal.dto';
@@ -30,6 +31,7 @@ import { SyncGoalMetricDto } from './dto/sync-goal-metric.dto';
 export class HealthGoalsController {
   constructor(
     private readonly healthGoalsService: HealthGoalsService,
+    private readonly goalMetricActionService: GoalMetricActionService,
   ) {}
 
   @Permissions('health-goals.read')
@@ -45,10 +47,8 @@ export class HealthGoalsController {
     @Req() req: any,
     @Body() dto: SyncGoalMetricDto,
   ) {
-    const result = await this.healthGoalsService.syncMetricEventForUser(
-      req.user.sub,
-      dto,
-    );
+    const patient = await this.healthGoalsService.getPatientIdForUser(req.user.sub);
+    const result = await this.goalMetricActionService.sync(patient, dto);
 
     return { data: result };
   }
