@@ -5,7 +5,7 @@ import { HealthGoalsService } from './health-goals.service';
 import { CreateHealthGoalDto } from './dto/create-health-goal.dto';
 import { UpdateHealthGoalDto } from './dto/update-health-goal.dto';
 
-type AuthenticatedRequest = { user?: { sub?: string; id?: string } };
+type AuthenticatedRequest = { user?: { sub?: string; id?: string; userId?: string } };
 
 @Controller('patient-health-goals')
 @UseGuards(JwtAuthGuard)
@@ -16,7 +16,7 @@ export class PatientHealthGoalsController {
   ) {}
 
   private userId(request: AuthenticatedRequest) {
-    return request.user?.sub ?? request.user?.id ?? '';
+    return request.user?.sub ?? request.user?.userId ?? request.user?.id ?? '';
   }
 
   private async assertOwnGoal(goalId: string, userId: string) {
@@ -75,7 +75,7 @@ export class PatientHealthGoalsController {
   async update(@Param('id') id: string, @Body() dto: UpdateHealthGoalDto, @Req() request: AuthenticatedRequest) {
     const existing = await this.assertOwnGoal(id, this.userId(request));
     const {
-      patientId,
+      patientId: _patientId,
       metricType,
       metricKey,
       frequency,
@@ -93,16 +93,22 @@ export class PatientHealthGoalsController {
     if (parsedTargetDate && Number.isNaN(parsedTargetDate.getTime())) throw new BadRequestException('Target date is invalid.');
     if (parsedAchievedAt && Number.isNaN(parsedAchievedAt.getTime())) throw new BadRequestException('Achievement date is invalid.');
 
+    const isSmokingGoal = String(existing.category).toUpperCase() === 'SMOKING' || String(goalData.category ?? '').toUpperCase() === 'SMOKING';
+
     const updated = await this.prisma.healthGoal.update({
       where: { id },
       data: {
         ...goalData,
-        ...(patientId !== undefined ? {} : {}),
         ...(targetDate !== undefined ? { targetDate: parsedTargetDate } : {}),
         ...(achievedAt !== undefined ? { achievedAt: parsedAchievedAt } : {}),
+        ...(isSmokingGoal ? { status: 'ACTIVE', achievedAt: null, currentValue: null } : {}),
       },
       include: { patient: true, practitioner: true, carePlan: true, progress: { orderBy: { measuredAt: 'desc' } } },
     });
+
+    if (isSmokingGoal) {
+      await this.prisma.healthGoalProgress.deleteMany({ where: { healthGoalId: id } });
+    }
 
     if (metricType || metricKey || frequency || frequencyTarget !== undefined || aggregation || comparison || guidanceText !== undefined) {
       await this.healthGoalsService.configureMetric(id, {
@@ -129,14 +135,19 @@ export class PatientHealthGoalsController {
     aggregation?: 'SUM' | 'LATEST' | 'AVERAGE' | 'MIN' | 'MAX';
     comparison?: 'AT_LEAST' | 'AT_MOST' | 'CLOSEST' | 'INCREASE_TO' | 'DECREASE_TO';
   }, @Req() request: AuthenticatedRequest) {
-    await this.assertOwnGoal(id, this.userId(request));
+    const goal = await this.assertOwnGoal(id, this.userId(request));
+    if (String(goal.category).toUpperCase() === 'SMOKING') {
+      await this.prisma.healthGoalProgress.deleteMany({ where: { healthGoalId: id } });
+      await this.prisma.healthGoal.update({ where: { id }, data: { status: 'ACTIVE', achievedAt: null, currentValue: null } });
+      config = { ...config, metricType: 'SMOKING', metricKey: 'smoking.cigarettes', frequency: 'DAILY', aggregation: 'LATEST', comparison: 'AT_MOST' };
+    }
     return this.healthGoalsService.configureMetric(id, config);
   }
 
   @Delete(':id')
   async remove(@Param('id') id: string, @Req() request: AuthenticatedRequest) {
-    await this.assertOwnGoal(id, this.userId(request));
-    await this.prisma.healthGoal.update({ where: { id }, data: { status: 'CANCELLED' } });
+    const goal = await this.assertOwnGoal(id, this.userId(request));
+    await this.prisma.healthGoal.update({ where: { id: goal.id }, data: { status: 'CANCELLED', achievedAt: null } });
     return { message: 'Health goal removed successfully.' };
   }
 }
