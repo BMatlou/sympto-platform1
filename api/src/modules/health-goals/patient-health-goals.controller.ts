@@ -145,7 +145,7 @@ export class PatientHealthGoalsController {
   }
 
   @Post(':id/smoking-log')
-  async logSmoking(@Param('id') id: string, @Body() body: { cigarettes?: number }, @Req() request: AuthenticatedRequest) {
+  async logSmoking(@Param('id') id: string, @Body() body: { cigarettes?: number; dayKey?: string }, @Req() request: AuthenticatedRequest) {
     const goal = await this.assertOwnGoal(id, this.userId(request));
     if (String(goal.category).toUpperCase() !== 'SMOKING') {
       throw new BadRequestException('This health goal is not a smoking goal.');
@@ -156,7 +156,11 @@ export class PatientHealthGoalsController {
       throw new BadRequestException('Cigarettes must be a number greater than or equal to 0.');
     }
 
-    const dayKey = new Date().toISOString().slice(0, 10);
+    const dayKey = String(body?.dayKey ?? '');
+    if (!/^\\d{4}-\\d{2}-\\d{2}$/.test(dayKey)) {
+      throw new BadRequestException('A valid local day is required for a smoking log.');
+    }
+
     return this.healthGoalsService.syncMetricEventForUser(this.userId(request), {
       metricType: 'SMOKING',
       metricKey: 'smoking.cigarettes',
