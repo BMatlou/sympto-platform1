@@ -222,19 +222,6 @@ export const AlcoholGoalCard: React.FC<AlcoholGoalCardProps> = ({ goal, onUpdate
         )}
       </p>
 
-      <div className="mt-4 flex items-center justify-between border-t border-[#edf1f3] pt-3">
-        <div>
-          <p className="text-[9px] font-bold uppercase tracking-[0.12em] text-[#91a0ae]">Target date</p>
-          <p className="mt-0.5 text-xs font-black text-[#17314e]">{targetDateLabel}</p>
-          <p className="text-[9px] font-medium text-[#7b8da1]">
-            {targetDaysLeft === 0 ? "Target date is today" : `${targetDaysLeft} days left to target`}
-          </p>
-        </div>
-        <Link href="/health-goals" className="inline-flex items-center gap-1 text-[10px] font-black text-[#0b2d54]">
-          View goal <ArrowRight className="h-3 w-3" />
-        </Link>
-      </div>
-
       {logOpen && !isAtOrAboveBudget && (
         <div className="mt-3 rounded-xl bg-[#f7fafb] p-3">
           <label htmlFor="alcohol-goal-drinks" className="text-[9px] font-black uppercase tracking-[0.14em] text-[#74859a]">
@@ -266,22 +253,38 @@ export const AlcoholGoalCard: React.FC<AlcoholGoalCardProps> = ({ goal, onUpdate
         </div>
       )}
 
-      <button
-        type="button"
-        disabled={isAtOrAboveBudget}
-        aria-disabled={isAtOrAboveBudget}
-        onClick={() => {
-          if (isAtOrAboveBudget) return;
-          setLogOpen(true);
-        }}
-        className={`mt-3 inline-flex min-h-10 w-full items-center justify-center rounded-xl px-3 py-2 text-[10px] font-black transition ${
-          isAtOrAboveBudget
-            ? "cursor-not-allowed bg-[#eef2f4] text-[#93a0aa]"
-            : "bg-[#0b2d54] text-white hover:bg-[#123e66]"
-        }`}
-      >
-        {saving ? "Saving…" : isAboveBudget ? "Weekly budget exceeded" : isAtOrAboveBudget ? "Weekly target reached" : logOpen ? "Close log" : "Log drinks"}
-      </button>
+      <div className="mt-4 border-t border-[#edf2f5] pt-3">
+        <div className="mb-3 flex items-center justify-between gap-3 text-[10px] text-[#74859a]">
+          <div>
+            <span className="block font-bold uppercase tracking-[0.12em] text-[#91a0ae]">Target date</span>
+            <span className="mt-0.5 block text-xs font-black text-[#0b2d54]">{targetDateLabel}</span>
+            <span className="block text-[9px] font-medium text-[#7b8da1]">
+              {targetDaysLeft === 0 ? "Target date is today" : `${targetDaysLeft} days left to target`}
+            </span>
+          </div>
+        </div>
+        <div className="grid grid-cols-2 gap-2">
+          <button
+            type="button"
+            disabled={isAtOrAboveBudget}
+            aria-disabled={isAtOrAboveBudget}
+            onClick={() => {
+              if (isAtOrAboveBudget) return;
+              setLogOpen(true);
+            }}
+            className={`min-h-10 rounded-xl px-3 py-2 text-[10px] font-black transition ${
+              isAtOrAboveBudget
+                ? "cursor-not-allowed bg-[#eef2f4] text-[#93a0aa]"
+                : "bg-[#0b2d54] text-white hover:bg-[#123e66]"
+            }`}
+          >
+            {saving ? "Saving…" : isAboveBudget ? "Weekly budget exceeded" : isAtOrAboveBudget ? "Weekly target reached" : logOpen ? "Close log" : "Log drinks"}
+          </button>
+          <Link href="/health-goals" className="inline-flex min-h-10 items-center justify-center gap-1 rounded-xl border border-[#d7e4e8] bg-white px-3 py-2 text-[10px] font-black text-[#0b2d54]">
+            View goal <ArrowRight className="h-3 w-3" />
+          </Link>
+        </div>
+      </div>
     </div>
   );
 };
