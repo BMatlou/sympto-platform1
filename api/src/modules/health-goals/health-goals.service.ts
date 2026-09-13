@@ -53,6 +53,7 @@ export class HealthGoalsService {
     const goal = await this.findOne(id);
     const defaults = goalRuleFor(goal.category);
     const isMedicationGoal = String(goal.category).toUpperCase() === 'MEDICATION';
+    const isSmokingGoal = String(goal.category).toUpperCase() === 'SMOKING';
     const resolvedMetricType = config.metricType ?? defaults.metricType;
     const resolvedMetricKey = config.metricKey ?? defaults.metricKey;
     const resolvedFrequency = config.frequency ?? defaults.frequency;
@@ -60,7 +61,9 @@ export class HealthGoalsService {
     const resolvedAggregation = config.aggregation ?? defaults.aggregation;
     const resolvedComparison = config.comparison ?? defaults.comparison;
 
-    if (!(resolvedTarget > 0)) throw new BadRequestException('A positive target is required for an automatic goal.');
+    if (!(resolvedTarget >= 0) || (!isSmokingGoal && resolvedTarget <= 0)) {
+      throw new BadRequestException(isSmokingGoal ? 'A zero-or-positive target is required for a smoking goal.' : 'A positive target is required for an automatic goal.');
+    }
 
     if (isMedicationGoal && (goal.targetValue == null || goal.unit !== '%')) {
       await this.prisma.healthGoal.update({ where: { id }, data: { targetValue: String(resolvedTarget), unit: '%' } });
