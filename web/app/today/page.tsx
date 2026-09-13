@@ -7,6 +7,7 @@ import ProtectedRoute from "@/components/auth/protected-route";
 import { useDashboard } from "@/hooks/use-dashboard";
 import DailyHealthCheckIn from "@/components/dashboard/daily-health-check-in";
 import TodayMedicationActions from "@/components/today/today-medication-actions";
+import TodayAlcoholGoal from "@/components/today/today-alcohol-goal";
 import { healthGoalsService } from "@/services/health-goals.service";
 
 function text(value: unknown, fallback = "—") {
@@ -166,7 +167,8 @@ export default function TodayPage() {
   const goals = (data.goals ?? []).filter((goal: any) => String(goal?.status).toUpperCase() === "ACTIVE");
   const medicationGoal = goals.find((goal: any) => String(goal?.category ?? "").toUpperCase() === "MEDICATION");
   const smokingGoal = goals.find((goal: any) => String(goal?.category ?? "").toUpperCase() === "SMOKING");
-  const otherGoals = goals.filter((goal: any) => !["MEDICATION", "SMOKING"].includes(String(goal?.category ?? "").toUpperCase()));
+  const alcoholGoal = goals.find((goal: any) => String(goal?.category ?? "").toUpperCase() === "ALCOHOL");
+  const otherGoals = goals.filter((goal: any) => !["MEDICATION", "SMOKING", "ALCOHOL"].includes(String(goal?.category ?? "").toUpperCase()));
   const attention = data.attention ?? [];
   const carePlans = data.carePlans ?? [];
   const careTasks = carePlans.flatMap((plan: any) =>
@@ -248,7 +250,7 @@ export default function TodayPage() {
 
           <div id="today-goals" className="mt-7 flex items-end justify-between gap-5"><h2 className="text-xl font-black tracking-[-.045em] text-[#0b2d54]">Your active goals</h2><Link href="/health-goals" className="text-[10px] font-black text-[#0b2d54]">Manage goals <ArrowRight className="ml-1 inline h-3.5 w-3.5" /></Link></div>
 
-          {(medicationGoal || smokingGoal) && <section className="mt-3.5 grid items-stretch gap-4 lg:grid-cols-2">
+          {(medicationGoal || smokingGoal || alcoholGoal) && <section className="mt-3.5 grid items-stretch gap-4 lg:grid-cols-2">
             {medicationGoal ? <TodayMedicationActions medications={medications} goal={medicationGoal} onUpdated={reload} /> : <div />}
             {smokingGoal ? (() => {
               const goalId = String(smokingGoal.id);
@@ -309,11 +311,12 @@ export default function TodayPage() {
                 </div>
               </article>;
             })() : <div />}
+            {alcoholGoal && <TodayAlcoholGoal goal={alcoholGoal} onUpdated={reload} />}
           </section>}
 
-          {otherGoals.length > 0 && <section className="mt-4 grid gap-4 sm:grid-cols-2 xl:grid-cols-3">{otherGoals.map((goal: any) => { const category = String(goal?.category ?? "OTHER").toUpperCase(); const meta = GOAL_META[category] ?? GOAL_META.OTHER; const Icon = meta.icon; const progress = goalProgress(goal); const journey = goalJourney(goal); const isAlcohol = category === "ALCOHOL"; return <article key={String(goal.id)} className="rounded-[24px] border border-[#e0ebee] bg-white p-5 shadow-[0_5px_18px_rgba(11,45,84,.03)]"><div className="flex items-center gap-3"><span className={`grid h-10 w-10 place-items-center rounded-xl ${meta.surface} ${meta.accent}`}><Icon className="h-4 w-4" /></span><div className="min-w-0"><p className={`text-[9px] font-black uppercase tracking-[0.14em] ${meta.accent}`}>{meta.label}</p><h3 className="mt-1 truncate text-[16px] font-black text-[#0b2d54]">{text(goal.title, "Health goal")}</h3></div></div><div className="mt-5 flex items-end justify-between"><div><p className="text-3xl font-black text-[#0b2d54]">{progress}%</p><p className="mt-1 text-[10px] text-[#74859a]">progress</p></div><p className="text-right text-[10px] font-bold text-[#74859a]">Target<br /><span className="text-[#0b2d54]">{goalTarget(goal)}</span></p></div><div className="mt-3 h-2 overflow-hidden rounded-full bg-[#edf2f5]"><div className="h-full rounded-full bg-gradient-to-r from-[#0b6f73] to-[#24c1c4]" style={{ width: `${progress}%` }} /></div>{isAlcohol && <div className="mt-4 rounded-[16px] bg-[#faf8fd] px-3.5 py-3"><div className="flex items-center justify-between gap-3 text-[10px]"><span className="font-semibold text-[#74859a]">Day {journey.journeyDay} of your journey</span>{journey.daysLeft !== null && <span className="font-black text-[#6d4692]">{journey.daysLeft} days left</span>}</div></div>}<div className={`${isAlcohol ? "mt-3" : "mt-4"} flex justify-end`}><Link href="/health-goals" className="text-[10px] font-black text-[#0b2d54]">View goal <ArrowRight className="ml-1 inline h-3.5 w-3.5" /></Link></div></article>; })}</section>}
+          {otherGoals.length > 0 && <section className="mt-4 grid gap-4 sm:grid-cols-2 xl:grid-cols-3">{otherGoals.map((goal: any) => { const category = String(goal?.category ?? "OTHER").toUpperCase(); const meta = GOAL_META[category] ?? GOAL_META.OTHER; const Icon = meta.icon; const progress = goalProgress(goal); return <article key={String(goal.id)} className="rounded-[24px] border border-[#e0ebee] bg-white p-5 shadow-[0_5px_18px_rgba(11,45,84,.03)]"><div className="flex items-center gap-3"><span className={`grid h-10 w-10 place-items-center rounded-xl ${meta.surface} ${meta.accent}`}><Icon className="h-4 w-4" /></span><div className="min-w-0"><p className={`text-[9px] font-black uppercase tracking-[0.14em] ${meta.accent}`}>{meta.label}</p><h3 className="mt-1 truncate text-[16px] font-black text-[#0b2d54]">{text(goal.title, "Health goal")}</h3></div></div><div className="mt-5 flex items-end justify-between"><div><p className="text-3xl font-black text-[#0b2d54]">{progress}%</p><p className="mt-1 text-[10px] text-[#74859a]">progress</p></div><p className="text-right text-[10px] font-bold text-[#74859a]">Target<br /><span className="text-[#0b2d54]">{goalTarget(goal)}</span></p></div><div className="mt-3 h-2 overflow-hidden rounded-full bg-[#edf2f5]"><div className="h-full rounded-full bg-gradient-to-r from-[#0b6f73] to-[#24c1c4]" style={{ width: `${progress}%` }} /></div><div className="mt-4 flex justify-end"><Link href="/health-goals" className="text-[10px] font-black text-[#0b2d54]">View goal <ArrowRight className="ml-1 inline h-3.5 w-3.5" /></Link></div></article>; })}</section>}
 
-          {!medicationGoal && !smokingGoal && <Link href="/health-goals" className="mt-4 inline-flex min-h-10 items-center gap-2 rounded-xl bg-[#0b2d54] px-4 py-2.5 text-[10px] font-black text-white">Set a health goal <ArrowRight className="h-3.5 w-3.5" /></Link>}
+          {!medicationGoal && !smokingGoal && !alcoholGoal && <Link href="/health-goals" className="mt-4 inline-flex min-h-10 items-center gap-2 rounded-xl bg-[#0b2d54] px-4 py-2.5 text-[10px] font-black text-white">Set a health goal <ArrowRight className="h-3.5 w-3.5" /></Link>}
         </div>
       </main>
     </ProtectedRoute>
