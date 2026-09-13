@@ -54,17 +54,30 @@ export type HealthGoalListResponse = {
 };
 
 const normalizeGoalInput = (input: HealthGoalInput | Partial<HealthGoalInput>) => {
-  if (String(input.category ?? "").toUpperCase() !== "SMOKING") return input;
-
-  return {
-    ...input,
-    metricType: "SMOKING",
-    metricKey: "smoking.cigarettes",
-    frequency: "DAILY" as const,
-    aggregation: "LATEST" as const,
-    comparison: "AT_MOST" as const,
-    unit: input.unit || "cigarettes/day",
-  };
+  const category = String(input.category ?? "").toUpperCase();
+  if (category === "SMOKING") {
+    return {
+      ...input,
+      metricType: "SMOKING",
+      metricKey: "smoking.cigarettes",
+      frequency: "DAILY" as const,
+      aggregation: "LATEST" as const,
+      comparison: "AT_MOST" as const,
+      unit: input.unit || "cigarettes/day",
+    };
+  }
+  if (category === "ALCOHOL") {
+    return {
+      ...input,
+      metricType: "ALCOHOL",
+      metricKey: "alcohol.drinks",
+      frequency: "WEEKLY" as const,
+      aggregation: "SUM" as const,
+      comparison: "AT_MOST" as const,
+      unit: input.unit || "drinks/week",
+    };
+  }
+  return input;
 };
 
 class HealthGoalsService {
@@ -89,7 +102,8 @@ class HealthGoalsService {
     id: string,
     config: Pick<HealthGoalInput, "metricType" | "metricKey" | "frequency" | "frequencyTarget" | "aggregation" | "comparison" | "guidanceText">,
   ) {
-    const normalized = String((config as any).metricType ?? "").toUpperCase() === "SMOKING"
+    const metricType = String((config as any).metricType ?? "").toUpperCase();
+    const normalized = metricType === "SMOKING"
       ? {
           ...config,
           metricType: "SMOKING",
@@ -98,7 +112,16 @@ class HealthGoalsService {
           aggregation: "LATEST" as const,
           comparison: "AT_MOST" as const,
         }
-      : config;
+      : metricType === "ALCOHOL"
+        ? {
+            ...config,
+            metricType: "ALCOHOL",
+            metricKey: "alcohol.drinks",
+            frequency: "WEEKLY" as const,
+            aggregation: "SUM" as const,
+            comparison: "AT_MOST" as const,
+          }
+        : config;
     const response = await api.patch(`/patient-health-goals/${id}/metric-config`, normalized);
     return response.data?.data ?? response.data;
   }
@@ -107,6 +130,18 @@ class HealthGoalsService {
     const response = await api.post(`/patient-health-goals/${id}/smoking-log`, {
       cigarettes,
       dayKey,
+    });
+    return response.data?.data ?? response.data;
+  }
+
+  async logAlcohol(drinks: number) {
+    const response = await api.post("/health-goals/metric-event", {
+      metricType: "ALCOHOL",
+      metricKey: "alcohol.drinks",
+      loggedValue: drinks,
+      occurredAt: new Date().toISOString(),
+      source: "patient-alcohol-log",
+      sourceId: `patient-alcohol-log:${new Date().toISOString()}`,
     });
     return response.data?.data ?? response.data;
   }
