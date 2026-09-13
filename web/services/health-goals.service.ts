@@ -105,6 +105,11 @@ class HealthGoalsService {
     return response.data?.data ?? response.data;
   }
 
+  async logSmoking(id: string, cigarettes: number) {
+    const response = await api.post(`/patient-health-goals/${id}/smoking-log`, { cigarettes });
+    return response.data?.data ?? response.data;
+  }
+
   async remove(id: string) {
     const response = await api.delete(`/patient-health-goals/${id}`);
     return response.data?.data ?? response.data;
