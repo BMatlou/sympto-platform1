@@ -154,7 +154,9 @@ export const AlcoholGoalCard: React.FC<AlcoholGoalCardProps> = ({ goal, onUpdate
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
           <div className="flex items-center gap-2">
-            <Wine className="h-4 w-4 text-purple-700" />
+            <span className="grid h-11 w-11 shrink-0 place-items-center rounded-2xl bg-[#e5f7f6] text-[#0b6f73]">
+              <Wine className="h-5 w-5" />
+            </span>
             <h3 className="text-xs font-black uppercase tracking-wide text-[#51677f]">Alcohol Moderation</h3>
           </div>
           <p className="mt-1 text-[10px] font-semibold text-[#7b8da1]">
