@@ -146,7 +146,8 @@ export class PatientHealthGoalsController {
 
   @Post(':id/smoking-log')
   async logSmoking(@Param('id') id: string, @Body() body: { cigarettes?: number; dayKey?: string }, @Req() request: AuthenticatedRequest) {
-    const goal = await this.assertOwnGoal(id, this.userId(request));
+    const userId = this.userId(request);
+    const goal = await this.assertOwnGoal(id, userId);
     if (String(goal.category).toUpperCase() !== 'SMOKING') {
       throw new BadRequestException('This health goal is not a smoking goal.');
     }
@@ -161,13 +162,38 @@ export class PatientHealthGoalsController {
       throw new BadRequestException('A valid local day is required for a smoking log.');
     }
 
-    return this.healthGoalsService.syncMetricEventForUser(this.userId(request), {
+    const metricResult = await this.healthGoalsService.syncMetricEventForUser(userId, {
       metricType: 'SMOKING',
       metricKey: 'smoking.cigarettes',
       loggedValue: cigarettes,
       source: 'patient-smoking-log',
       sourceId: `${id}:${dayKey}`,
     });
+
+    const journalTitle = `Smoking log · ${dayKey}`;
+    const journalText = `Smoking log for ${dayKey}: ${cigarettes} ${cigarettes === 1 ? 'cigarette' : 'cigarettes'} smoked.`;
+    const existingJournal = await this.prisma.healthJournal.findFirst({
+      where: { patientId: goal.patientId, title: journalTitle },
+      select: { id: true },
+    });
+
+    if (existingJournal) {
+      await this.prisma.healthJournal.update({
+        where: { id: existingJournal.id },
+        data: { journal: journalText, notes: 'Recorded from the Smoking health-goal card.' },
+      });
+    } else {
+      await this.prisma.healthJournal.create({
+        data: {
+          patientId: goal.patientId,
+          title: journalTitle,
+          journal: journalText,
+          notes: 'Recorded from the Smoking health-goal card.',
+        },
+      });
+    }
+
+    return { metricResult, journal: { title: journalTitle, dayKey, cigarettes } };
   }
 
   @Delete(':id')
