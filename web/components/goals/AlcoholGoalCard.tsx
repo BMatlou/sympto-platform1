@@ -126,6 +126,7 @@ export const AlcoholGoalCard: React.FC<AlcoholGoalCardProps> = ({ goal, onUpdate
     ? Math.round((thisWeekLogged / weeklyTarget) * 100)
     : 0;
   const isAboveBudget = hasTarget && thisWeekLogged > weeklyTarget;
+  const isAtOrAboveBudget = hasTarget && thisWeekLogged >= weeklyTarget;
   const remaining = Math.max(0, weeklyTarget - thisWeekLogged);
   const programDay = currentProgramDay(goal.startedAt || goal.createdAt || new Date().toISOString());
   const week = currentWeekNumber(goal.startedAt || goal.createdAt || new Date().toISOString());
@@ -134,7 +135,7 @@ export const AlcoholGoalCard: React.FC<AlcoholGoalCardProps> = ({ goal, onUpdate
 
   async function addDrinks() {
     const drinks = Number(draft);
-    if (!goal?.id || !Number.isFinite(drinks) || drinks <= 0) return;
+    if (!goal?.id || !Number.isFinite(drinks) || drinks <= 0 || isAtOrAboveBudget) return;
 
     try {
       setSaving(true);
@@ -149,7 +150,7 @@ export const AlcoholGoalCard: React.FC<AlcoholGoalCardProps> = ({ goal, onUpdate
   }
 
   return (
-    <div className="flex h-full max-w-md flex-col rounded-2xl border border-[#dfebef] bg-white p-4 shadow-sm">
+    <div className="flex h-full w-full min-w-0 flex-col rounded-2xl border border-[#dfebef] bg-white p-4 shadow-sm">
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
           <div className="flex items-center gap-2">
@@ -162,10 +163,10 @@ export const AlcoholGoalCard: React.FC<AlcoholGoalCardProps> = ({ goal, onUpdate
         </div>
         <span
           className={`shrink-0 whitespace-nowrap text-[9px] font-black uppercase tracking-wide ${
-            isAboveBudget ? "text-red-600" : "text-emerald-700"
+            isAboveBudget ? "text-red-600" : isAtOrAboveBudget ? "text-slate-600" : "text-emerald-700"
           }`}
         >
-          {isAboveBudget ? "⚠️ Above weekly target" : "🟢 On track this week"}
+          {isAboveBudget ? "⚠️ Above weekly target" : isAtOrAboveBudget ? "Weekly target reached" : "🟢 On track this week"}
         </span>
       </div>
 
@@ -188,7 +189,7 @@ export const AlcoholGoalCard: React.FC<AlcoholGoalCardProps> = ({ goal, onUpdate
         </div>
         <div className="px-2 text-center last:pr-0">
           <span className="block text-[9px] font-bold uppercase tracking-wide text-[#91a0ae]">Budget used</span>
-          <span className={`mt-1 block text-sm font-black ${isAboveBudget ? "text-red-600" : "text-emerald-700"}`}>
+          <span className={`mt-1 block text-sm font-black ${isAboveBudget ? "text-red-600" : isAtOrAboveBudget ? "text-slate-600" : "text-emerald-700"}`}>
             {budgetUsedPercentage}%
           </span>
         </div>
@@ -201,19 +202,21 @@ export const AlcoholGoalCard: React.FC<AlcoholGoalCardProps> = ({ goal, onUpdate
         </div>
         <div className="relative mt-2 h-2.5 overflow-hidden rounded-full bg-[#edf2f4]">
           <div
-            className={`h-full rounded-full transition-all duration-500 ${isAboveBudget ? "bg-red-500" : "bg-emerald-500"}`}
+            className={`h-full rounded-full transition-all duration-500 ${isAboveBudget ? "bg-red-500" : isAtOrAboveBudget ? "bg-slate-400" : "bg-emerald-500"}`}
             style={{ width: `${Math.min(budgetUsedPercentage, 100)}%` }}
           />
           <span className="absolute inset-y-[-2px] right-0 w-px bg-[#0b2d54]/35" aria-hidden="true" />
         </div>
         <p className="mt-1.5 text-right text-[9px] font-medium text-[#96a3ae]">
-          {isAboveBudget ? `${formatNumber(thisWeekLogged)} drinks logged` : `${formatNumber(remaining)} drinks remaining`}
+          {isAboveBudget ? `${formatNumber(thisWeekLogged)} drinks logged` : isAtOrAboveBudget ? "Weekly target reached" : `${formatNumber(remaining)} drinks remaining`}
         </p>
       </div>
 
       <p className="mt-3 text-[11px] leading-relaxed text-[#687d91]">
         {isAboveBudget ? (
           <>You have gone past your weekly budget. Focus on stopping further intake for the rest of this week. Your budget resets Monday at 00:00.</>
+        ) : isAtOrAboveBudget ? (
+          <>You have reached your weekly budget. No more drinks can be logged against this goal until the budget resets Monday at 00:00.</>
         ) : (
           <>Pace yourself through the remaining days and keep your entries honest.</>
         )}
@@ -232,7 +235,7 @@ export const AlcoholGoalCard: React.FC<AlcoholGoalCardProps> = ({ goal, onUpdate
         </Link>
       </div>
 
-      {logOpen && (
+      {logOpen && !isAtOrAboveBudget && (
         <div className="mt-3 rounded-xl bg-[#f7fafb] p-3">
           <label htmlFor="alcohol-goal-drinks" className="text-[9px] font-black uppercase tracking-[0.14em] text-[#74859a]">
             Drinks to add
@@ -263,15 +266,22 @@ export const AlcoholGoalCard: React.FC<AlcoholGoalCardProps> = ({ goal, onUpdate
         </div>
       )}
 
-      {!logOpen && (
-        <button
-          type="button"
-          onClick={() => setLogOpen(true)}
-          className="mt-3 inline-flex min-h-10 w-full items-center justify-center rounded-xl bg-[#0b2d54] px-3 py-2 text-[10px] font-black text-white"
-        >
-          Log drinks
-        </button>
-      )}
+      <button
+        type="button"
+        disabled={isAtOrAboveBudget}
+        aria-disabled={isAtOrAboveBudget}
+        onClick={() => {
+          if (isAtOrAboveBudget) return;
+          setLogOpen(true);
+        }}
+        className={`mt-3 inline-flex min-h-10 w-full items-center justify-center rounded-xl px-3 py-2 text-[10px] font-black transition ${
+          isAtOrAboveBudget
+            ? "cursor-not-allowed bg-[#eef2f4] text-[#93a0aa]"
+            : "bg-[#0b2d54] text-white hover:bg-[#123e66]"
+        }`}
+      >
+        {saving ? "Saving…" : isAboveBudget ? "Weekly budget exceeded" : isAtOrAboveBudget ? "Weekly target reached" : logOpen ? "Close log" : "Log drinks"}
+      </button>
     </div>
   );
 };
