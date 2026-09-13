@@ -29,19 +29,22 @@ function formatNumber(value: unknown) {
   return Number.isInteger(number) ? String(number) : number.toFixed(1);
 }
 
-function mondayStart(date = new Date()) {
-  const result = new Date(date);
-  const day = result.getDay();
-  const diff = day === 0 ? -6 : 1 - day;
-  result.setHours(0, 0, 0, 0);
-  result.setDate(result.getDate() + diff);
-  return result;
-}
-
-function nextMondayStart(date = new Date()) {
-  const result = mondayStart(date);
-  result.setDate(result.getDate() + 7);
-  return result;
+function southAfricanWeekKey(date = new Date()) {
+  const formatter = new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Africa/Johannesburg",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  });
+  const parts = formatter.formatToParts(date);
+  const year = Number(parts.find((part) => part.type === "year")?.value);
+  const month = Number(parts.find((part) => part.type === "month")?.value);
+  const day = Number(parts.find((part) => part.type === "day")?.value);
+  const localDate = new Date(Date.UTC(year, month - 1, day));
+  const weekday = localDate.getUTCDay();
+  const daysFromMonday = weekday === 0 ? 6 : weekday - 1;
+  localDate.setUTCDate(localDate.getUTCDate() - daysFromMonday);
+  return localDate.toISOString().slice(0, 10);
 }
 
 function formatDate(value: string | Date) {
@@ -53,8 +56,10 @@ function formatDate(value: string | Date) {
 function currentWeekNumber(startedAt: string) {
   const start = new Date(startedAt);
   if (Number.isNaN(start.getTime())) return 1;
-  const startWeek = mondayStart(start);
-  const nowWeek = mondayStart();
+  const startWeekKey = southAfricanWeekKey(start);
+  const nowWeekKey = southAfricanWeekKey();
+  const startWeek = new Date(`${startWeekKey}T00:00:00Z`);
+  const nowWeek = new Date(`${nowWeekKey}T00:00:00Z`);
   return Math.max(1, Math.floor((nowWeek.getTime() - startWeek.getTime()) / (7 * 86400000)) + 1);
 }
 
@@ -69,37 +74,28 @@ export const AlcoholGoalCard: React.FC<AlcoholGoalCardProps> = ({ goal, onUpdate
   const [logOpen, setLogOpen] = useState(false);
 
   useEffect(() => {
-    let cancelled = false;
+    if (!goal?.id) return;
 
-    const loadWeeklyTotal = async () => {
-      if (!goal?.id) return;
-      try {
-        const response = await healthGoalsService.getMetricEvents(
-          "ALCOHOL",
-          "alcohol.drinks",
-          mondayStart(),
-          nextMondayStart(),
-        );
-        if (cancelled) return;
-        const total = response.events.reduce((sum, event) => {
-          const value = Number(event.loggedValue);
-          return Number.isFinite(value) ? sum + value : sum;
-        }, 0);
-        setThisWeekLogged(total);
-      } catch {
-        if (!cancelled) setThisWeekLogged(Number(goal.currentValue ?? 0));
+    const weekKey = southAfricanWeekKey();
+    const storageKey = `sympto:alcohol-week:${goal.id}`;
+    const previousWeekKey = window.localStorage.getItem(storageKey);
+
+    const syncWeekBaseline = async () => {
+      if (previousWeekKey && previousWeekKey !== weekKey) {
+        try {
+          await healthGoalsService.update(goal.id!, { currentValue: "0" });
+          setThisWeekLogged(0);
+        } catch {
+          setThisWeekLogged(Number(goal.currentValue ?? 0));
+        }
+      } else {
+        setThisWeekLogged(Number(goal.currentValue ?? 0));
       }
+
+      window.localStorage.setItem(storageKey, weekKey);
     };
 
-    void loadWeeklyTotal();
-    const interval = window.setInterval(() => {
-      void loadWeeklyTotal();
-    }, 30000);
-
-    return () => {
-      cancelled = true;
-      window.clearInterval(interval);
-    };
+    void syncWeekBaseline();
   }, [goal?.id, goal?.currentValue]);
 
   const differenceDelta = thisWeekLogged - weeklyTarget;
@@ -117,11 +113,11 @@ export const AlcoholGoalCard: React.FC<AlcoholGoalCardProps> = ({ goal, onUpdate
 
   async function addDrinks() {
     const drinks = Number(draft);
-    if (!Number.isFinite(drinks) || drinks <= 0) return;
+    if (!goal?.id || !Number.isFinite(drinks) || drinks <= 0) return;
 
     try {
       setSaving(true);
-      await healthGoalsService.logAlcohol(drinks);
+      await healthGoalsService.logAlcohol(goal.id, thisWeekLogged, drinks);
       setThisWeekLogged((current) => current + drinks);
       setDraft("");
       setLogOpen(false);
