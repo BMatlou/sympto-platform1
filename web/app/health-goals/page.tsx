@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { ArrowLeft, ArrowRight, CalendarDays, CheckCircle2, Edit3, Plus, Target, Trash2, X, LockKeyhole } from "lucide-react";
+import { ArrowLeft, ArrowRight, CheckCircle2, Edit3, Plus, Target, Trash2, X, LockKeyhole, Cigarette } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 import ProtectedRoute from "@/components/auth/protected-route";
@@ -30,7 +30,7 @@ const CATEGORIES: Array<{ value: string; label: string; unit: string; metricType
   { value: "SLEEP", label: "Sleep", unit: "hours/night", metricType: "SLEEP", metricKey: "sleep.hours", frequency: "DAILY", aggregation: "LATEST", comparison: "AT_LEAST", targetLabel: "Hours" },
   { value: "MENTAL_HEALTH", label: "Mental health", unit: "score", metricType: "MENTAL_HEALTH", metricKey: "mental.stress", frequency: "DAILY", aggregation: "LATEST", comparison: "AT_MOST", targetLabel: "Maximum score" },
   { value: "HYDRATION", label: "Hydration", unit: "ml/day", metricType: "HYDRATION", metricKey: "hydration.ml", frequency: "DAILY", aggregation: "SUM", comparison: "AT_LEAST", targetLabel: "Daily amount" },
-  { value: "SMOKING", label: "Smoking", unit: "cigarettes/day", metricType: "SMOKING", metricKey: "smoking.status", frequency: "TOTAL", aggregation: "LATEST", comparison: "AT_MOST", targetLabel: "Maximum" },
+  { value: "SMOKING", label: "Smoking", unit: "cigarettes/day", metricType: "SMOKING", metricKey: "smoking.cigarettes", frequency: "DAILY", aggregation: "LATEST", comparison: "AT_MOST", targetLabel: "Maximum" },
   { value: "ALCOHOL", label: "Alcohol", unit: "drinks/week", metricType: "ALCOHOL", metricKey: "alcohol.frequency", frequency: "WEEKLY", aggregation: "LATEST", comparison: "AT_MOST", targetLabel: "Maximum" },
   { value: "HEART_RATE", label: "Heart rate", unit: "bpm", metricType: "HEART_RATE", metricKey: "heart_rate.bpm", frequency: "DAILY", aggregation: "LATEST", comparison: "AT_MOST", targetLabel: "Target rate" },
   { value: "OTHER", label: "Personal goal", unit: "", metricType: "OTHER", metricKey: "other.value", frequency: "TOTAL", aggregation: "LATEST", comparison: "CLOSEST", targetLabel: "Target" },
@@ -86,6 +86,11 @@ export default function HealthGoalsPage() {
   const [saving, setSaving] = useState(false);
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [search, setSearch] = useState("");
+  const [smokingGoalId, setSmokingGoalId] = useState<string | null>(null);
+  const [smokingTodayValue, setSmokingTodayValue] = useState<number | null>(null);
+  const [smokingLogOpen, setSmokingLogOpen] = useState(false);
+  const [smokingInput, setSmokingInput] = useState("");
+  const [smokingSaving, setSmokingSaving] = useState(false);
 
   const healthGoals = useMemo(
     () => (Array.isArray(dashboard?.goals) ? dashboard.goals : []).filter((goal: any) => ["ACTIVE", "ACHIEVED", "ON_TRACK", "IMPROVING", "STAGNANT", "DECLINING"].includes(String(goal?.status ?? "").toUpperCase())),
@@ -98,12 +103,50 @@ export default function HealthGoalsPage() {
     return healthGoals.filter((goal: any) => `${goal?.title ?? ""} ${goal?.category ?? ""} ${goal?.description ?? ""}`.toLowerCase().includes(query));
   }, [healthGoals, search]);
 
+  const smokingGoal = useMemo(
+    () => healthGoals.find((goal: any) => String(goal?.category ?? "").toUpperCase() === "SMOKING") ?? null,
+    [healthGoals],
+  );
+  const nonSmokingGoals = useMemo(
+    () => filteredGoals.filter((goal: any) => String(goal?.category ?? "").toUpperCase() !== "SMOKING"),
+    [filteredGoals],
+  );
+  const smokingTarget = smokingGoal?.targetValue == null ? 0 : Number(smokingGoal.targetValue);
+  const smokingIsLogged = smokingTodayValue !== null;
+  const smokingDelta = smokingIsLogged ? smokingTodayValue - smokingTarget : 0;
+
   const editingGoal = editingId ? healthGoals.find((goal: any) => String(goal.id) === editingId) : null;
   const selectedCategory = CATEGORIES.find((item) => item.value === draft.category);
 
   useEffect(() => {
-    if (!editorOpen) return;
-    if (!editingGoal) return;
+    let cancelled = false;
+    async function loadSmokingToday() {
+      if (!smokingGoal?.id) {
+        setSmokingGoalId(null);
+        setSmokingTodayValue(null);
+        return;
+      }
+      setSmokingGoalId(String(smokingGoal.id));
+      try {
+        const start = new Date();
+        start.setHours(0, 0, 0, 0);
+        const end = new Date(start);
+        end.setDate(end.getDate() + 1);
+        const result = await healthGoalsService.getMetricEvents("SMOKING", "smoking.cigarettes", start, end, "patient-smoking-log");
+        const latest = result.events?.[result.events.length - 1];
+        if (!cancelled) setSmokingTodayValue(latest ? Number(latest.loggedValue) : null);
+      } catch {
+        if (!cancelled) setSmokingTodayValue(null);
+      }
+    }
+    void loadSmokingToday();
+    return () => {
+      cancelled = true;
+    };
+  }, [smokingGoal?.id]);
+
+  useEffect(() => {
+    if (!editorOpen || !editingGoal) return;
     const category = CATEGORIES.find((item) => item.value === String(editingGoal.category ?? "")) ?? CATEGORIES[CATEGORIES.length - 1];
     setDraft({
       title: String(editingGoal.title ?? ""),
@@ -154,8 +197,10 @@ export default function HealthGoalsPage() {
       toast.error("Your patient profile could not be identified.");
       return;
     }
-    if (!draft.category || !draft.title.trim() || !draft.priority || !draft.targetValue || Number(draft.targetValue) <= 0) {
-      toast.error("Add a goal name, category, priority and a positive target.");
+    const numericTarget = Number(draft.targetValue);
+    const isSmoking = draft.category === "SMOKING";
+    if (!draft.category || !draft.title.trim() || !draft.priority || draft.targetValue === "" || !Number.isFinite(numericTarget) || numericTarget < 0 || (!isSmoking && numericTarget <= 0)) {
+      toast.error(isSmoking ? "Add a smoking goal and a target of 0 or more cigarettes/day." : "Add a goal name, category, priority and a positive target.");
       return;
     }
 
@@ -206,6 +251,29 @@ export default function HealthGoalsPage() {
     }
   }
 
+  async function saveSmokingLog() {
+    if (!smokingGoalId) return;
+    const cigarettes = Number(smokingInput);
+    if (!Number.isFinite(cigarettes) || cigarettes < 0) {
+      toast.error("Enter a number of cigarettes from 0 upward.");
+      return;
+    }
+
+    try {
+      setSmokingSaving(true);
+      await healthGoalsService.logSmoking(smokingGoalId, cigarettes);
+      setSmokingTodayValue(cigarettes);
+      setSmokingLogOpen(false);
+      setSmokingInput("");
+      toast.success("Today's smoking log was saved.");
+      await reload();
+    } catch (err: any) {
+      toast.error(String(err?.response?.data?.message || "We could not save today's smoking log."));
+    } finally {
+      setSmokingSaving(false);
+    }
+  }
+
   async function deleteGoal(goal: any) {
     const id = String(goal?.id ?? "");
     if (!id) return;
@@ -246,6 +314,37 @@ export default function HealthGoalsPage() {
             </div>
           </section>
 
+          {smokingGoal && (
+            <section className="mt-6 overflow-hidden rounded-[28px] border border-[#d7e6ea] bg-white shadow-[0_18px_44px_rgba(11,45,84,.06)]">
+              <div className="bg-gradient-to-r from-[#eefafa] via-white to-[#f8fbfc] p-5 sm:p-6">
+                <div className="flex flex-col gap-5 sm:flex-row sm:items-start sm:justify-between">
+                  <div className="flex items-start gap-3.5">
+                    <div className="grid h-12 w-12 shrink-0 place-items-center rounded-2xl bg-[#e7f8f7] text-[#0b6f73]"><Cigarette className="h-5 w-5" /></div>
+                    <div>
+                      <p className="text-[10px] font-black uppercase tracking-[0.15em] text-[#0b6f73]">Today&apos;s action</p>
+                      <h2 className="mt-1 text-xl font-black tracking-[-.04em] text-[#0b2d54]">{String(smokingGoal.title || "Smoking goal")}</h2>
+                      <p className="mt-1 text-xs leading-5 text-[#74859a]">Your daily target is {smokingTarget} cigarettes. Sympto tracks the actual number you log today.</p>
+                    </div>
+                  </div>
+                  <button type="button" onClick={() => { setSmokingInput(smokingTodayValue == null ? "" : String(smokingTodayValue)); setSmokingLogOpen(true); }} className="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl bg-[#0b2d54] px-4 py-2.5 text-xs font-black text-white shadow-sm transition hover:bg-[#123d63]">
+                    {smokingIsLogged ? "Update today's log" : "Log today's cigarettes"}
+                  </button>
+                </div>
+
+                <div className="mt-5 grid gap-3 sm:grid-cols-3">
+                  <div className="rounded-2xl border border-[#e3edf0] bg-white p-4"><p className="text-[9px] font-black uppercase tracking-[0.14em] text-[#97a7b4]">Today</p><p className="mt-1 text-2xl font-black tracking-[-.05em] text-[#0b2d54]">{smokingIsLogged ? `${smokingTodayValue} cigarettes` : "Not logged"}</p></div>
+                  <div className="rounded-2xl border border-[#e3edf0] bg-white p-4"><p className="text-[9px] font-black uppercase tracking-[0.14em] text-[#97a7b4]">Daily target</p><p className="mt-1 text-2xl font-black tracking-[-.05em] text-[#0b2d54]">{smokingTarget} cigarettes</p></div>
+                  <div className="rounded-2xl border border-[#e3edf0] bg-white p-4"><p className="text-[9px] font-black uppercase tracking-[0.14em] text-[#97a7b4]">What to do now</p><p className={`mt-1 text-sm font-black ${!smokingIsLogged ? "text-[#0b6f73]" : smokingDelta <= 0 ? "text-[#168660]" : "text-red-700"}`}>{!smokingIsLogged ? "Log today's cigarettes" : smokingDelta < 0 ? `${Math.abs(smokingDelta)} below your target` : smokingDelta === 0 ? "At your target" : `${smokingDelta} above your target`}</p></div>
+                </div>
+
+                <div className="mt-4 flex flex-wrap items-center justify-between gap-3 border-t border-[#e8eff1] pt-4">
+                  <span className={`rounded-full px-3 py-1.5 text-[10px] font-black uppercase tracking-[0.12em] ${!smokingIsLogged ? "bg-[#fff7df] text-[#9a6b00]" : smokingDelta <= 0 ? "bg-[#e9f8f1] text-[#168660]" : "bg-red-50 text-red-700"}`}>{!smokingIsLogged ? "Not logged today" : smokingDelta <= 0 ? "On target today" : "Above today's target"}</span>
+                  <button type="button" onClick={() => openEdit(smokingGoal)} className="inline-flex items-center gap-1.5 rounded-xl border border-[#d7e4e8] px-3 py-2 text-[10px] font-black text-[#0b2d54] transition hover:bg-[#f6fafb]"><Edit3 className="h-3.5 w-3.5" />Edit smoking goal</button>
+                </div>
+              </div>
+            </section>
+          )}
+
           <div className="mt-6 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <div><h2 className="text-xl font-black tracking-[-.04em] text-[#0b2d54]">Your goals</h2><p className="mt-1 text-xs text-[#74859a]">Choose a goal to edit it, or remove it when it no longer reflects what you are working toward.</p></div>
             <input aria-label="Search health goals" value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search goals" className="min-h-10 rounded-xl border border-[#dce8ec] bg-white px-3.5 text-xs font-semibold text-[#0b2d54] outline-none placeholder:text-[#9aa8b5] focus:border-[#24c1c4] focus:ring-2 focus:ring-[#24c1c4]/15" />
@@ -254,10 +353,10 @@ export default function HealthGoalsPage() {
           {loading && <div className="mt-4 rounded-[24px] border border-[#dce8ec] bg-white p-6 text-sm text-[#74859a]">Loading your health goals…</div>}
           {error && !loading && <div className="mt-4 rounded-[24px] border border-red-200 bg-white p-6"><h2 className="font-black text-[#0b2d54]">We couldn&apos;t load your goals</h2><button type="button" onClick={reload} className="mt-4 rounded-xl bg-[#0b2d54] px-4 py-2.5 text-xs font-black text-white">Try again</button></div>}
 
-          {!loading && !error && filteredGoals.length === 0 && <section className="mt-4 rounded-[28px] border border-[#dce8ec] bg-white p-10 text-center shadow-[0_14px_36px_rgba(11,45,84,.045)]"><div className="mx-auto grid h-14 w-14 place-items-center rounded-2xl bg-[#e5f7f6] text-[#0b6f73]"><Target className="h-6 w-6" /></div><h2 className="mt-5 text-xl font-black text-[#0b2d54]">{search ? "No goals match your search" : "No health goals yet"}</h2><p className="mx-auto mt-2 max-w-md text-sm leading-6 text-[#74859a]">{search ? "Try another goal name or category." : "Create your first health goal and Sympto can connect your activity, measurements and tracking to it."}</p>{!search && <button type="button" onClick={openAdd} className="mt-5 inline-flex items-center gap-2 rounded-xl bg-[#0b2d54] px-5 py-3 text-xs font-black text-white"><Plus className="h-4 w-4" />Create your first goal</button>}</section>}
+          {!loading && !error && nonSmokingGoals.length === 0 && !smokingGoal && <section className="mt-4 rounded-[28px] border border-[#dce8ec] bg-white p-10 text-center shadow-[0_14px_36px_rgba(11,45,84,.045)]"><div className="mx-auto grid h-14 w-14 place-items-center rounded-2xl bg-[#e5f7f6] text-[#0b6f73]"><Target className="h-6 w-6" /></div><h2 className="mt-5 text-xl font-black text-[#0b2d54]">{search ? "No goals match your search" : "No health goals yet"}</h2><p className="mx-auto mt-2 max-w-md text-sm leading-6 text-[#74859a]">{search ? "Try another goal name or category." : "Create your first health goal and Sympto can connect your activity, measurements and tracking to it."}</p>{!search && <button type="button" onClick={openAdd} className="mt-5 inline-flex items-center gap-2 rounded-xl bg-[#0b2d54] px-5 py-3 text-xs font-black text-white"><Plus className="h-4 w-4" />Create your first goal</button>}</section>}
 
-          {!loading && !error && filteredGoals.length > 0 && <div className="mt-4 grid gap-4 lg:grid-cols-2">
-            {filteredGoals.map((goal: any) => {
+          {!loading && !error && nonSmokingGoals.length > 0 && <div className="mt-4 grid gap-4 lg:grid-cols-2">
+            {nonSmokingGoals.map((goal: any) => {
               const presentation = goalPresentation(goal);
               const status = String(goal?.status ?? "ACTIVE").toUpperCase();
               return <article key={String(goal.id)} className="group relative overflow-hidden rounded-[26px] border border-[#dce8ec] bg-white p-5 shadow-[0_12px_30px_rgba(11,45,84,.045)] transition hover:-translate-y-0.5 hover:shadow-[0_18px_40px_rgba(11,45,84,.075)] sm:p-6">
@@ -275,6 +374,14 @@ export default function HealthGoalsPage() {
           <Link href="/today" className="mt-6 inline-flex items-center gap-2 text-[10px] font-black text-[#0b2d54]">Back to Today <ArrowRight className="h-3.5 w-3.5" /></Link>
         </div>
 
+        {smokingLogOpen && smokingGoal && <div className="fixed inset-0 z-50 flex items-end justify-center bg-[#08284a]/45 p-0 backdrop-blur-sm sm:items-center sm:p-6">
+          <div className="w-full max-w-md rounded-t-[30px] bg-white shadow-[0_30px_90px_rgba(8,40,74,.28)] sm:rounded-[30px]">
+            <div className="flex items-center justify-between border-b border-[#edf2f5] px-5 py-4 sm:px-7"><div><p className="text-[10px] font-black uppercase tracking-[0.15em] text-[#0b6f73]">Smoking goal</p><h2 className="mt-1 text-xl font-black tracking-[-.04em] text-[#0b2d54]">Log today&apos;s cigarettes</h2></div><button type="button" onClick={() => setSmokingLogOpen(false)} className="grid h-10 w-10 place-items-center rounded-xl bg-[#f4f7f8] text-[#617487]" aria-label="Close smoking log"><X className="h-4 w-4" /></button></div>
+            <div className="space-y-4 p-5 sm:p-7"><TextField type="number" label="Cigarettes today" value={smokingInput} placeholder="0" onChange={(value) => setSmokingInput(value)} /><p className="text-xs leading-5 text-[#74859a]">Enter 0 when you did not smoke any cigarettes today. Zero is a real log, not a missing value.</p></div>
+            <div className="flex items-center justify-between gap-3 border-t border-[#edf2f5] px-5 py-4 sm:px-7"><button type="button" onClick={() => setSmokingLogOpen(false)} className="rounded-xl px-4 py-2.5 text-xs font-black text-[#74859a]">Cancel</button><button type="button" onClick={() => void saveSmokingLog()} disabled={smokingSaving || smokingInput === "" || Number(smokingInput) < 0} className="inline-flex min-h-10 items-center gap-2 rounded-xl bg-[#0b2d54] px-5 py-2.5 text-xs font-black text-white disabled:cursor-not-allowed disabled:opacity-40">{smokingSaving ? "Saving…" : "Save today&apos;s log"}<ArrowRight className="h-3.5 w-3.5" /></button></div>
+          </div>
+        </div>}
+
         {editorOpen && <div className="fixed inset-0 z-50 flex items-end justify-center bg-[#08284a]/45 p-0 backdrop-blur-sm sm:items-center sm:p-6">
           <div className="max-h-[92vh] w-full max-w-2xl overflow-y-auto rounded-t-[30px] bg-white shadow-[0_30px_90px_rgba(8,40,74,.28)] sm:rounded-[30px]">
             <div className="sticky top-0 z-10 flex items-center justify-between border-b border-[#edf2f5] bg-white/95 px-5 py-4 backdrop-blur sm:px-7"><div><p className="text-[10px] font-black uppercase tracking-[0.15em] text-[#0b6f73]">Health goals</p><h2 className="mt-1 text-xl font-black tracking-[-.04em] text-[#0b2d54]">{editingId ? "Edit health goal" : "Add health goal"}</h2></div><button type="button" onClick={closeEditor} className="grid h-10 w-10 place-items-center rounded-xl bg-[#f4f7f8] text-[#617487] transition hover:bg-[#eaf0f2]" aria-label="Close editor"><X className="h-4 w-4" /></button></div>
@@ -283,13 +390,13 @@ export default function HealthGoalsPage() {
 
               {draft.category && <>
                 <div className="grid gap-4 sm:grid-cols-2"><TextField label="Goal name" value={draft.title} placeholder={selectedCategory?.label || "Name this goal"} onChange={(value) => setDraft((current) => ({ ...current, title: value }))} /><div><label className="mb-2 block text-sm font-medium text-slate-700">Priority</label><div className="grid grid-cols-2 gap-2 sm:grid-cols-4">{PRIORITIES.map((priority) => <button key={priority} type="button" onClick={() => setDraft((current) => ({ ...current, priority }))} className={`rounded-xl border px-2 py-2.5 text-[10px] font-black ${draft.priority === priority ? "border-[#24c1c4] bg-[#e9f9fa] text-[#0b6f73]" : "border-slate-200 text-slate-500"}`}>{formatEnum(priority)}</button>)}</div></div></div>
-                <div className="grid gap-4 sm:grid-cols-2"><TextField type="number" label={`${selectedCategory?.targetLabel || "Target"}${selectedCategory?.unit ? ` (${selectedCategory.unit})` : ""}`} value={draft.targetValue} placeholder="Enter a positive target" onChange={(value) => setDraft((current) => ({ ...current, targetValue: value }))} /><TextField label="Unit" value={draft.unit} onChange={(value) => setDraft((current) => ({ ...current, unit: value }))} /><TextField type="date" label="Target date" value={draft.targetDate} onChange={(value) => setDraft((current) => ({ ...current, targetDate: value }))} /></div>
+                <div className="grid gap-4 sm:grid-cols-2"><TextField type="number" label={`${selectedCategory?.targetLabel || "Target"}${selectedCategory?.unit ? ` (${selectedCategory.unit})` : ""}`} value={draft.targetValue} placeholder={draft.category === "SMOKING" ? "0 or more" : "Enter a positive target"} onChange={(value) => setDraft((current) => ({ ...current, targetValue: value }))} /><TextField label="Unit" value={draft.unit} onChange={(value) => setDraft((current) => ({ ...current, unit: value }))} /><TextField type="date" label="Target date" value={draft.targetDate} onChange={(value) => setDraft((current) => ({ ...current, targetDate: value }))} /></div>
                 <TextField label="Why this goal matters" value={draft.description} placeholder="Optional context or motivation" onChange={(value) => setDraft((current) => ({ ...current, description: value }))} />
 
                 <div className="rounded-2xl border border-[#dce9ee] bg-[#f7fbfc] p-4"><div className="flex items-start gap-3"><Target className="mt-0.5 h-4 w-4 shrink-0 text-[#0b6f73]" /><div><p className="text-xs font-black text-[#0b2d54]">Sympto will connect this goal to your health data</p><p className="mt-1 text-[11px] leading-5 text-[#74859a]">{selectedCategory?.frequency === "DAILY" ? "Daily" : selectedCategory?.frequency === "WEEKLY" ? "Weekly" : "Overall"} tracking · {selectedCategory?.comparison === "AT_LEAST" ? "at least" : selectedCategory?.comparison === "AT_MOST" ? "at most" : selectedCategory?.comparison === "DECREASE_TO" ? "decrease toward" : "target comparison"} your target.</p></div></div></div>
               </>}
             </div>
-            <div className="sticky bottom-0 flex items-center justify-between gap-3 border-t border-[#edf2f5] bg-white/95 px-5 py-4 backdrop-blur sm:px-7"><button type="button" onClick={closeEditor} className="rounded-xl px-4 py-2.5 text-xs font-black text-[#74859a]">Cancel</button><button type="button" onClick={() => void saveGoal()} disabled={saving || !draft.category || !draft.title.trim() || !draft.targetValue || Number(draft.targetValue) <= 0} className="inline-flex min-h-10 items-center gap-2 rounded-xl bg-[#0b2d54] px-5 py-2.5 text-xs font-black text-white disabled:cursor-not-allowed disabled:opacity-40">{saving ? "Saving…" : editingId ? "Save changes" : "Add goal"}<ArrowRight className="h-3.5 w-3.5" /></button></div>
+            <div className="sticky bottom-0 flex items-center justify-between gap-3 border-t border-[#edf2f5] bg-white/95 px-5 py-4 backdrop-blur sm:px-7"><button type="button" onClick={closeEditor} className="rounded-xl px-4 py-2.5 text-xs font-black text-[#74859a]">Cancel</button><button type="button" onClick={() => void saveGoal()} disabled={saving || !draft.category || !draft.title.trim() || draft.targetValue === "" || !Number.isFinite(Number(draft.targetValue)) || Number(draft.targetValue) < 0 || (draft.category !== "SMOKING" && Number(draft.targetValue) <= 0)} className="inline-flex min-h-10 items-center gap-2 rounded-xl bg-[#0b2d54] px-5 py-2.5 text-xs font-black text-white disabled:cursor-not-allowed disabled:opacity-40">{saving ? "Saving…" : editingId ? "Save changes" : "Add goal"}<ArrowRight className="h-3.5 w-3.5" /></button></div>
           </div>
         </div>}
       </main>
