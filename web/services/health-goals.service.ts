@@ -62,12 +62,12 @@ class HealthGoalsService {
   }
 
   async create(input: HealthGoalInput) {
-    const response = await api.post("/health-goals", input);
+    const response = await api.post("/patient-health-goals", input);
     return response.data?.data ?? response.data;
   }
 
   async update(id: string, input: Partial<HealthGoalInput>) {
-    const response = await api.patch(`/health-goals/${id}`, input);
+    const response = await api.patch(`/patient-health-goals/${id}`, input);
     return response.data?.data ?? response.data;
   }
 
@@ -75,12 +75,12 @@ class HealthGoalsService {
     id: string,
     config: Pick<HealthGoalInput, "metricType" | "metricKey" | "frequency" | "frequencyTarget" | "aggregation" | "comparison" | "guidanceText">,
   ) {
-    const response = await api.patch(`/health-goals/${id}/metric-config`, config);
+    const response = await api.patch(`/patient-health-goals/${id}/metric-config`, config);
     return response.data?.data ?? response.data;
   }
 
   async remove(id: string) {
-    const response = await api.delete(`/health-goals/${id}`);
+    const response = await api.delete(`/patient-health-goals/${id}`);
     return response.data?.data ?? response.data;
   }
 
