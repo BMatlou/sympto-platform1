@@ -158,7 +158,8 @@ export class GoalsEngineService {
 
       const strategy = this.strategyFor(config);
       const window = this.strategyWindow(config, goal.createdAt, now);
-      const aggregate = await this.aggregateMetric(patientId, config.metricType, config.metricKey, window.start, now, config.aggregation);
+      const aggregation = strategy === 'TARGET_RANGE_STABILIZATION' ? 'LATEST' : config.aggregation;
+      const aggregate = await this.aggregateMetric(patientId, config.metricType, config.metricKey, window.start, now, aggregation);
       if (aggregate == null) continue;
 
       const target = Number(config.frequencyTarget ?? goal.targetValue ?? 0);
@@ -258,15 +259,15 @@ export class GoalsEngineService {
       case 'DELTA_REDUCTION':
         return this.evaluateDeltaReduction(patientId, goalTitle, config, start, end, value, target);
       case 'CADENCE_ACCUMULATION':
-        return this.evaluateCadence(config, value, target, start, end);
+        return this.evaluateCadence(config, value, target);
       case 'TARGET_RANGE_STABILIZATION':
         return this.evaluateRangeStabilization(patientId, config, start, end, target, value);
       case 'ADHERENCE_SCORE':
-        return this.evaluateAdherence(config, value, target, start, end);
+        return this.evaluateAdherence(value, target);
       case 'STEP_DOWN_TAPER':
         return this.evaluateSmokingTaper(patientId, config, createdAt, end, value, target);
       case 'TREND_MAPPING':
-        return this.evaluateTrendMapping(patientId, config, start, end, value, target);
+        return this.evaluateTrendMapping(patientId, config, end, value, target);
     }
   }
 
@@ -289,20 +290,13 @@ export class GoalsEngineService {
     const remaining = Math.abs(currentValue - target);
     const dateText = this.formatTargetDate(end);
     const guidanceText = goalTitle.toLowerCase().includes('weight')
-      ? `Weight is ${this.formatNumber(currentValue)}kg. ${this.formatNumber(remaining)}kg ${remaining === 1 ? 'left' : 'left'} to your target by ${dateText}. ${direction}`
+      ? `Weight is ${this.formatNumber(currentValue)}kg. ${this.formatNumber(remaining)}kg left to your target by ${dateText}. ${direction}`
       : `${goalTitle}: ${this.formatNumber(currentValue)}. ${this.formatNumber(remaining)} remaining to target. ${direction}`;
 
     return { strategy: 'DELTA_REDUCTION', currentValue, progressPercent, achieved, guidanceText };
   }
 
-  private evaluateCadence(
-    config: GoalConfig,
-    currentValue: number,
-    target: number,
-    start: Date,
-    end: Date,
-  ): StrategyEvaluation {
-    const achieved = false; // Cadence goals reset with the active cadence window.
+  private evaluateCadence(config: GoalConfig, currentValue: number, target: number): StrategyEvaluation {
     const progressPercent = config.comparison === 'AT_MOST'
       ? target <= 0 ? (currentValue <= target ? 100 : 0) : this.cap((target / Math.max(currentValue, target)) * 100)
       : target > 0 ? this.cap((currentValue / target) * 100) : 0;
@@ -313,7 +307,7 @@ export class GoalsEngineService {
       ? `${this.formatNumber(currentValue)} ${unit} logged ${cadenceLabel}. Keep below your ${this.formatNumber(target)} ${unit} target.`
       : `${this.formatNumber(currentValue)} ${unit} logged ${cadenceLabel}. ${this.formatNumber(remaining)} ${unit} left to hit your target.`;
 
-    return { strategy: 'CADENCE_ACCUMULATION', currentValue, progressPercent, achieved, guidanceText };
+    return { strategy: 'CADENCE_ACCUMULATION', currentValue, progressPercent, achieved: false, guidanceText };
   }
 
   private async evaluateRangeStabilization(
@@ -349,13 +343,7 @@ export class GoalsEngineService {
     };
   }
 
-  private evaluateAdherence(
-    config: GoalConfig,
-    currentValue: number,
-    target: number,
-    _start: Date,
-    _end: Date,
-  ): StrategyEvaluation {
+  private evaluateAdherence(currentValue: number, target: number): StrategyEvaluation {
     const adherence = this.cap(currentValue);
     const guidanceText = `Medication adherence is ${this.formatNumber(adherence)}% this week against a ${this.formatNumber(target)}% target.`;
     return {
@@ -376,15 +364,15 @@ export class GoalsEngineService {
     target: number,
   ): Promise<StrategyEvaluation> {
     const startingValue = await this.firstMetricValue(patientId, config.metricType, config.metricKey, createdAt, now) ?? currentValue;
-    const elapsedWeeks = Math.max(0, Math.floor((now.getTime() - createdAt.getTime()) / (7 * 24 * 60 * 60 * 1000)));
-    const ceiling = Math.max(target, startingValue - elapsedWeeks);
     const dailyRows = await this.metricValues(patientId, config.metricType, config.metricKey, createdAt, now);
-    const compliant = dailyRows.filter(({ value }) => value <= this.taperCeilingAt(createdAt, target, startingValue, value.occurredAt)).length;
+    const compliant = dailyRows.filter((row) => row.value <= this.taperCeilingAt(createdAt, target, startingValue, row.occurredAt)).length;
     const compliancePercent = dailyRows.length ? this.cap((compliant / dailyRows.length) * 100) : 0;
     const reductionProgress = startingValue > target
       ? this.cap(((startingValue - currentValue) / (startingValue - target)) * 100)
       : currentValue <= target ? 100 : 0;
     const progressPercent = this.cap((compliancePercent * 0.7) + (reductionProgress * 0.3));
+    const elapsedWeeks = Math.max(0, Math.floor((now.getTime() - createdAt.getTime()) / (7 * 24 * 60 * 60 * 1000)));
+    const ceiling = Math.max(target, startingValue - elapsedWeeks);
     const achieved = target === 0 && currentValue <= 0;
     const guidanceText = currentValue <= ceiling
       ? `Stayed below your daily ceiling of ${this.formatNumber(ceiling)} cigarettes today. Step-down target is ${this.formatNumber(target)} cigarettes/day.`
@@ -396,7 +384,6 @@ export class GoalsEngineService {
   private async evaluateTrendMapping(
     patientId: string,
     config: GoalConfig,
-    start: Date,
     end: Date,
     currentValue: number,
     target: number,
@@ -448,11 +435,6 @@ export class GoalsEngineService {
   private async firstMetricValue(patientId: string, metricType: string, metricKey: string, start: Date, end: Date) {
     const rows = await this.prisma.$queryRaw<Array<{ loggedValue: number }>>`SELECT "loggedValue" FROM "HealthGoalMetricEvent" WHERE "patientId" = ${patientId} AND "metricType" = ${metricType} AND "metricKey" = ${metricKey} AND "occurredAt" BETWEEN ${start} AND ${end} ORDER BY "occurredAt" ASC LIMIT 1`;
     return rows.length ? Number(rows[0].loggedValue) : null;
-  }
-
-  private async minimumMetricValue(patientId: string, metricType: string, metricKey: string, start: Date, end: Date) {
-    const rows = await this.prisma.$queryRaw<Array<{ value: number | null }>>`SELECT MIN("loggedValue") AS value FROM "HealthGoalMetricEvent" WHERE "patientId" = ${patientId} AND "metricType" = ${metricType} AND "metricKey" = ${metricKey} AND "occurredAt" BETWEEN ${start} AND ${end}`;
-    return rows[0]?.value == null ? null : Number(rows[0].value);
   }
 
   private async averageMetricValue(patientId: string, metricType: string, metricKey: string, start: Date, end: Date) {
