@@ -157,7 +157,7 @@ export class PatientHealthGoalsController {
     }
 
     const dayKey = String(body?.dayKey ?? '');
-    if (!/^\\d{4}-\\d{2}-\\d{2}$/.test(dayKey)) {
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(dayKey)) {
       throw new BadRequestException('A valid local day is required for a smoking log.');
     }
 
