@@ -8,7 +8,7 @@ export type GoalMetricRule = {
 
 export const DEFAULT_GOAL_METRIC_RULES: Record<string, GoalMetricRule> = {
   WEIGHT: { metricType: 'WEIGHT', metricKey: 'weight.kg', frequency: 'TOTAL', aggregation: 'LATEST', comparison: 'DECREASE_TO' },
-  EXERCISE: { metricType: 'EXERCISE', metricKey: 'exercise.minutes', frequency: 'DAILY', aggregation: 'SUM', comparison: 'AT_LEAST' },
+  EXERCISE: { metricType: 'EXERCISE', metricKey: 'exercise.minutes', frequency: 'WEEKLY', aggregation: 'SUM', comparison: 'AT_LEAST' },
   NUTRITION: { metricType: 'NUTRITION', metricKey: 'nutrition.calories', frequency: 'DAILY', aggregation: 'SUM', comparison: 'AT_MOST' },
   BLOOD_PRESSURE: { metricType: 'BLOOD_PRESSURE', metricKey: 'blood_pressure.systolic', frequency: 'DAILY', aggregation: 'LATEST', comparison: 'AT_MOST' },
   BLOOD_GLUCOSE: { metricType: 'BLOOD_GLUCOSE', metricKey: 'blood_glucose.value', frequency: 'DAILY', aggregation: 'LATEST', comparison: 'AT_MOST' },
