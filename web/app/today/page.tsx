@@ -227,7 +227,6 @@ export default function TodayPage() {
               const hasTarget = Number.isFinite(dailyTarget) && dailyTarget > 0;
               const difference = todayLogged !== null && hasTarget ? todayLogged - dailyTarget : 0;
               const exceeded = todayLogged !== null && hasTarget && todayLogged > dailyTarget;
-              const percentOfAllowance = todayLogged !== null && hasTarget ? Math.round((todayLogged / dailyTarget) * 100) : null;
               const scaleMax = Math.max(hasTarget ? dailyTarget * 2 : 1, todayLogged ?? 0, 1);
               const todayBar = todayLogged === null ? 0 : Math.min(100, (todayLogged / scaleMax) * 100);
               const targetMarker = hasTarget ? Math.min(100, (dailyTarget / scaleMax) * 100) : 50;
@@ -264,7 +263,7 @@ export default function TodayPage() {
                           <div className={`absolute inset-y-0 left-0 rounded-full ${exceeded ? "bg-[#d9775f]" : "bg-[#35b77a]"}`} style={{ width: `${todayBar}%` }} />
                           {hasTarget && <span className="absolute -top-1.5 h-6 w-0.5 rounded-full bg-[#0b2d54]" style={{ left: `${targetMarker}%` }} aria-hidden="true" />}
                         </div>
-                        <div className="mt-2 flex items-center justify-between text-[9px] font-semibold text-[#8795a0]"><span>0</span><span className="font-black text-[#0b2d54]">Daily target {formatNumber(dailyTarget)}</span><span className={exceeded ? "font-black text-[#a34f43]" : "font-black text-[#168660]"}>{percentOfAllowance}% used</span></div>
+                        <div className="mt-2 flex items-center justify-between gap-2 text-[9px] font-semibold text-[#8795a0]"><span>0</span><span className="font-black text-[#0b2d54]">Daily target {formatNumber(dailyTarget)}</span><span className={`font-black ${exceeded ? "text-[#a34f43]" : difference < 0 ? "text-[#168660]" : "text-[#0b2d54]"}`}>{difference > 0 ? `${Math.abs(difference)} above target` : difference < 0 ? `${Math.abs(difference)} below target` : "At target"}</span></div>
                       </div>
                     </div>
                   )}
