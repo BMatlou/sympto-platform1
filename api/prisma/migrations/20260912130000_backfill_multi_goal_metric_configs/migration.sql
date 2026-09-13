@@ -118,16 +118,8 @@ WITH medication_totals AS (
 )
 UPDATE "HealthGoal" g
 SET "currentValue" = medication_totals."currentValue",
-    "status" = CASE
-      WHEN medication_totals."currentValue" >= medication_totals."target"
-        THEN 'ACHIEVED'::"HealthGoalStatus"
-      ELSE 'ACTIVE'::"HealthGoalStatus"
-    END,
-    "achievedAt" = CASE
-      WHEN medication_totals."currentValue" >= medication_totals."target"
-        THEN CURRENT_TIMESTAMP
-      ELSE NULL
-    END
+    "status" = CASE WHEN medication_totals."currentValue" >= medication_totals."target" THEN 'ACHIEVED' ELSE 'ACTIVE' END,
+    "achievedAt" = CASE WHEN medication_totals."currentValue" >= medication_totals."target" THEN CURRENT_TIMESTAMP ELSE NULL END
 FROM medication_totals
 WHERE g."id" = medication_totals."goalId";
 
@@ -154,10 +146,7 @@ SELECT
   "goalId",
   "currentValue",
   LEAST(100, GREATEST(0, ("currentValue" / NULLIF("target", 0)) * 100)),
-  CASE
-    WHEN "currentValue" >= "target" THEN 'ACHIEVED'::"HealthGoalProgressStatus"
-    ELSE 'IMPROVING'::"HealthGoalProgressStatus"
-  END,
+  CASE WHEN "currentValue" >= "target" THEN 'ACHIEVED' ELSE 'IMPROVING' END,
   'Backfilled from persisted medication adherence events during contextual goal engine migration.',
   CURRENT_TIMESTAMP
 FROM medication_totals;
