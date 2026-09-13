@@ -144,6 +144,27 @@ export class PatientHealthGoalsController {
     return this.healthGoalsService.configureMetric(id, config);
   }
 
+  @Post(':id/smoking-log')
+  async logSmoking(@Param('id') id: string, @Body() body: { cigarettes?: number }, @Req() request: AuthenticatedRequest) {
+    const goal = await this.assertOwnGoal(id, this.userId(request));
+    if (String(goal.category).toUpperCase() !== 'SMOKING') {
+      throw new BadRequestException('This health goal is not a smoking goal.');
+    }
+
+    const cigarettes = Number(body?.cigarettes);
+    if (!Number.isFinite(cigarettes) || cigarettes < 0) {
+      throw new BadRequestException('Cigarettes must be a number greater than or equal to 0.');
+    }
+
+    return this.healthGoalsService.syncMetricEventForUser(this.userId(request), {
+      metricType: 'SMOKING',
+      metricKey: 'smoking.cigarettes',
+      loggedValue: cigarettes,
+      source: 'patient-smoking-log',
+      sourceId: id,
+    });
+  }
+
   @Delete(':id')
   async remove(@Param('id') id: string, @Req() request: AuthenticatedRequest) {
     const goal = await this.assertOwnGoal(id, this.userId(request));
