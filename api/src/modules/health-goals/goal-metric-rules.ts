@@ -17,7 +17,7 @@ export const DEFAULT_GOAL_METRIC_RULES: Record<string, GoalMetricRule> = {
   SLEEP: { metricType: 'SLEEP', metricKey: 'sleep.hours', frequency: 'DAILY', aggregation: 'LATEST', comparison: 'AT_LEAST' },
   MENTAL_HEALTH: { metricType: 'MENTAL_HEALTH', metricKey: 'mental.stress', frequency: 'DAILY', aggregation: 'LATEST', comparison: 'AT_MOST' },
   HYDRATION: { metricType: 'HYDRATION', metricKey: 'hydration.ml', frequency: 'DAILY', aggregation: 'SUM', comparison: 'AT_LEAST' },
-  SMOKING: { metricType: 'SMOKING', metricKey: 'smoking.status', frequency: 'TOTAL', aggregation: 'LATEST', comparison: 'AT_MOST' },
+  SMOKING: { metricType: 'SMOKING', metricKey: 'smoking.cigarettes', frequency: 'DAILY', aggregation: 'LATEST', comparison: 'AT_MOST' },
   ALCOHOL: { metricType: 'ALCOHOL', metricKey: 'alcohol.frequency', frequency: 'WEEKLY', aggregation: 'LATEST', comparison: 'AT_MOST' },
   HEART_RATE: { metricType: 'HEART_RATE', metricKey: 'heart_rate.bpm', frequency: 'DAILY', aggregation: 'LATEST', comparison: 'AT_MOST' },
   OTHER: { metricType: 'OTHER', metricKey: 'other.value', frequency: 'TOTAL', aggregation: 'LATEST', comparison: 'CLOSEST' },
