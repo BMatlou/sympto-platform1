@@ -45,6 +45,11 @@ function normalizeGoals(result: HealthHomeResponse, fullGoals: any[]) {
       const hasReachedTarget = currentValue != null && Number.isFinite(currentValue) && target > 0 && currentValue <= target;
       const storedAsFalseAchievement = String(goal?.status ?? "").toUpperCase() === "ACHIEVED"
         && !hasReachedTarget;
+      const guidanceText = !hasSmokingMeasurement
+        ? `No daily cigarette count logged yet. Your target is ${target || "your configured"} cigarettes/day; log each day to track the step-down taper.`
+        : currentValue != null && currentValue <= target
+          ? `On track: ${currentValue} cigarette${currentValue === 1 ? "" : "s"} today, at or below your ${target}-cigarette daily target.`
+          : `Above target today. Keep logging your daily count so Sympto can track your step-down taper toward ${target} cigarettes/day.`;
 
       if (storedAsFalseAchievement || !hasSmokingMeasurement) {
         return {
@@ -52,12 +57,13 @@ function normalizeGoals(result: HealthHomeResponse, fullGoals: any[]) {
           status: storedAsFalseAchievement ? "ACTIVE" : goal?.status ?? "ACTIVE",
           currentValue: null,
           achievedAt: storedAsFalseAchievement ? null : goal?.achievedAt ?? null,
+          description: guidanceText,
           latestProgress: {
             ...(latestRecordedProgress ?? {}),
             currentValue: null,
             progressPercent: storedAsFalseAchievement ? 0 : Number(latestRecordedProgress?.progressPercent ?? 0),
             status: "IMPROVING",
-            notes: "No daily cigarette-count has been logged yet. Start logging your daily count to track the step-down taper.",
+            notes: guidanceText,
           },
         };
       }
@@ -65,11 +71,13 @@ function normalizeGoals(result: HealthHomeResponse, fullGoals: any[]) {
       return {
         ...goal,
         currentValue,
+        description: guidanceText,
         latestProgress: {
           ...(latestRecordedProgress ?? {}),
           currentValue,
           progressPercent: Number(latestRecordedProgress?.progressPercent ?? 0),
           status: hasReachedTarget ? "ACHIEVED" : "IMPROVING",
+          notes: guidanceText,
         },
       };
     }
