@@ -47,8 +47,7 @@ export class HealthGoalsController {
     @Req() req: any,
     @Body() dto: SyncGoalMetricDto,
   ) {
-    const patient = await this.healthGoalsService.getPatientIdForUser(req.user.sub);
-    const result = await this.goalMetricActionService.sync(patient, dto);
+    const result = await this.goalMetricActionService.syncForUser(req.user.sub, dto);
 
     return { data: result };
   }
