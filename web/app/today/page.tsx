@@ -271,8 +271,8 @@ export default function TodayPage() {
                 const dailyTarget = Number(smokingGoal?.metricConfig?.frequencyTarget ?? smokingGoal?.frequencyTarget ?? smokingGoal?.targetValue ?? 0);
                 const difference = todayLogged !== null ? todayLogged - dailyTarget : 0;
                 const exceeded = todayLogged !== null && dailyTarget > 0 && todayLogged > dailyTarget;
-                const meterWidth = todayLogged !== null && dailyTarget > 0 ? Math.min(100, (todayLogged / Math.max(todayLogged, dailyTarget)) * 100) : 0;
-                const targetMarker = todayLogged !== null && todayLogged > 0 && dailyTarget > 0 ? Math.min(100, (dailyTarget / todayLogged) * 100) : 50;
+                const targetMarker = todayLogged !== null && todayLogged > 0 && dailyTarget > 0 ? Math.min(94, Math.max(8, (dailyTarget / todayLogged) * 86 + 4)) : 50;
+                const todayMarker = todayLogged !== null ? 95 : 50;
                 const startDate = new Date(String(smokingGoal?.createdAt ?? "2026-08-21T00:00:00Z"));
                 const targetDate = new Date(String(smokingGoal?.targetDate ?? "2026-09-30T00:00:00Z"));
                 const journeyDay = Number.isNaN(startDate.getTime()) ? 1 : Math.max(1, Math.floor((Date.now() - startDate.getTime()) / 86400000) + 1);
@@ -280,6 +280,29 @@ export default function TodayPage() {
 
                 return (
                   <article className="flex h-full flex-col rounded-[24px] border border-[#dfe9ed] bg-white shadow-[0_5px_18px_rgba(11,45,84,.035)]">
+                    <style jsx>{`
+                      .smoking-track{position:relative;height:62px;border-radius:16px;background:linear-gradient(180deg,#f8fbfc,#edf4f6);border:1px solid #dfebef;display:flex;align-items:center;padding:0 12px;overflow:visible}
+                      .smoking-cigarette{position:relative;width:94%;height:24px;display:flex;align-items:stretch;filter:drop-shadow(0 4px 6px rgba(11,45,84,.12))}
+                      .smoking-filter{width:17%;min-width:42px;background:linear-gradient(90deg,#bd7e48,#efd0a0 20%,#d5a06a 62%,#b77546);border-radius:5px 0 0 5px;box-shadow:inset 0 0 0 1px rgba(123,74,35,.17),inset -6px 0 9px rgba(105,59,28,.13);position:relative}
+                      .smoking-filter:after{content:"";position:absolute;right:7px;top:0;bottom:0;width:2px;background:rgba(124,73,36,.18);box-shadow:5px 0 rgba(124,73,36,.11),10px 0 rgba(124,73,36,.08)}
+                      .smoking-paper{flex:1;position:relative;background:linear-gradient(180deg,#fff,#f0f4f2 78%,#d8e3e2);border:1px solid #cedddd;border-left:0;border-radius:0 6px 6px 0}
+                      .smoking-paper:before{content:"";position:absolute;left:4%;right:4%;top:4px;height:2px;background:rgba(11,45,84,.06);box-shadow:0 14px rgba(11,45,84,.05)}
+                      .smoking-burn{position:absolute;right:18px;top:-1px;bottom:-1px;width:5px;background:linear-gradient(90deg,#b95d36,#f19b55,#793e31);box-shadow:0 0 8px rgba(238,117,45,.5)}
+                      .smoking-ember{position:relative;width:22px;height:24px;border-radius:0 7px 7px 0;background:radial-gradient(circle at 25% 50%,#fff7a7 0 8%,#ffcb55 18%,#ef6b2d 48%,#8f3e32 80%);box-shadow:0 0 5px #ffb02e,0 0 12px rgba(255,94,35,.85),0 0 22px rgba(255,139,45,.5);animation:smokingPulse 1.2s ease-in-out infinite}
+                      .smoking-ember:before{content:"";position:absolute;left:-3px;top:4px;width:8px;height:16px;border-radius:50%;background:rgba(255,221,102,.66);filter:blur(3px)}
+                      .smoking-ember:after{content:"";position:absolute;right:1px;top:-13px;width:10px;height:15px;border-radius:70% 20% 70% 20%;background:linear-gradient(180deg,#fff09c,#ff8a32 68%,transparent);transform:rotate(24deg);animation:smokingFlicker .75s ease-in-out infinite alternate}
+                      .smoking-smoke{position:absolute;right:6px;top:-16px;width:14px;height:22px;border-left:2px solid rgba(117,137,151,.46);border-radius:50%;animation:smokingRise 3.1s ease-in-out infinite}
+                      .smoking-smoke.two{right:-1px;top:-21px;width:11px;height:18px;animation-delay:1s;opacity:.65}
+                      .smoking-smoke.three{right:12px;top:-26px;width:8px;height:14px;animation-delay:1.7s;opacity:.42}
+                      .smoking-target{position:absolute;left:var(--target);top:6px;bottom:6px;width:2px;background:#0b2d54;border-radius:2px;z-index:4}
+                      .smoking-target:before{content:"Target ${formatNumber(dailyTarget) ?? ""}";position:absolute;top:-2px;left:50%;transform:translate(-50%,-100%);font-size:8px;font-weight:900;color:#0b2d54;white-space:nowrap}
+                      .smoking-today{position:absolute;left:var(--today);bottom:5px;width:8px;height:8px;border-radius:50%;background:${exceeded ? "#de6c5f" : "#24c1c4"};box-shadow:0 0 0 4px ${exceeded ? "rgba(222,108,95,.12)" : "rgba(36,193,196,.14)"},0 0 12px ${exceeded ? "rgba(222,108,95,.48)" : "rgba(36,193,196,.45)"};z-index:5}
+                      .smoking-today:after{content:"Today ${todayLogged ?? "—"}";position:absolute;right:-3px;top:12px;font-size:8px;color:${exceeded ? "#de6c5f" : "#0b6f73"};font-weight:900;white-space:nowrap}
+                      @keyframes smokingPulse{0%,100%{filter:brightness(.95);transform:scaleX(1)}50%{filter:brightness(1.22);transform:scaleX(1.05)}}
+                      @keyframes smokingFlicker{0%{transform:rotate(18deg) scale(.82)}100%{transform:rotate(33deg) translateY(-2px) scale(1.08)}}
+                      @keyframes smokingRise{0%{transform:translateY(4px) rotate(8deg);opacity:.15}35%{opacity:.65}100%{transform:translateY(-12px) rotate(-15deg);opacity:0}}
+                    `}</style>
+
                     <div className="flex-1 p-5 sm:p-6">
                       <div className="flex items-start justify-between gap-3">
                         <div className="flex min-w-0 items-center gap-3">
@@ -300,15 +323,26 @@ export default function TodayPage() {
                         {exceeded && <p className="max-w-[150px] text-right text-[10px] font-semibold leading-4 text-[#842832]">{difference} above target. Every next choice counts.</p>}
                       </div>
 
-                      {todayLogged !== null && (
-                        <div className="mt-5">
-                          <div className="relative h-2 rounded-full bg-[#edf2f4]">
-                            <div className={`h-full rounded-full ${exceeded ? "bg-[#ef6b73]" : "bg-[#24babe]"}`} style={{ width: `${meterWidth}%` }} />
-                            <div className="absolute -top-1 h-4 w-0.5 rounded-full bg-[#0b2d54]" style={{ left: `${targetMarker}%` }} />
-                          </div>
-                          <div className="mt-1.5 flex items-center justify-between text-[9px] font-semibold text-[#8795a0]"><span>0</span><span>Target {formatNumber(dailyTarget)}</span><span>Today {todayLogged}</span></div>
+                      <div className="mt-5">
+                        <div className="mb-2 flex items-center justify-between gap-2 text-[9px] font-black uppercase tracking-[0.12em] text-[#74859a]">
+                          <span>Today&apos;s target</span>
+                          <span className={exceeded ? "text-[#de6c5f]" : "text-[#0b6f73]"}>{todayLogged === null ? "Not logged" : exceeded ? `${difference} above target` : "On target"}</span>
                         </div>
-                      )}
+                        <div className="smoking-track" role="img" aria-label={`Burning cigarette target bar: ${dailyTarget} target, ${todayLogged ?? "not logged"} today`} style={{ "--target": `${targetMarker}%`, "--today": `${todayMarker}%` } as React.CSSProperties}>
+                          <div className="smoking-cigarette">
+                            <div className="smoking-filter" />
+                            <div className="smoking-paper"><span className="smoking-burn" /></div>
+                            <div className="smoking-ember">
+                              <span className="smoking-smoke" />
+                              <span className="smoking-smoke two" />
+                              <span className="smoking-smoke three" />
+                            </div>
+                          </div>
+                          <span className="smoking-target" aria-hidden="true" />
+                          <span className="smoking-today" aria-hidden="true" />
+                        </div>
+                        <div className="mt-1.5 flex items-center justify-between text-[9px] font-semibold text-[#8795a0]"><span>0</span><span className="font-black text-[#0b2d54]">Target {formatNumber(dailyTarget)}</span><span className={exceeded ? "font-black text-[#de6c5f]" : "font-black text-[#0b6f73]"}>Today {todayLogged ?? "—"}</span></div>
+                      </div>
 
                       <p className="mt-4 text-[10px] font-semibold text-[#8a99a6]">Day {journeyDay} · {daysLeft} days left · target {formatDate(targetDate)}</p>
 
@@ -344,7 +378,7 @@ export default function TodayPage() {
                 return (
                   <article key={String(goal.id)} className="rounded-[24px] border border-[#e0ebee] bg-white p-5 shadow-[0_5px_18px_rgba(11,45,84,.03)]">
                     <div className="flex items-center gap-3">
-                      <span className={`grid h-10 w-10 place-items-center rounded-xl ${meta.surface} ${meta.accent}`}><Icon className="h-4.5 w-4.5" /></span>
+                      <span className={`grid h-10 w-10 shrink-0 place-items-center rounded-xl ${meta.surface} ${meta.accent}`}><Icon className="h-4.5 w-4.5" /></span>
                       <div className="min-w-0"><p className={`text-[9px] font-black uppercase tracking-[0.14em] ${meta.accent}`}>{meta.label}</p><h3 className="mt-1 truncate text-[16px] font-black text-[#0b2d54]">{text(goal.title, "Health goal")}</h3></div>
                     </div>
                     <div className="mt-5 flex items-end justify-between"><div><p className="text-3xl font-black text-[#0b2d54]">{progress}%</p><p className="mt-1 text-[10px] text-[#74859a]">progress</p></div><p className="text-right text-[10px] font-bold text-[#74859a]">Target<br /><span className="text-[#0b2d54]">{goalTarget(goal)}</span></p></div>
