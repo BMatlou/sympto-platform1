@@ -41,14 +41,15 @@ export class HealthGoalsController {
     return { data: result };
   }
 
-  @Permissions('health-goals.update')
+  // Patients already have health-goals.read; ownership is enforced from req.user.sub
+  // inside GoalMetricActionService so a patient can only write their own metric event.
+  @Permissions('health-goals.read')
   @Post('metric-event')
   async syncMetricEvent(
     @Req() req: any,
     @Body() dto: SyncGoalMetricDto,
   ) {
     const result = await this.goalMetricActionService.syncForUser(req.user.sub, dto);
-
     return { data: result };
   }
 
