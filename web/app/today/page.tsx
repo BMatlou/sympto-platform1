@@ -249,24 +249,24 @@ export default function TodayPage() {
                       <p className="mt-1.5 text-[11px] leading-5 text-[#74859a]">Log honestly when you are ready. Sympto will compare it with your daily ceiling without treating an unlogged day as zero.</p>
                     </div>
                   ) : (
-                    <>
-                      <div className="mt-5 rounded-[18px] border border-[#e7eef1] bg-[#fbfdfd] p-4">
-                        <div className="flex items-end justify-between gap-4"><div><p className="text-3xl font-black tracking-[-.06em] text-[#0b2d54]">{todayLogged} <span className="text-sm font-bold text-[#74859a]">cigarettes today</span></p><p className="mt-1.5 text-[10px] font-semibold text-[#74859a]">Daily Target: {formatNumber(dailyTarget)} cigarettes</p></div><div className="text-right"><p className={`text-xl font-black ${exceeded ? "text-[#a34f43]" : "text-[#168660]"}`}>{difference > 0 ? `+${difference}` : difference}</p><p className="mt-1 text-[9px] font-black uppercase tracking-[0.12em] text-[#8a99a6]">Today&apos;s difference</p></div></div>
-
-                        <div className="mt-5">
-                          <div className="relative h-3 rounded-full bg-[#edf2f5]">
-                            <div className={`absolute inset-y-0 left-0 rounded-full ${exceeded ? "bg-[#d9775f]" : "bg-[#35b77a]"}`} style={{ width: `${todayBar}%` }} />
-                            {hasTarget && <span className="absolute -top-1.5 h-6 w-0.5 rounded-full bg-[#0b2d54]" style={{ left: `${targetMarker}%` }} aria-hidden="true" />}
-                          </div>
-                          <div className="mt-2 flex items-center justify-between text-[9px] font-semibold text-[#8795a0]"><span>0</span><span className="font-black text-[#0b2d54]">Daily target {formatNumber(dailyTarget)}</span><span className={exceeded ? "font-black text-[#a34f43]" : "font-black text-[#168660]"}>{percentOfAllowance}% used</span></div>
+                    <div className="mt-5 rounded-[18px] border border-[#e7eef1] bg-[#fbfdfd] p-4">
+                      <div className="flex items-start justify-between gap-4">
+                        <div className="min-w-0">
+                          <p className="text-3xl font-black leading-none tracking-[-.06em] text-[#0b2d54]">{todayLogged}</p>
+                          <p className="mt-1 text-sm font-bold text-[#74859a]">cigarettes today</p>
+                          <p className="mt-2 text-[10px] font-semibold text-[#74859a]">Daily Target: {formatNumber(dailyTarget)} cigarettes</p>
                         </div>
+                        <div className="shrink-0 text-right"><p className={`text-xl font-black ${exceeded ? "text-[#a34f43]" : "text-[#168660]"}`}>{difference > 0 ? `+${difference}` : difference}</p><p className="mt-1 text-[9px] font-black uppercase tracking-[0.12em] text-[#8a99a6]">Today&apos;s difference</p></div>
                       </div>
 
-                      <div className={`mt-4 rounded-[18px] border p-4 ${exceeded ? "border-amber-200 bg-amber-50/60" : "border-emerald-100 bg-emerald-50/60"}`}>
-                        <p className={`text-[9px] font-black uppercase tracking-[0.14em] ${exceeded ? "text-amber-800" : "text-emerald-700"}`}>Sympto Guidance</p>
-                        <p className="mt-1.5 text-[11px] leading-5 text-[#526779]">{exceeded ? `You have exceeded your daily ceiling of ${formatNumber(dailyTarget)} cigarettes for today. Every next choice still counts. Keep your record honest and make the next choice visible.` : `You&apos;re ${Math.abs(difference)} below your daily ceiling of ${formatNumber(dailyTarget)} cigarettes today. Stay at or below this limit while Sympto helps you build consistency toward your target.`}</p>
+                      <div className="mt-5">
+                        <div className="relative h-3 rounded-full bg-[#edf2f5]">
+                          <div className={`absolute inset-y-0 left-0 rounded-full ${exceeded ? "bg-[#d9775f]" : "bg-[#35b77a]"}`} style={{ width: `${todayBar}%` }} />
+                          {hasTarget && <span className="absolute -top-1.5 h-6 w-0.5 rounded-full bg-[#0b2d54]" style={{ left: `${targetMarker}%` }} aria-hidden="true" />}
+                        </div>
+                        <div className="mt-2 flex items-center justify-between text-[9px] font-semibold text-[#8795a0]"><span>0</span><span className="font-black text-[#0b2d54]">Daily target {formatNumber(dailyTarget)}</span><span className={exceeded ? "font-black text-[#a34f43]" : "font-black text-[#168660]"}>{percentOfAllowance}% used</span></div>
                       </div>
-                    </>
+                    </div>
                   )}
 
                   {openSmokingGoalId === goalId && <div className="mt-4 rounded-xl bg-[#f7fafb] p-3"><label className="text-[9px] font-black uppercase tracking-[0.14em] text-[#74859a]" htmlFor={`smoking-${goalId}`}>Cigarettes today</label><div className="mt-2 flex gap-2"><input id={`smoking-${goalId}`} type="number" min="0" step="1" inputMode="numeric" value={smokingDrafts[goalId] ?? ""} onChange={(event) => setSmokingDrafts((current) => ({ ...current, [goalId]: event.target.value }))} className="min-h-10 min-w-0 flex-1 rounded-xl border border-[#d7e4e8] bg-white px-3 text-sm font-bold text-[#0b2d54] outline-none focus:border-[#24c1c4]" /><button type="button" disabled={savingSmokingGoalId === goalId} onClick={() => void saveSmokingToday(smokingGoal)} className="min-h-10 rounded-xl bg-[#0b2d54] px-4 text-[10px] font-black text-white disabled:opacity-50">{savingSmokingGoalId === goalId ? "Saving…" : "Save"}</button></div><button type="button" onClick={() => setOpenSmokingGoalId(null)} className="mt-2 text-[9px] font-bold text-[#74859a]">Cancel</button></div>}
