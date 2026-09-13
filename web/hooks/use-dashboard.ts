@@ -27,32 +27,51 @@ function normalizeGoals(result: HealthHomeResponse, fullGoals: any[]) {
     const historicalAchievement = progress.find(
       (item: any) => String(item?.status ?? "").toUpperCase() === "ACHIEVED",
     );
+    const latestRecordedProgress = progress[0] ?? null;
     const isWeightGoal = category === "WEIGHT";
     const isMedicationGoal = category === "MEDICATION";
     const isSmokingGoal = category === "SMOKING";
 
     if (isSmokingGoal) {
       const targetValue = Number(goal?.targetValue ?? 0);
-      const currentValue = goal?.currentValue == null ? null : Number(goal.currentValue);
       const target = Number.isFinite(targetValue) && targetValue > 0 ? targetValue : 0;
+      const hasSmokingMeasurement = latestRecordedProgress?.currentValue != null
+        || latestRecordedProgress?.progressPercent != null;
+      const currentValue = hasSmokingMeasurement && goal?.currentValue != null
+        ? Number(goal.currentValue)
+        : hasSmokingMeasurement && latestRecordedProgress?.currentValue != null
+          ? Number(latestRecordedProgress.currentValue)
+          : null;
       const hasReachedTarget = currentValue != null && Number.isFinite(currentValue) && target > 0 && currentValue <= target;
       const storedAsFalseAchievement = String(goal?.status ?? "").toUpperCase() === "ACHIEVED"
         && !hasReachedTarget;
 
-      if (storedAsFalseAchievement) {
+      if (storedAsFalseAchievement || !hasSmokingMeasurement) {
         return {
           ...goal,
-          status: "ACTIVE",
+          status: storedAsFalseAchievement ? "ACTIVE" : goal?.status ?? "ACTIVE",
           currentValue: null,
-          achievedAt: null,
+          achievedAt: storedAsFalseAchievement ? null : goal?.achievedAt ?? null,
           latestProgress: {
+            ...(latestRecordedProgress ?? {}),
             currentValue: null,
-            progressPercent: 0,
+            progressPercent: storedAsFalseAchievement ? 0 : Number(latestRecordedProgress?.progressPercent ?? 0),
             status: "IMPROVING",
-            notes: "Smoking target awaiting a daily cigarette-count measurement.",
+            notes: "No daily cigarette-count has been logged yet. Start logging your daily count to track the step-down taper.",
           },
         };
       }
+
+      return {
+        ...goal,
+        currentValue,
+        latestProgress: {
+          ...(latestRecordedProgress ?? {}),
+          currentValue,
+          progressPercent: Number(latestRecordedProgress?.progressPercent ?? 0),
+          status: hasReachedTarget ? "ACHIEVED" : "IMPROVING",
+        },
+      };
     }
 
     if (isMedicationGoal) {
@@ -144,8 +163,6 @@ export function useDashboard() {
   }, [patientId]);
 
   useEffect(() => {
-    // Reload whenever the selected patient changes. Family-member navigation
-    // uses ?patientId=..., so the page must never retain another patient's data.
     firstLoad.current = true;
     void loadDashboard();
 
