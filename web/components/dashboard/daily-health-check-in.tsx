@@ -211,7 +211,7 @@ export default function DailyHealthCheckIn({ embedded = false, goals = [] }: { e
     };
   }, []);
 
-  async function syncGoal(goal: Goal | undefined, category: "HYDRATION" | "EXERCISE" | "SLEEP", currentValue: number) {
+  async function syncGoal(goal: Goal | undefined, category: "HYDRATION" | "SLEEP", currentValue: number) {
     if (!hasLoaded.current || !goal?.id || syncingGoalIds.current.has(goal.id)) return;
     syncingGoalIds.current.add(goal.id);
     try {
@@ -248,6 +248,7 @@ export default function DailyHealthCheckIn({ embedded = false, goals = [] }: { e
 
       setSavedJournal(saved);
       setSleepQuality(saved.sleepQuality ?? effectiveSleepQuality);
+      window.dispatchEvent(new Event("sympto:health-checkin-updated"));
       setMessage("Today’s health check-in and linked goal progress are saved.");
     } catch {
       setError("We couldn't save today's check-in. Please try again.");
@@ -314,7 +315,7 @@ export default function DailyHealthCheckIn({ embedded = false, goals = [] }: { e
             <div className="min-w-0"><strong className="block text-[24px] font-black tracking-[-.06em] text-[#0b2d54]">{waterIntakeMl.toLocaleString("en-ZA")} ml</strong><span className="mt-1 block text-[11px] text-[#74859a]">of {waterGoalMl >= 1000 ? `${waterGoalMl / 1000} L` : `${waterGoalMl} ml`} goal</span><small className="mt-1 block text-[10px] text-[#74859a]">{waterRemaining > 0 ? `${waterRemaining.toLocaleString("en-ZA")} ml left` : "Goal reached"}</small></div>
           </div>
           <div className="mt-3 flex items-center gap-1.5"><Droplets className="h-3.5 w-3.5 text-[#2583bc]" /><span className="text-[10px] font-semibold text-[#74859a]">{hydrationGoal ? "Counts directly toward your hydration goal." : "Daily hydration tracking."}</span></div>
-          <div className="mt-3 flex items-center justify-between gap-2 rounded-2xl bg-[#fbfdfe] px-3 py-2.5 ring-1 ring-[#e4edf0]"><button type="button" aria-label="Decrease water intake" disabled={waterIntakeMl <= 0} onClick={() => { const next = Math.max(0, waterIntakeMl - WATER_STEP_ML); setWaterIntakeMl(next); void syncGoal(hydrationGoal, "HYDRATION", next); }} className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-[#f5f8fb] text-[#0b2d54] transition enabled:hover:bg-[#e9f2f6] disabled:cursor-not-allowed disabled:opacity-35"><Minus className="h-4 w-4" /></button><div className="min-w-0 text-center"><span className="block text-[11px] font-black text-[#0b2d54]">{WATER_STEP_ML} ml</span><span className="text-[9px] font-semibold text-[#8998a8]">per tap</span></div><button type="button" aria-label="Increase water intake" onClick={() => { const next = waterIntakeMl + WATER_STEP_ML; setWaterIntakeMl(next); void syncGoal(hydrationGoal, "HYDRATION", next); }} className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-[#e8f8f8] text-[#0b7b80] transition hover:bg-[#d8f2f2]"><Plus className="h-4 w-4" /></button></div>
+          <div className="mt-3 flex items-center justify-between gap-2 rounded-2xl bg-[#fbfdfe] px-3 py-2.5 ring-1 ring-[#e4edf0]"><button type="button" aria-label="Decrease water intake" disabled={waterIntakeMl <= 0} onClick={() => { const next = Math.max(0, waterIntakeMl - WATER_STEP_ML); setWaterIntakeMl(next); void syncGoal(hydrationGoal, "HYDRATION", next); }} className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-[#f5f8fb] text-[#0b2d54] transition enabled:hover:bg-[#e9f2f6] disabled:cursor-not-allowed disabled:opacity-35"><Minus className="h-4 w-4" /></button><div className="min-w-0 text-center"><span className="block text-[11px] font-black text-[#0b2d54]">{WATER_STEP_ML} ml</span><span className="text-[9px] font-semibold text-[#8998a8]">per tap</span></div><button type="button" aria-label="Increase water intake" onClick={() => { const next = waterIntakeMl + WATER_STEP_ML; setWaterIntakeMl(next); void syncGoal(hydrationGoal, "HYDRATION", next); }} className="grid h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-[#e8f8f8] text-[#0b7b80] transition hover:bg-[#d8f2f2]"><Plus className="h-4 w-4" /></button></div>
           <button type="button" onClick={() => { setWaterIntakeMl(0); void syncGoal(hydrationGoal, "HYDRATION", 0); }} className="mt-2 w-full rounded-[10px] border-0 bg-transparent px-2 py-2 text-[10px] font-black text-[#74859a]">Reset water</button>
         </article>
 
@@ -323,9 +324,9 @@ export default function DailyHealthCheckIn({ embedded = false, goals = [] }: { e
           <div className="mt-4 rounded-[21px] border border-[#dcecf0] bg-gradient-to-br from-[#f1f7ff] to-[#eefbfa] p-4">
             <div className="flex items-center gap-4"><div className="relative grid h-[88px] w-[88px] shrink-0 place-items-center rounded-full shadow-[0_7px_16px_rgba(36,193,196,.14)]" style={{ background: `conic-gradient(#24c1c4 0 ${movementProgress}%, #dfeef1 ${movementProgress}% 100%)` }}><div className="absolute inset-[10px] rounded-full bg-[#f7fcfc]" /><div className="relative z-10 text-center"><b className="block text-[21px] font-black tracking-[-.06em] text-[#0b2d54]">{exerciseMinutes}</b><span className="text-[10px] font-black text-[#74859a]">minutes</span></div></div><div><b className="block text-sm text-[#0b2d54]">{movementTitle[0]}</b><span className="mt-1 block text-[11px] leading-[1.45] text-[#74859a]">{movementTitle[1]}</span>{exerciseGoal && <span className="mt-2 inline-flex items-center gap-1 text-[10px] font-black text-[#3f75bd]"><Target className="h-3 w-3" />{movementProgress}% of goal</span>}</div></div>
             <div className="my-4 flex items-center">{[0,1,2,3,4].map((index) => <span key={index} className="contents">{index > 0 && <span className={`h-[3px] flex-1 ${exerciseMinutes >= Math.ceil(index * exerciseGoalMinutes / 4) ? "bg-[#24c1c4]" : "bg-[#d9e9ed]"}`} />}<span className={`h-[11px] w-[11px] rounded-full border-2 border-[#f2f9fa] ${exerciseMinutes >= Math.ceil(index * exerciseGoalMinutes / 4) ? "bg-[#24c1c4] shadow-[0_0_0_1px_#24c1c4]" : "bg-[#d9e9ed] shadow-[0_0_0_1px_#cfe3e7]"}`} /></span>)}</div>
-            <div className="flex flex-wrap gap-1.5">{exerciseOptions.map((value) => <button key={value} type="button" onClick={() => { setExerciseMinutes(value); void syncGoal(exerciseGoal, "EXERCISE", value); }} className={`rounded-[10px] border px-2.5 py-2 text-[10px] font-black ${exerciseMinutes === value ? "border-[#0b2d54] bg-[#0b2d54] text-white" : "border-[#d6e6ea] bg-white text-[#74859a]"}`}>{value === 0 ? "None" : `${value} min`}</button>)}</div>
+            <div className="flex flex-wrap gap-1.5">{exerciseOptions.map((value) => <button key={value} type="button" onClick={() => { setExerciseMinutes(value); }} className={`rounded-[10px] border px-2.5 py-2 text-[10px] font-black ${exerciseMinutes === value ? "border-[#0b2d54] bg-[#0b2d54] text-white" : "border-[#d6e6ea] bg-white text-[#74859a]"}`}>{value === 0 ? "None" : `${value} min`}</button>)}</div>
           </div>
-          <p className="mt-3 text-[11px] leading-[1.55] text-[#74859a]">Choose the time that matches your day. Sympto turns it into measurable progress against your exercise goal.</p>
+          <p className="mt-3 text-[11px] leading-[1.55] text-[#74859a]">Choose the time that matches your day. Sympto turns it into measurable progress against your exercise goal when you save today’s check-in.</p>
         </article>
       </div>
 
