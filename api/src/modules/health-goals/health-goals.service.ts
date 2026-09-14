@@ -93,22 +93,15 @@ export class HealthGoalsService {
 
   private async ensureOnboardingWeightGoalMetric(goal: any) {
     if (String(goal?.category).toUpperCase() !== 'WEIGHT') return false;
-
     const existing = await this.prisma.$queryRaw<Array<{ healthGoalId: string }>>`
-      SELECT "healthGoalId"
-      FROM "HealthGoalMetricConfig"
-      WHERE "healthGoalId" = ${goal.id}
-      LIMIT 1
+      SELECT "healthGoalId" FROM "HealthGoalMetricConfig" WHERE "healthGoalId" = ${goal.id} LIMIT 1
     `;
     if (existing.length) return false;
-
     const startingWeight = Number(goal?.patient?.weightKg);
     const lossAmount = Number(goal?.targetValue);
     if (!Number.isFinite(startingWeight) || startingWeight <= 0 || !Number.isFinite(lossAmount) || lossAmount <= 0) return false;
-
     const targetWeight = Number((startingWeight - lossAmount).toFixed(2));
     if (!Number.isFinite(targetWeight) || targetWeight <= 0) return false;
-
     const rule = goalRuleFor('WEIGHT');
     await this.prisma.$executeRaw`
       INSERT INTO "HealthGoalMetricConfig"
@@ -117,9 +110,29 @@ export class HealthGoalsService {
         (${goal.id}, ${rule.metricType}, ${rule.metricKey}, ${rule.frequency}, ${targetWeight}, ${`Lose ${lossAmount}kg from your starting weight of ${startingWeight}kg.`}, ${rule.aggregation}, ${rule.comparison})
       ON CONFLICT ("healthGoalId") DO NOTHING
     `;
-
     await this.goalsEngine.backfillJournalMetrics(goal.patientId);
     await this.goalsEngine.backfillPatientProfileMetrics(goal.patientId);
+    await this.goalsEngine.recomputeAllMatchingGoals(goal.patientId);
+    return true;
+  }
+
+  private async ensureOnboardingExerciseGoalMetric(goal: any) {
+    if (String(goal?.category).toUpperCase() !== 'EXERCISE') return false;
+    const existing = await this.prisma.$queryRaw<Array<{ healthGoalId: string }>>`
+      SELECT "healthGoalId" FROM "HealthGoalMetricConfig" WHERE "healthGoalId" = ${goal.id} LIMIT 1
+    `;
+    if (existing.length) return false;
+    const targetMinutes = Number(goal?.targetValue);
+    if (!Number.isFinite(targetMinutes) || targetMinutes <= 0) return false;
+    const rule = goalRuleFor('EXERCISE');
+    await this.prisma.$executeRaw`
+      INSERT INTO "HealthGoalMetricConfig"
+        ("healthGoalId", "metricType", "metricKey", "frequency", "frequencyTarget", "guidanceText", "aggregation", "comparison")
+      VALUES
+        (${goal.id}, ${rule.metricType}, ${rule.metricKey}, ${rule.frequency}, ${targetMinutes}, ${'Track your weekly exercise minutes against your goal.'}, ${rule.aggregation}, ${rule.comparison})
+      ON CONFLICT ("healthGoalId") DO NOTHING
+    `;
+    await this.goalsEngine.backfillJournalMetrics(goal.patientId);
     await this.goalsEngine.recomputeAllMatchingGoals(goal.patientId);
     return true;
   }
@@ -147,16 +160,7 @@ export class HealthGoalsService {
         AND "occurredAt" < ${input.to}
       ORDER BY "occurredAt" ASC
     `;
-    return {
-      count: rows.length,
-      events: rows.map((row) => ({
-        id: row.id,
-        loggedValue: Number(row.loggedValue),
-        occurredAt: row.occurredAt,
-        source: row.source,
-        sourceId: row.sourceId,
-      })),
-    };
+    return { count: rows.length, events: rows.map((row) => ({ id: row.id, loggedValue: Number(row.loggedValue), occurredAt: row.occurredAt, source: row.source, sourceId: row.sourceId })) };
   }
 
   async findAll(query: QueryHealthGoalDto) {
@@ -169,15 +173,16 @@ export class HealthGoalsService {
 
     for (const goal of data) {
       await this.ensureOnboardingWeightGoalMetric(goal);
+      await this.ensureOnboardingExerciseGoalMetric(goal);
     }
 
     const normalizedData = await Promise.all(data.map(async (goal) => {
       if (String(goal.category).toUpperCase() === 'MEDICATION' && goal.targetValue == null) {
         return { ...goal, targetValue: new Prisma.Decimal(DEFAULT_MEDICATION_TARGET), unit: '%' };
       }
-      if (String(goal.category).toUpperCase() === 'WEIGHT') {
-        const config = await this.prisma.$queryRaw<Array<{ frequencyTarget: Prisma.Decimal | number }>>`
-          SELECT "frequencyTarget"
+      if (['WEIGHT', 'EXERCISE'].includes(String(goal.category).toUpperCase())) {
+        const config = await this.prisma.$queryRaw<Array<{ frequencyTarget: Prisma.Decimal | number; frequency: string; aggregation: string; comparison: string; metricType: string; metricKey: string }>>`
+          SELECT "frequencyTarget", "frequency", "aggregation", "comparison", "metricType", "metricKey"
           FROM "HealthGoalMetricConfig"
           WHERE "healthGoalId" = ${goal.id}
           LIMIT 1
