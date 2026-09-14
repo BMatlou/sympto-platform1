@@ -60,8 +60,12 @@ export default function TodayExerciseGoal({ goal }: Props) {
   useEffect(() => {
     void loadWeekEvents();
     const handleUpdated = () => void loadWeekEvents();
+    const interval = window.setInterval(() => void loadWeekEvents(), 5000);
     window.addEventListener("sympto:health-checkin-updated", handleUpdated);
-    return () => window.removeEventListener("sympto:health-checkin-updated", handleUpdated);
+    return () => {
+      window.clearInterval(interval);
+      window.removeEventListener("sympto:health-checkin-updated", handleUpdated);
+    };
   }, [goal?.id, weekStart.getTime()]);
 
   const weekTotal = events.reduce((total, event) => total + (Number.isFinite(event.loggedValue) ? event.loggedValue : 0), 0);
