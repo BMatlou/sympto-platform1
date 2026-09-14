@@ -52,94 +52,69 @@ export type TalkToSymptoResult = {
 };
 
 class HealthJournalService {
-  async create(
-    dto: CreateHealthJournalDto,
-  ): Promise<HealthJournal> {
-    const { data } = await api.post(
-      "/health-journals",
-      dto,
-    );
-
-    return data.data;
+  private async syncExerciseMetric(journal: HealthJournal) {
+    if (journal.exerciseMinutes == null) return;
+    try {
+      await api.post("/health-goals/metric-event", {
+        metricType: "EXERCISE",
+        metricKey: "exercise.minutes",
+        loggedValue: Number(journal.exerciseMinutes),
+        occurredAt: journal.createdAt,
+        source: "health-journal",
+        sourceId: journal.id,
+      });
+    } catch {
+      // The journal remains the source of truth; goal projection can retry through the backend backfill.
+    }
   }
 
-  async processSymptom(
-    dto: {
-      symptomName: string;
-      severity: "MILD" | "MODERATE" | "SEVERE" | "VERY_SEVERE";
-      startedAt?: string;
-      details?: string;
-    },
-  ): Promise<SymptomIntelligenceResult> {
-    const { data } = await api.post(
-      "/health-journals/process-symptom",
-      dto,
-    );
+  async create(dto: CreateHealthJournalDto): Promise<HealthJournal> {
+    const { data } = await api.post("/health-journals", dto);
+    const journal = data.data as HealthJournal;
+    await this.syncExerciseMetric(journal);
+    return journal;
+  }
 
+  async processSymptom(dto: { symptomName: string; severity: "MILD" | "MODERATE" | "SEVERE" | "VERY_SEVERE"; startedAt?: string; details?: string }): Promise<SymptomIntelligenceResult> {
+    const { data } = await api.post("/health-journals/process-symptom", dto);
     return data.data;
   }
 
   async talkToSympto(message: string): Promise<TalkToSymptoResult> {
-    const { data } = await api.post(
-      "/health-journals/talk-to-sympto",
-      { message },
-    );
-
+    const { data } = await api.post("/health-journals/talk-to-sympto", { message });
     return data.data;
   }
 
-  async getAll(
-    params: GetHealthJournalsParams = {},
-  ): Promise<HealthJournalListResponse> {
-    const { data } = await api.get(
-      "/health-journals",
-      {
-        params: {
-          page: params.page ?? 1,
-          limit: params.limit ?? 20,
-          mood: params.mood,
-          energyLevel: params.energyLevel,
-          encounterId: params.encounterId,
-          practitionerId: params.practitionerId,
-        },
+  async getAll(params: GetHealthJournalsParams = {}): Promise<HealthJournalListResponse> {
+    const { data } = await api.get("/health-journals", {
+      params: {
+        page: params.page ?? 1,
+        limit: params.limit ?? 20,
+        mood: params.mood,
+        energyLevel: params.energyLevel,
+        encounterId: params.encounterId,
+        practitionerId: params.practitionerId,
       },
-    );
-
+    });
     return data.data;
   }
 
-  async getOne(
-    id: string,
-  ): Promise<HealthJournal> {
-    const { data } = await api.get(
-      `/health-journals/${id}`,
-    );
-
+  async getOne(id: string): Promise<HealthJournal> {
+    const { data } = await api.get(`/health-journals/${id}`);
     return data.data;
   }
 
-  async update(
-    id: string,
-    dto: Partial<CreateHealthJournalDto>,
-  ): Promise<HealthJournal> {
-    const { data } = await api.patch(
-      `/health-journals/${id}`,
-      dto,
-    );
-
-    return data.data;
+  async update(id: string, dto: Partial<CreateHealthJournalDto>): Promise<HealthJournal> {
+    const { data } = await api.patch(`/health-journals/${id}`, dto);
+    const journal = data.data as HealthJournal;
+    await this.syncExerciseMetric(journal);
+    return journal;
   }
 
-  async remove(
-    id: string,
-  ): Promise<{ message: string }> {
-    const { data } = await api.delete(
-      `/health-journals/${id}`,
-    );
-
+  async remove(id: string): Promise<{ message: string }> {
+    const { data } = await api.delete(`/health-journals/${id}`);
     return data.data;
   }
 }
 
-export const healthJournalService =
-  new HealthJournalService();
+export const healthJournalService = new HealthJournalService();
