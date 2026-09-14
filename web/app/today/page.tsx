@@ -276,7 +276,7 @@ export default function TodayPage() {
               <div><p className="text-[10px] font-black uppercase tracking-[0.18em] text-[#71839a]">Current health</p><h2 className="mt-1 text-xl font-black tracking-[-.045em] text-[#0b2d54]">Vitals and essentials</h2></div>
               <Link href="/health-journal" className="text-[10px] font-black text-[#0b2d54]">Open health journal <ArrowRight className="ml-1 inline h-3.5 w-3.5" /></Link>
             </div>
-            <HealthVitalsSummary vitals={healthVitals} bmi={bmi} bmiCategory={bmiCategory} weightKg={weightKg} heightCm={heightCm} />
+            <HealthVitalsSummary measurements={healthVitals} bmi={bmi} bmiCategory={bmiCategory} weightKg={weightKg} heightCm={heightCm} />
           </section>
 
           <div id="today-goals" className="mt-7 flex items-end justify-between gap-5"><h2 className="text-xl font-black tracking-[-.045em] text-[#0b2d54]">Your active goals</h2><Link href="/health-goals" className="text-[10px] font-black text-[#0b2d54]">Manage goals <ArrowRight className="ml-1 inline h-3.5 w-3.5" /></Link></div>
