@@ -131,8 +131,8 @@ export default function TodayWeightGoal({ goal, fallbackWeight }: Props) {
                   <p className="text-[10px] font-black uppercase tracking-[.16em] text-white/50">Latest recorded weight</p>
                   <p className="mt-2 text-[48px] font-black leading-none tracking-[-.08em]">{formatKg(currentWeight)}<span className="ml-1.5 text-lg font-bold tracking-normal text-white/55">kg</span></p>
                   <div className="mt-4 flex flex-wrap items-center gap-2">
-                    <span className="rounded-full bg-white/10 px-3 py-1.5 text-[10px] font-black text-white/82] ring-1 ring-white/10">Target {formatKg(targetWeight)} kg</span>
-                    <span className={`rounded-full px-3 py-1.5 text-[10px] font-black ${targetReached ? "bg-[#24c1c4]/20 text-[#7de6e7]" : "bg-white/10 text-white/72] ring-1 ring-white/10"}`}>{progress}% progress</span>
+                    <span className="rounded-full bg-white/10 px-3 py-1.5 text-[10px] font-black text-white/80 ring-1 ring-white/10">Target {formatKg(targetWeight)} kg</span>
+                    <span className={`rounded-full px-3 py-1.5 text-[10px] font-black ${targetReached ? "bg-[#24c1c4]/20 text-[#7de6e7]" : "bg-white/10 text-white/70 ring-1 ring-white/10"}`}>{progress}% progress</span>
                   </div>
                 </div>
 
