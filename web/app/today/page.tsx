@@ -10,6 +10,7 @@ import HealthVitalsSummary, { type DashboardVital } from "@/components/dashboard
 import TodayMedicationActions from "@/components/today/today-medication-actions";
 import TodayAlcoholGoal from "@/components/today/today-alcohol-goal";
 import TodayWeightGoal from "@/components/today/today-weight-goal";
+import TodayExerciseGoal from "@/components/today/today-exercise-goal";
 import { healthGoalsService } from "@/services/health-goals.service";
 import { TODAY_GOAL_CARD_CLASS, TODAY_GOAL_FOOTER_CLASS } from "@/components/today/today-goal-card-styles";
 
@@ -189,7 +190,8 @@ export default function TodayPage() {
   const smokingGoal = goals.find((goal: any) => String(goal?.category ?? "").toUpperCase() === "SMOKING");
   const alcoholGoal = goals.find((goal: any) => String(goal?.category ?? "").toUpperCase() === "ALCOHOL");
   const weightGoal = goals.find((goal: any) => String(goal?.category ?? "").toUpperCase() === "WEIGHT");
-  const otherGoals = goals.filter((goal: any) => !["MEDICATION", "SMOKING", "ALCOHOL", "WEIGHT"].includes(String(goal?.category ?? "").toUpperCase()));
+  const exerciseGoal = goals.find((goal: any) => String(goal?.category ?? "").toUpperCase() === "EXERCISE");
+  const otherGoals = goals.filter((goal: any) => !["MEDICATION", "SMOKING", "ALCOHOL", "WEIGHT", "EXERCISE"].includes(String(goal?.category ?? "").toUpperCase()));
   const attention = data.attention ?? [];
   const carePlans = data.carePlans ?? [];
   const careTasks = carePlans.flatMap((plan: any) =>
@@ -284,7 +286,7 @@ export default function TodayPage() {
 
           <div id="today-goals" className="mt-7 flex items-end justify-between gap-5"><h2 className="text-xl font-black tracking-[-.045em] text-[#0b2d54]">Your active goals</h2><Link href="/health-goals" className="text-[10px] font-black text-[#0b2d54]">Manage goals <ArrowRight className="ml-1 inline h-3.5 w-3.5" /></Link></div>
 
-          {(medicationGoal || smokingGoal || alcoholGoal || weightGoal) && <section className="mt-3.5 grid items-stretch gap-4 lg:grid-cols-2">
+          {(medicationGoal || smokingGoal || alcoholGoal || weightGoal || exerciseGoal) && <section className="mt-3.5 grid items-stretch gap-4 lg:grid-cols-2">
             {medicationGoal ? <TodayMedicationActions medications={medications} goal={medicationGoal} onUpdated={reload} /> : <div />}
             {smokingGoal ? (() => {
               const goalId = String(smokingGoal.id);
@@ -342,11 +344,12 @@ export default function TodayPage() {
             })() : <div />}
             {alcoholGoal && <TodayAlcoholGoal goal={alcoholGoal} onUpdated={reload} />}
             {weightGoal && <TodayWeightGoal goal={weightGoal} fallbackWeight={weightKg} />}
+            {exerciseGoal && <TodayExerciseGoal goal={exerciseGoal} onUpdated={reload} />}
           </section>}
 
           {otherGoals.length > 0 && <section className="mt-4 grid gap-4 sm:grid-cols-2 xl:grid-cols-3">{otherGoals.map((goal: any) => { const category = String(goal?.category ?? "OTHER").toUpperCase(); const meta = GOAL_META[category] ?? GOAL_META.OTHER; const Icon = meta.icon; const progress = goalProgress(goal); const journey = goalJourney(goal); const targetLabel = goalTarget(goal); return <article key={String(goal.id)} className={`${TODAY_GOAL_CARD_CLASS} flex h-full min-w-0 flex-col`}><div className="border-b border-[#edf2f5] bg-gradient-to-br from-[#f7fcfc] via-white to-[#eef8f8] px-5 py-4"><div className="flex items-start justify-between gap-3"><div className="flex min-w-0 items-center gap-3"><span className={`grid h-10 w-10 shrink-0 place-items-center rounded-xl ${meta.surface} ${meta.accent}`}><Icon className="h-4 w-4" /></span><div className="min-w-0"><p className={`text-[10px] font-black uppercase tracking-[0.14em] ${meta.accent}`}>{meta.label}</p><h3 className="truncate text-lg font-black text-[#0b2d54]">{text(goal.title, "Health goal")}</h3></div></div><span className="shrink-0 rounded-full bg-[#f1f6f8] px-2.5 py-1 text-[9px] font-black text-[#6f8091]">{progress}%</span></div></div><div className="flex-1 p-5"><div className="rounded-[18px] border border-[#e7eef1] bg-[#fbfdfd] p-4"><div className="flex items-end justify-between gap-4"><div><p className="text-3xl font-black leading-none tracking-[-.06em] text-[#0b2d54]">{progress}%</p><p className="mt-1 text-sm font-bold text-[#74859a]">progress</p></div><div className="text-right"><p className="text-[9px] font-black uppercase tracking-[0.12em] text-[#8a99a6]">Target</p><p className="mt-1 text-sm font-black text-[#0b2d54]">{targetLabel}</p></div></div><div className="mt-5 h-3 overflow-hidden rounded-full bg-[#edf2f5]"><div className="h-full rounded-full bg-gradient-to-r from-[#0b6f73] to-[#24c1c4]" style={{ width: `${progress}%` }} /></div><p className="mt-2 text-right text-[9px] font-semibold text-[#8a99a6]">{progress === 0 ? "Not started yet" : `${progress}% complete`}</p></div></div><div className={`${TODAY_GOAL_FOOTER_CLASS} px-4`}><div className="mb-3 flex items-start justify-between gap-3"><div><p className="text-[9px] font-black uppercase tracking-[0.12em] text-[#91a0ae]">Target date</p><p className="mt-0.5 text-xs font-black text-[#17314e]">{Number.isNaN(journey.targetDate.getTime()) ? "—" : formatDate(journey.targetDate)}</p><p className="text-[9px] font-medium text-[#7b8da1]">{journey.daysLeft === null ? "Target date not set" : journey.daysLeft === 0 ? "Target date is today" : `${journey.daysLeft} days left to target`}</p></div><span className="text-[9px] font-semibold text-[#7b8da1]">Day {journey.journeyDay} of your journey</span></div><Link href="/health-goals" className="inline-flex min-h-10 w-full items-center justify-center gap-1 rounded-xl border border-[#d7e4e8] bg-white px-3 py-2 text-[10px] font-black text-[#0b2d54]">View goal <ArrowRight className="h-3 w-3" /></Link></div></article>; })}</section>}
 
-          {!medicationGoal && !smokingGoal && !alcoholGoal && !weightGoal && <Link href="/health-goals" className="mt-4 inline-flex min-h-10 items-center gap-2 rounded-xl bg-[#0b2d54] px-4 py-2.5 text-[10px] font-black text-white">Set a health goal <ArrowRight className="h-3.5 w-3.5" /></Link>}
+          {!medicationGoal && !smokingGoal && !alcoholGoal && !weightGoal && !exerciseGoal && <Link href="/health-goals" className="mt-4 inline-flex min-h-10 items-center gap-2 rounded-xl bg-[#0b2d54] px-4 py-2.5 text-[10px] font-black text-white">Set a health goal <ArrowRight className="h-3.5 w-3.5" /></Link>}
         </div>
       </main>
     </ProtectedRoute>
