@@ -250,8 +250,11 @@ export class HealthHomeService {
     }
 
     const baselineRecordedAt = patient.baseline?.establishedAt ?? patient.baseline?.updatedAt ?? null;
+    const { start: todayStart, end: todayEnd } = southAfricaDayBounds(now);
+    const baselineRecordedToday = baselineRecordedAt != null && baselineRecordedAt >= todayStart && baselineRecordedAt < todayEnd;
     const manualVitals = [
-      inputPlaceholder: null,
+      baselineRecordedToday && patient.baseline?.weightKg != null ? { type: 'WEIGHT', name: 'Weight', value: Number(patient.baseline.weightKg), unit: 'kg', measuredAt: baselineRecordedAt, source: 'MANUAL_ENTRY' } : null,
+      baselineRecordedToday && patient.baseline?.heightCm != null ? { type: 'HEIGHT', name: 'Height', value: Number(patient.baseline.heightCm), unit: 'cm', measuredAt: baselineRecordedAt, source: 'MANUAL_ENTRY' } : null,
       patient.baseline?.systolicPressure != null && patient.baseline?.diastolicPressure != null ? { type: 'BLOOD_PRESSURE', name: 'Blood pressure', value: `${patient.baseline.systolicPressure}/${patient.baseline.diastolicPressure}`, unit: 'mmHg', measuredAt: baselineRecordedAt, source: 'MANUAL_ENTRY' } : null,
       patient.baseline?.restingHeartRate != null ? { type: 'HEART_RATE', name: 'Heart rate', value: Number(patient.baseline.restingHeartRate), unit: 'bpm', measuredAt: baselineRecordedAt, source: 'MANUAL_ENTRY' } : null,
       patient.baseline?.oxygenSaturation != null ? { type: 'OXYGEN_SATURATION', name: 'Oxygen saturation', value: Number(patient.baseline.oxygenSaturation), unit: '%', measuredAt: baselineRecordedAt, source: 'MANUAL_ENTRY' } : null,
