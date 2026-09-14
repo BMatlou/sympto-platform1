@@ -152,7 +152,7 @@ export const AlcoholGoalCard: React.FC<AlcoholGoalCardProps> = ({ goal, onUpdate
 
       <div className="flex-1 p-5">
         <div className={`text-sm font-semibold ${isAboveBudget ? "text-red-800" : "text-emerald-800"}`}>
-          {isAboveBudget ? < >You are <strong>{formatNumber(Math.abs(differenceDelta))} drinks</strong> above this week&apos;s budget.</> : <>✓ On track this week — <strong>{formatNumber(remaining)} drinks remaining.</strong></>}
+          {isAboveBudget ? <>You are <strong>{formatNumber(Math.abs(differenceDelta))} drinks</strong> above this week&apos;s budget.</> : <>✓ On track this week — <strong>{formatNumber(remaining)} drinks remaining.</strong></>}
         </div>
 
         <div className="mt-4 grid grid-cols-3 divide-x divide-[#edf2f5] border-y border-[#edf2f5] py-3">
