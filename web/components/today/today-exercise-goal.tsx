@@ -73,6 +73,7 @@ export default function TodayExerciseGoal({ goal }: Props) {
   const todayKey = localDayKey();
   const todayMinutes = events.filter((event) => { const date = new Date(event.occurredAt); return !Number.isNaN(date.getTime()) && localDayKey(date) === todayKey; }).reduce((total, event) => total + (Number.isFinite(event.loggedValue) ? event.loggedValue : 0), 0);
   const targetReached = targetMinutes > 0 && weekTotal >= targetMinutes;
+  const overTarget = targetMinutes > 0 && weekTotal > targetMinutes;
 
   return (
     <article className={`${TODAY_GOAL_CARD_CLASS} flex h-full min-w-0 flex-col`}>
@@ -88,9 +89,9 @@ export default function TodayExerciseGoal({ goal }: Props) {
 
       <div className={TODAY_GOAL_BODY_CLASS}>
         <div className="rounded-[18px] border border-[#e7eef1] bg-[#fbfdfd] p-4">
-          <div className="flex items-end justify-between gap-4"><div><p className="text-3xl font-black leading-none tracking-[-.06em] text-[#0b2d54]">{loading ? "—" : `${weekTotal} minutes`}</p><p className="mt-1 text-sm font-bold text-[#74859a]">{todayMinutes > 0 ? `${todayMinutes} min logged today` : "No exercise logged today"}</p></div><div className="text-right"><p className="text-[9px] font-black uppercase tracking-[0.12em] text-[#8a99a6]">Target</p><p className="mt-1 text-sm font-black text-[#0b2d54]">{targetMinutes} mins/week</p></div></div>
+          <div className="flex items-end justify-between gap-4"><div><p className="text-3xl font-black leading-none tracking-[-.06em] text-[#0b2d54]">{loading ? "—" : `${weekTotal} minutes`}</p><p className="mt-1 text-sm font-bold text-[#74859a]">{todayMinutes > 0 ? `${todayMinutes} min logged today` : "No exercise logged today"}</p></div><div className="text-right"><p className="text-[9px] font-black uppercase tracking-[0.12em] text-[#8a99a6]">Weekly goal</p><p className="mt-1 text-sm font-black text-[#0b2d54]">{targetMinutes} mins/week</p></div></div>
           <div className="mt-5 h-3 overflow-hidden rounded-full bg-[#edf2f5]"><div className="h-full rounded-full bg-gradient-to-r from-[#0b6f73] to-[#24c1c4] transition-[width] duration-500" style={{ width: `${progressPercent}%` }} /></div>
-          <p className="mt-2 text-right text-[9px] font-semibold text-[#8795a0]">{targetReached ? "Weekly goal reached" : `${progressPercent}% of goal`}</p>
+          <p className="mt-2 text-right text-[9px] font-semibold text-[#8795a0]">{overTarget ? `${weekTotal - targetMinutes} min above weekly goal` : targetReached ? "Weekly goal reached" : `${progressPercent}% of weekly goal`}</p>
         </div>
 
         <div className="mt-4 rounded-[18px] border border-[#e7eef1] bg-[#f8fbfc] p-4"><p className="text-sm font-black text-[#0b2d54]">Log exercise in your Daily Health Check-in</p><p className="mt-1.5 text-[11px] leading-5 text-[#74859a]">Sympto uses the exercise minutes saved there to calculate this weekly goal automatically. This card is read-only.</p><Link href="#daily-health-check-in" className="mt-3 inline-flex min-h-9 items-center gap-1 rounded-xl bg-[#0b2d54] px-3 py-2 text-[10px] font-black text-white">Go to health check-in <ArrowRight className="h-3 w-3" /></Link></div>
