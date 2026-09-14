@@ -4,18 +4,11 @@ import Link from "next/link";
 import { ArrowRight, Cigarette } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { healthGoalsService } from "@/services/health-goals.service";
-import { TODAY_GOAL_CARD_CLASS, TODAY_GOAL_FOOTER_CLASS } from "@/components/today/today-goal-card-styles";
 
 type Props = { goal: any };
-type SmokingEvent = { loggedValue: number; sourceId?: string | null };
 
 function localDayKey(date = new Date()) {
-  const parts = new Intl.DateTimeFormat("en-GB", {
-    timeZone: "Africa/Johannesburg",
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-  }).formatToParts(date);
+  const parts = new Intl.DateTimeFormat("en-GB", { timeZone: "Africa/Johannesburg", year: "numeric", month: "2-digit", day: "2-digit" }).formatToParts(date);
   const values = Object.fromEntries(parts.map((part) => [part.type, part.value]));
   return `${values.year}-${values.month}-${values.day}`;
 }
@@ -30,7 +23,13 @@ function formatDate(value: unknown) {
   if (!value) return "—";
   const date = new Date(String(value));
   if (Number.isNaN(date.getTime())) return "—";
-  return new Intl.DateTimeFormat("en-ZA", { dateStyle: "medium" }).format(date);
+  return new Intl.DateTimeFormat("en-ZA", { day: "numeric", month: "short", year: "numeric" }).format(date);
+}
+
+function calendarMidnight(value: unknown) {
+  const date = new Date(String(value));
+  if (Number.isNaN(date.getTime())) return null;
+  return new Date(date.getFullYear(), date.getMonth(), date.getDate());
 }
 
 export default function TodaySmokingGoal({ goal }: Props) {
@@ -42,14 +41,14 @@ export default function TodaySmokingGoal({ goal }: Props) {
   const goalId = String(goal?.id ?? "");
   const dailyTarget = Number(goal?.metricConfig?.frequencyTarget ?? goal?.frequencyTarget ?? goal?.targetValue ?? 0);
   const hasTarget = Number.isFinite(dailyTarget) && dailyTarget > 0;
-  const startDate = useMemo(() => new Date(String(goal?.createdAt ?? "")), [goal?.createdAt]);
-  const targetDate = useMemo(() => new Date(String(goal?.targetDate ?? "")), [goal?.targetDate]);
-  const journeyDay = Number.isNaN(startDate.getTime()) ? 1 : Math.max(1, Math.floor((Date.now() - startDate.getTime()) / 86400000) + 1);
-  const daysLeft = Number.isNaN(targetDate.getTime()) ? null : Math.max(0, Math.ceil((targetDate.getTime() - Date.now()) / 86400000));
+  const startDate = useMemo(() => calendarMidnight(goal?.createdAt), [goal?.createdAt]);
+  const targetDate = useMemo(() => calendarMidnight(goal?.targetDate), [goal?.targetDate]);
+  const today = calendarMidnight(new Date());
+  const journeyDay = startDate && today ? Math.max(1, Math.floor((today.getTime() - startDate.getTime()) / 86400000) + 1) : 1;
+  const daysLeft = targetDate && today ? Math.max(0, Math.ceil((targetDate.getTime() - today.getTime()) / 86400000)) : null;
 
   useEffect(() => {
     let active = true;
-
     async function loadToday() {
       if (!goalId) return;
       const dayKey = localDayKey();
@@ -57,7 +56,6 @@ export default function TodaySmokingGoal({ goal }: Props) {
       start.setHours(0, 0, 0, 0);
       const end = new Date(start);
       end.setDate(end.getDate() + 1);
-
       try {
         const response = await healthGoalsService.getMetricEvents("SMOKING", "smoking.cigarettes", start, end, "patient-smoking-log");
         if (!active) return;
@@ -69,7 +67,6 @@ export default function TodaySmokingGoal({ goal }: Props) {
         if (active) setTodayLogged(null);
       }
     }
-
     void loadToday();
     const interval = window.setInterval(() => void loadToday(), 30000);
     return () => {
@@ -81,15 +78,13 @@ export default function TodaySmokingGoal({ goal }: Props) {
   const difference = todayLogged !== null && hasTarget ? todayLogged - dailyTarget : 0;
   const targetReached = todayLogged !== null && hasTarget && todayLogged >= dailyTarget;
   const exceeded = todayLogged !== null && hasTarget && todayLogged > dailyTarget;
-  const scaleMax = Math.max(hasTarget ? dailyTarget * 2 : 1, todayLogged ?? 0, 1);
-  const todayBar = todayLogged === null ? 0 : Math.min(100, (todayLogged / scaleMax) * 100);
-  const targetMarker = hasTarget ? Math.min(100, (dailyTarget / scaleMax) * 100) : 50;
+  const progress = todayLogged !== null && hasTarget ? Math.min(1, todayLogged / dailyTarget) : 0;
+  const progressPercent = Math.round(progress * 100);
 
   async function save() {
     const cigarettes = Number(draft.trim());
     if (!goalId || !draft.trim() || !Number.isFinite(cigarettes) || cigarettes < 0) return;
     if (hasTarget && cigarettes > dailyTarget) return;
-
     try {
       setSaving(true);
       await healthGoalsService.logSmoking(goalId, cigarettes, localDayKey());
@@ -101,49 +96,71 @@ export default function TodaySmokingGoal({ goal }: Props) {
     }
   }
 
+  const ringSize = 156;
+  const ringStroke = 12;
+  const radius = (ringSize - ringStroke) / 2;
+  const circumference = 2 * Math.PI * radius;
+  const dashOffset = circumference * (1 - progress);
+
   return (
-    <article className={`${TODAY_GOAL_CARD_CLASS} flex h-full min-w-0 flex-col`}>
-      <div className="border-b border-[#edf2f5] bg-gradient-to-br from-[#f7fcfc] via-white to-[#eef8f8] px-5 py-4">
-        <div className="flex items-start justify-between gap-3">
-          <div className="flex min-w-0 items-center gap-3">
-            <span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-[#e5f7f6] text-[#0b6f73]"><Cigarette className="h-4 w-4" /></span>
-            <div className="min-w-0"><p className="text-[10px] font-black uppercase tracking-[0.14em] text-[#0b6f73]">Smoking cessation tracker</p><h3 className="truncate text-lg font-black tracking-[-.04em] text-[#0b2d54]">{String(goal?.title ?? "Smoking")}</h3></div>
-          </div>
-          {todayLogged !== null && <span className={`shrink-0 rounded-full px-2.5 py-1 text-[9px] font-black ${targetReached ? "bg-slate-100 text-slate-600" : exceeded ? "bg-amber-50 text-amber-800" : "bg-emerald-50 text-emerald-700"}`}>{targetReached ? "Daily target reached" : exceeded ? "Above today’s target" : "On track today"}</span>}
+    <article className="flex h-full min-w-0 flex-col overflow-hidden rounded-[30px] border border-[#e5edef] bg-white shadow-[0_20px_60px_rgba(11,45,84,.08)]">
+      <header className="flex items-center justify-between gap-4 px-5 pb-4 pt-5 sm:px-6 sm:pt-6">
+        <div className="flex min-w-0 items-center gap-3">
+          <span className="grid h-11 w-11 shrink-0 place-items-center rounded-[16px] bg-[#e8f8f7] text-[#24c1c4] ring-1 ring-[#d3efed]"><Cigarette className="h-5 w-5" /></span>
+          <div className="min-w-0"><p className="truncate text-base font-black tracking-[-.035em] text-[#0b2d54]">Smoking cessation</p><p className="mt-0.5 text-[10px] font-bold uppercase tracking-[.14em] text-[#8a99a6]">Today’s breathing room</p></div>
         </div>
-      </div>
+        <span className={`shrink-0 rounded-full px-3 py-1.5 text-[9px] font-black ${todayLogged === null ? "bg-[#eef5f6] text-[#71879b]" : exceeded ? "bg-red-50 text-red-700" : targetReached ? "bg-slate-100 text-slate-600" : "bg-[#e8f8f7] text-[#0b7b80]"}`}>{todayLogged === null ? "Not logged" : exceeded ? "Over ceiling" : targetReached ? "Ceiling reached" : "On track"}</span>
+      </header>
 
-      <div className="flex-1 p-5 sm:p-6">
-        <div className="rounded-[18px] border border-[#e7eef1] bg-[#fbfdfd] p-4">
-          {todayLogged === null ? (
-            <>
-              <p className="text-lg font-black tracking-[-.03em] text-[#0b2d54]">Today&apos;s smoking: Not logged</p>
-              <p className="mt-1.5 text-[11px] leading-5 text-[#74859a]">Log honestly when you are ready. Sympto will compare it with your daily ceiling.</p>
-            </>
-          ) : (
-            <>
-              <div className="flex items-start justify-between gap-4">
-                <div><p className="text-3xl font-black leading-none tracking-[-.06em] text-[#0b2d54]">{todayLogged}</p><p className="mt-1 text-sm font-bold text-[#74859a]">cigarettes today</p><p className="mt-2 text-[10px] font-semibold text-[#74859a]">Daily Target: {formatNumber(dailyTarget)} cigarettes</p></div>
-                <div className="shrink-0 text-right"><p className={`text-xl font-black ${exceeded ? "text-[#a34f43]" : targetReached ? "text-[#0b2d54]" : "text-[#168660]"}`}>{difference > 0 ? `+${difference}` : difference}</p><p className="mt-1 text-[9px] font-black uppercase tracking-[0.12em] text-[#8a99a6]">Today&apos;s difference</p></div>
+      <div className="px-4 pb-4 sm:px-5 sm:pb-5">
+        <section className="relative overflow-hidden rounded-[28px] bg-[#0b2d54] px-5 py-6 text-white shadow-[0_18px_42px_rgba(11,45,84,.17)] sm:px-6 sm:py-7">
+          <div className="pointer-events-none absolute -right-20 -top-20 h-48 w-48 rounded-full bg-[#24c1c4]/20 blur-3xl" />
+          <div className="pointer-events-none absolute -bottom-24 left-1/4 h-52 w-52 rounded-full bg-[#24c1c4]/10 blur-3xl" />
+
+          <div className="relative flex flex-col items-center text-center">
+            <p className="text-[10px] font-black uppercase tracking-[.19em] text-white/45">Today</p>
+            <div className="relative mt-4" style={{ width: ringSize, height: ringSize }}>
+              <svg width={ringSize} height={ringSize} viewBox={`0 0 ${ringSize} ${ringSize}`} className="-rotate-90">
+                <circle cx={ringSize / 2} cy={ringSize / 2} r={radius} fill="none" stroke="rgba(255,255,255,.10)" strokeWidth={ringStroke} />
+                {todayLogged !== null && hasTarget && <circle cx={ringSize / 2} cy={ringSize / 2} r={radius} fill="none" stroke={exceeded ? "#f87171" : "#24c1c4"} strokeWidth={ringStroke} strokeLinecap="round" strokeDasharray={circumference} strokeDashoffset={dashOffset} />}
+              </svg>
+              <div className="absolute inset-0 grid place-items-center">
+                {todayLogged === null ? <div><p className="text-4xl font-black tracking-[-.06em]">—</p><p className="mt-1 text-[10px] font-black uppercase tracking-[.15em] text-white/45">Not logged</p></div> : <div><p className="text-5xl font-black leading-none tracking-[-.075em]">{formatNumber(todayLogged)}</p><p className="mt-1.5 text-[10px] font-black uppercase tracking-[.14em] text-white/45">cigarettes</p></div>}
               </div>
-              <div className="mt-5"><div className="relative h-3 rounded-full bg-[#edf2f5]"><div className={`absolute inset-y-0 left-0 rounded-full ${exceeded ? "bg-[#d9775f]" : targetReached ? "bg-[#0b2d54]" : "bg-[#35b77a]"}`} style={{ width: `${todayBar}%` }} />{hasTarget && <span className="absolute -top-1.5 h-6 w-0.5 rounded-full bg-[#0b2d54]" style={{ left: `${targetMarker}%` }} />}</div><div className="mt-2 flex items-center justify-between gap-2 text-[9px] font-semibold text-[#8795a0]"><span>0</span><span className="font-black text-[#0b2d54]">Daily target {formatNumber(dailyTarget)}</span><span className="font-black">{difference > 0 ? `${Math.abs(difference)} above target` : difference < 0 ? `${Math.abs(difference)} below target` : "At target"}</span></div></div>
-            </>
-          )}
-        </div>
+            </div>
 
-        {open && !targetReached && (
-          <div className="mt-4 rounded-xl bg-[#f7fafb] p-3">
-            <label className="text-[9px] font-black uppercase tracking-[0.14em] text-[#74859a]" htmlFor={`smoking-${goalId}`}>Cigarettes today</label>
-            <div className="mt-2 flex gap-2"><input id={`smoking-${goalId}`} type="number" min="0" max={hasTarget ? dailyTarget : undefined} step="1" value={draft} onChange={(event) => setDraft(event.target.value)} className="min-h-10 min-w-0 flex-1 rounded-xl border border-[#d7e4e8] bg-white px-3 text-sm font-bold text-[#0b2d54] outline-none focus:border-[#24c1c4]" /><button type="button" disabled={saving} onClick={() => void save()} className="min-h-10 rounded-xl bg-[#0b2d54] px-4 text-[10px] font-black text-white disabled:opacity-50">{saving ? "Saving…" : "Save"}</button></div>
-            <button type="button" onClick={() => setOpen(false)} className="mt-2 text-[9px] font-bold text-[#74859a]">Cancel</button>
+            <div className="mt-5"><p className="text-[10px] font-black uppercase tracking-[.16em] text-white/40">Daily ceiling</p><p className="mt-1 text-lg font-black">{hasTarget ? `${formatNumber(dailyTarget)} cigarettes` : "No ceiling set"}</p></div>
+
+            <div className="mt-5 flex w-full items-center justify-center gap-2">
+              <span className="rounded-full bg-white/10 px-3 py-1.5 text-[10px] font-black text-white/75 ring-1 ring-white/10">{hasTarget ? `${progressPercent}% of ceiling` : "Track your day"}</span>
+              {todayLogged !== null && hasTarget && <span className="rounded-full bg-white/10 px-3 py-1.5 text-[10px] font-black text-white/75 ring-1 ring-white/10">{difference > 0 ? `${formatNumber(Math.abs(difference))} over` : difference < 0 ? `${formatNumber(Math.abs(difference))} remaining` : "At ceiling"}</span>}
+            </div>
+
+            <div className="mt-5 w-full border-t border-white/10 pt-4">
+              <p className="text-sm font-bold text-white">{todayLogged === null ? "Log honestly when you’re ready." : exceeded ? "Today’s ceiling has been exceeded. Keep your record honest." : targetReached ? "You’ve reached today’s ceiling. No more should be logged today." : "You are within today’s ceiling. Keep going."}</p>
+              <p className="mt-1 text-[10px] leading-5 text-white/45">Sympto compares today’s entry with your daily cessation target.</p>
+            </div>
           </div>
+        </section>
+
+        {open && !targetReached && !exceeded && (
+          <section className="mt-4 rounded-[22px] border border-[#e1ecee] bg-[#f8fbfb] p-4">
+            <label htmlFor={`smoking-${goalId}`} className="text-[9px] font-black uppercase tracking-[.15em] text-[#74859a]">Cigarettes today</label>
+            <div className="mt-2 flex gap-2"><input id={`smoking-${goalId}`} type="number" min="0" max={hasTarget ? dailyTarget : undefined} step="1" inputMode="numeric" value={draft} onChange={(event) => setDraft(event.target.value)} className="min-h-11 min-w-0 flex-1 rounded-xl border border-[#d7e4e8] bg-white px-3 text-sm font-bold text-[#0b2d54] outline-none focus:border-[#24c1c4]" /><button type="button" disabled={saving} onClick={() => void save()} className="min-h-11 rounded-xl bg-[#0b2d54] px-4 text-[10px] font-black text-white disabled:opacity-50">{saving ? "Saving…" : "Save entry"}</button></div>
+            <button type="button" onClick={() => setOpen(false)} className="mt-2 text-[9px] font-bold text-[#74859a]">Cancel</button>
+          </section>
         )}
+
+        <div className="mt-4 flex items-center justify-between gap-4 rounded-[22px] border border-[#e2ecef] bg-[#fbfdfd] px-4 py-3.5">
+          <div className="min-w-0"><p className="text-[9px] font-black uppercase tracking-[.15em] text-[#98a6b1]">Today’s action</p><p className="mt-1 text-[11px] font-semibold leading-5 text-[#74859a]">Keep the number honest — every entry helps you see the pattern.</p></div>
+          <button type="button" disabled={targetReached || exceeded} onClick={() => { if (!targetReached && !exceeded) { setOpen(true); setDraft(todayLogged == null ? "" : String(todayLogged)); } }} className={`shrink-0 rounded-xl px-3.5 py-2.5 text-[10px] font-black ${targetReached || exceeded ? "cursor-not-allowed bg-[#edf2f4] text-[#97a3ad]" : "bg-[#0b2d54] text-white shadow-[0_8px_18px_rgba(11,45,84,.14)]"}`}>{targetReached ? "Ceiling reached" : exceeded ? "Over ceiling" : open ? "Close" : todayLogged === null ? "Log today" : "Update log"}</button>
+        </div>
       </div>
 
-      <div className={`${TODAY_GOAL_FOOTER_CLASS} px-4`}>
-        <div className="mb-3 flex items-center justify-between gap-3 text-[10px] text-[#74859a]"><span>Day {journeyDay} of your journey</span>{daysLeft !== null && <span>{daysLeft} days left until {formatDate(targetDate)}</span>}</div>
-        <div className="grid grid-cols-2 gap-2"><button type="button" disabled={targetReached} onClick={() => { if (!targetReached) { setOpen(true); setDraft(todayLogged == null ? "" : String(todayLogged)); } }} className={`min-h-10 rounded-xl px-3 py-2 text-[10px] font-black ${targetReached ? "cursor-not-allowed bg-[#eef2f4] text-[#93a0aa]" : "bg-[#0b2d54] text-white hover:bg-[#123e66]"}`}>{targetReached ? "Daily target reached" : todayLogged === null ? "Log today’s smoking" : "Update today’s log"}</button><Link href="/health-goals" className="inline-flex min-h-10 items-center justify-center gap-1 rounded-xl border border-[#d7e4e8] bg-white px-3 py-2 text-[10px] font-black text-[#0b2d54]">View goal <ArrowRight className="h-3 w-3" /></Link></div>
-      </div>
+      <footer className="border-t border-[#edf2f4] bg-[#fbfdfd] px-5 py-4 sm:px-6">
+        <div className="flex items-center justify-between gap-4"><div><p className="text-[9px] font-black uppercase tracking-[.15em] text-[#9aa8b3]">Journey</p><p className="mt-1 text-sm font-black text-[#0b2d54]">Day {journeyDay}</p></div><div className="text-right">{daysLeft !== null && <><p className="text-sm font-black text-[#0b2d54]">{daysLeft} days left</p><p className="mt-0.5 text-[9px] font-medium text-[#7d8d99]">until {formatDate(goal?.targetDate)}</p></>}</div></div>
+        <div className="mt-3 flex items-center justify-between gap-3"><p className="text-[9px] font-medium text-[#7d8d99]">Your cessation journey continues one day at a time.</p><Link href="/health-goals" className="inline-flex min-h-10 shrink-0 items-center justify-center gap-1.5 rounded-xl border border-[#d6e4e7] bg-white px-3.5 py-2 text-[10px] font-black text-[#0b2d54]">View goal <ArrowRight className="h-3 w-3" /></Link></div>
+      </footer>
     </article>
   );
 }
