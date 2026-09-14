@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { ArrowRight, Cigarette } from "lucide-react";
+import type { ReactNode } from "react";
 
 type Props = {
   logged: number | null;
@@ -11,9 +12,10 @@ type Props = {
   targetDate: string;
   onLog: () => void;
   disabled?: boolean;
+  logPanel?: ReactNode;
 };
 
-export default function PremiumSmokingCard({ logged, target, day, daysLeft, targetDate, onLog, disabled }: Props) {
+export default function PremiumSmokingCard({ logged, target, day, daysLeft, targetDate, onLog, disabled, logPanel }: Props) {
   const hasTarget = Number.isFinite(target) && target > 0;
   const reached = logged !== null && hasTarget && logged >= target;
   const pct = logged !== null && hasTarget ? Math.min(100, Math.round((logged / target) * 100)) : 0;
@@ -44,6 +46,8 @@ export default function PremiumSmokingCard({ logged, target, day, daysLeft, targ
           {logged === null ? <><p className="text-sm font-bold">Log honestly when you’re ready.</p><p className="mt-1 text-[10px] leading-relaxed text-white/55">Sympto will compare your entry with your daily ceiling.</p></> : <p className="text-[11px] font-bold text-white/70">{reached ? "You have reached today’s ceiling." : `${Math.max(0, target - logged)} cigarettes remaining today.`}</p>}
         </div>
       </div>
+
+      {logPanel}
 
       <div className="px-5 pb-5 pt-4">
         <div className="mb-4 flex items-end justify-between"><div><p className="text-[9px] font-black uppercase tracking-[0.14em] text-[#9aa8b4]">Journey</p><p className="mt-1 text-sm font-black text-[#0b2d54]">Day {day}</p></div>{daysLeft !== null && <div className="text-right"><p className="text-sm font-black text-[#0b2d54]">{daysLeft} days left</p><p className="mt-0.5 text-[9px] text-[#8291a0]">until {targetDate}</p></div>}</div>
