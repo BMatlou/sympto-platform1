@@ -16,6 +16,7 @@ export type DashboardVital = {
 };
 
 type Props = {
+  patientId?: string | null;
   bmi?: number | null;
   bmiCategory?: string | null;
   weightKg?: number | null;
@@ -162,6 +163,27 @@ function measurementsFromBaseline(baseline: any): DashboardVital[] {
   return result;
 }
 
+function measurementsFromStorage(patientId?: string | null): DashboardVital[] {
+  if (typeof window === "undefined" || !patientId) return [];
+  try {
+    const raw = window.localStorage.getItem(`sympto:today-measurements:${patientId}`);
+    if (!raw) return [];
+    const parsed = JSON.parse(raw);
+    return Array.isArray(parsed) ? parsed.filter((item) => sameLocalDay(item?.measuredAt)) : [];
+  } catch {
+    return [];
+  }
+}
+
+function saveMeasurementsToStorage(patientId: string | null | undefined, measurements: DashboardVital[]) {
+  if (typeof window === "undefined" || !patientId) return;
+  try {
+    window.localStorage.setItem(`sympto:today-measurements:${patientId}`, JSON.stringify(measurements));
+  } catch {
+    // Server persistence remains authoritative if browser storage is unavailable.
+  }
+}
+
 function mergeMeasurements(current: DashboardVital[], incoming: DashboardVital[]) {
   const map = new Map<string, DashboardVital>();
   for (const item of [...current, ...incoming]) {
@@ -175,19 +197,20 @@ function mergeMeasurements(current: DashboardVital[], incoming: DashboardVital[]
   return Array.from(map.values());
 }
 
-export default function HealthVitalsSummary({ measurements = [] }: Props) {
+export default function HealthVitalsSummary({ patientId, measurements = [] }: Props) {
   const [dayKey, setDayKey] = useState(() => localDayKey());
   const [open, setOpen] = useState(false);
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState("");
-  const [todayMeasurements, setTodayMeasurements] = useState<DashboardVital[]>(() => measurements.filter((item) => sameLocalDay(item.measuredAt)));
-  const [form, setForm] = useState<FormState>(() => formFromMeasurements(measurements.filter((item) => sameLocalDay(item.measuredAt))));
+  const initial = mergeMeasurements(measurements.filter((item) => sameLocalDay(item.measuredAt)), measurementsFromStorage(patientId));
+  const [todayMeasurements, setTodayMeasurements] = useState<DashboardVital[]>(initial);
+  const [form, setForm] = useState<FormState>(() => formFromMeasurements(initial));
 
   useEffect(() => {
-    const incoming = measurements.filter((item) => sameLocalDay(item.measuredAt));
+    const incoming = mergeMeasurements(measurements.filter((item) => sameLocalDay(item.measuredAt)), measurementsFromStorage(patientId));
     setTodayMeasurements((current) => mergeMeasurements(current, incoming));
     if (incoming.length) setForm((current) => ({ ...current, ...formFromMeasurements(incoming) }));
-  }, [measurements, dayKey]);
+  }, [measurements, patientId, dayKey]);
 
   useEffect(() => {
     let active = true;
@@ -202,35 +225,44 @@ export default function HealthVitalsSummary({ measurements = [] }: Props) {
 
         const journals = Array.isArray(journalResponse?.data) ? journalResponse.data : [];
         const todaysJournals = journals
-          .filter((item: any) => sameLocalDay(String(item?.updatedAt || item?.createdAt || "")) && (item?.weightKg != null || item?.title === "[Sympto] Today's measurements"))
+          .filter((item: any) => sameLocalDay(String(item?.updatedAt || item?.createdAt || "")))
           .sort((a: any, b: any) => new Date(String(b.updatedAt || b.createdAt)).getTime() - new Date(String(a.updatedAt || a.createdAt)).getTime());
 
-        const fromJournal = todaysJournals.length ? measurementsFromJournal(todaysJournals[0]) : [];
+        const dedicatedJournal = todaysJournals.find((item: any) => item?.title === "[Sympto] Today's measurements");
+        const fromJournal = dedicatedJournal ? measurementsFromJournal(dedicatedJournal) : [];
         const fromBaseline = measurementsFromBaseline(healthHome?.healthSnapshot?.baseline);
         const fromHealthHome = Array.isArray(healthHome?.healthSnapshot?.latestMeasurements)
           ? healthHome.healthSnapshot.latestMeasurements
               .filter((item: any) => sameLocalDay(String(item?.measuredAt || "")))
               .map((item: any) => ({ type: item.type ?? item.measurementType, name: item.name, value: item.value, unit: item.unit, measuredAt: item.measuredAt, source: item.source ?? "Health Home" }))
           : [];
+        const fromStorage = measurementsFromStorage(patientId);
 
-        const incoming = mergeMeasurements(mergeMeasurements(fromBaseline, fromJournal), fromHealthHome);
+        const incoming = mergeMeasurements(
+          mergeMeasurements(fromStorage, fromBaseline),
+          mergeMeasurements(fromJournal, fromHealthHome),
+        );
         if (!incoming.length) return;
 
         setTodayMeasurements((current) => mergeMeasurements(current, incoming));
         setForm((current) => ({ ...current, ...formFromMeasurements(incoming) }));
+        saveMeasurementsToStorage(patientId, incoming);
       } catch {
-        // The locally supplied Today measurements remain usable when hydration endpoints are unavailable.
+        // The storage/server state already hydrated above remains usable when an API call is unavailable.
       }
     };
 
     void hydrate();
     return () => { active = false; };
-  }, [dayKey]);
+  }, [dayKey, patientId]);
 
   useEffect(() => {
     const interval = window.setInterval(() => {
       const nextDay = localDayKey();
       if (nextDay !== dayKey) {
+        if (patientId) {
+          try { window.localStorage.removeItem(`sympto:today-measurements:${patientId}`); } catch { /* ignore */ }
+        }
         setDayKey(nextDay);
         setOpen(false);
         setMessage("");
@@ -239,7 +271,7 @@ export default function HealthVitalsSummary({ measurements = [] }: Props) {
       }
     }, 30_000);
     return () => window.clearInterval(interval);
-  }, [dayKey]);
+  }, [dayKey, patientId]);
 
   const todayWeight = Number(form.weightKg || findMeasurement(todayMeasurements, ["WEIGHT", "BODY_WEIGHT"])?.value || 0);
   const todayHeight = Number(form.heightCm || findMeasurement(todayMeasurements, ["HEIGHT", "BODY_HEIGHT"])?.value || 0);
@@ -291,7 +323,8 @@ export default function HealthVitalsSummary({ measurements = [] }: Props) {
       add("RESPIRATORY_RATE", input.respiratoryRate, "/min");
 
       setTodayMeasurements((current) => mergeMeasurements(current, nextMeasurements));
-      setForm(formFromMeasurements(nextMeasurements));
+      setForm(formFromMeasurements(mergeMeasurements(todayMeasurements, nextMeasurements)));
+      saveMeasurementsToStorage(patientId, nextMeasurements);
       window.dispatchEvent(new CustomEvent("sympto:weight-updated"));
       setMessage("Today’s measurements saved.");
       setOpen(false);
@@ -302,54 +335,21 @@ export default function HealthVitalsSummary({ measurements = [] }: Props) {
     }
   }
 
-  return (
-    <section className="mt-7 overflow-hidden rounded-[27px] border border-[#e0ebef] bg-white shadow-[0_6px_22px_rgba(11,45,84,0.035)]">
-      <div className="flex flex-col gap-3 border-b border-[#edf2f4] px-5 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-6">
-        <div>
-          <div className="flex items-center gap-2"><span className="text-[10px] font-black uppercase tracking-[0.18em] text-[#71839a]">Current health</span><span className="h-1 w-1 rounded-full bg-[#24c1c4]"/><span className="text-[10px] font-bold text-[#0b6f73]">Today</span></div>
-          <h2 className="mt-1 text-xl font-black tracking-[-.045em] text-[#0b2d54]">Vitals and essentials</h2>
-          <p className="mt-1 text-[11px] text-[#8795a0]">{hasTodayMeasurements ? "Today’s latest entries" : "Nothing recorded today yet"}</p>
-        </div>
-        <div className="flex gap-2"><button type="button" onClick={openEntry} className="inline-flex min-h-10 items-center justify-center gap-2 rounded-xl bg-[#0b2d54] px-4 py-2.5 text-[10px] font-black text-white hover:bg-[#123e66]"><Plus className="h-3.5 w-3.5"/>Add today’s measurements</button><Link href="/health-vitals" className="inline-flex min-h-10 items-center justify-center gap-1 rounded-xl border border-[#d7e4e8] bg-white px-3 py-2.5 text-[10px] font-black text-[#0b2d54]">History <ArrowRight className="h-3 w-3"/></Link></div>
-      </div>
-
-      <div className="grid gap-3 p-4 sm:p-5 lg:grid-cols-[245px_1fr]">
-        <div className="rounded-[22px] bg-gradient-to-br from-[#f4fbfc] to-white p-4 ring-1 ring-[#e4eef1]">
-          <div className="flex items-start justify-between"><div><p className="text-[9px] font-black uppercase tracking-[0.15em] text-[#71839a]">BMI</p><div className="mt-1 flex items-end gap-2"><p className="text-[38px] font-black leading-none tracking-[-.07em] text-[#0b2d54]">{formatNumber(todayBmi,1)}</p>{bmiCategory && <span className={`mb-1 rounded-full px-2 py-1 text-[8px] font-black uppercase tracking-wide ring-1 ${tone(bmiCategory)}`}>{categoryLabel[bmiCategory] ?? String(bmiCategory).replaceAll("_"," ")}</span>}</div></div><span className="grid h-9 w-9 place-items-center rounded-xl bg-[#24c1c4]/10 text-[#0b2d54]"><Activity className="h-4 w-4"/></span></div>
-          <div className="mt-4 grid grid-cols-2 gap-2"><Metric label="Weight" value={`${todayWeight > 0 ? formatNumber(todayWeight,1) : "—"} kg`}/><Metric label="Height" value={`${todayHeight > 0 ? formatNumber(todayHeight,0) : "—"} cm`}/></div>
-        </div>
-
-        <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-5">
-          <VitalTile icon={<HeartPulse className="h-3.5 w-3.5"/>} label="Blood pressure" value={bloodPressureLabel}/>
-          <VitalTile icon={<Activity className="h-3.5 w-3.5"/>} label="Heart rate" value={heartRate?.value != null ? `${formatNumber(heartRate.value)} ${heartRate.unit ?? "bpm"}`.trim() : "—"}/>
-          <VitalTile icon={<Wind className="h-3.5 w-3.5"/>} label="Oxygen" value={oxygen?.value != null ? `${formatNumber(oxygen.value,1)} ${oxygen.unit ?? "%"}`.trim() : "—"}/>
-          <VitalTile icon={<Thermometer className="h-3.5 w-3.5"/>} label="Temperature" value={temperature?.value != null ? `${formatNumber(temperature.value,1)} ${temperature.unit ?? "°C"}`.trim() : "—"}/>
-          <VitalTile icon={<Wind className="h-3.5 w-3.5"/>} label="Respiratory" value={respiratory?.value != null ? `${formatNumber(respiratory.value)} ${respiratory.unit ?? "/min"}`.trim() : "—"}/>
-        </div>
-      </div>
-
-      {message && <div className="border-t border-[#edf2f4] bg-[#f7fbfc] px-5 py-3 text-[11px] font-semibold text-[#0b2d54]">{message}</div>}
-
-      {open && <div className="border-t border-[#edf2f4] bg-[#fbffff] p-5 sm:p-6">
-        <div className="flex items-start justify-between gap-4"><div><p className="text-[10px] font-black uppercase tracking-[0.15em] text-[#71839a]">Today’s entry</p><h3 className="mt-1 text-lg font-black text-[#0b2d54]">Add your measurements</h3><p className="mt-1 text-[11px] text-[#8795a0]">These entry fields clear automatically when a new day starts.</p></div><button type="button" onClick={()=>setOpen(false)} className="grid h-9 w-9 place-items-center rounded-xl bg-slate-100 text-slate-500"><X className="h-4 w-4"/></button></div>
-        <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-4"><Field label="Weight (kg)" value={form.weightKg} onChange={(value)=>updateField("weightKg",value)}/><Field label="Height (cm)" value={form.heightCm} onChange={(value)=>updateField("heightCm",value)}/><Field label="Systolic" value={form.systolicPressure} onChange={(value)=>updateField("systolicPressure",value)}/><Field label="Diastolic" value={form.diastolicPressure} onChange={(value)=>updateField("diastolicPressure",value)}/><Field label="Heart rate (bpm)" value={form.restingHeartRate} onChange={(value)=>updateField("restingHeartRate",value)}/><Field label="Oxygen (%)" value={form.oxygenSaturation} onChange={(value)=>updateField("oxygenSaturation",value)}/><Field label="Temperature (°C)" value={form.bodyTemperature} onChange={(value)=>updateField("bodyTemperature",value)} step="0.1"/><Field label="Respiratory (/min)" value={form.respiratoryRate} onChange={(value)=>updateField("respiratoryRate",value)}/></div>
-        <div className="mt-4 flex justify-end gap-2"><button type="button" onClick={()=>setOpen(false)} className="min-h-10 rounded-xl border border-[#d7e4e8] bg-white px-4 py-2 text-[10px] font-black text-[#74859a]">Cancel</button><button type="button" disabled={busy} onClick={()=>void saveToday()} className="min-h-10 rounded-xl bg-[#0b2d54] px-5 py-2 text-[10px] font-black text-white disabled:cursor-not-allowed disabled:opacity-50">{busy ? "Saving…" : "Save today’s measurements"}</button></div>
-      </div>}
-
-      <div className="border-t border-[#edf2f4] px-5 py-2.5 text-right sm:px-6"><span className="text-[9px] font-medium text-[#9aa8b7]">BMI is a screening measure and should be considered with other health information. Saved measurements remain in your health history.</span></div>
-    </section>
-  );
+  return <section className="mt-7 overflow-hidden rounded-[27px] border border-[#e0ebef] bg-white shadow-[0_6px_22px_rgba(11,45,84,0.035)]">
+    <div className="flex flex-col gap-3 border-b border-[#edf2f4] px-5 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-6">
+      <div><div className="flex items-center gap-2"><span className="text-[10px] font-black uppercase tracking-[0.18em] text-[#71839a]">Current health</span><span className="h-1 w-1 rounded-full bg-[#24c1c4]"/><span className="text-[10px] font-bold text-[#0b6f73]">Today</span></div><h2 className="mt-1 text-xl font-black tracking-[-.045em] text-[#0b2d54]">Vitals and essentials</h2><p className="mt-1 text-[11px] text-[#8795a0]">{hasTodayMeasurements ? "Today’s latest entries" : "Nothing recorded today yet"}</p></div>
+      <div className="flex gap-2"><button type="button" onClick={openEntry} className="inline-flex min-h-10 items-center justify-center gap-2 rounded-xl bg-[#0b2d54] px-4 py-2.5 text-[10px] font-black text-white hover:bg-[#123e66]"><Plus className="h-3.5 w-3.5"/>Add today’s measurements</button><Link href="/health-vitals" className="inline-flex min-h-10 items-center justify-center gap-1 rounded-xl border border-[#d7e4e8] bg-white px-3 py-2.5 text-[10px] font-black text-[#0b2d54]">History <ArrowRight className="h-3 w-3"/></Link></div>
+    </div>
+    <div className="grid gap-3 p-4 sm:p-5 lg:grid-cols-[245px_1fr]">
+      <div className="rounded-[22px] bg-gradient-to-br from-[#f4fbfc] to-white p-4 ring-1 ring-[#e4eef1]"><div className="flex items-start justify-between"><div><p className="text-[9px] font-black uppercase tracking-[0.15em] text-[#71839a]">BMI</p><div className="mt-1 flex items-end gap-2"><p className="text-[38px] font-black leading-none tracking-[-.07em] text-[#0b2d54]">{formatNumber(todayBmi,1)}</p>{bmiCategory && <span className={`mb-1 rounded-full px-2 py-1 text-[8px] font-black uppercase tracking-wide ring-1 ${tone(bmiCategory)}`}>{categoryLabel[bmiCategory] ?? String(bmiCategory).replaceAll("_"," ")}</span>}</div></div><span className="grid h-9 w-9 place-items-center rounded-xl bg-[#24c1c4]/10 text-[#0b2d54]"><Activity className="h-4 w-4"/></span></div><div className="mt-4 grid grid-cols-2 gap-2"><Metric label="Weight" value={`${todayWeight > 0 ? formatNumber(todayWeight,1) : "—"} kg`}/><Metric label="Height" value={`${todayHeight > 0 ? formatNumber(todayHeight,0) : "—"} cm`}/></div></div>
+      <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-5"><VitalTile icon={<HeartPulse className="h-3.5 w-3.5"/>} label="Blood pressure" value={bloodPressureLabel}/><VitalTile icon={<Activity className="h-3.5 w-3.5"/>} label="Heart rate" value={heartRate?.value != null ? `${formatNumber(heartRate.value)} ${heartRate.unit ?? "bpm"}`.trim() : "—"}/><VitalTile icon={<Wind className="h-3.5 w-3.5"/>} label="Oxygen" value={oxygen?.value != null ? `${formatNumber(oxygen.value,1)} ${oxygen.unit ?? "%"}`.trim() : "—"}/><VitalTile icon={<Thermometer className="h-3.5 w-3.5"/>} label="Temperature" value={temperature?.value != null ? `${formatNumber(temperature.value,1)} ${temperature.unit ?? "°C"}`.trim() : "—"}/><VitalTile icon={<Wind className="h-3.5 w-3.5"/>} label="Respiratory" value={respiratory?.value != null ? `${formatNumber(respiratory.value)} ${respiratory.unit ?? "/min"}`.trim() : "—"}/></div>
+    </div>
+    {message && <div className="border-t border-[#edf2f4] bg-[#f7fbfc] px-5 py-3 text-[11px] font-semibold text-[#0b2d54]">{message}</div>}
+    {open && <div className="border-t border-[#edf2f4] bg-[#fbffff] p-5 sm:p-6"><div className="flex items-start justify-between gap-4"><div><p className="text-[10px] font-black uppercase tracking-[0.15em] text-[#71839a]">Today’s entry</p><h3 className="mt-1 text-lg font-black text-[#0b2d54]">Add your measurements</h3><p className="mt-1 text-[11px] text-[#8795a0]">These entry fields clear automatically when a new day starts.</p></div><button type="button" onClick={()=>setOpen(false)} className="grid h-9 w-9 place-items-center rounded-xl bg-slate-100 text-slate-500"><X className="h-4 w-4"/></button></div><div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-4"><Field label="Weight (kg)" value={form.weightKg} onChange={(value)=>updateField("weightKg",value)}/><Field label="Height (cm)" value={form.heightCm} onChange={(value)=>updateField("heightCm",value)}/><Field label="Systolic" value={form.systolicPressure} onChange={(value)=>updateField("systolicPressure",value)}/><Field label="Diastolic" value={form.diastolicPressure} onChange={(value)=>updateField("diastolicPressure",value)}/><Field label="Heart rate (bpm)" value={form.restingHeartRate} onChange={(value)=>updateField("restingHeartRate",value)}/><Field label="Oxygen (%)" value={form.oxygenSaturation} onChange={(value)=>updateField("oxygenSaturation",value)}/><Field label="Temperature (°C)" value={form.bodyTemperature} onChange={(value)=>updateField("bodyTemperature",value)} step="0.1"/><Field label="Respiratory (/min)" value={form.respiratoryRate} onChange={(value)=>updateField("respiratoryRate",value)}/></div><div className="mt-4 flex justify-end gap-2"><button type="button" onClick={()=>setOpen(false)} className="min-h-10 rounded-xl border border-[#d7e4e8] bg-white px-4 py-2 text-[10px] font-black text-[#74859a]">Cancel</button><button type="button" disabled={busy} onClick={()=>void saveToday()} className="min-h-10 rounded-xl bg-[#0b2d54] px-5 py-2 text-[10px] font-black text-white disabled:cursor-not-allowed disabled:opacity-50">{busy ? "Saving…" : "Save today’s measurements"}</button></div></div>}
+    <div className="border-t border-[#edf2f4] px-5 py-2.5 text-right sm:px-6"><span className="text-[9px] font-medium text-[#9aa8b7]">BMI is a screening measure and should be considered with other health information. Saved measurements remain in your health history.</span></div>
+  </section>;
 }
 
-function Field({ label, value, onChange, step = "0.1" }: { label: string; value: string; onChange: (value: string) => void; step?: string }) {
-  return <label className="block"><span className="text-[9px] font-black uppercase tracking-[0.12em] text-[#71839a]">{label}</span><input type="number" inputMode="decimal" min="0" step={step} value={value} onChange={(event)=>onChange(event.target.value)} className="mt-1.5 w-full rounded-xl border border-[#d7e4e8] bg-white px-3 py-2.5 text-sm font-bold text-[#0b2d54] outline-none focus:border-[#24c1c4]"/></label>;
-}
-
-function Metric({ label, value }: { label: string; value: string }) {
-  return <div className="rounded-xl bg-white px-3 py-2.5 ring-1 ring-[#e4eef1]"><p className="text-[8px] font-black uppercase tracking-[0.12em] text-[#9aa8b7]">{label}</p><p className="mt-1 text-sm font-black text-[#0b2d54]">{value}</p></div>;
-}
-
-function VitalTile({ icon, label, value }: { icon: React.ReactNode; label: string; value: string }) {
-  const recorded = value !== "—";
-  return <div className="rounded-[18px] border border-[#e5edf0] bg-white px-3.5 py-3.5"><div className="flex items-center gap-2"><span className="grid h-7 w-7 shrink-0 place-items-center rounded-lg bg-[#24c1c4]/10 text-[#0b2d54]">{icon}</span><p className="truncate text-[9px] font-black uppercase tracking-[0.08em] text-[#71839a]">{label}</p></div><p className={`mt-2.5 text-lg font-black tracking-[-.03em] ${recorded ? "text-[#0b2d54]" : "text-[#a7b3bd]"}`}>{value}</p><p className="mt-1 text-[8px] font-semibold text-[#a7b3bd]">{recorded ? "Recorded today" : "Not recorded today"}</p></div>;
-}
+function Field({ label, value, onChange, step = "0.1" }: { label: string; value: string; onChange: (value: string) => void; step?: string }) { return <label className="block"><span className="text-[9px] font-black uppercase tracking-[0.12em] text-[#71839a]">{label}</span><input type="number" inputMode="decimal" min="0" step={step} value={value} onChange={(event)=>onChange(event.target.value)} className="mt-1.5 w-full rounded-xl border border-[#d7e4e8] bg-white px-3 py-2.5 text-sm font-bold text-[#0b2d54] outline-none focus:border-[#24c1c4]"/></label>; }
+function Metric({ label, value }: { label: string; value: string }) { return <div className="rounded-xl bg-white px-3 py-2.5 ring-1 ring-[#e4eef1]"><p className="text-[8px] font-black uppercase tracking-[0.12em] text-[#9aa8b7]">{label}</p><p className="mt-1 text-sm font-black text-[#0b2d54]">{value}</p></div>; }
+function VitalTile({ icon, label, value }: { icon: React.ReactNode; label: string; value: string }) { const recorded = value !== "—"; return <div className="rounded-[18px] border border-[#e5edf0] bg-white px-3.5 py-3.5"><div className="flex items-center gap-2"><span className="grid h-7 w-7 shrink-0 place-items-center rounded-lg bg-[#24c1c4]/10 text-[#0b2d54]">{icon}</span><p className="truncate text-[9px] font-black uppercase tracking-[0.08em] text-[#71839a]">{label}</p></div><p className={`mt-2.5 text-lg font-black tracking-[-.03em] ${recorded ? "text-[#0b2d54]" : "text-[#a7b3bd]"}`}>{value}</p><p className="mt-1 text-[8px] font-semibold text-[#a7b3bd]">{recorded ? "Recorded today" : "Not recorded today"}</p></div>; }
