@@ -94,7 +94,9 @@ export default function TodayWeightGoal({ goal, fallbackWeight }: Props) {
   const expectedProgress = journey.totalDays != null && journey.totalDays > 0 ? Math.min(100, Math.max(0, ((journey.journeyDay - 1) / journey.totalDays) * 100)) : null;
   const onTrack = targetReached || expectedProgress == null || progress >= expectedProgress - 10;
   const weeksLeft = journey.daysLeft != null ? journey.daysLeft / 7 : null;
-  const requiredWeeklyChange = remainingKg != null && weeksLeft && weeksLeft > 0 ? remainingKg / weeksLeft : null;
+  const goalLossAmount = comparison === "DECREASE_TO" ? numberValue(goal?.targetValue) : null;
+  const remainingGoalAmount = goalLossAmount != null && lostKg != null ? Math.max(goalLossAmount - lostKg, 0) : null;
+  const requiredWeeklyChange = remainingGoalAmount != null && weeksLeft && weeksLeft > 0 ? remainingGoalAmount / weeksLeft : null;
   const ChangeIcon = comparison === "INCREASE_TO" ? TrendingUp : TrendingDown;
 
   return (
