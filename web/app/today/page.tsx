@@ -6,6 +6,7 @@ import { useEffect, useState } from "react";
 import ProtectedRoute from "@/components/auth/protected-route";
 import { useDashboard } from "@/hooks/use-dashboard";
 import DailyHealthCheckIn from "@/components/dashboard/daily-health-check-in";
+import HealthVitalsSummary, { type DashboardVital } from "@/components/dashboard/health-vitals-summary";
 import TodayMedicationActions from "@/components/today/today-medication-actions";
 import TodayAlcoholGoal from "@/components/today/today-alcohol-goal";
 import { healthGoalsService } from "@/services/health-goals.service";
@@ -36,6 +37,23 @@ function formatNumber(value: unknown) {
   const number = Number(value);
   if (!Number.isFinite(number)) return null;
   return Number.isInteger(number) ? String(number) : number.toFixed(1);
+}
+
+function normalizeVitals(data: any): DashboardVital[] {
+  const deviceVitals = Array.isArray(data?.healthSnapshot?.latestMeasurements)
+    ? data.healthSnapshot.latestMeasurements.map((item: any) => ({ type: item.type ?? item.measurementType, name: item.name, value: item.value, unit: item.unit, measuredAt: item.measuredAt, source: item.source }))
+    : [];
+  const clinicalVitals = Array.isArray(data?.clinicalVitals)
+    ? data.clinicalVitals.map((item: any) => ({ type: item.vitalType?.code ?? item.vitalType?.name, name: item.vitalType?.name, value: item.value, unit: item.vitalType?.unit, measuredAt: item.measuredAt, source: "CLINICAL_RECORD" }))
+    : [];
+  const byType = new Map<string, DashboardVital>();
+  for (const vital of [...deviceVitals, ...clinicalVitals]) {
+    const key = String(vital.type ?? vital.name ?? "").toUpperCase();
+    if (!key) continue;
+    const previous = byType.get(key);
+    if (!previous || new Date(String(vital.measuredAt ?? 0)).getTime() > new Date(String(previous.measuredAt ?? 0)).getTime()) byType.set(key, vital);
+  }
+  return Array.from(byType.values());
 }
 
 function goalProgress(goal: any) {
@@ -182,6 +200,11 @@ export default function TodayPage() {
   const notifications = (data.today?.notifications ?? data.notifications ?? []).filter(
     (item: any) => !item.scheduledFor || new Date(String(item.scheduledFor)) <= new Date(),
   );
+  const healthVitals = normalizeVitals(data);
+  const bmi = data.healthSnapshot?.bmi ?? data.patient?.bmi ?? null;
+  const bmiCategory = data.healthSnapshot?.bmiCategory ?? data.patient?.bmiCategory ?? null;
+  const weightKg = data.patient?.weightKg ?? data.healthSnapshot?.weightKg ?? null;
+  const heightCm = data.patient?.heightCm ?? data.healthSnapshot?.heightCm ?? null;
 
   const actionItems = [
     ...attention.slice(0, 3).map((item: any) => ({ href: String(item.actionUrl || "/health-journal"), label: "Needs review", title: text(item.title, "Attention needed"), detail: text(item.description), icon: CheckCircle2 })),
@@ -247,6 +270,14 @@ export default function TodayPage() {
 
           <div id="daily-health-check-in" className="mt-7 flex items-end justify-between gap-5"><h2 className="text-xl font-black tracking-[-.045em] text-[#0b2d54]">Daily health check-in</h2><p className="hidden text-right text-[11px] text-[#74859a] sm:block">A few answers help Sympto understand your day.</p></div>
           <div className="mt-3.5"><DailyHealthCheckIn embedded goals={goals} /></div>
+
+          <section className="mt-7 rounded-[27px] border border-[#e0ebef] bg-white p-5 shadow-[0_5px_18px_rgba(11,45,84,0.03)] sm:p-6">
+            <div className="flex flex-wrap items-end justify-between gap-4">
+              <div><p className="text-[10px] font-black uppercase tracking-[0.18em] text-[#71839a]">Current health</p><h2 className="mt-1 text-xl font-black tracking-[-.045em] text-[#0b2d54]">Vitals and essentials</h2></div>
+              <Link href="/health-journal" className="text-[10px] font-black text-[#0b2d54]">Open health journal <ArrowRight className="ml-1 inline h-3.5 w-3.5" /></Link>
+            </div>
+            <HealthVitalsSummary vitals={healthVitals} bmi={bmi} bmiCategory={bmiCategory} weightKg={weightKg} heightCm={heightCm} />
+          </section>
 
           <div id="today-goals" className="mt-7 flex items-end justify-between gap-5"><h2 className="text-xl font-black tracking-[-.045em] text-[#0b2d54]">Your active goals</h2><Link href="/health-goals" className="text-[10px] font-black text-[#0b2d54]">Manage goals <ArrowRight className="ml-1 inline h-3.5 w-3.5" /></Link></div>
 
