@@ -37,6 +37,9 @@ type Goal = {
   targetValue?: number | string | null;
   currentValue?: number | string | null;
   unit?: string | null;
+  metricConfig?: {
+    frequencyTarget?: number | string | null;
+  } | null;
 };
 
 function isToday(value: string) {
@@ -78,7 +81,13 @@ function hydrationTarget(goal?: Goal) {
 }
 
 function exerciseTarget(goal?: Goal) {
-  if (!goal || goal.targetValue == null) return DEFAULT_EXERCISE_GOAL_MINUTES;
+  if (!goal) return DEFAULT_EXERCISE_GOAL_MINUTES;
+  const configuredTarget = goal.metricConfig?.frequencyTarget;
+  if (configuredTarget != null) {
+    const target = numberValue(configuredTarget, DEFAULT_EXERCISE_GOAL_MINUTES);
+    return target > 0 ? target : DEFAULT_EXERCISE_GOAL_MINUTES;
+  }
+  if (goal.targetValue == null) return DEFAULT_EXERCISE_GOAL_MINUTES;
   const target = numberValue(goal.targetValue, DEFAULT_EXERCISE_GOAL_MINUTES);
   const unit = normaliseUnit(goal.unit);
   return ["h", "hr", "hour", "hours"].includes(unit) ? target * 60 : target;
