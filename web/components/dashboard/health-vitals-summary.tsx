@@ -39,10 +39,25 @@ export default function HealthVitalsSummary({ measurements = [] }: Props) {
   const [open, setOpen] = useState(false);
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState("");
-  const [todayMeasurements, setTodayMeasurements] = useState<DashboardVital[]>(() => measurements.filter((item) => sameLocalDay(item.measuredAt)));
-  const [form, setForm] = useState<FormState>(() => formFromMeasurements(measurements.filter((item) => sameLocalDay(item.measuredAt))));
+  const initialTodayMeasurements = measurements.filter((item) => sameLocalDay(item.measuredAt));
+  const [todayMeasurements, setTodayMeasurements] = useState<DashboardVital[]>(initialTodayMeasurements);
+  const [form, setForm] = useState<FormState>(() => formFromMeasurements(initialTodayMeasurements));
+  const sourceMeasurementsSignature = useMemo(
+    () => measurements
+      .filter((item) => sameLocalDay(item.measuredAt))
+      .map((item) => ({ type: item.type, name: item.name, value: item.value, unit: item.unit, measuredAt: item.measuredAt, source: item.source ?? null }))
+      .sort((a, b) => `${a.type ?? ""}|${a.name ?? ""}|${a.measuredAt ?? ""}`.localeCompare(`${b.type ?? ""}|${b.name ?? ""}|${b.measuredAt ?? ""}`))
+      .map((item) => JSON.stringify(item))
+      .join("\n"),
+    [measurements],
+  );
 
-  useEffect(() => { const next = measurements.filter((item) => sameLocalDay(item.measuredAt)); setTodayMeasurements(next); setForm(formFromMeasurements(next)); }, [measurements, dayKey]);
+  useEffect(() => {
+    const next = measurements.filter((item) => sameLocalDay(item.measuredAt));
+    setTodayMeasurements(next);
+    setForm(formFromMeasurements(next));
+  }, [sourceMeasurementsSignature, dayKey]);
+
   useEffect(() => { const interval = window.setInterval(() => { const nextDay = localDayKey(); if (nextDay !== dayKey) { setDayKey(nextDay); setOpen(false); setMessage(""); setTodayMeasurements([]); setForm({ ...EMPTY_FORM }); } }, 30000); return () => window.clearInterval(interval); }, [dayKey]);
 
   const todayWeight = Number(form.weightKg || findMeasurement(todayMeasurements, ["WEIGHT", "BODY_WEIGHT"])?.value || 0);
