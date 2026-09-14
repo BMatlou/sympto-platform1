@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { Activity, ArrowRight, HeartPulse, Plus, Thermometer, Wind, X } from "lucide-react";
 import { healthHomeService } from "@/services/health-home.service";
+import { healthJournalService } from "@/services/health-journal.service";
 
 export type DashboardVital = { type?: string; name?: string; value?: number | string; unit?: string; measuredAt?: string; source?: string | null };
 type Props = { bmi?: number | null; bmiCategory?: string | null; weightKg?: number | null; heightCm?: number | null; measurements?: DashboardVital[] };
@@ -34,6 +35,25 @@ function formFromMeasurements(measurements: DashboardVital[]): FormState { const
 function bmiCategoryFor(value: number | null) { if (value == null) return null; if (value < 18.5) return "UNDERWEIGHT"; if (value < 25) return "HEALTHY_WEIGHT"; if (value < 30) return "OVERWEIGHT"; if (value < 35) return "OBESITY_CLASS_1"; if (value < 40) return "OBESITY_CLASS_2"; return "OBESITY_CLASS_3"; }
 function tone(category?: string | null) { switch (category) { case "HEALTHY_WEIGHT": return "bg-emerald-50 text-emerald-700 ring-emerald-100"; case "UNDERWEIGHT": return "bg-amber-50 text-amber-700 ring-amber-100"; case "OVERWEIGHT": return "bg-orange-50 text-orange-700 ring-orange-100"; case "OBESITY_CLASS_1": case "OBESITY_CLASS_2": case "OBESITY_CLASS_3": return "bg-red-50 text-red-700 ring-red-100"; default: return "bg-slate-50 text-slate-600 ring-slate-100"; } }
 
+function measurementsFromJournal(journal: any): DashboardVital[] {
+  if (!journal?.createdAt || !sameLocalDay(String(journal.createdAt))) return [];
+  const measuredAt = String(journal.updatedAt || journal.createdAt);
+  const result: DashboardVital[] = [];
+  const add = (type: string, value: unknown, unit: string) => {
+    if (value === null || value === undefined || value === "") return;
+    result.push({ type, value: Number(value), unit, measuredAt, source: "Health Journal" });
+  };
+  add("WEIGHT", journal.weightKg, "kg");
+  const heightMatch = String(journal.notes ?? "").match(/Height:\s*([0-9.]+)\s*cm/i);
+  if (heightMatch) add("HEIGHT", heightMatch[1], "cm");
+  if (journal.bloodPressureSystolic != null && journal.bloodPressureDiastolic != null) result.push({ type: "BLOOD_PRESSURE", value: `${journal.bloodPressureSystolic}/${journal.bloodPressureDiastolic}`, unit: "mmHg", measuredAt, source: "Health Journal" });
+  add("HEART_RATE", journal.heartRate, "bpm");
+  add("OXYGEN_SATURATION", journal.oxygenSaturation, "%");
+  add("BODY_TEMPERATURE", journal.temperature, "°C");
+  add("RESPIRATORY_RATE", journal.respiratoryRate, "/min");
+  return result;
+}
+
 export default function HealthVitalsSummary({ measurements = [] }: Props) {
   const [dayKey, setDayKey] = useState(() => localDayKey());
   const [open, setOpen] = useState(false);
@@ -57,6 +77,30 @@ export default function HealthVitalsSummary({ measurements = [] }: Props) {
     setTodayMeasurements(next);
     setForm(formFromMeasurements(next));
   }, [sourceMeasurementsSignature, dayKey]);
+
+  useEffect(() => {
+    let active = true;
+    healthJournalService.getAll({ page: 1, limit: 20 }).then((response) => {
+      if (!active) return;
+      const journal = (response.data ?? [])
+        .filter((item: any) => item?.title === "[Sympto] Today's measurements" && sameLocalDay(String(item.createdAt)))
+        .sort((a: any, b: any) => new Date(String(b.updatedAt || b.createdAt)).getTime() - new Date(String(a.updatedAt || a.createdAt)).getTime())[0];
+      if (!journal) return;
+      const journalMeasurements = measurementsFromJournal(journal);
+      if (!journalMeasurements.length) return;
+      setTodayMeasurements((current) => {
+        const merged = [...current.filter((item) => item.source !== "Health Journal"), ...journalMeasurements];
+        return merged;
+      });
+      setForm((current) => {
+        const journalForm = formFromMeasurements(journalMeasurements);
+        return Object.values(journalForm).some(Boolean) ? journalForm : current;
+      });
+    }).catch(() => {
+      // Today can still use dashboard-provided measurements when the journal request is unavailable.
+    });
+    return () => { active = false; };
+  }, [dayKey]);
 
   useEffect(() => { const interval = window.setInterval(() => { const nextDay = localDayKey(); if (nextDay !== dayKey) { setDayKey(nextDay); setOpen(false); setMessage(""); setTodayMeasurements([]); setForm({ ...EMPTY_FORM }); } }, 30000); return () => window.clearInterval(interval); }, [dayKey]);
 
