@@ -67,7 +67,7 @@ export default function TodayExerciseGoal({ goal }: Props) {
   const weekTotal = events.reduce((total, event) => total + (Number.isFinite(event.loggedValue) ? event.loggedValue : 0), 0);
   const progressPercent = targetMinutes > 0 ? Math.min(100, Math.round((weekTotal / targetMinutes) * 100)) : 0;
   const todayKey = localDayKey();
-  const todayMinutes = events.filter((event) => String(event.sourceId ?? "").endsWith(`:${todayKey}`)).reduce((total, event) => total + (Number.isFinite(event.loggedValue) ? event.loggedValue : 0), 0);
+  const todayMinutes = events.filter((event) => { const date = new Date(event.occurredAt); return !Number.isNaN(date.getTime()) && localDayKey(date) === todayKey; }).reduce((total, event) => total + (Number.isFinite(event.loggedValue) ? event.loggedValue : 0), 0);
   const targetReached = targetMinutes > 0 && weekTotal >= targetMinutes;
 
   return (
