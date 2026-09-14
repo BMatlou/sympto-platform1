@@ -136,9 +136,9 @@ export class HealthHomeService {
 
     const { start, end } = southAfricaDayBounds(measuredAt);
     const parts = [
-      currentWeight != null ? `Weight: ${Number(currentWeight).toFixed(1)} kg.` : null,
-      currentHeight != null ? `Height: ${Number(currentHeight).toFixed(0)} cm.` : null,
-      bmi != null ? `BMI: ${Number(bmi).toFixed(1)}${bmiCategory ? ` (${bmiCategory.replaceAll('_', ' ').toLowerCase()})` : ''}.` : null,
+      input.weightKg != null ? `Weight: ${Number(input.weightKg).toFixed(1)} kg.` : null,
+      input.heightCm != null ? `Height: ${Number(input.heightCm).toFixed(0)} cm.` : null,
+      input.weightKg != null && input.heightCm != null && bmi != null ? `BMI: ${Number(bmi).toFixed(1)}${bmiCategory ? ` (${bmiCategory.replaceAll('_', ' ').toLowerCase()})` : ''}.` : null,
       input.systolicPressure != null && input.diastolicPressure != null ? `Blood pressure: ${input.systolicPressure}/${input.diastolicPressure} mmHg.` : null,
       input.restingHeartRate != null ? `Heart rate: ${input.restingHeartRate} bpm.` : null,
       input.oxygenSaturation != null ? `Oxygen saturation: ${input.oxygenSaturation}%.` : null,
@@ -159,14 +159,17 @@ export class HealthHomeService {
     const journalData = {
       title: '[Sympto] Today\'s measurements',
       journal: journalText,
-      weightKg: currentWeight ?? undefined,
+      weightKg: input.weightKg ?? undefined,
       temperature: input.bodyTemperature ?? undefined,
       bloodPressureSystolic: input.systolicPressure ?? undefined,
       bloodPressureDiastolic: input.diastolicPressure ?? undefined,
       heartRate: input.restingHeartRate ?? undefined,
       oxygenSaturation: input.oxygenSaturation ?? undefined,
       respiratoryRate: input.respiratoryRate ?? undefined,
-      notes: currentHeight != null ? `Height: ${Number(currentHeight).toFixed(0)} cm.${bmi != null ? ` BMI: ${Number(bmi).toFixed(1)}.` : ''}` : bmi != null ? `BMI: ${Number(bmi).toFixed(1)}.` : undefined,
+      notes: [
+        input.heightCm != null ? `Height: ${Number(input.heightCm).toFixed(0)} cm.` : null,
+        input.weightKg != null && input.heightCm != null && bmi != null ? `BMI: ${Number(bmi).toFixed(1)}.` : null,
+      ].filter(Boolean).join(' ') || undefined,
       updatedAt: measuredAt,
     };
 
@@ -220,7 +223,7 @@ export class HealthHomeService {
       this.prisma.notification.findMany({ where: { userId: selectedUserId, readAt: null, status: { in: ['PENDING', 'QUEUED', 'SENT', 'DELIVERED'] } }, orderBy: [{ priority: 'desc' }, { createdAt: 'desc' }], take: 10 }),
       this.prisma.wearableDevice.findMany({ where: { patientId }, orderBy: { lastSyncAt: 'desc' }, include: { _count: { select: { measurements: true } } } }),
       this.prisma.deviceMeasurement.findMany({ where: { device: { patientId } }, orderBy: { measuredAt: 'desc' }, take: 100 }),
-      this.prisma.symptomLog.findMany({ where: { clinicalEpisode: { patientId }, status: { in: ['ACTIVE', 'COMPLETED'] } }, include: { clinicalEpisode: true, symptoms: { include: { symptom: true }, }, triggers: true }, orderBy: { startedAt: 'desc' }, take: 20 }),
+      this.prisma.symptomLog.findMany({ where: { clinicalEpisode: { patientId }, status: { in: ['ACTIVE', 'COMPLETED'] } }, include: { clinicalEpisode: true, symptoms: { include: { symptom: true } }, triggers: true }, orderBy: { startedAt: 'desc' }, take: 20 }),
       this.prisma.aIObservation.findMany({ where: { symptomLog: { clinicalEpisode: { patientId } } }, orderBy: { createdAt: 'desc' }, take: 10 }),
       this.prisma.labOrder.findMany({ where: { patientId }, include: { laboratory: true, items: { include: { test: true, labResults: { orderBy: { createdAt: 'desc' }, take: 1, include: { items: { include: { test: true } } } } } } }, orderBy: { orderedAt: 'desc' }, take: 20 }),
       this.prisma.imagingStudy.findMany({ where: { patientId }, include: { imagingCenter: true, reports: true }, orderBy: { createdAt: 'desc' }, take: 20 }),
@@ -248,6 +251,7 @@ export class HealthHomeService {
 
     const baselineRecordedAt = patient.baseline?.establishedAt ?? patient.baseline?.updatedAt ?? null;
     const manualVitals = [
+      inputPlaceholder: null,
       patient.baseline?.systolicPressure != null && patient.baseline?.diastolicPressure != null ? { type: 'BLOOD_PRESSURE', name: 'Blood pressure', value: `${patient.baseline.systolicPressure}/${patient.baseline.diastolicPressure}`, unit: 'mmHg', measuredAt: baselineRecordedAt, source: 'MANUAL_ENTRY' } : null,
       patient.baseline?.restingHeartRate != null ? { type: 'HEART_RATE', name: 'Heart rate', value: Number(patient.baseline.restingHeartRate), unit: 'bpm', measuredAt: baselineRecordedAt, source: 'MANUAL_ENTRY' } : null,
       patient.baseline?.oxygenSaturation != null ? { type: 'OXYGEN_SATURATION', name: 'Oxygen saturation', value: Number(patient.baseline.oxygenSaturation), unit: '%', measuredAt: baselineRecordedAt, source: 'MANUAL_ENTRY' } : null,
