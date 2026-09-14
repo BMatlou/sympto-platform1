@@ -27,6 +27,19 @@ function assertRange(name: string, value: number | undefined, min: number, max: 
   }
 }
 
+function southAfricaDayBounds(value: Date) {
+  const date = new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'Africa/Johannesburg',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).format(value);
+  const start = new Date(`${date}T00:00:00+02:00`);
+  const end = new Date(start);
+  end.setUTCDate(end.getUTCDate() + 1);
+  return { start, end };
+}
+
 @Injectable()
 export class HealthHomeService {
   constructor(
@@ -93,6 +106,7 @@ export class HealthHomeService {
     const currentHeight = input.heightCm ?? (patient.heightCm != null ? Number(patient.heightCm) : patient.baseline?.heightCm != null ? Number(patient.baseline.heightCm) : null);
     const currentWeight = input.weightKg ?? (patient.weightKg != null ? Number(patient.weightKg) : patient.baseline?.weightKg != null ? Number(patient.baseline.weightKg) : null);
     const bmi = calculateBmi(currentWeight, currentHeight);
+    const bmiCategory = getBmiCategory(bmi);
 
     await this.prisma.patient.update({ where: { id: patient.id }, data: { ...(input.weightKg !== undefined ? { weightKg: input.weightKg } : {}), ...(input.heightCm !== undefined ? { heightCm: input.heightCm } : {}) } });
     const baseline = await this.prisma.patientBaseline.upsert({
@@ -120,7 +134,49 @@ export class HealthHomeService {
       });
     }
 
-    return { recordedAt: measuredAt.toISOString(), bmi, bmiCategory: getBmiCategory(bmi), baseline };
+    const { start, end } = southAfricaDayBounds(measuredAt);
+    const parts = [
+      currentWeight != null ? `Weight: ${Number(currentWeight).toFixed(1)} kg.` : null,
+      currentHeight != null ? `Height: ${Number(currentHeight).toFixed(0)} cm.` : null,
+      bmi != null ? `BMI: ${Number(bmi).toFixed(1)}${bmiCategory ? ` (${bmiCategory.replaceAll('_', ' ').toLowerCase()})` : ''}.` : null,
+      input.systolicPressure != null && input.diastolicPressure != null ? `Blood pressure: ${input.systolicPressure}/${input.diastolicPressure} mmHg.` : null,
+      input.restingHeartRate != null ? `Heart rate: ${input.restingHeartRate} bpm.` : null,
+      input.oxygenSaturation != null ? `Oxygen saturation: ${input.oxygenSaturation}%.` : null,
+      input.bodyTemperature != null ? `Temperature: ${input.bodyTemperature} °C.` : null,
+      input.respiratoryRate != null ? `Respiratory rate: ${input.respiratoryRate}/min.` : null,
+    ].filter(Boolean) as string[];
+    const journalText = [`Today’s measurements recorded in Sympto.`, ...parts].join('\n');
+
+    const existingJournal = await this.prisma.healthJournal.findFirst({
+      where: {
+        patientId: patient.id,
+        title: '[Sympto] Today\'s measurements',
+        createdAt: { gte: start, lt: end },
+      },
+      orderBy: { createdAt: 'desc' },
+    });
+
+    const journalData = {
+      title: '[Sympto] Today\'s measurements',
+      journal: journalText,
+      weightKg: currentWeight ?? undefined,
+      temperature: input.bodyTemperature ?? undefined,
+      bloodPressureSystolic: input.systolicPressure ?? undefined,
+      bloodPressureDiastolic: input.diastolicPressure ?? undefined,
+      heartRate: input.restingHeartRate ?? undefined,
+      oxygenSaturation: input.oxygenSaturation ?? undefined,
+      respiratoryRate: input.respiratoryRate ?? undefined,
+      notes: currentHeight != null ? `Height: ${Number(currentHeight).toFixed(0)} cm.${bmi != null ? ` BMI: ${Number(bmi).toFixed(1)}.` : ''}` : bmi != null ? `BMI: ${Number(bmi).toFixed(1)}.` : undefined,
+      updatedAt: measuredAt,
+    };
+
+    if (existingJournal) {
+      await this.prisma.healthJournal.update({ where: { id: existingJournal.id }, data: journalData });
+    } else {
+      await this.prisma.healthJournal.create({ data: { ...journalData, patientId: patient.id, createdAt: measuredAt } });
+    }
+
+    return { recordedAt: measuredAt.toISOString(), bmi, bmiCategory, baseline };
   }
 
   async getHealthHome(userId: string, requestedPatientId?: string) {
@@ -164,7 +220,7 @@ export class HealthHomeService {
       this.prisma.notification.findMany({ where: { userId: selectedUserId, readAt: null, status: { in: ['PENDING', 'QUEUED', 'SENT', 'DELIVERED'] } }, orderBy: [{ priority: 'desc' }, { createdAt: 'desc' }], take: 10 }),
       this.prisma.wearableDevice.findMany({ where: { patientId }, orderBy: { lastSyncAt: 'desc' }, include: { _count: { select: { measurements: true } } } }),
       this.prisma.deviceMeasurement.findMany({ where: { device: { patientId } }, orderBy: { measuredAt: 'desc' }, take: 100 }),
-      this.prisma.symptomLog.findMany({ where: { clinicalEpisode: { patientId }, status: { in: ['ACTIVE', 'COMPLETED'] } }, include: { clinicalEpisode: true, symptoms: { include: { symptom: true } }, triggers: true }, orderBy: { startedAt: 'desc' }, take: 20 }),
+      this.prisma.symptomLog.findMany({ where: { clinicalEpisode: { patientId }, status: { in: ['ACTIVE', 'COMPLETED'] } }, include: { clinicalEpisode: true, symptoms: { include: { symptom: true }, }, triggers: true }, orderBy: { startedAt: 'desc' }, take: 20 }),
       this.prisma.aIObservation.findMany({ where: { symptomLog: { clinicalEpisode: { patientId } } }, orderBy: { createdAt: 'desc' }, take: 10 }),
       this.prisma.labOrder.findMany({ where: { patientId }, include: { laboratory: true, items: { include: { test: true, labResults: { orderBy: { createdAt: 'desc' }, take: 1, include: { items: { include: { test: true } } } } } } }, orderBy: { orderedAt: 'desc' }, take: 20 }),
       this.prisma.imagingStudy.findMany({ where: { patientId }, include: { imagingCenter: true, reports: true }, orderBy: { createdAt: 'desc' }, take: 20 }),
