@@ -4,6 +4,7 @@ import Link from "next/link";
 import { ArrowRight, Scale, TrendingDown, TrendingUp } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { healthGoalsService } from "@/services/health-goals.service";
+import { TODAY_GOAL_CARD_CLASS, TODAY_GOAL_FOOTER_CLASS, TODAY_GOAL_HEADER_CLASS } from "@/components/today/today-goal-card-styles";
 
 function numberValue(value: unknown): number | null {
   const parsed = Number(value);
@@ -97,8 +98,8 @@ export default function TodayWeightGoal({ goal, fallbackWeight }: Props) {
   const ChangeIcon = comparison === "INCREASE_TO" ? TrendingUp : TrendingDown;
 
   return (
-    <article className="flex h-full w-full min-w-0 flex-col overflow-hidden rounded-[24px] border border-[#dce9ee] bg-white shadow-[0_5px_18px_rgba(11,45,84,.03)]">
-      <div className="border-b border-[#edf2f5] bg-gradient-to-br from-[#f7fcfc] via-white to-[#eef8f8] px-5 py-4 sm:px-6">
+    <article className={`${TODAY_GOAL_CARD_CLASS} flex h-full min-w-0 flex-col`}>
+      <div className={TODAY_GOAL_HEADER_CLASS}>
         <div className="flex items-start justify-between gap-3">
           <div className="flex min-w-0 items-center gap-3">
             <span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-[#e5f7f6] text-[#0b6f73]"><Scale className="h-4 w-4" /></span>
@@ -143,7 +144,7 @@ export default function TodayWeightGoal({ goal, fallbackWeight }: Props) {
         )}
       </div>
 
-      <div className="border-t border-[#edf2f5] bg-[#fbfdfd] px-4 py-3">
+      <div className={`${TODAY_GOAL_FOOTER_CLASS} px-4`}>
         <div className="mb-3 flex items-center justify-between gap-3 text-[10px] text-[#74859a]"><span>Day {journey.journeyDay} of your journey</span>{journey.daysLeft !== null && <span>{journey.daysLeft === 0 ? "Target date is today" : `${journey.daysLeft} days left`}</span>}</div>
         <div className="flex items-center justify-between gap-3"><p className="text-[9px] leading-4 text-[#8a99a6]">Progress is calculated from your recorded weight measurements.</p><Link href="/health-goals" className="inline-flex min-h-10 shrink-0 items-center justify-center gap-1 rounded-xl border border-[#d7e4e8] bg-white px-3 py-2 text-[10px] font-black text-[#0b2d54]">View goal <ArrowRight className="h-3 w-3" /></Link></div>
       </div>
