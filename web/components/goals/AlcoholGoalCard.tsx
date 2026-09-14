@@ -4,7 +4,6 @@ import Link from "next/link";
 import { ArrowRight, Wine } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { healthGoalsService } from "@/services/health-goals.service";
-import { TODAY_GOAL_CARD_CLASS, TODAY_GOAL_FOOTER_CLASS, TODAY_GOAL_HEADER_CLASS } from "@/components/today/today-goal-card-styles";
 
 export interface AlcoholGoalData {
   id?: string;
@@ -135,58 +134,65 @@ export const AlcoholGoalCard: React.FC<AlcoholGoalCardProps> = ({ goal, onUpdate
   }
 
   return (
-    <div className={`${TODAY_GOAL_CARD_CLASS} flex h-full min-w-0 flex-col`}>
-      <div className={TODAY_GOAL_HEADER_CLASS}>
-        <div className="flex items-start justify-between gap-3">
+    <article className="flex h-full min-w-0 flex-col overflow-hidden rounded-[30px] border border-[#dfeaec] bg-white shadow-[0_18px_48px_rgba(11,45,84,.06)]">
+      <div className="flex items-center justify-between gap-4 px-5 pb-4 pt-5 sm:px-6 sm:pt-6">
+        <div className="flex min-w-0 items-center gap-3">
+          <span className="grid h-10 w-10 shrink-0 place-items-center rounded-[14px] bg-[#e8f8f7] text-[#0b7b80] ring-1 ring-[#d8efed]"><Wine className="h-4 w-4" /></span>
           <div className="min-w-0">
-            <div className="flex items-center gap-2">
-              <span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-[#fff3df] text-[#b76a00] ring-1 ring-[#f4dfbf]"><Wine className="h-4 w-4" /></span>
-              <h3 className="text-xs font-black uppercase tracking-wide text-[#51677f]">Alcohol Moderation</h3>
+            <p className="truncate text-base font-black tracking-[-.035em] text-[#0b2d54]">Alcohol Moderation</p>
+            <p className="mt-0.5 text-[10px] font-bold uppercase tracking-[.14em] text-[#84969e]">Day {programDay} · Week {week}</p>
+          </div>
+        </div>
+        <span className={`shrink-0 rounded-full px-3 py-1.5 text-[10px] font-black ${isAboveBudget ? "bg-red-50 text-red-700" : isAtOrAboveBudget ? "bg-slate-100 text-slate-600" : "bg-[#e8f8f7] text-[#0b7b80]"}`}>
+          {isAboveBudget ? "Above target" : isAtOrAboveBudget ? "Target reached" : "On track"}
+        </span>
+      </div>
+
+      <div className="px-4 pb-4 sm:px-5 sm:pb-5">
+        <div className="relative overflow-hidden rounded-[27px] bg-[#0b2d54] p-5 text-white shadow-[0_16px_34px_rgba(11,45,84,.16)] sm:p-6">
+          <div className="pointer-events-none absolute -right-16 -top-16 h-40 w-40 rounded-full bg-[#24c1c4]/18 blur-3xl" />
+          <div className="pointer-events-none absolute -bottom-20 left-1/3 h-44 w-44 rounded-full bg-[#24c1c4]/10 blur-3xl" />
+
+          <div className="relative flex flex-col items-center gap-6 sm:flex-row sm:items-center sm:justify-between">
+            <div className="relative shrink-0">
+              <div className="relative grid h-[148px] w-[148px] place-items-center rounded-full" style={{ background: `conic-gradient(${isAboveBudget ? "#f87171" : "#24c1c4"} 0 ${Math.min(budgetUsedPercentage, 100)}%, rgba(255,255,255,.12) ${Math.min(budgetUsedPercentage, 100)}% 100%)` }}>
+                <div className="absolute inset-[10px] rounded-full bg-[#0b2d54] ring-1 ring-white/10" />
+                <div className="relative z-10 text-center"><p className="text-[38px] font-black leading-none tracking-[-.07em]">{formatNumber(thisWeekLogged)}</p><p className="mt-1 text-[10px] font-black uppercase tracking-[.15em] text-white/45">drinks</p></div>
+              </div>
             </div>
-            <p className="mt-1 text-[10px] font-semibold text-[#7b8da1]">Day {programDay} of your program <span className="px-1 text-[#c1cbd4]">•</span> Week {week}</p>
+
+            <div className="min-w-0 flex-1 text-center sm:pl-2 sm:text-left">
+              <p className="text-[10px] font-black uppercase tracking-[.16em] text-white/50">This week</p>
+              <p className="mt-2 text-[31px] font-black leading-none tracking-[-.065em]">{formatNumber(thisWeekLogged)}<span className="ml-1.5 text-base font-bold tracking-normal text-white/55">/ {formatNumber(weeklyTarget)}</span></p>
+              <p className="mt-2 text-xs font-semibold text-white/65">{remaining > 0 ? `${formatNumber(remaining)} drinks remaining` : isAboveBudget ? `${formatNumber(Math.abs(differenceDelta))} drinks above target` : "Weekly target reached"}</p>
+              <div className="mt-4 inline-flex rounded-full bg-white/10 px-3 py-1.5 text-[10px] font-black text-white/80 ring-1 ring-white/10">{budgetUsedPercentage}% of weekly budget</div>
+            </div>
           </div>
-          <span className={`shrink-0 whitespace-nowrap text-[9px] font-black uppercase tracking-wide ${isAboveBudget ? "text-red-600" : isAtOrAboveBudget ? "text-slate-600" : "text-emerald-700"}`}>
-            {isAboveBudget ? "⚠️ Above weekly target" : isAtOrAboveBudget ? "Weekly target reached" : "🟢 On track this week"}
-          </span>
-        </div>
-      </div>
 
-      <div className="flex-1 p-5">
-        <div className={`text-sm font-semibold ${isAboveBudget ? "text-red-800" : "text-emerald-800"}`}>
-          {isAboveBudget ? <>You are <strong>{formatNumber(Math.abs(differenceDelta))} drinks</strong> above this week&apos;s budget.</> : <>✓ On track this week — <strong>{formatNumber(remaining)} drinks remaining.</strong></>}
-        </div>
-
-        <div className="mt-4 grid grid-cols-3 divide-x divide-[#edf2f5] border-y border-[#edf2f5] py-3">
-          <div className="px-2 text-center first:pl-0"><span className="block text-[9px] font-bold uppercase tracking-wide text-[#91a0ae]">This week</span><span className="mt-1 block text-sm font-black text-[#17314e]">{formatNumber(thisWeekLogged)} drinks</span></div>
-          <div className="px-2 text-center"><span className="block text-[9px] font-bold uppercase tracking-wide text-[#91a0ae]">Weekly target</span><span className="mt-1 block text-sm font-black text-[#17314e]">≤ {formatNumber(weeklyTarget)}</span></div>
-          <div className="px-2 text-center last:pr-0"><span className="block text-[9px] font-bold uppercase tracking-wide text-[#91a0ae]">Budget used</span><span className={`mt-1 block text-sm font-black ${isAboveBudget ? "text-red-600" : isAtOrAboveBudget ? "text-slate-600" : "text-emerald-700"}`}>{budgetUsedPercentage}%</span></div>
-        </div>
-
-        <div className="mt-4">
-          <div className="flex items-end justify-between gap-3 text-[10px]"><span className="font-medium text-[#8a9aaa]">0 drinks</span><span className="font-bold text-[#667b91]">Weekly budget: {formatNumber(weeklyTarget)} drinks</span></div>
-          <div className="relative mt-2 h-2.5 overflow-hidden rounded-full bg-[#edf2f4]"><div className={`h-full rounded-full transition-all duration-500 ${isAboveBudget ? "bg-red-500" : isAtOrAboveBudget ? "bg-slate-400" : "bg-emerald-500"}`} style={{ width: `${Math.min(budgetUsedPercentage, 100)}%` }} /><span className="absolute inset-y-[-2px] right-0 w-px bg-[#0b2d54]/35" aria-hidden="true" /></div>
-          <p className="mt-1.5 text-right text-[9px] font-medium text-[#96a3ae]">{isAboveBudget ? `${formatNumber(thisWeekLogged)} drinks logged` : isAtOrAboveBudget ? "Weekly target reached" : `${formatNumber(remaining)} drinks remaining`}</p>
-        </div>
-
-        <p className="mt-3 text-[11px] leading-relaxed text-[#687d91]">{isAboveBudget ? <>You have gone past your weekly budget. Focus on stopping further intake for the rest of this week. Your budget resets Monday at 00:00.</> : isAtOrAboveBudget ? <>You have reached your weekly budget. No more drinks can be logged against this goal until the budget resets Monday at 00:00.</> : <>Pace yourself through the remaining days and keep your entries honest.</>}</p>
-
-        {logOpen && !isAtOrAboveBudget && (
-          <div className="mt-3 rounded-xl bg-[#f7fafb] p-3">
-            <label htmlFor="alcohol-goal-drinks" className="text-[9px] font-black uppercase tracking-[0.14em] text-[#74859a]">Drinks to add</label>
-            <div className="mt-2 flex gap-2"><input id="alcohol-goal-drinks" type="number" min="1" step="1" inputMode="numeric" value={draft} onChange={(event) => setDraft(event.target.value)} className="min-h-10 min-w-0 flex-1 rounded-xl border border-[#d7e4e8] bg-white px-3 text-sm font-bold text-[#0b2d54] outline-none focus:border-[#24c1c4]" /><button type="button" disabled={saving || !draft} onClick={() => void addDrinks()} className="min-h-10 rounded-xl bg-[#0b2d54] px-4 text-[10px] font-black text-white disabled:cursor-not-allowed disabled:opacity-50">{saving ? "Saving…" : "Add"}</button></div>
-            <button type="button" onClick={() => setLogOpen(false)} className="mt-2 text-[9px] font-bold text-[#74859a]">Cancel</button>
+          <div className="relative mt-6 border-t border-white/10 pt-5">
+            <div className="flex items-end justify-between gap-3"><div><p className="text-[10px] font-black uppercase tracking-[.14em] text-white/45">Weekly budget</p><p className="mt-1 text-sm font-bold text-white">≤ {formatNumber(weeklyTarget)} drinks</p></div><p className="text-right text-[10px] font-bold text-white/50">{targetDaysLeft === 0 ? "Target date today" : `${targetDaysLeft} days left`}</p></div>
           </div>
-        )}
-      </div>
 
-      <div className={TODAY_GOAL_FOOTER_CLASS}>
-        <div className="mb-3 flex items-center justify-between gap-3 text-[10px] text-[#74859a]"><div><span className="block font-bold uppercase tracking-[0.12em] text-[#91a0ae]">Target date</span><span className="mt-0.5 block text-xs font-black text-[#0b2d54]">{targetDateLabel}</span><span className="block text-[9px] font-medium text-[#7b8da1]">{targetDaysLeft === 0 ? "Target date is today" : `${targetDaysLeft} days left to target`}</span></div></div>
-        <div className="grid grid-cols-2 gap-2">
-          <button type="button" disabled={isAtOrAboveBudget} aria-disabled={isAtOrAboveBudget} onClick={() => { if (isAtOrAboveBudget) return; setLogOpen(true); }} className={`min-h-10 rounded-xl px-3 py-2 text-[10px] font-black transition ${isAtOrAboveBudget ? "cursor-not-allowed bg-[#eef2f4] text-[#93a0aa]" : "bg-[#0b2d54] text-white hover:bg-[#123e66]"}`}>{saving ? "Saving…" : isAboveBudget ? "Weekly budget exceeded" : isAtOrAboveBudget ? "Weekly target reached" : logOpen ? "Close log" : "Log drinks"}</button>
-          <Link href="/health-goals" className="inline-flex min-h-10 items-center justify-center gap-1 rounded-xl border border-[#d7e4e8] bg-white px-3 py-2 text-[10px] font-black text-[#0b2d54]">View goal <ArrowRight className="h-3 w-3" /></Link>
+          {logOpen && !isAtOrAboveBudget && (
+            <div className="relative mt-4 rounded-[20px] bg-white/8 p-4 ring-1 ring-white/10">
+              <label htmlFor="alcohol-goal-drinks" className="text-[9px] font-black uppercase tracking-[.14em] text-white/55">Drinks to add</label>
+              <div className="mt-2 flex gap-2"><input id="alcohol-goal-drinks" type="number" min="1" step="1" inputMode="numeric" value={draft} onChange={(event) => setDraft(event.target.value)} className="min-h-10 min-w-0 flex-1 rounded-xl border border-white/15 bg-white/10 px-3 text-sm font-bold text-white outline-none placeholder:text-white/30 focus:border-[#24c1c4]" /><button type="button" disabled={saving || !draft} onClick={() => void addDrinks()} className="min-h-10 rounded-xl bg-white px-4 text-[10px] font-black text-[#0b2d54] disabled:cursor-not-allowed disabled:opacity-50">{saving ? "Saving…" : "Add"}</button></div>
+              <button type="button" onClick={() => setLogOpen(false)} className="mt-2 text-[9px] font-bold text-white/55">Cancel</button>
+            </div>
+          )}
+        </div>
+
+        <div className="mt-4 flex items-center justify-between gap-3 rounded-[20px] border border-[#e2ecef] bg-[#fbfdfd] px-4 py-3.5">
+          <p className="text-[10px] font-semibold leading-4 text-[#74859a]">{isAboveBudget ? "Your weekly budget has been exceeded. Keep logging honestly and avoid further intake for the remainder of the week." : isAtOrAboveBudget ? "Your weekly budget has been reached. No more drinks can be logged until Monday." : "Pace yourself through the remaining days and keep your entries honest."}</p>
+          <button type="button" disabled={isAtOrAboveBudget} onClick={() => { if (!isAtOrAboveBudget) setLogOpen((value) => !value); }} className={`shrink-0 rounded-xl px-3.5 py-2.5 text-[10px] font-black ${isAtOrAboveBudget ? "cursor-not-allowed bg-[#edf2f4] text-[#94a0aa]" : "bg-[#0b2d54] text-white shadow-[0_7px_16px_rgba(11,45,84,.14)]"}`}>{isAboveBudget ? "Budget exceeded" : isAtOrAboveBudget ? "Target reached" : logOpen ? "Close" : "Log drinks"}</button>
         </div>
       </div>
-    </div>
+
+      <div className="border-t border-[#edf2f4] bg-[#fbfdfd] px-5 py-4 sm:px-6">
+        <div className="flex items-center justify-between gap-3"><div><p className="text-[9px] font-black uppercase tracking-[.14em] text-[#91a0ae]">Target date</p><p className="mt-1 text-sm font-black text-[#0b2d54]">{targetDateLabel}</p></div><Link href="/health-goals" className="inline-flex min-h-10 items-center justify-center gap-1.5 rounded-xl border border-[#d6e5e8] bg-white px-3.5 py-2 text-[10px] font-black text-[#0b2d54]">View goal <ArrowRight className="h-3 w-3" /></Link></div>
+        <p className="mt-1.5 text-[9px] font-medium text-[#7b8da1]">{targetDaysLeft === 0 ? "Target date is today" : `${targetDaysLeft} days left to target`}</p>
+      </div>
+    </article>
   );
 };
 
