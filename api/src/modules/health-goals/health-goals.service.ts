@@ -91,6 +91,39 @@ export class HealthGoalsService {
     return this.findOne(id);
   }
 
+  private async ensureOnboardingWeightGoalMetric(goal: any) {
+    if (String(goal?.category).toUpperCase() !== 'WEIGHT') return false;
+
+    const existing = await this.prisma.$queryRaw<Array<{ healthGoalId: string }>>`
+      SELECT "healthGoalId"
+      FROM "HealthGoalMetricConfig"
+      WHERE "healthGoalId" = ${goal.id}
+      LIMIT 1
+    `;
+    if (existing.length) return false;
+
+    const startingWeight = Number(goal?.patient?.weightKg);
+    const lossAmount = Number(goal?.targetValue);
+    if (!Number.isFinite(startingWeight) || startingWeight <= 0 || !Number.isFinite(lossAmount) || lossAmount <= 0) return false;
+
+    const targetWeight = Number((startingWeight - lossAmount).toFixed(2));
+    if (!Number.isFinite(targetWeight) || targetWeight <= 0) return false;
+
+    const rule = goalRuleFor('WEIGHT');
+    await this.prisma.$executeRaw`
+      INSERT INTO "HealthGoalMetricConfig"
+        ("healthGoalId", "metricType", "metricKey", "frequency", "frequencyTarget", "guidanceText", "aggregation", "comparison")
+      VALUES
+        (${goal.id}, ${rule.metricType}, ${rule.metricKey}, ${rule.frequency}, ${targetWeight}, ${`Lose ${lossAmount}kg from your starting weight of ${startingWeight}kg.`}, ${rule.aggregation}, ${rule.comparison})
+      ON CONFLICT ("healthGoalId") DO NOTHING
+    `;
+
+    await this.goalsEngine.backfillJournalMetrics(goal.patientId);
+    await this.goalsEngine.backfillPatientProfileMetrics(goal.patientId);
+    await this.goalsEngine.recomputeAllMatchingGoals(goal.patientId);
+    return true;
+  }
+
   async getActiveSnapshot(patientId: string) { return this.goalsEngine.snapshot(patientId); }
 
   async syncMetricEventForUser(userId: string, input: { metricType: string; metricKey: string; loggedValue: number; occurredAt?: Date; source?: string; sourceId?: string }) {
@@ -133,12 +166,27 @@ export class HealthGoalsService {
       this.prisma.healthGoal.findMany({ where, include: { patient: true, practitioner: true, carePlan: true, progress: { orderBy: { measuredAt: 'desc' } } }, orderBy: { createdAt: 'desc' }, skip: (page - 1) * limit, take: limit }),
       this.prisma.healthGoal.count({ where }),
     ]);
-    const normalizedData = data.map((goal) => {
+
+    for (const goal of data) {
+      await this.ensureOnboardingWeightGoalMetric(goal);
+    }
+
+    const normalizedData = await Promise.all(data.map(async (goal) => {
       if (String(goal.category).toUpperCase() === 'MEDICATION' && goal.targetValue == null) {
         return { ...goal, targetValue: new Prisma.Decimal(DEFAULT_MEDICATION_TARGET), unit: '%' };
       }
+      if (String(goal.category).toUpperCase() === 'WEIGHT') {
+        const config = await this.prisma.$queryRaw<Array<{ frequencyTarget: Prisma.Decimal | number }>>`
+          SELECT "frequencyTarget"
+          FROM "HealthGoalMetricConfig"
+          WHERE "healthGoalId" = ${goal.id}
+          LIMIT 1
+        `;
+        return { ...goal, metricConfig: config[0] ?? null };
+      }
       return goal;
-    });
+    }));
+
     return { data: normalizedData, pagination: { page, limit, total, totalPages: Math.ceil(total / limit) } };
   }
 
