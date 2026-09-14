@@ -42,6 +42,24 @@ type Goal = {
   } | null;
 };
 
+type ExerciseEvent = {
+  loggedValue: number;
+  occurredAt: string;
+};
+
+function startOfLocalWeek(date = new Date()) {
+  const start = new Date(date);
+  start.setHours(0, 0, 0, 0);
+  const day = start.getDay();
+  const daysFromMonday = day === 0 ? 6 : day - 1;
+  start.setDate(start.getDate() - daysFromMonday);
+  return start;
+}
+
+function localDayKey(date = new Date()) {
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
+}
+
 function isToday(value: string) {
   const date = new Date(value);
   const now = new Date();
@@ -154,6 +172,7 @@ export default function DailyHealthCheckIn({ embedded = false, goals = [] }: { e
   const [stressLevel, setStressLevel] = useState(5);
   const [exerciseMinutes, setExerciseMinutes] = useState(0);
   const [waterIntakeMl, setWaterIntakeMl] = useState(0);
+  const [weeklyExerciseEvents, setWeeklyExerciseEvents] = useState<ExerciseEvent[]>([]);
   const [savedJournal, setSavedJournal] = useState<HealthJournal | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -172,21 +191,36 @@ export default function DailyHealthCheckIn({ embedded = false, goals = [] }: { e
   const sleepGoalHours = sleepTarget(sleepGoal);
   const waterPercent = Math.min(100, Math.round((waterIntakeMl / waterGoalMl) * 100));
   const waterRemaining = Math.max(0, waterGoalMl - waterIntakeMl);
-  const movementProgress = Math.min(100, Math.round((exerciseMinutes / exerciseGoalMinutes) * 100));
+  const persistedWeekMinutes = weeklyExerciseEvents.reduce((total, event) => total + (Number.isFinite(event.loggedValue) ? event.loggedValue : 0), 0);
+  const persistedTodayMinutes = weeklyExerciseEvents
+    .filter((event) => {
+      const date = new Date(event.occurredAt);
+      return !Number.isNaN(date.getTime()) && localDayKey(date) === localDayKey();
+    })
+    .reduce((total, event) => total + (Number.isFinite(event.loggedValue) ? event.loggedValue : 0), 0);
+  const projectedWeekMinutes = Math.max(0, persistedWeekMinutes - persistedTodayMinutes + exerciseMinutes);
+  const movementProgress = exerciseGoalMinutes > 0 ? Math.min(100, Math.round((projectedWeekMinutes / exerciseGoalMinutes) * 100)) : 0;
   const sleepProgress = Math.min(100, Math.round((sleepHours / sleepGoalHours) * 100));
   const derivedSleepQuality = sleepHours > 0 ? sleepQualityForHours(sleepHours) : null;
   const effectiveSleepQuality = derivedSleepQuality ?? sleepQuality;
+  const movementOverTarget = Math.max(0, projectedWeekMinutes - exerciseGoalMinutes);
+  const movementRemaining = Math.max(0, exerciseGoalMinutes - projectedWeekMinutes);
 
   const hasInput = useMemo(
     () => Boolean(mood || sleepQuality || sleepHours > 0 || exerciseMinutes > 0 || waterIntakeMl > 0 || stressTouched),
     [mood, sleepQuality, sleepHours, exerciseMinutes, waterIntakeMl, stressTouched],
   );
 
-  const movementTitle = exerciseMinutes === 0
-    ? ["Ready when you are", "Even a little movement counts."]
-    : exerciseMinutes < exerciseGoalMinutes
-      ? ["Nice rhythm", `${Math.max(0, exerciseGoalMinutes - exerciseMinutes)} more minutes to your movement goal.`]
-      : ["Goal reached", "You have reached today’s movement target."];
+  const movementTitle = projectedWeekMinutes >= exerciseGoalMinutes && projectedWeekMinutes > 0
+    ? [
+        "Weekly goal reached",
+        movementOverTarget > 0
+          ? `You’re ${movementOverTarget} minutes above your ${exerciseGoalMinutes}-minute weekly goal.`
+          : `You’ve reached your ${exerciseGoalMinutes}-minute weekly exercise goal.`,
+      ]
+    : projectedWeekMinutes === 0
+      ? ["Ready when you are", `Your weekly exercise goal is ${exerciseGoalMinutes} minutes.`]
+      : ["Nice rhythm", `${movementRemaining} more minutes this week to reach your ${exerciseGoalMinutes}-minute goal.`];
 
   useEffect(() => {
     let active = true;
@@ -221,6 +255,31 @@ export default function DailyHealthCheckIn({ embedded = false, goals = [] }: { e
       active = false;
     };
   }, []);
+
+  useEffect(() => {
+    let active = true;
+    const weekStart = startOfLocalWeek();
+
+    async function loadWeekExercise() {
+      try {
+        const response = await healthGoalsService.getMetricEvents("EXERCISE", "exercise.minutes", weekStart, new Date(), "health-journal");
+        if (!active) return;
+        setWeeklyExerciseEvents((response.events ?? []).map((event) => ({ loggedValue: Number(event.loggedValue), occurredAt: String(event.occurredAt) })));
+      } catch {
+        if (active) setWeeklyExerciseEvents([]);
+      }
+    }
+
+    void loadWeekExercise();
+    const handleUpdated = () => void loadWeekExercise();
+    const interval = window.setInterval(() => void loadWeekExercise(), 5000);
+    window.addEventListener("sympto:health-checkin-updated", handleUpdated);
+    return () => {
+      active = false;
+      window.clearInterval(interval);
+      window.removeEventListener("sympto:health-checkin-updated", handleUpdated);
+    };
+  }, [exerciseGoal?.id]);
 
   async function syncGoal(goal: Goal | undefined, category: "HYDRATION" | "SLEEP", currentValue: number) {
     if (!hasLoaded.current || !goal?.id || syncingGoalIds.current.has(goal.id)) return;
@@ -331,22 +390,23 @@ export default function DailyHealthCheckIn({ embedded = false, goals = [] }: { e
         </article>
 
         <article className="rounded-[27px] border border-[#dfebef] bg-white p-5 shadow-[0_6px_20px_rgba(11,45,84,.035)] sm:p-[23px]">
-          <div className="flex items-start justify-between gap-4"><div><h3 className="text-[17px] font-black text-[#0b2d54]">Exercise</h3><p className="mt-1 text-xs text-[#74859a]">Track movement toward your goal</p></div><span className="rounded-[11px] bg-[#e9f8f1] px-2.5 py-2 text-[10px] font-black text-[#168660]">{movementProgress}%</span></div>
+          <div className="flex items-start justify-between gap-4"><div><h3 className="text-[17px] font-black text-[#0b2d54]">Exercise</h3><p className="mt-1 text-xs text-[#74859a]">Track movement toward your weekly goal</p></div><span className="rounded-[11px] bg-[#e9f8f1] px-2.5 py-2 text-[10px] font-black text-[#168660]">{movementProgress}%</span></div>
+          {exerciseGoal && <p className="mt-3 flex items-center gap-1.5 text-[10px] font-semibold text-[#3f75bd]"><Target className="h-3 w-3" />{exerciseGoal.title ?? "Exercise goal"} · {exerciseGoalMinutes} min/week</p>}
           <div className="mt-4 rounded-[21px] border border-[#dcecf0] bg-gradient-to-br from-[#f1f7ff] to-[#eefbfa] p-4">
-            <div className="flex items-center gap-4"><div className="relative grid h-[88px] w-[88px] shrink-0 place-items-center rounded-full shadow-[0_7px_16px_rgba(36,193,196,.14)]" style={{ background: `conic-gradient(#24c1c4 0 ${movementProgress}%, #dfeef1 ${movementProgress}% 100%)` }}><div className="absolute inset-[10px] rounded-full bg-[#f7fcfc]" /><div className="relative z-10 text-center"><b className="block text-[21px] font-black tracking-[-.06em] text-[#0b2d54]">{exerciseMinutes}</b><span className="text-[10px] font-black text-[#74859a]">minutes</span></div></div><div><b className="block text-sm text-[#0b2d54]">{movementTitle[0]}</b><span className="mt-1 block text-[11px] leading-[1.45] text-[#74859a]">{movementTitle[1]}</span>{exerciseGoal && <span className="mt-2 inline-flex items-center gap-1 text-[10px] font-black text-[#3f75bd]"><Target className="h-3 w-3" />{movementProgress}% of goal</span>}</div></div>
-            <div className="my-4 flex items-center">{[0,1,2,3,4].map((index) => <span key={index} className="contents">{index > 0 && <span className={`h-[3px] flex-1 ${exerciseMinutes >= Math.ceil(index * exerciseGoalMinutes / 4) ? "bg-[#24c1c4]" : "bg-[#d9e9ed]"}`} />}<span className={`h-[11px] w-[11px] rounded-full border-2 border-[#f2f9fa] ${exerciseMinutes >= Math.ceil(index * exerciseGoalMinutes / 4) ? "bg-[#24c1c4] shadow-[0_0_0_1px_#24c1c4]" : "bg-[#d9e9ed] shadow-[0_0_0_1px_#cfe3e7]"}`} /></span>)}</div>
+            <div className="flex items-center gap-4"><div className="relative grid h-[88px] w-[88px] shrink-0 place-items-center rounded-full shadow-[0_7px_16px_rgba(36,193,196,.14)]" style={{ background: `conic-gradient(#24c1c4 0 ${movementProgress}%, #dfeef1 ${movementProgress}% 100%)` }}><div className="absolute inset-[10px] rounded-full bg-[#f7fcfc]" /><div className="relative z-10 text-center"><b className="block text-[21px] font-black tracking-[-.06em] text-[#0b2d54]">{exerciseMinutes}</b><span className="text-[10px] font-black text-[#74859a]">today</span></div></div><div><b className="block text-sm text-[#0b2d54]">{movementTitle[0]}</b><span className="mt-1 block text-[11px] leading-[1.45] text-[#74859a]">{movementTitle[1]}</span><span className="mt-2 inline-flex items-center gap-1 text-[10px] font-black text-[#3f75bd]"><Target className="h-3 w-3" />{projectedWeekMinutes} / {exerciseGoalMinutes} min this week</span></div></div>
+            <div className="my-4 flex items-center">{[0,1,2,3,4].map((index) => <span key={index} className="contents">{index > 0 && <span className={`h-[3px] flex-1 ${projectedWeekMinutes >= Math.ceil(index * exerciseGoalMinutes / 4) ? "bg-[#24c1c4]" : "bg-[#d9e9ed]"}`} />}<span className={`h-[11px] w-[11px] rounded-full border-2 border-[#f2f9fa] ${projectedWeekMinutes >= Math.ceil(index * exerciseGoalMinutes / 4) ? "bg-[#24c1c4] shadow-[0_0_0_1px_#24c1c4]" : "bg-[#d9e9ed] shadow-[0_0_0_1px_#cfe3e7]"}`} /></span>)}</div>
             <div className="flex items-center justify-between gap-2 rounded-2xl bg-white/70 px-2 py-2 ring-1 ring-[#e4edf0]">
               <button type="button" aria-label="Decrease exercise minutes" disabled={exerciseMinutes <= 0} onClick={() => setExerciseMinutes(Math.max(0, exerciseMinutes - EXERCISE_STEP_MINUTES))} className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-[#f5f8fb] text-[#0b2d54] transition enabled:hover:bg-[#e9f2f6] disabled:cursor-not-allowed disabled:opacity-35">
                 <Minus className="h-4 w-4" />
               </button>
               <div className="min-w-0 text-center"><span className="block text-[11px] font-black text-[#0b2d54]">{EXERCISE_STEP_MINUTES} min</span><span className="text-[9px] font-semibold text-[#8998a8]">per tap</span></div>
-              <button type="button" aria-label="Increase exercise minutes" disabled={exerciseMinutes >= MAX_EXERCISE_MINUTES} onClick={() => setExerciseMinutes(Math.min(MAX_EXERCISE_MINUTES, exerciseMinutes + EXERCISE_STEP_MINUTES))} className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-[#e8f8f8] text-[#0b7b80] transition enabled:hover:bg-[#d8f2f2] disabled:cursor-not-allowed disabled:opacity-35">
+              <button type="button" aria-label="Increase exercise minutes" disabled={exerciseMinutes >= MAX_EXERCISE_MINUTES} onClick={() => setExerciseMinutes(Math.min(MAX_EXERCISE_MINUTES, exerciseMinutes + EXERCISE_STEP_MINUTES))} className="grid h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-[#e8f8f8] text-[#0b7b80] transition enabled:hover:bg-[#d8f2f2] disabled:cursor-not-allowed disabled:opacity-35">
                 <Plus className="h-4 w-4" />
               </button>
             </div>
             <div className="mt-2 flex flex-wrap gap-1.5">{exerciseOptions.map((value) => <button key={value} type="button" onClick={() => setExerciseMinutes(value)} className={`rounded-[10px] border px-2.5 py-2 text-[10px] font-black ${exerciseMinutes === value ? "border-[#0b2d54] bg-[#0b2d54] text-white" : "border-[#d6e6ea] bg-white text-[#74859a]"}`}>{value === 0 ? "None" : `${value} min`}</button>)}</div>
           </div>
-          <p className="mt-3 text-[11px] leading-[1.55] text-[#74859a]">Choose the time that matches your day, or adjust it in 15-minute steps. Sympto turns it into measurable progress against your exercise goal when you save today’s check-in.</p>
+          <p className="mt-3 text-[11px] leading-[1.55] text-[#74859a]">Choose the exercise time that matches your day. Sympto adds saved exercise minutes to your weekly total and compares that total with the goal you set, such as 60 minutes/week.</p>
         </article>
       </div>
 
