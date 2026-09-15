@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { ArrowRight, Pill } from "lucide-react";
+import { ArrowRight, Pill, Target } from "lucide-react";
 
 type PrescribedMedication = {
   id?: string | null;
@@ -14,6 +14,15 @@ type PrescribedMedication = {
   frequency?: string | null;
   schedule?: string | null;
   source?: string | null;
+};
+
+type HealthGoal = {
+  id?: string | null;
+  category?: string | null;
+  status?: string | null;
+  associatedMedicationId?: string | null;
+  patientMedicationId?: string | null;
+  medicationId?: string | null;
 };
 
 function firstText(...values: unknown[]) {
@@ -31,8 +40,34 @@ function medicationSchedule(medication: PrescribedMedication) {
   return `${dose} · ${frequency}`;
 }
 
-export default function PrescribedMedicationsCard({ prescriptionsList }: { prescriptionsList: PrescribedMedication[]; activeGoalsArray?: unknown[] }) {
+function patientMedicationId(medication: PrescribedMedication) {
+  return medication.patientMedicationId || medication.patientMedication?.id || medication.id || null;
+}
+
+function goalMedicationId(goal: HealthGoal) {
+  return goal.associatedMedicationId || goal.patientMedicationId || goal.medicationId || null;
+}
+
+function findMedicationGoal(medication: PrescribedMedication, goals: HealthGoal[]) {
+  const medicationId = patientMedicationId(medication);
+  if (!medicationId) return null;
+
+  return goals.find((goal) => {
+    const category = String(goal?.category ?? "").toUpperCase();
+    const status = String(goal?.status ?? "").toUpperCase();
+    return category === "MEDICATION" && ["ACTIVE", "IN_PROGRESS"].includes(status) && goalMedicationId(goal) === medicationId;
+  }) ?? null;
+}
+
+export default function PrescribedMedicationsCard({
+  prescriptionsList,
+  activeGoalsArray = [],
+}: {
+  prescriptionsList: PrescribedMedication[];
+  activeGoalsArray?: HealthGoal[];
+}) {
   const medications = Array.isArray(prescriptionsList) ? prescriptionsList : [];
+  const goals = Array.isArray(activeGoalsArray) ? activeGoalsArray : [];
 
   return (
     <section className="mt-3.5 overflow-hidden rounded-[30px] border border-[#d8e9ed] bg-white shadow-[0_18px_48px_rgba(11,45,84,.07)]">
@@ -51,11 +86,21 @@ export default function PrescribedMedicationsCard({ prescriptionsList }: { presc
           <div className="divide-y divide-[#e6eff2]">
             {medications.map((medication, index) => {
               const name = medicationName(medication);
+              const goal = findMedicationGoal(medication, goals);
               const isClinicPrescription = String(medication.source ?? "").toUpperCase() === "PRESCRIPTION";
-              return <div key={medication.patientMedicationId || medication.patientMedication?.id || medication.id || `${name}-${index}`} className="flex items-center gap-3.5 py-4 first:pt-2 last:pb-2">
-                <span className="grid h-10 w-10 shrink-0 place-items-center rounded-[14px] bg-[#e8f7f7] text-[#087d82] ring-1 ring-[#d4eeee]"><Pill className="h-4 w-4" /></span>
-                <div className="min-w-0 flex-1"><div className="flex flex-wrap items-center gap-2"><h4 className="text-[15px] font-black tracking-[-.025em] text-[#0b2d54]">{name}</h4>{isClinicPrescription && <span className="rounded-full bg-[#edf4ff] px-2 py-1 text-[8px] font-black uppercase tracking-[.12em] text-[#315b88]">Clinic prescription</span>}</div><p className="mt-1 text-[11px] font-black uppercase tracking-[.08em] text-[#0d8589]">{medicationSchedule(medication)}</p></div>
-                <span className="hidden shrink-0 rounded-full bg-white px-2.5 py-1 text-[9px] font-bold text-[#71839a] ring-1 ring-[#e1ecef] sm:inline-flex">Today</span>
+              const goalHref = goal?.id ? `/health-goals#goal-${encodeURIComponent(String(goal.id))}` : "/health-goals";
+              return <div key={patientMedicationId(medication) || `${name}-${index}`} className="flex flex-col gap-3 py-4 first:pt-2 last:pb-2 sm:flex-row sm:items-center">
+                <div className="flex min-w-0 flex-1 items-center gap-3.5">
+                  <span className="grid h-10 w-10 shrink-0 place-items-center rounded-[14px] bg-[#e8f7f7] text-[#087d82] ring-1 ring-[#d4eeee]"><Pill className="h-4 w-4" /></span>
+                  <div className="min-w-0"><div className="flex flex-wrap items-center gap-2"><h4 className="text-[15px] font-black tracking-[-.025em] text-[#0b2d54]">{name}</h4>{isClinicPrescription && <span className="rounded-full bg-[#edf4ff] px-2 py-1 text-[8px] font-black uppercase tracking-[.12em] text-[#315b88]">Clinic prescription</span>}</div><p className="mt-1 text-[11px] font-black uppercase tracking-[.08em] text-[#0d8589]">{medicationSchedule(medication)}</p></div>
+                </div>
+                <div className="flex shrink-0 items-center gap-2 sm:ml-auto">
+                  <span className="rounded-full bg-white px-2.5 py-1 text-[9px] font-bold text-[#71839a] ring-1 ring-[#e1ecef]">Today</span>
+                  <Link href={goalHref} className="inline-flex min-h-9 items-center gap-1.5 rounded-xl border border-[#d7e4e8] bg-white px-3 py-2 text-[10px] font-black text-[#0b2d54] transition hover:border-[#24c1c4] hover:bg-[#f2fbfb]" aria-label={goal ? `Open ${name} medication goal` : `Set a medication goal for ${name}`}>
+                    <Target className="h-3.5 w-3.5 text-[#0b7d82]" />
+                    {goal ? "View medication goal" : "Set medication goal"}
+                  </Link>
+                </div>
               </div>;
             })}
           </div>
