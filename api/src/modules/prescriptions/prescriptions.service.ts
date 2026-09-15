@@ -43,6 +43,39 @@ export class PrescriptionsService {
     });
   }
 
+  async findMine(userId: string | undefined, query: QueryPrescriptionDto) {
+    if (!userId) throw new NotFoundException('Authenticated user not found.');
+
+    const patient = await this.prisma.patient.findUnique({
+      where: { userId },
+      select: { id: true },
+    });
+
+    if (!patient) throw new NotFoundException('Patient profile not found.');
+
+    const { page, limit, encounterId } = query;
+    const where = {
+      patientId: patient.id,
+      ...(encounterId && { encounterId }),
+    };
+
+    const [data, total] = await this.prisma.$transaction([
+      this.prisma.prescription.findMany({
+        where,
+        include: prescriptionInclude,
+        orderBy: { issuedAt: 'desc' },
+        skip: (page - 1) * limit,
+        take: limit,
+      }),
+      this.prisma.prescription.count({ where }),
+    ]);
+
+    return {
+      data,
+      pagination: { page, limit, total, totalPages: Math.ceil(total / limit) },
+    };
+  }
+
   async findAll(query: QueryPrescriptionDto) {
     const { page, limit, encounterId, patientId, practitionerId } = query;
     const where = {
