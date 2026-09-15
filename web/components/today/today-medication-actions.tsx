@@ -1,6 +1,7 @@
 "use client";
 
-import { Check, CircleSlash2, Pill, Target } from "lucide-react";
+import Link from "next/link";
+import { Check, CircleSlash2, Pill, Target, ArrowRight } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 import { api } from "@/lib/api";
@@ -133,7 +134,7 @@ export default function TodayMedicationActions({ medications, goal, onUpdated }:
 
   if (!medications.length) {
     return (
-      <section className={cardClass}>
+      <section id="medication-goal-card" className={cardClass}>
         <div className="flex items-center gap-3 px-5 py-4">
           <span className="grid h-10 w-10 shrink-0 place-items-center rounded-[14px] bg-[#e8f8f7] text-[#24c1c4] ring-1 ring-[#d3efed]"><Target className="h-4 w-4" /></span>
           <div className="min-w-0">
@@ -146,8 +147,31 @@ export default function TodayMedicationActions({ medications, goal, onUpdated }:
     );
   }
 
+  if (!goal) {
+    return (
+      <section id="medication-goal-card" className={cardClass}>
+        <header className="flex items-center gap-3 px-4 pb-3 pt-4 sm:px-5 sm:pt-5">
+          <span className="grid h-10 w-10 shrink-0 place-items-center rounded-[14px] bg-[#e8f8f7] text-[#24c1c4] ring-1 ring-[#d3efed]"><Pill className="h-4 w-4" /></span>
+          <div className="min-w-0">
+            <p className="text-[8px] font-black uppercase tracking-[.16em] text-[#0b7b80]">Medication goal</p>
+            <h3 className="mt-0.5 truncate text-base font-black tracking-[-.035em] text-[#0b2d54]">Set a goal for {medicationName(trackedMedication)}</h3>
+            <p className="mt-1 text-[10px] font-medium text-[#7c8e9b]">Choose an adherence target so your Today page can track this medicine against a clear goal.</p>
+          </div>
+        </header>
+
+        <div className="mx-3.5 mb-3.5 rounded-[22px] bg-[#f7fbfb] p-4 ring-1 ring-[#e1ecef] sm:mx-4 sm:mb-4 sm:p-5">
+          <div className="flex items-center justify-between gap-4">
+            <div className="min-w-0"><p className="text-[8px] font-black uppercase tracking-[.14em] text-[#91a0ae]">Today’s medicine</p><p className="mt-1 truncate text-lg font-black tracking-[-.045em] text-[#0b2d54]">{medicationName(trackedMedication)}</p><p className="mt-1 text-[10px] font-semibold uppercase tracking-[.08em] text-[#83939e]">{medicationSchedule(trackedMedication)}</p></div>
+            <span className="grid h-12 w-12 shrink-0 place-items-center rounded-full bg-white text-[#24c1c4] ring-1 ring-[#d9e9ec]"><Target className="h-5 w-5" /></span>
+          </div>
+          <Link href="/health-goals" className="mt-4 inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-[14px] bg-[#0b2d54] px-4 py-3 text-[10px] font-black text-white shadow-[0_9px_22px_rgba(11,45,84,.13)] transition hover:bg-[#123d63]">Set medication goal <ArrowRight className="h-3.5 w-3.5 text-[#24c1c4]" /></Link>
+        </div>
+      </section>
+    );
+  }
+
   return (
-    <section className={cardClass}>
+    <section id="medication-goal-card" className={cardClass}>
       <header className="flex items-center justify-between gap-3 px-4 pb-3 pt-4 sm:px-5 sm:pt-5">
         <div className="flex min-w-0 items-center gap-2.5">
           <span className="grid h-9 w-9 shrink-0 place-items-center rounded-[13px] bg-[#e8f8f7] text-[#24c1c4] ring-1 ring-[#d3efed]"><Pill className="h-4 w-4" /></span>
