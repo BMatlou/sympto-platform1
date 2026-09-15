@@ -95,6 +95,11 @@ export default function TodayMedicationActions({ medications, goal, onUpdated }:
 
   const doseLabel = useMemo(() => (totalRequiredDosesPerDay === 1 ? "1 dose" : `${totalRequiredDosesPerDay} doses`), [totalRequiredDosesPerDay]);
   const { journeyDay, daysLeft } = journeyProgress(goal);
+  const ringSize = 96;
+  const ringStroke = 9;
+  const radius = (ringSize - ringStroke) / 2;
+  const circumference = 2 * Math.PI * radius;
+  const dashOffset = circumference * (1 - percent / 100);
 
   async function record(medication: any, action: Action) {
     if (dosesLoggedToday >= totalRequiredDosesPerDay || isSyncing) return;
@@ -124,19 +129,17 @@ export default function TodayMedicationActions({ medications, goal, onUpdated }:
   }
 
   const goalTitle = goal?.title || "Medication adherence";
-  const cardClass = "w-full overflow-hidden rounded-[24px] border border-[#dce9ee] bg-white shadow-[0_5px_18px_rgba(11,45,84,.03)]";
+  const cardClass = "w-full overflow-hidden rounded-[26px] border border-[#dce9ee] bg-white shadow-[0_14px_34px_rgba(11,45,84,.06)]";
 
   if (!medications.length) {
     return (
       <section className={cardClass}>
-        <div className="p-5">
-          <div className="flex items-start gap-3">
-            <span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-[#edf4ff] text-[#0b2d54]"><Target className="h-4 w-4" /></span>
-            <div className="min-w-0">
-              <p className="text-[10px] font-black uppercase tracking-[0.14em] text-[#0b6f73]">Medication</p>
-              <h3 className="mt-1 truncate text-lg font-black tracking-[-.04em] text-[#0b2d54]">{goalTitle}</h3>
-              <p className="mt-1 text-xs text-[#74859a]">No active medicine scheduled today.</p>
-            </div>
+        <div className="flex items-center gap-3 px-5 py-4">
+          <span className="grid h-10 w-10 shrink-0 place-items-center rounded-[14px] bg-[#e8f8f7] text-[#24c1c4] ring-1 ring-[#d3efed]"><Target className="h-4 w-4" /></span>
+          <div className="min-w-0">
+            <p className="text-[9px] font-black uppercase tracking-[.16em] text-[#0b7b80]">Medication</p>
+            <h3 className="mt-0.5 truncate text-base font-black tracking-[-.035em] text-[#0b2d54]">{goalTitle}</h3>
+            <p className="mt-0.5 text-[10px] font-medium text-[#7c8e9b]">No active medicine scheduled today.</p>
           </div>
         </div>
       </section>
@@ -145,36 +148,56 @@ export default function TodayMedicationActions({ medications, goal, onUpdated }:
 
   return (
     <section className={cardClass}>
-      <div className="relative border-b border-[#edf2f5] bg-gradient-to-br from-[#f7fcfc] via-white to-[#eef8f8] px-5 py-4">
-        <div className="relative flex items-center justify-between gap-3">
-          <div className="flex min-w-0 items-center gap-3">
-            <span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-[#e5f7f6] text-[#0b6f73]"><Pill className="h-4 w-4" /></span>
-            <div className="min-w-0">
-              <p className="text-[10px] font-black uppercase tracking-[0.14em] text-[#0b6f73]">Medication</p>
-              <h3 className="truncate text-lg font-black tracking-[-.04em] text-[#0b2d54]">{goalTitle}</h3>
+      <header className="flex items-center justify-between gap-3 px-4 pb-3 pt-4 sm:px-5 sm:pt-5">
+        <div className="flex min-w-0 items-center gap-2.5">
+          <span className="grid h-9 w-9 shrink-0 place-items-center rounded-[13px] bg-[#e8f8f7] text-[#24c1c4] ring-1 ring-[#d3efed]"><Pill className="h-4 w-4" /></span>
+          <div className="min-w-0"><p className="text-[8px] font-black uppercase tracking-[.16em] text-[#0b7b80]">Medication</p><h3 className="truncate text-sm font-black tracking-[-.035em] text-[#0b2d54]">{goalTitle}</h3></div>
+        </div>
+        <div className="shrink-0 text-right"><p className="text-sm font-black text-[#0b2d54]">{doseLabel}</p><p className="mt-0.5 text-[8px] font-bold uppercase tracking-[.11em] text-[#8a99a6]">{percent}% complete</p></div>
+      </header>
+
+      <div className="mx-3.5 mb-3.5 rounded-[22px] bg-[#0b2d54] px-4 py-4 text-white shadow-[0_12px_28px_rgba(11,45,84,.14)] sm:mx-4 sm:mb-4 sm:px-5 sm:py-4">
+        <div className="flex items-center gap-4 sm:gap-5">
+          <div className="relative shrink-0" style={{ width: ringSize, height: ringSize }}>
+            <svg width={ringSize} height={ringSize} viewBox={`0 0 ${ringSize} ${ringSize}`} className="-rotate-90">
+              <circle cx={ringSize / 2} cy={ringSize / 2} r={radius} fill="none" stroke="rgba(255,255,255,.10)" strokeWidth={ringStroke} />
+              <circle cx={ringSize / 2} cy={ringSize / 2} r={radius} fill="none" stroke="#24c1c4" strokeWidth={ringStroke} strokeLinecap="round" strokeDasharray={circumference} strokeDashoffset={dashOffset} />
+            </svg>
+            <div className="absolute inset-0 grid place-items-center text-center"><p className="text-3xl font-black leading-none tracking-[-.07em]">{dosesLoggedToday}</p></div>
+          </div>
+
+          <div className="min-w-0 flex-1">
+            <p className="text-[8px] font-black uppercase tracking-[.15em] text-white/45">Today’s medication</p>
+            <p className="mt-1 truncate text-lg font-black tracking-[-.045em]">{medicationName(trackedMedication)}</p>
+            <p className="mt-1 text-[10px] font-semibold uppercase tracking-[.08em] text-white/55">{medicationSchedule(trackedMedication)}</p>
+            <div className="mt-2.5 flex flex-wrap items-center gap-2"><span className="rounded-full bg-white/10 px-2.5 py-1 text-[8px] font-black text-white/75 ring-1 ring-white/10">{dosesLoggedToday}/{totalRequiredDosesPerDay} doses</span><span className="rounded-full bg-white/10 px-2.5 py-1 text-[8px] font-black text-[#b8ffff] ring-1 ring-white/10">{percent}% complete</span></div>
+          </div>
+        </div>
+
+        <div className="mt-3.5 border-t border-white/10 pt-3">
+          <div className="flex items-center justify-between gap-3"><p className="text-[9px] font-semibold text-white/50">{dosesLoggedToday >= totalRequiredDosesPerDay ? "All scheduled doses logged today." : `${totalRequiredDosesPerDay - dosesLoggedToday} dose${totalRequiredDosesPerDay - dosesLoggedToday === 1 ? "" : "s"} remaining today.`}</p><p className="text-[9px] font-black text-white/60">{Math.max(0, totalRequiredDosesPerDay - dosesLoggedToday)} remaining</p></div>
+        </div>
+      </div>
+
+      {medications.map((medication, index) => {
+        const key = String(patientMedicationId(medication) ?? index);
+        const state = states[key];
+        const isTrackedMedication = index === 0;
+        const disabled = !isTrackedMedication || dosesLoggedToday >= totalRequiredDosesPerDay || isSyncing;
+        return (
+          <div key={key} className="border-t border-[#edf2f5] px-4 py-3.5 sm:px-5">
+            <div className="flex items-center justify-between gap-3">
+              <div className="min-w-0"><p className="truncate text-[11px] font-bold text-[#7c8e9b]">Dose status</p><p className="mt-0.5 text-[10px] font-semibold text-[#9aa7b1]">{state === "TAKEN" ? "Taken today" : state === "SKIPPED" ? "Skipped today" : "Choose an action below"}</p></div>
+              <div className="grid w-[170px] shrink-0 grid-cols-2 gap-2"><button type="button" disabled={disabled} onClick={() => void record(medication, "TAKEN")} className={`inline-flex min-h-9 items-center justify-center gap-1 rounded-xl px-2.5 py-2 text-[9px] font-black ${state === "TAKEN" ? "bg-[#168660] text-white" : "bg-[#0b2d54] text-white"}`}><Check className="h-3 w-3" />{savingKey === `${key}:TAKEN` ? "Saving…" : "Taken"}</button><button type="button" disabled={disabled} onClick={() => void record(medication, "SKIPPED")} className={`inline-flex min-h-9 items-center justify-center gap-1 rounded-xl border px-2.5 py-2 text-[9px] font-black ${state === "SKIPPED" ? "border-amber-300 bg-amber-50 text-amber-700" : "border-[#d4e1e5] bg-white text-[#526779]"}`}><CircleSlash2 className="h-3 w-3" />{savingKey === `${key}:SKIPPED` ? "Saving…" : "Skipped"}</button></div>
             </div>
           </div>
-          <div className="shrink-0 text-right"><p className="text-sm font-black leading-none text-[#0b2d54]">{doseLabel}</p><p className="mt-1 text-[9px] font-bold text-[#7d8f9e]">{percent}% complete</p></div>
-        </div>
-      </div>
+        );
+      })}
 
-      <div className="px-5 py-4">
-        {medications.map((medication, index) => {
-          const key = String(patientMedicationId(medication) ?? index);
-          const state = states[key];
-          const isTrackedMedication = index === 0;
-          const disabled = !isTrackedMedication || dosesLoggedToday >= totalRequiredDosesPerDay || isSyncing;
-          return <div key={key} className="flex flex-col gap-3"><div className="min-w-0"><p className="truncate text-[14px] font-black text-[#0b2d54]">{medicationName(medication)}</p><p className="mt-1 text-[11px] font-semibold text-[#7a8d9b]">{medicationSchedule(medication)}</p><span className="mt-2 inline-flex rounded-full bg-[#f5f8fa] px-2 py-1 text-[9px] font-black text-[#647889]">{Math.min(dosesLoggedToday, totalRequiredDosesPerDay)}/{totalRequiredDosesPerDay} doses</span></div><div className="grid grid-cols-2 gap-2"><button type="button" disabled={disabled} onClick={() => void record(medication, "TAKEN")} className={`inline-flex min-h-9 items-center justify-center gap-1 rounded-xl px-3 py-2 text-[10px] font-black transition disabled:cursor-not-allowed disabled:opacity-40 ${state === "TAKEN" ? "bg-[#168660] text-white" : "bg-[#0b2d54] text-white hover:bg-[#123e66]"}`}><Check className="h-3 w-3" />{savingKey === `${key}:TAKEN` ? "Saving…" : "Taken"}</button><button type="button" disabled={disabled} onClick={() => void record(medication, "SKIPPED")} className={`inline-flex min-h-9 items-center justify-center gap-1 rounded-xl border px-3 py-2 text-[10px] font-black transition disabled:cursor-not-allowed disabled:opacity-40 ${state === "SKIPPED" ? "border-amber-300 bg-amber-50 text-amber-700" : "border-[#d4e1e5] bg-white text-[#526779] hover:bg-[#f3f7f8]"}`}><CircleSlash2 className="h-3 w-3" />{savingKey === `${key}:SKIPPED` ? "Saving…" : "Skipped"}</button></div></div>;
-        })}
-      </div>
-
-      <div className="border-t border-[#edf2f5] bg-[#fbfdfd] px-5 py-3">
-        <div className="flex items-center justify-between gap-3 text-[10px] text-[#74859a]">
-          <span>Day {journeyDay} of your journey</span>
-          {daysLeft !== null && <span>{daysLeft} days left</span>}
-        </div>
-        <p className="mt-1.5 text-[11px] font-semibold text-[#74859a]">{dosesLoggedToday >= totalRequiredDosesPerDay ? "✓ All doses logged today." : `${totalRequiredDosesPerDay - dosesLoggedToday} dose${totalRequiredDosesPerDay - dosesLoggedToday === 1 ? "" : "s"} remaining.`}</p>
-      </div>
+      <footer className="flex items-center justify-between gap-3 border-t border-[#edf2f5] bg-[#fbfdfd] px-4 py-3 sm:px-5">
+        <div><p className="text-[8px] font-black uppercase tracking-[.14em] text-[#9aa8b3]">Journey</p><p className="mt-0.5 text-xs font-black text-[#0b2d54]">Day {journeyDay}{daysLeft !== null ? ` · ${daysLeft} days left` : ""}</p></div>
+        <p className="text-right text-[9px] font-semibold text-[#74859a]">{dosesLoggedToday >= totalRequiredDosesPerDay ? "Medication complete today" : `${totalRequiredDosesPerDay - dosesLoggedToday} dose${totalRequiredDosesPerDay - dosesLoggedToday === 1 ? "" : "s"} remaining.`}</p>
+      </footer>
     </section>
   );
 }
