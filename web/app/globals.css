@@ -36,10 +36,6 @@
   --color-secondary: var(--secondary);
   --color-primary-foreground: var(--primary-foreground);
   --color-primary: var(--primary);
-  --color-popover-foreground: var(--popover-foreground);
-  --color-popover: var(--popover);
-  --color-card-foreground: var(--card-foreground);
-  --color-card: var(--card);
   --radius-sm: calc(var(--radius) * 0.6);
   --radius-md: calc(var(--radius) * 0.8);
   --radius-lg: var(--radius);
@@ -113,18 +109,98 @@
   --sidebar-foreground: oklch(0.985 0 0);
   --sidebar-primary: oklch(0.488 0.243 264.376);
   --sidebar-primary-foreground: oklch(0.985 0 0);
+  --sidebar-accent: oklch(0.269 0 0);
+  --sidebar-accent-foreground: oklch(0.985 0 0);
+  --sidebar-accent-foreground: oklch(0.985 0 0);
   --sidebar-border: oklch(1 0 0 / 10%);
   --sidebar-ring: oklch(0.556 0 0);
 }
 
 @layer base {
-  * {
-    @apply border-border outline-ring/50;
-  }
-  body {
-    @apply bg-background text-foreground;
-  }
-  html {
-    @apply font-sans;
-  }
+  * { @apply border-border outline-ring/50; }
+  body { @apply bg-background text-foreground; }
+  html { @apply font-sans; }
+}
+
+/* Calm premium styling for the Today-page Daily Health Check-in. */
+#daily-health-check-in + div > div {
+  gap: 14px !important;
+}
+
+#daily-health-check-in + div > div > article {
+  border: 1px solid #e6eff1 !important;
+  border-radius: 28px !important;
+  background: #ffffff !important;
+  box-shadow: 0 14px 36px rgba(11, 45, 84, 0.045) !important;
+}
+
+#daily-health-check-in + div > div > article:first-child {
+  background: linear-gradient(180deg, #ffffff 0%, #fcfefe 100%) !important;
+}
+
+#daily-health-check-in + div article h3 {
+  color: #0b2d54 !important;
+  letter-spacing: -0.045em !important;
+}
+
+#daily-health-check-in + div article button {
+  -webkit-tap-highlight-color: transparent;
+}
+
+#daily-health-check-in + div article button:focus-visible,
+#daily-health-check-in + div article input:focus-visible {
+  outline: 3px solid rgba(36, 193, 196, 0.18) !important;
+  outline-offset: 2px !important;
+}
+
+#daily-health-check-in + div article:nth-child(1) .group {
+  border-color: #e3edef !important;
+  background: #fbfdfd !important;
+  box-shadow: 0 5px 16px rgba(11, 45, 84, 0.025) !important;
+  transform: none !important;
+}
+
+#daily-health-check-in + div article:nth-child(1) .group[aria-pressed="true"] {
+  border-color: #24c1c4 !important;
+  background: #edfafa !important;
+  box-shadow: 0 0 0 4px rgba(36, 193, 196, 0.07) !important;
+}
+
+#daily-health-check-in + div article:nth-child(1) input[type="range"] + span {
+  box-shadow: 0 3px 10px rgba(11, 45, 84, 0.14) !important;
+}
+
+#daily-health-check-in + div article:nth-child(2),
+#daily-health-check-in + div article:nth-child(3) {
+  background: linear-gradient(180deg, #ffffff 0%, #fbfefe 100%) !important;
+}
+
+#daily-health-check-in + div article:nth-child(2) > div,
+#daily-health-check-in + div article:nth-child(3) > div {
+  border-color: #e7eff1 !important;
+}
+
+#daily-health-check-in + div article:nth-child(2) button,
+#daily-health-check-in + div article:nth-child(3) button {
+  transition: transform 160ms ease, background-color 160ms ease, box-shadow 160ms ease !important;
+}
+
+#daily-health-check-in + div article:nth-child(2) button:hover:not(:disabled),
+#daily-health-check-in + div article:nth-child(3) button:hover:not(:disabled) {
+  transform: translateY(-1px);
+}
+
+#daily-health-check-in + div article:nth-child(3) .rounded-full {
+  box-shadow: 0 6px 18px rgba(36, 193, 196, 0.08) !important;
+}
+
+#daily-health-check-in + div > div > article:first-child,
+#daily-health-check-in + div > div > article:nth-child(2),
+#daily-health-check-in + div > div > article:nth-child(3) {
+  min-height: 0 !important;
+}
+
+@media (max-width: 1023px) {
+  #daily-health-check-in + div > div { grid-template-columns: 1fr !important; }
+  #daily-health-check-in + div > div > article:first-child { grid-row: auto !important; }
 }
