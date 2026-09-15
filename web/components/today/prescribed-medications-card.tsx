@@ -26,14 +26,22 @@ type HealthGoal = {
   category?: string | null;
   status?: string | null;
   metricType?: string | null;
+  metricConfig?: { metricType?: string | null; metricKey?: string | null } | null;
   associatedMedicationId?: string | null;
   patientMedicationId?: string | null;
   medicationId?: string | null;
+  associatedMedication?: { id?: string | null; name?: string | null } | null;
+  patientMedication?: { id?: string | null; medication?: { name?: string | null } | null } | null;
+  medication?: { id?: string | null; name?: string | null; genericName?: string | null; brandName?: string | null } | null;
 };
 
 function firstText(...values: unknown[]) {
   const value = values.find((item) => item !== null && item !== undefined && String(item).trim() !== "");
   return value === undefined ? "" : String(value);
+}
+
+function normalise(value: unknown) {
+  return String(value ?? "").trim().toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
 }
 
 function medicationName(medication: PrescribedMedication) {
@@ -50,47 +58,63 @@ function patientMedicationId(medication: PrescribedMedication) {
   return medication.id || medication.patientMedicationId || medication.patientMedication?.id || null;
 }
 
+function goalMedicationId(goal: HealthGoal) {
+  return goal.associatedMedicationId || goal.patientMedicationId || goal.medicationId || goal.associatedMedication?.id || goal.patientMedication?.id || goal.medication?.id || null;
+}
+
+function medicationGoalNameMatches(medication: PrescribedMedication, goal: HealthGoal) {
+  const medicationNameValue = normalise(medicationName(medication));
+  if (!medicationNameValue) return false;
+
+  const candidates = [
+    goal.title,
+    goal.description,
+    goal.notes,
+    goal.medication?.name,
+    goal.medication?.genericName,
+    goal.medication?.brandName,
+    goal.patientMedication?.medication?.name,
+    goal.associatedMedication?.name,
+  ].map(normalise).filter(Boolean);
+
+  return candidates.some((candidate) =>
+    candidate === medicationNameValue ||
+    candidate.includes(medicationNameValue) ||
+    medicationNameValue.includes(candidate),
+  );
+}
+
+function isActiveMedicationGoal(goal: HealthGoal) {
+  const status = normalise(goal.status).replace(/ /g, "_").toUpperCase();
+  if (!["ACTIVE", "IN_PROGRESS"].includes(status)) return false;
+
+  const category = normalise(goal.category).replace(/ /g, "_").toUpperCase();
+  const metricType = normalise(goal.metricType).replace(/ /g, "_").toUpperCase();
+  const metricConfigType = normalise(goal.metricConfig?.metricType).replace(/ /g, "_").toUpperCase();
+  const metricKey = normalise(goal.metricConfig?.metricKey).toLowerCase();
+
+  return category === "MEDICATION" || metricType === "MEDICATION" || metricConfigType === "MEDICATION" || metricKey === "medication adherence";
+}
+
 function findMedicationGoal(medication: PrescribedMedication, goals: HealthGoal[]) {
-  const isGoalSetForThisMed = goals.some((goal) => {
-    if (goal.status !== "IN_PROGRESS") return false;
-
-    const isMedicationGoal =
-      goal.metricType === "MEDICATION" ||
-      goal.category === "MEDICATION" ||
-      goal.title?.toLowerCase() === "manage medication";
-
-    if (!isMedicationGoal) return false;
-
-    const matchesIdDirectly =
-      goal.associatedMedicationId === medication.id ||
-      goal.patientMedicationId === medication.id ||
-      goal.medicationId === medication.id;
-
-    if (matchesIdDirectly) return true;
-
-    return medicationName(medication).toLowerCase().includes("metformin");
-  });
-
-  if (!isGoalSetForThisMed) return null;
+  const medicationIds = [
+    patientMedicationId(medication),
+    medication.patientMedicationId,
+    medication.medicationId,
+    medication.medication?.id,
+    medication.medication?.medicationId,
+  ].filter(Boolean).map(String);
 
   return goals.find((goal) => {
-    if (goal.status !== "IN_PROGRESS") return false;
+    if (!isActiveMedicationGoal(goal)) return false;
 
-    const isMedicationGoal =
-      goal.metricType === "MEDICATION" ||
-      goal.category === "MEDICATION" ||
-      goal.title?.toLowerCase() === "manage medication";
+    const linkedGoalId = goalMedicationId(goal);
+    if (linkedGoalId && medicationIds.includes(String(linkedGoalId))) return true;
 
-    if (!isMedicationGoal) return false;
-
-    const matchesIdDirectly =
-      goal.associatedMedicationId === medication.id ||
-      goal.patientMedicationId === medication.id ||
-      goal.medicationId === medication.id;
-
-    if (matchesIdDirectly) return true;
-
-    return medicationName(medication).toLowerCase().includes("metformin");
+    // Existing medication goals created by the Health Goals editor carry the
+    // medication name in the title/description. Use that persisted identity
+    // rather than a medication-specific hard-coded fallback.
+    return medicationGoalNameMatches(medication, goal);
   }) ?? null;
 }
 
@@ -126,7 +150,6 @@ function handleMedicationActionClick(
     dosage,
     frequency,
     associatedMedicationId,
-    // Backward-compatible aliases consumed by the existing Health Goals editor.
     open: "medication",
     name,
     medicationId: associatedMedicationId,
