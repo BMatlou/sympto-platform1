@@ -22,11 +22,12 @@ function medicationId(medication: any) {
 }
 
 function toMedicationItem(medication: any) {
-  const id = medicationId(medication);
-  if (!id) return null;
+  const patientMedicationId = medicationId(medication);
+  if (!patientMedicationId) return null;
 
   return {
-    medicationId: String(medication?.medicationId || medication?.medication?.id || id),
+    patientMedicationId: String(patientMedicationId),
+    medicationId: String(medication?.medicationId || medication?.medication?.id || patientMedicationId),
     dosage: medication?.dosage ?? undefined,
     frequency: medication?.frequency ?? undefined,
     route: medication?.route ?? undefined,
@@ -35,7 +36,7 @@ function toMedicationItem(medication: any) {
     prescribedBy: medication?.prescribedBy ?? undefined,
     startedAt: medication?.startedAt ?? undefined,
     endedAt: medication?.endedAt ?? undefined,
-    ongoing: medication?.ongoing ?? medication?.status === "ACTIVE" ?? true,
+    ongoing: medication?.ongoing ?? (medication?.status ? medication.status === "ACTIVE" : true),
     adherencePercentage: medication?.adherencePercentage ?? undefined,
     missedDoses: medication?.missedDoses ?? undefined,
     sideEffects: medication?.sideEffects ?? undefined,
@@ -67,7 +68,7 @@ export default function MedicationsPage() {
 
   const [medicationValues, setMedicationValues] = useState<UpdatePatientMedicationsDto>({ medications: [] });
 
-  function openAddMedication() {
+  function openMedicationManager() {
     setMedicationValues(initialMedicationValues);
     setShowAddMedication(true);
   }
@@ -75,14 +76,9 @@ export default function MedicationsPage() {
   async function saveMedications() {
     if (saving) return;
 
-    if (medicationValues.medications.length === 0) {
-      toast.error("Please add at least one medication.");
-      return;
-    }
-
     try {
       setSaving(true);
-      await onboardingService.updatePatientMedications(medicationValues);
+      await onboardingService.managePatientMedications(medicationValues);
       toast.success("Your medication list has been updated.");
       setShowAddMedication(false);
       await reload();
@@ -100,7 +96,7 @@ export default function MedicationsPage() {
       <div className="mx-auto max-w-6xl px-4 py-8 sm:px-6 lg:px-8">
         <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
           <Link href="/dashboard" className="inline-flex items-center gap-2 text-sm font-medium text-[#0b2d54] hover:text-[#24c1c4]"><ArrowLeft className="h-4 w-4" />Back to Health Home</Link>
-          <Button type="button" onClick={openAddMedication} className="inline-flex items-center gap-2 rounded-xl bg-[#0b2d54] px-4 py-2.5 text-sm font-semibold text-white hover:bg-[#071f3a]"><Plus className="h-4 w-4" />Add medication</Button>
+          <Button type="button" onClick={openMedicationManager} className="inline-flex items-center gap-2 rounded-xl bg-[#0b2d54] px-4 py-2.5 text-sm font-semibold text-white hover:bg-[#071f3a]"><Plus className="h-4 w-4" />Add medication</Button>
         </div>
 
         <div className="mb-8">
@@ -119,14 +115,16 @@ export default function MedicationsPage() {
         </section>
 
         {!loading && !error && <section>
-          <h2 className="mb-1 text-lg font-semibold text-[#0b2d54]">Current medications</h2>
-          <p className="mb-4 text-sm text-slate-500">Medicines currently recorded in your Sympto health profile.</p>
+          <div className="mb-4 flex flex-wrap items-end justify-between gap-3">
+            <div><h2 className="mb-1 text-lg font-semibold text-[#0b2d54]">Current medications</h2><p className="text-sm text-slate-500">Medicines currently recorded in your Sympto health profile.</p></div>
+            {medications.length > 0 && <Button type="button" variant="outline" onClick={openMedicationManager} className="rounded-xl border-[#0b2d54]/20 text-[#0b2d54]">Edit medications</Button>}
+          </div>
           {activeMedications.length === 0 ? (
             <div className="rounded-2xl border border-slate-200 bg-white p-10 text-center">
               <Pill className="mx-auto h-8 w-8 text-slate-400" />
               <h3 className="mt-4 font-semibold text-[#0b2d54]">No current medications</h3>
               <p className="mx-auto mt-2 max-w-md text-sm text-slate-500">Add a medicine you take so Sympto can keep it in your health profile and Today view.</p>
-              <Button type="button" onClick={openAddMedication} className="mt-5 inline-flex items-center gap-2 rounded-xl bg-[#0b2d54] px-5 py-3 text-sm font-semibold text-white"><Plus className="h-4 w-4" />Add medication</Button>
+              <Button type="button" onClick={openMedicationManager} className="mt-5 inline-flex items-center gap-2 rounded-xl bg-[#0b2d54] px-5 py-3 text-sm font-semibold text-white"><Plus className="h-4 w-4" />Add medication</Button>
             </div>
           ) : (
             <div className="grid gap-4 md:grid-cols-2">
