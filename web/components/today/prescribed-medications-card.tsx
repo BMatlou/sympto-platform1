@@ -16,17 +16,10 @@ type PrescribedMedication = {
   instructions?: string | null;
   doctorName?: string | null;
   practitioner?: { name?: string | null; firstName?: string | null; lastName?: string | null } | null;
-  prescription?: {
-    practitioner?: { name?: string | null; firstName?: string | null; lastName?: string | null } | null;
-    doctorName?: string | null;
-  } | null;
+  prescription?: { practitioner?: { name?: string | null; firstName?: string | null; lastName?: string | null } | null; doctorName?: string | null } | null;
 };
 
-type ActiveGoal = {
-  id?: string | null;
-  associatedMedicationId?: string | null;
-  status?: string | null;
-};
+type ActiveGoal = { id?: string | null; associatedMedicationId?: string | null; status?: string | null };
 
 function firstText(...values: unknown[]) {
   const value = values.find((item) => item !== null && item !== undefined && String(item).trim() !== "");
@@ -43,12 +36,7 @@ function medicationName(medication: PrescribedMedication) {
 
 function medicationDoctor(medication: PrescribedMedication) {
   const practitioner = medication.practitioner ?? medication.prescription?.practitioner;
-  return firstText(
-    medication.doctorName,
-    medication.prescription?.doctorName,
-    practitioner?.name,
-    practitioner ? [practitioner.firstName, practitioner.lastName].filter(Boolean).join(" ") : "",
-  );
+  return firstText(medication.doctorName, medication.prescription?.doctorName, practitioner?.name, practitioner ? [practitioner.firstName, practitioner.lastName].filter(Boolean).join(" ") : "");
 }
 
 function medicationSchedule(medication: PrescribedMedication) {
@@ -61,13 +49,7 @@ function medicationInstructions(medication: PrescribedMedication) {
   return firstText(medication.instructions, "Follow your prescribed instructions.");
 }
 
-export default function PrescribedMedicationsCard({
-  prescriptionsList,
-  activeGoalsArray,
-}: {
-  prescriptionsList: PrescribedMedication[];
-  activeGoalsArray: ActiveGoal[];
-}) {
+export default function PrescribedMedicationsCard({ prescriptionsList, activeGoalsArray }: { prescriptionsList: PrescribedMedication[]; activeGoalsArray: ActiveGoal[] }) {
   const prescriptions = Array.isArray(prescriptionsList) ? prescriptionsList : [];
   const activeGoals = Array.isArray(activeGoalsArray) ? activeGoalsArray : [];
 
@@ -85,23 +67,15 @@ export default function PrescribedMedicationsCard({
         </div>
       </header>
 
-      {prescriptions.length === 0 ? (
-        <div className="p-5 text-sm text-[#74859a]">No medication is scheduled for today.</div>
-      ) : (
+      {prescriptions.length === 0 ? <div className="p-5 text-sm text-[#74859a]">No medication is scheduled for today.</div> : (
         <div className="bg-[#f8fcfc] p-4 sm:p-5">
           {prescriptions.map((medication, index) => {
-            const isGoalSetForThisMed = activeGoals.some(
-              (goal) => goal.associatedMedicationId === medication.id && goal.status === "IN_PROGRESS",
-            );
-            const goalForThisMedication = isGoalSetForThisMed
-              ? activeGoals.find(
-                  (goal) => goal.associatedMedicationId === medication.id && goal.status === "IN_PROGRESS",
-                )
-              : undefined;
+            const isGoalSetForThisMed = activeGoals.some((goal) => goal.associatedMedicationId === medication.id && goal.status === "IN_PROGRESS");
+            const goalForThisMedication = isGoalSetForThisMed ? activeGoals.find((goal) => goal.associatedMedicationId === medication.id && goal.status === "IN_PROGRESS") : undefined;
             const recordId = medicationRecordId(medication);
             const name = medicationName(medication);
             const doctor = medicationDoctor(medication);
-            const medicationAnchor = `#medication-goal-card-${encodeURIComponent(String(medication.id ?? recordId ?? index))}`;
+            const medicationAnchor = `#medication-goal-card-${encodeURIComponent(String(recordId || medication.id || index))}`;
 
             return (
               <article key={recordId || `${name}-${index}`} className="mb-4 overflow-hidden rounded-[25px] border border-[#deebee] bg-white shadow-[0_10px_28px_rgba(11,45,84,.055)] last:mb-0">
@@ -121,17 +95,12 @@ export default function PrescribedMedicationsCard({
                     {isGoalSetForThisMed ? (
                       <div>
                         <div className="mb-3 flex items-center gap-2 text-[11px] font-bold text-emerald-700"><span className="h-2 w-2 rounded-full bg-emerald-500" />This medication is linked to an active health goal.</div>
-                        <Link href={medicationAnchor} className="group inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-[16px] border border-emerald-200 bg-emerald-50 px-3 py-2.5 text-[11px] font-black text-emerald-700 transition hover:bg-emerald-100">
-                          View {name} adherence progress &amp; log today&apos;s doses<ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-0.5" />
-                        </Link>
+                        <Link href={medicationAnchor} className="group inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-[16px] border border-emerald-200 bg-emerald-50 px-3 py-2.5 text-[11px] font-black text-emerald-700 transition hover:bg-emerald-100">View {name} adherence progress &amp; log today&apos;s doses<ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-0.5" /></Link>
                       </div>
                     ) : (
                       <div>
                         <div className="mb-3 rounded-[17px] border border-amber-200/80 bg-gradient-to-r from-amber-50 to-orange-50 px-4 py-3.5"><p className="text-[11px] font-black text-amber-900">💡 New prescription</p><p className="mt-1 text-[10px] leading-5 text-amber-800/80">You haven&apos;t set a tracking goal for this medication yet.</p></div>
-                        <Link href={`/health-goals?medicationId=${encodeURIComponent(String(medication.id ?? recordId ?? ""))}`} className="group inline-flex min-h-12 w-full items-center justify-center gap-2 rounded-[17px] bg-[#0b2d54] px-3 py-3 text-[11px] font-black text-white shadow-[0_12px_24px_rgba(11,45,84,.14)] transition hover:bg-[#123d63]">
-                          <span className="grid h-7 w-7 place-items-center rounded-full bg-[#24c1c4]/15 text-[#63e0e0] ring-1 ring-[#24c1c4]/25"><Target className="h-3.5 w-3.5" /></span>
-                          <span>Set a Medication Goal for {name}</span><ArrowRight className="ml-0.5 h-4 w-4 transition-transform group-hover:translate-x-0.5" />
-                        </Link>
+                        <Link href={medicationAnchor} className="group inline-flex min-h-12 w-full items-center justify-center gap-2 rounded-[17px] bg-[#0b2d54] px-3 py-3 text-[11px] font-black text-white shadow-[0_12px_24px_rgba(11,45,84,.14)] transition hover:bg-[#123d63]"><span className="grid h-7 w-7 place-items-center rounded-full bg-[#24c1c4]/15 text-[#63e0e0] ring-1 ring-[#24c1c4]/25"><Target className="h-3.5 w-3.5" /></span><span>Set a Medication Goal for {name}</span><ArrowRight className="ml-0.5 h-4 w-4 transition-transform group-hover:translate-x-0.5" /></Link>
                       </div>
                     )}
                   </div>
