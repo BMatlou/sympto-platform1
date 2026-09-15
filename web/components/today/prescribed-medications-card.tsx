@@ -19,7 +19,15 @@ type PrescribedMedication = {
   prescription?: { practitioner?: { name?: string | null; firstName?: string | null; lastName?: string | null } | null; doctorName?: string | null } | null;
 };
 
-type ActiveGoal = { associatedMedicationId?: string | null; status?: string | null };
+type ActiveGoal = {
+  associatedMedicationId?: string | null;
+  patientMedicationId?: string | null;
+  medicationId?: string | null;
+  associatedMedication?: { id?: string | null } | null;
+  patientMedication?: { id?: string | null } | null;
+  medication?: { id?: string | null } | null;
+  status?: string | null;
+};
 
 function firstText(...values: unknown[]) {
   const value = values.find((item) => item !== null && item !== undefined && String(item).trim() !== "");
@@ -49,6 +57,17 @@ function medicationInstructions(medication: PrescribedMedication) {
   return firstText(medication.instructions, "Follow your prescribed instructions.");
 }
 
+function goalMedicationId(goal: ActiveGoal) {
+  return firstText(
+    goal.associatedMedicationId,
+    goal.patientMedicationId,
+    goal.medicationId,
+    goal.associatedMedication?.id,
+    goal.patientMedication?.id,
+    goal.medication?.id,
+  );
+}
+
 export default function PrescribedMedicationsCard({ prescriptionsList, activeGoalsArray }: { prescriptionsList: PrescribedMedication[]; activeGoalsArray: ActiveGoal[] }) {
   const prescriptions = Array.isArray(prescriptionsList) ? prescriptionsList : [];
   const activeGoals = Array.isArray(activeGoalsArray) ? activeGoalsArray : [];
@@ -71,9 +90,11 @@ export default function PrescribedMedicationsCard({ prescriptionsList, activeGoa
         <div className="bg-[#f8fcfc] p-4 sm:p-5">
           {prescriptions.map((medication, index) => {
             const recordId = medicationRecordId(medication);
-            const isGoalSetForThisMed = activeGoals.some(
-              (goal) => goal.associatedMedicationId === recordId && goal.status === "IN_PROGRESS",
-            );
+            const isGoalSetForThisMed = activeGoals.some((goal) => {
+              const status = String(goal?.status ?? "").toUpperCase();
+              const linkedMedicationId = goalMedicationId(goal);
+              return Boolean(recordId) && Boolean(linkedMedicationId) && String(linkedMedicationId) === String(recordId) && ["ACTIVE", "IN_PROGRESS"].includes(status);
+            });
             const name = medicationName(medication);
             const doctor = medicationDoctor(medication);
             const medicationAnchor = `#medication-goal-card-${encodeURIComponent(String(recordId || medication.id || index))}`;
@@ -101,7 +122,7 @@ export default function PrescribedMedicationsCard({ prescriptionsList, activeGoa
                     ) : (
                       <div>
                         <div className="mb-3 rounded-[17px] border border-amber-200/80 bg-gradient-to-r from-amber-50 to-orange-50 px-4 py-3.5"><p className="text-[11px] font-black text-amber-900">💡 New prescription</p><p className="mt-1 text-[10px] leading-5 text-amber-800/80">You haven&apos;t set a tracking goal for this medication yet.</p></div>
-                        <Link href={medicationAnchor} className="group inline-flex min-h-12 w-full items-center justify-center gap-2 rounded-[17px] bg-[#0b2d54] px-3 py-3 text-[11px] font-black text-white shadow-[0_12px_24px_rgba(11,45,84,.14)] transition hover:bg-[#123d63]"><span className="grid h-7 w-7 place-items-center rounded-full bg-[#24c1c4]/15 text-[#63e0e0] ring-1 ring-[#24c1c4]/25"><Target className="h-3.5 w-3.5" /></span><span>Set a Medication Goal for {name}</span><ArrowRight className="ml-0.5 h-4 w-4 transition-transform group-hover:translate-x-0.5" /></Link>
+                        <Link href="/health-goals" className="group inline-flex min-h-12 w-full items-center justify-center gap-2 rounded-[17px] bg-[#0b2d54] px-3 py-3 text-[11px] font-black text-white shadow-[0_12px_24px_rgba(11,45,84,.14)] transition hover:bg-[#123d63]"><span className="grid h-7 w-7 place-items-center rounded-full bg-[#24c1c4]/15 text-[#63e0e0] ring-1 ring-[#24c1c4]/25"><Target className="h-3.5 w-3.5" /></span><span>Set a Medication Goal for {name}</span><ArrowRight className="ml-0.5 h-4 w-4 transition-transform group-hover:translate-x-0.5" /></Link>
                       </div>
                     )}
                   </div>
