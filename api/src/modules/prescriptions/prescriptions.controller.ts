@@ -7,6 +7,7 @@ import {
   Patch,
   Post,
   Query,
+  Req,
   UseGuards,
 } from '@nestjs/common';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
@@ -36,6 +37,21 @@ export class PrescriptionsController {
     @Body() dto: CreatePrescriptionDto,
   ) {
     return this.prescriptionsService.create(dto);
+  }
+
+  /**
+   * Patient-safe prescription feed.
+   *
+   * This route deliberately has no prescriptions.read permission requirement.
+   * The service derives the patient from the authenticated user, so a patient
+   * cannot supply another patient's ID to read their prescriptions.
+   */
+  @Get('mine')
+  findMine(
+    @Req() request: { user?: { sub?: string } },
+    @Query() query: QueryPrescriptionDto,
+  ) {
+    return this.prescriptionsService.findMine(request.user?.sub, query);
   }
 
   @Permissions('prescriptions.read')
