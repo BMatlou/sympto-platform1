@@ -4,6 +4,7 @@ import "./hydration-card.css";
 import "./hydration-wave-fix.css";
 import "./hydration-wave.css";
 import "./exercise-card.css";
+import "./medication-card.css";
 import { Toaster } from "sonner";
 
 import { cn } from "@/lib/utils";
