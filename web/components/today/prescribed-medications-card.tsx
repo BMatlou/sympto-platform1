@@ -7,7 +7,7 @@ type PrescribedMedication = {
   id?: string | null;
   patientMedicationId?: string | null;
   patientMedication?: { id?: string | null } | null;
-  medication?: { name?: string | null; genericName?: string | null; brandName?: string | null } | null;
+  medication?: { id?: string | null; name?: string | null; genericName?: string | null; brandName?: string | null } | null;
   name?: string | null;
   dosage?: string | number | null;
   dose?: string | number | null;
@@ -20,12 +20,17 @@ type PrescribedMedication = {
 };
 
 type ActiveGoal = {
+  id?: string | null;
+  title?: string | null;
+  description?: string | null;
+  category?: string | null;
+  metricType?: string | null;
   associatedMedicationId?: string | null;
   patientMedicationId?: string | null;
   medicationId?: string | null;
-  associatedMedication?: { id?: string | null } | null;
-  patientMedication?: { id?: string | null } | null;
-  medication?: { id?: string | null } | null;
+  associatedMedication?: { id?: string | null; name?: string | null } | null;
+  patientMedication?: { id?: string | null; medication?: { id?: string | null; name?: string | null } | null } | null;
+  medication?: { id?: string | null; name?: string | null } | null;
   status?: string | null;
 };
 
@@ -38,8 +43,17 @@ function medicationRecordId(medication: PrescribedMedication) {
   return firstText(medication.patientMedicationId, medication.patientMedication?.id, medication.id);
 }
 
+function medicationIds(medication: PrescribedMedication) {
+  return [
+    medication.patientMedicationId,
+    medication.patientMedication?.id,
+    medication.id,
+    medication.medication?.id,
+  ].filter(Boolean).map(String);
+}
+
 function medicationName(medication: PrescribedMedication) {
-  return firstText(medication.medication?.name, medication.name, medication.medication?.genericName, "Your medicine");
+  return firstText(medication.medication?.name, medication.name, medication.medication?.genericName, medication.medication?.brandName, "Your medicine");
 }
 
 function medicationDoctor(medication: PrescribedMedication) {
@@ -57,14 +71,38 @@ function medicationInstructions(medication: PrescribedMedication) {
   return firstText(medication.instructions, "Follow your prescribed instructions.");
 }
 
-function goalMedicationId(goal: ActiveGoal) {
-  return firstText(
+function goalMedicationIds(goal: ActiveGoal) {
+  return [
     goal.associatedMedicationId,
     goal.patientMedicationId,
     goal.medicationId,
     goal.associatedMedication?.id,
     goal.patientMedication?.id,
+    goal.patientMedication?.medication?.id,
     goal.medication?.id,
+  ].filter(Boolean).map(String);
+}
+
+function normalizeText(value: unknown) {
+  return String(value ?? "").trim().toLowerCase().replace(/\s+/g, " ");
+}
+
+function goalMatchesMedication(goal: ActiveGoal, medication: PrescribedMedication) {
+  const linkedIds = goalMedicationIds(goal);
+  const medicationIdSet = new Set(medicationIds(medication));
+  if (linkedIds.some((id) => medicationIdSet.has(id))) return true;
+
+  const name = normalizeText(medicationName(medication));
+  if (!name || name === "your medicine") return false;
+
+  const title = normalizeText(goal.title);
+  const description = normalizeText(goal.description);
+  const associatedName = normalizeText(goal.associatedMedication?.name ?? goal.medication?.name ?? goal.patientMedication?.medication?.name);
+
+  return Boolean(
+    associatedName === name ||
+    (title && (title === name || title.includes(name) || name.includes(title))) ||
+    (description && description.includes(name)),
   );
 }
 
@@ -80,7 +118,7 @@ export default function PrescribedMedicationsCard({ prescriptionsList, activeGoa
         <div className="relative flex items-center justify-between gap-4">
           <div className="flex min-w-0 items-center gap-3.5">
             <span className="grid h-12 w-12 shrink-0 place-items-center rounded-[18px] bg-white/12 text-[#63e0e0] ring-1 ring-white/20 shadow-[inset_0_1px_0_rgba(255,255,255,.16)]"><Pill className="h-5.5 w-5.5" /></span>
-            <div className="min-w-0"><p className="text-[9px] font-black uppercase tracking-[.18em] text-[#8fe6e5]">Prescribed medications</p><h3 className="mt-1 text-[18px] font-black tracking-[-.04em] text-white">Medication today</h3><p className="mt-0.5 text-[11px] text-white/60">Keep today&apos;s treatment close and clear.</p></div>
+            <div className="min-w-0"><p className="text-[9px] font-black uppercase tracking-[.18em] text-[#8fe6e5]">Prescribed medications</p><h3 className="mt-1 text-[18px] font-black tracking-[-0.04em] text-white">Medication today</h3><p className="mt-0.5 text-[11px] text-white/60">Keep today&apos;s treatment close and clear.</p></div>
           </div>
           <span className="shrink-0 rounded-full bg-white/10 px-3 py-1.5 text-[9px] font-black tracking-[.02em] text-white/75 ring-1 ring-white/15">{prescriptions.length} {prescriptions.length === 1 ? "prescription" : "prescriptions"}</span>
         </div>
@@ -92,8 +130,10 @@ export default function PrescribedMedicationsCard({ prescriptionsList, activeGoa
             const recordId = medicationRecordId(medication);
             const isGoalSetForThisMed = activeGoals.some((goal) => {
               const status = String(goal?.status ?? "").toUpperCase();
-              const linkedMedicationId = goalMedicationId(goal);
-              return Boolean(recordId) && Boolean(linkedMedicationId) && String(linkedMedicationId) === String(recordId) && ["ACTIVE", "IN_PROGRESS"].includes(status);
+              if (!["ACTIVE", "IN_PROGRESS"].includes(status)) return false;
+              const category = String(goal?.category ?? goal?.metricType ?? "").toUpperCase();
+              if (category && category !== "MEDICATION") return false;
+              return goalMatchesMedication(goal, medication);
             });
             const name = medicationName(medication);
             const doctor = medicationDoctor(medication);
