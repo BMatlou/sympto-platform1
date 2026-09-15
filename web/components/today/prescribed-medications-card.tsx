@@ -65,21 +65,19 @@ function findMedicationGoal(medication: PrescribedMedication, goals: HealthGoal[
     const status = String(goal?.status ?? "").toUpperCase();
     if (category !== "MEDICATION" || !["ACTIVE", "IN_PROGRESS"].includes(status)) return false;
 
-    // Prefer an explicit patient-medication relationship when one is exposed.
+    // If the API exposes a direct medication relationship, that is authoritative.
     const linkedMedicationId = goalMedicationId(goal);
     if (medicationId && linkedMedicationId === medicationId) return true;
 
-    // The current HealthGoal model stores medication goals through the
-    // MEDICATION metric rather than a patientMedication FK. In that model,
-    // the medication identity is carried by the goal's human-readable title
-    // or description. Match that identity as a fallback so existing goals
-    // (including legacy goals) are recognised correctly.
-    const metricType = normalise(goal.metricConfig?.metricType);
-    const metricKey = normalise(goal.metricConfig?.metricKey);
-    if (metricType !== "medication" && metricKey !== "medication.adherence") return false;
-
+    // Existing medication goals are also represented by the MEDICATION category.
+    // The current HealthGoal API does not always expose a patientMedication FK,
+    // so match the medication name in the goal's title/description as the
+    // legacy-compatible identity for the existing goal data.
     const goalText = normalise(`${goal.title ?? ""} ${goal.description ?? ""}`);
-    return goalText.includes(name);
+    if (!goalText || !name) return false;
+
+    const escapedName = name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    return new RegExp(`(^|\\s)${escapedName}(\\s|$)`, "i").test(goalText);
   }) ?? null;
 }
 
