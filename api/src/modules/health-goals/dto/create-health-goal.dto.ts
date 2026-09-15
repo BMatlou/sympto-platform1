@@ -5,6 +5,7 @@ export class CreateHealthGoalDto {
   @IsUUID() patientId!: string;
   @IsOptional() @IsUUID() practitionerId?: string;
   @IsOptional() @IsUUID() carePlanId?: string;
+  @IsOptional() @IsUUID() patientMedicationId?: string;
   @IsString() title!: string;
   @IsOptional() @IsString() description?: string;
   @IsEnum(HealthGoalCategory) category!: HealthGoalCategory;
