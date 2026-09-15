@@ -8,7 +8,6 @@ import { MedicationReminderButton } from "@/components/medications/MedicationRem
 import { MedicationAdherenceActions } from "@/components/medications/MedicationAdherenceActions";
 import { MedicationsStep } from "@/components/onboarding/steps/MedicationsStep";
 import { onboardingService } from "@/services/onboarding.service";
-import { healthGoalsService } from "@/services/health-goals.service";
 import type { UpdatePatientMedicationsDto } from "@/types/onboarding";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
@@ -19,7 +18,7 @@ function formatEnum(value: unknown) {
 }
 
 function medicationId(medication: any) {
-  return medication?.patientMedicationId || medication?.patientMedication?.id || medication?.id || null;
+  return medication?.patientMedicationId || medication?.patientMedication?.id || null;
 }
 
 function toMedicationItem(medication: any) {
@@ -99,60 +98,7 @@ export default function MedicationsPage() {
             ),
           ];
 
-      // Keep the complete medication payload intact. This page owns the
-      // PatientMedication record and now deliberately initializes the
-      // medication goal immediately after a successful medication save.
-      const savedResponse = await onboardingService.managePatientMedications({ medications: medicationsToSave });
-      const savedMedications = Array.isArray(savedResponse)
-        ? savedResponse
-        : Array.isArray(savedResponse?.data)
-          ? savedResponse.data
-          : [];
-
-      const patientId = data?.patient?.id;
-      if (patientId && savedMedications.length > 0) {
-        const existingGoalsResponse = await healthGoalsService.list(String(patientId));
-        const existingGoals = Array.isArray(existingGoalsResponse?.data) ? existingGoalsResponse.data : [];
-
-        for (const medication of savedMedications) {
-          const patientMedicationId = medicationId(medication);
-          if (!patientMedicationId) continue;
-
-          const alreadyHasGoal = existingGoals.some(
-            (goal: any) => String(goal?.patientMedicationId ?? "") === String(patientMedicationId),
-          );
-          if (alreadyHasGoal) continue;
-
-          const medicationName = String(
-            medication?.medication?.name
-              || medication?.medication?.genericName
-              || medication?.name
-              || "Medication",
-          );
-
-          await healthGoalsService.create({
-            patientId: String(patientId),
-            patientMedicationId: String(patientMedicationId),
-            title: "Manage medication",
-            description: `Track adherence for ${medicationName}.`,
-            category: "MEDICATION",
-            priority: "MEDIUM",
-            status: "IN_PROGRESS",
-            metricType: "MEDICATION",
-            metricKey: "medication.adherence",
-            targetValue: "90",
-            currentValue: "0",
-            unit: "%",
-            frequency: "DAILY",
-            frequencyTarget: "90",
-            aggregation: "LATEST",
-            comparison: "AT_LEAST",
-          });
-
-          existingGoals.push({ patientMedicationId: String(patientMedicationId) });
-        }
-      }
-
+      await onboardingService.managePatientMedications({ medications: medicationsToSave });
       toast.success("Your medication list has been updated.");
       setShowMedicationEditor(false);
       await reload();
