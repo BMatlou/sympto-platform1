@@ -1,242 +1,136 @@
 "use client";
 
-import { ArrowRight, Pill, Target } from "lucide-react";
 import { useRouter } from "next/navigation";
-import type { MouseEvent } from "react";
-
-type PrescribedMedication = {
-  id?: string | null;
-  patientMedicationId?: string | null;
-  medicationId?: string | null;
-  patientMedication?: { id?: string | null } | null;
-  medication?: { id?: string | null; medicationId?: string | null; name?: string | null; genericName?: string | null; brandName?: string | null } | null;
-  name?: string | null;
-  dosage?: string | number | null;
-  dose?: string | number | null;
-  frequency?: string | null;
-  schedule?: string | null;
-  source?: string | null;
-};
+import { Pill, Target } from "lucide-react";
+import type { PrescribedMedication } from "@/services/health-home.service";
 
 type HealthGoal = {
-  id?: string | null;
-  title?: string | null;
-  description?: string | null;
-  notes?: string | null;
-  category?: string | null;
-  status?: string | null;
+  id?: string;
+  category?: string;
+  status?: string;
+  title?: string;
+  description?: string;
+  patientMedicationId?: string | null;
+  associatedMedicationId?: string | null;
+  medicationId?: string | null;
+  medication?: { id?: string | null; name?: string | null } | null;
   metricType?: string | null;
   metricConfig?: { metricType?: string | null; metricKey?: string | null } | null;
-  associatedMedicationId?: string | null;
-  patientMedicationId?: string | null;
-  medicationId?: string | null;
-  associatedMedication?: { id?: string | null; name?: string | null } | null;
-  patientMedication?: { id?: string | null; medication?: { name?: string | null } | null } | null;
-  medication?: { id?: string | null; name?: string | null; genericName?: string | null; brandName?: string | null } | null;
 };
 
-function firstText(...values: unknown[]) {
-  const value = values.find((item) => item !== null && item !== undefined && String(item).trim() !== "");
-  return value === undefined ? "" : String(value);
-}
-
 function normalise(value: unknown) {
-  return String(value ?? "").trim().toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
+  return String(value ?? "").trim().toLowerCase();
 }
 
-function medicationName(medication: PrescribedMedication) {
-  return firstText(medication.medication?.name, medication.name, medication.medication?.genericName, medication.medication?.brandName, "Your medicine");
-}
-
-function medicationSchedule(medication: PrescribedMedication) {
-  const dose = firstText(medication.dosage, medication.dose, "Dose not recorded");
-  const frequency = firstText(medication.frequency, medication.schedule, "Schedule not recorded").replaceAll("_", " ");
-  return `${dose} · ${frequency}`;
-}
-
-function patientMedicationId(medication: PrescribedMedication) {
+function getPatientMedicationId(medication: PrescribedMedication) {
   return medication.patientMedicationId || medication.patientMedication?.id || medication.id || null;
 }
 
 function isActiveMedicationGoal(goal: HealthGoal) {
   const status = normalise(goal.status).replace(/ /g, "_").toUpperCase();
   if (!["ACTIVE", "IN_PROGRESS"].includes(status)) return false;
-
   const category = normalise(goal.category).replace(/ /g, "_").toUpperCase();
   const metricType = normalise(goal.metricType).replace(/ /g, "_").toUpperCase();
   const metricConfigType = normalise(goal.metricConfig?.metricType).replace(/ /g, "_").toUpperCase();
-  const metricKey = normalise(goal.metricConfig?.metricKey).toLowerCase();
-
+  const metricKey = normalise(goal.metricConfig?.metricKey);
   return category === "MEDICATION" || metricType === "MEDICATION" || metricConfigType === "MEDICATION" || metricKey === "medication adherence";
 }
 
-function explicitGoalIdentity(goal: HealthGoal) {
-  return firstText(goal.patientMedicationId, goal.associatedMedicationId, goal.medicationId, goal.patientMedication?.id, goal.associatedMedication?.id);
-}
-
-function medicationCatalogIds(medication: PrescribedMedication) {
-  return [medication.medicationId, medication.medication?.id, medication.medication?.medicationId].filter(Boolean).map(String);
-}
-
-function medicationGoalNameMatches(medication: PrescribedMedication, goal: HealthGoal) {
-  const medicationNameValue = normalise(medicationName(medication));
-  if (!medicationNameValue) return false;
-
-  const candidates = [
-    goal.title,
-    goal.description,
-    goal.notes,
-    goal.medication?.name,
-    goal.medication?.genericName,
-    goal.medication?.brandName,
-    goal.patientMedication?.medication?.name,
-    goal.associatedMedication?.name,
-  ].map(normalise).filter(Boolean);
-
-  return candidates.some((candidate) => candidate === medicationNameValue || candidate.includes(medicationNameValue) || medicationNameValue.includes(candidate));
-}
-
-function findMedicationGoal(medication: PrescribedMedication, medications: PrescribedMedication[], goals: HealthGoal[]) {
-  const currentPatientMedicationId = patientMedicationId(medication);
-  const currentCatalogIds = medicationCatalogIds(medication);
-  const activeGoals = goals.filter(isActiveMedicationGoal);
-
-  // A persisted PatientMedication ID is the authoritative identity. A goal
-  // attached to another patient-medication record can never match this row.
-  const exactPatientMedicationGoal = activeGoals.find((goal) => {
-    const linkedPatientMedicationId = goal.patientMedicationId;
-    return Boolean(linkedPatientMedicationId && currentPatientMedicationId && String(linkedPatientMedicationId) === String(currentPatientMedicationId));
-  });
-  if (exactPatientMedicationGoal) return exactPatientMedicationGoal;
-
-  // Older goal payloads may carry the PatientMedication ID under an alias.
-  // Treat that identity as authoritative too, and never fall back to a name.
-  const aliasedPatientMedicationGoal = activeGoals.find((goal) => {
-    const identity = explicitGoalIdentity(goal);
-    if (!identity || !currentPatientMedicationId) return false;
-    return String(identity) === String(currentPatientMedicationId);
-  });
-  if (aliasedPatientMedicationGoal) return aliasedPatientMedicationGoal;
-
-  // Catalog medication IDs are only safe when this medicine is unique in the
-  // Today list. This prevents two PatientMedication rows for the same catalog
-  // medicine from sharing one goal accidentally.
-  const sameCatalogMedicationCount = medications.filter((item) => medicationCatalogIds(item).some((id) => currentCatalogIds.includes(id))).length;
-  if (sameCatalogMedicationCount === 1) {
-    const legacyCatalogGoal = activeGoals.find((goal) => {
-      if (explicitGoalIdentity(goal)) return false;
-      const linkedCatalogIds = [goal.medicationId, goal.medication?.id].filter(Boolean).map(String);
-      return linkedCatalogIds.some((id) => currentCatalogIds.includes(id));
-    });
-    if (legacyCatalogGoal) return legacyCatalogGoal;
-
-    // Last-resort compatibility for goals created before medication identity
-    // was persisted. Only allow it when the medicine name is unique today.
-    const sameNameCount = medications.filter((item) => normalise(medicationName(item)) === normalise(medicationName(medication))).length;
-    if (sameNameCount === 1) {
-      return activeGoals.find((goal) => !explicitGoalIdentity(goal) && medicationGoalNameMatches(medication, goal)) ?? null;
-    }
+function goalBelongsToMedication(goal: HealthGoal, medication: PrescribedMedication, allMedications: PrescribedMedication[]) {
+  if (!isActiveMedicationGoal(goal)) return false;
+  const patientMedicationId = getPatientMedicationId(medication);
+  if (patientMedicationId) {
+    if (goal.patientMedicationId && String(goal.patientMedicationId) === String(patientMedicationId)) return true;
+    if (goal.associatedMedicationId && String(goal.associatedMedicationId) === String(patientMedicationId)) return true;
+    if (goal.medicationId && String(goal.medicationId) === String(patientMedicationId)) return true;
+    if (goal.medication?.id && String(goal.medication.id) === String(patientMedicationId)) return true;
   }
 
-  return null;
-}
-
-function handleMedicationActionClick(
-  event: MouseEvent<HTMLButtonElement>,
-  medication: PrescribedMedication,
-  hasGoal: boolean,
-  router: ReturnType<typeof useRouter>,
-) {
-  event.preventDefault();
-
-  const medicationId = patientMedicationId(medication);
-
-  if (hasGoal) {
-    if (!medicationId) return;
-
-    const targetElement = document.getElementById(`medication-adherence-card-${String(medicationId)}`);
-    if (targetElement) {
-      targetElement.scrollIntoView({ behavior: "smooth", block: "center" });
-    } else {
-      window.location.hash = `medication-adherence-card-${encodeURIComponent(String(medicationId))}`;
-    }
-    return;
+  const medicationId = String(medication.medicationId ?? "");
+  if (medicationId && goal.medicationId && String(goal.medicationId) === medicationId) {
+    const sameCatalogMedicationCount = allMedications.filter((item) => String(item.medicationId ?? "") === medicationId).length;
+    if (sameCatalogMedicationCount === 1) return true;
   }
 
-  const name = medicationName(medication);
-  const dosage = firstText(medication.dosage, medication.dose, "");
-  const frequency = firstText(medication.frequency, medication.schedule, "");
-  const associatedMedicationId = String(medicationId ?? "");
-  const queryParams = new URLSearchParams({
-    action: "create",
-    category: "MEDICATION",
-    medicationName: name,
-    dosage,
-    frequency,
-    patientMedicationId: associatedMedicationId,
-    associatedMedicationId,
-    open: "medication",
-    name,
-    medicationId: associatedMedicationId,
-  }).toString();
-
-  router.push(`/health-goals?${queryParams}`);
+  const name = normalise(medication.name);
+  const goalName = normalise(goal.medication?.name || goal.title);
+  if (name && goalName && name === goalName) {
+    const sameNameCount = allMedications.filter((item) => normalise(item.name) === name).length;
+    if (sameNameCount === 1) return true;
+  }
+  return false;
 }
 
-export default function PrescribedMedicationsCard({
-  prescriptionsList,
-  activeGoalsArray = [],
-}: {
-  prescriptionsList: PrescribedMedication[];
-  activeGoalsArray?: HealthGoal[];
-}) {
+export function PrescribedMedicationsCard({ prescriptionsList, activeGoalsArray = [] }: { prescriptionsList: PrescribedMedication[]; activeGoalsArray?: HealthGoal[] }) {
   const router = useRouter();
-  const medications = Array.isArray(prescriptionsList) ? prescriptionsList : [];
-  const goals = Array.isArray(activeGoalsArray) ? activeGoalsArray : [];
+
+  const handleAction = (medication: PrescribedMedication, hasGoal: boolean) => {
+    const id = getPatientMedicationId(medication);
+    if (hasGoal) {
+      if (!id) return;
+      const target = document.getElementById(`medication-adherence-card-${String(id)}`);
+      if (target) target.scrollIntoView({ behavior: "smooth", block: "center" });
+      else window.location.hash = `medication-adherence-card-${encodeURIComponent(String(id))}`;
+      return;
+    }
+
+    const name = medication.name || "Medication";
+    const dosage = medication.dosage || "";
+    const frequency = medication.frequency || "";
+    const params = new URLSearchParams({
+      action: "create",
+      category: "MEDICATION",
+      open: "medication",
+      name,
+      medicationName: name,
+      dosage,
+      frequency,
+      patientMedicationId: String(id ?? ""),
+      associatedMedicationId: String(id ?? ""),
+      medicationId: String(id ?? medication.medicationId ?? ""),
+    });
+    router.push(`/health-goals?${params.toString()}`);
+  };
 
   return (
-    <section className="mt-3.5 overflow-hidden rounded-[30px] border border-[#d8e9ed] bg-white shadow-[0_18px_48px_rgba(11,45,84,.07)]">
-      <header className="relative overflow-hidden border-b border-[#e6eff2] bg-gradient-to-br from-[#08284a] via-[#0c3f68] to-[#0f6178] px-5 py-5 text-white sm:px-6">
-        <div className="relative flex items-center justify-between gap-4">
-          <div className="flex min-w-0 items-center gap-3.5">
-            <span className="grid h-12 w-12 shrink-0 place-items-center rounded-[18px] bg-white/12 text-[#63e0e0] ring-1 ring-white/20"><Pill className="h-5 w-5" /></span>
-            <div className="min-w-0"><p className="text-[9px] font-black uppercase tracking-[.18em] text-[#8fe6e5]">Prescribed medications</p><h3 className="mt-1 text-[18px] font-black tracking-[-0.04em] text-white">Medication today</h3><p className="mt-0.5 text-[11px] text-white/60">Keep today&apos;s treatment close and clear.</p></div>
-          </div>
-          <span className="shrink-0 rounded-full bg-white/10 px-3 py-1.5 text-[9px] font-black text-white/75 ring-1 ring-white/15">{medications.length} {medications.length === 1 ? "medication" : "medications"}</span>
+    <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+      <div className="mb-4 flex items-center justify-between">
+        <div>
+          <p className="text-sm font-semibold text-slate-900">Prescribed medications</p>
+          <p className="text-xs text-slate-500">Your medication schedule for today</p>
         </div>
-      </header>
+        <Pill className="h-5 w-5 text-slate-400" />
+      </div>
 
-      {medications.length === 0 ? <div className="p-5 text-sm text-[#74859a]">No medication is scheduled for today.</div> : (
-        <div className="bg-[#f8fcfc] px-4 py-3 sm:px-5">
-          <div className="divide-y divide-[#e6eff2]">
-            {medications.map((medication, index) => {
-              const name = medicationName(medication);
-              const goal = findMedicationGoal(medication, medications, goals);
-              const hasGoal = Boolean(goal);
-              const isClinicPrescription = String(medication.source ?? "").toUpperCase() === "PRESCRIPTION";
-              return <div key={patientMedicationId(medication) || medication.medicationId || `${name}-${index}`} className="flex flex-col gap-3 py-4 first:pt-2 last:pb-2 sm:flex-row sm:items-center">
-                <div className="flex min-w-0 flex-1 items-center gap-3.5">
-                  <span className="grid h-10 w-10 shrink-0 place-items-center rounded-[14px] bg-[#e8f7f7] text-[#087d82] ring-1 ring-[#d4eeee]"><Pill className="h-4 w-4" /></span>
-                  <div className="min-w-0"><div className="flex flex-wrap items-center gap-2"><h4 className="text-[15px] font-black tracking-[-.025em] text-[#0b2d54]">{name}</h4>{isClinicPrescription && <span className="rounded-full bg-[#edf4ff] px-2 py-1 text-[8px] font-black uppercase tracking-[.12em] text-[#315b88]">Clinic prescription</span>}</div><p className="mt-1 text-[11px] font-black uppercase tracking-[.08em] text-[#0d8589]">{medicationSchedule(medication)}</p></div>
+      {prescriptionsList.length === 0 ? (
+        <p className="py-4 text-sm text-slate-500">No active prescribed medications today.</p>
+      ) : (
+        <div className="space-y-3">
+          {prescriptionsList.map((medication) => {
+            const hasGoal = activeGoalsArray.some((goal) => goalBelongsToMedication(goal, medication, prescriptionsList));
+            const id = getPatientMedicationId(medication);
+            return (
+              <div key={String(id ?? medication.name)} className="flex items-center justify-between gap-4 rounded-xl border border-slate-100 bg-slate-50/70 px-4 py-3">
+                <div className="min-w-0">
+                  <p className="truncate text-sm font-semibold text-slate-900">{medication.name}</p>
+                  <p className="text-xs text-slate-500">{medication.dosage}{medication.frequency ? ` · ${medication.frequency}` : ""}</p>
                 </div>
-                <div className="flex shrink-0 items-center gap-2 sm:ml-auto">
-                  <span className="rounded-full bg-white px-2.5 py-1 text-[9px] font-bold text-[#71839a] ring-1 ring-[#e1ecef]">Today</span>
+                <div className="flex shrink-0 items-center gap-3">
+                  <span className="text-xs font-medium text-slate-500">Today</span>
                   <button
                     type="button"
-                    onClick={(event) => handleMedicationActionClick(event, medication, hasGoal, router)}
+                    onClick={() => handleAction(medication, hasGoal)}
                     className={hasGoal
-                      ? "inline-flex min-h-9 items-center gap-1.5 rounded-xl border border-[#bde8d5] bg-white px-3 py-2 text-[10px] font-black text-[#087d5a] transition hover:border-[#7bd5ae] hover:bg-[#ecfbf3]"
-                      : "inline-flex min-h-9 items-center gap-1.5 rounded-xl bg-[#0b2d54] px-3 py-2 text-[10px] font-black text-white transition hover:bg-[#123d63]"}
-                    aria-label={hasGoal ? `View the active medication goal for ${name}` : `Set a medication goal for ${name}`}
+                      ? "inline-flex items-center gap-1.5 rounded-lg px-3 py-2 text-xs font-semibold text-emerald-700 transition-all duration-200 hover:bg-emerald-50 hover:text-emerald-800"
+                      : "inline-flex items-center gap-1.5 rounded-lg bg-slate-800 px-3 py-2 text-xs font-semibold text-white transition-all duration-200 hover:bg-slate-700"}
                   >
-                    <Target className={hasGoal ? "h-3.5 w-3.5 text-[#0b9b6b]" : "h-3.5 w-3.5 text-[#24c1c4]"} />
+                    {hasGoal ? <Target className="h-3.5 w-3.5" /> : null}
                     {hasGoal ? "View Goal" : "Set medication goal"}
                   </button>
                 </div>
-              </div>;
-            })}
-          </div>
-          <div className="mt-2 border-t border-[#e2ecef] pt-4"><a href="/medications" className="group inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-[16px] bg-[#0b2d54] px-4 py-2.5 text-[11px] font-black text-white shadow-[0_10px_22px_rgba(11,45,84,.12)] transition hover:bg-[#123d63]">View and manage medications<ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-0.5" /></a></div>
+              </div>
+            );
+          })}
         </div>
       )}
     </section>
