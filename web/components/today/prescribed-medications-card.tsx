@@ -61,7 +61,7 @@ function goalBelongsToMedication(goal: HealthGoal, medication: PrescribedMedicat
   return false;
 }
 
-export function PrescribedMedicationsCard({ prescriptionsList, activeGoalsArray = [] }: { prescriptionsList: PrescribedMedication[]; activeGoalsArray?: HealthGoal[] }) {
+export default function PrescribedMedicationsCard({ prescriptionsList, activeGoalsArray = [] }: { prescriptionsList: PrescribedMedication[]; activeGoalsArray?: HealthGoal[] }) {
   const router = useRouter();
 
   const handleAction = (medication: PrescribedMedication, hasGoal: boolean) => {
@@ -117,13 +117,7 @@ export function PrescribedMedicationsCard({ prescriptionsList, activeGoalsArray 
                 </div>
                 <div className="flex shrink-0 items-center gap-3">
                   <span className="text-xs font-medium text-slate-500">Today</span>
-                  <button
-                    type="button"
-                    onClick={() => handleAction(medication, hasGoal)}
-                    className={hasGoal
-                      ? "inline-flex items-center gap-1.5 rounded-lg px-3 py-2 text-xs font-semibold text-emerald-700 transition-all duration-200 hover:bg-emerald-50 hover:text-emerald-800"
-                      : "inline-flex items-center gap-1.5 rounded-lg bg-slate-800 px-3 py-2 text-xs font-semibold text-white transition-all duration-200 hover:bg-slate-700"}
-                  >
+                  <button type="button" onClick={() => handleAction(medication, hasGoal)} className={hasGoal ? "inline-flex items-center gap-1.5 rounded-lg px-3 py-2 text-xs font-semibold text-emerald-700 transition-all duration-200 hover:bg-emerald-50 hover:text-emerald-800" : "inline-flex items-center gap-1.5 rounded-lg bg-slate-800 px-3 py-2 text-xs font-semibold text-white transition-all duration-200 hover:bg-slate-700"}>
                     {hasGoal ? <Target className="h-3.5 w-3.5" /> : null}
                     {hasGoal ? "View Goal" : "Set medication goal"}
                   </button>
