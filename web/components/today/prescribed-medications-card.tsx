@@ -6,8 +6,22 @@ import { ArrowRight, Pill, Target } from "lucide-react";
 type PrescribedMedication = {
   id?: string | null;
   patientMedicationId?: string | null;
-  patientMedication?: { id?: string | null; medicationId?: string | null; medication?: { id?: string | null; name?: string | null; genericName?: string | null; brandName?: string | null } | null } | null;
-  medication?: { id?: string | null; name?: string | null; genericName?: string | null; brandName?: string | null } | null;
+  patientMedication?: {
+    id?: string | null;
+    medicationId?: string | null;
+    medication?: {
+      id?: string | null;
+      name?: string | null;
+      genericName?: string | null;
+      brandName?: string | null;
+    } | null;
+  } | null;
+  medication?: {
+    id?: string | null;
+    name?: string | null;
+    genericName?: string | null;
+    brandName?: string | null;
+  } | null;
   name?: string | null;
   dosage?: string | number | null;
   dose?: string | number | null;
@@ -16,7 +30,10 @@ type PrescribedMedication = {
   instructions?: string | null;
   doctorName?: string | null;
   practitioner?: { name?: string | null; firstName?: string | null; lastName?: string | null } | null;
-  prescription?: { practitioner?: { name?: string | null; firstName?: string | null; lastName?: string | null } | null; doctorName?: string | null } | null;
+  prescription?: {
+    practitioner?: { name?: string | null; firstName?: string | null; lastName?: string | null } | null;
+    doctorName?: string | null;
+  } | null;
 };
 
 type ActiveGoal = {
@@ -36,44 +53,17 @@ function firstText(...values: unknown[]) {
   return value === undefined ? "" : String(value);
 }
 
-function normalizeText(value: unknown) {
-  return String(value ?? "")
-    .trim()
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, " ")
-    .replace(/\s+/g, " ")
-    .trim();
-}
-
 function medicationRecordId(medication: PrescribedMedication) {
   return firstText(medication.patientMedicationId, medication.patientMedication?.id, medication.id);
 }
 
-function medicationClinicalIds(medication: PrescribedMedication) {
-  return [
-    medication.patientMedicationId,
-    medication.patientMedication?.id,
-    medication.medication?.id,
-    medication.patientMedication?.medicationId,
-  ].filter((value): value is string => Boolean(value));
-}
-
-function medicationNames(medication: PrescribedMedication) {
-  return [
-    medication.medication?.name,
-    medication.medication?.genericName,
-    medication.medication?.brandName,
-    medication.patientMedication?.medication?.name,
-    medication.patientMedication?.medication?.genericName,
-    medication.patientMedication?.medication?.brandName,
-    medication.name,
-  ]
-    .map(normalizeText)
-    .filter(Boolean);
-}
-
 function medicationName(medication: PrescribedMedication) {
-  return firstText(medication.medication?.name, medication.name, medication.medication?.genericName, "Your medicine");
+  return firstText(
+    medication.medication?.name,
+    medication.name,
+    medication.medication?.genericName,
+    "Your medicine",
+  );
 }
 
 function medicationDoctor(medication: PrescribedMedication) {
@@ -96,34 +86,13 @@ function medicationInstructions(medication: PrescribedMedication) {
   return firstText(medication.instructions, "Follow your prescribed instructions.");
 }
 
-function goalMedicationId(goal: ActiveGoal) {
-  return firstText(
-    goal.associatedMedicationId,
-    goal.patientMedicationId,
-    goal.medicationId,
-    goal.medication?.id,
-  );
-}
-
-function goalMatchesMedication(goal: ActiveGoal, medication: PrescribedMedication) {
-  const goalIds = [goalMedicationId(goal)].filter(Boolean);
-  const medicationIds = medicationClinicalIds(medication);
-  if (goalIds.length > 0 && medicationIds.some((id) => goalIds.includes(id))) return true;
-
-  const goalSearchText = [goal.title, goal.description, goal.medication?.name, goal.medication?.genericName, goal.medication?.brandName, goal.metricConfig?.guidanceText]
-    .map(normalizeText)
-    .filter(Boolean)
-    .join(" ");
-  if (!goalSearchText) return false;
-
-  const names = medicationNames(medication);
-  return names.some((name) => {
-    if (name.length < 3) return false;
-    return goalSearchText.includes(name);
-  });
-}
-
-export default function PrescribedMedicationsCard({ prescriptionsList, activeGoalsArray }: { prescriptionsList: PrescribedMedication[]; activeGoalsArray: ActiveGoal[] }) {
+export default function PrescribedMedicationsCard({
+  prescriptionsList,
+  activeGoalsArray,
+}: {
+  prescriptionsList: PrescribedMedication[];
+  activeGoalsArray: ActiveGoal[];
+}) {
   const prescriptions = Array.isArray(prescriptionsList) ? prescriptionsList : [];
   const activeGoals = Array.isArray(activeGoalsArray) ? activeGoalsArray : [];
 
@@ -154,18 +123,24 @@ export default function PrescribedMedicationsCard({ prescriptionsList, activeGoa
       ) : (
         <div className="bg-[#f8fcfc] p-4 sm:p-5">
           {prescriptions.map((medication, index) => {
+            // Exact per-prescription validation:
+            // only a goal explicitly associated with this prescription's record ID
+            // and currently IN_PROGRESS counts as an active medication goal.
+            const isGoalSetForThisMed = activeGoals.some(
+              (goal) =>
+                goal.associatedMedicationId === medication.id &&
+                goal.status === "IN_PROGRESS",
+            );
+
             const recordId = medicationRecordId(medication);
-            const goal = activeGoals.find((candidate) => {
-              const status = String(candidate?.status ?? "").toUpperCase();
-              return goalMatchesMedication(candidate, medication) && (status === "IN_PROGRESS" || status === "ACTIVE");
-            });
-            const isGoalSetForThisMed = Boolean(goal);
             const name = medicationName(medication);
             const doctor = medicationDoctor(medication);
-            const goalAnchor = recordId ? `#medication-goal-card-${recordId}` : "#today-goals";
 
             return (
-              <article key={recordId || `${name}-${index}`} className="mb-4 last:mb-0 overflow-hidden rounded-[25px] border border-[#deebee] bg-white shadow-[0_10px_28px_rgba(11,45,84,.055)]">
+              <article
+                key={recordId || `${name}-${index}`}
+                className="mb-4 last:mb-0 overflow-hidden rounded-[25px] border border-[#deebee] bg-white shadow-[0_10px_28px_rgba(11,45,84,.055)]"
+              >
                 <div className="p-5 sm:p-5.5">
                   <div className="flex items-start gap-3.5">
                     <span className="grid h-11 w-11 shrink-0 place-items-center rounded-[16px] bg-[#e8f7f7] text-[#087d82] ring-1 ring-[#d4eeee]">
@@ -192,7 +167,10 @@ export default function PrescribedMedicationsCard({ prescriptionsList, activeGoa
                           <span className="h-2 w-2 rounded-full bg-emerald-500" />
                           This medication is linked to an active health goal.
                         </div>
-                        <Link href={goalAnchor} className="group inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-[16px] border border-emerald-200 bg-emerald-50 px-3 py-2.5 text-[11px] font-black text-emerald-700 transition hover:bg-emerald-100">
+                        <Link
+                          href="/health-goals"
+                          className="group inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-[16px] border border-emerald-200 bg-emerald-50 px-3 py-2.5 text-[11px] font-black text-emerald-700 transition hover:bg-emerald-100"
+                        >
                           View adherence progress &amp; log today&apos;s doses
                           <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-0.5" />
                         </Link>
@@ -203,7 +181,10 @@ export default function PrescribedMedicationsCard({ prescriptionsList, activeGoa
                           <p className="text-[11px] font-black text-amber-900">💡 New prescription</p>
                           <p className="mt-1 text-[10px] leading-5 text-amber-800/80">You haven&apos;t set a tracking goal for this medication yet.</p>
                         </div>
-                        <Link href="/health-goals" className="group inline-flex min-h-12 w-full items-center justify-center gap-2 rounded-[17px] bg-[#0b2d54] px-3 py-3 text-[11px] font-black text-white shadow-[0_12px_24px_rgba(11,45,84,.14)] transition hover:bg-[#123d63]">
+                        <Link
+                          href="/health-goals"
+                          className="group inline-flex min-h-12 w-full items-center justify-center gap-2 rounded-[17px] bg-[#0b2d54] px-3 py-3 text-[11px] font-black text-white shadow-[0_12px_24px_rgba(11,45,84,.14)] transition hover:bg-[#123d63]"
+                        >
                           <span className="grid h-7 w-7 place-items-center rounded-full bg-[#24c1c4]/15 text-[#63e0e0] ring-1 ring-[#24c1c4]/25">
                             <Target className="h-3.5 w-3.5" />
                           </span>
