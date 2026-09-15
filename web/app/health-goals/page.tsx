@@ -2,7 +2,8 @@
 
 import Link from "next/link";
 import { ArrowLeft, ArrowRight, CalendarDays, CheckCircle2, Edit3, Plus, Target, Trash2, X, LockKeyhole } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { useSearchParams } from "next/navigation";
 import { toast } from "sonner";
 import ProtectedRoute from "@/components/auth/protected-route";
 import { useDashboard } from "@/hooks/use-dashboard";
@@ -80,6 +81,8 @@ function goalPresentation(goal: any) {
 
 export default function HealthGoalsPage() {
   const { data: dashboard, loading, error, reload } = useDashboard();
+  const searchParams = useSearchParams();
+  const medicationPrefillHandled = useRef(false);
   const [draft, setDraft] = useState<GoalDraft>(emptyDraft());
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editorOpen, setEditorOpen] = useState(false);
@@ -115,6 +118,29 @@ export default function HealthGoalsPage() {
       targetDate: editingGoal.targetDate ? String(editingGoal.targetDate).slice(0, 10) : "",
     });
   }, [editingGoal, editorOpen]);
+
+  useEffect(() => {
+    if (medicationPrefillHandled.current || !dashboard?.patient?.id || loading) return;
+    if (searchParams.get("open") !== "medication") return;
+
+    medicationPrefillHandled.current = true;
+    const name = searchParams.get("name")?.trim() || "Medication adherence";
+    const dosage = searchParams.get("dosage")?.trim() || "";
+    const frequency = searchParams.get("frequency")?.trim() || "";
+    const details = [dosage && `Dosage: ${dosage}`, frequency && `Frequency: ${frequency.replaceAll("_", " ")}`].filter(Boolean).join(" · ");
+
+    setEditingId(null);
+    setDraft({
+      title: name,
+      description: details ? `Medication: ${name} · ${details}` : `Medication: ${name}`,
+      category: "MEDICATION",
+      priority: "MEDIUM",
+      targetValue: "90",
+      unit: "%",
+      targetDate: "",
+    });
+    setEditorOpen(true);
+  }, [dashboard?.patient?.id, loading, searchParams]);
 
   function openAdd() {
     setEditingId(null);
