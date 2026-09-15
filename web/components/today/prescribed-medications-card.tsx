@@ -25,6 +25,7 @@ type HealthGoal = {
   category?: string | null;
   status?: string | null;
   metricType?: string | null;
+  metricConfig?: { metricType?: string | null } | null;
 };
 
 function firstText(...values: unknown[]) {
@@ -43,35 +44,40 @@ function medicationSchedule(medication: PrescribedMedication) {
 }
 
 function findMedicationGoal(medication: PrescribedMedication, goals: HealthGoal[]) {
-  const medicationNameValue = medicationName(medication);
-  const medicationNameLower = medicationNameValue.toLowerCase();
+  const medicationNameLower = medicationName(medication).toLowerCase();
   if (!medicationNameLower) return null;
 
-  // 🔍 Bulletproof matching logic: Checks metric type, title, and string description containment together.
+  // Direct frontend lookup: the goal must be an in-progress medication goal,
+  // and the medication name must appear in the goal title or notes.
   const isGoalSetForThisMed = (goal: HealthGoal) => {
-    if (goal.status !== "IN_PROGRESS") return false;
+    if (String(goal.status ?? "").toUpperCase() !== "IN_PROGRESS") return false;
 
-    const matchesMetricType = goal.metricType === "MEDICATION";
-    const matchesTitleName = goal.title?.toLowerCase().includes(medicationNameLower);
-    const matchesNoteContext = goal.notes?.toLowerCase().includes(medicationNameLower);
+    const metricType = String(goal.metricType ?? goal.metricConfig?.metricType ?? goal.category ?? "").toUpperCase();
+    const matchesMetricType = metricType === "MEDICATION";
+    const matchesTitleName = String(goal.title ?? "").toLowerCase().includes(medicationNameLower);
+    const matchesNoteContext = String(goal.notes ?? "").toLowerCase().includes(medicationNameLower);
 
-    // If it's a medication goal AND the title matches the drug name, it's a hit!
     return matchesMetricType && (matchesTitleName || matchesNoteContext);
   };
 
   return goals.find(isGoalSetForThisMed) ?? null;
 }
 
-function medicationGoalHref(medication: PrescribedMedication, goal: HealthGoal) {
-  const anchorMedicationId = medication.patientMedicationId || medication.patientMedication?.id || medication.id || medication.medicationId || medication.medication?.id || medication.medication?.medicationId;
-  if (anchorMedicationId) return `/today#medication-goal-card-${encodeURIComponent(String(anchorMedicationId))}`;
-  return goal.id ? `/today#medication-goal-card-${encodeURIComponent(String(goal.id))}` : "/today#medication-goal-card";
+function patientMedicationId(medication: PrescribedMedication) {
+  return medication.patientMedicationId || medication.patientMedication?.id || medication.id || null;
+}
+
+function medicationGoalHref(medication: PrescribedMedication) {
+  const medicationId = patientMedicationId(medication);
+  return medicationId
+    ? `/today#medication-goal-card-${encodeURIComponent(String(medicationId))}`
+    : "/today#medication-goal-card";
 }
 
 function setMedicationGoalHref(medication: PrescribedMedication) {
   const params = new URLSearchParams();
   params.set("open", "medication");
-  const medicationId = medication.patientMedicationId || medication.patientMedication?.id || medication.id || medication.medicationId || medication.medication?.id || medication.medication?.medicationId;
+  const medicationId = patientMedicationId(medication);
   if (medicationId) params.set("medicationId", String(medicationId));
   params.set("name", medicationName(medication));
   params.set("dosage", firstText(medication.dosage, medication.dose, ""));
@@ -108,8 +114,8 @@ export default function PrescribedMedicationsCard({
               const name = medicationName(medication);
               const goal = findMedicationGoal(medication, goals);
               const isClinicPrescription = String(medication.source ?? "").toUpperCase() === "PRESCRIPTION";
-              const href = goal ? medicationGoalHref(medication, goal) : setMedicationGoalHref(medication);
-              return <div key={medication.patientMedicationId || medication.patientMedication?.id || medication.id || medication.medicationId || `${name}-${index}`} className="flex flex-col gap-3 py-4 first:pt-2 last:pb-2 sm:flex-row sm:items-center">
+              const href = goal ? medicationGoalHref(medication) : setMedicationGoalHref(medication);
+              return <div key={patientMedicationId(medication) || medication.medicationId || `${name}-${index}`} className="flex flex-col gap-3 py-4 first:pt-2 last:pb-2 sm:flex-row sm:items-center">
                 <div className="flex min-w-0 flex-1 items-center gap-3.5">
                   <span className="grid h-10 w-10 shrink-0 place-items-center rounded-[14px] bg-[#e8f7f7] text-[#087d82] ring-1 ring-[#d4eeee]"><Pill className="h-4 w-4" /></span>
                   <div className="min-w-0"><div className="flex flex-wrap items-center gap-2"><h4 className="text-[15px] font-black tracking-[-.025em] text-[#0b2d54]">{name}</h4>{isClinicPrescription && <span className="rounded-full bg-[#edf4ff] px-2 py-1 text-[8px] font-black uppercase tracking-[.12em] text-[#315b88]">Clinic prescription</span>}</div><p className="mt-1 text-[11px] font-black uppercase tracking-[.08em] text-[#0d8589]">{medicationSchedule(medication)}</p></div>
