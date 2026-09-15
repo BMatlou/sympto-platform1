@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { ArrowLeft, Clock3, FileText, Pill, Plus, ShieldCheck, X } from "lucide-react";
 import { useDashboard } from "@/hooks/use-dashboard";
 import { MedicationReminderButton } from "@/components/medications/MedicationReminderButton";
@@ -72,6 +72,23 @@ export default function MedicationsPage() {
     setMedicationValues(initialMedicationValues);
     setShowAddMedication(true);
   }
+
+  useEffect(() => {
+    if (!showAddMedication) return;
+
+    const frame = window.requestAnimationFrame(() => {
+      const dialog = document.querySelector('[role="dialog"][aria-labelledby="add-medication-title"]');
+      if (!dialog) return;
+
+      const addButton = Array.from(dialog.querySelectorAll("button")).find(
+        (button) => button.textContent?.trim() === "+ Add" || button.textContent?.trim() === "Add a medicine",
+      ) as HTMLButtonElement | undefined;
+
+      addButton?.click();
+    });
+
+    return () => window.cancelAnimationFrame(frame);
+  }, [showAddMedication]);
 
   async function saveMedications() {
     if (saving) return;
