@@ -9,56 +9,26 @@ import { CreatePrescriptionDto } from './dto/create-prescription.dto';
 import { UpdatePrescriptionDto } from './dto/update-prescription.dto';
 import { QueryPrescriptionDto } from './dto/query-prescription.dto';
 
+const prescriptionInclude = {
+  encounter: true,
+  patient: { include: { person: true } },
+  practitioner: { include: { person: true } },
+  items: { include: { medication: true } },
+};
+
 @Injectable()
 export class PrescriptionsService {
-  constructor(
-    private readonly prisma: PrismaService,
-  ) {}
+  constructor(private readonly prisma: PrismaService) {}
 
-  async create(
-    dto: CreatePrescriptionDto,
-  ) {
-    const [
-      encounter,
-      patient,
-      practitioner,
-    ] = await this.prisma.$transaction([
-      this.prisma.encounter.findUnique({
-        where: {
-          id: dto.encounterId,
-        },
-      }),
-
-      this.prisma.patient.findUnique({
-        where: {
-          id: dto.patientId,
-        },
-      }),
-
-      this.prisma.practitioner.findUnique({
-        where: {
-          id: dto.practitionerId,
-        },
-      }),
+  async create(dto: CreatePrescriptionDto) {
+    const [encounter, patient, practitioner] = await this.prisma.$transaction([
+      this.prisma.encounter.findUnique({ where: { id: dto.encounterId } }),
+      this.prisma.patient.findUnique({ where: { id: dto.patientId } }),
+      this.prisma.practitioner.findUnique({ where: { id: dto.practitionerId } }),
     ]);
-
-    if (!encounter) {
-      throw new NotFoundException(
-        'Encounter not found.',
-      );
-    }
-
-    if (!patient) {
-      throw new NotFoundException(
-        'Patient not found.',
-      );
-    }
-
-    if (!practitioner) {
-      throw new NotFoundException(
-        'Practitioner not found.',
-      );
-    }
+    if (!encounter) throw new NotFoundException('Encounter not found.');
+    if (!patient) throw new NotFoundException('Patient not found.');
+    if (!practitioner) throw new NotFoundException('Practitioner not found.');
 
     return this.prisma.prescription.create({
       data: {
@@ -66,167 +36,63 @@ export class PrescriptionsService {
         patientId: dto.patientId,
         practitionerId: dto.practitionerId,
         status: dto.status,
-        expiresAt: dto.expiresAt
-          ? new Date(dto.expiresAt)
-          : undefined,
+        expiresAt: dto.expiresAt ? new Date(dto.expiresAt) : undefined,
         notes: dto.notes,
       },
-
-      include: {
-        encounter: true,
-        patient: {
-          include: {
-            person: true,
-          },
-        },
-        practitioner: true,
-        items: true,
-      },
+      include: prescriptionInclude,
     });
   }
 
-  async findAll(
-    query: QueryPrescriptionDto,
-  ) {
-    const {
-      page,
-      limit,
-      encounterId,
-      patientId,
-      practitionerId,
-    } = query;
-
+  async findAll(query: QueryPrescriptionDto) {
+    const { page, limit, encounterId, patientId, practitionerId } = query;
     const where = {
-      ...(encounterId && {
-        encounterId,
-      }),
-      ...(patientId && {
-        patientId,
-      }),
-      ...(practitionerId && {
-        practitionerId,
-      }),
+      ...(encounterId && { encounterId }),
+      ...(patientId && { patientId }),
+      ...(practitionerId && { practitionerId }),
     };
 
-    const [data, total] =
-      await this.prisma.$transaction([
-        this.prisma.prescription.findMany({
-          where,
-
-          include: {
-            encounter: true,
-            patient: {
-              include: {
-                person: true,
-              },
-            },
-            practitioner: true,
-            items: true,
-          },
-
-          orderBy: {
-            issuedAt: 'desc',
-          },
-
-          skip: (page - 1) * limit,
-
-          take: limit,
-        }),
-
-        this.prisma.prescription.count({
-          where,
-        }),
-      ]);
+    const [data, total] = await this.prisma.$transaction([
+      this.prisma.prescription.findMany({
+        where,
+        include: prescriptionInclude,
+        orderBy: { issuedAt: 'desc' },
+        skip: (page - 1) * limit,
+        take: limit,
+      }),
+      this.prisma.prescription.count({ where }),
+    ]);
 
     return {
       data,
-
-      pagination: {
-        page,
-        limit,
-        total,
-        totalPages: Math.ceil(
-          total / limit,
-        ),
-      },
+      pagination: { page, limit, total, totalPages: Math.ceil(total / limit) },
     };
   }
 
   async findOne(id: string) {
-    const prescription =
-      await this.prisma.prescription.findUnique({
-        where: {
-          id,
-        },
-
-        include: {
-          encounter: true,
-          patient: {
-            include: {
-              person: true,
-            },
-          },
-          practitioner: true,
-          items: true,
-        },
-      });
-
-    if (!prescription) {
-      throw new NotFoundException(
-        'Prescription not found.',
-      );
-    }
-
+    const prescription = await this.prisma.prescription.findUnique({ where: { id }, include: prescriptionInclude });
+    if (!prescription) throw new NotFoundException('Prescription not found.');
     return prescription;
   }
 
-  async update(
-    id: string,
-    dto: UpdatePrescriptionDto,
-  ) {
+  async update(id: string, dto: UpdatePrescriptionDto) {
     await this.findOne(id);
-
     return this.prisma.prescription.update({
-      where: {
-        id,
-      },
-
+      where: { id },
       data: {
         encounterId: dto.encounterId,
         patientId: dto.patientId,
         practitionerId: dto.practitionerId,
         status: dto.status,
-        expiresAt: dto.expiresAt
-          ? new Date(dto.expiresAt)
-          : undefined,
+        expiresAt: dto.expiresAt ? new Date(dto.expiresAt) : undefined,
         notes: dto.notes,
       },
-
-      include: {
-        encounter: true,
-        patient: {
-          include: {
-            person: true,
-          },
-        },
-        practitioner: true,
-        items: true,
-      },
+      include: prescriptionInclude,
     });
   }
 
   async remove(id: string) {
     await this.findOne(id);
-
-    await this.prisma.prescription.delete({
-      where: {
-        id,
-      },
-    });
-
-    return {
-      message:
-        'Prescription deleted successfully.',
-    };
+    await this.prisma.prescription.delete({ where: { id } });
+    return { message: 'Prescription deleted successfully.' };
   }
 }
