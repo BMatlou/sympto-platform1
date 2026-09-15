@@ -30,6 +30,7 @@ export type HealthGoalInput = {
   patientId: string;
   practitionerId?: string;
   carePlanId?: string;
+  patientMedicationId?: string;
   title: string;
   description?: string;
   category: string;
@@ -53,18 +54,30 @@ export type HealthGoalListResponse = {
   pagination?: { page: number; limit: number; total: number; totalPages: number };
 };
 
+const medicationIdFromCurrentUrl = () => {
+  if (typeof window === "undefined") return undefined;
+  const params = new URLSearchParams(window.location.search);
+  if (params.get("open") !== "medication") return undefined;
+  return params.get("patientMedicationId")?.trim() || params.get("associatedMedicationId")?.trim() || params.get("medicationId")?.trim() || undefined;
+};
+
 const normalizeGoalInput = (input: HealthGoalInput | Partial<HealthGoalInput>) => {
   const category = String(input.category ?? "").toUpperCase();
+  const medicationIdentity = input.patientMedicationId || medicationIdFromCurrentUrl();
+  const withMedicationIdentity = category === "MEDICATION" && medicationIdentity
+    ? { ...input, patientMedicationId: medicationIdentity }
+    : input;
+
   if (category === "SMOKING") {
-    return { ...input, metricType: "SMOKING", metricKey: "smoking.cigarettes", frequency: "DAILY" as const, aggregation: "LATEST" as const, comparison: "AT_MOST" as const, unit: input.unit || "cigarettes/day" };
+    return { ...withMedicationIdentity, metricType: "SMOKING", metricKey: "smoking.cigarettes", frequency: "DAILY" as const, aggregation: "LATEST" as const, comparison: "AT_MOST" as const, unit: input.unit || "cigarettes/day" };
   }
   if (category === "ALCOHOL") {
-    return { ...input, metricType: "ALCOHOL", metricKey: "alcohol.drinks", frequency: "WEEKLY" as const, aggregation: "SUM" as const, comparison: "AT_MOST" as const, unit: input.unit || "drinks/week" };
+    return { ...withMedicationIdentity, metricType: "ALCOHOL", metricKey: "alcohol.drinks", frequency: "WEEKLY" as const, aggregation: "SUM" as const, comparison: "AT_MOST" as const, unit: input.unit || "drinks/week" };
   }
   if (category === "EXERCISE") {
-    return { ...input, metricType: "EXERCISE", metricKey: "exercise.minutes", frequency: "WEEKLY" as const, aggregation: "SUM" as const, comparison: "AT_LEAST" as const, unit: input.unit || "mins/week" };
+    return { ...withMedicationIdentity, metricType: "EXERCISE", metricKey: "exercise.minutes", frequency: "WEEKLY" as const, aggregation: "SUM" as const, comparison: "AT_LEAST" as const, unit: input.unit || "mins/week" };
   }
-  return input;
+  return withMedicationIdentity;
 };
 
 class HealthGoalsService {
