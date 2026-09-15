@@ -25,7 +25,8 @@ type HealthGoal = {
   category?: string | null;
   status?: string | null;
   metricType?: string | null;
-  metricConfig?: { metricType?: string | null } | null;
+  associatedMedicationId?: string | null;
+  patientMedicationId?: string | null;
 };
 
 function firstText(...values: unknown[]) {
@@ -44,23 +45,31 @@ function medicationSchedule(medication: PrescribedMedication) {
 }
 
 function findMedicationGoal(medication: PrescribedMedication, goals: HealthGoal[]) {
-  const medicationNameLower = medicationName(medication).toLowerCase();
-  if (!medicationNameLower) return null;
+  const isGoalSetForThisMed = goals.some((goal) => {
+    if (goal.status !== "IN_PROGRESS") return false;
 
-  // Direct frontend lookup: the goal must be an in-progress medication goal,
-  // and the medication name must appear in the goal title or notes.
-  const isGoalSetForThisMed = (goal: HealthGoal) => {
-    if (String(goal.status ?? "").toUpperCase() !== "IN_PROGRESS") return false;
+    // 1. Direct ID matching check if populated.
+    const matchesId = goal.associatedMedicationId === medication.id || goal.patientMedicationId === medication.id;
 
-    const metricType = String(goal.metricType ?? goal.metricConfig?.metricType ?? goal.category ?? "").toUpperCase();
-    const matchesMetricType = metricType === "MEDICATION";
-    const matchesTitleName = String(goal.title ?? "").toLowerCase().includes(medicationNameLower);
-    const matchesNoteContext = String(goal.notes ?? "").toLowerCase().includes(medicationNameLower);
+    // 2. Metric check combined with the goal title backup.
+    const matchesMetric = goal.metricType === "MEDICATION";
+    const matchesGenericTitle = goal.title?.toLowerCase() === "manage medication";
+    const medicationName = medication.name?.toLowerCase();
+    const matchesMedicationTitle = Boolean(medicationName && goal.title?.toLowerCase().includes(medicationName));
 
-    return matchesMetricType && (matchesTitleName || matchesNoteContext);
-  };
+    return matchesId || (matchesMetric && (matchesGenericTitle || matchesMedicationTitle));
+  });
 
-  return goals.find(isGoalSetForThisMed) ?? null;
+  if (!isGoalSetForThisMed) return null;
+  return goals.find((goal) => {
+    if (goal.status !== "IN_PROGRESS") return false;
+    const matchesId = goal.associatedMedicationId === medication.id || goal.patientMedicationId === medication.id;
+    const matchesMetric = goal.metricType === "MEDICATION";
+    const matchesGenericTitle = goal.title?.toLowerCase() === "manage medication";
+    const medicationName = medication.name?.toLowerCase();
+    const matchesMedicationTitle = Boolean(medicationName && goal.title?.toLowerCase().includes(medicationName));
+    return matchesId || (matchesMetric && (matchesGenericTitle || matchesMedicationTitle));
+  }) ?? null;
 }
 
 function patientMedicationId(medication: PrescribedMedication) {
@@ -83,6 +92,18 @@ function setMedicationGoalHref(medication: PrescribedMedication) {
   params.set("dosage", firstText(medication.dosage, medication.dose, ""));
   params.set("frequency", firstText(medication.frequency, medication.schedule, ""));
   return `/health-goals?${params.toString()}`;
+}
+
+function handleViewGoal(event: React.MouseEvent<HTMLAnchorElement>, medication: PrescribedMedication) {
+  const medicationId = patientMedicationId(medication);
+  if (!medicationId) return;
+
+  event.preventDefault();
+  const target = document.getElementById(`medication-goal-card-${String(medicationId)}`);
+  if (target) {
+    window.history.replaceState(null, "", `/today#medication-goal-card-${encodeURIComponent(String(medicationId))}`);
+    target.scrollIntoView({ behavior: "smooth", block: "start" });
+  }
 }
 
 export default function PrescribedMedicationsCard({
@@ -122,7 +143,7 @@ export default function PrescribedMedicationsCard({
                 </div>
                 <div className="flex shrink-0 items-center gap-2 sm:ml-auto">
                   <span className="rounded-full bg-white px-2.5 py-1 text-[9px] font-bold text-[#71839a] ring-1 ring-[#e1ecef]">Today</span>
-                  <Link href={href} className="inline-flex min-h-9 items-center gap-1.5 rounded-xl border border-[#d7e4e8] bg-white px-3 py-2 text-[10px] font-black text-[#0b2d54] transition hover:border-[#24c1c4] hover:bg-[#f2fbfb]" aria-label={goal ? `View the active medication goal for ${name}` : `Set a medication goal for ${name}`}>
+                  <Link href={href} onClick={goal ? (event) => handleViewGoal(event, medication) : undefined} className="inline-flex min-h-9 items-center gap-1.5 rounded-xl border border-[#d7e4e8] bg-white px-3 py-2 text-[10px] font-black text-[#0b2d54] transition hover:border-[#24c1c4] hover:bg-[#f2fbfb]" aria-label={goal ? `View the active medication goal for ${name}` : `Set a medication goal for ${name}`}>
                     <Target className="h-3.5 w-3.5 text-[#0b7d82]" />
                     {goal ? "View Goal" : "Set medication goal"}
                   </Link>
