@@ -3,6 +3,7 @@ import {
   IsBoolean,
   IsDateString,
   IsEnum,
+  IsIn,
   IsNumber,
   IsOptional,
   IsString,
@@ -14,6 +15,26 @@ import {
 import { MedicationStatus } from '@prisma/client';
 import { Type } from 'class-transformer';
 
+const MEDICATION_FREQUENCIES = [
+  'ONCE_DAILY',
+  'TWICE_DAILY',
+  'THREE_TIMES_DAILY',
+  'FOUR_TIMES_DAILY',
+  'AS_NEEDED',
+  'WEEKLY',
+  'OTHER',
+] as const;
+
+const MEDICATION_ROUTES = [
+  'ORAL',
+  'INHALATION',
+  'INJECTION',
+  'TOPICAL',
+  'OPHTHALMIC',
+  'OTIC',
+  'OTHER',
+] as const;
+
 export class PatientMedicationItemDto {
   @IsOptional()
   @IsUUID()
@@ -23,8 +44,8 @@ export class PatientMedicationItemDto {
   medicationId!: string;
 
   @IsOptional() @IsString() @MaxLength(100) dosage?: string;
-  @IsOptional() @IsString() @MaxLength(100) frequency?: string;
-  @IsOptional() @IsString() @MaxLength(100) route?: string;
+  @IsOptional() @IsString() @IsIn(MEDICATION_FREQUENCIES) @MaxLength(50) frequency?: string;
+  @IsOptional() @IsString() @IsIn(MEDICATION_ROUTES) @MaxLength(50) route?: string;
   @IsOptional() @IsString() @MaxLength(255) indication?: string;
   @IsOptional() @IsString() instructions?: string;
   @IsOptional() @IsString() @MaxLength(150) prescribedBy?: string;
