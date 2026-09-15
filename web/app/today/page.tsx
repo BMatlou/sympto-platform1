@@ -170,9 +170,9 @@ export default function TodayPage() {
 
           <div id="today-goals" className="mt-7 flex items-end justify-between gap-5"><h2 className="text-xl font-black tracking-[-.045em] text-[#0b2d54]">Your active goals</h2><Link href="/health-goals" className="text-[10px] font-black text-[#0b2d54]">Manage goals <ArrowRight className="ml-1 inline h-3.5 w-3.5" /></Link></div>
 
-          {(medicationGoal || smokingGoal || alcoholGoal || weightGoal || exerciseGoal) && (
+          {(medications.length > 0 || medicationGoal || smokingGoal || alcoholGoal || weightGoal || exerciseGoal) && (
             <section className="mt-3.5 grid items-stretch gap-4 lg:grid-cols-2">
-              {medicationGoal ? <TodayMedicationActions medications={medications} goal={medicationGoal} onUpdated={reload} /> : <div />}
+              {(medications.length > 0 || medicationGoal) ? <TodayMedicationActions medications={medications} goal={medicationGoal} onUpdated={reload} /> : <div />}
               {smokingGoal ? <TodaySmokingGoal goal={smokingGoal} /> : <div />}
               {alcoholGoal && <TodayAlcoholGoal goal={alcoholGoal} onUpdated={reload} />}
               {weightGoal && <TodayWeightGoal goal={weightGoal} fallbackWeight={weightKg} />}
@@ -200,7 +200,7 @@ export default function TodayPage() {
             </section>
           )}
 
-          {!medicationGoal && !smokingGoal && !alcoholGoal && !weightGoal && !exerciseGoal && <Link href="/health-goals" className="mt-4 inline-flex min-h-10 items-center gap-2 rounded-xl bg-[#0b2d54] px-4 py-2.5 text-[10px] font-black text-white">Set a health goal <ArrowRight className="h-3.5 w-3.5" /></Link>}
+          {!medicationGoal && medications.length === 0 && !smokingGoal && !alcoholGoal && !weightGoal && !exerciseGoal && <Link href="/health-goals" className="mt-4 inline-flex min-h-10 items-center gap-2 rounded-xl bg-[#0b2d54] px-4 py-2.5 text-[10px] font-black text-white">Set a health goal <ArrowRight className="h-3.5 w-3.5" /></Link>}
         </div>
       </main>
     </ProtectedRoute>
