@@ -86,21 +86,26 @@ function normalizeGoals(result: HealthHomeResponse, fullGoals: any[]) {
       const targetValue = Number(goal?.targetValue ?? goal?.metricConfig?.frequencyTarget ?? DEFAULT_MEDICATION_TARGET);
       const target = Number.isFinite(targetValue) && targetValue > 0 ? targetValue : DEFAULT_MEDICATION_TARGET;
       const currentValue = medicationAdherence;
-      const achieved = currentValue != null && currentValue >= target;
       const progressPercent = currentValue == null ? 0 : Math.min(100, Math.max(0, Math.round((currentValue / target) * 100)));
+      const originalStatus = String(goal?.status ?? "").toUpperCase();
+      const isActive = ["ACTIVE", "IN_PROGRESS"].includes(originalStatus);
 
+      // Do not turn an active medication journey into ACHIEVED merely because
+      // today's/overall adherence happens to meet the target. The persisted
+      // goal status controls whether the journey is active. TodayMedicationActions
+      // owns the per-dose Taken/Skipped tracking and journey progress UI.
       return {
         ...goal,
         unit: "%",
         targetValue: target,
         currentValue,
-        status: achieved ? "ACHIEVED" : "ACTIVE",
-        achievedAt: achieved ? goal?.achievedAt ?? new Date().toISOString() : goal?.achievedAt ?? null,
+        status: isActive ? originalStatus : originalStatus,
+        achievedAt: goal?.achievedAt ?? null,
         latestProgress: {
           ...(historicalAchievement ?? progress[0] ?? {}),
           currentValue,
           progressPercent,
-          status: achieved ? "ACHIEVED" : "IMPROVING",
+          status: originalStatus === "ACHIEVED" ? "ACHIEVED" : "IMPROVING",
         },
       };
     }
@@ -157,7 +162,7 @@ export function useDashboard() {
         today: {
           ...result.today,
           activeGoalCount: normalizedGoals.filter(
-            (goal: any) => String(goal?.status ?? "").toUpperCase() === "ACTIVE",
+            (goal: any) => ["ACTIVE", "IN_PROGRESS"].includes(String(goal?.status ?? "").toUpperCase()),
           ).length,
         },
       });
