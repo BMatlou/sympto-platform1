@@ -11,83 +11,32 @@ import {
   Min,
   ValidateNested,
 } from 'class-validator';
-
 import { MedicationStatus } from '@prisma/client';
-
 import { Type } from 'class-transformer';
 
 export class PatientMedicationItemDto {
+  @IsOptional()
+  @IsUUID()
+  patientMedicationId?: string;
+
   @IsUUID()
   medicationId!: string;
 
-  @IsOptional()
-  @IsString()
-  @MaxLength(100)
-  dosage?: string;
-
-  @IsOptional()
-  @IsString()
-  @MaxLength(100)
-  frequency?: string;
-
-  @IsOptional()
-  @IsString()
-  @MaxLength(100)
-  route?: string;
-
-  @IsOptional()
-  @IsString()
-  @MaxLength(255)
-  indication?: string;
-
-  @IsOptional()
-  @IsString()
-  instructions?: string;
-
-  @IsOptional()
-  @IsString()
-  @MaxLength(150)
-  prescribedBy?: string;
-
-  @IsOptional()
-  @IsDateString()
-  startedAt?: string;
-
-  @IsOptional()
-  @IsDateString()
-  endedAt?: string;
-
-  @IsOptional()
-  @IsBoolean()
-  ongoing?: boolean;
-
-  @IsOptional()
-  @IsNumber()
-  @Min(0)
-  adherencePercentage?: number;
-
-  @IsOptional()
-  @IsNumber()
-  @Min(0)
-  missedDoses?: number;
-
-  @IsOptional()
-  @IsString()
-  sideEffects?: string;
-
-  @IsOptional()
-  @IsString()
-  @MaxLength(255)
-  effectiveness?: string;
-
-  @IsOptional()
-  @IsEnum(MedicationStatus)
-  status?: MedicationStatus;
-
-  @IsOptional()
-  @IsString()
-  @MaxLength(1000)
-  notes?: string;
+  @IsOptional() @IsString() @MaxLength(100) dosage?: string;
+  @IsOptional() @IsString() @MaxLength(100) frequency?: string;
+  @IsOptional() @IsString() @MaxLength(100) route?: string;
+  @IsOptional() @IsString() @MaxLength(255) indication?: string;
+  @IsOptional() @IsString() instructions?: string;
+  @IsOptional() @IsString() @MaxLength(150) prescribedBy?: string;
+  @IsOptional() @IsDateString() startedAt?: string;
+  @IsOptional() @IsDateString() endedAt?: string;
+  @IsOptional() @IsBoolean() ongoing?: boolean;
+  @IsOptional() @IsNumber() @Min(0) adherencePercentage?: number;
+  @IsOptional() @IsNumber() @Min(0) missedDoses?: number;
+  @IsOptional() @IsString() sideEffects?: string;
+  @IsOptional() @IsString() @MaxLength(255) effectiveness?: string;
+  @IsOptional() @IsEnum(MedicationStatus) status?: MedicationStatus;
+  @IsOptional() @IsString() @MaxLength(1000) notes?: string;
 }
 
 export class UpdatePatientMedicationsDto {
