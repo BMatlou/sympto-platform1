@@ -84,12 +84,6 @@ function journeyProgress(goal: any) {
   return { journeyDay, daysLeft };
 }
 
-/**
- * Returns the cumulative number of doses taken before/through today.
- * Today-only metric-event counts must never be used for this value.
- * Prefer an exact backend counter when one is present; otherwise derive it
- * from the medication's persisted adherence percentage and missed-dose count.
- */
 function cumulativeTakenDoses(medication: any): number {
   const exactCandidates = [
     medication?.takenDoses,
@@ -109,8 +103,6 @@ function cumulativeTakenDoses(medication: any): number {
   if (!Number.isFinite(adherence) || !Number.isFinite(missed) || missed < 0 || adherence <= 0) return 0;
   if (adherence >= 100 && missed === 0) return 0;
 
-  // adherence = taken / (taken + missed) * 100. Find the smallest integer
-  // count consistent with the persisted percentage after normal rounding.
   const roundedTarget = Number(adherence.toFixed(2));
   for (let total = Math.max(1, Math.ceil(missed)); total <= 10000; total += 1) {
     const taken = total - missed;
@@ -204,7 +196,7 @@ export default function TodayMedicationActions({ medications, goal: suppliedGoal
 
   const doseLabel = useMemo(() => (totalRequiredDosesPerDay === 1 ? "1 dose" : `${totalRequiredDosesPerDay} doses`), [totalRequiredDosesPerDay]);
   const { journeyDay, daysLeft } = journeyProgress(resolvedGoal);
-  const medicationAnchorId = `medication-goal-card-${String(medicationId ?? "unassigned")}`;
+  const medicationAnchorId = `medication-adherence-card-${String(medicationId ?? "unassigned")}`;
   const ringSize = 96;
   const ringStroke = 9;
   const radius = (ringSize - ringStroke) / 2;
