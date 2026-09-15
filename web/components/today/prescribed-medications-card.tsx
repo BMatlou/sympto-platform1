@@ -115,13 +115,21 @@ function handleMedicationActionClick(
     return;
   }
 
+  const name = medicationName(medication);
+  const dosage = firstText(medication.dosage, medication.dose, "");
+  const frequency = firstText(medication.frequency, medication.schedule, "");
+  const associatedMedicationId = String(patientMedicationId(medication) ?? "");
   const queryParams = new URLSearchParams({
     action: "create",
     category: "MEDICATION",
-    medicationName: medicationName(medication),
-    dosage: firstText(medication.dosage, medication.dose, ""),
-    frequency: firstText(medication.frequency, medication.schedule, ""),
-    associatedMedicationId: String(patientMedicationId(medication) ?? ""),
+    medicationName: name,
+    dosage,
+    frequency,
+    associatedMedicationId,
+    // Backward-compatible aliases consumed by the existing Health Goals editor.
+    open: "medication",
+    name,
+    medicationId: associatedMedicationId,
   }).toString();
 
   router.push(`/health-goals?${queryParams}`);
