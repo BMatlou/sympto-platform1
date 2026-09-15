@@ -110,7 +110,7 @@ class HealthHomeService {
 
     let prescriptionRecords: any[] = Array.isArray(healthHome.prescriptions) ? healthHome.prescriptions : [];
     try {
-      const prescriptionResponse = await api.get('/prescriptions', { params: { patientId: healthHome.patient.id, page: 1, limit: 100 } });
+      const prescriptionResponse = await api.get('/prescriptions/mine', { params: { page: 1, limit: 100 } });
       const prescriptionPayload: any = prescriptionResponse.data;
       const fetched = prescriptionPayload?.data ?? prescriptionPayload;
       if (Array.isArray(fetched)) prescriptionRecords = fetched;
@@ -147,7 +147,7 @@ class HealthHomeService {
     const conditions = canonicalConditions.length > 0 ? canonicalConditions : healthHomeConditions.map((condition: any) => condition?.status ? condition : { ...condition, status: 'ACTIVE' });
     const goals = normalizeGoals(canonical.healthGoals, canonical.goals, healthHomeGoals);
 
-    return { ...healthHome, profile: canonical.profile ?? healthHome.profile, patient: { ...healthHome.patient, ...(canonical.patient ?? {}) }, healthPassport: canonical.healthPassport ?? healthHome.healthPassport, emergencyContacts, allergies, conditions, medications, immunizations, goals, healthGoals: goals, prescriptions: prescriptionRecords, healthSnapshot: { ...healthHome.healthSnapshot, activeAllergies: allergies, activeConditions: conditions, allergies, immunizations, bloodType: canonical.healthPassport?.bloodType ?? healthHome.healthSnapshot.bloodType, rhesusFactor: canonical.healthPassport?.rhesusFactor ?? healthHome.healthSnapshot.rhesusFactor }, today: { ...healthHome.today, activeMedications: medications, activeMedicationCount: medications.length }, wearables: healthHome.wearables ?? { devices: healthHome.healthSnapshot.connectedDevices, latestMeasurements: healthHome.healthSnapshot.latestMeasurements.map((m: any, index) => ({ id: `${m.type}-${index}`, type: m.type, value: m.value, unit: m.unit, measuredAt: m.measuredAt, source: m.source })) } };
+    return { ...healthHome, profile: canonical.profile ?? healthHome.profile, patient: { ...healthHome.patient, ...(canonical.patient ?? {}) }, healthPassport: canonical.healthPassport ?? healthHome.healthPassport, emergencyContacts, allergies, conditions, medications, immunizations, goals, healthGoals: goals, prescriptions: prescriptionRecords, healthSnapshot: { ...healthHome.healthSnapshot, activeAllergies: allergies, activeConditions: conditions, allergies, immunizations, bloodType: canonical.healthPassport?.bloodType ?? healthHome.healthSnapshot.bloodType, rhesusFactor: canonical.healthPassport?.rhesusFactor ?? healthHome.healthSnapshot.rhesusFactor }, today: { ...healthHome.today, activeMedications: medications, activeMedicationCount: medications.length }, wearables: healthHome.wearables ?? { devices: healthHome.healthSnapshot.connectedDevices, latestMeasurements: healthHome.healthSnapshot.latestMeasurements.map((m: any, index: number) => ({ id: `${m.type}-${index}`, type: m.type, value: m.value, unit: m.unit, measuredAt: m.measuredAt, source: m.source })) } };
   }
 
   async updateWeight(weightKg: number, heightCm?: number, patientId?: string): Promise<UpdateWeightResponse> {
