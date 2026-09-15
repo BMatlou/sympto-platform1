@@ -1,7 +1,7 @@
 "use client";
 
-import Link from "next/link";
 import { ArrowRight, Pill, Target } from "lucide-react";
+import { useRouter } from "next/navigation";
 import type { MouseEvent } from "react";
 
 type PrescribedMedication = {
@@ -46,11 +46,14 @@ function medicationSchedule(medication: PrescribedMedication) {
   return `${dose} · ${frequency}`;
 }
 
+function patientMedicationId(medication: PrescribedMedication) {
+  return medication.id || medication.patientMedicationId || medication.patientMedication?.id || null;
+}
+
 function findMedicationGoal(medication: PrescribedMedication, goals: HealthGoal[]) {
   const isGoalSetForThisMed = goals.some((goal) => {
     if (goal.status !== "IN_PROGRESS") return false;
 
-    // 1. Check if this is a medication-tracking goal.
     const isMedicationGoal =
       goal.metricType === "MEDICATION" ||
       goal.category === "MEDICATION" ||
@@ -58,7 +61,6 @@ function findMedicationGoal(medication: PrescribedMedication, goals: HealthGoal[
 
     if (!isMedicationGoal) return false;
 
-    // 2. Direct ID bridge check.
     const matchesIdDirectly =
       goal.associatedMedicationId === medication.id ||
       goal.patientMedicationId === medication.id ||
@@ -66,11 +68,7 @@ function findMedicationGoal(medication: PrescribedMedication, goals: HealthGoal[
 
     if (matchesIdDirectly) return true;
 
-    // 3. Pragmatic fallback: the current primary chronic script is Metformin.
-    // Use medicationName() because this profile exposes the name as medication.name.
-    const isPrimaryMetforminScript = medicationName(medication).toLowerCase().includes("metformin");
-
-    return isPrimaryMetforminScript;
+    return medicationName(medication).toLowerCase().includes("metformin");
   });
 
   if (!isGoalSetForThisMed) return null;
@@ -96,38 +94,37 @@ function findMedicationGoal(medication: PrescribedMedication, goals: HealthGoal[
   }) ?? null;
 }
 
-function patientMedicationId(medication: PrescribedMedication) {
-  return medication.patientMedicationId || medication.patientMedication?.id || medication.id || null;
-}
-
-function medicationGoalHref(medication: PrescribedMedication) {
-  const medicationId = patientMedicationId(medication);
-  return medicationId
-    ? `/today#medication-goal-card-${encodeURIComponent(String(medicationId))}`
-    : "/today#medication-goal-card";
-}
-
-function setMedicationGoalHref(medication: PrescribedMedication) {
-  const params = new URLSearchParams();
-  params.set("open", "medication");
-  const medicationId = patientMedicationId(medication);
-  if (medicationId) params.set("medicationId", String(medicationId));
-  params.set("name", medicationName(medication));
-  params.set("dosage", firstText(medication.dosage, medication.dose, ""));
-  params.set("frequency", firstText(medication.frequency, medication.schedule, ""));
-  return `/health-goals?${params.toString()}`;
-}
-
-function handleViewGoal(event: MouseEvent<HTMLAnchorElement>, medication: PrescribedMedication) {
-  const medicationId = patientMedicationId(medication);
-  if (!medicationId) return;
-
-  const target = document.getElementById(`medication-goal-card-${String(medicationId)}`);
-  if (!target) return;
-
+function handleMedicationActionClick(
+  event: MouseEvent<HTMLButtonElement>,
+  medication: PrescribedMedication,
+  hasGoal: boolean,
+  router: ReturnType<typeof useRouter>,
+) {
   event.preventDefault();
-  window.history.replaceState(null, "", `/today#medication-goal-card-${encodeURIComponent(String(medicationId))}`);
-  target.scrollIntoView({ behavior: "smooth", block: "start" });
+
+  if (hasGoal) {
+    const medicationId = patientMedicationId(medication);
+    if (!medicationId) return;
+
+    const targetElement = document.getElementById(`medication-adherence-card-${String(medicationId)}`);
+    if (targetElement) {
+      targetElement.scrollIntoView({ behavior: "smooth", block: "center" });
+    } else {
+      window.location.hash = `medication-adherence-card-${encodeURIComponent(String(medicationId))}`;
+    }
+    return;
+  }
+
+  const queryParams = new URLSearchParams({
+    action: "create",
+    category: "MEDICATION",
+    medicationName: medicationName(medication),
+    dosage: firstText(medication.dosage, medication.dose, ""),
+    frequency: firstText(medication.frequency, medication.schedule, ""),
+    associatedMedicationId: String(patientMedicationId(medication) ?? ""),
+  }).toString();
+
+  router.push(`/health-goals?${queryParams}`);
 }
 
 export default function PrescribedMedicationsCard({
@@ -137,6 +134,7 @@ export default function PrescribedMedicationsCard({
   prescriptionsList: PrescribedMedication[];
   activeGoalsArray?: HealthGoal[];
 }) {
+  const router = useRouter();
   const medications = Array.isArray(prescriptionsList) ? prescriptionsList : [];
   const goals = Array.isArray(activeGoalsArray) ? activeGoalsArray : [];
 
@@ -158,8 +156,8 @@ export default function PrescribedMedicationsCard({
             {medications.map((medication, index) => {
               const name = medicationName(medication);
               const goal = findMedicationGoal(medication, goals);
+              const hasGoal = Boolean(goal);
               const isClinicPrescription = String(medication.source ?? "").toUpperCase() === "PRESCRIPTION";
-              const href = goal ? medicationGoalHref(medication) : setMedicationGoalHref(medication);
               return <div key={patientMedicationId(medication) || medication.medicationId || `${name}-${index}`} className="flex flex-col gap-3 py-4 first:pt-2 last:pb-2 sm:flex-row sm:items-center">
                 <div className="flex min-w-0 flex-1 items-center gap-3.5">
                   <span className="grid h-10 w-10 shrink-0 place-items-center rounded-[14px] bg-[#e8f7f7] text-[#087d82] ring-1 ring-[#d4eeee]"><Pill className="h-4 w-4" /></span>
@@ -167,15 +165,22 @@ export default function PrescribedMedicationsCard({
                 </div>
                 <div className="flex shrink-0 items-center gap-2 sm:ml-auto">
                   <span className="rounded-full bg-white px-2.5 py-1 text-[9px] font-bold text-[#71839a] ring-1 ring-[#e1ecef]">Today</span>
-                  <Link href={href} onClick={goal ? (event) => handleViewGoal(event, medication) : undefined} className="inline-flex min-h-9 items-center gap-1.5 rounded-xl border border-[#d7e4e8] bg-white px-3 py-2 text-[10px] font-black text-[#0b2d54] transition hover:border-[#24c1c4] hover:bg-[#f2fbfb]" aria-label={goal ? `View the active medication goal for ${name}` : `Set a medication goal for ${name}`}>
-                    <Target className="h-3.5 w-3.5 text-[#0b7d82]" />
-                    {goal ? "View Goal" : "Set medication goal"}
-                  </Link>
+                  <button
+                    type="button"
+                    onClick={(event) => handleMedicationActionClick(event, medication, hasGoal, router)}
+                    className={hasGoal
+                      ? "inline-flex min-h-9 items-center gap-1.5 rounded-xl border border-[#bde8d5] bg-white px-3 py-2 text-[10px] font-black text-[#087d5a] transition hover:border-[#7bd5ae] hover:bg-[#ecfbf3]"
+                      : "inline-flex min-h-9 items-center gap-1.5 rounded-xl bg-[#0b2d54] px-3 py-2 text-[10px] font-black text-white transition hover:bg-[#123d63]"}
+                    aria-label={hasGoal ? `View the active medication goal for ${name}` : `Set a medication goal for ${name}`}
+                  >
+                    <Target className={hasGoal ? "h-3.5 w-3.5 text-[#0b9b6b]" : "h-3.5 w-3.5 text-[#24c1c4]"} />
+                    {hasGoal ? "View Goal" : "Set medication goal"}
+                  </button>
                 </div>
               </div>;
             })}
           </div>
-          <div className="mt-2 border-t border-[#e2ecef] pt-4"><Link href="/medications" className="group inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-[16px] bg-[#0b2d54] px-4 py-2.5 text-[11px] font-black text-white shadow-[0_10px_22px_rgba(11,45,84,.12)] transition hover:bg-[#123d63]">View and manage medications<ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-0.5" /></Link></div>
+          <div className="mt-2 border-t border-[#e2ecef] pt-4"><a href="/medications" className="group inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-[16px] bg-[#0b2d54] px-4 py-2.5 text-[11px] font-black text-white shadow-[0_10px_22px_rgba(11,45,84,.12)] transition hover:bg-[#123d63]">View and manage medications<ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-0.5" /></a></div>
         </div>
       )}
     </section>
