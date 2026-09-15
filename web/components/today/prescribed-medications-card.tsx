@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { ArrowRight, Pill, Target } from "lucide-react";
+import type { MouseEvent } from "react";
 
 type PrescribedMedication = {
   id?: string | null;
@@ -94,7 +95,7 @@ function setMedicationGoalHref(medication: PrescribedMedication) {
   return `/health-goals?${params.toString()}`;
 }
 
-function handleViewGoal(event: React.MouseEvent<HTMLAnchorElement>, medication: PrescribedMedication) {
+function handleViewGoal(event: MouseEvent<HTMLAnchorElement>, medication: PrescribedMedication) {
   const medicationId = patientMedicationId(medication);
   if (!medicationId) return;
 
