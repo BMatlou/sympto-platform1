@@ -96,6 +96,7 @@ export default function TodayMedicationActions({ medications, goal, onUpdated }:
 
   const doseLabel = useMemo(() => (totalRequiredDosesPerDay === 1 ? "1 dose" : `${totalRequiredDosesPerDay} doses`), [totalRequiredDosesPerDay]);
   const { journeyDay, daysLeft } = journeyProgress(goal);
+  const medicationAnchorId = `medication-goal-card-${String(patientMedicationId(trackedMedication) ?? "unassigned")}`;
   const ringSize = 96;
   const ringStroke = 9;
   const radius = (ringSize - ringStroke) / 2;
@@ -149,7 +150,7 @@ export default function TodayMedicationActions({ medications, goal, onUpdated }:
 
   if (!goal) {
     return (
-      <section id="medication-goal-card" className={cardClass}>
+      <section id={medicationAnchorId} className={cardClass}>
         <header className="flex items-center gap-3 px-4 pb-3 pt-4 sm:px-5 sm:pt-5">
           <span className="grid h-10 w-10 shrink-0 place-items-center rounded-[14px] bg-[#e8f8f7] text-[#24c1c4] ring-1 ring-[#d3efed]"><Pill className="h-4 w-4" /></span>
           <div className="min-w-0">
@@ -171,7 +172,7 @@ export default function TodayMedicationActions({ medications, goal, onUpdated }:
   }
 
   return (
-    <section id="medication-goal-card" className={cardClass}>
+    <section id={medicationAnchorId} className={cardClass}>
       <header className="flex items-center justify-between gap-3 px-4 pb-3 pt-4 sm:px-5 sm:pt-5">
         <div className="flex min-w-0 items-center gap-2.5">
           <span className="grid h-9 w-9 shrink-0 place-items-center rounded-[13px] bg-[#e8f8f7] text-[#24c1c4] ring-1 ring-[#d3efed]"><Pill className="h-4 w-4" /></span>
