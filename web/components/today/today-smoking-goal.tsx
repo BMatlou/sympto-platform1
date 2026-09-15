@@ -113,7 +113,7 @@ export default function TodaySmokingGoal({ goal }: Props) {
       </header>
 
       <div className="px-3.5 pb-3.5 sm:px-4 sm:pb-4">
-        <section className="relative overflow-hidden rounded-[23px] bg-[#0b2d54] px-4 py-4 text-white shadow-[0_12px_28px_rgba(11,45,84,.14)] sm:px-5 sm:py-4.5">
+        <section className="relative overflow-hidden rounded-[23px] bg-[#0b2d54] px-4 py-3.5 text-white shadow-[0_12px_28px_rgba(11,45,84,.14)] sm:px-5 sm:py-4">
           <div className="pointer-events-none absolute -right-10 -top-12 h-28 w-28 rounded-full bg-[#24c1c4]/18 blur-2xl" />
           <div className="relative flex items-center gap-4 sm:gap-5">
             <div className="relative shrink-0" style={{ width: ringSize, height: ringSize }}>
@@ -127,10 +127,22 @@ export default function TodaySmokingGoal({ goal }: Props) {
             </div>
 
             <div className="min-w-0 flex-1">
-              <p className="text-[8px] font-black uppercase tracking-[.16em] text-white/40">Daily ceiling</p>
-              <p className="mt-0.5 text-lg font-black tracking-[-.045em]">{hasTarget ? formatNumber(dailyTarget) : "—"}<span className="ml-1 text-[10px] font-bold tracking-normal text-white/55">cigarettes</span></p>
-              <div className="mt-2 inline-flex rounded-full bg-white/10 px-2.5 py-1.5 text-[9px] font-black text-[#b8ffff] ring-1 ring-white/10">{hasTarget ? `${progressPercent}% of ceiling` : "Set a daily ceiling"}</div>
-              {todayLogged !== null && hasTarget && <p className="mt-1.5 text-[9px] font-semibold text-white/50">{difference < 0 ? `${formatNumber(Math.abs(difference))} remaining today` : difference === 0 ? "At today’s ceiling" : `${formatNumber(Math.abs(difference))} over today’s ceiling`}</p>}
+              <div className="grid grid-cols-2 gap-3 sm:gap-4">
+                <div>
+                  <p className="text-[8px] font-black uppercase tracking-[.16em] text-white/40">Daily ceiling</p>
+                  <p className="mt-1 text-xl font-black leading-none tracking-[-.045em]">{hasTarget ? formatNumber(dailyTarget) : "—"}</p>
+                  <p className="mt-1 text-[9px] font-semibold text-white/50">cigarettes</p>
+                </div>
+                <div className="border-l border-white/10 pl-3 sm:pl-4">
+                  <p className="text-[8px] font-black uppercase tracking-[.16em] text-white/40">Today</p>
+                  <p className="mt-1 text-xl font-black leading-none tracking-[-.045em]">{todayLogged === null ? "—" : formatNumber(todayLogged)}</p>
+                  <p className="mt-1 text-[9px] font-semibold text-white/50">{todayLogged === null ? "not logged" : "cigarettes"}</p>
+                </div>
+              </div>
+              <div className="mt-3 flex items-center gap-2">
+                <span className="rounded-full bg-white/10 px-2.5 py-1.5 text-[9px] font-black text-[#b8ffff] ring-1 ring-white/10">{hasTarget ? `${progressPercent}% of ceiling` : "Set a daily ceiling"}</span>
+                {todayLogged !== null && hasTarget && <span className="truncate text-[9px] font-semibold text-white/50">{difference < 0 ? `${formatNumber(Math.abs(difference))} remaining` : difference === 0 ? "At ceiling" : `${formatNumber(Math.abs(difference))} over`}</span>}
+              </div>
             </div>
           </div>
         </section>
