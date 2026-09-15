@@ -155,16 +155,18 @@ export default function MedicationsPage() {
       </div>
 
       {showAddMedication && (
-        <div className="fixed inset-0 z-50 overflow-y-auto bg-slate-950/40 p-4 sm:p-6" role="dialog" aria-modal="true" aria-labelledby="add-medication-title">
-          <div className="mx-auto max-w-3xl rounded-3xl bg-white shadow-2xl">
-            <div className="flex items-center justify-between border-b border-slate-200 px-5 py-4 sm:px-7">
+        <div className="fixed inset-0 z-50 overflow-y-auto bg-slate-950/40 p-3 sm:p-5" role="dialog" aria-modal="true" aria-labelledby="add-medication-title">
+          <div className="mx-auto w-full max-w-5xl rounded-3xl bg-white shadow-2xl">
+            <div className="flex items-center justify-between border-b border-slate-200 px-5 py-4 sm:px-8">
               <div><h2 id="add-medication-title" className="text-xl font-bold text-[#0b2d54]">Add a medication</h2><p className="mt-1 text-sm text-slate-500">Search for your medicine, then add the dose and schedule.</p></div>
               <button type="button" onClick={() => !saving && setShowAddMedication(false)} className="rounded-full p-2 text-slate-500 hover:bg-slate-100" aria-label="Close"><X className="h-5 w-5" /></button>
             </div>
-            <div className="max-h-[75vh] overflow-y-auto px-5 py-6 sm:px-7">
-              <MedicationsStep values={medicationValues} onChange={setMedicationValues} />
+            <div className="max-h-[80vh] overflow-y-auto px-5 py-6 sm:px-8">
+              <div className="[&>div>div:first-child]:hidden">
+                <MedicationsStep values={medicationValues} onChange={setMedicationValues} />
+              </div>
             </div>
-            <div className="flex flex-col-reverse gap-3 border-t border-slate-200 px-5 py-4 sm:flex-row sm:justify-end sm:px-7">
+            <div className="flex flex-col-reverse gap-3 border-t border-slate-200 px-5 py-4 sm:flex-row sm:justify-end sm:px-8">
               <Button type="button" variant="outline" disabled={saving} onClick={() => setShowAddMedication(false)}>Cancel</Button>
               <Button type="button" disabled={saving} onClick={saveMedications} className="bg-[#0b2d54] text-white hover:bg-[#071f3a]">{saving ? "Saving..." : "Save medications"}</Button>
             </div>
