@@ -35,7 +35,7 @@ export class PatientMedicationItemDto {
   @IsOptional() @IsNumber() @Min(0) missedDoses?: number;
   @IsOptional() @IsString() sideEffects?: string;
   @IsOptional() @IsString() @MaxLength(255) effectiveness?: string;
-  @IsOptional() @IsEnum(MedicationStatus) status?: MedicationStatus;
+  @IsOptional() @IsEnum(MedicationStatus) status: MedicationStatus = MedicationStatus.ACTIVE;
   @IsOptional() @IsString() @MaxLength(1000) notes?: string;
 }
 
