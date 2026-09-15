@@ -106,7 +106,7 @@ export class OnboardingService {
       const submittedExistingIds = new Set<string>();
 
       for (const medication of dto.medications) {
-        const recordData = {
+        const createData = {
           medicationId: medication.medicationId,
           dosage: medication.dosage,
           frequency: medication.frequency,
@@ -129,10 +129,31 @@ export class OnboardingService {
           if (!existingIds.has(medication.patientMedicationId)) {
             throw new BadRequestException('One or more medication records do not belong to this patient.');
           }
+
           submittedExistingIds.add(medication.patientMedicationId);
-          await tx.patientMedication.update({ where: { id: medication.patientMedicationId }, data: recordData });
+
+          const updateData = {
+            medicationId: createData.medicationId,
+            dosage: createData.dosage ?? null,
+            frequency: createData.frequency ?? null,
+            route: createData.route ?? null,
+            indication: createData.indication ?? null,
+            instructions: createData.instructions ?? null,
+            prescribedBy: createData.prescribedBy ?? null,
+            startedAt: createData.startedAt ?? null,
+            endedAt: createData.endedAt ?? null,
+            ongoing: createData.ongoing,
+            adherencePercentage: createData.adherencePercentage,
+            missedDoses: createData.missedDoses,
+            sideEffects: createData.sideEffects ?? null,
+            effectiveness: createData.effectiveness ?? null,
+            status: createData.status,
+            notes: createData.notes ?? null,
+          };
+
+          await tx.patientMedication.update({ where: { id: medication.patientMedicationId }, data: updateData });
         } else {
-          await tx.patientMedication.create({ data: { healthPassportId, ...recordData } });
+          await tx.patientMedication.create({ data: { healthPassportId, ...createData } });
         }
       }
 
