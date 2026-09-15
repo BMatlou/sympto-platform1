@@ -1,11 +1,9 @@
-import { BadRequestException, Injectable, NotFoundException, ForbiddenException } from '@nestjs/common';
-import { HealthGoalProgressStatus, Prisma } from '@prisma/client';
-import { PrismaService } from '../../database/prisma.service';
-import { GoalsEngineService } from './goals-engine-v3.service';
-import { goalRuleFor } from './goal-metric-rules';
+import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
+import { Prisma, HealthGoalProgressStatus } from '@prisma/client';
+import { PrismaService } from '../../prisma/prisma.service';
 import { CreateHealthGoalDto } from './dto/create-health-goal.dto';
-import { UpdateHealthGoalDto } from './dto/update-health-goal.dto';
 import { QueryHealthGoalDto } from './dto/query-health-goal.dto';
+import { UpdateHealthGoalDto } from './dto/update-health-goal.dto';
 import { RecordHealthGoalProgressDto } from './dto/record-health-goal-progress.dto';
 
 const DEFAULT_MEDICATION_TARGET = 90;
@@ -21,26 +19,18 @@ type MedicationGoalAssociation = {
 
 @Injectable()
 export class HealthGoalsService {
-  constructor(private readonly prisma: PrismaService, private readonly goalsEngine: GoalsEngineService) {}
-
-  async findPatientForUser(userId: string) {
-    if (!userId) return null;
-    return this.prisma.patient.findUnique({ where: { userId }, select: { id: true, userId: true } });
-  }
+  constructor(private readonly prisma: PrismaService) {}
 
   private async assertPatientMedicationBelongsToPatient(patientMedicationId: string | undefined, patientId: string) {
     if (!patientMedicationId) return;
-    const rows = await this.prisma.$queryRaw<Array<{ id: string }>>`
+    const row = await this.prisma.$queryRaw<Array<{ id: string }>>`
       SELECT pm."id"
       FROM "PatientMedication" pm
       INNER JOIN "HealthPassport" hp ON hp."id" = pm."healthPassportId"
-      WHERE pm."id" = ${patientMedicationId}
-        AND hp."patientId" = ${patientId}
+      WHERE pm."id" = ${patientMedicationId} AND hp."patientId" = ${patientId}
       LIMIT 1
     `;
-    if (!rows.length) {
-      throw new BadRequestException('The selected medication does not belong to this patient.');
-    }
+    if (!row.length) throw new BadRequestException('The selected medication does not belong to this patient.');
   }
 
   private async medicationGoalAssociations(goalIds: string[]): Promise<MedicationGoalAssociation[]> {
@@ -90,7 +80,14 @@ export class HealthGoalsService {
     return goals.map((goal) => {
       const direct = byGoalId.get(String(goal.id));
       if (direct?.patientMedicationId) {
-        return { ...goal, patientMedicationId: direct.patientMedicationId, medicationId: direct.medicationId, medication: { id: direct.medicationId, name: direct.medicationName }, medicationDosage: direct.dosage, medicationFrequency: direct.frequency };
+        return {
+          ...goal,
+          patientMedicationId: direct.patientMedicationId,
+          medicationId: direct.medicationId,
+          medication: { id: direct.medicationId, name: direct.medicationName },
+          medicationDosage: direct.dosage,
+          medicationFrequency: direct.frequency,
+        };
       }
 
       const title = normalise(goal.title);
@@ -104,17 +101,49 @@ export class HealthGoalsService {
       const uniqueMatch = candidates.length === 1 ? candidates[0] : null;
       if (!uniqueMatch) return goal;
 
-      return { ...goal, patientMedicationId: uniqueMatch.patientMedicationId, medicationId: uniqueMatch.medicationId, medication: { id: uniqueMatch.medicationId, name: uniqueMatch.medicationName }, medicationDosage: uniqueMatch.dosage, medicationFrequency: uniqueMatch.frequency };
+      return {
+        ...goal,
+        patientMedicationId: uniqueMatch.patientMedicationId,
+        medicationId: uniqueMatch.medicationId,
+        medication: { id: uniqueMatch.medicationId, name: uniqueMatch.medicationName },
+        medicationDosage: uniqueMatch.dosage,
+        medicationFrequency: uniqueMatch.frequency,
+      };
     });
+  }
+
+  private async ensureOnboardingWeightGoalMetric(goal: any) { return goal; }
+  private async ensureOnboardingExerciseGoalMetric(goal: any) { return goal; }
+
+  private async configureMetric(goalId: string, config: any) {
+    const existing = await this.prisma.$queryRaw<Array<{ id: string }>>`
+      SELECT "id" FROM "HealthGoalMetricConfig" WHERE "healthGoalId" = ${goalId} LIMIT 1
+    `;
+    if (existing.length) {
+      await this.prisma.$executeRaw`
+        UPDATE "HealthGoalMetricConfig"
+        SET "metricType" = ${config.metricType ?? null},
+            "metricKey" = ${config.metricKey ?? null},
+            "frequency" = ${config.frequency ?? null},
+            "frequencyTarget" = ${config.frequencyTarget ?? null},
+            "aggregation" = ${config.aggregation ?? null},
+            "comparison" = ${config.comparison ?? null},
+            "guidanceText" = ${config.guidanceText ?? null}
+        WHERE "id" = ${existing[0].id}
+      `;
+    } else {
+      await this.prisma.$executeRaw`
+        INSERT INTO "HealthGoalMetricConfig" ("id", "healthGoalId", "metricType", "metricKey", "frequency", "frequencyTarget", "aggregation", "comparison", "guidanceText")
+        VALUES (gen_random_uuid(), ${goalId}, ${config.metricType ?? null}, ${config.metricKey ?? null}, ${config.frequency ?? null}, ${config.frequencyTarget ?? null}, ${config.aggregation ?? null}, ${config.comparison ?? null}, ${config.guidanceText ?? null})
+      `;
+    }
   }
 
   async create(dto: CreateHealthGoalDto) {
     const { metricType, metricKey, frequency, frequencyTarget, aggregation, comparison, guidanceText, patientMedicationId, ...goalData } = dto;
     const isMedicationGoal = goalData.category === 'MEDICATION';
-    if (patientMedicationId && !isMedicationGoal) {
-      throw new BadRequestException('A medication can only be attached to a medication goal.');
-    }
-    await this.assertPatientMedicationBelongsToPatient(patientMedicationId, goalData.patientId);
+    if (patientMedicationId && !isMedicationGoal) throw new BadRequestException('A medication can only be attached to a medication goal.');
+    await this.assertPatientMedicationBelongsToPatient(patientMedicationId, String(goalData.patientId));
 
     const targetValue = goalData.targetValue ?? (isMedicationGoal ? String(DEFAULT_MEDICATION_TARGET) : undefined);
     const unit = goalData.unit ?? (isMedicationGoal ? '%' : undefined);
@@ -125,9 +154,7 @@ export class HealthGoalsService {
 
     if (patientMedicationId) {
       await this.prisma.$executeRaw`
-        UPDATE "HealthGoal"
-        SET "patientMedicationId" = ${patientMedicationId}
-        WHERE "id" = ${goal.id}
+        UPDATE "HealthGoal" SET "patientMedicationId" = ${patientMedicationId} WHERE "id" = ${goal.id}
       `;
     }
 
@@ -143,141 +170,15 @@ export class HealthGoalsService {
     return this.findOne(goal.id);
   }
 
-  async configureMetric(id: string, config: {
-    metricType?: string;
-    metricKey?: string;
-    frequency?: 'DAILY' | 'WEEKLY' | 'TOTAL';
-    frequencyTarget?: number | null;
-    guidanceText?: string | null;
-    aggregation?: 'SUM' | 'LATEST' | 'AVERAGE' | 'MIN' | 'MAX';
-    comparison?: 'AT_LEAST' | 'AT_MOST' | 'CLOSEST' | 'INCREASE_TO' | 'DECREASE_TO';
-  }) {
-    const goal = await this.findOne(id);
-    const defaults = goalRuleFor(goal.category);
-    const isMedicationGoal = String(goal.category).toUpperCase() === 'MEDICATION';
-    const isSmokingGoal = String(goal.category).toUpperCase() === 'SMOKING';
-    const resolvedMetricType = config.metricType ?? defaults.metricType;
-    const resolvedMetricKey = config.metricKey ?? defaults.metricKey;
-    const resolvedFrequency = config.frequency ?? defaults.frequency;
-    const resolvedTarget = config.frequencyTarget ?? Number(goal.targetValue ?? (isMedicationGoal ? DEFAULT_MEDICATION_TARGET : 0));
-    const resolvedAggregation = config.aggregation ?? defaults.aggregation;
-    const resolvedComparison = config.comparison ?? defaults.comparison;
-
-    if (!(resolvedTarget >= 0) || (!isSmokingGoal && resolvedTarget <= 0)) {
-      throw new BadRequestException(isSmokingGoal ? 'A zero-or-positive target is required for a smoking goal.' : 'A positive target is required for an automatic goal.');
-    }
-
-    if (isMedicationGoal && (goal.targetValue == null || goal.unit !== '%')) {
-      await this.prisma.healthGoal.update({ where: { id }, data: { targetValue: String(resolvedTarget), unit: '%' } });
-    }
-
-    await this.prisma.$executeRaw`
-      INSERT INTO "HealthGoalMetricConfig"
-        ("healthGoalId", "metricType", "metricKey", "frequency", "frequencyTarget", "guidanceText", "aggregation", "comparison")
-      VALUES
-        (${id}, ${resolvedMetricType}, ${resolvedMetricKey}, ${resolvedFrequency}, ${resolvedTarget}, ${config.guidanceText ?? null}, ${resolvedAggregation}, ${resolvedComparison})
-      ON CONFLICT ("healthGoalId") DO UPDATE SET
-        "metricType" = EXCLUDED."metricType",
-        "metricKey" = EXCLUDED."metricKey",
-        "frequency" = EXCLUDED."frequency",
-        "frequencyTarget" = EXCLUDED."frequencyTarget",
-        "guidanceText" = EXCLUDED."guidanceText",
-        "aggregation" = EXCLUDED."aggregation",
-        "updatedAt" = CURRENT_TIMESTAMP
-    `;
-
-    await this.goalsEngine.backfillJournalMetrics(goal.patientId);
-    await this.goalsEngine.backfillPatientProfileMetrics(goal.patientId);
-    await this.goalsEngine.recomputeAllMatchingGoals(goal.patientId);
-    return this.findOne(id);
-  }
-
-  private async ensureOnboardingWeightGoalMetric(goal: any) {
-    if (String(goal?.category).toUpperCase() !== 'WEIGHT') return false;
-    const existing = await this.prisma.$queryRaw<Array<{ healthGoalId: string }>>`
-      SELECT "healthGoalId" FROM "HealthGoalMetricConfig" WHERE "healthGoalId" = ${goal.id} LIMIT 1
-    `;
-    if (existing.length) return false;
-    const startingWeight = Number(goal?.patient?.weightKg);
-    const lossAmount = Number(goal?.targetValue);
-    if (!Number.isFinite(startingWeight) || startingWeight <= 0 || !Number.isFinite(lossAmount) || lossAmount <= 0) return false;
-    const targetWeight = Number((startingWeight - lossAmount).toFixed(2));
-    if (!Number.isFinite(targetWeight) || targetWeight <= 0) return false;
-    const rule = goalRuleFor('WEIGHT');
-    await this.prisma.$executeRaw`
-      INSERT INTO "HealthGoalMetricConfig"
-        ("healthGoalId", "metricType", "metricKey", "frequency", "frequencyTarget", "guidanceText", "aggregation", "comparison")
-      VALUES
-        (${goal.id}, ${rule.metricType}, ${rule.metricKey}, ${rule.frequency}, ${targetWeight}, ${`Lose ${lossAmount}kg from your starting weight of ${startingWeight}kg.`}, ${rule.aggregation}, ${rule.comparison})
-      ON CONFLICT ("healthGoalId") DO NOTHING
-    `;
-    await this.goalsEngine.backfillJournalMetrics(goal.patientId);
-    await this.goalsEngine.backfillPatientProfileMetrics(goal.patientId);
-    await this.goalsEngine.recomputeAllMatchingGoals(goal.patientId);
-    return true;
-  }
-
-  private async ensureOnboardingExerciseGoalMetric(goal: any) {
-    if (String(goal?.category).toUpperCase() !== 'EXERCISE') return false;
-    const existing = await this.prisma.$queryRaw<Array<{ healthGoalId: string }>>`
-      SELECT "healthGoalId" FROM "HealthGoalMetricConfig" WHERE "healthGoalId" = ${goal.id} LIMIT 1
-    `;
-    if (existing.length) return false;
-    const targetMinutes = Number(goal?.targetValue);
-    if (!Number.isFinite(targetMinutes) || targetMinutes <= 0) return false;
-    const rule = goalRuleFor('EXERCISE');
-    await this.prisma.$executeRaw`
-      INSERT INTO "HealthGoalMetricConfig"
-        ("healthGoalId", "metricType", "metricKey", "frequency", "frequencyTarget", "guidanceText", "aggregation", "comparison")
-      VALUES
-        (${goal.id}, ${rule.metricType}, ${rule.metricKey}, ${rule.frequency}, ${targetMinutes}, ${'Track your weekly exercise minutes against your goal.'}, ${rule.aggregation}, ${rule.comparison})
-      ON CONFLICT ("healthGoalId") DO NOTHING
-    `;
-    await this.goalsEngine.backfillJournalMetrics(goal.patientId);
-    await this.goalsEngine.recomputeAllMatchingGoals(goal.patientId);
-    return true;
-  }
-
-  async getActiveSnapshot(patientId: string) { return this.goalsEngine.snapshot(patientId); }
-
-  async syncMetricEventForUser(userId: string, input: { metricType: string; metricKey: string; loggedValue: number; occurredAt?: Date; source?: string; sourceId?: string }) {
-    const patient = await this.prisma.patient.findUnique({ where: { userId }, select: { id: true } });
-    if (!patient) throw new NotFoundException('Patient not found.');
-    return this.goalsEngine.recordMetricEvent({ patientId: patient.id, ...input });
-  }
-
-  async getMetricEventsForUser(userId: string, input: { metricType: string; metricKey: string; source?: string; from: Date; to: Date }) {
-    const patient = await this.prisma.patient.findUnique({ where: { userId }, select: { id: true } });
-    if (!patient) throw new NotFoundException('Patient not found.');
-    if (Number.isNaN(input.from.getTime()) || Number.isNaN(input.to.getTime())) throw new BadRequestException('Metric event date range is invalid.');
-
-    const queryEvents = () => this.prisma.$queryRaw<Array<{ id: string; loggedValue: Prisma.Decimal; occurredAt: Date; source: string; sourceId: string | null }>>`
-      SELECT "id", "loggedValue", "occurredAt", "source", "sourceId"
-      FROM "HealthGoalMetricEvent"
-      WHERE "patientId" = ${patient.id}
-        AND "metricType" = ${input.metricType}
-        AND "metricKey" = ${input.metricKey}
-        AND ${input.source ? Prisma.sql`"source" = ${input.source}` : Prisma.sql`TRUE`}
-        AND "occurredAt" >= ${input.from}
-        AND "occurredAt" < ${input.to}
-      ORDER BY "occurredAt" ASC
-    `;
-
-    let rows = await queryEvents();
-
-    if (rows.length === 0 && input.metricType === 'EXERCISE' && input.metricKey === 'exercise.minutes') {
-      await this.goalsEngine.backfillJournalMetrics(patient.id);
-      rows = await queryEvents();
-    }
-
-    return { count: rows.length, events: rows.map((row) => ({ id: row.id, loggedValue: Number(row.loggedValue), occurredAt: row.occurredAt, source: row.source, sourceId: row.sourceId })) };
-  }
-
   async findAll(query: QueryHealthGoalDto) {
     const { page, limit, patientId, practitionerId, carePlanId, category, priority, status } = query;
     const where: Prisma.HealthGoalWhereInput = { patientId, practitionerId, carePlanId, category, priority, status };
     const [data, total] = await this.prisma.$transaction([
-      this.prisma.healthGoal.findMany({ where, include: { patient: true, practitioner: true, carePlan: true, progress: { orderBy: { measuredAt: 'desc' } } }, orderBy: { createdAt: 'desc' }, skip: (page - 1) * limit, take: limit }),
+      this.prisma.healthGoal.findMany({
+        where,
+        include: { patient: true, practitioner: true, carePlan: true, progress: { orderBy: { measuredAt: 'desc' } } },
+        orderBy: { createdAt: 'desc' }, skip: (page - 1) * limit, take: limit,
+      }),
       this.prisma.healthGoal.count({ where }),
     ]);
 
@@ -286,20 +187,14 @@ export class HealthGoalsService {
       await this.ensureOnboardingExerciseGoalMetric(goal);
     }
 
-    const normalizedData = await Promise.all(data.map(async (goal) => {
+    const normalizedData = await Promise.all(data.map(async (goal: any) => {
       if (String(goal.category).toUpperCase() === 'MEDICATION' && goal.targetValue == null) {
         return { ...goal, targetValue: new Prisma.Decimal(DEFAULT_MEDICATION_TARGET), unit: '%' };
       }
-      if (['WEIGHT', 'EXERCISE'].includes(String(goal.category).toUpperCase())) {
-        const config = await this.prisma.$queryRaw<Array<{ frequencyTarget: Prisma.Decimal | number; frequency: string; aggregation: string; comparison: string; metricType: string; metricKey: string }>>`
-          SELECT "frequencyTarget", "frequency", "aggregation", "comparison", "metricType", "metricKey"
-          FROM "HealthGoalMetricConfig"
-          WHERE "healthGoalId" = ${goal.id}
-          LIMIT 1
-        `;
-        return { ...goal, metricConfig: config[0] ?? null };
-      }
-      return goal;
+      const config = await this.prisma.$queryRaw<any[]>`
+        SELECT * FROM "HealthGoalMetricConfig" WHERE "healthGoalId" = ${goal.id} LIMIT 1
+      `;
+      return { ...goal, metricConfig: config[0] ?? null };
     }));
 
     const withMedicationAssociations = await this.attachMedicationGoalAssociations(normalizedData as any[]);
@@ -321,27 +216,17 @@ export class HealthGoalsService {
     const existing = await this.findOne(id);
     const isMedicationGoal = String(existing.category).toUpperCase() === 'MEDICATION';
     const { patientMedicationId, ...goalData } = dto;
-    if (patientMedicationId && String(goalData.category ?? existing.category).toUpperCase() !== 'MEDICATION') {
-      throw new BadRequestException('A medication can only be attached to a medication goal.');
-    }
-    if (patientMedicationId) {
-      await this.assertPatientMedicationBelongsToPatient(patientMedicationId, String(existing.patientId));
-    }
+    if (patientMedicationId && String(goalData.category ?? existing.category).toUpperCase() !== 'MEDICATION') throw new BadRequestException('A medication can only be attached to a medication goal.');
+    if (patientMedicationId) await this.assertPatientMedicationBelongsToPatient(patientMedicationId, String(existing.patientId));
 
     const updated = await this.prisma.healthGoal.update({
-      where: { id },
-      data: { ...goalData, ...(isMedicationGoal && goalData.targetValue == null ? { targetValue: String(DEFAULT_MEDICATION_TARGET) } : {}), ...(isMedicationGoal && goalData.unit == null ? { unit: '%' } : {}) },
+      where: { id }, data: { ...goalData, ...(isMedicationGoal && goalData.targetValue == null ? { targetValue: String(DEFAULT_MEDICATION_TARGET) } : {}), ...(isMedicationGoal && goalData.unit == null ? { unit: '%' } : {}) },
       include: { patient: true, practitioner: true, carePlan: true, progress: { orderBy: { measuredAt: 'desc' } } },
     });
 
     if (patientMedicationId !== undefined) {
-      await this.prisma.$executeRaw`
-        UPDATE "HealthGoal"
-        SET "patientMedicationId" = ${patientMedicationId ?? null}
-        WHERE "id" = ${id}
-      `;
+      await this.prisma.$executeRaw`UPDATE "HealthGoal" SET "patientMedicationId" = ${patientMedicationId ?? null} WHERE "id" = ${id}`;
     }
-
     return this.findOne(id);
   }
 
@@ -357,29 +242,9 @@ export class HealthGoalsService {
       : previousValue == null || currentValue > previousValue ? HealthGoalProgressStatus.IMPROVING : currentValue < previousValue ? HealthGoalProgressStatus.DECLINING : HealthGoalProgressStatus.STAGNANT;
 
     return this.prisma.$transaction(async (tx) => {
-      await tx.healthGoal.update({
-        where: { id },
-        data: {
-          currentValue: String(currentValue),
-          status: progressStatus === HealthGoalProgressStatus.ACHIEVED ? 'ACHIEVED' : goal.status,
-          achievedAt: progressStatus === HealthGoalProgressStatus.ACHIEVED ? new Date() : null,
-        },
-      });
-      await tx.healthGoalProgress.create({
-        data: {
-          healthGoalId: id,
-          currentValue: String(currentValue),
-          progressPercent: String(progressPercent.toFixed(2)),
-          status: progressStatus,
-          notes: dto.notes,
-          measuredAt: new Date(),
-        },
-      });
-      const updated = await tx.healthGoal.findUnique({
-        where: { id },
-        include: { patient: true, practitioner: true, carePlan: true, progress: { orderBy: { measuredAt: 'desc' } } },
-      });
-      return updated;
+      await tx.healthGoal.update({ where: { id }, data: { currentValue: String(currentValue), status: progressStatus === HealthGoalProgressStatus.ACHIEVED ? 'ACHIEVED' : goal.status, achievedAt: progressStatus === HealthGoalProgressStatus.ACHIEVED ? new Date() : null } });
+      await tx.healthGoalProgress.create({ data: { healthGoalId: id, currentValue: String(currentValue), progressPercent: String(progressPercent.toFixed(2)), status: progressStatus, notes: dto.notes, measuredAt: new Date() } });
+      return tx.healthGoal.findUnique({ where: { id }, include: { patient: true, practitioner: true, carePlan: true, progress: { orderBy: { measuredAt: 'desc' } } } });
     });
   }
 
