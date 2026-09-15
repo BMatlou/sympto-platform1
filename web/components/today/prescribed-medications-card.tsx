@@ -28,9 +28,11 @@ type HealthGoal = {
   medicationId?: string | null;
   associatedMedication?: { id?: string | null } | null;
   patientMedication?: { id?: string | null } | null;
-  medication?: { id?: string | null } | null;
+  medication?: { id?: string | null; name?: string | null; genericName?: string | null; brandName?: string | null } | null;
   metricConfig?: { metricType?: string | null; metricKey?: string | null } | null;
 };
+
+const ACTIVE_GOAL_STATUSES = new Set(["ACTIVE", "IN_PROGRESS", "ON_TRACK", "IMPROVING", "STAGNANT", "DECLINING"]);
 
 function firstText(...values: unknown[]) {
   const value = values.find((item) => item !== null && item !== undefined && String(item).trim() !== "");
@@ -73,6 +75,16 @@ function normalise(value: unknown) {
   return String(value ?? "").trim().toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
 }
 
+function goalMedicationNames(goal: HealthGoal) {
+  return [
+    goal.medication?.name,
+    goal.medication?.genericName,
+    goal.medication?.brandName,
+    goal.title,
+    goal.description,
+  ].filter(Boolean).map(normalise).filter(Boolean);
+}
+
 function findMedicationGoal(medication: PrescribedMedication, goals: HealthGoal[]) {
   const ids = new Set(medicationIds(medication));
   const name = normalise(medicationName(medication));
@@ -83,23 +95,18 @@ function findMedicationGoal(medication: PrescribedMedication, goals: HealthGoal[
     const status = String(goal?.status ?? "").toUpperCase();
     const metricKey = String(goal?.metricConfig?.metricKey ?? "").toLowerCase();
     const isMedicationGoal = category === "MEDICATION" || metricKey === "medication.adherence";
-    if (!isMedicationGoal || !["ACTIVE", "IN_PROGRESS"].includes(status)) return false;
+    if (!isMedicationGoal || !ACTIVE_GOAL_STATUSES.has(status)) return false;
 
-    // Medication records expose both the patient-medication ID and the
-    // underlying medication/catalog ID. A goal may use either one.
     const linkedIds = goalMedicationIds(goal);
     if (linkedIds.some((id) => ids.has(id))) return true;
 
-    // Older medication goals can identify the medicine only through their
-    // title/description. Keep that as a compatibility fallback.
-    const goalText = normalise(`${goal.title ?? ""} ${goal.description ?? ""}`);
-    return Boolean(name && goalText && (goalText === name || goalText.includes(name)));
+    const goalNames = goalMedicationNames(goal);
+    return Boolean(name && goalNames.some((goalName) => goalName === name || goalName.includes(name) || name.includes(goalName)));
   }) ?? null;
 }
 
-function medicationGoalAnchor(medication: PrescribedMedication) {
-  const anchorId = medication.patientMedicationId || medication.patientMedication?.id || medication.id || medication.medicationId || medication.medication?.id || medication.medication?.medicationId;
-  return anchorId ? `/today#medication-goal-card-${encodeURIComponent(String(anchorId))}` : "/today#today-goals";
+function medicationGoalAnchor(goal: HealthGoal) {
+  return goal.id ? `/health-goals#goal-${encodeURIComponent(String(goal.id))}` : "/health-goals";
 }
 
 function setMedicationGoalHref(medication: PrescribedMedication) {
@@ -142,7 +149,7 @@ export default function PrescribedMedicationsCard({
               const name = medicationName(medication);
               const goal = findMedicationGoal(medication, goals);
               const isClinicPrescription = String(medication.source ?? "").toUpperCase() === "PRESCRIPTION";
-              const href = goal ? medicationGoalAnchor(medication) : setMedicationGoalHref(medication);
+              const href = goal ? medicationGoalAnchor(goal) : setMedicationGoalHref(medication);
               return <div key={medication.patientMedicationId || medication.patientMedication?.id || medication.id || medication.medicationId || `${name}-${index}`} className="flex flex-col gap-3 py-4 first:pt-2 last:pb-2 sm:flex-row sm:items-center">
                 <div className="flex min-w-0 flex-1 items-center gap-3.5">
                   <span className="grid h-10 w-10 shrink-0 place-items-center rounded-[14px] bg-[#e8f7f7] text-[#087d82] ring-1 ring-[#d4eeee]"><Pill className="h-4 w-4" /></span>
