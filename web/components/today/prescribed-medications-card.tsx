@@ -55,11 +55,11 @@ function medicationSchedule(medication: PrescribedMedication) {
 }
 
 function patientMedicationId(medication: PrescribedMedication) {
-  return medication.id || medication.patientMedicationId || medication.patientMedication?.id || null;
+  return medication.patientMedicationId || medication.patientMedication?.id || medication.id || null;
 }
 
 function goalMedicationId(goal: HealthGoal) {
-  return goal.associatedMedicationId || goal.patientMedicationId || goal.medicationId || goal.associatedMedication?.id || goal.patientMedication?.id || goal.medication?.id || null;
+  return goal.patientMedicationId || goal.associatedMedicationId || goal.medicationId || goal.associatedMedication?.id || goal.patientMedication?.id || goal.medication?.id || null;
 }
 
 function medicationGoalNameMatches(medication: PrescribedMedication, goal: HealthGoal) {
@@ -97,24 +97,24 @@ function isActiveMedicationGoal(goal: HealthGoal) {
 }
 
 function findMedicationGoal(medication: PrescribedMedication, goals: HealthGoal[]) {
-  const medicationIds = [
-    patientMedicationId(medication),
-    medication.patientMedicationId,
-    medication.medicationId,
-    medication.medication?.id,
-    medication.medication?.medicationId,
-  ].filter(Boolean).map(String);
+  const patientMedicationIdValue = patientMedicationId(medication);
+  const medicationCatalogIds = [medication.medicationId, medication.medication?.id, medication.medication?.medicationId].filter(Boolean).map(String);
 
   return goals.find((goal) => {
     if (!isActiveMedicationGoal(goal)) return false;
 
-    const linkedGoalId = goalMedicationId(goal);
-    if (linkedGoalId && medicationIds.includes(String(linkedGoalId))) return true;
+    const linkedPatientMedicationId = goal.patientMedicationId;
+    if (linkedPatientMedicationId) {
+      return Boolean(patientMedicationIdValue) && String(linkedPatientMedicationId) === String(patientMedicationIdValue);
+    }
 
-    // Existing medication goals created by the Health Goals editor carry the
-    // medication name in the title/description. Use that persisted identity
-    // rather than a medication-specific hard-coded fallback.
-    return medicationGoalNameMatches(medication, goal);
+    const linkedMedicationId = goal.associatedMedicationId || goal.medicationId || goal.associatedMedication?.id || goal.patientMedication?.id || goal.medication?.id;
+    if (linkedMedicationId && medicationCatalogIds.includes(String(linkedMedicationId))) return true;
+
+    // Legacy goals created before patientMedicationId existed may only identify
+    // the medicine by name. The backend now resolves unambiguous legacy matches;
+    // keep this fallback for those older records only.
+    return !linkedMedicationId && medicationGoalNameMatches(medication, goal);
   }) ?? null;
 }
 
@@ -149,6 +149,7 @@ function handleMedicationActionClick(
     medicationName: name,
     dosage,
     frequency,
+    patientMedicationId: associatedMedicationId,
     associatedMedicationId,
     open: "medication",
     name,
