@@ -6,7 +6,8 @@ import { ArrowRight, Pill, Target } from "lucide-react";
 type PrescribedMedication = {
   id?: string | null;
   patientMedicationId?: string | null;
-  medication?: { id?: string | null; name?: string | null; genericName?: string | null } | null;
+  patientMedication?: { id?: string | null; medicationId?: string | null; medication?: { id?: string | null; name?: string | null; genericName?: string | null; brandName?: string | null } | null } | null;
+  medication?: { id?: string | null; name?: string | null; genericName?: string | null; brandName?: string | null } | null;
   name?: string | null;
   dosage?: string | number | null;
   dose?: string | number | null;
@@ -20,9 +21,13 @@ type PrescribedMedication = {
 
 type ActiveGoal = {
   id?: string | null;
+  title?: string | null;
+  description?: string | null;
   associatedMedicationId?: string | null;
   medicationId?: string | null;
   patientMedicationId?: string | null;
+  medication?: { id?: string | null; name?: string | null; genericName?: string | null; brandName?: string | null } | null;
+  metricConfig?: { guidanceText?: string | null; metricKey?: string | null } | null;
   status?: string | null;
 };
 
@@ -31,8 +36,40 @@ function firstText(...values: unknown[]) {
   return value === undefined ? "" : String(value);
 }
 
+function normalizeText(value: unknown) {
+  return String(value ?? "")
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
 function medicationRecordId(medication: PrescribedMedication) {
-  return firstText(medication.patientMedicationId, medication.id, medication.medication?.id);
+  return firstText(medication.patientMedicationId, medication.patientMedication?.id, medication.id);
+}
+
+function medicationClinicalIds(medication: PrescribedMedication) {
+  return [
+    medication.patientMedicationId,
+    medication.patientMedication?.id,
+    medication.medication?.id,
+    medication.patientMedication?.medicationId,
+  ].filter((value): value is string => Boolean(value));
+}
+
+function medicationNames(medication: PrescribedMedication) {
+  return [
+    medication.medication?.name,
+    medication.medication?.genericName,
+    medication.medication?.brandName,
+    medication.patientMedication?.medication?.name,
+    medication.patientMedication?.medication?.genericName,
+    medication.patientMedication?.medication?.brandName,
+    medication.name,
+  ]
+    .map(normalizeText)
+    .filter(Boolean);
 }
 
 function medicationName(medication: PrescribedMedication) {
@@ -60,7 +97,30 @@ function medicationInstructions(medication: PrescribedMedication) {
 }
 
 function goalMedicationId(goal: ActiveGoal) {
-  return firstText(goal.associatedMedicationId, goal.patientMedicationId, goal.medicationId);
+  return firstText(
+    goal.associatedMedicationId,
+    goal.patientMedicationId,
+    goal.medicationId,
+    goal.medication?.id,
+  );
+}
+
+function goalMatchesMedication(goal: ActiveGoal, medication: PrescribedMedication) {
+  const goalIds = [goalMedicationId(goal)].filter(Boolean);
+  const medicationIds = medicationClinicalIds(medication);
+  if (goalIds.length > 0 && medicationIds.some((id) => goalIds.includes(id))) return true;
+
+  const goalSearchText = [goal.title, goal.description, goal.medication?.name, goal.medication?.genericName, goal.medication?.brandName, goal.metricConfig?.guidanceText]
+    .map(normalizeText)
+    .filter(Boolean)
+    .join(" ");
+  if (!goalSearchText) return false;
+
+  const names = medicationNames(medication);
+  return names.some((name) => {
+    if (name.length < 3) return false;
+    return goalSearchText.includes(name);
+  });
 }
 
 export default function PrescribedMedicationsCard({ prescriptionsList, activeGoalsArray }: { prescriptionsList: PrescribedMedication[]; activeGoalsArray: ActiveGoal[] }) {
@@ -83,10 +143,11 @@ export default function PrescribedMedicationsCard({ prescriptionsList, activeGoa
         <div className="p-4 sm:p-5">
           {prescriptions.map((medication, index) => {
             const recordId = medicationRecordId(medication);
-            const isGoalSetForThisMed = activeGoals.some((goal) => {
-              const status = String(goal?.status ?? "").toUpperCase();
-              return Boolean(recordId) && goalMedicationId(goal) === recordId && (status === "IN_PROGRESS" || status === "ACTIVE");
+            const goal = activeGoals.find((candidate) => {
+              const status = String(candidate?.status ?? "").toUpperCase();
+              return goalMatchesMedication(candidate, medication) && (status === "IN_PROGRESS" || status === "ACTIVE");
             });
+            const isGoalSetForThisMed = Boolean(goal);
             const name = medicationName(medication);
             const doctor = medicationDoctor(medication);
             const goalAnchor = recordId ? `#medication-goal-card-${recordId}` : "#today-goals";
