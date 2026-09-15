@@ -15,6 +15,8 @@ type PrescribedMedication = {
   schedule?: string | null;
   instructions?: string | null;
   doctorName?: string | null;
+  prescribedBy?: string | null;
+  source?: string | null;
   practitioner?: { name?: string | null; firstName?: string | null; lastName?: string | null } | null;
   prescription?: { practitioner?: { name?: string | null; firstName?: string | null; lastName?: string | null } | null; doctorName?: string | null } | null;
 };
@@ -44,12 +46,7 @@ function medicationRecordId(medication: PrescribedMedication) {
 }
 
 function medicationIds(medication: PrescribedMedication) {
-  return [
-    medication.patientMedicationId,
-    medication.patientMedication?.id,
-    medication.id,
-    medication.medication?.id,
-  ].filter(Boolean).map(String);
+  return [medication.patientMedicationId, medication.patientMedication?.id, medication.id, medication.medication?.id].filter(Boolean).map(String);
 }
 
 function medicationName(medication: PrescribedMedication) {
@@ -57,8 +54,7 @@ function medicationName(medication: PrescribedMedication) {
 }
 
 function medicationDoctor(medication: PrescribedMedication) {
-  const practitioner = medication.practitioner ?? medication.prescription?.practitioner;
-  return firstText(medication.doctorName, medication.prescription?.doctorName, practitioner?.name, practitioner ? [practitioner.firstName, practitioner.lastName].filter(Boolean).join(" ") : "");
+  return firstText(medication.doctorName, medication.prescribedBy, medication.prescription?.doctorName, medication.practitioner?.name, medication.practitioner ? [medication.practitioner.firstName, medication.practitioner.lastName].filter(Boolean).join(" ") : "");
 }
 
 function medicationSchedule(medication: PrescribedMedication) {
@@ -72,15 +68,7 @@ function medicationInstructions(medication: PrescribedMedication) {
 }
 
 function goalMedicationIds(goal: ActiveGoal) {
-  return [
-    goal.associatedMedicationId,
-    goal.patientMedicationId,
-    goal.medicationId,
-    goal.associatedMedication?.id,
-    goal.patientMedication?.id,
-    goal.patientMedication?.medication?.id,
-    goal.medication?.id,
-  ].filter(Boolean).map(String);
+  return [goal.associatedMedicationId, goal.patientMedicationId, goal.medicationId, goal.associatedMedication?.id, goal.patientMedication?.id, goal.patientMedication?.medication?.id, goal.medication?.id].filter(Boolean).map(String);
 }
 
 function normalizeText(value: unknown) {
@@ -91,19 +79,12 @@ function goalMatchesMedication(goal: ActiveGoal, medication: PrescribedMedicatio
   const linkedIds = goalMedicationIds(goal);
   const medicationIdSet = new Set(medicationIds(medication));
   if (linkedIds.some((id) => medicationIdSet.has(id))) return true;
-
   const name = normalizeText(medicationName(medication));
   if (!name || name === "your medicine") return false;
-
   const title = normalizeText(goal.title);
   const description = normalizeText(goal.description);
   const associatedName = normalizeText(goal.associatedMedication?.name ?? goal.medication?.name ?? goal.patientMedication?.medication?.name);
-
-  return Boolean(
-    associatedName === name ||
-    (title && (title === name || title.includes(name) || name.includes(title))) ||
-    (description && description.includes(name)),
-  );
+  return Boolean(associatedName === name || (title && (title === name || title.includes(name) || name.includes(title))) || (description && description.includes(name)));
 }
 
 function activeMedicationGoals(goals: ActiveGoal[]) {
@@ -129,7 +110,7 @@ export default function PrescribedMedicationsCard({ prescriptionsList, activeGoa
             <span className="grid h-12 w-12 shrink-0 place-items-center rounded-[18px] bg-white/12 text-[#63e0e0] ring-1 ring-white/20 shadow-[inset_0_1px_0_rgba(255,255,255,.16)]"><Pill className="h-5.5 w-5.5" /></span>
             <div className="min-w-0"><p className="text-[9px] font-black uppercase tracking-[.18em] text-[#8fe6e5]">Prescribed medications</p><h3 className="mt-1 text-[18px] font-black tracking-[-0.04em] text-white">Medication today</h3><p className="mt-0.5 text-[11px] text-white/60">Keep today&apos;s treatment close and clear.</p></div>
           </div>
-          <span className="shrink-0 rounded-full bg-white/10 px-3 py-1.5 text-[9px] font-black tracking-[.02em] text-white/75 ring-1 ring-white/15">{prescriptions.length} {prescriptions.length === 1 ? "prescription" : "prescriptions"}</span>
+          <span className="shrink-0 rounded-full bg-white/10 px-3 py-1.5 text-[9px] font-black tracking-[.02em] text-white/75 ring-1 ring-white/15">{prescriptions.length} {prescriptions.length === 1 ? "medication" : "medications"}</span>
         </div>
       </header>
 
@@ -138,14 +119,12 @@ export default function PrescribedMedicationsCard({ prescriptionsList, activeGoa
           {prescriptions.map((medication, index) => {
             const recordId = medicationRecordId(medication);
             const directGoal = activeGoals.find((goal) => goalMatchesMedication(goal, medication));
-            // If there is exactly one prescribed medication and exactly one active
-            // medication goal, that goal belongs to this medication even when the
-            // API has not returned the medication association fields.
             const isOnlyMedicationWithOnlyGoal = prescriptions.length === 1 && activeGoals.length === 1;
             const isGoalSetForThisMed = Boolean(directGoal) || isOnlyMedicationWithOnlyGoal;
             const name = medicationName(medication);
             const doctor = medicationDoctor(medication);
             const medicationAnchor = `#medication-goal-card-${encodeURIComponent(String(recordId || medication.id || index))}`;
+            const isClinicPrescription = String(medication.source ?? "").toUpperCase() === "PRESCRIPTION";
 
             return (
               <article key={recordId || `${name}-${index}`} className="mb-4 overflow-hidden rounded-[25px] border border-[#deebee] bg-white shadow-[0_10px_28px_rgba(11,45,84,.055)] last:mb-0">
@@ -153,7 +132,7 @@ export default function PrescribedMedicationsCard({ prescriptionsList, activeGoa
                   <div className="flex items-start gap-3.5">
                     <span className="grid h-11 w-11 shrink-0 place-items-center rounded-[16px] bg-[#e8f7f7] text-[#087d82] ring-1 ring-[#d4eeee]"><Pill className="h-4.5 w-4.5" /></span>
                     <div className="min-w-0 flex-1">
-                      <div className="flex flex-wrap items-center gap-2"><h4 className="text-[17px] font-black tracking-[-.035em] text-[#0b2d54]">{name}</h4><span className="rounded-full bg-[#edf5f7] px-2 py-1 text-[8px] font-black uppercase tracking-[.12em] text-[#6d8190]">Today</span></div>
+                      <div className="flex flex-wrap items-center gap-2"><h4 className="text-[17px] font-black tracking-[-.035em] text-[#0b2d54]">{name}</h4><span className="rounded-full bg-[#edf5f7] px-2 py-1 text-[8px] font-black uppercase tracking-[.12em] text-[#6d8190]">Today</span>{isClinicPrescription && <span className="rounded-full bg-[#edf4ff] px-2 py-1 text-[8px] font-black uppercase tracking-[.12em] text-[#315b88]">Clinic prescription</span>}</div>
                       <p className="mt-1.5 text-[11px] font-black uppercase tracking-[.1em] text-[#0d8589]">{medicationSchedule(medication)}</p>
                       {doctor && <p className="mt-1.5 text-[10px] font-semibold text-[#8595a2]">Prescribed by {doctor}</p>}
                     </div>
