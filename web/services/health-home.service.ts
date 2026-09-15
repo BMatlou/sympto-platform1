@@ -39,11 +39,7 @@ export interface ManualVitalsInput { systolicPressure?: number; diastolicPressur
 export interface ManualVitalsResponse { recordedAt: string; bmi: number | null; bmiCategory: string | null }
 
 function normalizeMedications(medications: any[]): any[] {
-  return medications.map((medication: any) => ({
-    ...medication,
-    patientMedicationId: medication?.patientMedicationId ?? medication?.id ?? null,
-    medicationId: medication?.medicationId ?? medication?.medication?.id ?? medication?.medication?.medicationId ?? null,
-  }));
+  return medications.map((medication: any) => ({ ...medication, patientMedicationId: medication?.patientMedicationId ?? medication?.id ?? null, medicationId: medication?.medicationId ?? medication?.medication?.id ?? medication?.medication?.medicationId ?? null }));
 }
 
 function normalizeGoals(...sources: any[]): any[] {
@@ -67,8 +63,7 @@ function mergePrescriptionMedications(patientMedications: any[], prescriptions: 
   const existingMedicationIds = new Set(result.map((item: any) => String(item?.medicationId ?? '')).filter(Boolean));
 
   for (const prescription of Array.isArray(prescriptions) ? prescriptions : []) {
-    const status = String(prescription?.status ?? '').toUpperCase();
-    if (status !== 'ACTIVE') continue;
+    if (String(prescription?.status ?? '').toUpperCase() !== 'ACTIVE') continue;
     const expiresAt = prescription?.expiresAt ? new Date(String(prescription.expiresAt)) : null;
     if (expiresAt && !Number.isNaN(expiresAt.getTime()) && expiresAt.getTime() < Date.now()) continue;
 
@@ -76,9 +71,7 @@ function mergePrescriptionMedications(patientMedications: any[], prescriptions: 
       const medicationId = item?.medicationId ?? item?.medication?.id ?? null;
       if (!medicationId || existingMedicationIds.has(String(medicationId))) continue;
       const practitioner = prescription?.practitioner;
-      const practitionerName = practitioner?.person
-        ? [practitioner.person.firstName, practitioner.person.lastName].filter(Boolean).join(' ')
-        : (practitioner?.name ?? '');
+      const practitionerName = practitioner?.person ? [practitioner.person.firstName, practitioner.person.lastName].filter(Boolean).join(' ') : (practitioner?.name ?? '');
       result.push({
         id: `prescription-item-${item.id}`,
         patientMedicationId: null,
@@ -99,7 +92,6 @@ function mergePrescriptionMedications(patientMedications: any[], prescriptions: 
       existingMedicationIds.add(String(medicationId));
     }
   }
-
   return result;
 }
 
@@ -116,6 +108,17 @@ class HealthHomeService {
     const healthHomeMedications = Array.isArray(healthHome.medications) && healthHome.medications.length > 0 ? healthHome.medications : (Array.isArray(healthHome.today?.activeMedications) ? healthHome.today.activeMedications : []);
     const healthHomeGoals = normalizeGoals(healthHome.goals, healthHome.healthGoals);
 
+    let prescriptionRecords: any[] = Array.isArray(healthHome.prescriptions) ? healthHome.prescriptions : [];
+    try {
+      const prescriptionResponse = await api.get('/prescriptions', { params: { patientId: healthHome.patient.id, page: 1, limit: 100 } });
+      const prescriptionPayload: any = prescriptionResponse.data;
+      const fetched = prescriptionPayload?.data ?? prescriptionPayload;
+      if (Array.isArray(fetched)) prescriptionRecords = fetched;
+      else if (Array.isArray(fetched?.data)) prescriptionRecords = fetched.data;
+    } catch (error) {
+      console.warn('Prescription feed unavailable; using Health Home medication data.', error);
+    }
+
     let canonical: any = null;
     if (!patientId || patientId === healthHome.patient?.id) {
       try {
@@ -128,22 +131,10 @@ class HealthHomeService {
     }
 
     const canonicalMedications = canonical && canonical.patient?.id === healthHome.patient?.id && Array.isArray(canonical.medications) ? canonical.medications : healthHomeMedications;
-    const prescriptions = Array.isArray(healthHome.prescriptions) ? healthHome.prescriptions : [];
-    const medications = mergePrescriptionMedications(canonicalMedications, prescriptions);
+    const medications = mergePrescriptionMedications(canonicalMedications, prescriptionRecords);
 
     if (!canonical || canonical.patient?.id !== healthHome.patient?.id) {
-      return {
-        ...healthHome,
-        allergies: healthHomeAllergies,
-        conditions: healthHomeConditions,
-        medications,
-        immunizations: healthHomeImmunizations,
-        goals: healthHomeGoals,
-        healthGoals: healthHomeGoals,
-        healthSnapshot: { ...healthHome.healthSnapshot, activeAllergies: healthHomeAllergies, activeConditions: healthHomeConditions, allergies: healthHomeAllergies, immunizations: healthHomeImmunizations },
-        today: { ...healthHome.today, activeMedications: medications, activeMedicationCount: medications.length },
-        wearables: healthHome.wearables ?? { devices: healthHome.healthSnapshot.connectedDevices, latestMeasurements: healthHome.healthSnapshot.latestMeasurements.map((m: any, index) => ({ id: `${m.type}-${index}`, type: m.type, value: m.value, unit: m.unit, measuredAt: m.measuredAt, source: m.source })) },
-      };
+      return { ...healthHome, allergies: healthHomeAllergies, conditions: healthHomeConditions, medications, immunizations: healthHomeImmunizations, goals: healthHomeGoals, healthGoals: healthHomeGoals, prescriptions: prescriptionRecords, healthSnapshot: { ...healthHome.healthSnapshot, activeAllergies: healthHomeAllergies, activeConditions: healthHomeConditions, allergies: healthHomeAllergies, immunizations: healthHomeImmunizations }, today: { ...healthHome.today, activeMedications: medications, activeMedicationCount: medications.length }, wearables: healthHome.wearables ?? { devices: healthHome.healthSnapshot.connectedDevices, latestMeasurements: healthHome.healthSnapshot.latestMeasurements.map((m: any, index) => ({ id: `${m.type}-${index}`, type: m.type, value: m.value, unit: m.unit, measuredAt: m.measuredAt, source: m.source })) } };
     }
 
     const canonicalImmunizations = Array.isArray(canonical.immunizations) ? canonical.immunizations : [];
@@ -156,22 +147,7 @@ class HealthHomeService {
     const conditions = canonicalConditions.length > 0 ? canonicalConditions : healthHomeConditions.map((condition: any) => condition?.status ? condition : { ...condition, status: 'ACTIVE' });
     const goals = normalizeGoals(canonical.healthGoals, canonical.goals, healthHomeGoals);
 
-    return {
-      ...healthHome,
-      profile: canonical.profile ?? healthHome.profile,
-      patient: { ...healthHome.patient, ...(canonical.patient ?? {}) },
-      healthPassport: canonical.healthPassport ?? healthHome.healthPassport,
-      emergencyContacts,
-      allergies,
-      conditions,
-      medications,
-      immunizations,
-      goals,
-      healthGoals: goals,
-      healthSnapshot: { ...healthHome.healthSnapshot, activeAllergies: allergies, activeConditions: conditions, allergies, immunizations, bloodType: canonical.healthPassport?.bloodType ?? healthHome.healthSnapshot.bloodType, rhesusFactor: canonical.healthPassport?.rhesusFactor ?? healthHome.healthSnapshot.rhesusFactor },
-      today: { ...healthHome.today, activeMedications: medications, activeMedicationCount: medications.length },
-      wearables: healthHome.wearables ?? { devices: healthHome.healthSnapshot.connectedDevices, latestMeasurements: healthHome.healthSnapshot.latestMeasurements.map((m: any, index) => ({ id: `${m.type}-${index}`, type: m.type, value: m.value, unit: m.unit, measuredAt: m.measuredAt, source: m.source })) },
-    };
+    return { ...healthHome, profile: canonical.profile ?? healthHome.profile, patient: { ...healthHome.patient, ...(canonical.patient ?? {}) }, healthPassport: canonical.healthPassport ?? healthHome.healthPassport, emergencyContacts, allergies, conditions, medications, immunizations, goals, healthGoals: goals, prescriptions: prescriptionRecords, healthSnapshot: { ...healthHome.healthSnapshot, activeAllergies: allergies, activeConditions: conditions, allergies, immunizations, bloodType: canonical.healthPassport?.bloodType ?? healthHome.healthSnapshot.bloodType, rhesusFactor: canonical.healthPassport?.rhesusFactor ?? healthHome.healthSnapshot.rhesusFactor }, today: { ...healthHome.today, activeMedications: medications, activeMedicationCount: medications.length }, wearables: healthHome.wearables ?? { devices: healthHome.healthSnapshot.connectedDevices, latestMeasurements: healthHome.healthSnapshot.latestMeasurements.map((m: any, index) => ({ id: `${m.type}-${index}`, type: m.type, value: m.value, unit: m.unit, measuredAt: m.measuredAt, source: m.source })) } };
   }
 
   async updateWeight(weightKg: number, heightCm?: number, patientId?: string): Promise<UpdateWeightResponse> {
