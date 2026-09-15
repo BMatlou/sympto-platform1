@@ -37,15 +37,10 @@ type Goal = {
   targetValue?: number | string | null;
   currentValue?: number | string | null;
   unit?: string | null;
-  metricConfig?: {
-    frequencyTarget?: number | string | null;
-  } | null;
+  metricConfig?: { frequencyTarget?: number | string | null } | null;
 };
 
-type ExerciseEvent = {
-  loggedValue: number;
-  occurredAt: string;
-};
+type ExerciseEvent = { loggedValue: number; occurredAt: string };
 
 function startOfLocalWeek(date = new Date()) {
   const start = new Date(date);
@@ -155,7 +150,7 @@ function MoodFace({ tone }: { tone: string }) {
   }[tone] ?? "M 18 31 L 30 31";
 
   return (
-    <svg viewBox="0 0 48 48" className="h-[27px] w-[27px] fill-none stroke-current [stroke-linecap:round] [stroke-linejoin:round] [stroke-width:2.2]" aria-hidden="true">
+    <svg viewBox="0 0 48 48" className="h-6 w-6 fill-none stroke-current [stroke-linecap:round] [stroke-linejoin:round] [stroke-width:2.2]" aria-hidden="true">
       <circle cx="24" cy="24" r="16" />
       <path d="M17 20h.01M31 20h.01" />
       <path d={mouth} />
@@ -192,39 +187,27 @@ export default function DailyHealthCheckIn({ embedded = false, goals = [] }: { e
   const waterPercent = Math.min(100, Math.round((waterIntakeMl / waterGoalMl) * 100));
   const waterRemaining = Math.max(0, waterGoalMl - waterIntakeMl);
   const persistedWeekMinutes = weeklyExerciseEvents.reduce((total, event) => total + (Number.isFinite(event.loggedValue) ? event.loggedValue : 0), 0);
-  const persistedTodayMinutes = weeklyExerciseEvents
-    .filter((event) => {
-      const date = new Date(event.occurredAt);
-      return !Number.isNaN(date.getTime()) && localDayKey(date) === localDayKey();
-    })
-    .reduce((total, event) => total + (Number.isFinite(event.loggedValue) ? event.loggedValue : 0), 0);
+  const persistedTodayMinutes = weeklyExerciseEvents.filter((event) => {
+    const date = new Date(event.occurredAt);
+    return !Number.isNaN(date.getTime()) && localDayKey(date) === localDayKey();
+  }).reduce((total, event) => total + (Number.isFinite(event.loggedValue) ? event.loggedValue : 0), 0);
   const projectedWeekMinutes = Math.max(0, persistedWeekMinutes - persistedTodayMinutes + exerciseMinutes);
   const movementProgress = exerciseGoalMinutes > 0 ? Math.min(100, Math.round((projectedWeekMinutes / exerciseGoalMinutes) * 100)) : 0;
   const sleepProgress = Math.min(100, Math.round((sleepHours / sleepGoalHours) * 100));
   const derivedSleepQuality = sleepHours > 0 ? sleepQualityForHours(sleepHours) : null;
   const effectiveSleepQuality = derivedSleepQuality ?? sleepQuality;
-  const movementOverTarget = Math.max(0, projectedWeekMinutes - exerciseGoalMinutes);
   const movementRemaining = Math.max(0, exerciseGoalMinutes - projectedWeekMinutes);
 
-  const hasInput = useMemo(
-    () => Boolean(mood || sleepQuality || sleepHours > 0 || exerciseMinutes > 0 || waterIntakeMl > 0 || stressTouched),
-    [mood, sleepQuality, sleepHours, exerciseMinutes, waterIntakeMl, stressTouched],
-  );
+  const hasInput = useMemo(() => Boolean(mood || sleepQuality || sleepHours > 0 || exerciseMinutes > 0 || waterIntakeMl > 0 || stressTouched), [mood, sleepQuality, sleepHours, exerciseMinutes, waterIntakeMl, stressTouched]);
 
   const movementTitle = projectedWeekMinutes >= exerciseGoalMinutes && projectedWeekMinutes > 0
-    ? [
-        "Weekly goal reached",
-        movementOverTarget > 0
-          ? `You’re ${movementOverTarget} minutes above your ${exerciseGoalMinutes}-minute weekly goal.`
-          : `You’ve reached your ${exerciseGoalMinutes}-minute weekly exercise goal.`,
-      ]
+    ? ["Weekly goal reached", `You’ve reached your ${exerciseGoalMinutes}-minute weekly exercise goal.`]
     : projectedWeekMinutes === 0
       ? ["Ready when you are", `Your weekly exercise goal is ${exerciseGoalMinutes} minutes.`]
       : ["Nice rhythm", `${movementRemaining} more minutes this week to reach your ${exerciseGoalMinutes}-minute goal.`];
 
   useEffect(() => {
     let active = true;
-
     async function loadToday() {
       try {
         const response = await healthJournalService.getAll({ limit: 100 });
@@ -241,25 +224,17 @@ export default function DailyHealthCheckIn({ embedded = false, goals = [] }: { e
           setWaterIntakeMl(existing.waterIntakeMl ?? 0);
         }
       } catch {
-        // Keep the check-in usable when today's entry cannot be loaded.
       } finally {
-        if (active) {
-          hasLoaded.current = true;
-          setLoading(false);
-        }
+        if (active) { hasLoaded.current = true; setLoading(false); }
       }
     }
-
     loadToday();
-    return () => {
-      active = false;
-    };
+    return () => { active = false; };
   }, []);
 
   useEffect(() => {
     let active = true;
     const weekStart = startOfLocalWeek();
-
     async function loadWeekExercise() {
       try {
         const response = await healthGoalsService.getMetricEvents("EXERCISE", "exercise.minutes", weekStart, new Date(), "health-journal");
@@ -269,16 +244,11 @@ export default function DailyHealthCheckIn({ embedded = false, goals = [] }: { e
         if (active) setWeeklyExerciseEvents([]);
       }
     }
-
     void loadWeekExercise();
     const handleUpdated = () => void loadWeekExercise();
     const interval = window.setInterval(() => void loadWeekExercise(), 5000);
     window.addEventListener("sympto:health-checkin-updated", handleUpdated);
-    return () => {
-      active = false;
-      window.clearInterval(interval);
-      window.removeEventListener("sympto:health-checkin-updated", handleUpdated);
-    };
+    return () => { active = false; window.clearInterval(interval); window.removeEventListener("sympto:health-checkin-updated", handleUpdated); };
   }, [exerciseGoal?.id]);
 
   async function syncGoal(goal: Goal | undefined, category: "HYDRATION" | "SLEEP", currentValue: number) {
@@ -297,9 +267,7 @@ export default function DailyHealthCheckIn({ embedded = false, goals = [] }: { e
     setSaving(true);
     setError("");
     setMessage("");
-
     const journal = buildJournalText({ mood, sleepQuality: effectiveSleepQuality, sleepHours, stressLevel, exerciseMinutes, waterIntakeMl, stressTouched });
-
     try {
       const payload = {
         title: "Daily Health Check-in",
@@ -311,11 +279,7 @@ export default function DailyHealthCheckIn({ embedded = false, goals = [] }: { e
         exerciseMinutes,
         waterIntakeMl,
       };
-
-      const saved = savedJournal
-        ? await healthJournalService.update(savedJournal.id, payload)
-        : await healthJournalService.create({ ...payload, notes: "Captured from the What do I do today? health check-in." });
-
+      const saved = savedJournal ? await healthJournalService.update(savedJournal.id, payload) : await healthJournalService.create({ ...payload, notes: "Captured from the What do I do today? health check-in." });
       setSavedJournal(saved);
       setSleepQuality(saved.sleepQuality ?? effectiveSleepQuality);
       window.dispatchEvent(new Event("sympto:health-checkin-updated"));
@@ -328,94 +292,73 @@ export default function DailyHealthCheckIn({ embedded = false, goals = [] }: { e
   }
 
   if (loading) {
-    return (
-      <div className={embedded ? "grid gap-4 lg:grid-cols-[1.05fr_.95fr]" : "mt-5 grid gap-4 lg:grid-cols-[1.05fr_.95fr]"}>
-        <div className="h-[520px] animate-pulse rounded-[27px] bg-white" />
-        <div className="space-y-4"><div className="h-[250px] animate-pulse rounded-[27px] bg-white" /><div className="h-[250px] animate-pulse rounded-[27px] bg-white" /></div>
-      </div>
-    );
+    return <div className={embedded ? "rounded-[30px] bg-white/70 p-4" : "mt-5 rounded-[30px] bg-white/70 p-4"} aria-busy="true"><div className="h-[520px] animate-pulse rounded-[26px] bg-[#edf5f6]" /></div>;
   }
 
-  const surface = embedded ? "" : "rounded-[27px] border border-[#dfebef] bg-white shadow-[0_16px_42px_rgba(11,45,84,.06)]";
+  const outer = embedded ? "" : "rounded-[30px] border border-[#e4edef] bg-white shadow-[0_18px_50px_rgba(11,45,84,.055)]";
 
   return (
-    <div className={surface}>
+    <div className={outer}>
       {!embedded && (
-        <div className="border-b border-[#edf2f5] px-6 py-6 sm:px-7">
-          <div className="flex items-center gap-3">
-            <span className="grid h-9 w-9 place-items-center rounded-xl bg-[#e5f7f6] text-[#0b2d54]"><Sparkles className="h-4 w-4" /></span>
-            <div><p className="text-[10px] font-black uppercase tracking-[.18em] text-[#71839a]">Daily health check-in</p><h2 className="mt-1 text-xl font-black tracking-[-.04em] text-[#0b2d54]">How are you feeling today?</h2></div>
+        <div className="flex items-center justify-between gap-4 border-b border-[#eef3f4] px-5 py-5 sm:px-7">
+          <div className="flex min-w-0 items-center gap-3">
+            <span className="grid h-10 w-10 shrink-0 place-items-center rounded-[14px] bg-[#e8f8f7] text-[#24c1c4]"><Sparkles className="h-4.5 w-4.5" /></span>
+            <div className="min-w-0"><p className="text-[9px] font-black uppercase tracking-[.18em] text-[#7d909e]">Daily health check-in</p><h2 className="mt-1 truncate text-[19px] font-black tracking-[-.045em] text-[#0b2d54]">A few calm minutes for you</h2></div>
           </div>
+          {savedJournal && <span className="shrink-0 rounded-full bg-[#edf8f3] px-3 py-1.5 text-[9px] font-black text-[#168660]">Saved today</span>}
         </div>
       )}
 
-      <div className={embedded ? "grid gap-[15px] lg:grid-cols-[1.05fr_.95fr]" : "grid gap-[15px] p-4 lg:grid-cols-[1.05fr_.95fr]"}>
-        <article className="rounded-[27px] border border-[#dfebef] bg-white p-5 shadow-[0_6px_20px_rgba(11,45,84,.035)] sm:p-[23px] lg:row-span-2">
-          <div className="flex items-start justify-between gap-4">
-            <div><h3 className="text-[17px] font-black tracking-[-.035em] text-[#0b2d54]">How are you feeling today?</h3><p className="mt-1 text-xs leading-5 text-[#74859a]">A few quick taps — never health homework.</p></div>
-            {savedJournal && <span className="whitespace-nowrap rounded-[11px] bg-[#e9f8f1] px-2.5 py-2 text-[10px] font-black text-[#168660]">✓ Saved today</span>}
+      <div className={embedded ? "grid gap-3.5 lg:grid-cols-[1.08fr_.92fr]" : "grid gap-3.5 p-3.5 lg:grid-cols-[1.08fr_.92fr] sm:p-5"}>
+        <article className="rounded-[27px] bg-[#f8fbfb] p-4 ring-1 ring-[#e6eff1] sm:p-5 lg:row-span-2">
+          <div className="flex items-end justify-between gap-3">
+            <div><p className="text-[9px] font-black uppercase tracking-[.17em] text-[#7b8e9d]">How are you feeling?</p><p className="mt-1 text-[12px] font-medium text-[#8a9aa6]">Choose what feels closest today.</p></div>
+            {mood && <span className="rounded-full bg-white px-3 py-1.5 text-[9px] font-black text-[#0b7b80] ring-1 ring-[#deeaec]">{moodLabel(mood)}</span>}
           </div>
 
-          <div className="mb-3 mt-5 text-sm font-black text-[#0b2d54]">Mood</div>
-          <div className="grid grid-cols-5 gap-1.5 sm:gap-2">
+          <div className="mt-4 grid grid-cols-5 gap-1.5">
             {moodOptions.map((option) => {
               const selected = mood === option.value;
-              const iconTone = { "very-low": "bg-[#f1eefe] text-[#7356b2]", low: "bg-[#edf4ff] text-[#3f75bd]", okay: "bg-[#eef8f4] text-[#168660]", good: "bg-[#e5f7f6] text-[#148e92]", great: "bg-[#fff5df] text-[#a26204]" }[option.tone];
-              return <button key={option.value} type="button" aria-pressed={selected} onClick={() => setMood(option.value)} className={`group min-w-0 rounded-2xl border bg-[#fbfdfe] px-1.5 py-2.5 text-center text-[10px] font-black transition ${selected ? "border-[#24c1c4] bg-[#e8f9f8] text-[#0b2d54] shadow-[0_0_0_3px_rgba(36,193,196,.10)]" : "border-[#dfebef] text-[#74859a] hover:-translate-y-0.5"}`}><span className={`mx-auto mb-2 grid h-[38px] w-[38px] place-items-center rounded-[14px] transition group-hover:-translate-y-0.5 ${selected ? "bg-[#24c1c4] text-[#0b2d54]" : iconTone}`}><MoodFace tone={option.tone} /></span>{option.label}</button>;
+              const iconTone = { "very-low": "bg-[#f1eefe] text-[#7356b2]", low: "bg-[#edf4ff] text-[#3f75bd]", okay: "bg-[#eef8f4] text-[#168660]", good: "bg-[#e8f8f7] text-[#0b7b80]", great: "bg-[#eef2ff] text-[#5265a9]" }[option.tone];
+              return <button key={option.value} type="button" aria-pressed={selected} onClick={() => setMood(option.value)} className={`rounded-[18px] px-1.5 py-2.5 text-center transition ${selected ? "bg-[#0b2d54] text-white shadow-[0_10px_22px_rgba(11,45,84,.13)]" : "bg-white text-[#708493] ring-1 ring-[#e1ecef] hover:bg-[#f4f9f9]"}`}><span className={`mx-auto grid h-9 w-9 place-items-center rounded-[13px] ${selected ? "bg-[#24c1c4] text-[#0b2d54]" : iconTone}`}><MoodFace tone={option.tone} /></span><span className="mt-1.5 block text-[9px] font-black">{option.label}</span></button>;
             })}
           </div>
 
-          <div className="mt-6 flex items-end justify-between gap-4"><strong className="text-sm font-black text-[#0b2d54]">Stress</strong><span className="text-[24px] font-black tracking-[-.06em] text-[#0b2d54]">{stressLevel}/10</span></div>
-          <div className="relative mt-2.5 h-2.5 overflow-visible rounded-full bg-[#dfeef1]"><div className="absolute inset-y-0 left-0 w-[70%] rounded-full bg-[#83d6c0]" /><div className="absolute inset-y-0 left-[70%] w-[14%] bg-[#f4d993]" /><div className="absolute inset-y-0 left-[84%] right-0 rounded-r-full bg-[#f09a92]" /><input aria-label="Stress level" type="range" min={1} max={10} value={stressLevel} onChange={(event) => { setStressLevel(Number(event.target.value)); setStressTouched(true); }} className="absolute inset-0 h-2.5 w-full cursor-pointer opacity-0" /><span className="pointer-events-none absolute top-1/2 h-[19px] w-[19px] rounded-full border-4 border-[#0b2d54] bg-white shadow-[0_2px_6px_rgba(11,45,84,.2)]" style={{ left: `${((stressLevel - 1) / 9) * 100}%`, transform: "translate(-50%,-50%)" }} /></div>
-          <div className="mt-2 flex justify-between text-[10px] font-extrabold text-[#74859a]"><span>Calm</span><span>Very stressed</span></div>
+          <div className="mt-5 rounded-[22px] bg-white p-4 ring-1 ring-[#e4edef]">
+            <div className="flex items-center justify-between gap-3"><div><p className="text-[9px] font-black uppercase tracking-[.15em] text-[#82939f]">Stress</p><p className="mt-1 text-[10px] text-[#9aa6af]">Move gently between calm and very stressed.</p></div><strong className="text-[25px] font-black tracking-[-.06em] text-[#0b2d54]">{stressLevel}<span className="text-sm text-[#8a9aa6]">/10</span></strong></div>
+            <div className="relative mt-4 h-2.5 rounded-full bg-[#e8eff1]"><div className="absolute inset-y-0 left-0 rounded-full bg-[#24c1c4]" style={{ width: `${((stressLevel - 1) / 9) * 100}%` }} /><input aria-label="Stress level" type="range" min={1} max={10} value={stressLevel} onChange={(event) => { setStressLevel(Number(event.target.value)); setStressTouched(true); }} className="absolute inset-0 h-2.5 w-full cursor-pointer opacity-0" /><span className="pointer-events-none absolute top-1/2 h-5 w-5 rounded-full border-[4px] border-[#0b2d54] bg-white shadow-[0_2px_8px_rgba(11,45,84,.18)]" style={{ left: `${((stressLevel - 1) / 9) * 100}%`, transform: "translate(-50%,-50%)" }} /></div>
+            <div className="mt-2 flex justify-between text-[9px] font-bold text-[#8999a5]"><span>Calm</span><span>Very stressed</span></div>
+          </div>
 
-          <div className="mt-5 border-t border-[#eef3f4] pt-4">
-            <div className="flex items-center justify-between gap-4"><div className="flex items-center gap-3"><span className="grid h-9 w-9 place-items-center rounded-xl bg-[#f2efff] text-[#7356b2]"><Moon className="h-4 w-4" /></span><div><b className="block text-[18px] font-black tracking-[-.05em] text-[#0b2d54]">{sleepHours}h</b><span className="text-[11px] text-[#74859a]">Rest and recovery</span></div></div><span className="text-xs font-black text-[#7356b2]">{sleepProgress}%</span></div>
-            {sleepGoal && <p className="mt-2 flex items-center gap-1.5 text-[10px] font-semibold text-[#7356b2]"><Target className="h-3 w-3" />{sleepGoal.title ?? "Sleep goal"} · {sleepGoalHours}h target</p>}
-            <div className="mt-3 flex items-center gap-2 rounded-xl bg-[#fbf9ff] px-3 py-2 text-[10px] font-black text-[#7356b2]"><span className="h-2.5 w-2.5 rounded-full bg-[#bdaee9]" />{effectiveSleepQuality ? sleepLabel(effectiveSleepQuality) : "Select your sleep hours"}<span className="ml-auto text-[10px] font-extrabold text-[#9b8bbf]">{effectiveSleepQuality ? "Recovery level" : "Not started"}</span></div>
-            <div className="mt-3 flex items-center justify-between rounded-2xl bg-[#fbfdfe] px-3 py-2.5 ring-1 ring-[#e4edf0]"><span className="text-[9px] font-black uppercase tracking-[.14em] text-[#8797a8]">Hours slept</span><div className="flex items-center gap-2"><button type="button" aria-label="Decrease sleep hours" onClick={() => { const next = Math.max(0, Number((sleepHours - 0.5).toFixed(1))); setSleepHours(next); void syncGoal(sleepGoal, "SLEEP", next); }} className="grid h-8 w-8 place-items-center rounded-lg bg-[#f5f8fb] text-[#0b2d54]"><Minus className="h-3.5 w-3.5" /></button><span className="min-w-10 text-center text-sm font-black text-[#0b2d54]">{sleepHours}h</span><button type="button" aria-label="Increase sleep hours" onClick={() => { const next = Math.min(24, Number((sleepHours + 0.5).toFixed(1))); setSleepHours(next); void syncGoal(sleepGoal, "SLEEP", next); }} className="grid h-8 w-8 place-items-center rounded-lg bg-[#f5f8fb] text-[#0b2d54]"><Plus className="h-3.5 w-3.5" /></button></div></div>
+          <div className="mt-3 rounded-[22px] bg-white p-4 ring-1 ring-[#e4edef]">
+            <div className="flex items-center justify-between gap-3"><div className="flex items-center gap-3"><span className="grid h-9 w-9 place-items-center rounded-[13px] bg-[#eef2ff] text-[#5265a9]"><Moon className="h-4 w-4" /></span><div><p className="text-[9px] font-black uppercase tracking-[.15em] text-[#8999a5]">Rest & recovery</p><p className="mt-0.5 text-[20px] font-black tracking-[-.05em] text-[#0b2d54]">{sleepHours}h</p></div></div><span className="rounded-full bg-[#eef2ff] px-2.5 py-1 text-[9px] font-black text-[#5265a9]">{sleepProgress}%</span></div>
+            <div className="mt-3 flex items-center justify-between gap-3 rounded-[17px] bg-[#f8f9ff] px-3 py-2.5"><span className="text-[9px] font-black text-[#66779b]">{effectiveSleepQuality ? sleepLabel(effectiveSleepQuality) : "Sleep hours not selected"}</span>{sleepGoal && <span className="text-[9px] font-bold text-[#8996b8]">Goal {sleepGoalHours}h</span>}</div>
+            <div className="mt-3 flex items-center justify-between rounded-[17px] bg-[#fbfdfe] px-3 py-2 ring-1 ring-[#e4edef]"><span className="text-[9px] font-black uppercase tracking-[.13em] text-[#8796a2]">Hours slept</span><div className="flex items-center gap-2"><button type="button" aria-label="Decrease sleep hours" onClick={() => { const next = Math.max(0, Number((sleepHours - .5).toFixed(1))); setSleepHours(next); void syncGoal(sleepGoal, "SLEEP", next); }} className="grid h-8 w-8 place-items-center rounded-[10px] bg-[#f0f5f6] text-[#0b2d54]"><Minus className="h-3.5 w-3.5" /></button><span className="min-w-10 text-center text-sm font-black text-[#0b2d54]">{sleepHours}h</span><button type="button" aria-label="Increase sleep hours" onClick={() => { const next = Math.min(24, Number((sleepHours + .5).toFixed(1))); setSleepHours(next); void syncGoal(sleepGoal, "SLEEP", next); }} className="grid h-8 w-8 place-items-center rounded-[10px] bg-[#e8f8f7] text-[#0b7b80]"><Plus className="h-3.5 w-3.5" /></button></div></div>
           </div>
         </article>
 
-        <article className="rounded-[27px] border border-[#dfebef] bg-white p-5 shadow-[0_6px_20px_rgba(11,45,84,.035)] sm:p-[23px]">
-          <div className="flex items-start justify-between gap-4"><div><h3 className="text-[17px] font-black text-[#0b2d54]">Hydration</h3><p className="mt-1 text-xs text-[#74859a]">Fill your glass as you go</p></div><span className="rounded-[11px] bg-[#e9f8f1] px-2.5 py-2 text-[10px] font-black text-[#168660]">{waterPercent}%</span></div>
-          {hydrationGoal && <p className="mt-3 flex items-center gap-1.5 text-[10px] font-semibold text-[#0b7b80]"><Target className="h-3 w-3" />{hydrationGoal.title ?? "Hydration goal"} · {waterGoalMl >= 1000 ? `${(waterGoalMl / 1000).toFixed(1).replace(/\.0$/, "")} L` : `${waterGoalMl} ml`} target</p>}
-          <div className="mt-4 flex items-center gap-4">
-            <div className="relative h-[116px] w-[82px] overflow-hidden rounded-[7px_7px_19px_19px] border-[3px] border-[#acd8e3] bg-gradient-to-br from-white/85 to-[#e0f7fa]/40 shadow-[inset_8px_0_13px_rgba(255,255,255,.58),inset_-8px_0_13px_rgba(55,132,164,.08),0_8px_20px_rgba(39,133,167,.12)]"><div className="absolute inset-0 overflow-hidden"><div className="absolute inset-x-0 bottom-0 bg-gradient-to-b from-[#74d8dc] to-[#24aeb9] transition-all duration-500" style={{ height: `${Math.max(0, waterPercent)}%` }} /><span className="absolute bottom-5 left-[18px] h-1.5 w-1.5 rounded-full bg-white/70 motion-safe:animate-bounce" /><span className="absolute bottom-9 left-[53px] h-1 w-1 rounded-full bg-white/70" /></div><div className="absolute -left-[5px] -right-[5px] -top-[5px] h-3 rounded-[50%] border-[3px] border-[#acd8e3] bg-white/45" /><div className="absolute left-[10px] top-[14px] h-[71px] w-2 rotate-[5deg] rounded-full bg-white/70" /></div>
-            <div className="min-w-0"><strong className="block text-[24px] font-black tracking-[-.06em] text-[#0b2d54]">{waterIntakeMl.toLocaleString("en-ZA")} ml</strong><span className="mt-1 block text-[11px] text-[#74859a]">of {waterGoalMl >= 1000 ? `${waterGoalMl / 1000} L` : `${waterGoalMl} ml`} goal</span><small className="mt-1 block text-[10px] text-[#74859a]">{waterRemaining > 0 ? `${waterRemaining.toLocaleString("en-ZA")} ml left` : "Goal reached"}</small></div>
-          </div>
-          <div className="mt-3 flex items-center gap-1.5"><Droplets className="h-3.5 w-3.5 text-[#2583bc]" /><span className="text-[10px] font-semibold text-[#74859a]">{hydrationGoal ? "Counts directly toward your hydration goal." : "Daily hydration tracking."}</span></div>
-          <div className="mt-3 flex items-center justify-between gap-2 rounded-2xl bg-[#fbfdfe] px-3 py-2.5 ring-1 ring-[#e4edf0]"><button type="button" aria-label="Decrease water intake" disabled={waterIntakeMl <= 0} onClick={() => { const next = Math.max(0, waterIntakeMl - WATER_STEP_ML); setWaterIntakeMl(next); void syncGoal(hydrationGoal, "HYDRATION", next); }} className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-[#f5f8fb] text-[#0b2d54] transition enabled:hover:bg-[#e9f2f6] disabled:cursor-not-allowed disabled:opacity-35"><Minus className="h-4 w-4" /></button><div className="min-w-0 text-center"><span className="block text-[11px] font-black text-[#0b2d54]">{WATER_STEP_ML} ml</span><span className="text-[9px] font-semibold text-[#8998a8]">per tap</span></div><button type="button" aria-label="Increase water intake" onClick={() => { const next = waterIntakeMl + WATER_STEP_ML; setWaterIntakeMl(next); void syncGoal(hydrationGoal, "HYDRATION", next); }} className="grid h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-[#e8f8f8] text-[#0b7b80] transition hover:bg-[#d8f2f2]"><Plus className="h-4 w-4" /></button></div>
-          <button type="button" onClick={() => { setWaterIntakeMl(0); void syncGoal(hydrationGoal, "HYDRATION", 0); }} className="mt-2 w-full rounded-[10px] border-0 bg-transparent px-2 py-2 text-[10px] font-black text-[#74859a]">Reset water</button>
+        <article className="rounded-[27px] bg-white p-4 ring-1 ring-[#e3edef] shadow-[0_7px_22px_rgba(11,45,84,.025)] sm:p-5">
+          <div className="flex items-center justify-between gap-3"><div className="flex items-center gap-3"><span className="grid h-9 w-9 place-items-center rounded-[13px] bg-[#e8f8f7] text-[#0b7b80]"><Droplets className="h-4 w-4" /></span><div><p className="text-[9px] font-black uppercase tracking-[.15em] text-[#82939f]">Hydration</p><p className="mt-0.5 text-[11px] text-[#8b9aa5]">Fill your glass as you go</p></div></div><strong className="text-[20px] font-black tracking-[-.05em] text-[#0b2d54]">{waterPercent}%</strong></div>
+          <div className="mt-4 flex items-center gap-4"><div className="relative h-[92px] w-[66px] shrink-0 overflow-hidden rounded-[8px_8px_18px_18px] border-2 border-[#b5dfe4] bg-[#f8ffff]"><div className="absolute inset-x-0 bottom-0 bg-[#24c1c4] transition-all duration-500" style={{ height: `${waterPercent}%` }} /><div className="absolute inset-x-0 top-0 h-3 rounded-full border-2 border-[#b5dfe4] bg-white/70" /></div><div className="min-w-0"><p className="text-[27px] font-black leading-none tracking-[-.06em] text-[#0b2d54]">{waterIntakeMl.toLocaleString("en-ZA")} <span className="text-sm tracking-normal text-[#82939f]">ml</span></p><p className="mt-1 text-[10px] text-[#8796a2]">of {waterGoalMl >= 1000 ? `${waterGoalMl / 1000} L` : `${waterGoalMl} ml`} goal</p><p className="mt-1 text-[10px] font-bold text-[#0b7b80]">{waterRemaining > 0 ? `${waterRemaining.toLocaleString("en-ZA")} ml remaining` : "Goal reached"}</p></div></div>
+          <div className="mt-4 flex items-center justify-between rounded-[17px] bg-[#f8fbfb] px-3 py-2.5 ring-1 ring-[#e4edef]"><span className="text-[9px] font-black uppercase tracking-[.13em] text-[#83939e]">Per tap</span><span className="text-[11px] font-black text-[#0b2d54]">250 ml</span><div className="flex gap-1.5"><button type="button" aria-label="Decrease water intake" disabled={waterIntakeMl <= 0} onClick={() => { const next = Math.max(0, waterIntakeMl - WATER_STEP_ML); setWaterIntakeMl(next); void syncGoal(hydrationGoal, "HYDRATION", next); }} className="grid h-8 w-8 place-items-center rounded-[10px] bg-white text-[#0b2d54] ring-1 ring-[#dde9ec] disabled:opacity-30"><Minus className="h-3.5 w-3.5" /></button><button type="button" aria-label="Increase water intake" onClick={() => { const next = waterIntakeMl + WATER_STEP_ML; setWaterIntakeMl(next); void syncGoal(hydrationGoal, "HYDRATION", next); }} className="grid h-8 w-8 place-items-center rounded-[10px] bg-[#e8f8f7] text-[#0b7b80]"><Plus className="h-3.5 w-3.5" /></button></div></div>
+          <button type="button" onClick={() => { setWaterIntakeMl(0); void syncGoal(hydrationGoal, "HYDRATION", 0); }} className="mt-2 text-[9px] font-black text-[#8a99a4]">Reset water</button>
         </article>
 
-        <article className="rounded-[27px] border border-[#dfebef] bg-white p-5 shadow-[0_6px_20px_rgba(11,45,84,.035)] sm:p-[23px]">
-          <div className="flex items-start justify-between gap-4"><div><h3 className="text-[17px] font-black text-[#0b2d54]">Exercise</h3><p className="mt-1 text-xs text-[#74859a]">Track movement toward your weekly goal</p></div><span className="rounded-[11px] bg-[#e9f8f1] px-2.5 py-2 text-[10px] font-black text-[#168660]">{movementProgress}%</span></div>
-          {exerciseGoal && <p className="mt-3 flex items-center gap-1.5 text-[10px] font-semibold text-[#3f75bd]"><Target className="h-3 w-3" />{exerciseGoal.title ?? "Exercise goal"} · {exerciseGoalMinutes} min/week</p>}
-          <div className="mt-4 rounded-[21px] border border-[#dcecf0] bg-gradient-to-br from-[#f1f7ff] to-[#eefbfa] p-4">
-            <div className="flex items-center gap-4"><div className="relative grid h-[88px] w-[88px] shrink-0 place-items-center rounded-full shadow-[0_7px_16px_rgba(36,193,196,.14)]" style={{ background: `conic-gradient(#24c1c4 0 ${movementProgress}%, #dfeef1 ${movementProgress}% 100%)` }}><div className="absolute inset-[10px] rounded-full bg-[#f7fcfc]" /><div className="relative z-10 text-center"><b className="block text-[21px] font-black tracking-[-.06em] text-[#0b2d54]">{exerciseMinutes}</b><span className="text-[10px] font-black text-[#74859a]">today</span></div></div><div><b className="block text-sm text-[#0b2d54]">{movementTitle[0]}</b><span className="mt-1 block text-[11px] leading-[1.45] text-[#74859a]">{movementTitle[1]}</span><span className="mt-2 inline-flex items-center gap-1 text-[10px] font-black text-[#3f75bd]"><Target className="h-3 w-3" />{projectedWeekMinutes} / {exerciseGoalMinutes} min this week</span></div></div>
-            <div className="my-4 flex items-center">{[0,1,2,3,4].map((index) => <span key={index} className="contents">{index > 0 && <span className={`h-[3px] flex-1 ${projectedWeekMinutes >= Math.ceil(index * exerciseGoalMinutes / 4) ? "bg-[#24c1c4]" : "bg-[#d9e9ed]"}`} />}<span className={`h-[11px] w-[11px] rounded-full border-2 border-[#f2f9fa] ${projectedWeekMinutes >= Math.ceil(index * exerciseGoalMinutes / 4) ? "bg-[#24c1c4] shadow-[0_0_0_1px_#24c1c4]" : "bg-[#d9e9ed] shadow-[0_0_0_1px_#cfe3e7]"}`} /></span>)}</div>
-            <div className="flex items-center justify-between gap-2 rounded-2xl bg-white/70 px-2 py-2 ring-1 ring-[#e4edf0]">
-              <button type="button" aria-label="Decrease exercise minutes" disabled={exerciseMinutes <= 0} onClick={() => setExerciseMinutes(Math.max(0, exerciseMinutes - EXERCISE_STEP_MINUTES))} className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-[#f5f8fb] text-[#0b2d54] transition enabled:hover:bg-[#e9f2f6] disabled:cursor-not-allowed disabled:opacity-35">
-                <Minus className="h-4 w-4" />
-              </button>
-              <div className="min-w-0 text-center"><span className="block text-[11px] font-black text-[#0b2d54]">{EXERCISE_STEP_MINUTES} min</span><span className="text-[9px] font-semibold text-[#8998a8]">per tap</span></div>
-              <button type="button" aria-label="Increase exercise minutes" disabled={exerciseMinutes >= MAX_EXERCISE_MINUTES} onClick={() => setExerciseMinutes(Math.min(MAX_EXERCISE_MINUTES, exerciseMinutes + EXERCISE_STEP_MINUTES))} className="grid h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-[#e8f8f8] text-[#0b7b80] transition enabled:hover:bg-[#d8f2f2] disabled:cursor-not-allowed disabled:opacity-35">
-                <Plus className="h-4 w-4" />
-              </button>
-            </div>
-            <div className="mt-2 flex flex-wrap gap-1.5">{exerciseOptions.map((value) => <button key={value} type="button" onClick={() => setExerciseMinutes(value)} className={`rounded-[10px] border px-2.5 py-2 text-[10px] font-black ${exerciseMinutes === value ? "border-[#0b2d54] bg-[#0b2d54] text-white" : "border-[#d6e6ea] bg-white text-[#74859a]"}`}>{value === 0 ? "None" : `${value} min`}</button>)}</div>
-          </div>
-          <p className="mt-3 text-[11px] leading-[1.55] text-[#74859a]">Choose the exercise time that matches your day. Sympto adds saved exercise minutes to your weekly total and compares that total with the goal you set, such as 60 minutes/week.</p>
+        <article className="rounded-[27px] bg-white p-4 ring-1 ring-[#e3edef] shadow-[0_7px_22px_rgba(11,45,84,.025)] sm:p-5">
+          <div className="flex items-center justify-between gap-3"><div className="flex items-center gap-3"><span className="grid h-9 w-9 place-items-center rounded-[13px] bg-[#edf4ff] text-[#3f75bd]"><Dumbbell className="h-4 w-4" /></span><div><p className="text-[9px] font-black uppercase tracking-[.15em] text-[#82939f]">Exercise</p><p className="mt-0.5 text-[11px] text-[#8b9aa5]">Move toward your weekly goal</p></div></div><strong className="text-[20px] font-black tracking-[-.05em] text-[#0b2d54]">{movementProgress}%</strong></div>
+          {exerciseGoal && <p className="mt-3 flex items-center gap-1.5 text-[9px] font-black text-[#3f75bd]"><Target className="h-3 w-3" />{exerciseGoal.title ?? "Exercise goal"} · {exerciseGoalMinutes} min/week</p>}
+          <div className="mt-3 rounded-[20px] bg-[#f7fbff] p-3.5 ring-1 ring-[#e2ebf2]"><div className="flex items-center gap-3"><div className="relative grid h-[76px] w-[76px] shrink-0 place-items-center rounded-full" style={{ background: `conic-gradient(#24c1c4 0 ${movementProgress}%, #dfeef1 ${movementProgress}% 100%)` }}><div className="absolute inset-[9px] rounded-full bg-white" /><div className="relative z-10 text-center"><b className="block text-[20px] font-black leading-none text-[#0b2d54]">{exerciseMinutes}</b><span className="text-[9px] font-black text-[#82929e]">today</span></div></div><div className="min-w-0"><p className="text-[12px] font-black text-[#0b2d54]">{movementTitle[0]}</p><p className="mt-1 text-[10px] leading-4 text-[#82929e]">{movementTitle[1]}</p><p className="mt-2 text-[10px] font-black text-[#0b7b80]">{projectedWeekMinutes} / {exerciseGoalMinutes} min this week</p></div></div></div>
+          <div className="mt-3 flex items-center justify-between rounded-[17px] bg-[#f8fbfb] px-3 py-2.5 ring-1 ring-[#e4edef]"><span className="text-[9px] font-black uppercase tracking-[.13em] text-[#83939e]">Per tap</span><span className="text-[11px] font-black text-[#0b2d54]">15 min</span><div className="flex gap-1.5"><button type="button" aria-label="Decrease exercise minutes" disabled={exerciseMinutes <= 0} onClick={() => setExerciseMinutes(Math.max(0, exerciseMinutes - EXERCISE_STEP_MINUTES))} className="grid h-8 w-8 place-items-center rounded-[10px] bg-white text-[#0b2d54] ring-1 ring-[#dde9ec] disabled:opacity-30"><Minus className="h-3.5 w-3.5" /></button><button type="button" aria-label="Increase exercise minutes" disabled={exerciseMinutes >= MAX_EXERCISE_MINUTES} onClick={() => setExerciseMinutes(Math.min(MAX_EXERCISE_MINUTES, exerciseMinutes + EXERCISE_STEP_MINUTES))} className="grid h-8 w-8 place-items-center rounded-[10px] bg-[#e8f8f7] text-[#0b7b80] disabled:opacity-30"><Plus className="h-3.5 w-3.5" /></button></div></div>
+          <div className="mt-2 flex flex-wrap gap-1.5">{exerciseOptions.map((value) => <button key={value} type="button" onClick={() => setExerciseMinutes(value)} className={`rounded-[10px] border px-2.5 py-1.5 text-[9px] font-black ${exerciseMinutes === value ? "border-[#0b2d54] bg-[#0b2d54] text-white" : "border-[#d9e6ea] bg-white text-[#7a8c98]"}`}>{value === 0 ? "None" : `${value} min`}</button>)}</div>
         </article>
       </div>
 
-      {message && <div className="mt-4 flex items-center gap-2 rounded-2xl bg-[#edf9f2] px-4 py-3 text-xs font-semibold text-[#168660]"><Check className="h-4 w-4" />{message}</div>}
-      {error && <div className="mt-4 rounded-2xl bg-red-50 px-4 py-3 text-xs font-semibold text-red-700">{error}</div>}
+      {message && <div className="mt-3 flex items-center gap-2 rounded-[18px] bg-[#edf9f3] px-4 py-3 text-[10px] font-black text-[#168660]"><span className="grid h-6 w-6 place-items-center rounded-full bg-white"><Check className="h-3.5 w-3.5" /></span>{message}</div>}
+      {error && <div className="mt-3 rounded-[18px] bg-[#fff3f2] px-4 py-3 text-[10px] font-black text-[#b94a43]">{error}</div>}
 
-      <div className={`${embedded ? "mt-4" : "mt-4 px-4 pb-4"} flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between`}>
-        <p className="max-w-xl text-[10px] leading-4 text-[#9aa8b7]">Mood, sleep, stress, hydration and exercise are stored in your Health Journal. Goal-linked measures also update their progress history.</p>
-        <button type="button" disabled={saving || !hasInput} onClick={save} className="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl bg-[#0b2d54] px-5 py-3 text-xs font-black text-white shadow-[0_8px_22px_rgba(11,45,84,.16)] disabled:cursor-not-allowed disabled:opacity-45"><Save className="h-4 w-4" />{saving ? "Saving…" : savedJournal ? "Update check-in" : "Save today’s check-in"}</button>
+      <div className={`${embedded ? "mt-3" : "mt-3 px-3.5 pb-3.5 sm:px-5 sm:pb-5"} flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between`}>
+        <p className="max-w-xl text-[9px] leading-4 text-[#99a6af]">Mood, sleep, stress, hydration and exercise are stored in your Health Journal. Goal-linked measures also update their progress history.</p>
+        <button type="button" disabled={saving || !hasInput} onClick={save} className="inline-flex min-h-11 shrink-0 items-center justify-center gap-2 rounded-[14px] bg-[#0b2d54] px-5 py-3 text-[10px] font-black text-white shadow-[0_9px_22px_rgba(11,45,84,.14)] disabled:cursor-not-allowed disabled:opacity-40"><Save className="h-4 w-4 text-[#24c1c4]" />{saving ? "Saving…" : savedJournal ? "Update today’s check-in" : "Save today’s check-in"}</button>
       </div>
     </div>
   );
