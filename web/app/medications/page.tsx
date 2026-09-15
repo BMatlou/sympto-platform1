@@ -86,7 +86,19 @@ export default function MedicationsPage() {
 
     try {
       setSaving(true);
-      await onboardingService.managePatientMedications(medicationValues);
+
+      const medicationsToSave = editingMedications
+        ? medicationValues.medications
+        : [
+            ...initialMedicationValues.medications,
+            ...medicationValues.medications.filter(
+              (newMedication) => !initialMedicationValues.medications.some(
+                (existingMedication) => existingMedication.medicationId === newMedication.medicationId,
+              ),
+            ),
+          ];
+
+      await onboardingService.managePatientMedications({ medications: medicationsToSave });
       toast.success("Your medication list has been updated.");
       setShowMedicationEditor(false);
       await reload();
