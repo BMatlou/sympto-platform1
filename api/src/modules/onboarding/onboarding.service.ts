@@ -69,18 +69,7 @@ export class OnboardingService {
 
       const primary = await tx.personAddress.findFirst({ where: { personId: user.personId, type: 'HOME', isPrimary: true }, include: { address: true } });
       if (primary) {
-        await tx.address.update({
-          where: { id: primary.addressId },
-          data: {
-            line1: dto.addressLine1 ?? primary.address.line1,
-            line2: dto.addressLine2 !== undefined ? dto.addressLine2 : primary.address.line2,
-            suburb: dto.suburb !== undefined ? dto.suburb : primary.address.suburb,
-            city: dto.city ?? primary.address.city,
-            province: dto.province !== undefined ? dto.province : primary.address.province,
-            postalCode: dto.postalCode !== undefined ? dto.postalCode : primary.address.postalCode,
-            countryId,
-          },
-        });
+        await tx.address.update({ where: { id: primary.addressId }, data: { line1: dto.addressLine1 ?? primary.address.line1, line2: dto.addressLine2 !== undefined ? dto.addressLine2 : primary.address.line2, suburb: dto.suburb !== undefined ? dto.suburb : primary.address.suburb, city: dto.city ?? primary.address.city, province: dto.province !== undefined ? dto.province : primary.address.province, postalCode: dto.postalCode !== undefined ? dto.postalCode : primary.address.postalCode, countryId } });
       } else {
         const address = await tx.address.create({ data: { line1: dto.addressLine1 ?? '', line2: dto.addressLine2 ?? null, suburb: dto.suburb ?? null, city: dto.city ?? '', province: dto.province ?? null, postalCode: dto.postalCode ?? null, countryId: countryId ?? null } });
         await tx.personAddress.create({ data: { personId: user.personId, addressId: address.id, type: 'HOME', isPrimary: true } });
@@ -104,32 +93,20 @@ export class OnboardingService {
   async updatePatientConditions(userId: string, dto: UpdatePatientConditionsDto) { return this.onboardingRepository.savePatientConditions(userId, dto); }
   async updatePatientMedications(userId: string, dto: UpdatePatientMedicationsDto) { return this.onboardingRepository.savePatientMedications(userId, dto); }
 
-  /**
-   * Live Medications page save.
-   * Unlike the onboarding Step 6 save, this never replaces the entire
-   * PatientMedication collection. Existing records are updated in place so
-   * their IDs and adherence history remain intact; new records are created.
-   */
+  /** Live Medications page save: update existing PatientMedication rows in place and create new rows. */
   async managePatientMedications(userId: string, dto: UpdatePatientMedicationsDto) {
     return this.prisma.$transaction(async (tx) => {
-      const patient = await tx.patient.findUnique({
-        where: { userId },
-        include: { healthPassport: true },
-      });
-
+      const patient = await tx.patient.findUnique({ where: { userId }, include: { healthPassport: true } });
       if (!patient) throw new BadRequestException('Patient not found.');
       if (!patient.healthPassport) throw new BadRequestException('Health Passport not found.');
 
       const healthPassportId = patient.healthPassport.id;
-      const existing = await tx.patientMedication.findMany({
-        where: { healthPassportId },
-        select: { id: true },
-      });
+      const existing = await tx.patientMedication.findMany({ where: { healthPassportId }, select: { id: true } });
       const existingIds = new Set(existing.map((item) => item.id));
       const submittedExistingIds = new Set<string>();
 
       for (const medication of dto.medications) {
-        const data = {
+        const recordData = {
           medicationId: medication.medicationId,
           dosage: medication.dosage,
           frequency: medication.frequency,
@@ -144,7 +121,7 @@ export class OnboardingService {
           missedDoses: medication.missedDoses,
           sideEffects: medication.sideEffects,
           effectiveness: medication.effectiveness,
-          status: medication.status ?? 'ACTIVE',
+          status: medication.status,
           notes: medication.notes,
         };
 
@@ -152,34 +129,19 @@ export class OnboardingService {
           if (!existingIds.has(medication.patientMedicationId)) {
             throw new BadRequestException('One or more medication records do not belong to this patient.');
           }
-
           submittedExistingIds.add(medication.patientMedicationId);
-          await tx.patientMedication.update({
-            where: { id: medication.patientMedicationId },
-            data,
-          });
+          await tx.patientMedication.update({ where: { id: medication.patientMedicationId }, data: recordData });
         } else {
-          await tx.patientMedication.create({
-            data: { healthPassportId, ...data },
-          });
+          await tx.patientMedication.create({ data: { healthPassportId, ...recordData } });
         }
       }
 
-      const idsToDelete = existing
-        .map((item) => item.id)
-        .filter((id) => !submittedExistingIds.has(id));
-
+      const idsToDelete = existing.map((item) => item.id).filter((id) => !submittedExistingIds.has(id));
       if (idsToDelete.length > 0) {
-        await tx.patientMedication.deleteMany({
-          where: { healthPassportId, id: { in: idsToDelete } },
-        });
+        await tx.patientMedication.deleteMany({ where: { healthPassportId, id: { in: idsToDelete } } });
       }
 
-      return tx.patientMedication.findMany({
-        where: { healthPassportId },
-        include: { medication: true },
-        orderBy: { createdAt: 'desc' },
-      });
+      return tx.patientMedication.findMany({ where: { healthPassportId }, include: { medication: true }, orderBy: { createdAt: 'desc' } });
     });
   }
 
@@ -196,9 +158,7 @@ export class OnboardingService {
 
     const primaryAddress = await this.prisma.personAddress.findFirst({ where: { personId, type: 'HOME', isPrimary: true }, include: { address: { include: { country: true } } } });
     const healthPassportId = (dashboard.healthPassport as { id?: string } | null)?.id;
-    const patientImmunizations = healthPassportId
-      ? await this.prisma.patientImmunization.findMany({ where: { healthPassportId }, include: { immunization: true }, orderBy: { administeredAt: 'desc' } })
-      : [];
+    const patientImmunizations = healthPassportId ? await this.prisma.patientImmunization.findMany({ where: { healthPassportId }, include: { immunization: true }, orderBy: { administeredAt: 'desc' } }) : [];
 
     return { ...dashboard, profile: { ...dashboard.profile, address: primaryAddress?.address ?? null }, immunizations: patientImmunizations };
   }
