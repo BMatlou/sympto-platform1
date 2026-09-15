@@ -1,5 +1,5 @@
 /* Hydration card presentation only. Existing state, handlers and data flow stay unchanged. */
-#daily-health-check-in + div > div > article:nth-child(2) {
+#daily-health-check-in + div article:nth-child(2) {
   position: relative;
   overflow: hidden;
   isolation: isolate;
@@ -16,7 +16,7 @@
   transition: transform .22s ease, box-shadow .22s ease, border-color .22s ease;
 }
 
-#daily-health-check-in + div > div > article:nth-child(2)::before {
+#daily-health-check-in + div article:nth-child(2)::before {
   content: "";
   position: absolute;
   right: -80px;
@@ -30,7 +30,7 @@
   z-index: -1;
 }
 
-#daily-health-check-in + div > div > article:nth-child(2)::after {
+#daily-health-check-in + div article:nth-child(2)::after {
   content: "";
   position: absolute;
   left: 22px;
@@ -41,21 +41,21 @@
   pointer-events: none;
 }
 
-#daily-health-check-in + div > div > article:nth-child(2) > * {
+#daily-health-check-in + div article:nth-child(2) > * {
   position: relative;
   z-index: 1;
 }
 
 /* Card header */
-#daily-health-check-in + div > div > article:nth-child(2) > div:first-child {
+#daily-health-check-in + div article:nth-child(2) > div:first-child {
   padding-bottom: 2px;
 }
 
-#daily-health-check-in + div > div > article:nth-child(2) > div:first-child > div {
+#daily-health-check-in + div article:nth-child(2) > div:first-child > div {
   min-width: 0;
 }
 
-#daily-health-check-in + div > div > article:nth-child(2) > div:first-child > div:first-child > span {
+#daily-health-check-in + div article:nth-child(2) > div:first-child > div:first-child > span {
   width: 42px !important;
   height: 42px !important;
   border-radius: 15px !important;
@@ -64,19 +64,19 @@
   box-shadow: inset 0 1px 0 rgba(255,255,255,.95), 0 7px 16px rgba(36,193,196,.10) !important;
 }
 
-#daily-health-check-in + div > div > article:nth-child(2) > div:first-child p:first-child {
+#daily-health-check-in + div article:nth-child(2) > div:first-child p:first-child {
   color: #087b82 !important;
   font-size: 10px !important;
   letter-spacing: .16em !important;
 }
 
-#daily-health-check-in + div > div > article:nth-child(2) > div:first-child p:last-child {
+#daily-health-check-in + div article:nth-child(2) > div:first-child p:last-child {
   margin-top: 2px !important;
   color: #667f8e !important;
   font-size: 12px !important;
 }
 
-#daily-health-check-in + div > div > article:nth-child(2) > div:first-child strong {
+#daily-health-check-in + div article:nth-child(2) > div:first-child strong {
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -92,13 +92,13 @@
 }
 
 /* Main hydration visual */
-#daily-health-check-in + div > div > article:nth-child(2) > div:nth-child(2) {
+#daily-health-check-in + div article:nth-child(2) > div:nth-child(2) {
   align-items: center !important;
   gap: 18px !important;
   margin-top: 18px !important;
 }
 
-#daily-health-check-in + div > div > article:nth-child(2) .h-\[92px\].w-\[66px\] {
+#daily-health-check-in + div article:nth-child(2) .h-\[92px\].w-\[66px\] {
   width: 88px !important;
   height: 132px !important;
   flex: 0 0 88px;
@@ -113,7 +113,7 @@
     0 15px 30px rgba(35, 135, 153, .13) !important;
 }
 
-#daily-health-check-in + div > div > article:nth-child(2) .h-\[92px\].w-\[66px\]::before {
+#daily-health-check-in + div article:nth-child(2) .h-\[92px\].w-\[66px\]::before {
   content: "";
   position: absolute;
   inset: 8px auto 12px 9px;
@@ -124,7 +124,7 @@
   z-index: 4;
 }
 
-#daily-health-check-in + div > div > article:nth-child(2) .h-\[92px\].w-\[66px\] > div:first-child {
+#daily-health-check-in + div article:nth-child(2) .h-\[92px\].w-\[66px\] > div:first-child {
   position: absolute;
   inset: auto 0 0;
   overflow: hidden !important;
@@ -134,7 +134,7 @@
 }
 
 /* Curved animated water line */
-#daily-health-check-in + div > div > article:nth-child(2) .h-\[92px\].w-\[66px\] > div:first-child::before {
+#daily-health-check-in + div article:nth-child(2) .h-\[92px\].w-\[66px\] > div:first-child::before {
   content: "";
   position: absolute;
   left: -22%;
@@ -147,7 +147,7 @@
   animation: sympto-hydration-wave 3.6s ease-in-out infinite;
 }
 
-#daily-health-check-in + div > div > article:nth-child(2) .h-\[92px\].w-\[66px\] > div:first-child::after {
+#daily-health-check-in + div article:nth-child(2) .h-\[92px\].w-\[66px\] > div:first-child::after {
   content: "";
   position: absolute;
   left: -25%;
@@ -159,7 +159,7 @@
   animation: sympto-hydration-wave 3.6s ease-in-out infinite reverse;
 }
 
-#daily-health-check-in + div > div > article:nth-child(2) .h-\[92px\].w-\[66px\] > div:nth-child(2) {
+#daily-health-check-in + div article:nth-child(2) .h-\[92px\].w-\[66px\] > div:nth-child(2) {
   position: absolute;
   inset: 7px 7px auto;
   height: 13px !important;
@@ -171,7 +171,7 @@
 }
 
 /* Primary water reading */
-#daily-health-check-in + div > div > article:nth-child(2) > div:nth-child(2) p:first-child {
+#daily-health-check-in + div article:nth-child(2) > div:nth-child(2) p:first-child {
   color: #0b2d54 !important;
   font-size: 34px !important;
   line-height: .95 !important;
@@ -179,19 +179,19 @@
   letter-spacing: -.065em !important;
 }
 
-#daily-health-check-in + div > div > article:nth-child(2) > div:nth-child(2) p:first-child span {
+#daily-health-check-in + div article:nth-child(2) > div:nth-child(2) p:first-child span {
   color: #6e8794 !important;
   font-size: 15px !important;
   font-weight: 800 !important;
   letter-spacing: -.02em !important;
 }
 
-#daily-health-check-in + div > div > article:nth-child(2) > div:nth-child(2) p:nth-child(2) {
+#daily-health-check-in + div article:nth-child(2) > div:nth-child(2) p:nth-child(2) {
   color: #7c919d !important;
   font-size: 10px !important;
 }
 
-#daily-health-check-in + div > div > article:nth-child(2) > div:nth-child(2) p:nth-child(3) {
+#daily-health-check-in + div article:nth-child(2) > div:nth-child(2) p:nth-child(3) {
   display: inline-flex;
   margin-top: 7px !important;
   border-radius: 999px;
@@ -204,7 +204,7 @@
 }
 
 /* Tap controls */
-#daily-health-check-in + div > div > article:nth-child(2) > div:nth-child(3) {
+#daily-health-check-in + div article:nth-child(2) > div:nth-child(3) {
   margin-top: 19px !important;
   border: 1px solid #dcebed !important;
   border-radius: 19px !important;
@@ -213,13 +213,13 @@
   box-shadow: inset 0 1px 0 rgba(255,255,255,.95) !important;
 }
 
-#daily-health-check-in + div > div > article:nth-child(2) > div:nth-child(3) > span:first-child {
+#daily-health-check-in + div article:nth-child(2) > div:nth-child(3) > span:first-child {
   color: #7d909b !important;
   font-size: 9px !important;
   letter-spacing: .13em !important;
 }
 
-#daily-health-check-in + div > div > article:nth-child(2) > div:nth-child(3) > span:nth-child(2) {
+#daily-health-check-in + div article:nth-child(2) > div:nth-child(3) > span:nth-child(2) {
   min-width: 58px;
   border-radius: 999px;
   background: #e9fafa;
@@ -230,7 +230,7 @@
   box-shadow: inset 0 0 0 1px rgba(36,193,196,.10);
 }
 
-#daily-health-check-in + div > div > article:nth-child(2) > div:nth-child(3) button {
+#daily-health-check-in + div article:nth-child(2) > div:nth-child(3) button {
   width: 34px !important;
   height: 34px !important;
   border-radius: 11px !important;
@@ -239,18 +239,18 @@
   transition: transform .16s ease, background .16s ease, box-shadow .16s ease;
 }
 
-#daily-health-check-in + div > div > article:nth-child(2) > div:nth-child(3) button:hover:not(:disabled) {
+#daily-health-check-in + div article:nth-child(2) > div:nth-child(3) button:hover:not(:disabled) {
   transform: translateY(-1px);
   box-shadow: 0 5px 12px rgba(11,45,84,.08) !important;
 }
 
-#daily-health-check-in + div > div > article:nth-child(2) > div:nth-child(3) button:last-child {
+#daily-health-check-in + div article:nth-child(2) > div:nth-child(3) button:last-child {
   border-color: rgba(36,193,196,.22) !important;
   background: linear-gradient(180deg, #e5fbfb 0%, #ccf1f2 100%) !important;
   color: #087b82 !important;
 }
 
-#daily-health-check-in + div > div > article:nth-child(2) > button {
+#daily-health-check-in + div article:nth-child(2) > button {
   margin-top: 8px !important;
   padding: 2px 3px !important;
   color: #8a9da7 !important;
@@ -260,7 +260,7 @@
   transition: color .16s ease, background .16s ease;
 }
 
-#daily-health-check-in + div > div > article:nth-child(2) > button:hover {
+#daily-health-check-in + div article:nth-child(2) > button:hover {
   color: #087b82 !important;
   background: #eefafa !important;
 }
@@ -271,16 +271,16 @@
 }
 
 @media (min-width: 640px) {
-  #daily-health-check-in + div > div > article:nth-child(2) {
+  #daily-health-check-in + div article:nth-child(2) {
     min-height: 304px;
   }
 
-  #daily-health-check-in + div > div > article:nth-child(2) > div:nth-child(2) {
+  #daily-health-check-in + div article:nth-child(2) > div:nth-child(2) {
     margin-top: 20px !important;
     gap: 22px !important;
   }
 
-  #daily-health-check-in + div > div > article:nth-child(2) .h-\[92px\].w-\[66px\] {
+  #daily-health-check-in + div article:nth-child(2) .h-\[92px\].w-\[66px\] {
     width: 96px !important;
     height: 142px !important;
     flex-basis: 96px;
@@ -288,8 +288,8 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
-  #daily-health-check-in + div > div > article:nth-child(2) .h-\[92px\].w-\[66px\] > div:first-child::before,
-  #daily-health-check-in + div > div > article:nth-child(2) .h-\[92px\].w-\[66px\] > div:first-child::after {
+  #daily-health-check-in + div article:nth-child(2) .h-\[92px\].w-\[66px\] > div:first-child::before,
+  #daily-health-check-in + div article:nth-child(2) .h-\[92px\].w-\[66px\] > div:first-child::after {
     animation: none;
   }
 }
