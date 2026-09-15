@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
-import { ArrowLeft, Clock3, FileText, Pill, Plus, ShieldCheck, X } from "lucide-react";
+import { ArrowLeft, Clock3, FileText, Pill, Plus, ShieldCheck } from "lucide-react";
 import { useDashboard } from "@/hooks/use-dashboard";
 import { MedicationReminderButton } from "@/components/medications/MedicationReminderButton";
 import { MedicationAdherenceActions } from "@/components/medications/MedicationAdherenceActions";
@@ -73,14 +73,17 @@ export default function MedicationsPage() {
     setShowAddMedication(true);
   }
 
+  // MedicationsStep owns the onboarding search UI. On the live page we keep
+  // that same UI, but open its search control automatically so the user lands
+  // directly on "Search for your medicine" instead of another modal/step.
   useEffect(() => {
     if (!showAddMedication) return;
 
     const frame = window.requestAnimationFrame(() => {
-      const dialog = document.querySelector('[role="dialog"][aria-labelledby="add-medication-title"]');
-      if (!dialog) return;
+      const editor = document.querySelector('[data-medication-editor]');
+      if (!editor) return;
 
-      const addButton = Array.from(dialog.querySelectorAll("button")).find(
+      const addButton = Array.from(editor.querySelectorAll("button")).find(
         (button) => button.textContent?.trim() === "+ Add" || button.textContent?.trim() === "Add a medicine",
       ) as HTMLButtonElement | undefined;
 
@@ -124,6 +127,29 @@ export default function MedicationsPage() {
 
         {loading && <div className="mb-6 rounded-2xl border border-slate-200 bg-white p-4 text-sm text-slate-500">Loading your medications...</div>}
         {error && !loading && <div className="mb-6 rounded-2xl border border-red-200 bg-white p-6"><h2 className="font-semibold text-[#0b2d54]">We couldn't load your medications</h2><button onClick={reload} className="mt-4 rounded-xl bg-[#0b2d54] px-4 py-2 text-sm font-semibold text-white">Try again</button></div>}
+
+        {showAddMedication && (
+          <section data-medication-editor className="mb-8 overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-sm">
+            <div className="flex flex-col gap-4 border-b border-slate-200 px-5 py-5 sm:flex-row sm:items-center sm:justify-between sm:px-7">
+              <div>
+                <h2 className="text-xl font-bold tracking-tight text-[#0b2d54]">Add a medication</h2>
+                <p className="mt-1 text-sm text-slate-500">Search for your medicine, then add the dose and schedule.</p>
+              </div>
+              <Button type="button" variant="outline" disabled={saving} onClick={() => setShowAddMedication(false)} className="w-fit rounded-xl border-slate-200">Cancel</Button>
+            </div>
+
+            <div className="px-5 py-6 sm:px-7 lg:px-10">
+              <div className="[&>div>div:first-child]:hidden">
+                <MedicationsStep values={medicationValues} onChange={setMedicationValues} />
+              </div>
+            </div>
+
+            <div className="flex flex-col gap-3 border-t border-slate-200 bg-slate-50/70 px-5 py-4 sm:flex-row sm:justify-end sm:px-7">
+              <Button type="button" variant="outline" disabled={saving} onClick={() => setShowAddMedication(false)} className="rounded-xl">Cancel</Button>
+              <Button type="button" disabled={saving} onClick={saveMedications} className="rounded-xl bg-[#0b2d54] text-white hover:bg-[#071f3a]">{saving ? "Saving..." : "Save medications"}</Button>
+            </div>
+          </section>
+        )}
 
         <section className="mb-8 grid gap-4 sm:grid-cols-3">
           <div className="rounded-2xl border border-slate-200 bg-white p-5"><Pill className="h-5 w-5 text-[#24c1c4]" /><p className="mt-4 text-2xl font-bold text-[#0b2d54]">{activeMedications.length}</p><p className="mt-1 text-sm text-slate-500">Current medications</p></div>
@@ -170,26 +196,6 @@ export default function MedicationsPage() {
 
         <div className="mt-8 rounded-2xl border border-[#24c1c4]/20 bg-[#24c1c4]/5 p-5"><div className="flex gap-3"><ShieldCheck className="h-5 w-5 shrink-0 text-[#0b2d54]" /><div><h3 className="font-semibold text-[#0b2d54]">Keep your medication list up to date</h3><p className="mt-1 text-sm leading-6 text-slate-500">Add medicines you take yourself here. Clinic or practitioner prescriptions are also shown automatically when they are issued to you.</p></div></div></div>
       </div>
-
-      {showAddMedication && (
-        <div className="fixed inset-0 z-50 overflow-y-auto bg-slate-950/40 p-3 sm:p-5" role="dialog" aria-modal="true" aria-labelledby="add-medication-title">
-          <div className="mx-auto w-full max-w-5xl rounded-3xl bg-white shadow-2xl">
-            <div className="flex items-center justify-between border-b border-slate-200 px-5 py-4 sm:px-8">
-              <div><h2 id="add-medication-title" className="text-xl font-bold text-[#0b2d54]">Add a medication</h2><p className="mt-1 text-sm text-slate-500">Search for your medicine, then add the dose and schedule.</p></div>
-              <button type="button" onClick={() => !saving && setShowAddMedication(false)} className="rounded-full p-2 text-slate-500 hover:bg-slate-100" aria-label="Close"><X className="h-5 w-5" /></button>
-            </div>
-            <div className="max-h-[80vh] overflow-y-auto px-5 py-6 sm:px-8">
-              <div className="[&>div>div:first-child]:hidden">
-                <MedicationsStep values={medicationValues} onChange={setMedicationValues} />
-              </div>
-            </div>
-            <div className="flex flex-col-reverse gap-3 border-t border-slate-200 px-5 py-4 sm:flex-row sm:justify-end sm:px-8">
-              <Button type="button" variant="outline" disabled={saving} onClick={() => setShowAddMedication(false)}>Cancel</Button>
-              <Button type="button" disabled={saving} onClick={saveMedications} className="bg-[#0b2d54] text-white hover:bg-[#071f3a]">{saving ? "Saving..." : "Save medications"}</Button>
-            </div>
-          </div>
-        </div>
-      )}
     </main>
   );
 }
