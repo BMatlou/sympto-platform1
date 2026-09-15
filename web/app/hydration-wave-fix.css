@@ -1,0 +1,59 @@
+/* Hydration wave presentation only. No state, data or event logic is changed. */
+#daily-health-check-in + div article:nth-child(2) .h-\\[92px\\].w-\\[66px\\] > div:first-child {
+  z-index: 2 !important;
+}
+
+#daily-health-check-in + div article:nth-child(2) .h-\\[92px\\].w-\\[66px\\] > div:first-child::before {
+  content: "" !important;
+  position: absolute !important;
+  left: -18% !important;
+  top: -5px !important;
+  width: 136% !important;
+  height: 20px !important;
+  border-radius: 48% 52% 46% 54% / 62% 60% 40% 38% !important;
+  background:
+    radial-gradient(ellipse at 50% 90%, rgba(255,255,255,.62) 0 34%, rgba(255,255,255,.18) 35% 54%, transparent 56%) !important;
+  box-shadow:
+    0 -1px 0 rgba(255,255,255,.40),
+    0 2px 8px rgba(11,130,146,.18) !important;
+  transform: translate3d(-3%, 0, 0) rotate(-1deg) !important;
+  animation: sympto-hydration-wave-visible 3.2s ease-in-out infinite !important;
+  pointer-events: none !important;
+}
+
+#daily-health-check-in + div article:nth-child(2) .h-\\[92px\\].w-\\[66px\\] > div:first-child::after {
+  content: "" !important;
+  position: absolute !important;
+  left: -20% !important;
+  top: -1px !important;
+  width: 140% !important;
+  height: 13px !important;
+  border-radius: 50% !important;
+  border-top: 3px solid rgba(255,255,255,.48) !important;
+  box-shadow: 0 2px 6px rgba(255,255,255,.12) !important;
+  transform: translate3d(4%, 0, 0) rotate(1deg) !important;
+  animation: sympto-hydration-wave-visible 3.2s ease-in-out infinite reverse !important;
+  pointer-events: none !important;
+}
+
+@keyframes sympto-hydration-wave-visible {
+  0%, 100% {
+    transform: translate3d(-4%, 0, 0) rotate(-1.5deg) scaleX(1.01);
+  }
+  25% {
+    transform: translate3d(2%, 1px, 0) rotate(1deg) scaleX(1.05);
+  }
+  50% {
+    transform: translate3d(7%, 0, 0) rotate(1.5deg) scaleX(.98);
+  }
+  75% {
+    transform: translate3d(1%, -1px, 0) rotate(-1deg) scaleX(1.05);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  #daily-health-check-in + div article:nth-child(2) .h-\\[92px\\].w-\\[66px\\] > div:first-child::before,
+  #daily-health-check-in + div article:nth-child(2) .h-\\[92px\\].w-\\[66px\\] > div:first-child::after {
+    animation: none !important;
+  }
+}
