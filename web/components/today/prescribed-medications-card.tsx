@@ -19,7 +19,7 @@ type PrescribedMedication = {
   prescription?: { practitioner?: { name?: string | null; firstName?: string | null; lastName?: string | null } | null; doctorName?: string | null } | null;
 };
 
-type ActiveGoal = { id?: string | null; associatedMedicationId?: string | null; status?: string | null };
+type ActiveGoal = { associatedMedicationId?: string | null; status?: string | null };
 
 function firstText(...values: unknown[]) {
   const value = values.find((item) => item !== null && item !== undefined && String(item).trim() !== "");
@@ -71,7 +71,6 @@ export default function PrescribedMedicationsCard({ prescriptionsList, activeGoa
         <div className="bg-[#f8fcfc] p-4 sm:p-5">
           {prescriptions.map((medication, index) => {
             const isGoalSetForThisMed = activeGoals.some((goal) => goal.associatedMedicationId === medication.id && goal.status === "IN_PROGRESS");
-            const goalForThisMedication = isGoalSetForThisMed ? activeGoals.find((goal) => goal.associatedMedicationId === medication.id && goal.status === "IN_PROGRESS") : undefined;
             const recordId = medicationRecordId(medication);
             const name = medicationName(medication);
             const doctor = medicationDoctor(medication);
