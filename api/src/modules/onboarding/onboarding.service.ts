@@ -15,6 +15,26 @@ import { UpdateHealthGoalsDto } from './dto/update-health-goals.dto';
 import { UpdateHealthJournalSettingsDto } from './dto/update-health-journal-settings.dto';
 import { UpdateConsentDto } from './dto/update-consent.dto';
 
+const MEDICATION_FREQUENCIES = new Set([
+  'ONCE_DAILY',
+  'TWICE_DAILY',
+  'THREE_TIMES_DAILY',
+  'FOUR_TIMES_DAILY',
+  'AS_NEEDED',
+  'WEEKLY',
+  'OTHER',
+]);
+
+const MEDICATION_ROUTES = new Set([
+  'ORAL',
+  'INHALATION',
+  'INJECTION',
+  'TOPICAL',
+  'OPHTHALMIC',
+  'OTIC',
+  'OTHER',
+]);
+
 @Injectable()
 export class OnboardingService {
   constructor(
@@ -93,29 +113,99 @@ export class OnboardingService {
   async updatePatientConditions(userId: string, dto: UpdatePatientConditionsDto) { return this.onboardingRepository.savePatientConditions(userId, dto); }
   async updatePatientMedications(userId: string, dto: UpdatePatientMedicationsDto) { return this.onboardingRepository.savePatientMedications(userId, dto); }
 
+  private parseMedicationDate(value: string | undefined, field: string): Date | undefined {
+    if (!value) return undefined;
+    const parsed = new Date(value);
+    if (Number.isNaN(parsed.getTime())) {
+      throw new BadRequestException(`Invalid medication ${field} date.`);
+    }
+    return parsed;
+  }
+
+  private normalizeMedicationFrequency(value: string | undefined): string | undefined {
+    if (value === undefined || value === null || value === '') return undefined;
+    const normalized = value.trim().toUpperCase();
+    if (!MEDICATION_FREQUENCIES.has(normalized)) {
+      throw new BadRequestException(`Invalid medication frequency: ${value}.`);
+    }
+    return normalized;
+  }
+
+  private normalizeMedicationRoute(value: string | undefined): string | undefined {
+    if (value === undefined || value === null || value === '') return undefined;
+    const normalized = value.trim().toUpperCase();
+    if (!MEDICATION_ROUTES.has(normalized)) {
+      throw new BadRequestException(`Invalid medication route: ${value}.`);
+    }
+    return normalized;
+  }
+
   /** Live Medications page save: update existing PatientMedication rows in place and create new rows. */
   async managePatientMedications(userId: string, dto: UpdatePatientMedicationsDto) {
     return this.prisma.$transaction(async (tx) => {
-      const patient = await tx.patient.findUnique({ where: { userId }, include: { healthPassport: true } });
-      if (!patient) throw new BadRequestException('Patient not found.');
-      if (!patient.healthPassport) throw new BadRequestException('Health Passport not found.');
+      // HealthPassport is a 1:1 child of Patient. Resolve it through the
+      // authenticated user's Patient relation so a caller can never write
+      // a PatientMedication against another patient's passport.
+      const patient = await tx.patient.findUnique({
+        where: { userId },
+        select: {
+          id: true,
+          healthPassport: { select: { id: true, patientId: true } },
+        },
+      });
 
-      const healthPassportId = patient.healthPassport.id;
-      const existing = await tx.patientMedication.findMany({ where: { healthPassportId }, select: { id: true } });
+      if (!patient) throw new BadRequestException('Patient not found.');
+
+      const healthPassport = patient.healthPassport;
+      if (!healthPassport || healthPassport.patientId !== patient.id) {
+        throw new BadRequestException('Health Passport not found for this patient.');
+      }
+
+      const healthPassportId = healthPassport.id;
+      const submittedMedicationIds = [...new Set(dto.medications.map((item) => item.medicationId))];
+
+      // Validate the Medication FK before entering the write loop. This turns
+      // a database FK crash into a clear client error and prevents a failed
+      // transaction from taking down the API connection used by Health Home.
+      if (submittedMedicationIds.length > 0) {
+        const medications = await tx.medication.findMany({
+          where: { id: { in: submittedMedicationIds } },
+          select: { id: true },
+        });
+        const validMedicationIds = new Set(medications.map((item) => item.id));
+        const missingMedicationId = submittedMedicationIds.find((id) => !validMedicationIds.has(id));
+        if (missingMedicationId) {
+          throw new BadRequestException(`Medication ${missingMedicationId} could not be found.`);
+        }
+      }
+
+      const existing = await tx.patientMedication.findMany({
+        where: { healthPassportId },
+        select: { id: true },
+      });
       const existingIds = new Set(existing.map((item) => item.id));
       const submittedExistingIds = new Set<string>();
 
       for (const medication of dto.medications) {
+        const frequency = this.normalizeMedicationFrequency(medication.frequency);
+        const route = this.normalizeMedicationRoute(medication.route);
+        const startedAt = this.parseMedicationDate(medication.startedAt, 'start');
+        const endedAt = this.parseMedicationDate(medication.endedAt, 'end');
+
+        if (endedAt && startedAt && endedAt < startedAt) {
+          throw new BadRequestException('Medication stopped date cannot be before the started date.');
+        }
+
         const createData = {
           medicationId: medication.medicationId,
           dosage: medication.dosage,
-          frequency: medication.frequency,
-          route: medication.route,
+          frequency,
+          route,
           indication: medication.indication,
           instructions: medication.instructions,
           prescribedBy: medication.prescribedBy,
-          startedAt: medication.startedAt ? new Date(medication.startedAt) : undefined,
-          endedAt: medication.endedAt ? new Date(medication.endedAt) : undefined,
+          startedAt,
+          endedAt,
           ongoing: medication.ongoing ?? true,
           adherencePercentage: medication.adherencePercentage,
           missedDoses: medication.missedDoses,
@@ -132,37 +222,53 @@ export class OnboardingService {
 
           submittedExistingIds.add(medication.patientMedicationId);
 
-          const updateData = {
-            medicationId: createData.medicationId,
-            dosage: createData.dosage ?? null,
-            frequency: createData.frequency ?? null,
-            route: createData.route ?? null,
-            indication: createData.indication ?? null,
-            instructions: createData.instructions ?? null,
-            prescribedBy: createData.prescribedBy ?? null,
-            startedAt: createData.startedAt ?? null,
-            endedAt: createData.endedAt ?? null,
-            ongoing: createData.ongoing,
-            adherencePercentage: createData.adherencePercentage,
-            missedDoses: createData.missedDoses,
-            sideEffects: createData.sideEffects ?? null,
-            effectiveness: createData.effectiveness ?? null,
-            status: createData.status,
-            notes: createData.notes ?? null,
-          };
-
-          await tx.patientMedication.update({ where: { id: medication.patientMedicationId }, data: updateData });
+          await tx.patientMedication.update({
+            where: { id: medication.patientMedicationId },
+            data: {
+              medicationId: createData.medicationId,
+              dosage: createData.dosage ?? null,
+              frequency: createData.frequency ?? null,
+              route: createData.route ?? null,
+              indication: createData.indication ?? null,
+              instructions: createData.instructions ?? null,
+              prescribedBy: createData.prescribedBy ?? null,
+              startedAt: createData.startedAt ?? null,
+              endedAt: createData.endedAt ?? null,
+              ongoing: createData.ongoing,
+              adherencePercentage: createData.adherencePercentage,
+              missedDoses: createData.missedDoses,
+              sideEffects: createData.sideEffects ?? null,
+              effectiveness: createData.effectiveness ?? null,
+              status: createData.status,
+              notes: createData.notes ?? null,
+            },
+          });
         } else {
-          await tx.patientMedication.create({ data: { healthPassportId, ...createData } });
+          await tx.patientMedication.create({
+            data: {
+              healthPassportId,
+              ...createData,
+            },
+          });
         }
       }
 
-      const idsToDelete = existing.map((item) => item.id).filter((id) => !submittedExistingIds.has(id));
+      // Keep the live-page semantics: records omitted from an Edit submission
+      // are removed. The delete is scoped to this patient's passport only.
+      const idsToDelete = existing
+        .map((item) => item.id)
+        .filter((id) => !submittedExistingIds.has(id));
       if (idsToDelete.length > 0) {
-        await tx.patientMedication.deleteMany({ where: { healthPassportId, id: { in: idsToDelete } } });
+        await tx.patientMedication.deleteMany({
+          where: { healthPassportId, id: { in: idsToDelete } },
+        });
       }
 
-      return tx.patientMedication.findMany({ where: { healthPassportId }, include: { medication: true }, orderBy: { createdAt: 'desc' } });
+      return tx.patientMedication.findMany({
+        where: { healthPassportId },
+        include: { medication: true },
+        orderBy: { createdAt: 'desc' },
+      });
     });
   }
 
