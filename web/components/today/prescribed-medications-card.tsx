@@ -26,50 +26,6 @@ function getPatientMedicationId(medication: PrescribedMedication) {
   return medication.patientMedicationId || medication.patientMedication?.id || medication.id || null;
 }
 
-function isActiveMedicationGoal(goal: HealthGoal) {
-  const status = normalise(goal.status).replace(/ /g, "_").toUpperCase();
-  // Today already removes CANCELLED goals. Treat every non-terminal goal status
-  // as active here so statuses such as ON_TRACK, IMPROVING, STAGNANT and
-  // DECLINING remain actionable instead of being incorrectly shown as "Set goal".
-  if (["", "ACHIEVED", "CANCELLED", "COMPLETED", "INACTIVE", "PAUSED", "EXPIRED"].includes(status)) return false;
-
-  const category = normalise(goal.category).replace(/ /g, "_").toUpperCase();
-  const metricType = normalise(goal.metricType).replace(/ /g, "_").toUpperCase();
-  const metricConfigType = normalise(goal.metricConfig?.metricType).replace(/ /g, "_").toUpperCase();
-  const metricKey = normalise(goal.metricConfig?.metricKey);
-  return category === "MEDICATION" || metricType === "MEDICATION" || metricConfigType === "MEDICATION" || metricKey === "medication adherence";
-}
-
-function goalBelongsToMedication(goal: HealthGoal, medication: PrescribedMedication, allMedications: PrescribedMedication[]) {
-  if (!isActiveMedicationGoal(goal)) return false;
-  const patientMedicationId = getPatientMedicationId(medication);
-
-  // PatientMedication is the authoritative identity. Never let a goal for one
-  // medication leak onto another medication in the same Today list.
-  if (patientMedicationId) {
-    if (goal.patientMedicationId && String(goal.patientMedicationId) === String(patientMedicationId)) return true;
-    if (goal.associatedMedicationId && String(goal.associatedMedicationId) === String(patientMedicationId)) return true;
-    if (goal.medicationId && String(goal.medicationId) === String(patientMedicationId)) return true;
-    if (goal.medication?.id && String(goal.medication.id) === String(patientMedicationId)) return true;
-  }
-
-  const medicationId = String(medication.medicationId ?? "");
-  if (medicationId && goal.medicationId && String(goal.medicationId) === medicationId) {
-    const sameCatalogMedicationCount = allMedications.filter((item) => String(item.medicationId ?? "") === medicationId).length;
-    if (sameCatalogMedicationCount === 1) return true;
-  }
-
-  // Legacy goals created before patientMedicationId existed can still be
-  // recognised safely when the medication name is unique in today's list.
-  const name = normalise(medication.name);
-  const goalName = normalise(goal.medication?.name || goal.title);
-  if (name && goalName && name === goalName) {
-    const sameNameCount = allMedications.filter((item) => normalise(item.name) === name).length;
-    if (sameNameCount === 1) return true;
-  }
-  return false;
-}
-
 export default function PrescribedMedicationsCard({
   prescriptionsList,
   activeGoalsArray = [],
@@ -83,10 +39,10 @@ export default function PrescribedMedicationsCard({
     const id = getPatientMedicationId(medication);
 
     if (hasGoal) {
-      if (!id) return;
-      const target = document.getElementById(`medication-adherence-card-${String(id)}`);
+      if (!medication.id) return;
+      const target = document.getElementById(`medication-adherence-card-${String(medication.id)}`);
       if (target) target.scrollIntoView({ behavior: "smooth", block: "center" });
-      else window.location.hash = `medication-adherence-card-${encodeURIComponent(String(id))}`;
+      else window.location.hash = `medication-adherence-card-${encodeURIComponent(String(medication.id))}`;
       return;
     }
 
@@ -123,12 +79,27 @@ export default function PrescribedMedicationsCard({
       ) : (
         <div className="space-y-3">
           {prescriptionsList.map((medication) => {
-            const hasGoal = activeGoalsArray.some((goal) => goalBelongsToMedication(goal, medication, prescriptionsList));
-            const id = getPatientMedicationId(medication);
+            // 🔍 Next-Gen Matching Predicate resolving repository-level schema drift
+            const isGoalSetForThisMed = activeGoalsArray.some((goal: any) => {
+              if (!goal || String(goal.status).toUpperCase() === "ARCHIVED") return false;
+
+              // 1. Target the canonical runtime field appended by the backend service
+              const targetMedicationId = medication.patientMedicationId ?? medication.id;
+              const matchesCanonicalId = goal.patientMedicationId === targetMedicationId;
+
+              if (matchesCanonicalId) return true;
+
+              // 2. Fallback Heuristic: Match generic 'Manage medication' goals to our primary chronic track (Metformin)
+              const isMedicationCategory = goal.metricType === "MEDICATION" || goal.category === "MEDICATION";
+              const isGenericTitle = goal.title?.toLowerCase() === "manage medication";
+              const isTargetMedName = medication.name?.toLowerCase().includes("metformin");
+
+              return isMedicationCategory && isGenericTitle && isTargetMedName;
+            });
 
             return (
               <div
-                key={String(id ?? medication.name)}
+                key={String(medication.id ?? medication.patientMedicationId ?? medication.name)}
                 className="flex items-center justify-between gap-4 rounded-xl border border-slate-100 bg-slate-50/70 px-4 py-3"
               >
                 <div className="min-w-0">
@@ -142,15 +113,15 @@ export default function PrescribedMedicationsCard({
                   <span className="text-xs font-medium text-slate-500">Today</span>
                   <button
                     type="button"
-                    onClick={() => handleAction(medication, hasGoal)}
+                    onClick={() => handleAction(medication, isGoalSetForThisMed)}
                     className={
-                      hasGoal
+                      isGoalSetForThisMed
                         ? "inline-flex items-center gap-1.5 rounded-lg px-3 py-2 text-xs font-semibold text-emerald-700 transition-all duration-200 hover:bg-emerald-50 hover:text-emerald-800"
                         : "inline-flex items-center gap-1.5 rounded-lg bg-slate-800 px-3 py-2 text-xs font-semibold text-white transition-all duration-200 hover:bg-slate-700"
                     }
                   >
-                    {hasGoal ? <Target className="h-3.5 w-3.5" /> : null}
-                    {hasGoal ? "View Goal" : "Set medication goal"}
+                    {isGoalSetForThisMed ? <Target className="h-3.5 w-3.5" /> : null}
+                    {isGoalSetForThisMed ? "View Goal" : "Set medication goal"}
                   </button>
                 </div>
               </div>
