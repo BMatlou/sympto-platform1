@@ -72,10 +72,6 @@ function patientMedicationId(medication: any) {
   return medication?.patientMedicationId || medication?.patientMedication?.id || medication?.id || null;
 }
 
-function goalMedicationId(goal: any) {
-  return goal?.associatedMedicationId || goal?.patientMedicationId || goal?.medicationId || goal?.associatedMedication?.id || goal?.patientMedication?.id || goal?.medication?.id || null;
-}
-
 function normalise(value: unknown) {
   return String(value ?? "").trim().toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
 }
@@ -84,25 +80,29 @@ function medicationName(medication: any) {
   return normalise(medication?.medication?.name || medication?.name || medication?.medication?.genericName || medication?.medication?.brandName);
 }
 
-function goalMedicationNameMatches(goal: any, medication: any) {
-  const name = medicationName(medication);
-  if (!name) return false;
-  const goalNames = [goal?.medication?.name, goal?.medication?.genericName, goal?.medication?.brandName, goal?.title, goal?.description].map(normalise).filter(Boolean);
-  return goalNames.some((candidate) => candidate === name || candidate.includes(name) || name.includes(candidate));
-}
-
 function medicationGoalFor(medication: any, goals: any[]) {
   const medicationId = patientMedicationId(medication);
-  const medicationCatalogId = medication?.medicationId || medication?.medication?.id || medication?.medication?.medicationId;
-  const ids = [medicationId, medicationCatalogId].filter(Boolean).map(String);
+  const medicationCatalogIds = [medication?.medicationId, medication?.medication?.id, medication?.medication?.medicationId].filter(Boolean).map(String);
 
   return goals.find((goal: any) => {
     const category = String(goal?.category ?? "").toUpperCase();
     const metricKey = String(goal?.metricConfig?.metricKey ?? "").toLowerCase();
     const status = String(goal?.status ?? "").toUpperCase();
     if ((category !== "MEDICATION" && metricKey !== "medication.adherence") || !ACTIVE_GOAL_STATUSES.has(status)) return false;
-    const linkedId = goalMedicationId(goal);
-    return (linkedId && ids.includes(String(linkedId))) || goalMedicationNameMatches(goal, medication);
+
+    // A persisted patientMedicationId is authoritative. Never fall back to
+    // medicine-name matching when the goal is explicitly attached elsewhere.
+    if (goal?.patientMedicationId) {
+      return Boolean(medicationId) && String(goal.patientMedicationId) === String(medicationId);
+    }
+
+    const linkedMedicationId = goal?.associatedMedicationId || goal?.medicationId || goal?.associatedMedication?.id || goal?.patientMedication?.id || goal?.medication?.id;
+    if (linkedMedicationId) return medicationCatalogIds.includes(String(linkedMedicationId));
+
+    const name = medicationName(medication);
+    if (!name) return false;
+    const goalNames = [goal?.medication?.name, goal?.medication?.genericName, goal?.medication?.brandName, goal?.title, goal?.description].map(normalise).filter(Boolean);
+    return goalNames.some((candidate) => candidate === name || candidate.includes(name) || name.includes(candidate));
   }) ?? null;
 }
 
