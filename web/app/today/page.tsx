@@ -66,6 +66,14 @@ function goalJourney(goal: any) {
   return { journeyDay, targetDate, daysLeft };
 }
 
+function patientMedicationId(medication: any) {
+  return medication?.patientMedicationId || medication?.patientMedication?.id || medication?.id || null;
+}
+
+function goalMedicationId(goal: any) {
+  return goal?.associatedMedicationId || goal?.patientMedicationId || goal?.medicationId || null;
+}
+
 const GOAL_META: Record<string, { label: string; icon: typeof Target; accent: string; surface: string }> = {
   NUTRITION: { label: "Nutrition", icon: Apple, accent: "text-orange-700", surface: "bg-orange-50" },
   BLOOD_PRESSURE: { label: "Blood pressure", icon: HeartPulse, accent: "text-rose-700", surface: "bg-rose-50" },
@@ -121,6 +129,15 @@ export default function TodayPage() {
   const exerciseGoal = goals.find((goal: any) => String(goal?.category ?? "").toUpperCase() === "EXERCISE");
   const otherGoals = goals.filter((goal: any) => !["MEDICATION", "SMOKING", "ALCOHOL", "WEIGHT", "EXERCISE"].includes(String(goal?.category ?? "").toUpperCase()));
 
+  const medicationGoalCards = (Array.isArray(medications) ? medications : []).map((medication: any) => {
+    const medicationId = patientMedicationId(medication);
+    const goal = activeGoalsArray.find((candidate: any) => {
+      const candidateStatus = String(candidate?.status ?? "").toUpperCase();
+      return Boolean(medicationId) && goalMedicationId(candidate) === medicationId && ["IN_PROGRESS", "ACTIVE"].includes(candidateStatus);
+    });
+    return { medication, goal };
+  });
+
   const attention = data.attention ?? [];
   const carePlans = data.carePlans ?? [];
   const careTasks = carePlans.flatMap((plan: any) =>
@@ -172,7 +189,18 @@ export default function TodayPage() {
 
           {(medications.length > 0 || medicationGoal || smokingGoal || alcoholGoal || weightGoal || exerciseGoal) && (
             <section className="mt-3.5 grid items-stretch gap-4 lg:grid-cols-2">
-              {(medications.length > 0 || medicationGoal) ? <TodayMedicationActions medications={medications} goal={medicationGoal} onUpdated={reload} /> : <div />}
+              {medicationGoalCards.length > 0
+                ? medicationGoalCards.map(({ medication, goal }, index) => (
+                    <TodayMedicationActions
+                      key={String(patientMedicationId(medication) ?? `medication-${index}`)}
+                      medications={[medication]}
+                      goal={goal}
+                      onUpdated={reload}
+                    />
+                  ))
+                : medicationGoal
+                  ? <TodayMedicationActions medications={[]} goal={medicationGoal} onUpdated={reload} />
+                  : null}
               {smokingGoal ? <TodaySmokingGoal goal={smokingGoal} /> : <div />}
               {alcoholGoal && <TodayAlcoholGoal goal={alcoholGoal} onUpdated={reload} />}
               {weightGoal && <TodayWeightGoal goal={weightGoal} fallbackWeight={weightKg} />}
