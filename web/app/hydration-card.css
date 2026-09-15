@@ -77,7 +77,7 @@
 }
 
 /* Proper drinking-glass silhouette */
-#daily-health-check-in + div article:nth-child(2) .h-\[92px\].w-\[66px\] {
+#daily-health-check-in + div article:nth-child(2) .h-\\[92px\\].w-\\[66px\\] {
   position: relative !important;
   width: 92px !important;
   height: 138px !important;
@@ -95,7 +95,7 @@
 }
 
 /* Glass rim */
-#daily-health-check-in + div article:nth-child(2) .h-\[92px\].w-\[66px\] > div:nth-child(2) {
+#daily-health-check-in + div article:nth-child(2) .h-\\[92px\\].w-\\[66px\\] > div:nth-child(2) {
   position: absolute !important;
   inset: 5px 5px auto !important;
   height: 14px !important;
@@ -109,7 +109,7 @@
 }
 
 /* Glass reflection */
-#daily-health-check-in + div article:nth-child(2) .h-\[92px\].w-\[66px\]::before {
+#daily-health-check-in + div article:nth-child(2) .h-\\[92px\\].w-\\[66px\\]::before {
   content: "";
   position: absolute;
   left: 9px;
@@ -124,7 +124,7 @@
 }
 
 /* Water */
-#daily-health-check-in + div article:nth-child(2) .h-\[92px\].w-\[66px\] > div:first-child {
+#daily-health-check-in + div article:nth-child(2) .h-\\[92px\\].w-\\[66px\\] > div:first-child {
   position: absolute !important;
   inset: auto 0 0 !important;
   min-height: 10px;
@@ -135,7 +135,7 @@
   transition: height .45s ease !important;
 }
 
-#daily-health-check-in + div article:nth-child(2) .h-\[92px\].w-\[66px\] > div:first-child::before {
+#daily-health-check-in + div article:nth-child(2) .h-\\[92px\\].w-\\[66px\\] > div:first-child::before {
   content: "";
   position: absolute;
   left: -20%;
@@ -148,7 +148,7 @@
   animation: sympto-hydration-wave 3.6s ease-in-out infinite;
 }
 
-#daily-health-check-in + div article:nth-child(2) .h-\[92px\].w-\[66px\] > div:first-child::after {
+#daily-health-check-in + div article:nth-child(2) .h-\\[92px\\].w-\\[66px\\] > div:first-child::after {
   content: "";
   position: absolute;
   left: -24%;
@@ -224,7 +224,7 @@
   box-shadow: inset 0 0 0 1px rgba(36,193,196,.10) !important;
 }
 
-/* Borderless premium tap targets: visibility comes from contrast + elevation, not outlines. */
+/* Borderless premium tap targets: visibility comes from tonal contrast, elevation and motion—not outlines. */
 #daily-health-check-in + div article:nth-child(2) > div:nth-child(3) button {
   width: 42px !important;
   height: 42px !important;
@@ -235,6 +235,7 @@
   flex: 0 0 42px !important;
   border: 0 !important;
   outline: 0 !important;
+  box-shadow: 0 7px 16px rgba(11,45,84,.10) !important;
   border-radius: 14px !important;
   opacity: 1 !important;
   visibility: visible !important;
@@ -252,24 +253,18 @@
 #daily-health-check-in + div article:nth-child(2) > div:nth-child(3) button:first-child {
   background: linear-gradient(145deg, #ffffff 0%, #edf5f7 100%) !important;
   color: #0b2d54 !important;
-  box-shadow:
-    0 7px 15px rgba(11,45,84,.10),
-    inset 0 1px 0 rgba(255,255,255,.98) !important;
+  box-shadow: 0 7px 16px rgba(11,45,84,.12) !important;
 }
 
 #daily-health-check-in + div article:nth-child(2) > div:nth-child(3) button:last-child {
   background: linear-gradient(145deg, #dffbfb 0%, #aeecef 100%) !important;
   color: #087b82 !important;
-  box-shadow:
-    0 8px 17px rgba(36,193,196,.18),
-    inset 0 1px 0 rgba(255,255,255,.88) !important;
+  box-shadow: 0 9px 19px rgba(36,193,196,.20) !important;
 }
 
 #daily-health-check-in + div article:nth-child(2) > div:nth-child(3) button:focus-visible {
   outline: 0 !important;
-  box-shadow:
-    0 0 0 4px rgba(36,193,196,.18),
-    0 8px 18px rgba(11,45,84,.12) !important;
+  box-shadow: 0 0 0 4px rgba(36,193,196,.18), 0 9px 20px rgba(11,45,84,.13) !important;
 }
 
 #daily-health-check-in + div article:nth-child(2) > div:nth-child(3) button:hover:not(:disabled) {
@@ -284,7 +279,7 @@
   opacity: .68 !important;
   color: #607783 !important;
   background: #f2f6f7 !important;
-  box-shadow: inset 0 1px 0 rgba(255,255,255,.9) !important;
+  box-shadow: 0 3px 8px rgba(11,45,84,.05) !important;
 }
 
 /* Reset */
@@ -320,7 +315,7 @@
 }
 
 @media (min-width: 640px) {
-  #daily-health-check-in + div article:nth-child(2) .h-\[92px\].w-\[66px\] {
+  #daily-health-check-in + div article:nth-child(2) .h-\\[92px\\].w-\\[66px\\] {
     width: 98px !important;
     height: 146px !important;
     flex-basis: 98px !important;
@@ -328,8 +323,8 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
-  #daily-health-check-in + div article:nth-child(2) .h-\[92px\].w-\[66px\] > div:first-child::before,
-  #daily-health-check-in + div article:nth-child(2) .h-\[92px\].w-\[66px\] > div:first-child::after {
+  #daily-health-check-in + div article:nth-child(2) .h-\\[92px\\].w-\\[66px\\] > div:first-child::before,
+  #daily-health-check-in + div article:nth-child(2) .h-\\[92px\\].w-\\[66px\\] > div:first-child::after {
     animation: none;
   }
 
