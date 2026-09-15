@@ -6,6 +6,7 @@ import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 import { api } from "@/lib/api";
 import { healthGoalsService } from "@/services/health-goals.service";
+import { healthHomeService } from "@/services/health-home.service";
 
 interface TodayMedicationActionsProps {
   medications: any[];
@@ -112,15 +113,23 @@ export default function TodayMedicationActions({ medications, goal: suppliedGoal
 
     async function resolveGoal() {
       setGoalLookupComplete(false);
-      const patientId = trackedMedication?.patientId || trackedMedication?.patient?.id || trackedMedication?.patientMedication?.patientId;
-      if (!patientId) {
-        setGoalLookupComplete(true);
-        return;
-      }
       try {
-        const response = await healthGoalsService.list(String(patientId));
-        const goals = Array.isArray(response?.data) ? response.data : [];
-        const activeMedicationGoals = goals.filter((candidate: any) => {
+        const healthHome = await healthHomeService.getHealthHome();
+        const patientId = healthHome?.patient?.id;
+        const rawGoals = Array.isArray(healthHome?.goals) ? healthHome.goals : Array.isArray(healthHome?.healthGoals) ? healthHome.healthGoals : [];
+        const goals = rawGoals.length || !patientId ? rawGoals : (() => [])();
+        let candidates = goals;
+
+        if (patientId) {
+          try {
+            const listed = await healthGoalsService.list(String(patientId));
+            candidates = Array.isArray(listed) ? listed : Array.isArray(listed?.data) ? listed.data : candidates;
+          } catch {
+            // Health Home goals remain the fallback source.
+          }
+        }
+
+        const activeMedicationGoals = candidates.filter((candidate: any) => {
           const status = String(candidate?.status ?? "").toUpperCase();
           return String(candidate?.category ?? "").toUpperCase() === "MEDICATION" && ["ACTIVE", "IN_PROGRESS"].includes(status);
         });
@@ -192,70 +201,39 @@ export default function TodayMedicationActions({ medications, goal: suppliedGoal
     }
   }
 
-  const goalTitle = resolvedGoal?.title || "Medication adherence";
+  const goalTitle = resolvedGoal?.title || `${medicationName(trackedMedication)} adherence`;
   const cardClass = "w-full overflow-hidden rounded-[26px] border border-[#dce9ee] bg-white shadow-[0_14px_34px_rgba(11,45,84,.06)]";
 
   if (!medications.length) {
     return (
       <section id="medication-goal-card" className={cardClass}>
-        <div className="flex items-center gap-3 px-5 py-4">
-          <span className="grid h-10 w-10 shrink-0 place-items-center rounded-[14px] bg-[#e8f8f7] text-[#24c1c4] ring-1 ring-[#d3efed]"><Target className="h-4 w-4" /></span>
-          <div className="min-w-0">
-            <p className="text-[9px] font-black uppercase tracking-[.16em] text-[#0b7b80]">Medication</p>
-            <h3 className="mt-0.5 truncate text-base font-black tracking-[-.035em] text-[#0b2d54]">{goalTitle}</h3>
-            <p className="mt-0.5 text-[10px] font-medium text-[#7c8e9b]">No active medicine scheduled today.</p>
-          </div>
-        </div>
+        <div className="flex items-center gap-3 px-5 py-4"><span className="grid h-10 w-10 shrink-0 place-items-center rounded-[14px] bg-[#e8f8f7] text-[#24c1c4] ring-1 ring-[#d3efed]"><Target className="h-4 w-4" /></span><div className="min-w-0"><p className="text-[9px] font-black uppercase tracking-[.16em] text-[#0b7b80]">Medication</p><h3 className="mt-0.5 truncate text-base font-black tracking-[-.035em] text-[#0b2d54]">{goalTitle}</h3><p className="mt-0.5 text-[10px] font-medium text-[#7c8e9b]">No active medicine scheduled today.</p></div></div>
       </section>
     );
   }
 
   if (!goalLookupComplete) {
     return (
-      <section id={medicationAnchorId} className={cardClass}>
-        <div className="flex items-center gap-3 px-4 py-5 sm:px-5">
-          <span className="grid h-10 w-10 shrink-0 place-items-center rounded-[14px] bg-[#e8f8f7] text-[#24c1c4] ring-1 ring-[#d3efed]"><Pill className="h-4 w-4" /></span>
-          <div><p className="text-[8px] font-black uppercase tracking-[.16em] text-[#0b7b80]">Medication goal</p><p className="mt-1 text-[11px] font-semibold text-[#7c8e9b]">Loading your medication goal…</p></div>
-        </div>
-      </section>
+      <section id={medicationAnchorId} className={cardClass}><div className="flex items-center gap-3 px-4 py-5 sm:px-5"><span className="grid h-10 w-10 shrink-0 place-items-center rounded-[14px] bg-[#e8f8f7] text-[#24c1c4] ring-1 ring-[#d3efed]"><Pill className="h-4 w-4" /></span><div><p className="text-[8px] font-black uppercase tracking-[.16em] text-[#0b7b80]">Medication goal</p><p className="mt-1 text-[11px] font-semibold text-[#7c8e9b]">Loading your medication goal…</p></div></div></section>
     );
   }
 
   if (!resolvedGoal) {
     return (
       <section id={medicationAnchorId} className={cardClass}>
-        <header className="flex items-center gap-3 px-4 pb-3 pt-4 sm:px-5 sm:pt-5">
-          <span className="grid h-10 w-10 shrink-0 place-items-center rounded-[14px] bg-[#e8f8f7] text-[#24c1c4] ring-1 ring-[#d3efed]"><Pill className="h-4 w-4" /></span>
-          <div className="min-w-0"><p className="text-[8px] font-black uppercase tracking-[.16em] text-[#0b7b80]">Medication goal</p><h3 className="mt-0.5 truncate text-base font-black tracking-[-.035em] text-[#0b2d54]">Set a goal for {medicationName(trackedMedication)}</h3><p className="mt-1 text-[10px] font-medium text-[#7c8e9b]">Choose an adherence target so your Today page can track this medicine against a clear goal.</p></div>
-        </header>
-        <div className="mx-3.5 mb-3.5 rounded-[22px] bg-[#f7fbfb] p-4 ring-1 ring-[#e1ecef] sm:mx-4 sm:mb-4 sm:p-5">
-          <div className="flex items-center justify-between gap-4"><div className="min-w-0"><p className="text-[8px] font-black uppercase tracking-[.14em] text-[#91a0ae]">Today’s medicine</p><p className="mt-1 truncate text-lg font-black tracking-[-.045em] text-[#0b2d54]">{medicationName(trackedMedication)}</p><p className="mt-1 text-[10px] font-semibold uppercase tracking-[.08em] text-[#83939e]">{medicationSchedule(trackedMedication)}</p></div><span className="grid h-12 w-12 shrink-0 place-items-center rounded-full bg-white text-[#24c1c4] ring-1 ring-[#d9e9ec]"><Target className="h-5 w-5" /></span></div>
-          <Link href="/health-goals" className="mt-4 inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-[14px] bg-[#0b2d54] px-4 py-3 text-[10px] font-black text-white shadow-[0_9px_22px_rgba(11,45,84,.13)] transition hover:bg-[#123d63]">Set medication goal <ArrowRight className="h-3.5 w-3.5 text-[#24c1c4]" /></Link>
-        </div>
+        <header className="flex items-center gap-3 px-4 pb-3 pt-4 sm:px-5 sm:pt-5"><span className="grid h-10 w-10 shrink-0 place-items-center rounded-[14px] bg-[#e8f8f7] text-[#24c1c4] ring-1 ring-[#d3efed]"><Pill className="h-4 w-4" /></span><div className="min-w-0"><p className="text-[8px] font-black uppercase tracking-[.16em] text-[#0b7b80]">Medication goal</p><h3 className="mt-0.5 truncate text-base font-black tracking-[-.035em] text-[#0b2d54]">Set a goal for {medicationName(trackedMedication)}</h3><p className="mt-1 text-[10px] font-medium text-[#7c8e9b]">Choose an adherence target so your Today page can track this medicine against a clear goal.</p></div></header>
+        <div className="mx-3.5 mb-3.5 rounded-[22px] bg-[#f7fbfb] p-4 ring-1 ring-[#e1ecef] sm:mx-4 sm:mb-4 sm:p-5"><div className="flex items-center justify-between gap-4"><div className="min-w-0"><p className="text-[8px] font-black uppercase tracking-[.14em] text-[#91a0ae]">Today’s medicine</p><p className="mt-1 truncate text-lg font-black tracking-[-.045em] text-[#0b2d54]">{medicationName(trackedMedication)}</p><p className="mt-1 text-[10px] font-semibold uppercase tracking-[.08em] text-[#83939e]">{medicationSchedule(trackedMedication)}</p></div><span className="grid h-12 w-12 shrink-0 place-items-center rounded-full bg-white text-[#24c1c4] ring-1 ring-[#d9e9ec]"><Target className="h-5 w-5" /></span></div><Link href="/health-goals" className="mt-4 inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-[14px] bg-[#0b2d54] px-4 py-3 text-[10px] font-black text-white shadow-[0_9px_22px_rgba(11,45,84,.13)] transition hover:bg-[#123d63]">Set medication goal <ArrowRight className="h-3.5 w-3.5 text-[#24c1c4]" /></Link></div>
       </section>
     );
   }
 
   return (
     <section id={medicationAnchorId} className={cardClass}>
-      <header className="flex items-center justify-between gap-3 px-4 pb-3 pt-4 sm:px-5 sm:pt-5">
-        <div className="flex min-w-0 items-center gap-2.5"><span className="grid h-9 w-9 shrink-0 place-items-center rounded-[13px] bg-[#e8f8f7] text-[#24c1c4] ring-1 ring-[#d3efed]"><Pill className="h-4 w-4" /></span><div className="min-w-0"><p className="text-[8px] font-black uppercase tracking-[.16em] text-[#0b7b80]">Medication</p><h3 className="truncate text-sm font-black tracking-[-.035em] text-[#0b2d54]">{goalTitle}</h3></div></div>
-        <div className="shrink-0 text-right"><p className="text-sm font-black text-[#0b2d54]">{doseLabel}</p><p className="mt-0.5 text-[8px] font-bold uppercase tracking-[.11em] text-[#8a99a6]">{percent}% complete</p></div>
-      </header>
+      <header className="flex items-center justify-between gap-3 px-4 pb-3 pt-4 sm:px-5 sm:pt-5"><div className="flex min-w-0 items-center gap-2.5"><span className="grid h-9 w-9 shrink-0 place-items-center rounded-[13px] bg-[#e8f8f7] text-[#24c1c4] ring-1 ring-[#d3efed]"><Pill className="h-4 w-4" /></span><div className="min-w-0"><p className="text-[8px] font-black uppercase tracking-[.16em] text-[#0b7b80]">Medication</p><h3 className="truncate text-sm font-black tracking-[-.035em] text-[#0b2d54]">{goalTitle}</h3></div></div><div className="shrink-0 text-right"><p className="text-sm font-black text-[#0b2d54]">{doseLabel}</p><p className="mt-0.5 text-[8px] font-bold uppercase tracking-[.11em] text-[#8a99a6]">{percent}% complete</p></div></header>
 
-      <div className="mx-3.5 mb-3.5 rounded-[22px] bg-[#0b2d54] px-4 py-4 text-white shadow-[0_12px_28px_rgba(11,45,84,.14)] sm:mx-4 sm:mb-4 sm:px-5 sm:py-4">
-        <div className="flex items-center gap-4 sm:gap-5">
-          <div className="relative shrink-0" style={{ width: ringSize, height: ringSize }}><svg width={ringSize} height={ringSize} viewBox={`0 0 ${ringSize} ${ringSize}`} className="-rotate-90"><circle cx={ringSize / 2} cy={ringSize / 2} r={radius} fill="none" stroke="rgba(255,255,255,.10)" strokeWidth={ringStroke} /><circle cx={ringSize / 2} cy={ringSize / 2} r={radius} fill="none" stroke="#24c1c4" strokeWidth={ringStroke} strokeLinecap="round" strokeDasharray={circumference} strokeDashoffset={dashOffset} /></svg><div className="absolute inset-0 grid place-items-center text-center"><p className="text-3xl font-black leading-none tracking-[-.07em]">{dosesLoggedToday}</p></div></div>
-          <div className="min-w-0 flex-1"><p className="text-[8px] font-black uppercase tracking-[.15em] text-white/45">Today’s medication</p><p className="mt-1 truncate text-lg font-black tracking-[-.045em]">{medicationName(trackedMedication)}</p><p className="mt-1 text-[10px] font-semibold uppercase tracking-[.08em] text-white/55">{medicationSchedule(trackedMedication)}</p><div className="mt-2.5 flex flex-wrap items-center gap-2"><span className="rounded-full bg-white/10 px-2.5 py-1 text-[8px] font-black text-white/75 ring-1 ring-white/10">{dosesLoggedToday}/{totalRequiredDosesPerDay} doses</span><span className="rounded-full bg-white/10 px-2.5 py-1 text-[8px] font-black text-[#b8ffff] ring-1 ring-white/10">{percent}% complete</span></div></div>
-        </div>
-        <div className="mt-3.5 border-t border-white/10 pt-3"><div className="flex items-center justify-between gap-3"><p className="text-[9px] font-semibold text-white/50">{dosesLoggedToday >= totalRequiredDosesPerDay ? "All scheduled doses logged today." : `${totalRequiredDosesPerDay - dosesLoggedToday} dose${totalRequiredDosesPerDay - dosesLoggedToday === 1 ? "" : "s"} remaining today.`}</p><p className="text-[9px] font-black text-white/60">{Math.max(0, totalRequiredDosesPerDay - dosesLoggedToday)} remaining</p></div></div>
-      </div>
+      <div className="mx-3.5 mb-3.5 rounded-[22px] bg-[#0b2d54] px-4 py-4 text-white shadow-[0_12px_28px_rgba(11,45,84,.14)] sm:mx-4 sm:mb-4 sm:px-5 sm:py-4"><div className="flex items-center gap-4 sm:gap-5"><div className="relative shrink-0" style={{ width: ringSize, height: ringSize }}><svg width={ringSize} height={ringSize} viewBox={`0 0 ${ringSize} ${ringSize}`} className="-rotate-90"><circle cx={ringSize / 2} cy={ringSize / 2} r={radius} fill="none" stroke="rgba(255,255,255,.10)" strokeWidth={ringStroke} /><circle cx={ringSize / 2} cy={ringSize / 2} r={radius} fill="none" stroke="#24c1c4" strokeWidth={ringStroke} strokeLinecap="round" strokeDasharray={circumference} strokeDashoffset={dashOffset} /></svg><div className="absolute inset-0 grid place-items-center text-center"><p className="text-3xl font-black leading-none tracking-[-.07em]">{dosesLoggedToday}</p></div></div><div className="min-w-0 flex-1"><p className="text-[8px] font-black uppercase tracking-[.15em] text-white/45">Today’s medication</p><p className="mt-1 truncate text-lg font-black tracking-[-.045em]">{medicationName(trackedMedication)}</p><p className="mt-1 text-[10px] font-semibold uppercase tracking-[.08em] text-white/55">{medicationSchedule(trackedMedication)}</p><div className="mt-2.5 flex flex-wrap items-center gap-2"><span className="rounded-full bg-white/10 px-2.5 py-1 text-[8px] font-black text-white/75 ring-1 ring-white/10">{dosesLoggedToday}/{totalRequiredDosesPerDay} doses</span><span className="rounded-full bg-white/10 px-2.5 py-1 text-[8px] font-black text-[#b8ffff] ring-1 ring-white/10">{percent}% complete</span></div></div></div><div className="mt-3.5 border-t border-white/10 pt-3"><div className="flex items-center justify-between gap-3"><p className="text-[9px] font-semibold text-white/50">{dosesLoggedToday >= totalRequiredDosesPerDay ? "All scheduled doses logged today." : `${totalRequiredDosesPerDay - dosesLoggedToday} dose${totalRequiredDosesPerDay - dosesLoggedToday === 1 ? "" : "s"} remaining today.`}</p><p className="text-[9px] font-black text-white/60">{Math.max(0, totalRequiredDosesPerDay - dosesLoggedToday)} remaining</p></div></div></div>
 
-      <div className="border-t border-[#edf2f5] px-4 py-3.5 sm:px-5">
-        <div className="mb-3 flex flex-wrap items-center justify-between gap-2"><div><p className="text-[8px] font-black uppercase tracking-[.14em] text-[#91a0ae]">Goal journey</p><p className="mt-0.5 text-[11px] font-black text-[#0b2d54]">Day {journeyDay}{daysLeft !== null ? ` · ${daysLeft} day${daysLeft === 1 ? "" : "s"} left` : ""}</p></div><p className="text-[10px] font-black text-[#0b7b80]">{Math.round(Number(resolvedGoal?.targetValue ?? 0)) > 0 ? `Target ${resolvedGoal.targetValue}` : "Active goal"}</p></div>
-        <div className="mb-3 h-2 overflow-hidden rounded-full bg-[#edf3f5]"><div className="h-full rounded-full bg-[#24c1c4] transition-all" style={{ width: `${percent}%` }} /></div>
-        <div className="flex items-center justify-between gap-3"><div><p className="text-[11px] font-bold text-[#7c8e9b]">Dose status</p><p className="mt-0.5 text-[10px] font-semibold text-[#9aa7b1]">{states[String(medicationId)] === "TAKEN" ? "Taken today" : states[String(medicationId)] === "SKIPPED" ? "Skipped today" : "Choose an action below"}</p></div><div className="grid w-[180px] grid-cols-2 gap-2"><button type="button" disabled={dosesLoggedToday >= totalRequiredDosesPerDay || isSyncing} onClick={() => void record(trackedMedication, "TAKEN")} className="inline-flex min-h-10 items-center justify-center gap-1 rounded-xl bg-[#0b2d54] px-2.5 py-2 text-[9px] font-black text-white disabled:cursor-not-allowed disabled:opacity-40">{savingKey === `${String(medicationId)}:TAKEN` ? "Saving…" : <><Check className="h-3 w-3" />Taken</>}</button><button type="button" disabled={dosesLoggedToday >= totalRequiredDosesPerDay || isSyncing} onClick={() => void record(trackedMedication, "SKIPPED")} className="inline-flex min-h-10 items-center justify-center gap-1 rounded-xl bg-[#f1f5f7] px-2.5 py-2 text-[9px] font-black text-[#0b2d54] ring-1 ring-[#dce7eb] disabled:cursor-not-allowed disabled:opacity-40">{savingKey === `${String(medicationId)}:SKIPPED` ? "Saving…" : <><CircleSlash2 className="h-3 w-3" />Skipped</>}</button></div></div>
-      </div>
+      <div className="border-t border-[#edf2f5] px-4 py-3.5 sm:px-5"><div className="mb-3 flex flex-wrap items-center justify-between gap-2"><div><p className="text-[8px] font-black uppercase tracking-[.14em] text-[#91a0ae]">Goal journey</p><p className="mt-0.5 text-[11px] font-black text-[#0b2d54]">Day {journeyDay}{daysLeft !== null ? ` · ${daysLeft} day${daysLeft === 1 ? "" : "s"} left` : ""}</p></div><p className="text-[10px] font-black text-[#0b7b80]">{resolvedGoal?.targetValue ? `Target ${resolvedGoal.targetValue}` : "Active goal"}</p></div><div className="mb-3 h-2 overflow-hidden rounded-full bg-[#edf3f5]"><div className="h-full rounded-full bg-[#24c1c4] transition-all" style={{ width: `${percent}%` }} /></div><div className="flex items-center justify-between gap-3"><div><p className="text-[11px] font-bold text-[#7c8e9b]">Dose status</p><p className="mt-0.5 text-[10px] font-semibold text-[#9aa7b1]">{states[String(medicationId)] === "TAKEN" ? "Taken today" : states[String(medicationId)] === "SKIPPED" ? "Skipped today" : "Choose an action below"}</p></div><div className="grid w-[180px] grid-cols-2 gap-2"><button type="button" disabled={dosesLoggedToday >= totalRequiredDosesPerDay || isSyncing} onClick={() => void record(trackedMedication, "TAKEN")} className="inline-flex min-h-10 items-center justify-center gap-1 rounded-xl bg-[#0b2d54] px-2.5 py-2 text-[9px] font-black text-white disabled:cursor-not-allowed disabled:opacity-40">{savingKey === `${String(medicationId)}:TAKEN` ? "Saving…" : <><Check className="h-3 w-3" />Taken</>}</button><button type="button" disabled={dosesLoggedToday >= totalRequiredDosesPerDay || isSyncing} onClick={() => void record(trackedMedication, "SKIPPED")} className="inline-flex min-h-10 items-center justify-center gap-1 rounded-xl bg-[#f1f5f7] px-2.5 py-2 text-[9px] font-black text-[#0b2d54] ring-1 ring-[#dce7eb] disabled:cursor-not-allowed disabled:opacity-40">{savingKey === `${String(medicationId)}:SKIPPED` ? "Saving…" : <><CircleSlash2 className="h-3 w-3" />Skipped</>}</button></div></div></div>
     </section>
   );
 }
