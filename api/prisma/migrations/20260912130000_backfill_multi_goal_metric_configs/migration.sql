@@ -146,7 +146,7 @@ SELECT
   "goalId",
   "currentValue",
   LEAST(100, GREATEST(0, ("currentValue" / NULLIF("target", 0)) * 100)),
-  CASE WHEN "currentValue" >= "target" THEN 'ACHIEVED' ELSE 'IMPROVING' END,
+  CASE WHEN "currentValue" >= "target" THEN 'ACHIEVED'::"HealthGoalProgressStatus" ELSE 'IMPROVING'::"HealthGoalProgressStatus" END,
   'Backfilled from persisted medication adherence events during contextual goal engine migration.',
   CURRENT_TIMESTAMP
 FROM medication_totals;
