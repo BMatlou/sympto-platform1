@@ -48,7 +48,8 @@ function toMedicationItem(medication: any) {
 
 export default function MedicationsPage() {
   const { data, loading, error, reload } = useDashboard();
-  const [showAddMedication, setShowAddMedication] = useState(false);
+  const [showMedicationEditor, setShowMedicationEditor] = useState(false);
+  const [editingMedications, setEditingMedications] = useState(false);
   const [saving, setSaving] = useState(false);
 
   const medications = Array.isArray(data?.medications) && data.medications.length > 0
@@ -68,16 +69,23 @@ export default function MedicationsPage() {
 
   const [medicationValues, setMedicationValues] = useState<UpdatePatientMedicationsDto>({ medications: [] });
 
-  function openMedicationManager() {
-    setMedicationValues(initialMedicationValues);
-    setShowAddMedication(true);
+  function openAddMedication() {
+    // ADD starts empty: the user searches first, selects a medicine,
+    // then the existing Step 6 detail fields appear for that medicine.
+    setMedicationValues({ medications: [] });
+    setEditingMedications(false);
+    setShowMedicationEditor(true);
   }
 
-  // MedicationsStep owns the onboarding search UI. On the live page we keep
-  // that same UI, but open its search control automatically so the user lands
-  // directly on "Search for your medicine" instead of another modal/step.
+  function openEditMedications() {
+    // EDIT starts with the user's existing PatientMedication records.
+    setMedicationValues(initialMedicationValues);
+    setEditingMedications(true);
+    setShowMedicationEditor(true);
+  }
+
   useEffect(() => {
-    if (!showAddMedication) return;
+    if (!showMedicationEditor) return;
 
     const frame = window.requestAnimationFrame(() => {
       const editor = document.querySelector('[data-medication-editor]');
@@ -91,7 +99,7 @@ export default function MedicationsPage() {
     });
 
     return () => window.cancelAnimationFrame(frame);
-  }, [showAddMedication]);
+  }, [showMedicationEditor]);
 
   async function saveMedications() {
     if (saving) return;
@@ -100,7 +108,7 @@ export default function MedicationsPage() {
       setSaving(true);
       await onboardingService.managePatientMedications(medicationValues);
       toast.success("Your medication list has been updated.");
-      setShowAddMedication(false);
+      setShowMedicationEditor(false);
       await reload();
     } catch (requestError: any) {
       console.error("Failed to save medications:", requestError);
@@ -116,7 +124,7 @@ export default function MedicationsPage() {
       <div className="mx-auto max-w-6xl px-4 py-8 sm:px-6 lg:px-8">
         <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
           <Link href="/dashboard" className="inline-flex items-center gap-2 text-sm font-medium text-[#0b2d54] hover:text-[#24c1c4]"><ArrowLeft className="h-4 w-4" />Back to Health Home</Link>
-          <Button type="button" onClick={openMedicationManager} className="inline-flex items-center gap-2 rounded-xl bg-[#0b2d54] px-4 py-2.5 text-sm font-semibold text-white hover:bg-[#071f3a]"><Plus className="h-4 w-4" />Add medication</Button>
+          <Button type="button" onClick={openAddMedication} className="inline-flex items-center gap-2 rounded-xl bg-[#0b2d54] px-4 py-2.5 text-sm font-semibold text-white hover:bg-[#071f3a]"><Plus className="h-4 w-4" />Add medication</Button>
         </div>
 
         <div className="mb-8">
@@ -128,14 +136,14 @@ export default function MedicationsPage() {
         {loading && <div className="mb-6 rounded-2xl border border-slate-200 bg-white p-4 text-sm text-slate-500">Loading your medications...</div>}
         {error && !loading && <div className="mb-6 rounded-2xl border border-red-200 bg-white p-6"><h2 className="font-semibold text-[#0b2d54]">We couldn't load your medications</h2><button onClick={reload} className="mt-4 rounded-xl bg-[#0b2d54] px-4 py-2 text-sm font-semibold text-white">Try again</button></div>}
 
-        {showAddMedication && (
+        {showMedicationEditor && (
           <section data-medication-editor className="mb-8 overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-sm">
             <div className="flex flex-col gap-4 border-b border-slate-200 px-5 py-5 sm:flex-row sm:items-center sm:justify-between sm:px-7">
               <div>
-                <h2 className="text-xl font-bold tracking-tight text-[#0b2d54]">Add a medication</h2>
-                <p className="mt-1 text-sm text-slate-500">Search for your medicine, then add the dose and schedule.</p>
+                <h2 className="text-xl font-bold tracking-tight text-[#0b2d54]">{editingMedications ? "Edit medications" : "Add a medication"}</h2>
+                <p className="mt-1 text-sm text-slate-500">{editingMedications ? "Update your medicines, doses and schedules." : "Search for your medicine, then add the dose and schedule."}</p>
               </div>
-              <Button type="button" variant="outline" disabled={saving} onClick={() => setShowAddMedication(false)} className="w-fit rounded-xl border-slate-200">Cancel</Button>
+              <Button type="button" variant="outline" disabled={saving} onClick={() => setShowMedicationEditor(false)} className="w-fit rounded-xl border-slate-200">Cancel</Button>
             </div>
 
             <div className="px-5 py-6 sm:px-7 lg:px-10">
@@ -145,8 +153,8 @@ export default function MedicationsPage() {
             </div>
 
             <div className="flex flex-col gap-3 border-t border-slate-200 bg-slate-50/70 px-5 py-4 sm:flex-row sm:justify-end sm:px-7">
-              <Button type="button" variant="outline" disabled={saving} onClick={() => setShowAddMedication(false)} className="rounded-xl">Cancel</Button>
-              <Button type="button" disabled={saving} onClick={saveMedications} className="rounded-xl bg-[#0b2d54] text-white hover:bg-[#071f3a]">{saving ? "Saving..." : "Save medications"}</Button>
+              <Button type="button" variant="outline" disabled={saving} onClick={() => setShowMedicationEditor(false)} className="rounded-xl">Cancel</Button>
+              <Button type="button" disabled={saving || medicationValues.medications.length === 0} onClick={saveMedications} className="rounded-xl bg-[#0b2d54] text-white hover:bg-[#071f3a]">{saving ? "Saving..." : "Save medications"}</Button>
             </div>
           </section>
         )}
@@ -160,14 +168,14 @@ export default function MedicationsPage() {
         {!loading && !error && <section>
           <div className="mb-4 flex flex-wrap items-end justify-between gap-3">
             <div><h2 className="mb-1 text-lg font-semibold text-[#0b2d54]">Current medications</h2><p className="text-sm text-slate-500">Medicines currently recorded in your Sympto health profile.</p></div>
-            {medications.length > 0 && <Button type="button" variant="outline" onClick={openMedicationManager} className="rounded-xl border-[#0b2d54]/20 text-[#0b2d54]">Edit medications</Button>}
+            {medications.length > 0 && <Button type="button" variant="outline" onClick={openEditMedications} className="rounded-xl border-[#0b2d54]/20 text-[#0b2d54]">Edit medications</Button>}
           </div>
           {activeMedications.length === 0 ? (
             <div className="rounded-2xl border border-slate-200 bg-white p-10 text-center">
               <Pill className="mx-auto h-8 w-8 text-slate-400" />
               <h3 className="mt-4 font-semibold text-[#0b2d54]">No current medications</h3>
               <p className="mx-auto mt-2 max-w-md text-sm text-slate-500">Add a medicine you take so Sympto can keep it in your health profile and Today view.</p>
-              <Button type="button" onClick={openMedicationManager} className="mt-5 inline-flex items-center gap-2 rounded-xl bg-[#0b2d54] px-5 py-3 text-sm font-semibold text-white"><Plus className="h-4 w-4" />Add medication</Button>
+              <Button type="button" onClick={openAddMedication} className="mt-5 inline-flex items-center gap-2 rounded-xl bg-[#0b2d54] px-5 py-3 text-sm font-semibold text-white"><Plus className="h-4 w-4" />Add medication</Button>
             </div>
           ) : (
             <div className="grid gap-4 md:grid-cols-2">
