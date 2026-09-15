@@ -1,12 +1,10 @@
 "use client";
 
-import Link from "next/link";
-import { Check, CircleSlash2, Pill, Target, ArrowRight } from "lucide-react";
+import { Check, CircleSlash2, Pill } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 import { api } from "@/lib/api";
 import { healthGoalsService } from "@/services/health-goals.service";
-import { healthHomeService } from "@/services/health-home.service";
 
 interface TodayMedicationActionsProps {
   medications: any[];
@@ -39,26 +37,6 @@ function requiredDosesForFrequency(frequency: string): number {
 
 function patientMedicationId(medication: any) {
   return medication?.patientMedicationId || medication?.patientMedication?.id || medication?.id || null;
-}
-
-function goalMedicationId(goal: any) {
-  return goal?.associatedMedicationId || goal?.patientMedicationId || goal?.medicationId || goal?.associatedMedication?.id || goal?.patientMedication?.id || goal?.medication?.id || null;
-}
-
-function normalizeText(value: unknown) {
-  return String(value ?? "").trim().toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
-}
-
-function goalMatchesMedication(goal: any, medication: any) {
-  const medicationId = patientMedicationId(medication);
-  const linkedId = goalMedicationId(goal);
-  if (medicationId && linkedId && String(medicationId) === String(linkedId)) return true;
-
-  const name = normalizeText(medicationName(medication));
-  if (!name) return false;
-  const title = normalizeText(goal?.title);
-  const description = normalizeText(goal?.description);
-  return Boolean(title && (title === name || title.includes(name) || name.includes(title))) || Boolean(description && description.includes(name));
 }
 
 function errorMessage(error: unknown) {
@@ -114,9 +92,15 @@ function cumulativeTakenDoses(medication: any): number {
   return 0;
 }
 
+function isValidMedicationGoal(goal: any) {
+  if (!goal) return false;
+  const status = String(goal?.status ?? "").toUpperCase();
+  const category = String(goal?.category ?? "").toUpperCase();
+  const metricType = String(goal?.metricType ?? "").toUpperCase();
+  return ["ACTIVE", "IN_PROGRESS"].includes(status) && (metricType === "MEDICATION" || category === "MEDICATION");
+}
+
 export default function TodayMedicationActions({ medications, goal: suppliedGoal, onUpdated }: TodayMedicationActionsProps) {
-  const [resolvedGoal, setResolvedGoal] = useState<any>(suppliedGoal ?? null);
-  const [goalLookupComplete, setGoalLookupComplete] = useState(Boolean(suppliedGoal));
   const [dosesLoggedToday, setDosesLoggedToday] = useState(0);
   const [isSyncing, setIsSyncing] = useState(false);
   const [savingKey, setSavingKey] = useState<string | null>(null);
@@ -127,54 +111,6 @@ export default function TodayMedicationActions({ medications, goal: suppliedGoal
   const frequency = medicationFrequency(trackedMedication);
   const totalRequiredDosesPerDay = requiredDosesForFrequency(frequency);
   const percent = totalRequiredDosesPerDay > 0 ? Math.min(100, Math.round((dosesLoggedToday / totalRequiredDosesPerDay) * 100)) : 0;
-
-  useEffect(() => {
-    let cancelled = false;
-    if (suppliedGoal) {
-      setResolvedGoal(suppliedGoal);
-      setGoalLookupComplete(true);
-      return;
-    }
-    if (!trackedMedication) {
-      setResolvedGoal(null);
-      setGoalLookupComplete(true);
-      return;
-    }
-
-    async function resolveGoal() {
-      setGoalLookupComplete(false);
-      try {
-        const healthHome = await healthHomeService.getHealthHome();
-        const patientId = healthHome?.patient?.id;
-        const rawGoals = Array.isArray(healthHome?.goals) ? healthHome.goals : Array.isArray(healthHome?.healthGoals) ? healthHome.healthGoals : [];
-        let candidates = rawGoals;
-
-        if (patientId) {
-          try {
-            const listed = await healthGoalsService.list(String(patientId));
-            candidates = Array.isArray(listed) ? listed : Array.isArray(listed?.data) ? listed.data : candidates;
-          } catch {
-            // Health Home goals remain the fallback source.
-          }
-        }
-
-        const activeMedicationGoals = candidates.filter((candidate: any) => {
-          const status = String(candidate?.status ?? "").toUpperCase();
-          return String(candidate?.category ?? "").toUpperCase() === "MEDICATION" && ["ACTIVE", "IN_PROGRESS"].includes(status);
-        });
-        const exact = activeMedicationGoals.find((candidate: any) => goalMatchesMedication(candidate, trackedMedication));
-        const fallback = activeMedicationGoals.length === 1 ? activeMedicationGoals[0] : null;
-        if (!cancelled) setResolvedGoal(exact || fallback || null);
-      } catch {
-        if (!cancelled) setResolvedGoal(null);
-      } finally {
-        if (!cancelled) setGoalLookupComplete(true);
-      }
-    }
-
-    void resolveGoal();
-    return () => { cancelled = true; };
-  }, [suppliedGoal, medicationId]);
 
   async function loadTodayEvents() {
     if (!medications.length) {
@@ -195,7 +131,7 @@ export default function TodayMedicationActions({ medications, goal: suppliedGoal
   }, [medications.length, totalRequiredDosesPerDay]);
 
   const doseLabel = useMemo(() => (totalRequiredDosesPerDay === 1 ? "1 dose" : `${totalRequiredDosesPerDay} doses`), [totalRequiredDosesPerDay]);
-  const { journeyDay, daysLeft } = journeyProgress(resolvedGoal);
+  const { journeyDay, daysLeft } = journeyProgress(suppliedGoal);
   const medicationAnchorId = `medication-adherence-card-${String(medicationId ?? "unassigned")}`;
   const ringSize = 96;
   const ringStroke = 9;
@@ -230,36 +166,17 @@ export default function TodayMedicationActions({ medications, goal: suppliedGoal
     }
   }
 
-  const goalTitle = resolvedGoal?.title || `${medicationName(trackedMedication)} adherence`;
-  const targetAdherence = Number(resolvedGoal?.targetValue) || 90;
+  if (!trackedMedication || !isValidMedicationGoal(suppliedGoal)) {
+    return null;
+  }
+
+  const goalTitle = suppliedGoal?.title || `${medicationName(trackedMedication)} adherence`;
+  const targetAdherence = Number(suppliedGoal?.targetValue) || 90;
   const scheduledGoalDoses = Math.max(0, Math.ceil((daysLeft !== null ? daysLeft + journeyDay - 1 : 30) * totalRequiredDosesPerDay));
   const targetDoseCount = Math.ceil((scheduledGoalDoses * targetAdherence) / 100);
   const takenDosesSoFar = cumulativeTakenDoses(trackedMedication);
   const dosesNeededForGoal = Math.max(0, targetDoseCount - takenDosesSoFar);
   const cardClass = "w-full overflow-hidden rounded-[26px] border border-[#dce9ee] bg-white shadow-[0_14px_34px_rgba(11,45,84,.06)]";
-
-  if (!medications.length) {
-    return (
-      <section id="medication-goal-card" className={cardClass}>
-        <div className="flex items-center gap-3 px-5 py-4"><span className="grid h-10 w-10 shrink-0 place-items-center rounded-[14px] bg-[#e8f8f7] text-[#24c1c4] ring-1 ring-[#d3efed]"><Target className="h-4 w-4" /></span><div className="min-w-0"><p className="text-[9px] font-black uppercase tracking-[.16em] text-[#0b7b80]">Medication</p><h3 className="mt-0.5 truncate text-base font-black tracking-[-.035em] text-[#0b2d54]">{goalTitle}</h3><p className="mt-0.5 text-[10px] font-medium text-[#7c8e9b]">No active medicine scheduled today.</p></div></div>
-      </section>
-    );
-  }
-
-  if (!goalLookupComplete) {
-    return (
-      <section id={medicationAnchorId} className={cardClass}><div className="flex items-center gap-3 px-4 py-5 sm:px-5"><span className="grid h-10 w-10 shrink-0 place-items-center rounded-[14px] bg-[#e8f8f7] text-[#24c1c4] ring-1 ring-[#d3efed]"><Pill className="h-4 w-4" /></span><div><p className="text-[8px] font-black uppercase tracking-[.16em] text-[#0b7b80]">Medication goal</p><p className="mt-1 text-[11px] font-semibold text-[#7c8e9b]">Loading your medication goal…</p></div></div></section>
-    );
-  }
-
-  if (!resolvedGoal) {
-    return (
-      <section id={medicationAnchorId} className={cardClass}>
-        <header className="flex items-center gap-3 px-4 pb-3 pt-4 sm:px-5 sm:pt-5"><span className="grid h-10 w-10 shrink-0 place-items-center rounded-[14px] bg-[#e8f8f7] text-[#24c1c4] ring-1 ring-[#d3efed]"><Pill className="h-4 w-4" /></span><div className="min-w-0"><p className="text-[8px] font-black uppercase tracking-[.16em] text-[#0b7b80]">Medication goal</p><h3 className="mt-0.5 truncate text-base font-black tracking-[-.035em] text-[#0b2d54]">Set a goal for {medicationName(trackedMedication)}</h3><p className="mt-1 text-[10px] font-medium text-[#7c8e9b]">Choose an adherence target so your Today page can track this medicine against a clear goal.</p></div></header>
-        <div className="mx-3.5 mb-3.5 rounded-[22px] bg-[#f7fbfb] p-4 ring-1 ring-[#e1ecef] sm:mx-4 sm:mb-4 sm:p-5"><div className="flex items-center justify-between gap-4"><div className="min-w-0"><p className="text-[8px] font-black uppercase tracking-[.14em] text-[#91a0ae]">Today’s medicine</p><p className="mt-1 truncate text-lg font-black tracking-[-.045em] text-[#0b2d54]">{medicationName(trackedMedication)}</p><p className="mt-1 text-[10px] font-semibold uppercase tracking-[.08em] text-[#83939e]">{medicationSchedule(trackedMedication)}</p></div><span className="grid h-12 w-12 shrink-0 place-items-center rounded-full bg-white text-[#24c1c4] ring-1 ring-[#d9e9ec]"><Target className="h-5 w-5" /></span></div><Link href="/health-goals" className="mt-4 inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-[14px] bg-[#0b2d54] px-4 py-3 text-[10px] font-black text-white shadow-[0_9px_22px_rgba(11,45,84,.13)] transition hover:bg-[#123d63]">Set medication goal <ArrowRight className="h-3.5 w-3.5 text-[#24c1c4]" /></Link></div>
-      </section>
-    );
-  }
 
   return (
     <section id={medicationAnchorId} className={cardClass}>
