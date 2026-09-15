@@ -84,6 +84,44 @@ function journeyProgress(goal: any) {
   return { journeyDay, daysLeft };
 }
 
+/**
+ * Returns the cumulative number of doses taken before/through today.
+ * Today-only metric-event counts must never be used for this value.
+ * Prefer an exact backend counter when one is present; otherwise derive it
+ * from the medication's persisted adherence percentage and missed-dose count.
+ */
+function cumulativeTakenDoses(medication: any): number {
+  const exactCandidates = [
+    medication?.takenDoses,
+    medication?.totalTakenDoses,
+    medication?.adherence?.takenDoses,
+    medication?.adherence?.totalTakenDoses,
+  ];
+
+  for (const value of exactCandidates) {
+    const parsed = Number(value);
+    if (Number.isFinite(parsed) && parsed >= 0) return Math.floor(parsed);
+  }
+
+  const adherence = Number(medication?.adherencePercentage ?? medication?.adherence?.percentage);
+  const missed = Number(medication?.missedDoses ?? medication?.adherence?.missedDoses);
+
+  if (!Number.isFinite(adherence) || !Number.isFinite(missed) || missed < 0 || adherence <= 0) return 0;
+  if (adherence >= 100 && missed === 0) return 0;
+
+  // adherence = taken / (taken + missed) * 100. Find the smallest integer
+  // count consistent with the persisted percentage after normal rounding.
+  const roundedTarget = Number(adherence.toFixed(2));
+  for (let total = Math.max(1, Math.ceil(missed)); total <= 10000; total += 1) {
+    const taken = total - missed;
+    if (taken < 0) continue;
+    const calculated = Number(((taken / total) * 100).toFixed(2));
+    if (calculated === roundedTarget) return taken;
+  }
+
+  return 0;
+}
+
 export default function TodayMedicationActions({ medications, goal: suppliedGoal, onUpdated }: TodayMedicationActionsProps) {
   const [resolvedGoal, setResolvedGoal] = useState<any>(suppliedGoal ?? null);
   const [goalLookupComplete, setGoalLookupComplete] = useState(Boolean(suppliedGoal));
@@ -204,7 +242,8 @@ export default function TodayMedicationActions({ medications, goal: suppliedGoal
   const targetAdherence = Number(resolvedGoal?.targetValue) || 90;
   const scheduledGoalDoses = Math.max(0, Math.ceil((daysLeft !== null ? daysLeft + journeyDay - 1 : 30) * totalRequiredDosesPerDay));
   const targetDoseCount = Math.ceil((scheduledGoalDoses * targetAdherence) / 100);
-  const dosesNeededForGoal = Math.max(0, targetDoseCount - dosesLoggedToday);
+  const takenDosesSoFar = cumulativeTakenDoses(trackedMedication);
+  const dosesNeededForGoal = Math.max(0, targetDoseCount - takenDosesSoFar);
   const cardClass = "w-full overflow-hidden rounded-[26px] border border-[#dce9ee] bg-white shadow-[0_14px_34px_rgba(11,45,84,.06)]";
 
   if (!medications.length) {
@@ -236,7 +275,7 @@ export default function TodayMedicationActions({ medications, goal: suppliedGoal
 
       <div className="mx-3.5 mb-3.5 rounded-[22px] bg-[#0b2d54] px-4 py-4 text-white shadow-[0_12px_28px_rgba(11,45,84,.14)] sm:mx-4 sm:mb-4 sm:px-5 sm:py-4"><div className="flex items-center gap-4 sm:gap-5"><div className="relative shrink-0" style={{ width: ringSize, height: ringSize }}><svg width={ringSize} height={ringSize} viewBox={`0 0 ${ringSize} ${ringSize}`} className="-rotate-90"><circle cx={ringSize / 2} cy={ringSize / 2} r={radius} fill="none" stroke="rgba(255,255,255,.10)" strokeWidth={ringStroke} /><circle cx={ringSize / 2} cy={ringSize / 2} r={radius} fill="none" stroke="#24c1c4" strokeWidth={ringStroke} strokeLinecap="round" strokeDasharray={circumference} strokeDashoffset={dashOffset} /></svg><div className="absolute inset-0 grid place-items-center text-center"><p className="text-3xl font-black leading-none tracking-[-.07em]">{dosesLoggedToday}</p></div></div><div className="min-w-0 flex-1"><p className="text-[8px] font-black uppercase tracking-[.15em] text-white/45">Today’s medication</p><p className="mt-1 truncate text-lg font-black tracking-[-.045em]">{medicationName(trackedMedication)}</p><p className="mt-1 text-[10px] font-semibold uppercase tracking-[.08em] text-white/55">{medicationSchedule(trackedMedication)}</p><div className="mt-2.5 flex flex-wrap items-center gap-2"><span className="rounded-full bg-white/10 px-2.5 py-1 text-[8px] font-black text-white/75 ring-1 ring-white/10">{dosesLoggedToday}/{totalRequiredDosesPerDay} doses today</span><span className="rounded-full bg-white/10 px-2.5 py-1 text-[8px] font-black text-[#b8ffff] ring-1 ring-white/10">{percent}% today</span></div></div></div><div className="mt-3.5 border-t border-white/10 pt-3"><div className="flex items-center justify-between gap-3"><p className="text-[9px] font-semibold text-white/60">{dosesLoggedToday >= totalRequiredDosesPerDay ? "All scheduled doses logged today." : `${totalRequiredDosesPerDay - dosesLoggedToday} dose${totalRequiredDosesPerDay - dosesLoggedToday === 1 ? "" : "s"} left to log today.`}</p><p className="text-[9px] font-black text-white/75">{Math.max(0, totalRequiredDosesPerDay - dosesLoggedToday)} left today</p></div></div></div>
 
-      <div className="border-t border-[#edf2f5] px-4 py-3.5 sm:px-5"><div className="mb-3 flex flex-wrap items-center justify-between gap-2"><div><p className="text-[8px] font-black uppercase tracking-[.14em] text-[#91a0ae]">Goal journey</p><p className="mt-0.5 text-[11px] font-black text-[#0b2d54]">Day {journeyDay}{daysLeft !== null ? ` · ${daysLeft} day${daysLeft === 1 ? "" : "s"} left` : ""}</p></div><div className="text-right"><p className="text-[10px] font-black text-[#0b7b80]">{targetAdherence}% adherence goal</p><p className="mt-0.5 text-[9px] font-semibold text-[#91a0ae]">Take at least {targetAdherence}% of your scheduled doses to reach this goal.</p></div></div><div className="mb-3 h-2 overflow-hidden rounded-full bg-[#edf3f5]"><div className="h-full rounded-full bg-[#24c1c4] transition-all" style={{ width: `${percent}%` }} /></div><div className="mb-3 rounded-[14px] bg-[#f7fbfb] px-3.5 py-3 ring-1 ring-[#e1ecef]"><div className="flex items-center justify-between gap-3"><div><p className="text-[8px] font-black uppercase tracking-[.13em] text-[#91a0ae]">Doses needed for your goal</p><p className="mt-0.5 text-[13px] font-black text-[#0b2d54]">{dosesNeededForGoal} more dose{dosesNeededForGoal === 1 ? "" : "s"}</p></div><p className="text-right text-[9px] font-bold text-[#7c8e9b]">{dosesLoggedToday} taken so far</p></div></div><div className="flex items-center justify-between gap-3"><div><p className="text-[11px] font-bold text-[#7c8e9b]">Dose status</p><p className="mt-0.5 text-[10px] font-semibold text-[#9aa7b1]">{states[String(medicationId)] === "TAKEN" ? "Taken today" : states[String(medicationId)] === "SKIPPED" ? "Skipped today" : "Choose an action below"}</p></div><div className="grid w-[180px] grid-cols-2 gap-2"><button type="button" disabled={dosesLoggedToday >= totalRequiredDosesPerDay || isSyncing} onClick={() => void record(trackedMedication, "TAKEN")} className="inline-flex min-h-10 items-center justify-center gap-1 rounded-xl bg-[#0b2d54] px-2.5 py-2 text-[9px] font-black text-white disabled:cursor-not-allowed disabled:opacity-40">{savingKey === `${String(medicationId)}:TAKEN` ? "Saving…" : <><Check className="h-3 w-3" />Taken</>}</button><button type="button" disabled={dosesLoggedToday >= totalRequiredDosesPerDay || isSyncing} onClick={() => void record(trackedMedication, "SKIPPED")} className="inline-flex min-h-10 items-center justify-center gap-1 rounded-xl bg-[#f1f5f7] px-2.5 py-2 text-[9px] font-black text-[#0b2d54] ring-1 ring-[#dce7eb] disabled:cursor-not-allowed disabled:opacity-40">{savingKey === `${String(medicationId)}:SKIPPED` ? "Saving…" : <><CircleSlash2 className="h-3 w-3" />Skipped</>}</button></div></div></div>
+      <div className="border-t border-[#edf2f5] px-4 py-3.5 sm:px-5"><div className="mb-3 flex flex-wrap items-center justify-between gap-2"><div><p className="text-[8px] font-black uppercase tracking-[.14em] text-[#91a0ae]">Goal journey</p><p className="mt-0.5 text-[11px] font-black text-[#0b2d54]">Day {journeyDay}{daysLeft !== null ? ` · ${daysLeft} day${daysLeft === 1 ? "" : "s"} left` : ""}</p></div><div className="text-right"><p className="text-[10px] font-black text-[#0b7b80]">{targetAdherence}% adherence goal</p><p className="mt-0.5 text-[9px] font-semibold text-[#91a0ae]">Take at least {targetAdherence}% of your scheduled doses to reach this goal.</p></div></div><div className="mb-3 h-2 overflow-hidden rounded-full bg-[#edf3f5]"><div className="h-full rounded-full bg-[#24c1c4] transition-all" style={{ width: `${percent}%` }} /></div><div className="mb-3 rounded-[14px] bg-[#f7fbfb] px-3.5 py-3 ring-1 ring-[#e1ecef]"><div className="flex items-center justify-between gap-3"><div><p className="text-[8px] font-black uppercase tracking-[.13em] text-[#91a0ae]">Doses needed for your goal</p><p className="mt-0.5 text-[13px] font-black text-[#0b2d54]">{dosesNeededForGoal} more dose{dosesNeededForGoal === 1 ? "" : "s"}</p></div><p className="text-right text-[9px] font-bold text-[#7c8e9b]">{takenDosesSoFar} taken so far</p></div></div><div className="flex items-center justify-between gap-3"><div><p className="text-[11px] font-bold text-[#7c8e9b]">Dose status</p><p className="mt-0.5 text-[10px] font-semibold text-[#9aa7b1]">{states[String(medicationId)] === "TAKEN" ? "Taken today" : states[String(medicationId)] === "SKIPPED" ? "Skipped today" : "Choose an action below"}</p></div><div className="grid w-[180px] grid-cols-2 gap-2"><button type="button" disabled={dosesLoggedToday >= totalRequiredDosesPerDay || isSyncing} onClick={() => void record(trackedMedication, "TAKEN")} className="inline-flex min-h-10 items-center justify-center gap-1 rounded-xl bg-[#0b2d54] px-2.5 py-2 text-[9px] font-black text-white disabled:cursor-not-allowed disabled:opacity-40">{savingKey === `${String(medicationId)}:TAKEN` ? "Saving…" : <><Check className="h-3 w-3" />Taken</>}</button><button type="button" disabled={dosesLoggedToday >= totalRequiredDosesPerDay || isSyncing} onClick={() => void record(trackedMedication, "SKIPPED")} className="inline-flex min-h-10 items-center justify-center gap-1 rounded-xl bg-[#f1f5f7] px-2.5 py-2 text-[9px] font-black text-[#0b2d54] ring-1 ring-[#dce7eb] disabled:cursor-not-allowed disabled:opacity-40">{savingKey === `${String(medicationId)}:SKIPPED` ? "Saving…" : <><CircleSlash2 className="h-3 w-3" />Skipped</>}</button></div></div></div>
     </section>
   );
 }
