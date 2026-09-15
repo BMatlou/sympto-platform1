@@ -79,7 +79,7 @@
   --sidebar-primary: oklch(0.205 0 0);
   --sidebar-primary-foreground: oklch(0.985 0 0);
   --sidebar-accent: oklch(0.97 0 0);
-  --sidebar-accent-foreground: oklch(0.205 0 0);
+  --sidebar-accent-foreground: oklch(0.145 0 0);
   --sidebar-border: oklch(0.922 0 0);
   --sidebar-ring: oklch(0.708 0 0);
 }
@@ -127,5 +127,174 @@
   }
   html {
     @apply font-sans;
+  }
+}
+
+/* Hydration presentation only — no business logic or data behavior is changed. */
+#daily-health-check-in + div > div > article:nth-child(2) {
+  position: relative;
+  overflow: hidden;
+  border: 0 !important;
+  border-radius: 28px !important;
+  background:
+    radial-gradient(circle at 92% 8%, rgba(36, 193, 196, 0.16), transparent 34%),
+    linear-gradient(180deg, #ffffff 0%, #f4fbfb 100%) !important;
+  box-shadow: 0 10px 34px rgba(11, 45, 84, 0.045) !important;
+}
+
+#daily-health-check-in + div > div > article:nth-child(2)::before {
+  content: "";
+  position: absolute;
+  left: -8%;
+  right: -8%;
+  bottom: -54px;
+  height: 120px;
+  border-radius: 50% 50% 0 0;
+  background: rgba(36, 193, 196, 0.075);
+  transform: rotate(-1.5deg);
+  pointer-events: none;
+}
+
+#daily-health-check-in + div > div > article:nth-child(2)::after {
+  content: "";
+  position: absolute;
+  top: 52px;
+  right: -40px;
+  width: 170px;
+  height: 170px;
+  border-radius: 50%;
+  border: 1px solid rgba(36, 193, 196, 0.08);
+  box-shadow:
+    0 0 0 18px rgba(36, 193, 196, 0.025),
+    0 0 0 38px rgba(36, 193, 196, 0.015);
+  pointer-events: none;
+}
+
+#daily-health-check-in + div > div > article:nth-child(2) > * {
+  position: relative;
+  z-index: 1;
+}
+
+/* Make the existing vessel feel like a glass of water. */
+#daily-health-check-in + div > div > article:nth-child(2) .h-\[116px\].w-\[82px\] {
+  height: 126px !important;
+  width: 88px !important;
+  border: 1.5px solid rgba(36, 193, 196, 0.3) !important;
+  border-radius: 12px 12px 25px 25px !important;
+  background:
+    linear-gradient(90deg, rgba(255,255,255,0.84), rgba(232,249,249,0.45) 48%, rgba(255,255,255,0.82)) !important;
+  box-shadow:
+    inset 10px 0 16px rgba(255,255,255,0.82),
+    inset -10px 0 18px rgba(11,45,84,0.025),
+    0 12px 28px rgba(36,193,196,0.1) !important;
+}
+
+#daily-health-check-in + div > div > article:nth-child(2) .h-\[116px\].w-\[82px\] > div:first-child {
+  overflow: hidden !important;
+}
+
+#daily-health-check-in + div > div > article:nth-child(2) .h-\[116px\].w-\[82px\] > div:first-child > div:first-child {
+  position: relative;
+  overflow: hidden;
+  background: linear-gradient(180deg, #74dfe2 0%, #24c1c4 55%, #0a9fa8 100%) !important;
+  border-radius: 0 !important;
+}
+
+/* Curved water surface at the current fill level. */
+#daily-health-check-in + div > div > article:nth-child(2) .h-\[116px\].w-\[82px\] > div:first-child > div:first-child::before {
+  content: "";
+  position: absolute;
+  left: -18%;
+  top: -8px;
+  width: 136%;
+  height: 22px;
+  border-radius: 50%;
+  background: rgba(255,255,255,0.3);
+  box-shadow: 0 3px 8px rgba(36,193,196,0.16);
+  animation: sympto-hydration-ripple 3.6s ease-in-out infinite;
+}
+
+#daily-health-check-in + div > div > article:nth-child(2) .h-\[116px\].w-\[82px\] > div:first-child > div:first-child::after {
+  content: "";
+  position: absolute;
+  left: -22%;
+  top: -3px;
+  width: 144%;
+  height: 16px;
+  border-radius: 50%;
+  border-top: 2px solid rgba(255,255,255,0.28);
+  animation: sympto-hydration-ripple 3.6s ease-in-out infinite reverse;
+}
+
+#daily-health-check-in + div > div > article:nth-child(2) .h-\[116px\].w-\[82px\] > div:first-child > span:first-of-type,
+#daily-health-check-in + div > div > article:nth-child(2) .h-\[116px\].w-\[82px\] > div:first-child > span:last-of-type {
+  box-shadow: 0 1px 4px rgba(255,255,255,0.22);
+  animation-duration: 2.8s;
+}
+
+/* Glass rim and highlight. */
+#daily-health-check-in + div > div > article:nth-child(2) .h-\[116px\].w-\[82px\] > div:nth-child(2) {
+  border-color: rgba(36,193,196,0.35) !important;
+  background: rgba(255,255,255,0.75) !important;
+}
+
+#daily-health-check-in + div > div > article:nth-child(2) .h-\[116px\].w-\[82px\] > div:nth-child(3) {
+  width: 9px !important;
+  background: linear-gradient(180deg, rgba(255,255,255,0.82), rgba(255,255,255,0.24)) !important;
+  filter: blur(0.1px);
+}
+
+/* Give the numeric water stat a clean, glassy hierarchy. */
+#daily-health-check-in + div > div > article:nth-child(2) strong {
+  color: #0b2d54 !important;
+}
+
+#daily-health-check-in + div > div > article:nth-child(2) strong + span {
+  color: #7d8e9b !important;
+}
+
+#daily-health-check-in + div > div > article:nth-child(2) small {
+  color: #0b7b80 !important;
+  font-weight: 700 !important;
+}
+
+/* Water progress replaces the dashboard-style percentage badge with a soft droplet cue. */
+#daily-health-check-in + div > div > article:nth-child(2) > div:first-child > span {
+  border-radius: 999px !important;
+  background: rgba(36,193,196,0.08) !important;
+  color: #0b7b80 !important;
+}
+
+/* De-emphasise the utility strip so the water vessel remains the visual focus. */
+#daily-health-check-in + div > div > article:nth-child(2) .rounded-2xl {
+  border: 0 !important;
+  background: rgba(247,252,252,0.86) !important;
+  box-shadow: none !important;
+}
+
+#daily-health-check-in + div > div > article:nth-child(2) .rounded-2xl button {
+  border: 0 !important;
+  border-radius: 999px !important;
+}
+
+#daily-health-check-in + div > div > article:nth-child(2) .rounded-2xl button:last-child {
+  background: #e8f8f7 !important;
+  color: #0b7b80 !important;
+}
+
+#daily-health-check-in + div > div > article:nth-child(2) > button {
+  color: #8a99a4 !important;
+  font-weight: 700 !important;
+}
+
+@keyframes sympto-hydration-ripple {
+  0%, 100% { transform: translateX(-4%) rotate(-1deg); }
+  50% { transform: translateX(4%) rotate(1deg); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  #daily-health-check-in + div > div > article:nth-child(2) .h-\[116px\].w-\[82px\] > div:first-child > div:first-child::before,
+  #daily-health-check-in + div > div > article:nth-child(2) .h-\[116px\].w-\[82px\] > div:first-child > div:first-child::after {
+    animation: none;
   }
 }
