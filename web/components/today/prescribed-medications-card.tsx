@@ -106,9 +106,18 @@ function goalMatchesMedication(goal: ActiveGoal, medication: PrescribedMedicatio
   );
 }
 
+function activeMedicationGoals(goals: ActiveGoal[]) {
+  return goals.filter((goal) => {
+    const status = String(goal?.status ?? "").toUpperCase();
+    if (!["ACTIVE", "IN_PROGRESS"].includes(status)) return false;
+    const category = String(goal?.category ?? goal?.metricType ?? "").toUpperCase();
+    return !category || category === "MEDICATION";
+  });
+}
+
 export default function PrescribedMedicationsCard({ prescriptionsList, activeGoalsArray }: { prescriptionsList: PrescribedMedication[]; activeGoalsArray: ActiveGoal[] }) {
   const prescriptions = Array.isArray(prescriptionsList) ? prescriptionsList : [];
-  const activeGoals = Array.isArray(activeGoalsArray) ? activeGoalsArray : [];
+  const activeGoals = activeMedicationGoals(Array.isArray(activeGoalsArray) ? activeGoalsArray : []);
 
   return (
     <section className="mt-3.5 overflow-hidden rounded-[30px] border border-[#d8e9ed] bg-white shadow-[0_18px_48px_rgba(11,45,84,.07)]">
@@ -128,13 +137,12 @@ export default function PrescribedMedicationsCard({ prescriptionsList, activeGoa
         <div className="bg-[#f8fcfc] p-4 sm:p-5">
           {prescriptions.map((medication, index) => {
             const recordId = medicationRecordId(medication);
-            const isGoalSetForThisMed = activeGoals.some((goal) => {
-              const status = String(goal?.status ?? "").toUpperCase();
-              if (!["ACTIVE", "IN_PROGRESS"].includes(status)) return false;
-              const category = String(goal?.category ?? goal?.metricType ?? "").toUpperCase();
-              if (category && category !== "MEDICATION") return false;
-              return goalMatchesMedication(goal, medication);
-            });
+            const directGoal = activeGoals.find((goal) => goalMatchesMedication(goal, medication));
+            // If there is exactly one prescribed medication and exactly one active
+            // medication goal, that goal belongs to this medication even when the
+            // API has not returned the medication association fields.
+            const isOnlyMedicationWithOnlyGoal = prescriptions.length === 1 && activeGoals.length === 1;
+            const isGoalSetForThisMed = Boolean(directGoal) || isOnlyMedicationWithOnlyGoal;
             const name = medicationName(medication);
             const doctor = medicationDoctor(medication);
             const medicationAnchor = `#medication-goal-card-${encodeURIComponent(String(recordId || medication.id || index))}`;
