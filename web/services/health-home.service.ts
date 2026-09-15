@@ -46,6 +46,24 @@ function normalizeMedications(medications: any[]): any[] {
   }));
 }
 
+function normalizeGoals(...sources: any[]): any[] {
+  const result: any[] = [];
+  const seen = new Set<string>();
+
+  for (const source of sources) {
+    if (!Array.isArray(source)) continue;
+    for (const goal of source) {
+      if (!goal || typeof goal !== 'object') continue;
+      const key = String(goal.id ?? `${goal.category ?? ''}|${goal.title ?? ''}|${goal.createdAt ?? ''}`);
+      if (seen.has(key)) continue;
+      seen.add(key);
+      result.push(goal);
+    }
+  }
+
+  return result;
+}
+
 class HealthHomeService {
   async getHealthHome(patientId?: string): Promise<HealthHomeResponse> {
     const response = await api.get('/health-home', { params: patientId ? { patientId } : undefined });
@@ -66,6 +84,7 @@ class HealthHomeService {
       ? healthHome.medications
       : (Array.isArray(healthHome.today?.activeMedications) ? healthHome.today.activeMedications : []);
     const normalizedHealthHomeMedications = normalizeMedications(healthHomeMedications);
+    const healthHomeGoals = normalizeGoals(healthHome.goals, healthHome.healthGoals);
 
     let canonical: any = null;
     if (!patientId || patientId === healthHome.patient?.id) {
@@ -85,6 +104,8 @@ class HealthHomeService {
         conditions: healthHomeConditions,
         medications: normalizedHealthHomeMedications,
         immunizations: healthHomeImmunizations,
+        goals: healthHomeGoals,
+        healthGoals: healthHomeGoals,
         healthSnapshot: {
           ...healthHome.healthSnapshot,
           activeAllergies: healthHomeAllergies,
@@ -109,6 +130,7 @@ class HealthHomeService {
       ? canonicalConditions
       : healthHomeConditions.map((condition: any) => condition?.status ? condition : { ...condition, status: 'ACTIVE' });
     const medications = normalizeMedications(canonicalMedications.length > 0 ? canonicalMedications : normalizedHealthHomeMedications);
+    const goals = normalizeGoals(canonical.healthGoals, canonical.goals, healthHomeGoals);
 
     return {
       ...healthHome,
@@ -120,7 +142,8 @@ class HealthHomeService {
       conditions,
       medications,
       immunizations,
-      healthGoals: canonical.healthGoals ?? healthHome.healthGoals,
+      goals,
+      healthGoals: goals,
       healthSnapshot: {
         ...healthHome.healthSnapshot,
         activeAllergies: allergies,
