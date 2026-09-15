@@ -79,6 +79,7 @@ export default function TodaySmokingGoal({ goal }: Props) {
   const targetReached = todayLogged !== null && hasTarget && todayLogged >= dailyTarget;
   const exceeded = todayLogged !== null && hasTarget && todayLogged > dailyTarget;
   const progress = todayLogged !== null && hasTarget ? Math.min(1, todayLogged / dailyTarget) : 0;
+  const progressPercent = Math.round(progress * 100);
 
   async function save() {
     const cigarettes = Number(draft.trim());
@@ -95,24 +96,24 @@ export default function TodaySmokingGoal({ goal }: Props) {
     }
   }
 
-  const ringSize = 116;
+  const ringSize = 104;
   const ringStroke = 10;
   const radius = (ringSize - ringStroke) / 2;
   const circumference = 2 * Math.PI * radius;
   const dashOffset = circumference * (1 - progress);
 
   return (
-    <article className="flex h-full min-w-0 flex-col overflow-hidden rounded-[28px] border border-[#e5edef] bg-white shadow-[0_14px_36px_rgba(11,45,84,.07)]">
+    <article className="flex h-full min-w-0 flex-col overflow-hidden rounded-[26px] border border-[#e5edef] bg-white shadow-[0_14px_36px_rgba(11,45,84,.07)]">
       <header className="flex items-center justify-between gap-3 px-4 pb-3 pt-4 sm:px-5 sm:pt-5">
         <div className="flex min-w-0 items-center gap-2.5">
           <span className="grid h-9 w-9 shrink-0 place-items-center rounded-[13px] bg-[#e8f8f7] text-[#24c1c4] ring-1 ring-[#d3efed]"><Cigarette className="h-4 w-4" /></span>
-          <div className="min-w-0"><p className="truncate text-sm font-black tracking-[-.035em] text-[#0b2d54]">Smoking cessation</p><p className="mt-0.5 text-[9px] font-bold uppercase tracking-[.13em] text-[#8a99a6]">Daily progress</p></div>
+          <div className="min-w-0"><p className="truncate text-sm font-black tracking-[-.035em] text-[#0b2d54]">Smoking cessation</p><p className="mt-0.5 text-[8px] font-bold uppercase tracking-[.14em] text-[#8a99a6]">Daily progress</p></div>
         </div>
         <span className={`shrink-0 rounded-full px-2.5 py-1 text-[8px] font-black ${todayLogged === null ? "bg-[#eef5f6] text-[#71879b]" : exceeded ? "bg-red-50 text-red-700" : targetReached ? "bg-slate-100 text-slate-600" : "bg-[#e8f8f7] text-[#0b7b80]"}`}>{todayLogged === null ? "Not logged" : exceeded ? "Over ceiling" : targetReached ? "Ceiling reached" : "On track"}</span>
       </header>
 
       <div className="px-3.5 pb-3.5 sm:px-4 sm:pb-4">
-        <section className="relative overflow-hidden rounded-[24px] bg-[#0b2d54] px-4 py-4 text-white shadow-[0_12px_28px_rgba(11,45,84,.14)] sm:px-5 sm:py-5">
+        <section className="relative overflow-hidden rounded-[23px] bg-[#0b2d54] px-4 py-4 text-white shadow-[0_12px_28px_rgba(11,45,84,.14)] sm:px-5 sm:py-4.5">
           <div className="pointer-events-none absolute -right-10 -top-12 h-28 w-28 rounded-full bg-[#24c1c4]/18 blur-2xl" />
           <div className="relative flex items-center gap-4 sm:gap-5">
             <div className="relative shrink-0" style={{ width: ringSize, height: ringSize }}>
@@ -121,15 +122,15 @@ export default function TodaySmokingGoal({ goal }: Props) {
                 {todayLogged !== null && hasTarget && <circle cx={ringSize / 2} cy={ringSize / 2} r={radius} fill="none" stroke={exceeded ? "#f87171" : "#24c1c4"} strokeWidth={ringStroke} strokeLinecap="round" strokeDasharray={circumference} strokeDashoffset={dashOffset} />}
               </svg>
               <div className="absolute inset-0 grid place-items-center text-center">
-                {todayLogged === null ? <div><p className="text-2xl font-black">—</p><p className="mt-0.5 text-[8px] font-black uppercase tracking-[.13em] text-white/45">Not logged</p></div> : <div><p className="text-3xl font-black leading-none tracking-[-.07em]">{formatNumber(todayLogged)}</p><p className="mt-1 text-[8px] font-black uppercase tracking-[.12em] text-white/45">today</p></div>}
+                <div><p className="text-3xl font-black leading-none tracking-[-.07em]">{todayLogged === null ? "—" : formatNumber(todayLogged)}</p><p className="mt-1 text-[8px] font-black uppercase tracking-[.12em] text-white/45">today</p></div>
               </div>
             </div>
 
             <div className="min-w-0 flex-1">
               <p className="text-[8px] font-black uppercase tracking-[.16em] text-white/40">Daily ceiling</p>
-              <p className="mt-0.5 text-lg font-black tracking-[-.045em]">{hasTarget ? `${formatNumber(dailyTarget)} cigarettes` : "No ceiling set"}</p>
-              <p className="mt-1.5 text-[10px] font-semibold text-white/60">{todayLogged === null ? "Log honestly when you’re ready." : exceeded ? `${formatNumber(Math.abs(difference))} over your ceiling` : difference < 0 ? `${formatNumber(Math.abs(difference))} remaining today` : "You are at today’s ceiling"}</p>
-              <div className="mt-2.5 h-1.5 overflow-hidden rounded-full bg-white/10">{hasTarget && <div className={`h-full rounded-full ${exceeded ? "bg-[#f87171]" : "bg-[#24c1c4]"}`} style={{ width: `${Math.min(100, progress * 100)}%` }} />}</div>
+              <p className="mt-0.5 text-lg font-black tracking-[-.045em]">{hasTarget ? formatNumber(dailyTarget) : "—"}<span className="ml-1 text-[10px] font-bold tracking-normal text-white/55">cigarettes</span></p>
+              <div className="mt-2 inline-flex rounded-full bg-white/10 px-2.5 py-1.5 text-[9px] font-black text-[#b8ffff] ring-1 ring-white/10">{hasTarget ? `${progressPercent}% of ceiling` : "Set a daily ceiling"}</div>
+              {todayLogged !== null && hasTarget && <p className="mt-1.5 text-[9px] font-semibold text-white/50">{difference < 0 ? `${formatNumber(Math.abs(difference))} remaining today` : difference === 0 ? "At today’s ceiling" : `${formatNumber(Math.abs(difference))} over today’s ceiling`}</p>}
             </div>
           </div>
         </section>
