@@ -49,7 +49,6 @@ function normalizeMedications(medications: any[]): any[] {
 function normalizeGoals(...sources: any[]): any[] {
   const result: any[] = [];
   const seen = new Set<string>();
-
   for (const source of sources) {
     if (!Array.isArray(source)) continue;
     for (const goal of source) {
@@ -58,6 +57,46 @@ function normalizeGoals(...sources: any[]): any[] {
       if (seen.has(key)) continue;
       seen.add(key);
       result.push(goal);
+    }
+  }
+  return result;
+}
+
+function mergePrescriptionMedications(patientMedications: any[], prescriptions: any[]) {
+  const result = normalizeMedications(patientMedications);
+  const existingMedicationIds = new Set(result.map((item: any) => String(item?.medicationId ?? '')).filter(Boolean));
+
+  for (const prescription of Array.isArray(prescriptions) ? prescriptions : []) {
+    const status = String(prescription?.status ?? '').toUpperCase();
+    if (status !== 'ACTIVE') continue;
+    const expiresAt = prescription?.expiresAt ? new Date(String(prescription.expiresAt)) : null;
+    if (expiresAt && !Number.isNaN(expiresAt.getTime()) && expiresAt.getTime() < Date.now()) continue;
+
+    for (const item of Array.isArray(prescription?.items) ? prescription.items : []) {
+      const medicationId = item?.medicationId ?? item?.medication?.id ?? null;
+      if (!medicationId || existingMedicationIds.has(String(medicationId))) continue;
+      const practitioner = prescription?.practitioner;
+      const practitionerName = practitioner?.person
+        ? [practitioner.person.firstName, practitioner.person.lastName].filter(Boolean).join(' ')
+        : (practitioner?.name ?? '');
+      result.push({
+        id: `prescription-item-${item.id}`,
+        patientMedicationId: null,
+        medicationId,
+        medication: item?.medication ?? null,
+        dosage: item?.dosage ?? null,
+        frequency: item?.frequency ?? null,
+        route: item?.route ?? null,
+        instructions: item?.instructions ?? prescription?.notes ?? null,
+        prescribedBy: practitionerName || prescription?.practitionerId || null,
+        prescriptionId: prescription.id,
+        prescriptionItemId: item.id,
+        source: 'PRESCRIPTION',
+        status: 'ACTIVE',
+        startedAt: prescription?.issuedAt ?? null,
+        endedAt: prescription?.expiresAt ?? null,
+      });
+      existingMedicationIds.add(String(medicationId));
     }
   }
 
@@ -71,19 +110,10 @@ class HealthHomeService {
     const healthHome: HealthHomeResponse = payload?.data ?? payload;
     if (!healthHome?.patient?.id) throw new Error('Health Home returned an invalid response.');
 
-    const healthHomeImmunizations = Array.isArray(healthHome.immunizations) && healthHome.immunizations.length > 0
-      ? healthHome.immunizations
-      : (Array.isArray(healthHome.healthSnapshot?.immunizations) ? healthHome.healthSnapshot.immunizations : []);
-    const healthHomeAllergies = Array.isArray(healthHome.allergies) && healthHome.allergies.length > 0
-      ? healthHome.allergies
-      : (Array.isArray(healthHome.healthSnapshot?.activeAllergies) ? healthHome.healthSnapshot.activeAllergies : (healthHome.healthSnapshot?.allergies ?? []));
-    const healthHomeConditions = Array.isArray(healthHome.conditions) && healthHome.conditions.length > 0
-      ? healthHome.conditions
-      : (Array.isArray(healthHome.healthSnapshot?.activeConditions) ? healthHome.healthSnapshot.activeConditions : []);
-    const healthHomeMedications = Array.isArray(healthHome.medications) && healthHome.medications.length > 0
-      ? healthHome.medications
-      : (Array.isArray(healthHome.today?.activeMedications) ? healthHome.today.activeMedications : []);
-    const normalizedHealthHomeMedications = normalizeMedications(healthHomeMedications);
+    const healthHomeImmunizations = Array.isArray(healthHome.immunizations) && healthHome.immunizations.length > 0 ? healthHome.immunizations : (Array.isArray(healthHome.healthSnapshot?.immunizations) ? healthHome.healthSnapshot.immunizations : []);
+    const healthHomeAllergies = Array.isArray(healthHome.allergies) && healthHome.allergies.length > 0 ? healthHome.allergies : (Array.isArray(healthHome.healthSnapshot?.activeAllergies) ? healthHome.healthSnapshot.activeAllergies : (healthHome.healthSnapshot?.allergies ?? []));
+    const healthHomeConditions = Array.isArray(healthHome.conditions) && healthHome.conditions.length > 0 ? healthHome.conditions : (Array.isArray(healthHome.healthSnapshot?.activeConditions) ? healthHome.healthSnapshot.activeConditions : []);
+    const healthHomeMedications = Array.isArray(healthHome.medications) && healthHome.medications.length > 0 ? healthHome.medications : (Array.isArray(healthHome.today?.activeMedications) ? healthHome.today.activeMedications : []);
     const healthHomeGoals = normalizeGoals(healthHome.goals, healthHome.healthGoals);
 
     let canonical: any = null;
@@ -97,23 +127,21 @@ class HealthHomeService {
       }
     }
 
+    const canonicalMedications = canonical && canonical.patient?.id === healthHome.patient?.id && Array.isArray(canonical.medications) ? canonical.medications : healthHomeMedications;
+    const prescriptions = Array.isArray(healthHome.prescriptions) ? healthHome.prescriptions : [];
+    const medications = mergePrescriptionMedications(canonicalMedications, prescriptions);
+
     if (!canonical || canonical.patient?.id !== healthHome.patient?.id) {
       return {
         ...healthHome,
         allergies: healthHomeAllergies,
         conditions: healthHomeConditions,
-        medications: normalizedHealthHomeMedications,
+        medications,
         immunizations: healthHomeImmunizations,
         goals: healthHomeGoals,
         healthGoals: healthHomeGoals,
-        healthSnapshot: {
-          ...healthHome.healthSnapshot,
-          activeAllergies: healthHomeAllergies,
-          activeConditions: healthHomeConditions,
-          allergies: healthHomeAllergies,
-          immunizations: healthHomeImmunizations,
-        },
-        today: { ...healthHome.today, activeMedications: normalizedHealthHomeMedications },
+        healthSnapshot: { ...healthHome.healthSnapshot, activeAllergies: healthHomeAllergies, activeConditions: healthHomeConditions, allergies: healthHomeAllergies, immunizations: healthHomeImmunizations },
+        today: { ...healthHome.today, activeMedications: medications, activeMedicationCount: medications.length },
         wearables: healthHome.wearables ?? { devices: healthHome.healthSnapshot.connectedDevices, latestMeasurements: healthHome.healthSnapshot.latestMeasurements.map((m: any, index) => ({ id: `${m.type}-${index}`, type: m.type, value: m.value, unit: m.unit, measuredAt: m.measuredAt, source: m.source })) },
       };
     }
@@ -124,12 +152,8 @@ class HealthHomeService {
     const emergencyContacts = canonicalEmergencyContacts.length > 0 ? canonicalEmergencyContacts : (healthHome.emergencyContacts ?? []);
     const canonicalAllergies = Array.isArray(canonical.allergies) ? canonical.allergies : [];
     const canonicalConditions = Array.isArray(canonical.conditions) ? canonical.conditions : [];
-    const canonicalMedications = Array.isArray(canonical.medications) ? canonical.medications : [];
     const allergies = canonicalAllergies.length > 0 ? canonicalAllergies : healthHomeAllergies;
-    const conditions = canonicalConditions.length > 0
-      ? canonicalConditions
-      : healthHomeConditions.map((condition: any) => condition?.status ? condition : { ...condition, status: 'ACTIVE' });
-    const medications = normalizeMedications(canonicalMedications.length > 0 ? canonicalMedications : normalizedHealthHomeMedications);
+    const conditions = canonicalConditions.length > 0 ? canonicalConditions : healthHomeConditions.map((condition: any) => condition?.status ? condition : { ...condition, status: 'ACTIVE' });
     const goals = normalizeGoals(canonical.healthGoals, canonical.goals, healthHomeGoals);
 
     return {
@@ -144,16 +168,8 @@ class HealthHomeService {
       immunizations,
       goals,
       healthGoals: goals,
-      healthSnapshot: {
-        ...healthHome.healthSnapshot,
-        activeAllergies: allergies,
-        activeConditions: conditions,
-        allergies,
-        immunizations,
-        bloodType: canonical.healthPassport?.bloodType ?? healthHome.healthSnapshot.bloodType,
-        rhesusFactor: canonical.healthPassport?.rhesusFactor ?? healthHome.healthSnapshot.rhesusFactor,
-      },
-      today: { ...healthHome.today, activeMedications: medications },
+      healthSnapshot: { ...healthHome.healthSnapshot, activeAllergies: allergies, activeConditions: conditions, allergies, immunizations, bloodType: canonical.healthPassport?.bloodType ?? healthHome.healthSnapshot.bloodType, rhesusFactor: canonical.healthPassport?.rhesusFactor ?? healthHome.healthSnapshot.rhesusFactor },
+      today: { ...healthHome.today, activeMedications: medications, activeMedicationCount: medications.length },
       wearables: healthHome.wearables ?? { devices: healthHome.healthSnapshot.connectedDevices, latestMeasurements: healthHome.healthSnapshot.latestMeasurements.map((m: any, index) => ({ id: `${m.type}-${index}`, type: m.type, value: m.value, unit: m.unit, measuredAt: m.measuredAt, source: m.source })) },
     };
   }
