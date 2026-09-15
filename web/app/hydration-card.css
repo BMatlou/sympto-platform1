@@ -1,0 +1,161 @@
+/* Hydration card presentation only. Existing state, handlers and data flow stay unchanged. */
+#daily-health-check-in + div > article:nth-child(2) {
+  position: relative;
+  overflow: hidden;
+  isolation: isolate;
+  border: 1px solid rgba(96, 211, 218, .22) !important;
+  border-radius: 28px !important;
+  background:
+    radial-gradient(circle at 88% 8%, rgba(66, 211, 221, .18), transparent 34%),
+    linear-gradient(180deg, rgba(255,255,255,.96) 0%, rgba(242,251,252,.98) 100%) !important;
+  box-shadow: 0 14px 38px rgba(25, 123, 152, .10), inset 0 1px 0 rgba(255,255,255,.85) !important;
+}
+
+#daily-health-check-in + div > article:nth-child(2)::before {
+  content: "";
+  position: absolute;
+  width: 180px;
+  height: 180px;
+  right: -70px;
+  top: 28px;
+  border-radius: 50%;
+  background: rgba(74, 214, 225, .10);
+  filter: blur(24px);
+  pointer-events: none;
+  z-index: -1;
+}
+
+#daily-health-check-in + div > article:nth-child(2) > * {
+  position: relative;
+  z-index: 1;
+}
+
+#daily-health-check-in + div > article:nth-child(2) > div:first-child h3 {
+  font-size: 18px !important;
+  letter-spacing: -.04em !important;
+}
+
+#daily-health-check-in + div > article:nth-child(2) > div:first-child p {
+  color: #6f8798 !important;
+}
+
+#daily-health-check-in + div > article:nth-child(2) > div:first-child > span {
+  border-radius: 999px !important;
+  padding: 7px 10px !important;
+  background: rgba(36,193,196,.09) !important;
+  color: #087b82 !important;
+}
+
+/* Glass vessel */
+#daily-health-check-in + div > article:nth-child(2) .h-\[116px\].w-\[82px\] {
+  width: 92px !important;
+  height: 132px !important;
+  border: 1.5px solid rgba(86, 190, 203, .34) !important;
+  border-radius: 14px 14px 26px 26px !important;
+  background: linear-gradient(110deg, rgba(255,255,255,.88), rgba(224,247,249,.48) 48%, rgba(255,255,255,.76)) !important;
+  box-shadow: inset 9px 0 18px rgba(255,255,255,.80), inset -8px 0 16px rgba(25,113,139,.045), 0 12px 28px rgba(43,147,170,.12) !important;
+}
+
+#daily-health-check-in + div > article:nth-child(2) .h-\[116px\].w-\[82px\] > div:first-child {
+  overflow: hidden !important;
+  border-radius: 11px 11px 23px 23px;
+}
+
+#daily-health-check-in + div > article:nth-child(2) .h-\[116px\].w-\[82px\] > div:first-child > div:first-child {
+  position: relative;
+  overflow: hidden;
+  background: linear-gradient(180deg, #8de9ea 0%, #43d3d7 38%, #20b9c2 72%, #079aa6 100%) !important;
+}
+
+/* Curved animated water surface */
+#daily-health-check-in + div > article:nth-child(2) .h-\[116px\].w-\[82px\] > div:first-child > div:first-child::before {
+  content: "";
+  position: absolute;
+  left: -15%;
+  top: -7px;
+  width: 130%;
+  height: 22px;
+  border-radius: 50%;
+  background: rgba(255,255,255,.34);
+  box-shadow: 0 2px 9px rgba(20,152,168,.16);
+  animation: sympto-hydration-wave 3.8s ease-in-out infinite;
+}
+
+#daily-health-check-in + div > article:nth-child(2) .h-\[116px\].w-\[82px\] > div:first-child > div:first-child::after {
+  content: "";
+  position: absolute;
+  left: -20%;
+  top: -2px;
+  width: 140%;
+  height: 15px;
+  border-radius: 50%;
+  border-top: 2px solid rgba(255,255,255,.32);
+  animation: sympto-hydration-wave 3.8s ease-in-out infinite reverse;
+}
+
+/* Water bubbles / highlights */
+#daily-health-check-in + div > article:nth-child(2) .h-\[116px\].w-\[82px\] > div:first-child > span:first-of-type,
+#daily-health-check-in + div > article:nth-child(2) .h-\[116px\].w-\[82px\] > div:first-child > span:last-of-type {
+  box-shadow: 0 1px 4px rgba(255,255,255,0.22);
+  animation-duration: 2.8s;
+}
+
+/* Glass rim and highlight */
+#daily-health-check-in + div > article:nth-child(2) .h-\[116px\].w-\[82px\] > div:nth-child(2) {
+  border-color: rgba(86,190,203,.30) !important;
+  background: rgba(255,255,255,.74) !important;
+}
+
+#daily-health-check-in + div > article:nth-child(2) .h-\[116px\].w-\[82px\] > div:nth-child(3) {
+  width: 9px !important;
+  background: linear-gradient(180deg, rgba(255,255,255,.86), rgba(255,255,255,.22)) !important;
+}
+
+/* Typography */
+#daily-health-check-in + div > article:nth-child(2) strong {
+  font-size: 27px !important;
+  letter-spacing: -.06em !important;
+  color: #0b2d54 !important;
+}
+
+#daily-health-check-in + div > article:nth-child(2) strong + span {
+  color: #78909e !important;
+}
+
+#daily-health-check-in + div > article:nth-child(2) small {
+  color: #087b82 !important;
+  font-weight: 800 !important;
+}
+
+/* Utility controls */
+#daily-health-check-in + div > article:nth-child(2) .rounded-2xl {
+  background: rgba(255,255,255,.62) !important;
+  border: 1px solid rgba(205,224,228,.72) !important;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.85) !important;
+}
+
+#daily-health-check-in + div > article:nth-child(2) .rounded-2xl button {
+  border-radius: 999px !important;
+  border: 0 !important;
+}
+
+#daily-health-check-in + div > article:nth-child(2) .rounded-2xl button:last-child {
+  background: linear-gradient(180deg, #e6fbfb 0%, #d4f3f3 100%) !important;
+  color: #087b82 !important;
+}
+
+#daily-health-check-in + div > article:nth-child(2) > button {
+  color: #8195a1 !important;
+}
+
+@keyframes sympto-hydration-wave {
+  0%, 100% { transform: translateX(-4%) rotate(-1deg); }
+  50% { transform: translateX(4%) rotate(1deg); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  #daily-health-check-in + div > article:nth-child(2) .h-\[116px\].w-\[82px\] > div:first-child > div:first-child::before,
+  #daily-health-check-in + div > article:nth-child(2) .h-\[116px\].w-\[82px\] > div:first-child > div:first-child::after {
+    animation: none;
+  }
+}
