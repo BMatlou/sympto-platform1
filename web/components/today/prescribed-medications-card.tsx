@@ -18,11 +18,14 @@ type PrescribedMedication = {
 
 type HealthGoal = {
   id?: string | null;
+  title?: string | null;
+  description?: string | null;
   category?: string | null;
   status?: string | null;
   associatedMedicationId?: string | null;
   patientMedicationId?: string | null;
   medicationId?: string | null;
+  metricConfig?: { metricType?: string | null; metricKey?: string | null } | null;
 };
 
 function firstText(...values: unknown[]) {
@@ -48,14 +51,35 @@ function goalMedicationId(goal: HealthGoal) {
   return goal.associatedMedicationId || goal.patientMedicationId || goal.medicationId || null;
 }
 
+function normalise(value: unknown) {
+  return String(value ?? "").trim().toLowerCase().replace(/\s+/g, " ");
+}
+
 function findMedicationGoal(medication: PrescribedMedication, goals: HealthGoal[]) {
   const medicationId = patientMedicationId(medication);
-  if (!medicationId) return null;
+  const name = normalise(medicationName(medication));
+  if (!medicationId && !name) return null;
 
   return goals.find((goal) => {
     const category = String(goal?.category ?? "").toUpperCase();
     const status = String(goal?.status ?? "").toUpperCase();
-    return category === "MEDICATION" && ["ACTIVE", "IN_PROGRESS"].includes(status) && goalMedicationId(goal) === medicationId;
+    if (category !== "MEDICATION" || !["ACTIVE", "IN_PROGRESS"].includes(status)) return false;
+
+    // Prefer an explicit patient-medication relationship when one is exposed.
+    const linkedMedicationId = goalMedicationId(goal);
+    if (medicationId && linkedMedicationId === medicationId) return true;
+
+    // The current HealthGoal model stores medication goals through the
+    // MEDICATION metric rather than a patientMedication FK. In that model,
+    // the medication identity is carried by the goal's human-readable title
+    // or description. Match that identity as a fallback so existing goals
+    // (including legacy goals) are recognised correctly.
+    const metricType = normalise(goal.metricConfig?.metricType);
+    const metricKey = normalise(goal.metricConfig?.metricKey);
+    if (metricType !== "medication" && metricKey !== "medication.adherence") return false;
+
+    const goalText = normalise(`${goal.title ?? ""} ${goal.description ?? ""}`);
+    return goalText.includes(name);
   }) ?? null;
 }
 
