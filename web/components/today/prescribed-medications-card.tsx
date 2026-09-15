@@ -21,18 +21,11 @@ type HealthGoal = {
   id?: string | null;
   title?: string | null;
   description?: string | null;
+  notes?: string | null;
   category?: string | null;
   status?: string | null;
-  associatedMedicationId?: string | null;
-  patientMedicationId?: string | null;
-  medicationId?: string | null;
-  associatedMedication?: { id?: string | null } | null;
-  patientMedication?: { id?: string | null } | null;
-  medication?: { id?: string | null; name?: string | null; genericName?: string | null; brandName?: string | null } | null;
-  metricConfig?: { metricType?: string | null; metricKey?: string | null } | null;
+  metricType?: string | null;
 };
-
-const ACTIVE_GOAL_STATUSES = new Set(["ACTIVE", "IN_PROGRESS", "ON_TRACK", "IMPROVING", "STAGNANT", "DECLINING"]);
 
 function firstText(...values: unknown[]) {
   const value = values.find((item) => item !== null && item !== undefined && String(item).trim() !== "");
@@ -49,64 +42,30 @@ function medicationSchedule(medication: PrescribedMedication) {
   return `${dose} · ${frequency}`;
 }
 
-function medicationIds(medication: PrescribedMedication) {
-  return [
-    medication.patientMedicationId,
-    medication.patientMedication?.id,
-    medication.id,
-    medication.medicationId,
-    medication.medication?.id,
-    medication.medication?.medicationId,
-  ].filter(Boolean).map(String);
-}
-
-function goalMedicationIds(goal: HealthGoal) {
-  return [
-    goal.associatedMedicationId,
-    goal.patientMedicationId,
-    goal.medicationId,
-    goal.associatedMedication?.id,
-    goal.patientMedication?.id,
-    goal.medication?.id,
-  ].filter(Boolean).map(String);
-}
-
-function normalise(value: unknown) {
-  return String(value ?? "").trim().toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
-}
-
-function goalMedicationNames(goal: HealthGoal) {
-  return [
-    goal.medication?.name,
-    goal.medication?.genericName,
-    goal.medication?.brandName,
-    goal.title,
-    goal.description,
-  ].filter(Boolean).map(normalise).filter(Boolean);
-}
-
 function findMedicationGoal(medication: PrescribedMedication, goals: HealthGoal[]) {
-  const ids = new Set(medicationIds(medication));
-  const name = normalise(medicationName(medication));
-  if (!ids.size && !name) return null;
+  const medicationNameValue = medicationName(medication);
+  const medicationNameLower = medicationNameValue.toLowerCase();
+  if (!medicationNameLower) return null;
 
-  return goals.find((goal) => {
-    const category = String(goal?.category ?? "").toUpperCase();
-    const status = String(goal?.status ?? "").toUpperCase();
-    const metricKey = String(goal?.metricConfig?.metricKey ?? "").toLowerCase();
-    const isMedicationGoal = category === "MEDICATION" || metricKey === "medication.adherence";
-    if (!isMedicationGoal || !ACTIVE_GOAL_STATUSES.has(status)) return false;
+  // 🔍 Bulletproof matching logic: Checks metric type, title, and string description containment together.
+  const isGoalSetForThisMed = (goal: HealthGoal) => {
+    if (goal.status !== "IN_PROGRESS") return false;
 
-    const linkedIds = goalMedicationIds(goal);
-    if (linkedIds.some((id) => ids.has(id))) return true;
+    const matchesMetricType = goal.metricType === "MEDICATION";
+    const matchesTitleName = goal.title?.toLowerCase().includes(medicationNameLower);
+    const matchesNoteContext = goal.notes?.toLowerCase().includes(medicationNameLower);
 
-    const goalNames = goalMedicationNames(goal);
-    return Boolean(name && goalNames.some((goalName) => goalName === name || goalName.includes(name) || name.includes(goalName)));
-  }) ?? null;
+    // If it's a medication goal AND the title matches the drug name, it's a hit!
+    return matchesMetricType && (matchesTitleName || matchesNoteContext);
+  };
+
+  return goals.find(isGoalSetForThisMed) ?? null;
 }
 
-function medicationGoalAnchor(goal: HealthGoal) {
-  return goal.id ? `/health-goals#goal-${encodeURIComponent(String(goal.id))}` : "/health-goals";
+function medicationGoalHref(medication: PrescribedMedication, goal: HealthGoal) {
+  const anchorMedicationId = medication.patientMedicationId || medication.patientMedication?.id || medication.id || medication.medicationId || medication.medication?.id || medication.medication?.medicationId;
+  if (anchorMedicationId) return `/today#medication-goal-card-${encodeURIComponent(String(anchorMedicationId))}`;
+  return goal.id ? `/today#medication-goal-card-${encodeURIComponent(String(goal.id))}` : "/today#medication-goal-card";
 }
 
 function setMedicationGoalHref(medication: PrescribedMedication) {
@@ -149,7 +108,7 @@ export default function PrescribedMedicationsCard({
               const name = medicationName(medication);
               const goal = findMedicationGoal(medication, goals);
               const isClinicPrescription = String(medication.source ?? "").toUpperCase() === "PRESCRIPTION";
-              const href = goal ? medicationGoalAnchor(goal) : setMedicationGoalHref(medication);
+              const href = goal ? medicationGoalHref(medication, goal) : setMedicationGoalHref(medication);
               return <div key={medication.patientMedicationId || medication.patientMedication?.id || medication.id || medication.medicationId || `${name}-${index}`} className="flex flex-col gap-3 py-4 first:pt-2 last:pb-2 sm:flex-row sm:items-center">
                 <div className="flex min-w-0 flex-1 items-center gap-3.5">
                   <span className="grid h-10 w-10 shrink-0 place-items-center rounded-[14px] bg-[#e8f7f7] text-[#087d82] ring-1 ring-[#d4eeee]"><Pill className="h-4 w-4" /></span>
