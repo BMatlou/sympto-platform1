@@ -118,7 +118,7 @@ WITH medication_totals AS (
 )
 UPDATE "HealthGoal" g
 SET "currentValue" = medication_totals."currentValue",
-    "status" = CASE WHEN medication_totals."currentValue" >= medication_totals."target" THEN 'ACHIEVED' ELSE 'ACTIVE' END,
+    "status" = CASE WHEN medication_totals."currentValue" >= medication_totals."target" THEN 'ACHIEVED'::"HealthGoalStatus" ELSE 'ACTIVE'::"HealthGoalStatus" END,
     "achievedAt" = CASE WHEN medication_totals."currentValue" >= medication_totals."target" THEN CURRENT_TIMESTAMP ELSE NULL END
 FROM medication_totals
 WHERE g."id" = medication_totals."goalId";
