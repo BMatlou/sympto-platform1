@@ -254,3 +254,118 @@
   #daily-health-check-in + div > div { grid-template-columns: 1fr !important; }
   #daily-health-check-in + div > div > article:first-child { grid-row: auto !important; }
 }
+
+/* Hydration: make the section read visually as water, not as a generic dashboard card. */
+#daily-health-check-in + div > div > article:nth-child(2) {
+  position: relative;
+  overflow: hidden;
+  background:
+    radial-gradient(circle at 88% 10%, rgba(36,193,196,.12), transparent 34%),
+    linear-gradient(180deg, #ffffff 0%, #f7fcfc 100%) !important;
+}
+
+#daily-health-check-in + div > div > article:nth-child(2)::before {
+  content: "";
+  position: absolute;
+  left: -12%;
+  right: -12%;
+  bottom: -35px;
+  height: 92px;
+  background: rgba(36,193,196,.10);
+  border-radius: 50% 50% 0 0;
+  transform: rotate(-2deg);
+  pointer-events: none;
+}
+
+#daily-health-check-in + div > div > article:nth-child(2)::after {
+  content: "";
+  position: absolute;
+  width: 150px;
+  height: 150px;
+  right: -72px;
+  top: -72px;
+  border-radius: 50%;
+  border: 1px solid rgba(36,193,196,.10);
+  box-shadow: 0 0 0 18px rgba(36,193,196,.025), 0 0 0 38px rgba(36,193,196,.018);
+  pointer-events: none;
+}
+
+#daily-health-check-in + div > div > article:nth-child(2) > * {
+  position: relative;
+  z-index: 1;
+}
+
+/* The water level itself: translucent glass + fluid fill. */
+#daily-health-check-in + div > div > article:nth-child(2) .h-\[92px\].w-\[66px\] {
+  height: 106px !important;
+  width: 74px !important;
+  border: 1.5px solid rgba(36,193,196,.32) !important;
+  border-radius: 10px 10px 22px 22px !important;
+  background: linear-gradient(180deg, rgba(255,255,255,.78), rgba(232,249,249,.58)) !important;
+  box-shadow: inset 8px 0 14px rgba(255,255,255,.78), inset -8px 0 16px rgba(11,45,84,.035), 0 10px 24px rgba(36,193,196,.09) !important;
+}
+
+#daily-health-check-in + div > div > article:nth-child(2) .h-\[92px\].w-\[66px\] > div:first-child > div {
+  background: linear-gradient(180deg, #69d7dc 0%, #24c1c4 72%, #0fa3ab 100%) !important;
+  position: relative;
+  overflow: hidden;
+}
+
+#daily-health-check-in + div > div > article:nth-child(2) .h-\[92px\].w-\[66px\] > div:first-child > div::before,
+#daily-health-check-in + div > div > article:nth-child(2) .h-\[92px\].w-\[66px\] > div:first-child > div::after {
+  content: "";
+  position: absolute;
+  left: -18%;
+  width: 136%;
+  height: 18px;
+  border-radius: 50%;
+  background: rgba(255,255,255,.22);
+  top: -5px;
+  animation: sympto-water-wave 3.8s ease-in-out infinite;
+}
+
+#daily-health-check-in + div > div > article:nth-child(2) .h-\[92px\].w-\[66px\] > div:first-child > div::after {
+  top: 1px;
+  opacity: .45;
+  animation-delay: -1.9s;
+}
+
+#daily-health-check-in + div > div > article:nth-child(2) .h-\[92px\].w-\[66px\] > div:nth-child(2) {
+  border-color: rgba(36,193,196,.38) !important;
+  background: rgba(255,255,255,.72) !important;
+}
+
+#daily-health-check-in + div > div > article:nth-child(2) .h-\[92px\].w-\[66px\] > div:nth-child(3) {
+  background: rgba(255,255,255,.62) !important;
+}
+
+#daily-health-check-in + div > div > article:nth-child(2) .text-\[27px\] {
+  color: #0b2d54 !important;
+  font-size: 30px !important;
+}
+
+#daily-health-check-in + div > div > article:nth-child(2) .text-\[9px\].font-black.uppercase {
+  color: #0b7b80 !important;
+}
+
+#daily-health-check-in + div > div > article:nth-child(2) .bg-\[\#f8fbfb\] {
+  background: rgba(239,250,250,.82) !important;
+  border-radius: 18px !important;
+}
+
+#daily-health-check-in + div > div > article:nth-child(2) .grid.h-9.w-9,
+#daily-health-check-in + div > div > article:nth-child(2) .grid.h-8.w-8 {
+  box-shadow: none !important;
+}
+
+@keyframes sympto-water-wave {
+  0%, 100% { transform: translateX(-3%) rotate(-1deg); }
+  50% { transform: translateX(3%) rotate(1deg); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  #daily-health-check-in + div > div > article:nth-child(2) .h-\[92px\].w-\[66px\] > div:first-child > div::before,
+  #daily-health-check-in + div > div > article:nth-child(2) .h-\[92px\].w-\[66px\] > div:first-child > div::after {
+    animation: none;
+  }
+}
