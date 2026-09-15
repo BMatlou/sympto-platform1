@@ -7,6 +7,7 @@ import ProtectedRoute from "@/components/auth/protected-route";
 import { useDashboard } from "@/hooks/use-dashboard";
 import DailyHealthCheckIn from "@/components/dashboard/daily-health-check-in";
 import HealthVitalsSummary, { type DashboardVital } from "@/components/dashboard/health-vitals-summary";
+import PrescribedMedicationsCard from "@/components/today/prescribed-medications-card";
 import TodayMedicationActions from "@/components/today/today-medication-actions";
 import TodaySmokingGoal from "@/components/today/today-smoking-goal";
 import TodayAlcoholGoal from "@/components/today/today-alcohol-goal";
@@ -111,6 +112,7 @@ export default function TodayPage() {
   const firstName = data.patient?.firstName || data.profile?.preferredName || "there";
   const medications = data.today?.activeMedications ?? [];
   const appointments = data.today?.upcomingAppointments ?? [];
+  const activeGoalsArray = (data.goals ?? data.healthGoals ?? []).filter((goal: any) => ["IN_PROGRESS", "ACTIVE"].includes(String(goal?.status ?? "").toUpperCase()));
   const goals = (data.goals ?? []).filter((goal: any) => String(goal?.status).toUpperCase() === "ACTIVE");
   const medicationGoal = goals.find((goal: any) => String(goal?.category ?? "").toUpperCase() === "MEDICATION");
   const smokingGoal = goals.find((goal: any) => String(goal?.category ?? "").toUpperCase() === "SMOKING");
@@ -159,12 +161,7 @@ export default function TodayPage() {
           </section>
 
           <div className="mt-7 flex items-end justify-between gap-5"><h2 className="text-xl font-black tracking-[-.045em] text-[#0b2d54]">Today, organised</h2><p className="hidden text-right text-[11px] text-[#74859a] sm:block">Only the things worth acting on.</p></div>
-          <section className="mt-3.5 overflow-hidden rounded-[26px] border border-[#dfebef] bg-white shadow-[0_6px_20px_rgba(11,45,84,.035)]">
-            {medications[0] ? (
-              <div className="flex flex-col gap-4 p-5 sm:flex-row sm:items-center sm:justify-between sm:px-6"><div className="flex items-center gap-3"><span className="grid h-11 w-11 shrink-0 place-items-center rounded-2xl bg-[#e5f7f6] text-[#0b6f73]"><Pill className="h-5 w-5" /></span><div><p className="text-[10px] font-black uppercase tracking-[0.15em] text-[#0b6f73]">Medication today</p><p className="mt-1 text-sm font-black text-[#0b2d54]">{text(medications[0]?.medication?.name, "Your medicine")}</p><p className="mt-1 text-[11px] text-[#74859a]">{text(medications[0]?.dosage, "Dose not recorded")} · {String(medications[0]?.frequency || "Schedule not recorded").replaceAll("_", " ")}</p></div></div><Link href="#today-goals" className="inline-flex min-h-10 items-center justify-center gap-2 rounded-xl bg-[#0b2d54] px-4 py-2.5 text-[10px] font-black text-white">Go to today&apos;s goals <ArrowRight className="h-3.5 w-3.5" /></Link></div>
-            ) : <div className="p-5 text-sm text-[#74859a]">No medication is scheduled for today.</div>}
-            {actionItems.length > 0 && <div className="divide-y divide-[#edf2f5] border-t border-[#edf2f5]">{actionItems.map((item: any, index: number) => { const Icon = item.icon; return <Link key={`${item.label}-${index}`} href={item.href} className="flex items-center gap-3.5 px-5 py-3.5 hover:bg-[#f8fbfc] sm:px-6"><span className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-[#f1f6f8] text-[#0b2d54]"><Icon className="h-4 w-4" /></span><span className="min-w-0 flex-1"><span className="block text-[9px] font-black uppercase tracking-[0.14em] text-[#8a99a8]">{item.label}</span><span className="mt-0.5 block truncate text-xs font-bold text-[#0b2d54]">{item.title}</span><span className="mt-0.5 block truncate text-[10px] text-[#74859a]">{item.detail}</span></span><ArrowRight className="h-4 w-4 shrink-0 text-[#93a1ad]" /></Link>; })}</div>}
-          </section>
+          <PrescribedMedicationsCard prescriptionsList={Array.isArray(medications) ? medications : []} activeGoalsArray={activeGoalsArray} />
 
           <div id="daily-health-check-in" className="mt-7 flex items-end justify-between gap-5"><h2 className="text-xl font-black tracking-[-.045em] text-[#0b2d54]">Daily health check-in</h2><p className="hidden text-right text-[11px] text-[#74859a] sm:block">A few answers help Sympto understand your day.</p></div>
           <div className="mt-3.5"><DailyHealthCheckIn embedded goals={goals} /></div>
