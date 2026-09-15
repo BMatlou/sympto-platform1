@@ -6,11 +6,7 @@ import { ArrowRight, Pill, Target } from "lucide-react";
 type PrescribedMedication = {
   id?: string | null;
   patientMedicationId?: string | null;
-  medication?: {
-    id?: string | null;
-    name?: string | null;
-    genericName?: string | null;
-  } | null;
+  medication?: { id?: string | null; name?: string | null; genericName?: string | null } | null;
   name?: string | null;
   dosage?: string | number | null;
   dose?: string | number | null;
@@ -19,10 +15,7 @@ type PrescribedMedication = {
   instructions?: string | null;
   doctorName?: string | null;
   practitioner?: { name?: string | null; firstName?: string | null; lastName?: string | null } | null;
-  prescription?: {
-    practitioner?: { name?: string | null; firstName?: string | null; lastName?: string | null } | null;
-    doctorName?: string | null;
-  } | null;
+  prescription?: { practitioner?: { name?: string | null; firstName?: string | null; lastName?: string | null } | null; doctorName?: string | null } | null;
 };
 
 type ActiveGoal = {
@@ -70,13 +63,7 @@ function goalMedicationId(goal: ActiveGoal) {
   return firstText(goal.associatedMedicationId, goal.patientMedicationId, goal.medicationId);
 }
 
-export default function PrescribedMedicationsCard({
-  prescriptionsList,
-  activeGoalsArray,
-}: {
-  prescriptionsList: PrescribedMedication[];
-  activeGoalsArray: ActiveGoal[];
-}) {
+export default function PrescribedMedicationsCard({ prescriptionsList, activeGoalsArray }: { prescriptionsList: PrescribedMedication[]; activeGoalsArray: ActiveGoal[] }) {
   const prescriptions = Array.isArray(prescriptionsList) ? prescriptionsList : [];
   const activeGoals = Array.isArray(activeGoalsArray) ? activeGoalsArray : [];
 
@@ -124,7 +111,7 @@ export default function PrescribedMedicationsCard({
                   ) : (
                     <div>
                       <p className="mb-2 rounded-xl bg-amber-50/70 p-3 text-xs font-semibold leading-5 text-amber-800">💡 New Prescription! You haven&apos;t set a tracking goal for this medication yet.</p>
-                      <Link href="/health-goals" className="inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-xl bg-[#0b2d54] px-3 py-2.5 text-xs font-black text-white shadow-[0_9px_22px_rgba(11,45,84,.12)] transition hover:bg-[#123d63)">
+                      <Link href="/health-goals" className="inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-xl bg-[#0b2d54] px-3 py-2.5 text-xs font-black text-white shadow-[0_9px_22px_rgba(11,45,84,.12)] transition hover:bg-[#123d63]">
                         <Target className="h-3.5 w-3.5 text-[#24c1c4]" />
                         Set a Medication Goal for {name} +
                       </Link>
