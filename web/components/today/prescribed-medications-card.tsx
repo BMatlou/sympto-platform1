@@ -123,23 +123,33 @@ export default function PrescribedMedicationsCard({
       ) : (
         <div className="bg-[#f8fcfc] p-4 sm:p-5">
           {prescriptions.map((medication, index) => {
-            // Exact per-prescription validation:
-            // only a goal explicitly associated with this prescription's record ID
-            // and currently IN_PROGRESS counts as an active medication goal.
             const isGoalSetForThisMed = activeGoals.some(
               (goal) =>
                 goal.associatedMedicationId === medication.id &&
                 goal.status === "IN_PROGRESS",
             );
-
-            const recordId = medicationRecordId(medication);
+            const medicationId = medication.id ?? medicationRecordId(medication);
+            const goalForThisMedication = isGoalSetForThisMed
+              ? activeGoals.find(
+                  (goal) =>
+                    goal.associatedMedicationId === medication.id &&
+                    goal.status === "IN_PROGRESS",
+                )
+              : undefined;
             const name = medicationName(medication);
             const doctor = medicationDoctor(medication);
+            const recordId = medicationRecordId(medication);
+            const goalHref = goalForThisMedication?.id
+              ? `/health-goals/${encodeURIComponent(goalForThisMedication.id)}`
+              : "/health-goals";
+            const setupHref = medicationId
+              ? `/health-goals/manage?medicationId=${encodeURIComponent(medicationId)}`
+              : "/health-goals/manage";
 
             return (
               <article
                 key={recordId || `${name}-${index}`}
-                className="mb-4 last:mb-0 overflow-hidden rounded-[25px] border border-[#deebee] bg-white shadow-[0_10px_28px_rgba(11,45,84,.055)]"
+                className="mb-4 overflow-hidden rounded-[25px] border border-[#deebee] bg-white shadow-[0_10px_28px_rgba(11,45,84,.055)] last:mb-0"
               >
                 <div className="p-5 sm:p-5.5">
                   <div className="flex items-start gap-3.5">
@@ -168,10 +178,10 @@ export default function PrescribedMedicationsCard({
                           This medication is linked to an active health goal.
                         </div>
                         <Link
-                          href="/health-goals"
+                          href={goalHref}
                           className="group inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-[16px] border border-emerald-200 bg-emerald-50 px-3 py-2.5 text-[11px] font-black text-emerald-700 transition hover:bg-emerald-100"
                         >
-                          View adherence progress &amp; log today&apos;s doses
+                          View {name} adherence progress &amp; log today&apos;s doses
                           <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-0.5" />
                         </Link>
                       </div>
@@ -182,7 +192,7 @@ export default function PrescribedMedicationsCard({
                           <p className="mt-1 text-[10px] leading-5 text-amber-800/80">You haven&apos;t set a tracking goal for this medication yet.</p>
                         </div>
                         <Link
-                          href="/health-goals"
+                          href={setupHref}
                           className="group inline-flex min-h-12 w-full items-center justify-center gap-2 rounded-[17px] bg-[#0b2d54] px-3 py-3 text-[11px] font-black text-white shadow-[0_12px_24px_rgba(11,45,84,.14)] transition hover:bg-[#123d63]"
                         >
                           <span className="grid h-7 w-7 place-items-center rounded-full bg-[#24c1c4]/15 text-[#63e0e0] ring-1 ring-[#24c1c4]/25">
