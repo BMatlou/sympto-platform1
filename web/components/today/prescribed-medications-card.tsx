@@ -47,10 +47,10 @@ function medicationSchedule(medication: PrescribedMedication) {
 }
 
 function findMedicationGoal(medication: PrescribedMedication, goals: HealthGoal[]) {
-  return goals.find((goal) => {
+  const isGoalSetForThisMed = goals.some((goal) => {
     if (goal.status !== "IN_PROGRESS") return false;
 
-    // 1. Check whether this is a medication-tracking goal.
+    // 1. Check if this is a medication-tracking goal.
     const isMedicationGoal =
       goal.metricType === "MEDICATION" ||
       goal.category === "MEDICATION" ||
@@ -58,7 +58,7 @@ function findMedicationGoal(medication: PrescribedMedication, goals: HealthGoal[
 
     if (!isMedicationGoal) return false;
 
-    // 2. Direct ID bridge when the current profile exposes the association.
+    // 2. Direct ID bridge check.
     const matchesIdDirectly =
       goal.associatedMedicationId === medication.id ||
       goal.patientMedicationId === medication.id ||
@@ -66,10 +66,33 @@ function findMedicationGoal(medication: PrescribedMedication, goals: HealthGoal[
 
     if (matchesIdDirectly) return true;
 
-    // 3. Pragmatic frontend fallback for the current primary chronic script.
-    const isPrimaryMetforminScript = medication.name?.toLowerCase().includes("metformin");
+    // 3. Pragmatic fallback: the current primary chronic script is Metformin.
+    // Use medicationName() because this profile exposes the name as medication.name.
+    const isPrimaryMetforminScript = medicationName(medication).toLowerCase().includes("metformin");
 
-    return Boolean(isPrimaryMetforminScript);
+    return isPrimaryMetforminScript;
+  });
+
+  if (!isGoalSetForThisMed) return null;
+
+  return goals.find((goal) => {
+    if (goal.status !== "IN_PROGRESS") return false;
+
+    const isMedicationGoal =
+      goal.metricType === "MEDICATION" ||
+      goal.category === "MEDICATION" ||
+      goal.title?.toLowerCase() === "manage medication";
+
+    if (!isMedicationGoal) return false;
+
+    const matchesIdDirectly =
+      goal.associatedMedicationId === medication.id ||
+      goal.patientMedicationId === medication.id ||
+      goal.medicationId === medication.id;
+
+    if (matchesIdDirectly) return true;
+
+    return medicationName(medication).toLowerCase().includes("metformin");
   }) ?? null;
 }
 
