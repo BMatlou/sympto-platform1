@@ -1,0 +1,145 @@
+/* Hydration visual override only. No business logic or event handling is changed. */
+
+/* Existing glass: article 2 -> hydration row -> first child. */
+#daily-health-check-in + div > article:nth-child(2) > div:nth-child(2) > div:first-child {
+  position: relative !important;
+  width: 82px !important;
+  height: 116px !important;
+  flex: 0 0 82px !important;
+  overflow: hidden !important;
+  border: 1.5px solid rgba(76,188,201,.42) !important;
+  border-radius: 13px 13px 25px 25px !important;
+  background: linear-gradient(112deg,rgba(255,255,255,.96) 0%,rgba(235,252,253,.70) 42%,rgba(214,246,248,.52) 100%) !important;
+  box-shadow:
+    inset 9px 0 16px rgba(255,255,255,.88),
+    inset -8px 0 16px rgba(11,45,84,.045),
+    0 13px 28px rgba(36,193,196,.13) !important;
+}
+
+/* This is the actual live water element. Its inline height continues to come from waterPercent. */
+#daily-health-check-in + div > article:nth-child(2) > div:nth-child(2) > div:first-child > div:first-child {
+  position: absolute !important;
+  left: -1px !important;
+  right: -1px !important;
+  bottom: -1px !important;
+  top: auto !important;
+  min-height: 0 !important;
+  overflow: hidden !important;
+  border-radius: 0 0 23px 23px !important;
+  background:
+    linear-gradient(180deg,rgba(185,249,250,.98) 0%,rgba(92,224,229,.98) 18%,rgba(35,198,207,.99) 55%,rgba(8,153,167,1) 100%) !important;
+  box-shadow:
+    inset 0 8px 13px rgba(255,255,255,.22),
+    inset 0 -7px 13px rgba(0,105,125,.16),
+    0 0 14px rgba(36,193,196,.20) !important;
+  transition: height .65s cubic-bezier(.2,.85,.2,1) !important;
+  will-change: height;
+  z-index: 2 !important;
+}
+
+/* Strong, visible moving surface wave. */
+#daily-health-check-in + div > article:nth-child(2) > div:nth-child(2) > div:first-child > div:first-child::before {
+  content: "";
+  position: absolute;
+  left: -55%;
+  top: -10px;
+  width: 210%;
+  height: 29px;
+  border-radius: 49% 51% 43% 57% / 68% 54% 46% 32%;
+  background:
+    radial-gradient(ellipse at 26% 45%,rgba(255,255,255,.96) 0 10%,rgba(255,255,255,.58) 24%,rgba(255,255,255,.12) 48%,transparent 70%),
+    radial-gradient(ellipse at 74% 55%,rgba(225,255,255,.72) 0 8%,rgba(255,255,255,.18) 38%,transparent 68%);
+  box-shadow: 0 3px 10px rgba(14,140,157,.20);
+  transform: translate3d(-8%,0,0) rotate(-2deg) scaleY(1);
+  transform-origin: 50% 78%;
+  animation: sympto-water-surface-flow-v2 1.65s ease-in-out infinite;
+  will-change: transform;
+  pointer-events: none;
+  z-index: 6;
+}
+
+/* Second wave crest moving the opposite way for a true liquid effect. */
+#daily-health-check-in + div > article:nth-child(2) > div:nth-child(2) > div:first-child > div:first-child::after {
+  content: "";
+  position: absolute;
+  left: -60%;
+  top: -3px;
+  width: 220%;
+  height: 18px;
+  border-radius: 50%;
+  border-top: 3px solid rgba(255,255,255,.84);
+  border-bottom: 1px solid rgba(255,255,255,.22);
+  filter: drop-shadow(0 2px 5px rgba(18,135,150,.14));
+  transform: translate3d(10%,0,0) rotate(1deg) scaleY(1);
+  transform-origin: 50% 70%;
+  animation: sympto-water-surface-flow-v2-secondary 2.15s ease-in-out infinite;
+  will-change: transform;
+  pointer-events: none;
+  z-index: 7;
+}
+
+/* Glass rim sits above the liquid. */
+#daily-health-check-in + div > article:nth-child(2) > div:nth-child(2) > div:first-child > div:nth-child(2) {
+  position: absolute !important;
+  left: 5px !important;
+  right: 5px !important;
+  top: 5px !important;
+  height: 14px !important;
+  border: 2px solid rgba(76,180,194,.46) !important;
+  border-radius: 999px !important;
+  background: linear-gradient(180deg,rgba(255,255,255,.94),rgba(222,249,251,.68)) !important;
+  box-shadow: 0 3px 8px rgba(49,155,170,.12), inset 0 1px 3px rgba(255,255,255,.98) !important;
+  z-index: 10 !important;
+}
+
+/* Glass reflection above water, below rim. */
+#daily-health-check-in + div > article:nth-child(2) > div:nth-child(2) > div:first-child::before {
+  content: "";
+  position: absolute;
+  left: 9px;
+  top: 22px;
+  bottom: 13px;
+  width: 7px;
+  border-radius: 999px;
+  background: linear-gradient(180deg,rgba(255,255,255,.95),rgba(255,255,255,.08));
+  box-shadow: 4px 0 12px rgba(255,255,255,.30);
+  pointer-events: none;
+  z-index: 9;
+}
+
+/* Tiny moving highlight in the water. */
+#daily-health-check-in + div > article:nth-child(2) > div:nth-child(2) > div:first-child > div:first-child {
+  background-image:
+    linear-gradient(180deg,rgba(185,249,250,.98) 0%,rgba(92,224,229,.98) 18%,rgba(35,198,207,.99) 55%,rgba(8,153,167,1) 100%),
+    radial-gradient(ellipse at 18% 35%,rgba(255,255,255,.30) 0 2px,transparent 3px),
+    radial-gradient(ellipse at 72% 62%,rgba(255,255,255,.18) 0 2px,transparent 3px) !important;
+  background-size: auto, 48px 34px, 72px 52px !important;
+  background-position: 0 0, 0 0, 22px 9px !important;
+  animation: sympto-water-bubbles-v2 4.2s linear infinite;
+}
+
+@keyframes sympto-water-surface-flow-v2 {
+  0%,100% { transform: translate3d(-8%,0,0) rotate(-2deg) scaleY(1); }
+  25% { transform: translate3d(1%,-2px,0) rotate(1.8deg) scaleY(1.13); }
+  50% { transform: translate3d(9%,1px,0) rotate(2.6deg) scaleY(.88); }
+  75% { transform: translate3d(-2%,-1px,0) rotate(-1.6deg) scaleY(1.11); }
+}
+
+@keyframes sympto-water-surface-flow-v2-secondary {
+  0%,100% { transform: translate3d(10%,0,0) rotate(1deg) scaleY(1); }
+  50% { transform: translate3d(-10%,1px,0) rotate(-1.4deg) scaleY(.82); }
+}
+
+@keyframes sympto-water-bubbles-v2 {
+  0% { background-position: 0 0, 0 0, 22px 9px; }
+  50% { background-position: 0 0, -18px -8px, 2px 16px; }
+  100% { background-position: 0 0, -36px -16px, -18px 23px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  #daily-health-check-in + div > article:nth-child(2) > div:nth-child(2) > div:first-child > div:first-child,
+  #daily-health-check-in + div > article:nth-child(2) > div:nth-child(2) > div:first-child > div:first-child::before,
+  #daily-health-check-in + div > article:nth-child(2) > div:nth-child(2) > div:first-child > div:first-child::after {
+    animation: none !important;
+  }
+}
