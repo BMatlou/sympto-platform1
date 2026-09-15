@@ -1,0 +1,266 @@
+/* Exercise card presentation only. Existing goal data, state, calculations and handlers remain unchanged. */
+#daily-health-check-in + div > article:nth-child(3) {
+  position: relative;
+  overflow: hidden;
+  isolation: isolate;
+  border: 1px solid rgba(63, 117, 189, 0.18) !important;
+  border-radius: 28px !important;
+  background:
+    radial-gradient(circle at 88% 8%, rgba(97, 157, 231, 0.17), transparent 34%),
+    radial-gradient(circle at 8% 100%, rgba(36, 193, 196, 0.08), transparent 38%),
+    linear-gradient(180deg, rgba(255,255,255,0.98) 0%, rgba(246,250,255,0.99) 100%) !important;
+  box-shadow:
+    0 16px 40px rgba(32, 79, 132, 0.09),
+    inset 0 1px 0 rgba(255,255,255,0.9) !important;
+}
+
+#daily-health-check-in + div > article:nth-child(3)::before {
+  content: "";
+  position: absolute;
+  width: 170px;
+  height: 170px;
+  right: -76px;
+  top: -88px;
+  border-radius: 999px;
+  background: rgba(77, 145, 222, 0.12);
+  filter: blur(4px);
+  pointer-events: none;
+  z-index: -1;
+}
+
+#daily-health-check-in + div > article:nth-child(3)::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 4px;
+  background: linear-gradient(90deg, rgba(63,117,189,0.95), rgba(36,193,196,0.9));
+  opacity: 0.9;
+  pointer-events: none;
+}
+
+/* Header */
+#daily-health-check-in + div > article:nth-child(3) > div:first-child {
+  align-items: flex-start;
+}
+
+#daily-health-check-in + div > article:nth-child(3) > div:first-child > div:first-child > span {
+  width: 44px !important;
+  height: 44px !important;
+  border-radius: 15px !important;
+  background: linear-gradient(145deg, #edf5ff, #e3efff) !important;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.95), 0 7px 18px rgba(63,117,189,0.08);
+}
+
+#daily-health-check-in + div > article:nth-child(3) > div:first-child > div:first-child > span svg {
+  width: 18px !important;
+  height: 18px !important;
+  stroke-width: 2.3;
+}
+
+#daily-health-check-in + div > article:nth-child(3) > div:first-child p:first-child {
+  color: #5f7896 !important;
+  letter-spacing: .19em !important;
+}
+
+#daily-health-check-in + div > article:nth-child(3) > div:first-child p.mt-0\.5 {
+  color: #8395a7 !important;
+  font-size: 11px !important;
+}
+
+#daily-health-check-in + div > article:nth-child(3) > div:first-child > strong {
+  font-size: 30px !important;
+  line-height: 1 !important;
+  letter-spacing: -0.07em !important;
+  color: #0b2d54 !important;
+  padding-top: 5px;
+}
+
+/* Goal badge under the header */
+#daily-health-check-in + div > article:nth-child(3) > p {
+  margin-top: 14px !important;
+  min-height: 32px;
+  border-radius: 16px;
+  padding: 8px 11px;
+  background: rgba(237, 245, 255, 0.84);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.9), 0 5px 14px rgba(63,117,189,0.06);
+  color: #3f75bd !important;
+}
+
+#daily-health-check-in + div > article:nth-child(3) > p svg {
+  flex: 0 0 auto;
+  width: 13px !important;
+  height: 13px !important;
+}
+
+/* Main movement summary area */
+#daily-health-check-in + div > article:nth-child(3) > div:nth-of-type(2) {
+  position: relative;
+  margin-top: 14px !important;
+  padding: 15px 16px 14px;
+  border-radius: 21px;
+  background: linear-gradient(145deg, #f7fbff 0%, #edf5ff 100%);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.92), 0 8px 22px rgba(47,96,151,0.06);
+}
+
+/* Weekly / today metrics */
+#daily-health-check-in + div > article:nth-child(3) > div:nth-of-type(2) > div:first-child {
+  align-items: flex-end;
+}
+
+#daily-health-check-in + div > article:nth-child(3) > div:nth-of-type(2) p:first-child {
+  color: #0b2d54 !important;
+  font-size: 27px !important;
+  line-height: 1 !important;
+  font-weight: 900 !important;
+  letter-spacing: -.065em !important;
+}
+
+#daily-health-check-in + div > article:nth-child(3) > div:nth-of-type(2) p:nth-child(2) {
+  margin-top: 6px !important;
+  color: #8799aa !important;
+  font-size: 10px !important;
+}
+
+#daily-health-check-in + div > article:nth-child(3) > div:nth-of-type(2) > div:first-child > div:last-child {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  border-radius: 999px;
+  padding: 7px 10px;
+  background: rgba(255,255,255,0.78);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.95);
+}
+
+/* Goal message */
+#daily-health-check-in + div > article:nth-child(3) > div:nth-of-type(2) p.mt-1 {
+  color: #4e6985 !important;
+  line-height: 1.45 !important;
+}
+
+#daily-health-check-in + div > article:nth-child(3) > div:nth-of-type(2) p.mt-1 + p {
+  color: #3f75bd !important;
+}
+
+/* Progress rail */
+#daily-health-check-in + div > article:nth-child(3) > div:nth-of-type(2) > div:last-child {
+  height: 11px !important;
+  margin-top: 12px !important;
+  border-radius: 999px !important;
+  background: #dfe9f3 !important;
+  box-shadow: inset 0 1px 2px rgba(43,84,122,0.08);
+  overflow: hidden;
+}
+
+#daily-health-check-in + div > article:nth-child(3) > div:nth-of-type(2) > div:last-child > div {
+  border-radius: 999px !important;
+  background: linear-gradient(90deg, #3f75bd 0%, #24c1c4 100%) !important;
+  box-shadow: 0 2px 8px rgba(63,117,189,0.18);
+}
+
+/* Tap controls */
+#daily-health-check-in + div > article:nth-child(3) > div:nth-of-type(3) {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-top: 13px !important;
+  border-radius: 18px;
+  padding: 9px 10px 9px 12px;
+  background: #f8fbff;
+  box-shadow: inset 0 0 0 1px #e4edf5;
+}
+
+#daily-health-check-in + div > article:nth-child(3) > div:nth-of-type(3) > span:first-child {
+  color: #7f92a3 !important;
+}
+
+#daily-health-check-in + div > article:nth-child(3) > div:nth-of-type(3) > span:nth-child(2) {
+  min-width: 58px;
+  text-align: center;
+  border-radius: 999px;
+  padding: 6px 8px;
+  background: #edf5ff;
+  color: #0b2d54 !important;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.9);
+}
+
+#daily-health-check-in + div > article:nth-child(3) > div:nth-of-type(3) > div {
+  gap: 7px !important;
+}
+
+#daily-health-check-in + div > article:nth-child(3) > div:nth-of-type(3) button,
+#daily-health-check-in + div > article:nth-child(3) button[aria-label*="exercise" i] {
+  width: 38px !important;
+  height: 38px !important;
+  border-radius: 13px !important;
+  transition: transform .18s ease, box-shadow .18s ease, background .18s ease;
+}
+
+#daily-health-check-in + div > article:nth-child(3) > div:nth-of-type(3) button:hover,
+#daily-health-check-in + div > article:nth-child(3) button[aria-label*="exercise" i]:hover {
+  transform: translateY(-1px);
+}
+
+#daily-health-check-in + div > article:nth-child(3) > div:nth-of-type(3) button:last-child {
+  background: linear-gradient(145deg, #eaf7f7, #dff3f3) !important;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.92), 0 5px 14px rgba(36,193,196,0.12);
+  color: #0b7b80 !important;
+}
+
+#daily-health-check-in + div > article:nth-child(3) > div:nth-of-type(3) button:first-child {
+  background: #fff !important;
+  box-shadow: inset 0 0 0 1px #dce7ef;
+}
+
+/* Minute preset selector */
+#daily-health-check-in + div > article:nth-child(3) > div:last-child {
+  margin-top: 13px !important;
+  padding: 4px;
+  border-radius: 17px;
+  background: #eef4f9;
+  box-shadow: inset 0 1px 2px rgba(38,76,113,0.06);
+}
+
+#daily-health-check-in + div > article:nth-child(3) > div:last-child button {
+  min-height: 36px;
+  border-radius: 13px !important;
+  font-size: 9px !important;
+  font-weight: 900 !important;
+  letter-spacing: -.01em;
+  transition: transform .18s ease, background .18s ease, box-shadow .18s ease, color .18s ease;
+}
+
+#daily-health-check-in + div > article:nth-child(3) > div:last-child button:hover {
+  transform: translateY(-1px);
+}
+
+#daily-health-check-in + div > article:nth-child(3) > div:last-child button[aria-pressed="true"] {
+  background: #0b2d54 !important;
+  color: #fff !important;
+  box-shadow: 0 6px 15px rgba(11,45,84,0.14), inset 0 1px 0 rgba(255,255,255,0.12);
+}
+
+#daily-health-check-in + div > article:nth-child(3) > div:last-child button:not([aria-pressed="true"]) {
+  color: #677d91 !important;
+  background: transparent !important;
+}
+
+@media (max-width: 520px) {
+  #daily-health-check-in + div > article:nth-child(3) {
+    border-radius: 24px !important;
+    padding: 15px !important;
+  }
+
+  #daily-health-check-in + div > article:nth-child(3) > div:nth-of-type(2) {
+    padding: 14px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  #daily-health-check-in + div > article:nth-child(3) > div:nth-of-type(3) button,
+  #daily-health-check-in + div > article:nth-child(3) > div:last-child button {
+    transition: none;
+  }
+}
