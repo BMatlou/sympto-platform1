@@ -70,8 +70,10 @@ export default function PrescribedMedicationsCard({ prescriptionsList, activeGoa
       {prescriptions.length === 0 ? <div className="p-5 text-sm text-[#74859a]">No medication is scheduled for today.</div> : (
         <div className="bg-[#f8fcfc] p-4 sm:p-5">
           {prescriptions.map((medication, index) => {
-            const isGoalSetForThisMed = activeGoals.some((goal) => goal.associatedMedicationId === medication.id && goal.status === "IN_PROGRESS");
             const recordId = medicationRecordId(medication);
+            const isGoalSetForThisMed = activeGoals.some(
+              (goal) => goal.associatedMedicationId === recordId && goal.status === "IN_PROGRESS",
+            );
             const name = medicationName(medication);
             const doctor = medicationDoctor(medication);
             const medicationAnchor = `#medication-goal-card-${encodeURIComponent(String(recordId || medication.id || index))}`;
