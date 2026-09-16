@@ -16,6 +16,82 @@ const prisma = new PrismaClient({
   adapter: new PrismaPg({ connectionString }),
 });
 
+function normalise(value: string) {
+  return value.trim().toLowerCase().replace(/\s+/g, ' ');
+}
+
+async function findMedication(name: string) {
+  const medications = await prisma.medication.findMany({
+    where: { active: true },
+    select: { id: true, name: true },
+  });
+
+  const wanted = normalise(name);
+  return (
+    medications.find((medication) => normalise(medication.name) === wanted) ??
+    medications.find((medication) => normalise(medication.name).includes(wanted))
+  );
+}
+
+async function findOrCreateSymptom(name: string) {
+  const existing = await prisma.symptom.findFirst({ where: { name } });
+  if (existing) return existing;
+
+  const reference = SYMPTOM_REFERENCE.find(
+    (symptom) => normalise(symptom.name) === normalise(name),
+  );
+
+  return prisma.symptom.create({
+    data: {
+      name,
+      category: reference?.category ?? 'General',
+      bodySystem: reference?.category ?? 'General',
+      description: reference?.synonyms?.length
+        ? `Also known as: ${reference.synonyms.join(', ')}`
+        : undefined,
+      searchable: true,
+      active: true,
+    },
+  });
+}
+
+async function upsertRelationship(
+  medicationId: string,
+  symptomName: string,
+  relationType: 'SIDE_EFFECT' | 'RELIEVES_SYMPTOM' | 'MAY_MASK_SYMPTOM',
+  source?: string,
+  notes?: string,
+) {
+  const symptom = await findOrCreateSymptom(symptomName);
+
+  await prisma.medicationClinicalReference.upsert({
+    where: {
+      medicationId_symptomId_relationType: {
+        medicationId,
+        symptomId: symptom.id,
+        relationType,
+      },
+    },
+    update: {
+      evidenceLevel: 'CURATED',
+      ...(source ? { source } : {}),
+      ...(notes ? { notes } : {}),
+      active: true,
+    },
+    create: {
+      medicationId,
+      symptomId: symptom.id,
+      relationType,
+      evidenceLevel: 'CURATED',
+      ...(source ? { source } : {}),
+      ...(notes ? { notes } : {}),
+      active: true,
+    },
+  });
+
+  return symptom;
+}
+
 async function main() {
   for (const name of ADDITIONAL_CONDITIONS) {
     const existing = await prisma.condition.findFirst({ where: { name } });
@@ -79,117 +155,72 @@ async function main() {
     }
   }
 
+  const medicationResults = [];
+
   for (const [medicationName, reference] of Object.entries(
     MEDICATION_CLINICAL_REFERENCE,
   )) {
-    const medication = await prisma.medication.findFirst({
-      where: { name: medicationName },
-    });
+    const medication = await findMedication(medicationName);
 
-    if (!medication) continue;
+    if (!medication) {
+      throw new Error(
+        `Medication clinical reference cannot be seeded because medication "${medicationName}" was not found in the Medication table.`,
+      );
+    }
+
+    let sideEffects = 0;
+    let relieved = 0;
 
     for (const symptomName of reference.sideEffects) {
-      const symptom = await prisma.symptom.findFirst({
-        where: { name: symptomName },
-      });
-      if (!symptom) continue;
-
-      await prisma.medicationClinicalReference.upsert({
-        where: {
-          medicationId_symptomId_relationType: {
-            medicationId: medication.id,
-            symptomId: symptom.id,
-            relationType: 'SIDE_EFFECT',
-          },
-        },
-        update: {
-          evidenceLevel: 'CURATED',
-          active: true,
-        },
-        create: {
-          medicationId: medication.id,
-          symptomId: symptom.id,
-          relationType: 'SIDE_EFFECT',
-          evidenceLevel: 'CURATED',
-          active: true,
-        },
-      });
+      await upsertRelationship(
+        medication.id,
+        symptomName,
+        'SIDE_EFFECT',
+      );
+      sideEffects++;
     }
 
     for (const symptomName of reference.relieves) {
-      const symptom = await prisma.symptom.findFirst({
-        where: { name: symptomName },
-      });
-      if (!symptom) continue;
-
-      await prisma.medicationClinicalReference.upsert({
-        where: {
-          medicationId_symptomId_relationType: {
-            medicationId: medication.id,
-            symptomId: symptom.id,
-            relationType: 'RELIEVES_SYMPTOM',
-          },
-        },
-        update: {
-          evidenceLevel: 'CURATED',
-          active: true,
-        },
-        create: {
-          medicationId: medication.id,
-          symptomId: symptom.id,
-          relationType: 'RELIEVES_SYMPTOM',
-          evidenceLevel: 'CURATED',
-          active: true,
-        },
-      });
+      await upsertRelationship(
+        medication.id,
+        symptomName,
+        'RELIEVES_SYMPTOM',
+      );
+      relieved++;
     }
+
+    medicationResults.push(
+      `${medication.name}: ${sideEffects} side effects, ${relieved} relieved symptoms`,
+    );
   }
 
   for (const [medicationName, symptomNames] of Object.entries(
     MEDICATION_MASK_REFERENCE,
   )) {
-    const medication = await prisma.medication.findFirst({
-      where: { name: medicationName },
-    });
+    const medication = await findMedication(medicationName);
 
-    if (!medication) continue;
+    if (!medication) {
+      throw new Error(
+        `Medication masking reference cannot be seeded because medication "${medicationName}" was not found in the Medication table.`,
+      );
+    }
 
     for (const symptomName of symptomNames) {
-      const symptom = await prisma.symptom.findFirst({
-        where: { name: symptomName },
-      });
-      if (!symptom) continue;
-
-      await prisma.medicationClinicalReference.upsert({
-        where: {
-          medicationId_symptomId_relationType: {
-            medicationId: medication.id,
-            symptomId: symptom.id,
-            relationType: 'MAY_MASK_SYMPTOM',
-          },
-        },
-        update: {
-          evidenceLevel: 'CURATED',
-          source: 'DailyMed',
-          notes: 'The antipyretic effect may mask fever.',
-          active: true,
-        },
-        create: {
-          medicationId: medication.id,
-          symptomId: symptom.id,
-          relationType: 'MAY_MASK_SYMPTOM',
-          evidenceLevel: 'CURATED',
-          source: 'DailyMed',
-          notes: 'The antipyretic effect may mask fever.',
-          active: true,
-        },
-      });
+      await upsertRelationship(
+        medication.id,
+        symptomName,
+        'MAY_MASK_SYMPTOM',
+        'DailyMed',
+        'The antipyretic effect may mask fever.',
+      );
     }
   }
 
   console.log(
     `Clinical reference seeded: ${SYMPTOM_REFERENCE.length} symptoms, ${ADDITIONAL_CONDITIONS.length} additional conditions, ${ADDITIONAL_ALLERGIES.length} additional allergies.`,
   );
+  console.log('Medication clinical reference:');
+  for (const result of medicationResults) console.log(`  ${result}`);
 }
 
 main()
