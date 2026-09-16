@@ -33,7 +33,23 @@ export class PatientMedicationsService {
     const existing = await this.prisma.patientMedication.findFirst({ where: { healthPassportId: dto.healthPassportId, medicationId: dto.medicationId } });
     if (existing) throw new ConflictException('This medication has already been added to the health passport.');
     return this.prisma.patientMedication.create({
-      data: { healthPassportId: dto.healthPassportId, medicationId: dto.medicationId, dosage: dto.dosage?.trim(), frequency: dto.frequency?.trim(), route: dto.route?.trim(), prescribedBy: dto.prescribedBy?.trim(), startedAt: dto.startedAt ? new Date(dto.startedAt) : undefined, endedAt: dto.endedAt ? new Date(dto.endedAt) : undefined, status: dto.status ?? MedicationStatus.ACTIVE, notes: dto.notes?.trim() },
+      data: {
+        healthPassportId: dto.healthPassportId,
+        medicationId: dto.medicationId,
+        dosage: dto.dosage?.trim(),
+        frequency: dto.frequency?.trim(),
+        route: dto.route?.trim(),
+        indication: dto.indication?.trim(),
+        instructions: dto.instructions?.trim(),
+        prescribedBy: dto.prescribedBy?.trim(),
+        startedAt: dto.startedAt ? new Date(dto.startedAt) : undefined,
+        endedAt: dto.endedAt ? new Date(dto.endedAt) : undefined,
+        ongoing: dto.ongoing ?? true,
+        sideEffects: dto.sideEffects?.trim(),
+        effectiveness: dto.effectiveness?.trim(),
+        status: dto.status ?? MedicationStatus.ACTIVE,
+        notes: dto.notes?.trim(),
+      },
       include: { medication: true, healthPassport: { include: { patient: { include: { person: true } } } } },
     });
   }
@@ -64,7 +80,23 @@ export class PatientMedicationsService {
     if (duplicate) throw new ConflictException('This medication has already been added to the health passport.');
     return this.prisma.patientMedication.update({
       where: { id },
-      data: { healthPassportId, medicationId, dosage: dto.dosage?.trim(), frequency: dto.frequency?.trim(), route: dto.route?.trim(), prescribedBy: dto.prescribedBy?.trim(), startedAt: dto.startedAt ? new Date(dto.startedAt) : undefined, endedAt: dto.endedAt ? new Date(dto.endedAt) : undefined, status: dto.status, notes: dto.notes?.trim() },
+      data: {
+        healthPassportId,
+        medicationId,
+        dosage: dto.dosage?.trim(),
+        frequency: dto.frequency?.trim(),
+        route: dto.route?.trim(),
+        indication: dto.indication?.trim(),
+        instructions: dto.instructions?.trim(),
+        prescribedBy: dto.prescribedBy?.trim(),
+        startedAt: dto.startedAt ? new Date(dto.startedAt) : undefined,
+        endedAt: dto.endedAt ? new Date(dto.endedAt) : undefined,
+        ongoing: dto.ongoing,
+        sideEffects: dto.sideEffects?.trim(),
+        effectiveness: dto.effectiveness?.trim(),
+        status: dto.status,
+        notes: dto.notes?.trim(),
+      },
       include: { medication: true, healthPassport: { include: { patient: { include: { person: true } } } } },
     });
   }
@@ -101,8 +133,6 @@ export class PatientMedicationsService {
     const source = 'medication-adherence';
     const sourceId = `${id}:${effectiveMeasuredAt.toISOString()}`;
 
-    // Record exactly one metric event for each Taken/Skipped action.
-    // The Today card uses these events to calculate today's dose count.
     const existingEvent = await this.prisma.$queryRaw<Array<{ id: string }>>`
       SELECT "id"
       FROM "HealthGoalMetricEvent"
