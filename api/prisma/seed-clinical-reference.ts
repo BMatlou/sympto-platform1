@@ -7,6 +7,7 @@ import {
   MEDICATION_CLINICAL_REFERENCE,
   SYMPTOM_REFERENCE,
 } from './clinical-reference-data';
+import { MEDICATION_MASK_REFERENCE } from './medication-mask-reference';
 
 const connectionString = process.env.DATABASE_URL;
 if (!connectionString) throw new Error('DATABASE_URL is not defined.');
@@ -138,6 +139,48 @@ async function main() {
           symptomId: symptom.id,
           relationType: 'RELIEVES_SYMPTOM',
           evidenceLevel: 'CURATED',
+          active: true,
+        },
+      });
+    }
+  }
+
+  for (const [medicationName, symptomNames] of Object.entries(
+    MEDICATION_MASK_REFERENCE,
+  )) {
+    const medication = await prisma.medication.findFirst({
+      where: { name: medicationName },
+    });
+
+    if (!medication) continue;
+
+    for (const symptomName of symptomNames) {
+      const symptom = await prisma.symptom.findFirst({
+        where: { name: symptomName },
+      });
+      if (!symptom) continue;
+
+      await prisma.medicationClinicalReference.upsert({
+        where: {
+          medicationId_symptomId_relationType: {
+            medicationId: medication.id,
+            symptomId: symptom.id,
+            relationType: 'MAY_MASK_SYMPTOM',
+          },
+        },
+        update: {
+          evidenceLevel: 'CURATED',
+          source: 'DailyMed',
+          notes: 'The antipyretic effect may mask fever.',
+          active: true,
+        },
+        create: {
+          medicationId: medication.id,
+          symptomId: symptom.id,
+          relationType: 'MAY_MASK_SYMPTOM',
+          evidenceLevel: 'CURATED',
+          source: 'DailyMed',
+          notes: 'The antipyretic effect may mask fever.',
           active: true,
         },
       });
