@@ -99,12 +99,10 @@ export default function TodayMedicationActions({ medications, goal: suppliedGoal
   const [states, setStates] = useState<Record<string, Action | undefined>>({});
 
   const trackedMedication = medications[0] ?? null;
-  const medication = trackedMedication
-    ? {
-        ...trackedMedication,
-        name: trackedMedication?.name || trackedMedication?.medication?.name || trackedMedication?.medication?.genericName || trackedMedication?.medication?.brandName || "",
-      }
-    : null;
+  const medication = {
+    ...(trackedMedication ?? {}),
+    name: trackedMedication?.name || trackedMedication?.medication?.name || trackedMedication?.medication?.genericName || trackedMedication?.medication?.brandName || "",
+  };
   const activeMedicationGoals = suppliedGoal ? [suppliedGoal] : [];
 
   // 🔍 Overwrite the goal evaluation loop inside the component file:
@@ -135,11 +133,6 @@ export default function TodayMedicationActions({ medications, goal: suppliedGoal
     return isMedicationGoal && isPrimaryMetforminScript && isGoalUnlinked;
   }) || null;
 
-  // 4. Strict Display Guard Checklist
-  if (!finalGoal) {
-    return null; // Keeps untracked scripts safely hidden
-  }
-
   const medicationId = patientMedicationId(trackedMedication);
   const frequency = medicationFrequency(trackedMedication);
   const totalRequiredDosesPerDay = requiredDosesForFrequency(frequency);
@@ -164,6 +157,12 @@ export default function TodayMedicationActions({ medications, goal: suppliedGoal
   }, [medications.length, totalRequiredDosesPerDay]);
 
   const doseLabel = useMemo(() => (totalRequiredDosesPerDay === 1 ? "1 dose" : `${totalRequiredDosesPerDay} doses`), [totalRequiredDosesPerDay]);
+
+  // 4. Strict Display Guard Checklist
+  if (!finalGoal) {
+    return null; // Keeps untracked scripts safely hidden
+  }
+
   const { journeyDay, daysLeft } = journeyProgress(finalGoal);
   const medicationAnchorId = `medication-adherence-card-${String(medicationId ?? "unassigned")}`;
   const ringSize = 96;
