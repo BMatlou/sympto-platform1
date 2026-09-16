@@ -45,29 +45,6 @@ function normalizeVitals(data: any): DashboardVital[] {
   return Array.from(byType.values());
 }
 
-function goalProgress(goal: any) {
-  const latest = Number(goal?.progressPercent ?? goal?.latestProgress?.progressPercent ?? goal?.currentProgress);
-  if (Number.isFinite(latest)) return Math.max(0, Math.min(100, Math.round(latest)));
-  const progress = Array.isArray(goal?.progress) ? goal.progress[0] : null;
-  const percent = Number(progress?.progressPercent);
-  return Number.isFinite(percent) ? Math.max(0, Math.min(100, Math.round(percent))) : 0;
-}
-
-function goalTarget(goal: any) {
-  const value = Number(goal?.metricConfig?.frequencyTarget ?? goal?.frequencyTarget ?? goal?.targetValue);
-  if (!Number.isFinite(value)) return "Target not set";
-  const unit = String(goal?.unit ?? "").trim();
-  return `${Number.isInteger(value) ? value : value.toFixed(1)}${unit ? ` ${unit}` : ""}`;
-}
-
-function goalJourney(goal: any) {
-  const startDate = new Date(String(goal?.createdAt ?? Date.now()));
-  const targetDate = new Date(String(goal?.targetDate ?? ""));
-  const journeyDay = Number.isNaN(startDate.getTime()) ? 1 : Math.max(1, Math.floor((Date.now() - startDate.getTime()) / 86400000) + 1);
-  const daysLeft = Number.isNaN(targetDate.getTime()) ? null : Math.max(0, Math.ceil((targetDate.getTime() - Date.now()) / 86400000));
-  return { journeyDay, targetDate, daysLeft };
-}
-
 function patientMedicationId(medication: any) {
   return medication?.patientMedicationId || medication?.patientMedication?.id || medication?.id || null;
 }
@@ -80,17 +57,20 @@ function medicationName(medication: any) {
   return normalise(medication?.medication?.name || medication?.name || medication?.medication?.genericName || medication?.medication?.brandName);
 }
 
+function isMedicationGoal(goal: any) {
+  const category = String(goal?.category ?? "").toUpperCase();
+  const metricType = String(goal?.metricType ?? "").toUpperCase();
+  const metricKey = String(goal?.metricConfig?.metricKey ?? goal?.metricKey ?? "").toLowerCase();
+  return category === "MEDICATION" || metricType === "MEDICATION" || metricKey === "medication.adherence";
+}
+
 function medicationGoalFor(medication: any, goals: any[], medicationCount: number) {
   const medicationId = patientMedicationId(medication);
   const medicationCatalogIds = [medication?.medicationId, medication?.medication?.id, medication?.medication?.medicationId].filter(Boolean).map(String);
 
   return goals.find((goal: any) => {
-    const category = String(goal?.category ?? "").toUpperCase();
-    const metricType = String(goal?.metricType ?? "").toUpperCase();
-    const metricKey = String(goal?.metricConfig?.metricKey ?? "").toLowerCase();
     const status = String(goal?.status ?? "").toUpperCase();
-    const isMedicationGoal = category === "MEDICATION" || metricType === "MEDICATION" || metricKey === "medication.adherence";
-    if (!isMedicationGoal || !["ACTIVE", "IN_PROGRESS"].includes(status)) return false;
+    if (!isMedicationGoal(goal) || !["ACTIVE", "IN_PROGRESS"].includes(status)) return false;
 
     if (goal?.patientMedicationId) {
       return Boolean(medicationId) && String(goal.patientMedicationId) === String(medicationId);
@@ -140,7 +120,8 @@ export default function TodayPage() {
   const activeGoalsArray = allGoals.filter((goal: any) => ACTIVE_GOAL_STATUSES.has(String(goal?.status ?? "").toUpperCase()));
   const goals = allGoals.filter((goal: any) => String(goal?.status).toUpperCase() === "ACTIVE");
   const medicationGoalCards = (Array.isArray(medications) ? medications : []).map((medication: any) => ({ medication, goal: medicationGoalFor(medication, activeGoalsArray, medications.length) }));
-  const medicationGoal = medicationGoalCards.find((item: any) => item.goal)?.goal;
+  const unmatchedMedicationGoals = activeGoalsArray.filter((goal: any) => isMedicationGoal(goal) && !medicationGoalCards.some((item: any) => item.goal?.id === goal?.id));
+  const medicationGoal = medicationGoalCards.find((item: any) => item.goal)?.goal || unmatchedMedicationGoals[0] || null;
   const smokingGoal = goals.find((goal: any) => String(goal?.category ?? "").toUpperCase() === "SMOKING");
   const alcoholGoal = goals.find((goal: any) => String(goal?.category ?? "").toUpperCase() === "ALCOHOL");
   const weightGoal = goals.find((goal: any) => String(goal?.category ?? "").toUpperCase() === "WEIGHT");
@@ -168,12 +149,14 @@ export default function TodayPage() {
         <div className="mt-3.5"><DailyHealthCheckIn embedded goals={goals} /></div>
         <section id="current-health" className="mt-7 rounded-[27px] border border-[#e0ebef] bg-white p-5 shadow-[0_5px_18px_rgba(11,45,84,0.03)] sm:p-6"><div className="flex flex-wrap items-end justify-between gap-4"><div><p className="text-[10px] font-black uppercase tracking-[0.18em] text-[#71839a]">Current health</p><h2 className="mt-1 text-xl font-black tracking-[-.045em] text-[#0b2d54]">Vitals and essentials</h2></div><Link href="/health-journal" className="text-[10px] font-black text-[#0b2d54]">Open health journal <ArrowRight className="ml-1 inline h-3.5 w-3.5" /></Link></div><HealthVitalsSummary measurements={healthVitals} bmi={bmi} bmiCategory={bmiCategory} weightKg={weightKg} heightCm={heightCm} /></section>
         <div id="today-goals" className="mt-7 flex items-end justify-between gap-5"><h2 className="text-xl font-black tracking-[-.045em] text-[#0b2d54]">Your active goals</h2><Link href="/health-goals" className="text-[10px] font-black text-[#0b2d54]">Manage goals <ArrowRight className="ml-1 inline h-3.5 w-3.5" /></Link></div>
-        {(medications.length > 0 || medicationGoal || smokingGoal || alcoholGoal || weightGoal || exerciseGoal) && <section className="mt-3.5 grid items-stretch gap-4 lg:grid-cols-2">
-          {medicationGoalCards.length > 0 ? medicationGoalCards.map(({ medication, goal }: any, index: number) => <TodayMedicationActions key={String(patientMedicationId(medication) ?? `medication-${index}`)} medications={[medication]} goal={goal} onUpdated={reload} />) : medicationGoal ? <TodayMedicationActions medications={[]} goal={medicationGoal} onUpdated={reload} /> : null}
-          {smokingGoal ? <TodaySmokingGoal goal={smokingGoal} /> : <div />}{alcoholGoal && <TodayAlcoholGoal goal={alcoholGoal} onUpdated={reload} />}{weightGoal && <TodayWeightGoal goal={weightGoal} fallbackWeight={weightKg} />}{exerciseGoal && <TodayExerciseGoal goal={exerciseGoal} />}
+        {(medicationGoal || smokingGoal || alcoholGoal || weightGoal || exerciseGoal) && <section className="mt-3.5 grid items-stretch gap-4 lg:grid-cols-2">
+          {medicationGoal ? <TodayMedicationActions medications={medicationGoalCards.find((item: any) => item.goal?.id === medicationGoal?.id)?.medication ? [medicationGoalCards.find((item: any) => item.goal?.id === medicationGoal?.id).medication] : medications.length > 0 ? [medications[0]] : []} goal={medicationGoal} onUpdated={reload} /> : null}
+          {smokingGoal ? <TodaySmokingGoal goal={smokingGoal} /> : null}
+          {alcoholGoal ? <TodayAlcoholGoal goal={alcoholGoal} onUpdated={reload} /> : null}
+          {weightGoal ? <TodayWeightGoal goal={weightGoal} fallbackWeight={weightKg} /> : null}
+          {exerciseGoal ? <TodayExerciseGoal goal={exerciseGoal} /> : null}
         </section>}
-        {activeGoalsArray.length === 0 ? <p className="mt-4 text-xs text-gray-400 italic">No active health goals running right now.</p> : <section className="mt-4 grid gap-4 sm:grid-cols-2 xl:grid-cols-3">{activeGoalsArray.map((goal: any) => { const progress = goalProgress(goal); const targetDate = goal?.targetDate ? new Date(String(goal.targetDate)) : null; const title = goal?.title || "Manage medication"; return <div key={String(goal.id)} className="bg-slate-50 p-3 rounded-xl border border-slate-100 mb-3"><div className="flex justify-between items-center mb-1.5"><div><span className="text-xs font-bold text-slate-800 block">{title}</span><p className="text-[10px] text-gray-400 font-medium">Keep your medication plan on track</p></div><span className="text-xs font-mono font-bold text-emerald-600">{progress}% progress</span></div><div className="w-full bg-slate-200 h-2 rounded-full overflow-hidden shadow-inner"><div className="bg-emerald-500 h-full transition-all duration-500 ease-out rounded-full" style={{ width: `${progress}%` }} /></div><div className="flex justify-between items-center text-[10px] text-slate-400 font-medium mt-1.5 pt-1 border-t border-slate-200/40"><span>🎯 Target: {targetDate && !Number.isNaN(targetDate.getTime()) ? targetDate.toLocaleDateString("en-ZA") : "1 Dec 2026"}</span><span>1 active goal</span></div></div>; })}</section>}
-        {!medicationGoal && medications.length === 0 && !smokingGoal && !alcoholGoal && !weightGoal && !exerciseGoal && <Link href="/health-goals" className="mt-4 inline-flex min-h-10 items-center gap-2 rounded-xl bg-[#0b2d54] px-4 py-2.5 text-[10px] font-black text-white">Set a health goal <ArrowRight className="h-3.5 w-3.5" /></Link>}
+        {!medicationGoal && !smokingGoal && !alcoholGoal && !weightGoal && !exerciseGoal && <Link href="/health-goals" className="mt-4 inline-flex min-h-10 items-center gap-2 rounded-xl bg-[#0b2d54] px-4 py-2.5 text-[10px] font-black text-white">Set a health goal <ArrowRight className="h-3.5 w-3.5" /></Link>}
       </div></main>
     </ProtectedRoute>
   );
