@@ -26,17 +26,22 @@ type SeedFormulation = {
 function parseSeedFormulations(): SeedFormulation[] {
   const seedPath = path.resolve(process.cwd(), 'prisma/seed.ts');
   const source = fs.readFileSync(seedPath, 'utf8');
+
   const startMarker = 'const medications: SeedMedication[] = [';
-  const endMarker = '\n];\n\n/*\n|--------------------------------------------------------------------------\n| UPSERT MEDICATIONS';
   const start = source.indexOf(startMarker);
-  const end = source.indexOf(endMarker, start);
+  const end = source.indexOf('];', start);
 
   if (start < 0 || end < 0) {
-    throw new Error('Could not locate the medication reference data in prisma/seed.ts.');
+    throw new Error(
+      'Could not locate the medication reference data in prisma/seed.ts.',
+    );
   }
 
   const section = source.slice(start + startMarker.length, end);
   const formulations: SeedFormulation[] = [];
+
+  // Medication reference entries are plain object literals in seed.ts.
+  // Read the four fields that are authoritative for MedicationStrength.
   const objectPattern = /\{([\s\S]*?)\n\s*\},/g;
 
   for (const match of section.matchAll(objectPattern)) {
@@ -47,12 +52,19 @@ function parseSeedFormulations(): SeedFormulation[] {
     const route = block.match(/route:\s*'([^']+)'/)?.[1];
 
     if (name && dosageForm && route) {
-      formulations.push({ name, strength, dosageForm, route });
+      formulations.push({
+        name,
+        strength,
+        dosageForm,
+        route,
+      });
     }
   }
 
   if (!formulations.length) {
-    throw new Error('No medication formulations were found in prisma/seed.ts.');
+    throw new Error(
+      'No medication formulations were found in prisma/seed.ts.',
+    );
   }
 
   return formulations;
@@ -62,13 +74,18 @@ async function main() {
   const formulations = parseSeedFormulations();
   let created = 0;
   let restored = 0;
+  let repaired = 0;
   let skipped = 0;
 
   for (const formulation of formulations) {
     const medication = await prisma.medication.findFirst({
       where: {
-        name: { equals: formulation.name, mode: 'insensitive' },
+        name: {
+          equals: formulation.name,
+          mode: 'insensitive',
+        },
       },
+      orderBy: { active: 'desc' },
       select: { id: true, name: true },
     });
 
@@ -77,13 +94,42 @@ async function main() {
       continue;
     }
 
-    const strength = formulation.strength || 'Unspecified';
+    // Every seeded medication has a route/form. A missing strength is still
+    // a valid reference formulation, so keep it as an explicit placeholder
+    // instead of dropping the entire MedicationStrength row.
+    const strength = formulation.strength?.trim() || 'Unspecified';
+    const dosageForm = formulation.dosageForm.trim();
+    const route = formulation.route.trim();
+
+    // First repair an existing row with the same medication/strength/form
+    // whose route was previously left empty by legacy seed data.
+    const incomplete = await prisma.medicationStrength.findFirst({
+      where: {
+        medicationId: medication.id,
+        strength,
+        dosageForm,
+        OR: [{ route: null }, { route: '' }],
+      },
+    });
+
+    if (incomplete) {
+      await prisma.medicationStrength.update({
+        where: { id: incomplete.id },
+        data: {
+          route,
+          active: true,
+        },
+      });
+      repaired++;
+      continue;
+    }
+
     const existing = await prisma.medicationStrength.findFirst({
       where: {
         medicationId: medication.id,
         strength,
-        dosageForm: formulation.dosageForm,
-        route: formulation.route,
+        dosageForm,
+        route,
       },
     });
 
@@ -102,16 +148,20 @@ async function main() {
       data: {
         medicationId: medication.id,
         strength,
-        dosageForm: formulation.dosageForm,
-        route: formulation.route,
+        dosageForm,
+        route,
         active: true,
       },
     });
     created++;
   }
 
-  console.log(`Medication formulation backfill complete: ${formulations.length} seed records checked.`);
-  console.log(`Created: ${created}; restored: ${restored}; skipped: ${skipped}`);
+  console.log(
+    `Medication formulation backfill complete: ${formulations.length} seed records checked.`,
+  );
+  console.log(
+    `Created: ${created}; repaired: ${repaired}; restored: ${restored}; skipped: ${skipped}`,
+  );
 }
 
 main()
