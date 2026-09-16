@@ -44,18 +44,37 @@ async function main() {
   }
 
   for (const symptom of SYMPTOM_REFERENCE) {
-    await prisma.$executeRawUnsafe(
-      `INSERT INTO "symptom_reference" ("id", "name", "category", "synonyms", "active")
-       VALUES (gen_random_uuid()::text, $1, $2, $3::jsonb, TRUE)
-       ON CONFLICT ("name") DO UPDATE
-       SET "category" = EXCLUDED."category",
-           "synonyms" = EXCLUDED."synonyms",
-           "active" = TRUE,
-           "updated_at" = NOW()`,
-      symptom.name,
-      symptom.category,
-      JSON.stringify(symptom.synonyms ?? []),
-    );
+    const description = symptom.synonyms?.length
+      ? `Also known as: ${symptom.synonyms.join(', ')}`
+      : undefined;
+
+    const existing = await prisma.symptom.findFirst({
+      where: { name: symptom.name },
+    });
+
+    if (existing) {
+      await prisma.symptom.update({
+        where: { id: existing.id },
+        data: {
+          category: symptom.category,
+          bodySystem: symptom.category,
+          description,
+          searchable: true,
+          active: true,
+        },
+      });
+    } else {
+      await prisma.symptom.create({
+        data: {
+          name: symptom.name,
+          category: symptom.category,
+          bodySystem: symptom.category,
+          description,
+          searchable: true,
+          active: true,
+        },
+      });
+    }
   }
 
   console.log(
