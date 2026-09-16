@@ -70,6 +70,81 @@ export class PatientMedicationsService {
     return patientMedication;
   }
 
+  async getClinicalReference(id: string, authenticatedUserId: string) {
+    const patientMedication = await this.findOne(id);
+    const ownerUserId = patientMedication.healthPassport.patient.userId;
+    if (!authenticatedUserId || ownerUserId !== authenticatedUserId) {
+      throw new NotFoundException('Patient medication not found.');
+    }
+
+    type ClinicalReferenceRow = {
+      id: string;
+      relationType: string;
+      evidenceLevel: string | null;
+      source: string | null;
+      notes: string | null;
+      symptomId: string;
+      symptomName: string;
+      symptomDescription: string | null;
+      symptomCategory: string | null;
+      symptomBodySystem: string | null;
+    };
+
+    const rows = await this.prisma.$queryRaw<ClinicalReferenceRow[]>`
+      SELECT
+        r."id" AS "id",
+        r."relationType" AS "relationType",
+        r."evidenceLevel" AS "evidenceLevel",
+        r."source" AS "source",
+        r."notes" AS "notes",
+        s."id" AS "symptomId",
+        s."name" AS "symptomName",
+        s."description" AS "symptomDescription",
+        s."category" AS "symptomCategory",
+        s."bodySystem" AS "symptomBodySystem"
+      FROM "MedicationClinicalReference" r
+      INNER JOIN "Symptom" s ON s."id" = r."symptomId"
+      WHERE r."medicationId" = ${patientMedication.medicationId}
+        AND r."active" = true
+        AND s."active" = true
+      ORDER BY r."relationType" ASC, s."name" ASC
+    `;
+
+    const grouped = {
+      sideEffects: rows.filter((row) => row.relationType === 'SIDE_EFFECT'),
+      relievesSymptoms: rows.filter((row) => row.relationType === 'RELIEVES_SYMPTOM'),
+      mayMaskSymptoms: rows.filter((row) => row.relationType === 'MAY_MASK_SYMPTOM'),
+    };
+
+    const mapSymptom = (row: ClinicalReferenceRow) => ({
+      id: row.symptomId,
+      name: row.symptomName,
+      description: row.symptomDescription,
+      category: row.symptomCategory,
+      bodySystem: row.symptomBodySystem,
+      evidenceLevel: row.evidenceLevel,
+      source: row.source,
+      notes: row.notes,
+    });
+
+    return {
+      medication: {
+        id: patientMedication.medication.id,
+        name: patientMedication.medication.name,
+        genericName: patientMedication.medication.genericName,
+        category: patientMedication.medication.category,
+      },
+      sideEffects: grouped.sideEffects.map(mapSymptom),
+      relievesSymptoms: grouped.relievesSymptoms.map(mapSymptom),
+      mayMaskSymptoms: grouped.mayMaskSymptoms.map(mapSymptom),
+      counts: {
+        sideEffects: grouped.sideEffects.length,
+        relievesSymptoms: grouped.relievesSymptoms.length,
+        mayMaskSymptoms: grouped.mayMaskSymptoms.length,
+      },
+    };
+  }
+
   async update(id: string, dto: UpdatePatientMedicationDto) {
     const existing = await this.findOne(id);
     const healthPassportId = dto.healthPassportId ?? existing.healthPassportId;
@@ -157,7 +232,7 @@ export class PatientMedicationsService {
           ("id", "patientId", "metricType", "metricKey", "loggedValue", "occurredAt", "source", "sourceId")
         VALUES
           (gen_random_uuid(), ${patientId}, 'MEDICATION', 'medication.adherence', ${adherencePercentage}, ${effectiveMeasuredAt}, ${source}, ${sourceId})
-      `;
+    `;
     }
 
     return { tracked: true, action: dto.action, scheduledFor: dto.scheduledFor ?? null, medication, adherencePercentage, missedDoses, affectedGoals: [] };
