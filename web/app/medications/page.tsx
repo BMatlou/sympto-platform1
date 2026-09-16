@@ -29,6 +29,7 @@ const EFFECTIVENESS = [["Helping", "Helping"], ["Helping a little", "Helping a l
 
 function medicationId(m: any) { return m?.patientMedicationId || m?.patientMedication?.id || m?.id || null; }
 function formatEnum(value: unknown) { if (!value) return "Not specified"; return String(value).toLowerCase().replace(/_/g, " ").replace(/\b\w/g, l => l.toUpperCase()); }
+function inferRouteFromDosageForm(value: unknown): string { const form = String(value || "").trim().toLowerCase(); if (!form) return ""; if (/tablet|caplet|capsule|pill|chewable|lozenge|troche|sublingual|buccal|oral|syrup|solution|suspension|powder|granule|elixir/.test(form)) return "ORAL"; if (/inhaler|inhalation|nebul|aerosol/.test(form)) return "INHALATION"; if (/injection|injectable|vial|ampoule|prefilled syringe/.test(form)) return "INJECTION"; if (/cream|ointment|gel|lotion|paste|topical|transdermal|patch/.test(form)) return "TOPICAL"; if (/ophthalmic|eye drop|ocular/.test(form)) return "OPHTHALMIC"; if (/otic|ear drop/.test(form)) return "OTIC"; return ""; }
 function toItem(m: any): MedicationItem | null {
   const id = medicationId(m); if (!id) return null;
   return { patientMedicationId: String(id), medicationId: String(m?.medicationId || m?.medication?.id || ""), dosage: m?.dosage, frequency: m?.frequency, route: m?.route, indication: m?.indication, instructions: m?.instructions, prescribedBy: m?.prescribedBy, startedAt: m?.startedAt, endedAt: m?.endedAt, ongoing: m?.ongoing ?? (m?.status ? m.status === "ACTIVE" : true), adherencePercentage: m?.adherencePercentage, missedDoses: m?.missedDoses, sideEffects: m?.sideEffects, effectiveness: m?.effectiveness, status: m?.status, notes: m?.notes };
@@ -64,19 +65,10 @@ function MedicationForm({ value, onChange }: { value: MedicationItem; onChange: 
   const set = (key: keyof MedicationItem, val: any) => onChange({ ...value, [key]: val });
   const choose = (key: keyof MedicationItem, val: string) => { const other = val === "Other"; setCustom(c => ({ ...c, [String(key)]: other })); set(key, other ? "" : val); };
 
-  const strengths = useMemo(() => {
-    const rows = Array.isArray(selectedMedication?.strengths) ? selectedMedication.strengths : [];
-    return Array.from(new Set(rows.map((s: any) => String(s?.strength || "").trim()).filter(Boolean)));
-  }, [selectedMedication]);
-  const routesFromMedication = useMemo(() => {
-    const rows = Array.isArray(selectedMedication?.strengths) ? selectedMedication.strengths : [];
-    return Array.from(new Set(rows.map((s: any) => String(s?.route || "").trim().toUpperCase()).filter(Boolean)));
-  }, [selectedMedication]);
-  const dosageForms = useMemo(() => {
-    const rows = Array.isArray(selectedMedication?.strengths) ? selectedMedication.strengths : [];
-    return Array.from(new Set(rows.map((s: any) => String(s?.dosageForm || "").trim()).filter(Boolean)));
-  }, [selectedMedication]);
-  const knownRoute = routesFromMedication.length === 1 ? routesFromMedication[0] : "";
+  const strengths = useMemo(() => { const rows = Array.isArray(selectedMedication?.strengths) ? selectedMedication.strengths : []; return Array.from(new Set(rows.map((s: any) => String(s?.strength || "").trim()).filter(Boolean))); }, [selectedMedication]);
+  const routeCandidates = useMemo(() => { const rows = Array.isArray(selectedMedication?.strengths) ? selectedMedication.strengths : []; return Array.from(new Set(rows.map((s: any) => String(s?.route || "").trim().toUpperCase() || inferRouteFromDosageForm(s?.dosageForm)).filter(Boolean))); }, [selectedMedication]);
+  const dosageForms = useMemo(() => { const rows = Array.isArray(selectedMedication?.strengths) ? selectedMedication.strengths : []; return Array.from(new Set(rows.map((s: any) => String(s?.dosageForm || "").trim()).filter(Boolean))); }, [selectedMedication]);
+  const knownRoute = routeCandidates.length === 1 ? routeCandidates[0] : "";
   const routeLabel = knownRoute ? formatEnum(knownRoute) : "";
   const doseOptions = strengths.length ? [...strengths, "Other"] : DOSES;
   const routeIsKnown = Boolean(knownRoute);
@@ -92,19 +84,19 @@ function MedicationForm({ value, onChange }: { value: MedicationItem; onChange: 
         {results.length > 0 && !value.medicationId && <div className="mt-2 overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-xl shadow-slate-200/40">{results.map(r => <button key={r.id} type="button" onClick={() => {
           const strengthsForMedication = Array.isArray(r?.strengths) ? r.strengths : [];
           const uniqueStrengths = Array.from(new Set(strengthsForMedication.map((s: any) => String(s?.strength || "").trim()).filter(Boolean)));
-          const uniqueRoutes = Array.from(new Set(strengthsForMedication.map((s: any) => String(s?.route || "").trim().toUpperCase()).filter(Boolean)));
+          const uniqueRoutes = Array.from(new Set(strengthsForMedication.map((s: any) => String(s?.route || "").trim().toUpperCase() || inferRouteFromDosageForm(s?.dosageForm)).filter(Boolean)));
           const autoRoute = uniqueRoutes.length === 1 ? uniqueRoutes[0] : "";
           setSelectedName(String(r.name)); setSearch(String(r.name)); setResults([]); setSelectedMedication(r);
           onChange({ ...value, medicationId: String(r.id), dosage: uniqueStrengths.length === 1 ? uniqueStrengths[0] : "", route: autoRoute });
         }} className="flex w-full items-center justify-between border-b border-slate-100 px-4 py-3.5 text-left last:border-0 hover:bg-[#24c1c4]/5"><span><span className="block text-sm font-semibold text-[#0b2d54]">{r.name}</span>{r.genericName && <span className="text-xs text-slate-500">{r.genericName}</span>}</span><Plus className="h-4 w-4 text-[#24c1c4]" /></button>)}</div>}
-        {value.medicationId && <div className="mt-4 rounded-2xl border border-[#24c1c4]/15 bg-white p-4 shadow-sm"><div className="flex items-start gap-3"><span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-[#24c1c4]/10 text-[#0b2d54]"><Check className="h-4 w-4" /></span><div className="min-w-0"><p className="text-sm font-bold text-[#0b2d54]">Sympto recognised your medicine</p><p className="mt-1 text-xs leading-5 text-slate-500">{selectedMedication?.genericName ? `${selectedMedication.genericName} · ` : ""}{dosageForms.length ? dosageForms.join(" / ") : "Medication details loaded"}{routeIsKnown ? ` · ${routeLabel}` : ""}</p>{routeIsKnown && <p className="mt-2 text-[11px] font-semibold text-emerald-700">✓ Route pre-filled from the medication data</p>}</div></div></div>}</Field>
+        {value.medicationId && <div className="mt-4 rounded-2xl border border-[#24c1c4]/15 bg-white p-4 shadow-sm"><div className="flex items-start gap-3"><span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-[#24c1c4]/10 text-[#0b2d54]"><Check className="h-4 w-4" /></span><div className="min-w-0"><p className="text-sm font-bold text-[#0b2d54]">Sympto recognised your medicine</p><p className="mt-1 text-xs leading-5 text-slate-500">{selectedMedication?.genericName ? `${selectedMedication.genericName} · ` : ""}{dosageForms.length ? dosageForms.join(" / ") : "Medication details loaded"}{routeIsKnown ? ` · ${routeLabel}` : ""}</p>{routeIsKnown && <p className="mt-2 text-[11px] font-semibold text-emerald-700">✓ Route recognised from medication formulation</p>}</div></div></div>}</Field>
       </div>
-      <div className="grid gap-4 sm:grid-cols-3">
+      <div className="grid gap-4 sm:grid-cols-2">
         <Field label="Dose" hint={strengths.length ? "Using the strengths available for this medicine." : undefined}><Select value={custom.dosage ? "Other" : value.dosage || ""} onChange={v => choose("dosage", v)} options={doseOptions} placeholder="Select dose" />{custom.dosage && <div className="mt-2"><TextInput value={value.dosage || ""} onChange={v => set("dosage", v)} placeholder="e.g. 125 mg" /></div>}</Field>
         <Field label="Frequency"><Select value={value.frequency || ""} onChange={v => set("frequency", v)} options={FREQUENCIES} placeholder="How often?" /></Field>
-        <Field label="Route" hint={routeIsKnown ? "Sympto found this from the selected medication." : "Choose how you take this formulation."}><Select disabled={routeIsKnown} value={value.route || ""} onChange={v => set("route", v)} options={ROUTES} placeholder="How do you take it?" /></Field>
       </div>
-      {routeIsKnown && <div className="flex items-center gap-2 rounded-2xl bg-[#0b2d54]/[0.03] px-4 py-3 text-xs text-slate-500"><ShieldCheck className="h-4 w-4 text-[#24c1c4]" /><span><b className="text-[#0b2d54]">Smart default:</b> Sympto is using the route stored for this medication formulation instead of making you enter it.</span></div>}
+      {!routeIsKnown && <Field label="Route" hint="Choose how you take this formulation."><Select value={value.route || ""} onChange={v => set("route", v)} options={ROUTES} placeholder="How do you take it?" /></Field>}
+      {routeIsKnown && <div className="flex items-center gap-3 rounded-2xl border border-[#24c1c4]/15 bg-[#0b2d54]/[0.03] px-4 py-3"><ShieldCheck className="h-4 w-4 shrink-0 text-[#24c1c4]" /><div className="text-xs text-slate-500"><b className="text-[#0b2d54]">Taken {routeLabel.toLowerCase()}</b> · Sympto recognised this from the medication formulation, so you don't need to enter it.</div></div>}
     </div>}
 
     {step === 2 && <div className="grid gap-5 sm:grid-cols-2 animate-in fade-in slide-in-from-right-2 duration-300">
