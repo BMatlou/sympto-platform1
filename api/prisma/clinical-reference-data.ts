@@ -29,8 +29,6 @@ export const SYMPTOM_REFERENCE: ClinicalReferenceEntry[] = [
   ].map(([category,name,synonyms]) => ({ category: category as string, name: name as string, synonyms: (synonyms as string[] | undefined) ?? [] }))
 ];
 
-/** Existing condition reference should remain diagnosis-oriented. These are
- * additional common conditions to complement the existing seed list. */
 export const ADDITIONAL_CONDITIONS = [
   'Allergic rhinitis','Anaphylaxis','Atopic dermatitis','Eczema','Psoriasis','Acne','Rosacea','Urticaria',
   'Gastroesophageal reflux disease','Irritable bowel syndrome','Inflammatory bowel disease','Crohn disease','Ulcerative colitis','Peptic ulcer disease','Gallstones','Fatty liver disease','Hepatitis','Celiac disease','Hemorrhoids',
@@ -72,6 +70,11 @@ export const MEDICATION_CLINICAL_REFERENCE = {
     relieves: ['Headache','Fever','Muscle pain','Joint pain','Toothache'],
     sideEffects: ['Nausea','Skin rash','Itching'],
     watch: ['Yellow skin','Dark urine','Skin rash','Swelling','Difficulty breathing']
+  },
+  Aspirin: {
+    relieves: ['Headache','Fever','Muscle pain','Joint pain'],
+    sideEffects: ['Nausea','Abdominal pain','Heartburn','Easy bruising','Easy bleeding'],
+    watch: ['Black stool','Vomiting blood','Swelling','Difficulty breathing','Severe skin rash']
   },
   Ibuprofen: {
     relieves: ['Headache','Fever','Muscle pain','Joint pain','Menstrual pain'],
