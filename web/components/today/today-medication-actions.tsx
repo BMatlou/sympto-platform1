@@ -40,7 +40,7 @@ function patientMedicationId(medication: any) {
 }
 
 function errorMessage(error: unknown) {
-  const message = (error as { response?: { data?: { message?: string | string[] } } })?.response?.data?.message;
+  const message = (error as { response?: { data?: { message?: string | string[] } })?.response?.data?.message;
   if (Array.isArray(message)) return message.join(" ");
   if (message) return message;
   return "We could not update this medication. Please try again.";
@@ -107,6 +107,29 @@ export default function TodayMedicationActions({ medications, goal: suppliedGoal
   const [states, setStates] = useState<Record<string, Action | undefined>>({});
 
   const trackedMedication = medications[0] ?? null;
+  const medication = trackedMedication;
+  const activeMedicationGoals = suppliedGoal ? [suppliedGoal] : [];
+
+  // 🔍 Hybrid Predicate resolving schema drift for existing user goals
+  const exactMatch = activeMedicationGoals.find((goal: any) => {
+    if (!goal || String(goal.status).toUpperCase() === 'ARCHIVED') return false;
+
+    // 1. Direct Canonical ID Check
+    const targetMedicationId = medication.patientMedicationId ?? medication.id;
+    const matchesIdDirectly = goal.patientMedicationId === targetMedicationId;
+    
+    if (matchesIdDirectly) return true;
+
+    // 2. Legacy / Onboarding Fallback: Match our primary chronic track (Metformin) 
+    // if the goal has a generic title and lacks a specific foreign key assignment
+    const isMedicationGoal = goal.metricType === 'MEDICATION' || goal.category === 'MEDICATION' || goal.title?.toLowerCase() === 'manage medication';
+    const isPrimaryMetforminScript = medication.name?.toLowerCase().includes('metformin');
+    const isGoalUnlinked = !goal.patientMedicationId;
+
+    return isMedicationGoal && isPrimaryMetforminScript && isGoalUnlinked;
+  });
+
+  const finalGoal = exactMatch;
   const medicationId = patientMedicationId(trackedMedication);
   const frequency = medicationFrequency(trackedMedication);
   const totalRequiredDosesPerDay = requiredDosesForFrequency(frequency);
@@ -131,7 +154,7 @@ export default function TodayMedicationActions({ medications, goal: suppliedGoal
   }, [medications.length, totalRequiredDosesPerDay]);
 
   const doseLabel = useMemo(() => (totalRequiredDosesPerDay === 1 ? "1 dose" : `${totalRequiredDosesPerDay} doses`), [totalRequiredDosesPerDay]);
-  const { journeyDay, daysLeft } = journeyProgress(suppliedGoal);
+  const { journeyDay, daysLeft } = journeyProgress(finalGoal);
   const medicationAnchorId = `medication-adherence-card-${String(medicationId ?? "unassigned")}`;
   const ringSize = 96;
   const ringStroke = 9;
@@ -166,12 +189,10 @@ export default function TodayMedicationActions({ medications, goal: suppliedGoal
     }
   }
 
-  if (!trackedMedication || !isValidMedicationGoal(suppliedGoal)) {
-    return null;
-  }
+  if (!finalGoal) return null;
 
-  const goalTitle = suppliedGoal?.title || `${medicationName(trackedMedication)} adherence`;
-  const targetAdherence = Number(suppliedGoal?.targetValue) || 90;
+  const goalTitle = finalGoal?.title || `${medicationName(trackedMedication)} adherence`;
+  const targetAdherence = Number(finalGoal?.targetValue) || 90;
   const scheduledGoalDoses = Math.max(0, Math.ceil((daysLeft !== null ? daysLeft + journeyDay - 1 : 30) * totalRequiredDosesPerDay));
   const targetDoseCount = Math.ceil((scheduledGoalDoses * targetAdherence) / 100);
   const takenDosesSoFar = cumulativeTakenDoses(trackedMedication);
