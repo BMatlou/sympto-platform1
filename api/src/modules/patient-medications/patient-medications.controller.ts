@@ -86,6 +86,20 @@ export class PatientMedicationsController {
   }
 
   @Permissions('patient-medication.read')
+  @Get(':id/clinical-reference')
+  getClinicalReference(
+    @Param('id') id: string,
+    @Req() request: AuthenticatedRequest,
+  ) {
+    const authenticatedUserId = request.user?.sub ?? request.user?.id ?? '';
+
+    return this.patientMedicationsService.getClinicalReference(
+      id,
+      authenticatedUserId,
+    );
+  }
+
+  @Permissions('patient-medication.read')
   @Get(':id')
   findOne(@Param('id') id: string) {
     return this.patientMedicationsService.findOne(id);
