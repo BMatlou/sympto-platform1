@@ -105,29 +105,25 @@ export default function TodayMedicationActions({ medications, goal: suppliedGoal
   };
   const activeMedicationGoals = suppliedGoal ? [suppliedGoal] : [];
 
-  // 🔍 Overwrite the goal evaluation loop inside the component file:
   const finalGoal = activeMedicationGoals.find((goal: any) => {
     if (!goal) return false;
 
-    // 1. Accept BOTH 'ACTIVE' and 'IN_PROGRESS' database status enums to bypass string filtering blocks
-    const isGoalLive = 
-      String(goal.status).toUpperCase() === 'ACTIVE' || 
-      String(goal.status).toUpperCase() === 'IN_PROGRESS';
-      
+    const isGoalLive =
+      String(goal.status).toUpperCase() === "ACTIVE" ||
+      String(goal.status).toUpperCase() === "IN_PROGRESS";
+
     if (!isGoalLive) return false;
 
-    // 2. Direct Canonical ID Check
     const targetMedicationId = medication.patientMedicationId ?? medication.id;
     const matchesIdDirectly = goal.patientMedicationId === targetMedicationId;
     if (matchesIdDirectly) return true;
 
-    // 3. Hybrid String-Matching Fallback for existing user goals
-    const isMedicationGoal = 
-      goal.metricType === 'MEDICATION' || 
-      goal.category === 'MEDICATION' || 
-      goal.title?.toLowerCase() === 'manage medication';
-      
-    const isPrimaryMetforminScript = medication.name?.toLowerCase().includes('metformin');
+    const isMedicationGoal =
+      goal.metricType === "MEDICATION" ||
+      goal.category === "MEDICATION" ||
+      goal.title?.toLowerCase() === "manage medication";
+
+    const isPrimaryMetforminScript = medication.name?.toLowerCase().includes("metformin");
     const isGoalUnlinked = !goal.patientMedicationId;
 
     return isMedicationGoal && isPrimaryMetforminScript && isGoalUnlinked;
@@ -136,7 +132,12 @@ export default function TodayMedicationActions({ medications, goal: suppliedGoal
   const medicationId = patientMedicationId(trackedMedication);
   const frequency = medicationFrequency(trackedMedication);
   const totalRequiredDosesPerDay = requiredDosesForFrequency(frequency);
-  const percent = totalRequiredDosesPerDay > 0 ? Math.min(100, Math.round((dosesLoggedToday / totalRequiredDosesPerDay) * 100)) : 0;
+  const safeDosesLoggedToday = Number.isFinite(Number(dosesLoggedToday))
+    ? Math.max(0, Number(dosesLoggedToday))
+    : 0;
+  const percent = totalRequiredDosesPerDay > 0
+    ? Math.min(100, Math.max(0, Math.round((safeDosesLoggedToday / totalRequiredDosesPerDay) * 100)))
+    : 0;
 
   async function loadTodayEvents() {
     if (!medications.length) {
@@ -146,7 +147,8 @@ export default function TodayMedicationActions({ medications, goal: suppliedGoal
     try {
       const { start, end } = todayBounds();
       const result = await healthGoalsService.getMetricEvents("MEDICATION", "medication.adherence", start, end, "medication-adherence");
-      setDosesLoggedToday(Math.min(totalRequiredDosesPerDay, result.count));
+      const eventCount = Number(result?.count);
+      setDosesLoggedToday(Number.isFinite(eventCount) ? Math.min(totalRequiredDosesPerDay, Math.max(0, eventCount)) : 0);
     } catch {
       // Keep the current UI if event history cannot be loaded.
     }
@@ -158,9 +160,8 @@ export default function TodayMedicationActions({ medications, goal: suppliedGoal
 
   const doseLabel = useMemo(() => (totalRequiredDosesPerDay === 1 ? "1 dose" : `${totalRequiredDosesPerDay} doses`), [totalRequiredDosesPerDay]);
 
-  // 4. Strict Display Guard Checklist
   if (!finalGoal) {
-    return null; // Keeps untracked scripts safely hidden
+    return null;
   }
 
   const { journeyDay, daysLeft } = journeyProgress(finalGoal);
@@ -169,10 +170,10 @@ export default function TodayMedicationActions({ medications, goal: suppliedGoal
   const ringStroke = 9;
   const radius = (ringSize - ringStroke) / 2;
   const circumference = 2 * Math.PI * radius;
-  const dashOffset = circumference * (1 - percent / 100);
+  const dashOffset = Number.isFinite(percent) ? circumference * (1 - percent / 100) : circumference;
 
   async function record(medication: any, action: Action) {
-    if (dosesLoggedToday >= totalRequiredDosesPerDay || isSyncing) return;
+    if (safeDosesLoggedToday >= totalRequiredDosesPerDay || isSyncing) return;
     const id = patientMedicationId(medication);
     if (!id) {
       toast.error("Medication record is incomplete", { description: "This medicine does not have a patient medication record ID." });
@@ -199,7 +200,8 @@ export default function TodayMedicationActions({ medications, goal: suppliedGoal
   }
 
   const goalTitle = finalGoal?.title || `${medicationName(trackedMedication)} adherence`;
-  const targetAdherence = Number(finalGoal?.targetValue) || 90;
+  const rawTargetAdherence = Number(finalGoal?.targetValue);
+  const targetAdherence = Number.isFinite(rawTargetAdherence) && rawTargetAdherence > 0 ? rawTargetAdherence : 90;
   const scheduledGoalDoses = Math.max(0, Math.ceil((daysLeft !== null ? daysLeft + journeyDay - 1 : 30) * totalRequiredDosesPerDay));
   const targetDoseCount = Math.ceil((scheduledGoalDoses * targetAdherence) / 100);
   const takenDosesSoFar = cumulativeTakenDoses(trackedMedication);
@@ -210,9 +212,9 @@ export default function TodayMedicationActions({ medications, goal: suppliedGoal
     <section id={medicationAnchorId} className={cardClass}>
       <header className="flex items-center justify-between gap-3 px-4 pb-3 pt-4 sm:px-5 sm:pt-5"><div className="flex min-w-0 items-center gap-2.5"><span className="grid h-9 w-9 shrink-0 place-items-center rounded-[13px] bg-[#e8f8f7] text-[#24c1c4] ring-1 ring-[#d3efed]"><Pill className="h-4 w-4" /></span><div className="min-w-0"><p className="text-[8px] font-black uppercase tracking-[.16em] text-[#0b7b80]">Medication</p><h3 className="truncate text-sm font-black tracking-[-.035em] text-[#0b2d54]">{goalTitle}</h3></div></div><div className="shrink-0 text-right"><p className="text-sm font-black text-[#0b2d54]">{doseLabel}</p><p className="mt-0.5 text-[8px] font-bold uppercase tracking-[.11em] text-[#8a99a6]">{percent}% today</p></div></header>
 
-      <div className="mx-3.5 mb-3.5 rounded-[22px] bg-[#0b2d54] px-4 py-4 text-white shadow-[0_12px_28px_rgba(11,45,84,.14)] sm:mx-4 sm:mb-4 sm:px-5 sm:py-4"><div className="flex items-center gap-4 sm:gap-5"><div className="relative shrink-0" style={{ width: ringSize, height: ringSize }}><svg width={ringSize} height={ringSize} viewBox={`0 0 ${ringSize} ${ringSize}`} className="-rotate-90"><circle cx={ringSize / 2} cy={ringSize / 2} r={radius} fill="none" stroke="rgba(255,255,255,.10)" strokeWidth={ringStroke} /><circle cx={ringSize / 2} cy={ringSize / 2} r={radius} fill="none" stroke="#24c1c4" strokeWidth={ringStroke} strokeLinecap="round" strokeDasharray={circumference} strokeDashoffset={dashOffset} /></svg><div className="absolute inset-0 grid place-items-center text-center"><p className="text-3xl font-black leading-none tracking-[-.07em]">{dosesLoggedToday}</p></div></div><div className="min-w-0 flex-1"><p className="text-[8px] font-black uppercase tracking-[.15em] text-white/45">Today’s medication</p><p className="mt-1 truncate text-lg font-black tracking-[-.045em]">{medicationName(trackedMedication)}</p><p className="mt-1 text-[10px] font-semibold uppercase tracking-[.08em] text-white/55">{medicationSchedule(trackedMedication)}</p><div className="mt-2.5 flex flex-wrap items-center gap-2"><span className="rounded-full bg-white/10 px-2.5 py-1 text-[8px] font-black text-white/75 ring-1 ring-white/10">{dosesLoggedToday}/{totalRequiredDosesPerDay} doses today</span><span className="rounded-full bg-white/10 px-2.5 py-1 text-[8px] font-black text-[#b8ffff] ring-1 ring-white/10">{percent}% today</span></div></div></div><div className="mt-3.5 border-t border-white/10 pt-3"><div className="flex items-center justify-between gap-3"><p className="text-[9px] font-semibold text-white/60">{dosesLoggedToday >= totalRequiredDosesPerDay ? "All scheduled doses logged today." : `${totalRequiredDosesPerDay - dosesLoggedToday} dose${totalRequiredDosesPerDay - dosesLoggedToday === 1 ? "" : "s"} left to log today.`}</p><p className="text-[9px] font-black text-white/75">{Math.max(0, totalRequiredDosesPerDay - dosesLoggedToday)} left today</p></div></div></div>
+      <div className="mx-3.5 mb-3.5 rounded-[22px] bg-[#0b2d54] px-4 py-4 text-white shadow-[0_12px_28px_rgba(11,45,84,.14)] sm:mx-4 sm:mb-4 sm:px-5 sm:py-4"><div className="flex items-center gap-4 sm:gap-5"><div className="relative shrink-0" style={{ width: ringSize, height: ringSize }}><svg width={ringSize} height={ringSize} viewBox={`0 0 ${ringSize} ${ringSize}`} className="-rotate-90"><circle cx={ringSize / 2} cy={ringSize / 2} r={radius} fill="none" stroke="rgba(255,255,255,.10)" strokeWidth={ringStroke} /><circle cx={ringSize / 2} cy={ringSize / 2} r={radius} fill="none" stroke="#24c1c4" strokeWidth={ringStroke} strokeLinecap="round" strokeDasharray={circumference} strokeDashoffset={dashOffset} /></svg><div className="absolute inset-0 grid place-items-center text-center"><p className="text-3xl font-black leading-none tracking-[-.07em]">{safeDosesLoggedToday}</p></div></div><div className="min-w-0 flex-1"><p className="text-[8px] font-black uppercase tracking-[.15em] text-white/45">Today’s medication</p><p className="mt-1 truncate text-lg font-black tracking-[-.045em]">{medicationName(trackedMedication)}</p><p className="mt-1 text-[10px] font-semibold uppercase tracking-[.08em] text-white/55">{medicationSchedule(trackedMedication)}</p><div className="mt-2.5 flex flex-wrap items-center gap-2"><span className="rounded-full bg-white/10 px-2.5 py-1 text-[8px] font-black text-white/75 ring-1 ring-white/10">{safeDosesLoggedToday}/{totalRequiredDosesPerDay} doses today</span><span className="rounded-full bg-white/10 px-2.5 py-1 text-[8px] font-black text-[#b8ffff] ring-1 ring-white/10">{percent}% today</span></div></div></div><div className="mt-3.5 border-t border-white/10 pt-3"><div className="flex items-center justify-between gap-3"><p className="text-[9px] font-semibold text-white/60">{safeDosesLoggedToday >= totalRequiredDosesPerDay ? "All scheduled doses logged today." : `${totalRequiredDosesPerDay - safeDosesLoggedToday} dose${totalRequiredDosesPerDay - safeDosesLoggedToday === 1 ? "" : "s"} left to log today.`}</p><p className="text-[9px] font-black text-white/75">{Math.max(0, totalRequiredDosesPerDay - safeDosesLoggedToday)} left today</p></div></div></div>
 
-      <div className="border-t border-[#edf2f5] px-4 py-3.5 sm:px-5"><div className="mb-3 flex flex-wrap items-center justify-between gap-2"><div><p className="text-[8px] font-black uppercase tracking-[.14em] text-[#91a0ae]">Goal journey</p><p className="mt-0.5 text-[11px] font-black text-[#0b2d54]">Day {journeyDay}{daysLeft !== null ? ` · ${daysLeft} day${daysLeft === 1 ? "" : "s"} left` : ""}</p></div><div className="text-right"><p className="text-[10px] font-black text-[#0b7b80]">{targetAdherence}% adherence goal</p><p className="mt-0.5 text-[9px] font-semibold text-[#91a0ae]">Take at least {targetAdherence}% of your scheduled doses to reach this goal.</p></div></div><div className="mb-3 h-2 overflow-hidden rounded-full bg-[#edf3f5]"><div className="h-full rounded-full bg-[#24c1c4] transition-all" style={{ width: `${percent}%` }} /></div><div className="mb-3 rounded-[14px] bg-[#f7fbfb] px-3.5 py-3 ring-1 ring-[#e1ecef]"><div className="flex items-center justify-between gap-3"><div><p className="text-[8px] font-black uppercase tracking-[.13em] text-[#91a0ae]">Doses needed for your goal</p><p className="mt-0.5 text-[13px] font-black text-[#0b2d54]">{dosesNeededForGoal} more dose{dosesNeededForGoal === 1 ? "" : "s"}</p></div><p className="text-right text-[9px] font-bold text-[#7c8e9b]">{takenDosesSoFar} taken so far</p></div></div><div className="flex items-center justify-between gap-3"><div><p className="text-[11px] font-bold text-[#7c8e9b]">Dose status</p><p className="mt-0.5 text-[10px] font-semibold text-[#9aa7b1]">{states[String(medicationId)] === "TAKEN" ? "Taken today" : states[String(medicationId)] === "SKIPPED" ? "Skipped today" : "Choose an action below"}</p></div><div className="grid w-[180px] grid-cols-2 gap-2"><button type="button" onClick={() => void record(trackedMedication, "TAKEN")} disabled={isSyncing || dosesLoggedToday >= totalRequiredDosesPerDay} className="inline-flex h-10 items-center justify-center gap-1.5 rounded-[13px] bg-[#24c1c4] px-3 text-[10px] font-black text-[#0b2d54] transition hover:brightness-105 disabled:cursor-not-allowed disabled:opacity-45"><Check className="h-3.5 w-3.5" />{savingKey === `${String(medicationId)}:TAKEN` ? "Saving" : "Taken"}</button><button type="button" onClick={() => void record(trackedMedication, "SKIPPED")} disabled={isSyncing || dosesLoggedToday >= totalRequiredDosesPerDay} className="inline-flex h-10 items-center justify-center gap-1.5 rounded-[13px] border border-[#dce7eb] bg-white px-3 text-[10px] font-black text-[#0b2d54] transition hover:bg-[#f7fbfb] disabled:cursor-not-allowed disabled:opacity-45"><CircleSlash2 className="h-3.5 w-3.5" />{savingKey === `${String(medicationId)}:SKIPPED` ? "Saving" : "Skipped"}</button></div></div></div>
+      <div className="border-t border-[#edf2f5] px-4 py-3.5 sm:px-5"><div className="mb-3 flex flex-wrap items-center justify-between gap-2"><div><p className="text-[8px] font-black uppercase tracking-[.14em] text-[#91a0ae]">Goal journey</p><p className="mt-0.5 text-[11px] font-black text-[#0b2d54]">Day {journeyDay}{daysLeft !== null ? ` · ${daysLeft} day${daysLeft === 1 ? "" : "s"} left` : ""}</p></div><div className="text-right"><p className="text-[10px] font-black text-[#0b7b80]">{targetAdherence}% adherence goal</p><p className="mt-0.5 text-[9px] font-semibold text-[#91a0ae]">Take at least {targetAdherence}% of your scheduled doses to reach this goal.</p></div></div><div className="mb-3 h-2 overflow-hidden rounded-full bg-[#edf3f5]"><div className="h-full rounded-full bg-[#24c1c4] transition-all" style={{ width: `${percent}%` }} /></div><div className="mb-3 rounded-[14px] bg-[#f7fbfb] px-3.5 py-3 ring-1 ring-[#e1ecef]"><div className="flex items-center justify-between gap-3"><div><p className="text-[8px] font-black uppercase tracking-[.13em] text-[#91a0ae]">Doses needed for your goal</p><p className="mt-0.5 text-[13px] font-black text-[#0b2d54]">{dosesNeededForGoal} more dose{dosesNeededForGoal === 1 ? "" : "s"}</p></div><p className="text-right text-[9px] font-bold text-[#7c8e9b]">{takenDosesSoFar} taken so far</p></div></div><div className="flex items-center justify-between gap-3"><div><p className="text-[11px] font-bold text-[#7c8e9b]">Dose status</p><p className="mt-0.5 text-[10px] font-semibold text-[#9aa7b1]">{states[String(medicationId)] === "TAKEN" ? "Taken today" : states[String(medicationId)] === "SKIPPED" ? "Skipped today" : "Choose an action below"}</p></div><div className="grid w-[180px] grid-cols-2 gap-2"><button type="button" onClick={() => void record(trackedMedication, "TAKEN")} disabled={isSyncing || safeDosesLoggedToday >= totalRequiredDosesPerDay} className="inline-flex h-10 items-center justify-center gap-1.5 rounded-[13px] bg-[#24c1c4] px-3 text-[10px] font-black text-[#0b2d54] transition hover:brightness-105 disabled:cursor-not-allowed disabled:opacity-45"><Check className="h-3.5 w-3.5" />{savingKey === `${String(medicationId)}:TAKEN` ? "Saving" : "Taken"}</button><button type="button" onClick={() => void record(trackedMedication, "SKIPPED")} disabled={isSyncing || safeDosesLoggedToday >= totalRequiredDosesPerDay} className="inline-flex h-10 items-center justify-center gap-1.5 rounded-[13px] border border-[#dce7eb] bg-white px-3 text-[10px] font-black text-[#0b2d54] transition hover:bg-[#f7fbfb] disabled:cursor-not-allowed disabled:opacity-45"><CircleSlash2 className="h-3.5 w-3.5" />{savingKey === `${String(medicationId)}:SKIPPED` ? "Saving" : "Skipped"}</button></div></div></div>
     </section>
   );
 }
