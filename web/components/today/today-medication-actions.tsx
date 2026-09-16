@@ -40,7 +40,7 @@ function patientMedicationId(medication: any) {
 }
 
 function errorMessage(error: unknown) {
-  const message = (error as { response?: { data?: { message?: string | string[] } })?.response?.data?.message;
+  const message = (error as { response?: { data?: { message?: string | string[] } } })?.response?.data?.message;
   if (Array.isArray(message)) return message.join(" ");
   if (message) return message;
   return "We could not update this medication. Please try again.";
