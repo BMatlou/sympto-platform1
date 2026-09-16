@@ -7,7 +7,7 @@ export default defineConfig({
 
   migrations: {
     path: 'prisma/migrations',
-    seed: 'tsx prisma/seed.ts && tsx prisma/ensure-patient-medication-permissions.ts && tsx prisma/ensure-medication-formulations.ts',
+    seed: 'tsx prisma/seed.ts && tsx prisma/seed-clinical-reference.ts && tsx prisma/ensure-patient-medication-permissions.ts',
   },
 
   datasource: {
