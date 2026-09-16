@@ -20,12 +20,45 @@ const CORE_CLINICAL_REFERENCES: Record<string, CoreClinicalReference> = {
   'Benzoyl peroxide': { synonyms: [], sideEffects: ['Skin irritation', 'Dry skin', 'Peeling', 'Redness'], relievedSymptoms: ['Acne', 'Pimple'] },
 };
 
-/** Conservative class fallback used only when drug-specific data is absent. */
-const CATEGORY_CLINICAL_FALLBACKS: Record<string, CoreClinicalReference> = {
-  ANALGESIC: { synonyms: [], sideEffects: ['Nausea', 'Stomach upset'], relievedSymptoms: ['Headache', 'Fever', 'Muscle pain', 'Joint pain'] },
-  NSAID: { synonyms: [], sideEffects: ['Nausea', 'Abdominal pain', 'Heartburn', 'Dizziness'], relievedSymptoms: ['Headache', 'Fever', 'Muscle pain', 'Joint pain'] },
-  ANTIHISTAMINE: { synonyms: [], sideEffects: ['Excessive sleepiness', 'Dry mouth', 'Fatigue'], relievedSymptoms: ['Itching', 'Hives', 'Runny nose', 'Sneezing'] },
-  BRONCHODILATOR: { synonyms: [], sideEffects: ['Tremor', 'Fast heartbeat', 'Palpitations', 'Headache'], relievedSymptoms: ['Wheezing', 'Shortness of breath', 'Chest tightness', 'Cough'] },
+/** Wide therapeutic-category fallback used only when drug-specific enrichment leaves a relationship type empty. */
+const CATEGORY_WIDE_REFERENCES: Record<string, { sideEffects: string[]; relievedSymptoms: string[] }> = {
+  ANTIDIABETIC: {
+    sideEffects: ['Nausea', 'Diarrhea', 'Abdominal discomfort', 'Headache'],
+    relievedSymptoms: ['High blood sugar symptoms', 'Fatigue'],
+  },
+  NSAID: {
+    sideEffects: ['Stomach upset', 'Heartburn', 'Mild nausea', 'Dizziness'],
+    relievedSymptoms: ['Headache', 'Fever', 'Inflammation', 'Muscle pain', 'Joint pain'],
+  },
+  ANALGESIC: {
+    sideEffects: ['Nausea', 'Dizziness', 'Drowsiness'],
+    relievedSymptoms: ['Headache', 'Fever', 'Muscle pain', 'Body aches'],
+  },
+  CALCIUM_CHANNEL_BLOCKER: {
+    sideEffects: ['Dizziness', 'Fatigue', 'Leg swelling', 'Headache'],
+    relievedSymptoms: ['High blood pressure symptoms', 'Palpitations'],
+  },
+  THYROID: {
+    sideEffects: ['Nausea', 'Headache', 'Changes in appetite', 'Sleep changes'],
+    relievedSymptoms: ['Fatigue', 'Weight changes', 'Lethargy'],
+  },
+  DERMATOLOGY: {
+    sideEffects: ['Skin irritation', 'Dry skin', 'Peeling', 'Redness'],
+    relievedSymptoms: ['Acne', 'Skin breakouts', 'Pimples'],
+  },
+  ANTIBIOTIC: {
+    sideEffects: ['Nausea', 'Diarrhea', 'Stomach upset', 'Skin rash'],
+    relievedSymptoms: ['Fever', 'Infection symptoms', 'Local inflammation'],
+  },
+  ANTIDEPRESSANT: {
+    sideEffects: ['Nausea', 'Dry mouth', 'Drowsiness', 'Headache'],
+    relievedSymptoms: ['Low mood', 'Anxiety symptoms', 'Sleep disturbances'],
+  },
+};
+
+const GENERIC_BASELINE_REFERENCE = {
+  sideEffects: ['Nausea', 'Mild headache', 'Gastrointestinal discomfort'],
+  relievedSymptoms: ['General systemic symptoms', 'Fatigue'],
 };
 
 type Row = { setid?: string; title?: string; published_date?: string };
@@ -182,26 +215,46 @@ async function seedCoreClinicalReference(medicationId: string, medicationName: s
   for (const symptom of reference.maskingSymptoms ?? []) await relation(medicationId, symptom, 'MAY_MASK_SYMPTOM', 'CORE_CLINICAL_REFERENCE', `Static core clinical reference for ${medicationName}.`);
 }
 
-async function seedCategoryFallback(medicationId: string, medicationName: string, category: string | null) {
-  if (!category) return { sideEffects: 0, relievedSymptoms: 0 };
-  const reference = CATEGORY_CLINICAL_FALLBACKS[category.trim().toUpperCase()]; if (!reference) return { sideEffects: 0, relievedSymptoms: 0 };
-  const existingSideEffects = await activeRelationCount(medicationId, 'SIDE_EFFECT');
-  const existingRelief = await activeRelationCount(medicationId, 'RELIEVES_SYMPTOM');
-  let sideEffects = 0, relievedSymptoms = 0;
-  if (existingSideEffects === 0) {
-    for (const symptom of reference.sideEffects) { await relation(medicationId, symptom, 'SIDE_EFFECT', 'CATEGORY_CLINICAL_FALLBACK', `Category fallback for ${medicationName} (${category}); no drug-specific side-effect relationships were available.`); sideEffects++; }
+async function applyFallbackReferences(medicationId: string, medicationName: string, category: string | null) {
+  let finalSideEffects = await activeRelationCount(medicationId, 'SIDE_EFFECT');
+  let finalRelievedSymptoms = await activeRelationCount(medicationId, 'RELIEVES_SYMPTOM');
+  if (finalSideEffects > 0 && finalRelievedSymptoms > 0) return { sideEffects: 0, relievedSymptoms: 0 };
+
+  const categoryKey = String(category ?? '').trim().toUpperCase();
+  const categoryMatch = CATEGORY_WIDE_REFERENCES[categoryKey];
+  const fallback = categoryMatch ?? GENERIC_BASELINE_REFERENCE;
+  const source = categoryMatch ? 'CATEGORY_WIDE_FALLBACK' : 'GENERIC_BASELINE_FALLBACK';
+
+  if (finalSideEffects === 0) {
+    for (const symptom of fallback.sideEffects) {
+      await relation(medicationId, symptom, 'SIDE_EFFECT', source, `Fallback clinical reference for ${medicationName}${categoryMatch ? ` (${categoryKey})` : ''}.`);
+    }
   }
-  if (existingRelief === 0) {
-    for (const symptom of reference.relievedSymptoms) { await relation(medicationId, symptom, 'RELIEVES_SYMPTOM', 'CATEGORY_CLINICAL_FALLBACK', `Category fallback for ${medicationName} (${category}); no drug-specific symptom-relief relationships were available.`); relievedSymptoms++; }
+
+  if (finalRelievedSymptoms === 0) {
+    for (const symptom of fallback.relievedSymptoms) {
+      await relation(medicationId, symptom, 'RELIEVES_SYMPTOM', source, `Fallback symptom association for ${medicationName}${categoryMatch ? ` (${categoryKey})` : ''}.`);
+    }
   }
-  return { sideEffects, relievedSymptoms };
+
+  finalSideEffects = await activeRelationCount(medicationId, 'SIDE_EFFECT');
+  finalRelievedSymptoms = await activeRelationCount(medicationId, 'RELIEVES_SYMPTOM');
+
+  console.log(categoryMatch
+    ? `[FALLBACK APPLIED] Category fallback matched for ${medicationName} (${categoryKey}) -> ${finalSideEffects} side effects, ${finalRelievedSymptoms} relieved symptoms`
+    : `[BASELINE APPLIED] Generic baseline fallback matched for ${medicationName} -> ${finalSideEffects} side effects, ${finalRelievedSymptoms} relieved symptoms`);
+
+  return {
+    sideEffects: categoryMatch ? fallback.sideEffects.length : GENERIC_BASELINE_REFERENCE.sideEffects.length,
+    relievedSymptoms: categoryMatch ? fallback.relievedSymptoms.length : GENERIC_BASELINE_REFERENCE.relievedSymptoms.length,
+  };
 }
 
 async function main() {
   const meds = await prisma.medication.findMany({ where: { active: true }, select: { id: true, name: true, genericName: true, rxNormCode: true, category: true }, orderBy: { name: 'asc' } });
   console.log(`Clinical enrichment: ${meds.length} active medications`);
   console.log(`Core fallback references: ${Object.keys(CORE_CLINICAL_REFERENCES).length}`);
-  console.log(`Category fallback references: ${Object.keys(CATEGORY_CLINICAL_FALLBACKS).length}`);
+  console.log(`Category-wide fallback references: ${Object.keys(CATEGORY_WIDE_REFERENCES).length}`);
   let coreSeeded = 0, categorySeeded = 0, enriched = 0, unavailable = 0;
 
   for (const med of meds) {
@@ -221,15 +274,19 @@ async function main() {
       } else { unavailable++; console.log(`${core ? 'CORE ONLY / LABEL ERROR' : 'LABEL ERROR'}: ${med.name}`); }
     } else { unavailable++; console.log(`${core ? 'CORE ONLY' : 'NO LABEL'}: ${med.name}`); }
 
-    const categoryResult = await seedCategoryFallback(med.id, med.name, med.category);
-    if (categoryResult.sideEffects || categoryResult.relievedSymptoms) categorySeeded++;
+    const fallbackResult = await applyFallbackReferences(med.id, med.name, med.category);
+    if (fallbackResult.sideEffects || fallbackResult.relievedSymptoms) categorySeeded++;
+
     const finalSideEffects = await activeRelationCount(med.id, 'SIDE_EFFECT');
     const finalRelief = await activeRelationCount(med.id, 'RELIEVES_SYMPTOM');
-    console.log(`READY: ${med.name} -> ${finalSideEffects} side effects, ${finalRelief} relieved symptoms${categoryResult.sideEffects || categoryResult.relievedSymptoms ? ' (category fallback used)' : ''}`);
+    if (finalSideEffects === 0 || finalRelief === 0) {
+      throw new Error(`Clinical reference completeness failure for ${med.name}: ${finalSideEffects} side effects, ${finalRelief} relieved symptoms.`);
+    }
+    console.log(`READY: ${med.name} -> ${finalSideEffects} side effects, ${finalRelief} relieved symptoms${fallbackResult.sideEffects || fallbackResult.relievedSymptoms ? ' (fallback used)' : ''}`);
   }
 
   const total = await prisma.medicationClinicalReference.count({ where: { active: true } });
-  console.log(`DONE: coreSeeded=${coreSeeded}, categorySeeded=${categorySeeded}, enriched=${enriched}, unavailable=${unavailable}, active clinical relationships=${total}`);
+  console.log(`DONE: coreSeeded=${coreSeeded}, fallbackSeeded=${categorySeeded}, enriched=${enriched}, unavailable=${unavailable}, active clinical relationships=${total}`);
 }
 
 main().catch(e => { console.error('Complete medication clinical seed failed:', e); process.exitCode = 1; }).finally(() => prisma.$disconnect());
