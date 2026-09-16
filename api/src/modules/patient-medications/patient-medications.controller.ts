@@ -40,20 +40,20 @@ export class PatientMedicationsController {
     private readonly patientMedicationsService: PatientMedicationsService,
   ) {}
 
-  @Permissions('patient-medication.create')
+  @Permissions('patient-medications.create')
   @Post()
   create(@Body() dto: CreatePatientMedicationDto) {
     return this.patientMedicationsService.create(dto);
   }
 
-  @Permissions('patient-medication.read')
+  @Permissions('patient-medications.read')
   @Get()
   findAll(@Query() query: QueryPatientMedicationDto) {
     return this.patientMedicationsService.findAll(query);
   }
 
   // Specific action routes are declared before the generic :id route.
-  @Permissions('patient-medication.update')
+  @Permissions('patient-medications.update')
   @Post(':id/adherence')
   recordAdherence(
     @Param('id') id: string,
@@ -69,7 +69,7 @@ export class PatientMedicationsController {
     );
   }
 
-  @Permissions('patient-medication.read')
+  @Permissions('patient-medications.read')
   @Post(':id/reminder')
   scheduleReminder(
     @Param('id') id: string,
@@ -85,7 +85,7 @@ export class PatientMedicationsController {
     );
   }
 
-  @Permissions('patient-medication.read')
+  @Permissions('patient-medications.read')
   @Get(':id/clinical-reference')
   getClinicalReference(
     @Param('id') id: string,
@@ -99,13 +99,13 @@ export class PatientMedicationsController {
     );
   }
 
-  @Permissions('patient-medication.read')
+  @Permissions('patient-medications.read')
   @Get(':id')
   findOne(@Param('id') id: string) {
     return this.patientMedicationsService.findOne(id);
   }
 
-  @Permissions('patient-medication.update')
+  @Permissions('patient-medications.update')
   @Patch(':id')
   update(
     @Param('id') id: string,
@@ -114,7 +114,7 @@ export class PatientMedicationsController {
     return this.patientMedicationsService.update(id, dto);
   }
 
-  @Permissions('patient-medication.delete')
+  @Permissions('patient-medications.delete')
   @Delete(':id')
   remove(@Param('id') id: string) {
     return this.patientMedicationsService.remove(id);
