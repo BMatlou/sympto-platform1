@@ -1,0 +1,24 @@
+enum MedicationClinicalRelationType {
+  SIDE_EFFECT
+  RELIEVES_SYMPTOM
+  MAY_MASK_SYMPTOM
+}
+
+model MedicationClinicalReference {
+  id            String                         @id @default(uuid())
+  medicationId  String
+  symptomId     String
+  relationType  MedicationClinicalRelationType
+  evidenceLevel String?
+  source        String?
+  notes         String?                        @db.Text
+  active        Boolean                        @default(true)
+  createdAt     DateTime                       @default(now())
+  updatedAt     DateTime                       @updatedAt
+
+  @@unique([medicationId, symptomId, relationType])
+  @@index([medicationId])
+  @@index([symptomId])
+  @@index([relationType])
+  @@index([active])
+}
