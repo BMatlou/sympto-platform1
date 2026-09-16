@@ -80,18 +80,19 @@ function medicationName(medication: any) {
   return normalise(medication?.medication?.name || medication?.name || medication?.medication?.genericName || medication?.medication?.brandName);
 }
 
-function medicationGoalFor(medication: any, goals: any[]) {
+function medicationGoalFor(medication: any, goals: any[], medicationCount: number) {
   const medicationId = patientMedicationId(medication);
   const medicationCatalogIds = [medication?.medicationId, medication?.medication?.id, medication?.medication?.medicationId].filter(Boolean).map(String);
 
   return goals.find((goal: any) => {
     const category = String(goal?.category ?? "").toUpperCase();
+    const metricType = String(goal?.metricType ?? "").toUpperCase();
     const metricKey = String(goal?.metricConfig?.metricKey ?? "").toLowerCase();
     const status = String(goal?.status ?? "").toUpperCase();
-    if ((category !== "MEDICATION" && metricKey !== "medication.adherence") || !ACTIVE_GOAL_STATUSES.has(status)) return false;
+    const isMedicationGoal = category === "MEDICATION" || metricType === "MEDICATION" || metricKey === "medication.adherence";
+    if (!isMedicationGoal || !["ACTIVE", "IN_PROGRESS"].includes(status)) return false;
 
-    // A persisted patientMedicationId is authoritative. Never fall back to
-    // medicine-name matching when the goal is explicitly attached elsewhere.
+    // A persisted patientMedicationId or medication catalogue link is authoritative.
     if (goal?.patientMedicationId) {
       return Boolean(medicationId) && String(goal.patientMedicationId) === String(medicationId);
     }
@@ -99,6 +100,15 @@ function medicationGoalFor(medication: any, goals: any[]) {
     const linkedMedicationId = goal?.associatedMedicationId || goal?.medicationId || goal?.associatedMedication?.id || goal?.patientMedication?.id || goal?.medication?.id;
     if (linkedMedicationId) return medicationCatalogIds.includes(String(linkedMedicationId));
 
+    // The onboarding Health Goals step intentionally creates the explicit
+    // medication goal with the title "Manage medication" and does not yet
+    // attach a PatientMedication ID. Preserve that real goal when there is
+    // exactly one active medication; never select an unrelated goal merely
+    // because it happens to be the only medication goal returned.
+    const title = normalise(goal?.title);
+    if (medicationCount === 1 && title === "manage medication") return true;
+
+    // Legacy explicitly named medication goals can still be matched by name.
     const name = medicationName(medication);
     if (!name) return false;
     const goalNames = [goal?.medication?.name, goal?.medication?.genericName, goal?.medication?.brandName, goal?.title, goal?.description].map(normalise).filter(Boolean);
@@ -135,7 +145,7 @@ export default function TodayPage() {
   const allGoals = data.goals ?? data.healthGoals ?? [];
   const activeGoalsArray = allGoals.filter((goal: any) => ACTIVE_GOAL_STATUSES.has(String(goal?.status ?? "").toUpperCase()));
   const goals = allGoals.filter((goal: any) => String(goal?.status).toUpperCase() === "ACTIVE");
-  const medicationGoalCards = (Array.isArray(medications) ? medications : []).map((medication: any) => ({ medication, goal: medicationGoalFor(medication, activeGoalsArray) }));
+  const medicationGoalCards = (Array.isArray(medications) ? medications : []).map((medication: any) => ({ medication, goal: medicationGoalFor(medication, activeGoalsArray, medications.length) }));
   const medicationGoal = medicationGoalCards.find((item: any) => item.goal)?.goal;
   const smokingGoal = goals.find((goal: any) => String(goal?.category ?? "").toUpperCase() === "SMOKING");
   const alcoholGoal = goals.find((goal: any) => String(goal?.category ?? "").toUpperCase() === "ALCOHOL");
