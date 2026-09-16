@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useMemo, useState } from "react";
+import { useMemo, useState, type ReactNode } from "react";
 import { ArrowLeft, Check, ChevronDown, Clock3, FileText, Pill, Plus, ShieldCheck } from "lucide-react";
 import { useDashboard } from "@/hooks/use-dashboard";
 import { MedicationReminderButton } from "@/components/medications/MedicationReminderButton";
@@ -11,9 +11,6 @@ import { api } from "@/lib/api";
 import type { MedicationItem, UpdatePatientMedicationsDto } from "@/types/onboarding";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
-
-const APP_NAVY = "#0b2d54";
-const APP_TEAL = "#24c1c4";
 
 const FREQUENCY_OPTIONS = [
   { label: "Once a day", value: "ONCE_DAILY" },
@@ -118,7 +115,7 @@ const emptyMedication = (): MedicationItem => ({
   notes: "",
 });
 
-function FieldLabel({ children, optional = false }: { children: React.ReactNode; optional?: boolean }) {
+function FieldLabel({ children, optional = false }: { children: ReactNode; optional?: boolean }) {
   return (
     <div className="mb-2 flex items-center gap-2">
       <span className="text-sm font-semibold text-[#0b2d54]">{children}</span>
@@ -150,40 +147,6 @@ function SelectField({
       </select>
       <ChevronDown className="pointer-events-none absolute right-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
     </div>
-  );
-}
-
-function ChoiceField({
-  value,
-  onChange,
-  options,
-  placeholder,
-  customPlaceholder,
-}: {
-  value: string;
-  onChange: (value: string) => void;
-  options: string[];
-  placeholder: string;
-  customPlaceholder: string;
-}) {
-  const isPreset = !value || options.includes(value);
-  return (
-    <>
-      <SelectField
-        value={isPreset ? value : "Other"}
-        onChange={(next) => onChange(next === "Other" ? "" : next)}
-        options={options.map((option) => ({ label: option, value: option }))}
-        placeholder={placeholder}
-      />
-      {(!isPreset || value === "") && value !== undefined && options.includes("Other") && (
-        <input
-          value={options.includes(value) ? "" : value}
-          onChange={(event) => onChange(event.target.value)}
-          placeholder={customPlaceholder}
-          className="mt-2 w-full rounded-xl border border-slate-200 px-4 py-3 text-sm text-[#0b2d54] outline-none transition-all focus:border-[#24c1c4] focus:ring-4 focus:ring-[#24c1c4]/10"
-        />
-      )}
-    </>
   );
 }
 
