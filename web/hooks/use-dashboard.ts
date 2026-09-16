@@ -38,7 +38,11 @@ function normalizeGoals(result: HealthHomeResponse, fullGoals: any[]) {
       const currentValue = medicationAdherence;
       const progressPercent = currentValue == null ? 0 : Math.min(100, Math.max(0, Math.round((currentValue / target) * 100)));
       const originalStatus = String(goal?.status ?? "").toUpperCase();
-      return { ...goal, unit: "%", targetValue: target, currentValue, status: originalStatus, achievedAt: goal?.achievedAt ?? null, latestProgress: { ...(historicalAchievement ?? progress[0] ?? {}), currentValue, progressPercent, status: originalStatus === "ACHIEVED" ? "ACHIEVED" : "IMPROVING" } };
+      // An explicitly selected medication goal may be persisted as NOT_STARTED.
+      // Today must still surface it; NOT_STARTED means no adherence has been logged yet,
+      // not that the user did not choose the goal.
+      const todayStatus = originalStatus === "NOT_STARTED" ? "ACTIVE" : originalStatus;
+      return { ...goal, unit: "%", targetValue: target, currentValue, status: todayStatus, achievedAt: goal?.achievedAt ?? null, latestProgress: { ...(historicalAchievement ?? progress[0] ?? {}), currentValue, progressPercent, status: todayStatus === "ACHIEVED" ? "ACHIEVED" : "IMPROVING" } };
     }
 
     if (!historicalAchievement && String(goal?.status ?? "").toUpperCase() !== "ACHIEVED") return goal;
