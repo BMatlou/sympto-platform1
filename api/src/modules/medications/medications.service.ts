@@ -79,9 +79,6 @@ export class MedicationsService {
         brandName: true,
         description: true,
         category: true,
-        strength: true,
-        dosageForm: true,
-        route: true,
         controlled: true,
         prescriptionRequired: true,
         active: true,
@@ -117,15 +114,17 @@ export class MedicationsService {
       return !strength || ['n/a', 'na', 'unknown', 'unspecified'].includes(strength);
     };
 
-    // Medication reference data stores the primary formulation directly on
-    // Medication. Older records may not have a MedicationStrength child row.
-    // Use the stored medication-level formulation as the fallback rather than
-    // losing route information that already exists in the medication seed.
+    // Some legacy formulation rows were created without copying the route
+    // from the medication reference data. Recover the route only when the
+    // dosage form gives us an unambiguous route; never default every medicine
+    // to oral administration.
     const inferRouteFromDosageForm = (value: unknown) => {
       const form = normalize(value);
       if (!form) return '';
 
-      if (/tablet|caplet|capsule|pill|chewable|lozenge|troche|sublingual|buccal|oral|syrup|solution|suspension|powder|granule|elixir/.test(form)) return 'ORAL';
+      if (/tablet|caplet|capsule|pill|chewable|lozenge|troche|sublingual|buccal|oral|syrup|solution|suspension|powder|granule|elixir/.test(form)) {
+        return 'ORAL';
+      }
       if (/inhaler|inhalation|nebul|aerosol/.test(form)) return 'INHALATION';
       if (/injection|injectable|vial|ampoule|prefilled syringe/.test(form)) return 'INJECTION';
       if (/cream|ointment|gel|lotion|paste|topical|transdermal|patch/.test(form)) return 'TOPICAL';
@@ -137,37 +136,17 @@ export class MedicationsService {
       return '';
     };
 
-    const withResolvedRoutes = (medication: MedicationRow) => {
-      const storedStrengths = medication.strengths.map((strength) => ({
+    const withResolvedRoutes = (medication: MedicationRow): MedicationRow => ({
+      ...medication,
+      strengths: medication.strengths.map((strength) => ({
         ...strength,
         route: strength.route || inferRouteFromDosageForm(strength.dosageForm) || null,
-      }));
+      })),
+    });
 
-      if (storedStrengths.length > 0) {
-        return { ...medication, strengths: storedStrengths };
-      }
-
-      // Preserve the route/form/strength that was stored directly on the
-      // Medication record when no child formulation row exists.
-      if (medication.route || medication.dosageForm || medication.strength) {
-        return {
-          ...medication,
-          strengths: [
-            {
-              id: `${medication.id}-primary-formulation`,
-              strength: medication.strength ?? null,
-              dosageForm: medication.dosageForm ?? null,
-              route: medication.route || inferRouteFromDosageForm(medication.dosageForm) || null,
-              active: medication.active,
-            },
-          ],
-        };
-      }
-
-      return { ...medication, strengths: storedStrengths };
-    };
-
-    const formulationKeys = (medication: MedicationRow | ReturnType<typeof withResolvedRoutes>) => {
+    // The selectable identity is the generic medication plus its formulations.
+    // Missing/N/A strength is not a separate formulation; it is incomplete data.
+    const formulationKeys = (medication: MedicationRow) => {
       const rows = medication.strengths;
       if (!rows.length) return ['unspecified-formulation'];
 
@@ -190,7 +169,7 @@ export class MedicationsService {
         });
     };
 
-    const unique = new Map<string, ReturnType<typeof withResolvedRoutes>>();
+    const unique = new Map<string, MedicationRow>();
 
     for (const medication of medications) {
       const resolvedMedication = withResolvedRoutes(medication);
@@ -203,6 +182,9 @@ export class MedicationsService {
         continue;
       }
 
+      // If duplicate legacy rows differ only because one has N/A strength,
+      // keep the row containing a real strength so the user gets the usable
+      // medication record rather than an incomplete result.
       const existingComplete = existing.strengths.some((s) => !isMissingStrength(s.strength));
       const currentComplete = resolvedMedication.strengths.some((s) => !isMissingStrength(s.strength));
       if (!existingComplete && currentComplete) unique.set(identity, resolvedMedication);
@@ -226,36 +208,16 @@ export class MedicationsService {
   async findOne(id: string) {
     const medication = await this.prisma.medication.findUnique({
       where: { id },
-      select: {
-        id: true,
-        rxNormCode: true,
-        name: true,
-        genericName: true,
-        brandName: true,
-        description: true,
-        category: true,
-        strength: true,
-        dosageForm: true,
-        route: true,
-        controlled: true,
-        prescriptionRequired: true,
-        searchable: true,
-        active: true,
-        createdAt: true,
-        updatedAt: true,
-        strengths: {
-          where: { active: true },
-          orderBy: { strength: 'asc' },
-        },
+      include: {
+        strengths: { where: { active: true }, orderBy: { strength: 'asc' } },
         _count: { select: { strengths: true, patientMedications: true, prescriptionItems: true } },
       },
     });
 
     if (!medication) throw new NotFoundException('Medication not found.');
 
-    const normalize = (value: unknown) => String(value ?? '').trim().toLowerCase();
     const inferRouteFromDosageForm = (value: unknown) => {
-      const form = normalize(value);
+      const form = String(value ?? '').trim().toLowerCase();
       if (!form) return '';
       if (/tablet|caplet|capsule|pill|chewable|lozenge|troche|sublingual|buccal|oral|syrup|solution|suspension|powder|granule|elixir/.test(form)) return 'ORAL';
       if (/inhaler|inhalation|nebul|aerosol/.test(form)) return 'INHALATION';
@@ -269,24 +231,12 @@ export class MedicationsService {
       return '';
     };
 
-    const strengths = medication.strengths.length > 0
-      ? medication.strengths.map((strength) => ({
-          ...strength,
-          route: strength.route || inferRouteFromDosageForm(strength.dosageForm) || null,
-        }))
-      : (medication.route || medication.dosageForm || medication.strength
-          ? [{
-              id: `${medication.id}-primary-formulation`,
-              strength: medication.strength ?? null,
-              dosageForm: medication.dosageForm ?? null,
-              route: medication.route || inferRouteFromDosageForm(medication.dosageForm) || null,
-              active: medication.active,
-            }]
-          : []);
-
     return {
       ...medication,
-      strengths,
+      strengths: medication.strengths.map((strength) => ({
+        ...strength,
+        route: strength.route || inferRouteFromDosageForm(strength.dosageForm) || null,
+      })),
     };
   }
 
