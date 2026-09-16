@@ -115,7 +115,7 @@ async function main() {
       });
     }
 
-    for (const symptomName of reference.relives ?? reference.relieves) {
+    for (const symptomName of reference.relieves) {
       const symptom = await prisma.symptom.findFirst({
         where: { name: symptomName },
       });
