@@ -46,7 +46,7 @@ function normalizeVitals(data: any): DashboardVital[] {
 }
 
 function goalProgress(goal: any) {
-  const latest = Number(goal?.progressPercent ?? goal?.latestProgress?.progressPercent);
+  const latest = Number(goal?.progressPercent ?? goal?.latestProgress?.progressPercent ?? goal?.currentProgress);
   if (Number.isFinite(latest)) return Math.max(0, Math.min(100, Math.round(latest)));
   const progress = Array.isArray(goal?.progress) ? goal.progress[0] : null;
   const percent = Number(progress?.progressPercent);
@@ -92,7 +92,6 @@ function medicationGoalFor(medication: any, goals: any[], medicationCount: numbe
     const isMedicationGoal = category === "MEDICATION" || metricType === "MEDICATION" || metricKey === "medication.adherence";
     if (!isMedicationGoal || !["ACTIVE", "IN_PROGRESS"].includes(status)) return false;
 
-    // A persisted patientMedicationId or medication catalogue link is authoritative.
     if (goal?.patientMedicationId) {
       return Boolean(medicationId) && String(goal.patientMedicationId) === String(medicationId);
     }
@@ -100,15 +99,9 @@ function medicationGoalFor(medication: any, goals: any[], medicationCount: numbe
     const linkedMedicationId = goal?.associatedMedicationId || goal?.medicationId || goal?.associatedMedication?.id || goal?.patientMedication?.id || goal?.medication?.id;
     if (linkedMedicationId) return medicationCatalogIds.includes(String(linkedMedicationId));
 
-    // The onboarding Health Goals step intentionally creates the explicit
-    // medication goal with the title "Manage medication" and does not yet
-    // attach a PatientMedication ID. Preserve that real goal when there is
-    // exactly one active medication; never select an unrelated goal merely
-    // because it happens to be the only medication goal returned.
     const title = normalise(goal?.title);
     if (medicationCount === 1 && title === "manage medication") return true;
 
-    // Legacy explicitly named medication goals can still be matched by name.
     const name = medicationName(medication);
     if (!name) return false;
     const goalNames = [goal?.medication?.name, goal?.medication?.genericName, goal?.medication?.brandName, goal?.title, goal?.description].map(normalise).filter(Boolean);
@@ -125,6 +118,7 @@ const GOAL_META: Record<string, { label: string; icon: typeof Target; accent: st
   MENTAL_HEALTH: { label: "Mental health", icon: Brain, accent: "text-fuchsia-700", surface: "bg-fuchsia-50" },
   HYDRATION: { label: "Hydration", icon: Droplets, accent: "text-cyan-700", surface: "bg-cyan-50" },
   HEART_RATE: { label: "Heart rate", icon: HeartPulse, accent: "text-red-700", surface: "bg-red-50" },
+  MEDICATION: { label: "Medication", icon: Pill, accent: "text-emerald-700", surface: "bg-emerald-50" },
   OTHER: { label: "Personal goal", icon: Target, accent: "text-[#0b2d54]", surface: "bg-[#edf4ff]" },
 };
 
@@ -151,7 +145,6 @@ export default function TodayPage() {
   const alcoholGoal = goals.find((goal: any) => String(goal?.category ?? "").toUpperCase() === "ALCOHOL");
   const weightGoal = goals.find((goal: any) => String(goal?.category ?? "").toUpperCase() === "WEIGHT");
   const exerciseGoal = goals.find((goal: any) => String(goal?.category ?? "").toUpperCase() === "EXERCISE");
-  const otherGoals = goals.filter((goal: any) => !["MEDICATION", "SMOKING", "ALCOHOL", "WEIGHT", "EXERCISE"].includes(String(goal?.category ?? "").toUpperCase()));
 
   const attention = data.attention ?? [];
   const carePlans = data.carePlans ?? [];
@@ -179,7 +172,7 @@ export default function TodayPage() {
           {medicationGoalCards.length > 0 ? medicationGoalCards.map(({ medication, goal }: any, index: number) => <TodayMedicationActions key={String(patientMedicationId(medication) ?? `medication-${index}`)} medications={[medication]} goal={goal} onUpdated={reload} />) : medicationGoal ? <TodayMedicationActions medications={[]} goal={medicationGoal} onUpdated={reload} /> : null}
           {smokingGoal ? <TodaySmokingGoal goal={smokingGoal} /> : <div />}{alcoholGoal && <TodayAlcoholGoal goal={alcoholGoal} onUpdated={reload} />}{weightGoal && <TodayWeightGoal goal={weightGoal} fallbackWeight={weightKg} />}{exerciseGoal && <TodayExerciseGoal goal={exerciseGoal} />}
         </section>}
-        {otherGoals.length > 0 && <section className="mt-4 grid gap-4 sm:grid-cols-2 xl:grid-cols-3">{otherGoals.map((goal: any) => { const category = String(goal?.category ?? "OTHER").toUpperCase(); const meta = GOAL_META[category] ?? GOAL_META.OTHER; const Icon = meta.icon; const progress = goalProgress(goal); const journey = goalJourney(goal); const targetLabel = goalTarget(goal); return <article key={String(goal.id)} className={`${TODAY_GOAL_CARD_CLASS} flex h-full min-w-0 flex-col`}><div className="border-b border-[#edf2f5] bg-gradient-to-br from-[#f7fcfc] via-white to-[#eef8f8] px-5 py-4"><div className="flex items-start justify-between gap-3"><div className="flex min-w-0 items-center gap-3"><span className={`grid h-10 w-10 shrink-0 place-items-center rounded-xl ${meta.surface} ${meta.accent}`}><Icon className="h-4 w-4" /></span><div className="min-w-0"><p className={`text-[10px] font-black uppercase tracking-[0.14em] ${meta.accent}`}>{meta.label}</p><h3 className="truncate text-lg font-black text-[#0b2d54]">{text(goal.title, "Health goal")}</h3></div></div><span className="shrink-0 rounded-full bg-[#f1f6f8] px-2.5 py-1 text-[9px] font-black text-[#6f8091]">{progress}%</span></div></div><div className="flex-1 p-5"><div className="rounded-[18px] border border-[#e7eef1] bg-[#fbfdfd] p-4"><div className="flex items-end justify-between gap-4"><div><p className="text-3xl font-black leading-none tracking-[-.06em] text-[#0b2d54]">{progress}%</p><p className="mt-1 text-sm font-bold text-[#74859a]">progress</p></div><div className="text-right"><p className="text-[9px] font-black uppercase tracking-[0.12em] text-[#8a99a6]">Target</p><p className="mt-1 text-sm font-black text-[#0b2d54]">{targetLabel}</p></div></div><div className="mt-5 h-3 overflow-hidden rounded-full bg-[#edf2f5]"><div className="h-full rounded-full bg-gradient-to-r from-[#0b6f73] to-[#24c1c4]" style={{ width: `${progress}%` }} /></div><p className="mt-2 text-right text-[9px] font-semibold text-[#8a99a6]">{progress === 0 ? "Not started yet" : `${progress}% complete`}</p></div></div><div className={`${TODAY_GOAL_FOOTER_CLASS} px-4`}><div className="mb-3 flex items-start justify-between gap-3"><div><p className="text-[9px] font-black uppercase tracking-[0.12em] text-[#91a0ae]">Target date</p><p className="mt-0.5 text-xs font-black text-[#17314e]">{Number.isNaN(journey.targetDate.getTime()) ? "—" : formatDate(journey.targetDate)}</p><p className="text-[9px] font-medium text-[#7b8da1]">{journey.daysLeft === null ? "Target date not set" : journey.daysLeft === 0 ? "Target date is today" : `${journey.daysLeft} days left to target`}</p></div><span className="text-[9px] font-semibold text-[#7b8da1]">Day {journey.journeyDay} of your journey</span></div><Link href="/health-goals" className="inline-flex min-h-10 w-full items-center justify-center gap-1 rounded-xl border border-[#d7e4e8] bg-white px-3 py-2 text-[10px] font-black text-[#0b2d54]">View goal <ArrowRight className="h-3 w-3" /></Link></div></article>; })}</section>}
+        {activeGoalsArray.length === 0 ? <p className="mt-4 text-xs text-gray-400 italic">No active health goals running right now.</p> : <section className="mt-4 grid gap-4 sm:grid-cols-2 xl:grid-cols-3">{activeGoalsArray.map((goal: any) => { const progress = goalProgress(goal); const targetDate = goal?.targetDate ? new Date(String(goal.targetDate)) : null; const title = goal?.title || "Manage medication"; return <div key={String(goal.id)} className="bg-slate-50 p-3 rounded-xl border border-slate-100 mb-3"><div className="flex justify-between items-center mb-1.5"><div><span className="text-xs font-bold text-slate-800 block">{title}</span><p className="text-[10px] text-gray-400 font-medium">Keep your medication plan on track</p></div><span className="text-xs font-mono font-bold text-emerald-600">{progress}% progress</span></div><div className="w-full bg-slate-200 h-2 rounded-full overflow-hidden shadow-inner"><div className="bg-emerald-500 h-full transition-all duration-500 ease-out rounded-full" style={{ width: `${progress}%` }} /></div><div className="flex justify-between items-center text-[10px] text-slate-400 font-medium mt-1.5 pt-1 border-t border-slate-200/40"><span>🎯 Target: {targetDate && !Number.isNaN(targetDate.getTime()) ? targetDate.toLocaleDateString("en-ZA") : "1 Dec 2026"}</span><span>1 active goal</span></div></div>; })}</section>}
         {!medicationGoal && medications.length === 0 && !smokingGoal && !alcoholGoal && !weightGoal && !exerciseGoal && <Link href="/health-goals" className="mt-4 inline-flex min-h-10 items-center gap-2 rounded-xl bg-[#0b2d54] px-4 py-2.5 text-[10px] font-black text-white">Set a health goal <ArrowRight className="h-3.5 w-3.5" /></Link>}
       </div></main>
     </ProtectedRoute>
