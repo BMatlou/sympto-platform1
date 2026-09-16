@@ -14,8 +14,118 @@ type MedicationGoalAssociation = { healthGoalId: string; patientMedicationId: st
 export class HealthGoalsService {
   constructor(private readonly prisma: PrismaService) {}
   async getActiveSnapshot(patientId: string) { return this.prisma.healthGoal.findMany({ where: { patientId, status: 'ACTIVE' } }); }
-  async getMetricEventsForUser(userId: string, filters: any) { return { success: true, events: [] }; }
-  async syncMetricEventForUser(userId: string, payload: { metricType: string; value?: number; [key: string]: any }) { return { success: true, updatedGoals: [] }; }
+
+  async getMetricEventsForUser(userId: string, filters: any) {
+    const patient = await this.findPatientForUser(userId);
+    if (!patient) throw new NotFoundException('Patient not found.');
+
+    const metricType = String(filters?.metricType ?? '').trim();
+    const metricKey = String(filters?.metricKey ?? '').trim();
+    const source = filters?.source ? String(filters.source).trim() : undefined;
+    const from = filters?.from instanceof Date ? filters.from : new Date(filters?.from);
+    const to = filters?.to instanceof Date ? filters.to : new Date(filters?.to);
+
+    if (!metricType || !metricKey) throw new BadRequestException('Metric type and metric key are required.');
+    if (Number.isNaN(from.getTime()) || Number.isNaN(to.getTime())) throw new BadRequestException('Metric event date range is invalid.');
+
+    const events = await this.prisma.$queryRaw<Array<{
+      id: string;
+      loggedValue: Prisma.Decimal;
+      occurredAt: Date;
+      source: string;
+      sourceId: string | null;
+    }>>`
+      SELECT "id", "loggedValue", "occurredAt", "source", "sourceId"
+      FROM "HealthGoalMetricEvent"
+      WHERE "patientId" = ${patient.id}
+        AND "metricType" = ${metricType}
+        AND "metricKey" = ${metricKey}
+        AND "occurredAt" >= ${from}
+        AND "occurredAt" < ${to}
+        ${source ? Prisma.sql`AND "source" = ${source}` : Prisma.empty}
+      ORDER BY "occurredAt" ASC
+    `;
+
+    return {
+      success: true,
+      count: events.length,
+      events: events.map((event) => ({
+        id: String(event.id),
+        loggedValue: Number(event.loggedValue),
+        occurredAt: event.occurredAt,
+        source: event.source,
+        sourceId: event.sourceId,
+      })),
+    };
+  }
+
+  async syncMetricEventForUser(userId: string, payload: { metricType: string; value?: number; [key: string]: any }) {
+    const patient = await this.findPatientForUser(userId);
+    if (!patient) throw new NotFoundException('Patient not found.');
+
+    const metricType = String(payload?.metricType ?? '').trim().toUpperCase();
+    const metricKey = String(payload?.metricKey ?? '').trim();
+    const loggedValue = Number(payload?.loggedValue ?? payload?.value);
+    const source = String(payload?.source ?? 'manual').trim();
+    const sourceId = payload?.sourceId ? String(payload.sourceId).trim() : null;
+    const occurredAt = payload?.occurredAt instanceof Date ? payload.occurredAt : payload?.occurredAt ? new Date(payload.occurredAt) : new Date();
+
+    if (!metricType || !metricKey || !source || !Number.isFinite(loggedValue)) {
+      throw new BadRequestException('Metric event data is invalid.');
+    }
+    if (Number.isNaN(occurredAt.getTime())) throw new BadRequestException('Metric event date is invalid.');
+
+    const existing = sourceId
+      ? await this.prisma.$queryRaw<Array<{ id: string }>>`
+          SELECT "id"
+          FROM "HealthGoalMetricEvent"
+          WHERE "patientId" = ${patient.id}
+            AND "source" = ${source}
+            AND "sourceId" = ${sourceId}
+          LIMIT 1
+        `
+      : [];
+
+    let eventId: string;
+    if (existing.length) {
+      eventId = String(existing[0].id);
+      await this.prisma.$executeRaw`
+        UPDATE "HealthGoalMetricEvent"
+        SET "metricType" = ${metricType},
+            "metricKey" = ${metricKey},
+            "loggedValue" = ${loggedValue},
+            "occurredAt" = ${occurredAt},
+            "metadata" = ${payload?.metadata ? JSON.stringify(payload.metadata) : null}::jsonb
+        WHERE "id" = ${eventId}::uuid
+      `;
+    } else {
+      const inserted = await this.prisma.$queryRaw<Array<{ id: string }>>`
+        INSERT INTO "HealthGoalMetricEvent"
+          ("id", "patientId", "metricType", "metricKey", "loggedValue", "occurredAt", "source", "sourceId", "metadata")
+        VALUES
+          (gen_random_uuid(), ${patient.id}, ${metricType}, ${metricKey}, ${loggedValue}, ${occurredAt}, ${source}, ${sourceId}, ${payload?.metadata ? JSON.stringify(payload.metadata) : null}::jsonb)
+        RETURNING "id"
+      `;
+      eventId = String(inserted[0].id);
+    }
+
+    const affectedGoals = await this.prisma.$queryRaw<Array<{ id: string; title: string; status: string }>>`
+      SELECT DISTINCT hg."id", hg."title", hg."status"
+      FROM "HealthGoal" hg
+      INNER JOIN "HealthGoalMetricConfig" hgm ON hgm."healthGoalId" = hg."id"
+      WHERE hg."patientId" = ${patient.id}
+        AND UPPER(hg."status") IN ('ACTIVE', 'IN_PROGRESS')
+        AND UPPER(hgm."metricType") = ${metricType}
+        AND hgm."metricKey" = ${metricKey}
+    `;
+
+    return {
+      success: true,
+      eventId,
+      affectedGoals,
+    };
+  }
+
   async findPatientForUser(userId: string) { return this.prisma.patient.findUnique({ where: { userId } }); }
   private async assertPatientMedicationBelongsToPatient(patientMedicationId: string | undefined, patientId: string) {
     if (!patientMedicationId) return;
@@ -85,5 +195,5 @@ export class HealthGoalsService {
     const progressPercent = targetValue != null && targetValue > 0 ? Math.min(100, Math.max(0, (currentValue / targetValue) * 100)) : 0; const progressStatus: HealthGoalProgressStatus = targetValue != null && targetValue > 0 && currentValue >= targetValue ? HealthGoalProgressStatus.ACHIEVED : previousValue == null || currentValue > previousValue ? HealthGoalProgressStatus.IMPROVING : currentValue < previousValue ? HealthGoalProgressStatus.DECLINING : HealthGoalProgressStatus.STAGNANT;
     return this.prisma.$transaction(async (tx) => { await tx.healthGoal.update({ where: { id }, data: { currentValue: String(currentValue), status: progressStatus === HealthGoalProgressStatus.ACHIEVED ? 'ACHIEVED' : goal.status, achievedAt: progressStatus === HealthGoalProgressStatus.ACHIEVED ? new Date() : null } }); await tx.healthGoalProgress.create({ data: { healthGoalId: id, currentValue: String(currentValue), progressPercent: String(progressPercent.toFixed(2)), status: progressStatus, notes: dto.notes, measuredAt: new Date() } }); return tx.healthGoal.findUnique({ where: { id }, include: { patient: true, practitioner: true, carePlan: true, progress: { orderBy: { measuredAt: 'desc' } } } }); });
   }
-  async remove(id: string) { await this.findOne(id); await this.prisma.healthGoal.delete({ where: { id } }); return { message: 'Health goal deleted successfully.' }; }
+  async remove(id: string) { await this.findOne(id); await this.prisma.healthGoal.delete({ where: { id }); return { message: 'Health goal deleted successfully.' }; }
 }
