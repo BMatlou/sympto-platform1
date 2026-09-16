@@ -43,20 +43,6 @@ async function main() {
     }
   }
 
-  // Keep the symptom vocabulary independent from diagnosis/condition data.
-  // This reference table is intentionally lightweight and searchable.
-  await prisma.$executeRawUnsafe(`
-    CREATE TABLE IF NOT EXISTS "symptom_reference" (
-      "id" TEXT PRIMARY KEY,
-      "name" TEXT NOT NULL UNIQUE,
-      "category" TEXT NOT NULL,
-      "synonyms" JSONB NOT NULL DEFAULT '[]'::jsonb,
-      "active" BOOLEAN NOT NULL DEFAULT TRUE,
-      "created_at" TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-      "updated_at" TIMESTAMPTZ NOT NULL DEFAULT NOW()
-    )
-  `);
-
   for (const symptom of SYMPTOM_REFERENCE) {
     await prisma.$executeRawUnsafe(
       `INSERT INTO "symptom_reference" ("id", "name", "category", "synonyms", "active")
