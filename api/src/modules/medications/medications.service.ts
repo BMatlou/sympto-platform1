@@ -76,6 +76,7 @@ export class MedicationsService {
         rxNormCode: true,
         name: true,
         genericName: true,
+        brandName: true,
         description: true,
         category: true,
         controlled: true,
