@@ -1,6 +1,6 @@
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { Prisma, HealthGoalProgressStatus } from '@prisma/client';
-import { PrismaService } from 'src/prisma/prisma.service';
+import { PrismaService } from '../../prisma/prisma.service';
 import { CreateHealthGoalDto } from './dto/create-health-goal.dto';
 import { QueryHealthGoalDto } from './dto/query-health-goal.dto';
 import { UpdateHealthGoalDto } from './dto/update-health-goal.dto';
