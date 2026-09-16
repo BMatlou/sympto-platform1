@@ -1,10 +1,10 @@
 import {
   IsBoolean,
   IsDateString,
+  IsEnum,
   IsOptional,
   IsString,
   IsUUID,
-  IsEnum,
 } from 'class-validator';
 
 import { MedicationStatus } from '@prisma/client';
@@ -30,6 +30,14 @@ export class CreatePatientMedicationDto {
 
   @IsOptional()
   @IsString()
+  indication?: string;
+
+  @IsOptional()
+  @IsString()
+  instructions?: string;
+
+  @IsOptional()
+  @IsString()
   prescribedBy?: string;
 
   @IsOptional()
@@ -41,8 +49,20 @@ export class CreatePatientMedicationDto {
   endedAt?: string;
 
   @IsOptional()
-@IsEnum(MedicationStatus)
-status?: MedicationStatus;
+  @IsBoolean()
+  ongoing?: boolean;
+
+  @IsOptional()
+  @IsString()
+  sideEffects?: string;
+
+  @IsOptional()
+  @IsString()
+  effectiveness?: string;
+
+  @IsOptional()
+  @IsEnum(MedicationStatus)
+  status?: MedicationStatus;
 
   @IsOptional()
   @IsString()
