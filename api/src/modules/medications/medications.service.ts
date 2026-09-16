@@ -14,13 +14,10 @@ import { QueryMedicationDto } from './dto/query-medication.dto';
 
 @Injectable()
 export class MedicationsService {
-  constructor(
-    private readonly prisma: PrismaService,
-  ) {}
+  constructor(private readonly prisma: PrismaService) {}
 
   async create(dto: CreateMedicationDto) {
     const name = dto.name.trim();
-
     const existing = await this.prisma.medication.findFirst({
       where: { name: { equals: name, mode: 'insensitive' } },
     });
@@ -103,41 +100,62 @@ export class MedicationsService {
       ],
     });
 
-    // A medication can exist in more than one database row because of legacy
-    // seed/import data. The selectable identity is the medication/formulation,
-    // not the database row and not the brand name. Keep genuinely different
-    // formulations (e.g. tablet vs suspension) separate while collapsing
-    // duplicate rows for the same formulation.
-    const unique = new Map<string, (typeof medications)[number]>();
+    type MedicationRow = (typeof medications)[number];
+
+    const normalize = (value: unknown) =>
+      String(value ?? '')
+        .trim()
+        .toLowerCase()
+        .replace(/\s+/g, ' ');
+
+    const isMissingStrength = (value: unknown) => {
+      const strength = normalize(value);
+      return !strength || ['n/a', 'na', 'unknown', 'unspecified'].includes(strength);
+    };
+
+    // The selectable identity is the generic medication plus its formulations.
+    // Missing/N/A strength is not a separate formulation; it is incomplete data.
+    const formulationKeys = (medication: MedicationRow) => {
+      const rows = medication.strengths;
+      if (!rows.length) return ['unspecified-formulation'];
+
+      const byFormRoute = new Map<string, string[]>();
+      for (const row of rows) {
+        const form = normalize(row.dosageForm);
+        const route = normalize(row.route);
+        const formRoute = `${form}|${route}`;
+        const strength = normalize(row.strength);
+        const values = byFormRoute.get(formRoute) ?? [];
+        if (!isMissingStrength(strength)) values.push(strength);
+        byFormRoute.set(formRoute, values);
+      }
+
+      return Array.from(byFormRoute.entries())
+        .sort(([a], [b]) => a.localeCompare(b))
+        .map(([formRoute, strengths]) => {
+          const uniqueStrengths = Array.from(new Set(strengths)).sort();
+          return `${formRoute}|${uniqueStrengths.length ? uniqueStrengths.join(',') : 'unspecified'}`;
+        });
+    };
+
+    const unique = new Map<string, MedicationRow>();
 
     for (const medication of medications) {
-      const normalizedName = (medication.genericName || medication.name || '')
-        .trim()
-        .toLowerCase()
-        .replace(/\s+/g, ' ');
+      const generic = normalize(medication.genericName || medication.name);
+      const identity = `${generic}::${formulationKeys(medication).join('||')}`;
+      const existing = unique.get(identity);
 
-      const normalizedMedicationName = (medication.name || '')
-        .trim()
-        .toLowerCase()
-        .replace(/\s+/g, ' ');
-
-      const strengths = medication.strengths.length
-        ? medication.strengths.map((strength) => [
-            (strength.strength || '').trim().toLowerCase(),
-            (strength.dosageForm || '').trim().toLowerCase(),
-            (strength.route || '').trim().toLowerCase(),
-          ].join('|')).sort().join('||')
-        : 'no-formulation';
-
-      const identity = [
-        normalizedName,
-        normalizedMedicationName,
-        strengths,
-      ].join('::');
-
-      if (!unique.has(identity)) {
+      if (!existing) {
         unique.set(identity, medication);
+        continue;
       }
+
+      // If duplicate legacy rows differ only because one has N/A strength,
+      // keep the row containing a real strength so the user gets the usable
+      // medication record rather than an incomplete result.
+      const existingComplete = existing.strengths.some((s) => !isMissingStrength(s.strength));
+      const currentComplete = medication.strengths.some((s) => !isMissingStrength(s.strength));
+      if (!existingComplete && currentComplete) unique.set(identity, medication);
     }
 
     const uniqueData = Array.from(unique.values());
@@ -164,10 +182,7 @@ export class MedicationsService {
       },
     });
 
-    if (!medication) {
-      throw new NotFoundException('Medication not found.');
-    }
-
+    if (!medication) throw new NotFoundException('Medication not found.');
     return medication;
   }
 
@@ -210,9 +225,7 @@ export class MedicationsService {
 
   async remove(id: string) {
     await this.findOne(id);
-
     await this.prisma.medication.delete({ where: { id } });
-
     return { message: 'Medication deleted successfully.' };
   }
 }
