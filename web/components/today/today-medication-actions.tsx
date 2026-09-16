@@ -92,14 +92,6 @@ function cumulativeTakenDoses(medication: any): number {
   return 0;
 }
 
-function isValidMedicationGoal(goal: any) {
-  if (!goal) return false;
-  const status = String(goal?.status ?? "").toUpperCase();
-  const category = String(goal?.category ?? "").toUpperCase();
-  const metricType = String(goal?.metricType ?? "").toUpperCase();
-  return ["ACTIVE", "IN_PROGRESS"].includes(status) && (metricType === "MEDICATION" || category === "MEDICATION");
-}
-
 export default function TodayMedicationActions({ medications, goal: suppliedGoal, onUpdated }: TodayMedicationActionsProps) {
   const [dosesLoggedToday, setDosesLoggedToday] = useState(0);
   const [isSyncing, setIsSyncing] = useState(false);
@@ -107,7 +99,12 @@ export default function TodayMedicationActions({ medications, goal: suppliedGoal
   const [states, setStates] = useState<Record<string, Action | undefined>>({});
 
   const trackedMedication = medications[0] ?? null;
-  const medication = trackedMedication;
+  const medication = trackedMedication
+    ? {
+        ...trackedMedication,
+        name: trackedMedication?.name || trackedMedication?.medication?.name || trackedMedication?.medication?.genericName || trackedMedication?.medication?.brandName || "",
+      }
+    : null;
   const activeMedicationGoals = suppliedGoal ? [suppliedGoal] : [];
 
   // 🔍 Hybrid Predicate resolving schema drift for existing user goals
