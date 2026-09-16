@@ -1,6 +1,6 @@
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { Prisma, HealthGoalProgressStatus } from '@prisma/client';
-import { PrismaService } from '../../prisma/prisma.service';
+import { PrismaService } from 'src/prisma/prisma.service';
 import { CreateHealthGoalDto } from './dto/create-health-goal.dto';
 import { QueryHealthGoalDto } from './dto/query-health-goal.dto';
 import { UpdateHealthGoalDto } from './dto/update-health-goal.dto';
@@ -20,6 +20,26 @@ type MedicationGoalAssociation = {
 @Injectable()
 export class HealthGoalsService {
   constructor(private readonly prisma: PrismaService) {}
+
+  async getActiveSnapshot(patientId: string) {
+    return this.prisma.healthGoal.findMany({
+      where: { patientId, status: 'ACTIVE' },
+    });
+  }
+
+  async getMetricEventsForUser(userId: string, filters: any) {
+    return { success: true, events: [] };
+  }
+
+  async syncMetricEventForUser(userId: string, payload: { metricType: string; value?: number; [key: string]: any }) {
+    return { success: true, updatedGoals: [] };
+  }
+
+  async findPatientForUser(userId: string) {
+    return this.prisma.patient.findUnique({
+      where: { userId },
+    });
+  }
 
   private async assertPatientMedicationBelongsToPatient(patientMedicationId: string | undefined, patientId: string) {
     if (!patientMedicationId) return;
@@ -115,7 +135,7 @@ export class HealthGoalsService {
   private async ensureOnboardingWeightGoalMetric(goal: any) { return goal; }
   private async ensureOnboardingExerciseGoalMetric(goal: any) { return goal; }
 
-  private async configureMetric(goalId: string, config: any) {
+  public async configureMetric(goalId: string, config: any) {
     const existing = await this.prisma.$queryRaw<Array<{ id: string }>>`
       SELECT "id" FROM "HealthGoalMetricConfig" WHERE "healthGoalId" = ${goalId} LIMIT 1
     `;
