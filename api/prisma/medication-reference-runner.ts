@@ -10,12 +10,27 @@ const prisma = new PrismaClient({ adapter: new PrismaPg({ connectionString }) })
 
 async function main() {
   await seedMedicationReference(prisma);
-  console.log(`Medication reference data established: ${MEDICATION_REFERENCE.length} medications.`);
+
+  const medicationCount = await prisma.medication.count({
+    where: { active: true, searchable: true },
+  });
+
+  const formulationCount = await prisma.medicationStrength.count({
+    where: { active: true },
+  });
+
+  console.log(
+    `Medication reference data established: ${MEDICATION_REFERENCE.length} curated medications.`,
+  );
+  console.log(`Active searchable medications: ${medicationCount}`);
+  console.log(`Active medication formulations: ${formulationCount}`);
 }
 
-main().catch((error) => {
-  console.error(error);
-  process.exit(1);
-}).finally(async () => {
-  await prisma.$disconnect();
-});
+main()
+  .catch((error) => {
+    console.error('Medication reference seed failed:', error);
+    process.exitCode = 1;
+  })
+  .finally(async () => {
+    await prisma.$disconnect();
+  });
