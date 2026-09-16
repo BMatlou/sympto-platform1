@@ -195,8 +195,15 @@ export const MEDICATION_REFERENCE = [
   ] },
 ] as const;
 
+// Keep an explicit rxNormCode field in the catalogue contract. The runner resolves
+// missing identifiers through RxNav before clinical enrichment starts.
+const MEDICATION_REFERENCE_WITH_RXNORM = MEDICATION_REFERENCE.map(medication => ({
+  ...medication,
+  rxNormCode: null as string | null,
+}));
+
 export async function seedMedicationReference(prisma: PrismaClient) {
-  for (const medication of MEDICATION_REFERENCE) {
+  for (const medication of MEDICATION_REFERENCE_WITH_RXNORM) {
     const existing = await prisma.medication.findFirst({
       where: { name: { equals: medication.name, mode: 'insensitive' } },
     });
@@ -207,6 +214,7 @@ export async function seedMedicationReference(prisma: PrismaClient) {
           data: {
             genericName: medication.genericName,
             category: medication.category,
+            rxNormCode: medication.rxNormCode,
             searchable: true,
             active: true,
           },
@@ -216,6 +224,7 @@ export async function seedMedicationReference(prisma: PrismaClient) {
             name: medication.name,
             genericName: medication.genericName,
             category: medication.category,
+            rxNormCode: medication.rxNormCode,
             prescriptionRequired: true,
             searchable: true,
             active: true,
