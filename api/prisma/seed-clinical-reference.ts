@@ -4,6 +4,7 @@ import { PrismaClient } from '@prisma/client';
 import {
   ADDITIONAL_ALLERGIES,
   ADDITIONAL_CONDITIONS,
+  MEDICATION_CLINICAL_REFERENCE,
   SYMPTOM_REFERENCE,
 } from './clinical-reference-data';
 
@@ -71,6 +72,72 @@ async function main() {
           bodySystem: symptom.category,
           description,
           searchable: true,
+          active: true,
+        },
+      });
+    }
+  }
+
+  for (const [medicationName, reference] of Object.entries(
+    MEDICATION_CLINICAL_REFERENCE,
+  )) {
+    const medication = await prisma.medication.findFirst({
+      where: { name: medicationName },
+    });
+
+    if (!medication) continue;
+
+    for (const symptomName of reference.sideEffects) {
+      const symptom = await prisma.symptom.findFirst({
+        where: { name: symptomName },
+      });
+      if (!symptom) continue;
+
+      await prisma.medicationClinicalReference.upsert({
+        where: {
+          medicationId_symptomId_relationType: {
+            medicationId: medication.id,
+            symptomId: symptom.id,
+            relationType: 'SIDE_EFFECT',
+          },
+        },
+        update: {
+          evidenceLevel: 'CURATED',
+          active: true,
+        },
+        create: {
+          medicationId: medication.id,
+          symptomId: symptom.id,
+          relationType: 'SIDE_EFFECT',
+          evidenceLevel: 'CURATED',
+          active: true,
+        },
+      });
+    }
+
+    for (const symptomName of reference.relives ?? reference.relieves) {
+      const symptom = await prisma.symptom.findFirst({
+        where: { name: symptomName },
+      });
+      if (!symptom) continue;
+
+      await prisma.medicationClinicalReference.upsert({
+        where: {
+          medicationId_symptomId_relationType: {
+            medicationId: medication.id,
+            symptomId: symptom.id,
+            relationType: 'RELIEVES_SYMPTOM',
+          },
+        },
+        update: {
+          evidenceLevel: 'CURATED',
+          active: true,
+        },
+        create: {
+          medicationId: medication.id,
+          symptomId: symptom.id,
+          relationType: 'RELIEVES_SYMPTOM',
+          evidenceLevel: 'CURATED',
           active: true,
         },
       });
