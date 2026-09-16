@@ -98,16 +98,39 @@ export class PatientMedicationsService {
 
     const measuredAt = dto.scheduledFor ? new Date(dto.scheduledFor) : new Date();
     const effectiveMeasuredAt = Number.isNaN(measuredAt.getTime()) ? new Date() : measuredAt;
-    const affectedGoals = await this.healthGoalsService.syncMetricEventForUser(authenticatedUserId, {
-      metricType: 'MEDICATION',
-      metricKey: 'medication.adherence',
-      loggedValue: adherencePercentage,
-      occurredAt: effectiveMeasuredAt,
-      source: 'medication-adherence',
-      sourceId: `${id}:${effectiveMeasuredAt.toISOString()}`,
-    });
+    const source = 'medication-adherence';
+    const sourceId = `${id}:${effectiveMeasuredAt.toISOString()}`;
 
-    return { tracked: true, action: dto.action, scheduledFor: dto.scheduledFor ?? null, medication, adherencePercentage, missedDoses, affectedGoals };
+    // Record exactly one metric event for each Taken/Skipped action.
+    // The Today card uses these events to calculate today's dose count.
+    const existingEvent = await this.prisma.$queryRaw<Array<{ id: string }>>`
+      SELECT "id"
+      FROM "HealthGoalMetricEvent"
+      WHERE "patientId" = ${patientId}
+        AND "source" = ${source}
+        AND "sourceId" = ${sourceId}
+      LIMIT 1
+    `;
+
+    if (existingEvent.length) {
+      await this.prisma.$executeRaw`
+        UPDATE "HealthGoalMetricEvent"
+        SET "metricType" = 'MEDICATION',
+            "metricKey" = 'medication.adherence',
+            "loggedValue" = ${adherencePercentage},
+            "occurredAt" = ${effectiveMeasuredAt}
+        WHERE "id" = ${existingEvent[0].id}::uuid
+      `;
+    } else {
+      await this.prisma.$executeRaw`
+        INSERT INTO "HealthGoalMetricEvent"
+          ("id", "patientId", "metricType", "metricKey", "loggedValue", "occurredAt", "source", "sourceId")
+        VALUES
+          (gen_random_uuid(), ${patientId}, 'MEDICATION', 'medication.adherence', ${adherencePercentage}, ${effectiveMeasuredAt}, ${source}, ${sourceId})
+      `;
+    }
+
+    return { tracked: true, action: dto.action, scheduledFor: dto.scheduledFor ?? null, medication, adherencePercentage, missedDoses, affectedGoals: [] };
   }
 
   async scheduleReminder(id: string, dto: CreateMedicationReminderDto, authenticatedUserId: string) {
