@@ -114,6 +114,36 @@ export class MedicationsService {
       return !strength || ['n/a', 'na', 'unknown', 'unspecified'].includes(strength);
     };
 
+    // Some legacy formulation rows were created without copying the route
+    // from the medication reference data. Recover the route only when the
+    // dosage form gives us an unambiguous route; never default every medicine
+    // to oral administration.
+    const inferRouteFromDosageForm = (value: unknown) => {
+      const form = normalize(value);
+      if (!form) return '';
+
+      if (/tablet|caplet|capsule|pill|chewable|lozenge|troche|sublingual|buccal|oral|syrup|solution|suspension|powder|granule|elixir/.test(form)) {
+        return 'ORAL';
+      }
+      if (/inhaler|inhalation|nebul|aerosol/.test(form)) return 'INHALATION';
+      if (/injection|injectable|vial|ampoule|prefilled syringe/.test(form)) return 'INJECTION';
+      if (/cream|ointment|gel|lotion|paste|topical|transdermal|patch/.test(form)) return 'TOPICAL';
+      if (/ophthalmic|eye drop|ocular/.test(form)) return 'OPHTHALMIC';
+      if (/otic|ear drop/.test(form)) return 'OTIC';
+      if (/nasal|spray/.test(form)) return 'NASAL';
+      if (/suppository|rectal|enema/.test(form)) return 'RECTAL';
+      if (/vaginal|pessary/.test(form)) return 'VAGINAL';
+      return '';
+    };
+
+    const withResolvedRoutes = (medication: MedicationRow): MedicationRow => ({
+      ...medication,
+      strengths: medication.strengths.map((strength) => ({
+        ...strength,
+        route: strength.route || inferRouteFromDosageForm(strength.dosageForm) || null,
+      })),
+    });
+
     // The selectable identity is the generic medication plus its formulations.
     // Missing/N/A strength is not a separate formulation; it is incomplete data.
     const formulationKeys = (medication: MedicationRow) => {
@@ -123,7 +153,7 @@ export class MedicationsService {
       const byFormRoute = new Map<string, string[]>();
       for (const row of rows) {
         const form = normalize(row.dosageForm);
-        const route = normalize(row.route);
+        const route = normalize(row.route || inferRouteFromDosageForm(row.dosageForm));
         const formRoute = `${form}|${route}`;
         const strength = normalize(row.strength);
         const values = byFormRoute.get(formRoute) ?? [];
@@ -142,12 +172,13 @@ export class MedicationsService {
     const unique = new Map<string, MedicationRow>();
 
     for (const medication of medications) {
-      const generic = normalize(medication.genericName || medication.name);
-      const identity = `${generic}::${formulationKeys(medication).join('||')}`;
+      const resolvedMedication = withResolvedRoutes(medication);
+      const generic = normalize(resolvedMedication.genericName || resolvedMedication.name);
+      const identity = `${generic}::${formulationKeys(resolvedMedication).join('||')}`;
       const existing = unique.get(identity);
 
       if (!existing) {
-        unique.set(identity, medication);
+        unique.set(identity, resolvedMedication);
         continue;
       }
 
@@ -155,8 +186,8 @@ export class MedicationsService {
       // keep the row containing a real strength so the user gets the usable
       // medication record rather than an incomplete result.
       const existingComplete = existing.strengths.some((s) => !isMissingStrength(s.strength));
-      const currentComplete = medication.strengths.some((s) => !isMissingStrength(s.strength));
-      if (!existingComplete && currentComplete) unique.set(identity, medication);
+      const currentComplete = resolvedMedication.strengths.some((s) => !isMissingStrength(s.strength));
+      if (!existingComplete && currentComplete) unique.set(identity, resolvedMedication);
     }
 
     const uniqueData = Array.from(unique.values());
@@ -184,7 +215,29 @@ export class MedicationsService {
     });
 
     if (!medication) throw new NotFoundException('Medication not found.');
-    return medication;
+
+    const inferRouteFromDosageForm = (value: unknown) => {
+      const form = String(value ?? '').trim().toLowerCase();
+      if (!form) return '';
+      if (/tablet|caplet|capsule|pill|chewable|lozenge|troche|sublingual|buccal|oral|syrup|solution|suspension|powder|granule|elixir/.test(form)) return 'ORAL';
+      if (/inhaler|inhalation|nebul|aerosol/.test(form)) return 'INHALATION';
+      if (/injection|injectable|vial|ampoule|prefilled syringe/.test(form)) return 'INJECTION';
+      if (/cream|ointment|gel|lotion|paste|topical|transdermal|patch/.test(form)) return 'TOPICAL';
+      if (/ophthalmic|eye drop|ocular/.test(form)) return 'OPHTHALMIC';
+      if (/otic|ear drop/.test(form)) return 'OTIC';
+      if (/nasal|spray/.test(form)) return 'NASAL';
+      if (/suppository|rectal|enema/.test(form)) return 'RECTAL';
+      if (/vaginal|pessary/.test(form)) return 'VAGINAL';
+      return '';
+    };
+
+    return {
+      ...medication,
+      strengths: medication.strengths.map((strength) => ({
+        ...strength,
+        route: strength.route || inferRouteFromDosageForm(strength.dosageForm) || null,
+      })),
+    };
   }
 
   async update(id: string, dto: UpdateMedicationDto) {
