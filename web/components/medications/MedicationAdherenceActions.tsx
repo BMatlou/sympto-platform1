@@ -44,6 +44,37 @@ function ClinicalList({ items }: { items: ClinicalSymptom[] }) {
   return <div className="flex flex-wrap gap-2">{items.map((item) => <span key={item.id} title={item.description || item.name} className="rounded-full border border-slate-200 bg-white px-2.5 py-1.5 text-[11px] font-medium text-[#0b2d54]">{item.name}</span>)}</div>;
 }
 
+function normalise(value: unknown) {
+  return String(value ?? "").trim().toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
+}
+
+function goalMatchesMedication(goal: any, patientMedicationId: string, medicationName: string) {
+  const category = String(goal?.category ?? "").toUpperCase();
+  const status = String(goal?.status ?? "").toUpperCase();
+  if (category !== "MEDICATION" || status === "ARCHIVED") return false;
+
+  // Canonical association: this is the authoritative match.
+  if (goal?.patientMedicationId) {
+    return String(goal.patientMedicationId) === patientMedicationId;
+  }
+
+  // Legacy/unlinked medication goals: support records created before
+  // patientMedicationId was introduced, without confusing two medications.
+  const linkedMedicationId = goal?.medicationId || goal?.associatedMedicationId || goal?.medication?.id || goal?.associatedMedication?.id;
+  if (linkedMedicationId) return false;
+
+  const targetName = normalise(medicationName);
+  const goalNames = [goal?.medication?.name, goal?.medication?.genericName, goal?.title, goal?.description]
+    .map(normalise)
+    .filter(Boolean);
+
+  if (targetName && goalNames.some((name) => name === targetName || name.includes(targetName) || targetName.includes(name))) return true;
+
+  // Preserve the legacy Today-page behaviour for the historical primary
+  // Metformin "Manage medication" goal.
+  return targetName === "metformin" && normalise(goal?.title) === "manage medication";
+}
+
 export function MedicationAdherenceActions({ medicationId, medicationName, adherencePercentage }: MedicationAdherenceActionsProps) {
   const { data: dashboard } = useDashboard();
   const [saving, setSaving] = useState<"TAKEN" | "SKIPPED" | null>(null);
@@ -73,12 +104,7 @@ export function MedicationAdherenceActions({ medicationId, medicationName, adher
         const payload = response.data?.data ?? response.data;
         const goals = Array.isArray(payload?.data) ? payload.data : Array.isArray(payload) ? payload : [];
         const targetId = String(medicationId);
-        const goal = goals.find((item: any) => {
-          const category = String(item?.category ?? "").toUpperCase();
-          const status = String(item?.status ?? "").toUpperCase();
-          const linkedPatientMedicationId = String(item?.patientMedicationId ?? "");
-          return category === "MEDICATION" && status !== "ARCHIVED" && linkedPatientMedicationId === targetId;
-        });
+        const goal = goals.find((item: any) => goalMatchesMedication(item, targetId, medicationName));
 
         if (!cancelled) setMedicationGoal(goal?.id ? { id: String(goal.id) } : null);
       } catch {
@@ -90,7 +116,7 @@ export function MedicationAdherenceActions({ medicationId, medicationName, adher
 
     void loadMedicationGoal();
     return () => { cancelled = true; };
-  }, [dashboard?.patient?.id, medicationId]);
+  }, [dashboard?.patient?.id, medicationId, medicationName]);
 
   useEffect(() => {
     let cancelled = false;
