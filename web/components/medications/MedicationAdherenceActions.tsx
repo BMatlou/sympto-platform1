@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { AlertTriangle, Check, ChevronDown, CircleSlash2, Info, ShieldCheck, Sparkles } from "lucide-react";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
@@ -111,9 +112,10 @@ export function MedicationAdherenceActions({ medicationId, medicationName, adher
       <div className="rounded-xl border border-slate-200 bg-slate-50/70 p-3">
         <div className="flex flex-wrap items-center justify-between gap-2">
           <div><p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-400">Adherence</p><p className="mt-1 text-sm font-bold text-[#0b2d54]">{adherence == null ? "Not recorded yet" : `${Math.round(adherence)}% overall`}</p></div>
-          <div className="flex gap-2">
+          <div className="flex flex-wrap gap-2">
             <button type="button" disabled={Boolean(saving)} onClick={() => record("TAKEN")} className="inline-flex items-center gap-1.5 rounded-xl bg-[#0b2d54] px-3 py-2 text-xs font-semibold text-white disabled:opacity-50"><Check className="h-3.5 w-3.5" />{saving === "TAKEN" ? "Saving…" : "Taken"}</button>
             <button type="button" disabled={Boolean(saving)} onClick={() => record("SKIPPED")} className="inline-flex items-center gap-1.5 rounded-xl border border-slate-300 bg-white px-3 py-2 text-xs font-semibold text-slate-700 disabled:opacity-50"><CircleSlash2 className="h-3.5 w-3.5" />{saving === "SKIPPED" ? "Saving…" : "Skipped"}</button>
+            <Link href={`/health-goals?open=medication&patientMedicationId=${encodeURIComponent(medicationId)}&name=${encodeURIComponent(medicationName)}`} className="inline-flex items-center gap-1.5 rounded-xl border border-[#24c1c4]/30 bg-white px-3 py-2 text-xs font-semibold text-[#0b2d54] hover:bg-[#24c1c4]/5">Set medication goal</Link>
           </div>
         </div>
       </div>
