@@ -1,5 +1,7 @@
 name: Temporary medication Continue fix
 on:
+  push:
+    branches: [feat/multi-goal-clean]
   workflow_dispatch:
 
 jobs:
@@ -35,5 +37,6 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add web/app/medications/page.tsx
+          git diff --cached --quiet && exit 0
           git commit -m "Allow Continue when medication route is known"
           git push origin feat/multi-goal-clean
