@@ -52,7 +52,7 @@ export class GoalsEngineService {
   private async restoreHistoricalAchievements(patientId: string, metricType: string, metricKey: string, now: Date) {
     const legacy = await this.prisma.$queryRaw<Array<{ healthGoalId: string }>>`SELECT c."healthGoalId" FROM "HealthGoalMetricConfig" c INNER JOIN "HealthGoal" g ON g."id" = c."healthGoalId" WHERE g."patientId" = ${patientId} AND g."status" = 'ACTIVE' AND c."metricType" = ${metricType} AND c."metricKey" = ${metricKey} AND EXISTS (SELECT 1 FROM "HealthGoalProgress" p WHERE p."healthGoalId" = g."id" AND p."status" = 'ACHIEVED')`;
     if (!legacy.length) return;
-    const currentRows = await this.prisma.$queryRaw<Array<{ loggedValue: number | null }>>`SELECT "loggedValue" FROM "HealthGoalMetricEvent" WHERE "patientId" = ${patientId} AND "metricType" = ${metricType} AND "metricKey" = ${metricKey} AND "occurredAt" <= ${now} ORDER BY "occurredAt" DESC LIMIT 1`;
+    const currentRows = await this.prisma.$queryRaw<Array<{ loggedValue: number | null }>>`SELECT "loggedValue" FROM "HealthGoalMetricEvent" WHERE "patientId" = ${patientId} AND "metricType" = ${metricType} AND "metricKey" = ${metricKey} AND "occurredAt" <= ${now} AND "source" <> 'goal-baseline' ORDER BY "occurredAt" DESC LIMIT 1`;
     const currentValue = currentRows[0]?.loggedValue == null ? null : Number(currentRows[0].loggedValue);
     for (const goal of legacy) await this.prisma.$transaction(async (tx) => {
       await tx.healthGoal.update({ where: { id: goal.healthGoalId }, data: { status: 'ACHIEVED', achievedAt: now, ...(currentValue != null ? { currentValue: String(currentValue) } : {}) } });
@@ -144,12 +144,30 @@ export class GoalsEngineService {
     switch (aggregation) { case 'SUM': return values.reduce((sum, value) => sum + value, 0); case 'AVERAGE': return values.reduce((sum, value) => sum + value, 0) / values.length; case 'MIN': return Math.min(...values); case 'MAX': return Math.max(...values); case 'LATEST': default: return values[values.length - 1]; }
   }
 
+  private async evaluateWeightStrategy(patientId: string, title: string, config: GoalConfig, goalCreatedAt: Date, now: Date, target: number): Promise<StrategyEvaluation> {
+    const baselineRows = await this.prisma.$queryRaw<Array<{ loggedValue: Prisma.Decimal }>>`SELECT "loggedValue" FROM "HealthGoalMetricEvent" WHERE "patientId" = ${patientId} AND "metricType" = 'WEIGHT' AND "metricKey" = 'weight.kg' AND "source" = 'goal-baseline' AND "sourceId" = ${config.healthGoalId} LIMIT 1`;
+    const historicalRows = !baselineRows.length && !Number.isNaN(goalCreatedAt.getTime())
+      ? await this.prisma.$queryRaw<Array<{ loggedValue: Prisma.Decimal }>>`SELECT "loggedValue" FROM "HealthGoalMetricEvent" WHERE "patientId" = ${patientId} AND "metricType" = 'WEIGHT' AND "metricKey" = 'weight.kg' AND "source" <> 'goal-baseline' AND "occurredAt" <= ${goalCreatedAt} ORDER BY "occurredAt" DESC LIMIT 1`
+      : [];
+    const latestRows = await this.prisma.$queryRaw<Array<{ loggedValue: Prisma.Decimal }>>`SELECT "loggedValue" FROM "HealthGoalMetricEvent" WHERE "patientId" = ${patientId} AND "metricType" = 'WEIGHT' AND "metricKey" = 'weight.kg' AND "source" <> 'goal-baseline' AND "occurredAt" <= ${now} ORDER BY "occurredAt" DESC LIMIT 1`;
+    const baseline = baselineRows.length ? Number(baselineRows[0].loggedValue) : historicalRows.length ? Number(historicalRows[0].loggedValue) : latestRows.length ? Number(latestRows[0].loggedValue) : null;
+    const latest = latestRows.length ? Number(latestRows[0].loggedValue) : baseline;
+    if (baseline == null || latest == null || !Number.isFinite(baseline) || !Number.isFinite(latest) || target < 0) return { strategy: 'DELTA_REDUCTION', currentValue: latest ?? baseline ?? 0, progressPercent: 0, achieved: false, guidanceText: `${title}: keep tracking weight toward the target.` };
+    const targetWeight = config.comparison === 'INCREASE_TO' ? baseline + target : baseline - target;
+    const movement = config.comparison === 'INCREASE_TO' ? Math.max(latest - baseline, 0) : Math.max(baseline - latest, 0);
+    const progressPercent = target === 0 ? 100 : Math.max(0, Math.min(100, (movement / target) * 100));
+    const achieved = config.comparison === 'INCREASE_TO' ? latest >= targetWeight : latest <= targetWeight;
+    const guidanceText = achieved ? `${title}: target met at ${targetWeight.toFixed(1)} kg.` : `${title}: keep tracking weight toward ${targetWeight.toFixed(1)} kg.`;
+    return { strategy: 'DELTA_REDUCTION', currentValue: latest, progressPercent: achieved ? 100 : progressPercent, achieved, guidanceText };
+  }
+
   private async evaluateStrategy(patientId: string, title: string, config: GoalConfig, goalCreatedAt: Date, start: Date, now: Date, aggregate: number, target: number, strategy: TrackingStrategy): Promise<StrategyEvaluation> {
+    if (strategy === 'DELTA_REDUCTION') return this.evaluateWeightStrategy(patientId, title, config, goalCreatedAt, now, target);
     const history = await this.prisma.$queryRaw<Array<{ loggedValue: Prisma.Decimal; occurredAt: Date }>>`SELECT "loggedValue", "occurredAt" FROM "HealthGoalMetricEvent" WHERE "patientId" = ${patientId} AND "metricType" = ${config.metricType} AND "metricKey" = ${config.metricKey} AND "occurredAt" >= ${goalCreatedAt} AND "occurredAt" <= ${now} ORDER BY "occurredAt" ASC`;
     const values = history.map((row) => Number(row.loggedValue)).filter(Number.isFinite);
     const latest = values.length ? values[values.length - 1] : aggregate;
     let progressPercent = 0; let achieved = false; let currentValue = latest;
-    if (strategy === 'DELTA_REDUCTION' || strategy === 'STEP_DOWN_TAPER') { const baseline = values.length ? values[0] : aggregate; const reduction = baseline - latest; progressPercent = baseline === 0 ? 100 : Math.max(0, Math.min(100, (reduction / Math.abs(baseline)) * 100)); achieved = config.comparison === 'AT_MOST' ? aggregate <= target : latest <= target; }
+    if (strategy === 'STEP_DOWN_TAPER') { const baseline = values.length ? values[0] : aggregate; const reduction = baseline - latest; progressPercent = baseline === 0 ? 100 : Math.max(0, Math.min(100, (reduction / Math.abs(baseline)) * 100)); achieved = config.comparison === 'AT_MOST' ? aggregate <= target : latest <= target; }
     else if (strategy === 'CADENCE_ACCUMULATION') { currentValue = aggregate; progressPercent = target <= 0 ? 100 : Math.max(0, Math.min(100, (aggregate / target) * 100)); achieved = config.comparison === 'AT_LEAST' ? aggregate >= target : aggregate <= target; }
     else if (strategy === 'ADHERENCE_SCORE') { currentValue = aggregate; progressPercent = Math.max(0, Math.min(100, aggregate)); achieved = aggregate >= target; }
     else if (strategy === 'TARGET_RANGE_STABILIZATION') { currentValue = latest; progressPercent = target <= 0 ? 100 : Math.max(0, Math.min(100, 100 - (Math.abs(latest - target) / Math.max(Math.abs(target), 1)) * 100)); achieved = config.comparison === 'AT_MOST' ? latest <= target : config.comparison === 'AT_LEAST' ? latest >= target : Math.abs(latest - target) < 0.5; }
