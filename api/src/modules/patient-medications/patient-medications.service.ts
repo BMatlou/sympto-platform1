@@ -251,8 +251,12 @@ export class PatientMedicationsService {
     return { reminder: notification, scheduledFor: scheduledFor.toISOString() };
   }
 
-  async remove(id: string) {
-    await this.findOne(id);
+  async remove(id: string, authenticatedUserId: string) {
+    const medication = await this.findOne(id);
+    const ownerUserId = medication.healthPassport.patient.userId;
+    if (!authenticatedUserId || ownerUserId !== authenticatedUserId) {
+      throw new NotFoundException('Patient medication not found.');
+    }
     await this.prisma.patientMedication.delete({ where: { id } });
     return { message: 'Patient medication deleted successfully.' };
   }
