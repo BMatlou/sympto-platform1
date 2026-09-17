@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useMemo, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { ArrowLeft, Check, ChevronDown, Clock3, FileText, Pill, Plus, ShieldCheck, Sparkles } from "lucide-react";
 import { useDashboard } from "@/hooks/use-dashboard";
 import { MedicationReminderButton } from "@/components/medications/MedicationReminderButton";
@@ -58,9 +58,11 @@ function MedicationForm({ value, onChange }: { value: MedicationItem; onChange: 
   const [selectedName, setSelectedName] = useState("");
   const [selectedMedication, setSelectedMedication] = useState<any | null>(null);
   const [custom, setCustom] = useState<Record<string, boolean>>({});
+  const [indicationOptions, setIndicationOptions] = useState<string[]>([]);
+  const [loadingIndications, setLoadingIndications] = useState(false);
 
   async function searchMedication(term: string) {
-    setSearch(term); setSelectedName(""); setSelectedMedication(null); onChange({ ...value, medicationId: "", dosage: "", route: "" });
+    setSearch(term); setSelectedName(""); setSelectedMedication(null); setIndicationOptions([]); onChange({ ...value, medicationId: "", dosage: "", route: "", indication: "" });
     if (term.trim().length < 2) { setResults([]); return; }
     try { setSearching(true); const { data } = await api.get("/medications", { params: { search: term.trim(), limit: 10, page: 1 } }); setResults(Array.isArray(data?.data?.data) ? data.data.data : []); }
     catch { setResults([]); }
@@ -69,6 +71,26 @@ function MedicationForm({ value, onChange }: { value: MedicationItem; onChange: 
   const set = (key: keyof MedicationItem, val: any) => onChange({ ...value, [key]: val });
   const choose = (key: keyof MedicationItem, val: string) => { const other = val === "Other"; setCustom(c => ({ ...c, [String(key)]: other })); set(key, other ? "" : val); };
 
+  useEffect(() => {
+    let cancelled = false;
+    async function loadIndications() {
+      if (!value.medicationId) { setIndicationOptions([]); return; }
+      try {
+        setLoadingIndications(true);
+        const { data } = await api.get(`/medications/${value.medicationId}/clinical-reference`);
+        const symptoms = Array.isArray(data?.data?.relievesSymptoms) ? data.data.relievesSymptoms : [];
+        const names = Array.from(new Set(symptoms.map((s: any) => String(s?.name || "").trim()).filter(Boolean)));
+        if (!cancelled) setIndicationOptions(names);
+      } catch {
+        if (!cancelled) setIndicationOptions([]);
+      } finally {
+        if (!cancelled) setLoadingIndications(false);
+      }
+    }
+    loadIndications();
+    return () => { cancelled = true; };
+  }, [value.medicationId]);
+
   const strengths = useMemo(() => { const rows = Array.isArray(selectedMedication?.strengths) ? selectedMedication.strengths : []; return Array.from(new Set(rows.map((s: any) => String(s?.strength || "").trim()).filter(v => v && !/^(unspecified|unknown|n\/a|na|not specified)$/i.test(v)))); }, [selectedMedication]);
   const routeCandidates = useMemo(() => { const rows = Array.isArray(selectedMedication?.strengths) ? selectedMedication.strengths : []; return Array.from(new Set(rows.map((s: any) => String(s?.route || "").trim().toUpperCase() || inferRouteFromDosageForm(s?.dosageForm)).filter(Boolean))); }, [selectedMedication]);
   const dosageForms = useMemo(() => { const rows = Array.isArray(selectedMedication?.strengths) ? selectedMedication.strengths : []; return Array.from(new Set(rows.map((s: any) => String(s?.dosageForm || "").trim()).filter(Boolean))); }, [selectedMedication]);
@@ -76,6 +98,8 @@ function MedicationForm({ value, onChange }: { value: MedicationItem; onChange: 
   const routeLabel = knownRoute ? formatRouteLabel(knownRoute) : "";
   const doseOptions = strengths.length === 1 ? strengths : strengths.length > 1 ? [...strengths, "Other"] : DOSES;
   const routeIsKnown = Boolean(knownRoute);
+  const indicationSelectOptions = indicationOptions.length > 0 ? [...indicationOptions, "Other"] : REASONS;
+  const indicationPlaceholder = loadingIndications ? "Loading options…" : indicationOptions.length ? "Choose what you're treating" : "Choose a reason";
   const canNext = step === 1 ? Boolean(value.medicationId && value.dosage && value.frequency && value.route) : step === 2 ? Boolean(value.indication && value.instructions && value.startedAt) : true;
 
   return <div className="space-y-6">
@@ -90,14 +114,14 @@ function MedicationForm({ value, onChange }: { value: MedicationItem; onChange: 
             {value.medicationId && <span className="pointer-events-none absolute right-4 top-1/2 flex -translate-y-1/2 items-center gap-1.5 rounded-full bg-emerald-50 px-2.5 py-1 text-[10px] font-bold text-emerald-700"><Check className="h-3.5 w-3.5" />Medicine recognised</span>}
             {searching && !value.medicationId && <span className="absolute right-4 top-1/2 -translate-y-1/2 text-[11px] text-slate-400">Searching…</span>}
           </div>
-          {value.medicationId && <div className="mt-2 flex items-center justify-between gap-3"><p className="text-[11px] text-slate-400">Selected from Sympto's medicine reference library.</p><button type="button" onClick={() => { setSelectedName(""); setSearch(""); setResults([]); setSelectedMedication(null); onChange({ ...value, medicationId: "", dosage: "", route: "" }); }} className="text-[11px] font-semibold text-[#0b2d54] hover:text-[#24c1c4]">Choose a different medicine</button></div>}
+          {value.medicationId && <div className="mt-2 flex items-center justify-between gap-3"><p className="text-[11px] text-slate-400">Selected from Sympto's medicine reference library.</p><button type="button" onClick={() => { setSelectedName(""); setSearch(""); setResults([]); setSelectedMedication(null); setIndicationOptions([]); onChange({ ...value, medicationId: "", dosage: "", route: "", indication: "" }); }} className="text-[11px] font-semibold text-[#0b2d54] hover:text-[#24c1c4]">Choose a different medicine</button></div>}
         {results.length > 0 && !value.medicationId && <div className="mt-2 overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-xl shadow-slate-200/40">{results.map(r => { const formulations = getFormulationSummaries(r); const formulationRows = Array.isArray(r?.strengths) ? r.strengths : []; return <button key={r.id} type="button" onClick={() => {
           const strengthsForMedication = Array.isArray(r?.strengths) ? r.strengths : [];
           const uniqueStrengths = Array.from(new Set(strengthsForMedication.map((s: any) => String(s?.strength || "").trim()).filter(v => v && !/^(unspecified|unknown|n\/a|na|not specified)$/i.test(v))));
           const uniqueRoutes = Array.from(new Set(strengthsForMedication.map((s: any) => String(s?.route || "").trim().toUpperCase() || inferRouteFromDosageForm(s?.dosageForm)).filter(Boolean)));
           const autoRoute = uniqueRoutes.length === 1 ? uniqueRoutes[0] : "";
-          setSelectedName(String(r.name)); setSearch(String(r.name)); setResults([]); setSelectedMedication(r);
-          onChange({ ...value, medicationId: String(r.id), dosage: uniqueStrengths.length === 1 ? uniqueStrengths[0] : "", route: autoRoute });
+          setSelectedName(String(r.name)); setSearch(String(r.name)); setResults([]); setSelectedMedication(r); setIndicationOptions([]);
+          onChange({ ...value, medicationId: String(r.id), dosage: uniqueStrengths.length === 1 ? uniqueStrengths[0] : "", route: autoRoute, indication: "" });
         }} className="flex w-full items-start justify-between gap-4 border-b border-slate-100 px-4 py-4 text-left last:border-0 hover:bg-[#24c1c4]/5"><span className="min-w-0 flex-1"><span className="block text-sm font-bold text-[#0b2d54]">{r.name || "Medicine"}</span><span className="mt-2 grid gap-x-6 gap-y-1.5 text-[11px] leading-4 sm:grid-cols-2"><span><b className="text-[#0b2d54]">Generic name:</b> {r.genericName || "Not specified"}</span><span><b className="text-[#0b2d54]">Type of medicine:</b> {formatCategoryLabel(r.category)}</span></span>{formulationRows.length > 0 && <span className="mt-3 block rounded-xl bg-slate-50 px-3 py-2.5"><span className="block text-[10px] font-bold uppercase tracking-[0.12em] text-[#24c1c4]">Available options</span><span className="mt-1.5 block space-y-1.5">{formulationRows.map((s: any, index: number) => { const rawStrength = String(s?.strength || "").trim(); const strength = /^(unspecified|unknown|n\/a|na|not specified)$/i.test(rawStrength) ? "Not specified" : rawStrength; const form = formatDosageForm(s?.dosageForm); const route = String(s?.route || "").trim().toUpperCase() || inferRouteFromDosageForm(form); return <span key={`${s?.id || index}-${strength}-${form}-${route}`} className="block text-[11px] text-slate-600"><b className="text-[#0b2d54]">Strength:</b> {strength} <span className="mx-1 text-slate-300">·</span> <b className="text-[#0b2d54]">Form:</b> {form} <span className="mx-1 text-slate-300">·</span> <b className="text-[#0b2d54]">How you take it:</b> {route ? formatRouteLabel(route) : "Not specified"}</span>; })}</span></span>}{formulationRows.length === 0 && formulations.length > 0 && <span className="mt-3 block text-[11px] font-medium text-slate-500">{formulations.join(" / ")}</span>}</span><Plus className="mt-1 h-4 w-4 shrink-0 text-[#24c1c4]" /></button>})}</div>}
           {value.medicationId && <div className="mt-4 rounded-2xl border border-[#24c1c4]/15 bg-white p-4 shadow-sm"><div className="flex items-start gap-3"><span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-[#24c1c4]/10 text-[#0b2d54]"><Check className="h-4 w-4" /></span><div className="min-w-0 flex-1"><p className="text-sm font-bold text-[#0b2d54]">Medicine details filled in</p><div className="mt-3 grid gap-3 sm:grid-cols-2"><div><p className="text-[10px] font-bold uppercase tracking-[0.1em] text-slate-400">Generic name</p><p className="mt-1 text-sm font-semibold text-[#0b2d54]">{selectedMedication?.genericName || "Not specified"}</p></div><div><p className="text-[10px] font-bold uppercase tracking-[0.1em] text-slate-400">Type of medicine</p><p className="mt-1 text-sm font-semibold text-[#0b2d54]">{formatCategoryLabel(selectedMedication?.category)}</p></div><div><p className="text-[10px] font-bold uppercase tracking-[0.1em] text-slate-400">Medicine form</p><p className="mt-1 text-sm font-semibold text-[#0b2d54]">{dosageForms.length ? dosageForms.map(formatDosageForm).join(" / ") : "Not specified"}</p></div><div><p className="text-[10px] font-bold uppercase tracking-[0.1em] text-slate-400">How you take it</p><p className="mt-1 text-sm font-semibold text-[#0b2d54]">{routeIsKnown ? routeLabel : "Choose below"}</p></div></div>{routeIsKnown && <p className="mt-3 text-[11px] font-semibold text-emerald-700">✓ How you take it was recognised automatically.</p>}</div></div></div>}
         </Field>
@@ -111,7 +135,7 @@ function MedicationForm({ value, onChange }: { value: MedicationItem; onChange: 
     </div>}
 
     {step === 2 && <div className="grid gap-5 sm:grid-cols-2 animate-in fade-in slide-in-from-right-2 duration-300">
-      <Field label="What are you taking it for?" hint="This helps Sympto understand your treatment context."><Select value={custom.indication ? "Other" : value.indication || ""} onChange={v => choose("indication", v)} options={REASONS} placeholder="Choose a reason" />{custom.indication && <div className="mt-2"><TextInput value={value.indication || ""} onChange={v => set("indication", v)} placeholder="What are you treating?" /></div>}</Field>
+      <Field label="What are you taking it for?" hint={indicationOptions.length ? "These options come from Sympto's medicine reference information. Choose the reason that matches your prescription or treatment plan." : "Tell Sympto what you are taking this medicine for."}><Select value={custom.indication ? "Other" : value.indication || ""} onChange={v => choose("indication", v)} options={indicationSelectOptions} placeholder={indicationPlaceholder} disabled={loadingIndications} />{custom.indication && <div className="mt-2"><TextInput value={value.indication || ""} onChange={v => set("indication", v)} placeholder="What are you treating?" /></div>}</Field>
       <Field label="What instructions were you given?" hint="Use the instructions on your prescription or from your healthcare professional."><Select value={custom.instructions ? "Other" : value.instructions || ""} onChange={v => choose("instructions", v)} options={INSTRUCTIONS} placeholder="Choose an instruction" />{custom.instructions && <div className="mt-2"><TextInput value={value.instructions || ""} onChange={v => set("instructions", v)} placeholder="e.g. Take 1 tablet after breakfast" /></div>}</Field>
       <Field label="When did you start?" hint="When did you start taking this medicine?"><input type="date" value={value.startedAt ? String(value.startedAt).slice(0, 10) : ""} onChange={e => set("startedAt", e.target.value || undefined)} className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3.5 text-sm text-[#0b2d54] outline-none focus:border-[#24c1c4] focus:ring-4 focus:ring-[#24c1c4]/10" /></Field>
       <div className="rounded-2xl border border-slate-200 bg-slate-50/70 p-4"><div className="flex items-center justify-between gap-4"><div><p className="text-sm font-semibold text-[#0b2d54]">I currently take this medicine</p><p className="mt-1 text-xs text-slate-500">Keep it active in Today and your health goals.</p></div><button type="button" onClick={() => set("ongoing", !(value.ongoing !== false))} className={`relative h-7 w-12 rounded-full transition-colors ${value.ongoing !== false ? "bg-[#24c1c4]" : "bg-slate-300"}`}><span className={`absolute top-1 h-5 w-5 rounded-full bg-white shadow transition-transform ${value.ongoing !== false ? "left-6" : "left-1"}`} /></button></div></div>
