@@ -159,7 +159,7 @@ export function MedicationAdherenceActions({ medicationId, medicationName, adher
 
   const goalAction = goalLoading ? null : medicationGoal ? (
     <Link
-      href={`/today?medicationGoalId=${encodeURIComponent(medicationGoal.id)}#medication-adherence-card-${encodeURIComponent(medicationId)}`}
+      href={`/today#medication-adherence-card-${encodeURIComponent(medicationId)}`}
       className="inline-flex items-center gap-1.5 rounded-xl border border-[#24c1c4]/30 bg-white px-3 py-2 text-xs font-semibold text-[#0b2d54] hover:bg-[#24c1c4]/5"
     >
       View Goal
