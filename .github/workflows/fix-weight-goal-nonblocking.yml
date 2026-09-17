@@ -1,0 +1,70 @@
+name: Fix weight goal logic
+
+on:
+  push:
+    branches:
+      - feat/multi-goal-clean
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: feat/multi-goal-clean
+          fetch-depth: 1
+      - name: Patch weight goal logic
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          import re
+
+          backend = Path('api/src/modules/health-goals/health-goals.service.ts')
+          text = backend.read_text()
+
+          old_baseline = '''    await this.prisma.$executeRaw`DELETE FROM "HealthGoalMetricEvent" WHERE "patientId" = ${patientId} AND "metricType" = 'WEIGHT' AND "metricKey" = 'weight.kg' AND "source" = 'goal-baseline' AND "sourceId" = ${goalId}`;
+    await this.prisma.$executeRaw`INSERT INTO "HealthGoalMetricEvent" ("id","patientId","metricType","metricKey","loggedValue","occurredAt","source","sourceId") VALUES (gen_random_uuid(),${patientId},'WEIGHT','weight.kg',${baseline},${createdAt},'goal-baseline',${goalId})`;'''
+          new_baseline = '''    const existingBaseline = await this.prisma.$queryRaw<Array<{ id: string }>>`SELECT "id" FROM "HealthGoalMetricEvent" WHERE "patientId" = ${patientId} AND "metricType" = 'WEIGHT' AND "metricKey" = 'weight.kg' AND "source" = 'goal-baseline' AND "sourceId" = ${goalId} LIMIT 1`;
+    if (existingBaseline.length) return;
+    await this.prisma.$executeRaw`INSERT INTO "HealthGoalMetricEvent" ("id","patientId","metricType","metricKey","loggedValue","occurredAt","source","sourceId") VALUES (gen_random_uuid(),${patientId},'WEIGHT','weight.kg',${baseline},${createdAt},'goal-baseline',${goalId})`;'''
+          if old_baseline not in text:
+              raise SystemExit('Expected immutable-baseline block not found; no changes made.')
+          text = text.replace(old_baseline, new_baseline, 1)
+
+          old_insert = '''VALUES (gen_random_uuid(), ${goalId}, ${config.metricType ?? null}, ${config.metricKey ?? null}, ${config.frequency ?? null}, ${config.aggregation ?? null}, ${config.comparison ?? null}, ${config.guidanceText ?? null})`;'''
+          new_insert = '''VALUES (gen_random_uuid(), ${goalId}, ${config.metricType ?? null}, ${config.metricKey ?? null}, ${config.frequency ?? null}, ${config.frequencyTarget ?? null}, ${config.aggregation ?? null}, ${config.comparison ?? null}, ${config.guidanceText ?? null})`;'''
+          if old_insert not in text:
+              raise SystemExit('Expected metric-config insert block not found; no changes made.')
+          text = text.replace(old_insert, new_insert, 1)
+          backend.write_text(text)
+
+          frontend = Path('web/app/health-goals/page.tsx')
+          text = frontend.read_text()
+          old_guard = '''      if (draft.weightDirection === "LOSE" && (analysis.underweightNow || analysis.targetBelowHealthy)) {
+        toast.error("This weight-loss target would move you below the adult BMI screening range. Choose a smaller target or a health-focused goal, and consider discussing your weight goal with a healthcare professional.");
+        return;
+      }'''
+          new_guard = '''      if (draft.weightDirection === "LOSE" && (analysis.underweightNow || analysis.targetBelowHealthy)) {
+        toast.warning("Weight goal saved. This target is below the standard adult BMI healthy screening range; review the goal with a healthcare professional.");
+      }'''
+          if old_guard not in text:
+              raise SystemExit('Expected BMI save guard not found; no changes made.')
+          text = text.replace(old_guard, new_guard, 1)
+          text, removed = re.subn(r'\n\s*\|\|\s*\(draft\.category === "WEIGHT"\s*&&\s*!!advisor\?\.targetBelowHealthy\s*&&\s*draft\.weightDirection === "LOSE"\)', '', text, count=1)
+          if removed != 1:
+              raise SystemExit('Expected BMI button guard not found; no changes made.')
+          frontend.write_text(text)
+
+          Path('.github/workflows/fix-weight-goal-nonblocking.yml').unlink()
+          PY
+      - name: Commit fixes
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add api/src/modules/health-goals/health-goals.service.ts web/app/health-goals/page.tsx .github/workflows/fix-weight-goal-nonblocking.yml
+          git diff --cached --check
+          git commit -m "fix: preserve weight baselines and keep BMI advice non-blocking"
+          git push origin feat/multi-goal-clean
