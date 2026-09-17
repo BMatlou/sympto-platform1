@@ -56,32 +56,24 @@ ALTER TABLE "HealthGoalMetricEvent"
 
 DO $$
 BEGIN
-  IF NOT EXISTS (
-    SELECT 1 FROM pg_constraint WHERE conname = 'HealthGoalMetricConfig_healthGoalId_key'
-  ) THEN
+  IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'HealthGoalMetricConfig_healthGoalId_key') THEN
     ALTER TABLE "HealthGoalMetricConfig"
       ADD CONSTRAINT "HealthGoalMetricConfig_healthGoalId_key" UNIQUE ("healthGoalId");
   END IF;
 
-  IF NOT EXISTS (
-    SELECT 1 FROM pg_constraint WHERE conname = 'HealthGoalMetricConfig_healthGoalId_fkey'
-  ) THEN
+  IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'HealthGoalMetricConfig_healthGoalId_fkey') THEN
     ALTER TABLE "HealthGoalMetricConfig"
       ADD CONSTRAINT "HealthGoalMetricConfig_healthGoalId_fkey"
       FOREIGN KEY ("healthGoalId") REFERENCES "HealthGoal"("id") ON DELETE CASCADE ON UPDATE CASCADE;
   END IF;
 
-  IF NOT EXISTS (
-    SELECT 1 FROM pg_constraint WHERE conname = 'HealthGoalMetricConfig_frequency_check'
-  ) THEN
+  IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'HealthGoalMetricConfig_frequency_check') THEN
     ALTER TABLE "HealthGoalMetricConfig"
       ADD CONSTRAINT "HealthGoalMetricConfig_frequency_check"
       CHECK ("frequency" IN ('DAILY', 'WEEKLY', 'TOTAL'));
   END IF;
 
-  IF NOT EXISTS (
-    SELECT 1 FROM pg_constraint WHERE conname = 'HealthGoalMetricEvent_patientId_fkey'
-  ) THEN
+  IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'HealthGoalMetricEvent_patientId_fkey') THEN
     ALTER TABLE "HealthGoalMetricEvent"
       ADD CONSTRAINT "HealthGoalMetricEvent_patientId_fkey"
       FOREIGN KEY ("patientId") REFERENCES "Patient"("id") ON DELETE CASCADE;
@@ -96,9 +88,3 @@ CREATE INDEX IF NOT EXISTS "HealthGoalMetricEvent_patient_metric_idx"
 
 CREATE INDEX IF NOT EXISTS "HealthGoalMetricEvent_source_idx"
   ON "HealthGoalMetricEvent" ("source", "sourceId");
-
--- A sourceId identifies the source record for a patient. This prevents
--- concurrent retries from creating duplicate projections for the same source.
-CREATE UNIQUE INDEX IF NOT EXISTS "HealthGoalMetricEvent_patient_source_unique"
-  ON "HealthGoalMetricEvent" ("patientId", "source", "sourceId")
-  WHERE "sourceId" IS NOT NULL;
