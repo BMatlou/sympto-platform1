@@ -16,6 +16,7 @@ import TodayExerciseGoal from "@/components/today/today-exercise-goal";
 import { TODAY_GOAL_CARD_CLASS, TODAY_GOAL_FOOTER_CLASS } from "@/components/today/today-goal-card-styles";
 
 const ACTIVE_GOAL_STATUSES = new Set(["IN_PROGRESS", "ACTIVE", "ON_TRACK", "IMPROVING", "STAGNANT", "DECLINING"]);
+const TODAY_GOAL_STATUSES = new Set([...ACTIVE_GOAL_STATUSES, "ACHIEVED"]);
 
 function text(value: unknown, fallback = "—") {
   return value === null || value === undefined || value === "" ? fallback : String(value);
@@ -144,14 +145,15 @@ export default function TodayPage() {
   const appointments = data.today?.upcomingAppointments ?? [];
   const allGoals = data.goals ?? data.healthGoals ?? [];
   const activeGoalsArray = allGoals.filter((goal: any) => ACTIVE_GOAL_STATUSES.has(String(goal?.status ?? "").toUpperCase()));
+  const todayGoalArray = allGoals.filter((goal: any) => TODAY_GOAL_STATUSES.has(String(goal?.status ?? "").toUpperCase()));
   const goals = allGoals.filter((goal: any) => String(goal?.status).toUpperCase() === "ACTIVE");
   const medicationGoalCards = (Array.isArray(medications) ? medications : []).map((medication: any) => ({ medication, goal: medicationGoalFor(medication, activeGoalsArray, medications.length) }));
   const unmatchedMedicationGoals = activeGoalsArray.filter((goal: any) => isMedicationGoal(goal) && !medicationGoalCards.some((item: any) => item.goal?.id === goal?.id));
   const medicationGoal = medicationGoalCards.find((item: any) => item.goal)?.goal || unmatchedMedicationGoals[0] || null;
-  const smokingGoal = goals.find((goal: any) => String(goal?.category ?? "").toUpperCase() === "SMOKING");
-  const alcoholGoal = goals.find((goal: any) => String(goal?.category ?? "").toUpperCase() === "ALCOHOL");
-  const weightGoal = goals.find((goal: any) => String(goal?.category ?? "").toUpperCase() === "WEIGHT");
-  const exerciseGoal = goals.find((goal: any) => String(goal?.category ?? "").toUpperCase() === "EXERCISE");
+  const smokingGoal = todayGoalArray.find((goal: any) => String(goal?.category ?? "").toUpperCase() === "SMOKING");
+  const alcoholGoal = todayGoalArray.find((goal: any) => String(goal?.category ?? "").toUpperCase() === "ALCOHOL");
+  const weightGoal = todayGoalArray.find((goal: any) => String(goal?.category ?? "").toUpperCase() === "WEIGHT");
+  const exerciseGoal = todayGoalArray.find((goal: any) => String(goal?.category ?? "").toUpperCase() === "EXERCISE");
 
   const attention = data.attention ?? [];
   const carePlans = data.carePlans ?? [];
@@ -179,7 +181,7 @@ export default function TodayPage() {
           {medicationGoal ? <TodayMedicationActions medications={medicationGoalCards.find((item: any) => item.goal?.id === medicationGoal?.id)?.medication ? [medicationGoalCards.find((item: any) => item.goal?.id === medicationGoal?.id).medication] : medications.length > 0 ? [medications[0]] : []} goal={medicationGoal} onUpdated={reload} /> : null}
           {smokingGoal ? <TodaySmokingGoal goal={smokingGoal} onUpdated={reload} /> : null}
           {alcoholGoal ? <TodayAlcoholGoal goal={alcoholGoal} onUpdated={reload} /> : null}
-          {weightGoal ? <TodayWeightGoal goal={weightGoal} onUpdated={reload} /> : null}
+          {weightGoal ? <TodayWeightGoal goal={weightGoal} /> : null}
           {exerciseGoal ? <TodayExerciseGoal goal={exerciseGoal} onUpdated={reload} /> : null}
         </section>}
         {attention.length > 0 && <section className="mt-7 rounded-[27px] border border-amber-200 bg-amber-50/50 p-5"><div className="flex items-center gap-2"><Bell className="h-4 w-4 text-amber-700" /><h2 className="text-sm font-black text-[#0b2d54]">Needs your attention</h2></div><div className="mt-3 space-y-2">{attention.map((item: any, index: number) => <div key={String(item.id ?? index)} className="rounded-xl bg-white p-3 text-xs text-slate-600 ring-1 ring-amber-100">{text(item.title || item.message || item.description)}</div>)}</div></section>}
