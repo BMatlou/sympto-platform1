@@ -26,9 +26,7 @@ import { QueryMedicationDto } from './dto/query-medication.dto';
 @Controller('medications')
 @UseGuards(JwtAuthGuard, PermissionsGuard)
 export class MedicationsController {
-  constructor(
-    private readonly medicationsService: MedicationsService,
-  ) {}
+  constructor(private readonly medicationsService: MedicationsService) {}
 
   @Permissions('medications.create')
   @Post()
@@ -43,6 +41,12 @@ export class MedicationsController {
   }
 
   @Permissions('medications.read')
+  @Get(':id/clinical-reference')
+  getClinicalReference(@Param('id') id: string) {
+    return this.medicationsService.getClinicalReference(id);
+  }
+
+  @Permissions('medications.read')
   @Get(':id')
   findOne(@Param('id') id: string) {
     return this.medicationsService.findOne(id);
@@ -50,10 +54,7 @@ export class MedicationsController {
 
   @Permissions('medications.update')
   @Patch(':id')
-  update(
-    @Param('id') id: string,
-    @Body() dto: UpdateMedicationDto,
-  ) {
+  update(@Param('id') id: string, @Body() dto: UpdateMedicationDto) {
     return this.medicationsService.update(id, dto);
   }
 
