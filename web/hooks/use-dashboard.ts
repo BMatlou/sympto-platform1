@@ -74,7 +74,7 @@ function normalizeGoals(result: HealthHomeResponse, fullGoals: any[]) {
       const currentValue = hasSmokingMeasurement && goal?.currentValue != null ? Number(goal.currentValue) : hasSmokingMeasurement && latestRecordedProgress?.currentValue != null ? Number(latestRecordedProgress.currentValue) : null;
       const hasReachedTarget = currentValue != null && Number.isFinite(currentValue) && target > 0 && currentValue <= target;
       const storedAsFalseAchievement = String(goal?.status ?? "").toUpperCase() === "ACHIEVED" && !hasReachedTarget;
-      const guidanceText = !hasSmokingMeasurement ? `No daily cigarette count logged yet. Your target is ${target || "your configured"} cigarettes/day; log each day to track the step-down taper.` : currentValue != null && currentValue <= target ? `On track: ${currentValue} cigarette${currentValue === 1 ? "" : "s"} today, at or below your ${target}-cigarette daily target.` : `Above target today. Keep logging your daily count so Sympto can track your step-down taper toward ${target} cigarettes/day.`;
+      const guidanceText = !hasSmokingMeasurement ? `No daily cigarette count logged yet. Your target is ${target || "your configured"} cigarettes/day; log each day to track the step-down taper.` : currentValue != null && currentValue <= target ? `On track: ${currentValue} cigarette${currentValue === 1 ? "" : "s"} today, at or below your ${target}-cigarette daily target.` : `Above target today. Keep logging your daily count so Sympto can track its step-down taper toward ${target} cigarettes/day.`;
       if (storedAsFalseAchievement || !hasSmokingMeasurement) return { ...goal, status: storedAsFalseAchievement ? "ACTIVE" : goal?.status ?? "ACTIVE", currentValue: null, achievedAt: storedAsFalseAchievement ? null : goal?.achievedAt ?? null, description: guidanceText, latestProgress: { ...(latestRecordedProgress ?? {}), currentValue: null, progressPercent: storedAsFalseAchievement ? 0 : Number(latestRecordedProgress?.progressPercent ?? 0), status: "IMPROVING", notes: guidanceText } };
       return { ...goal, currentValue, description: guidanceText, latestProgress: { ...(latestRecordedProgress ?? {}), currentValue, progressPercent: Number(latestRecordedProgress?.progressPercent ?? 0), status: hasReachedTarget ? "ACHIEVED" : "IMPROVING", notes: guidanceText } };
     }
@@ -109,7 +109,10 @@ export function useDashboard() {
       const normalizedMedications = normalizeMedicationDetails(Array.isArray(result.medications) ? result.medications : []);
       const hydratedMedications = await hydrateSavedMedicationDetails(normalizedMedications);
       const fullGoalsResponse = await healthGoalsService.list(result.patient.id);
-      const fullGoals = (Array.isArray(fullGoalsResponse?.data) ? fullGoalsResponse.data : Array.isArray(fullGoalsResponse) ? fullGoalsResponse : []).filter((goal: any) => String(goal?.status ?? "").toUpperCase() !== "CANCELLED");
+      const fullGoals = (Array.isArray(fullGoalsResponse?.data) ? fullGoalsResponse.data : Array.isArray(fullGoalsResponse) ? fullGoalsResponse : []).filter((goal: any) => {
+        const status = String(goal?.status ?? "").toUpperCase();
+        return !["CANCELLED", "DELETED", "ARCHIVED"].includes(status) && !goal?.deletedAt;
+      });
       const normalizedGoals = normalizeGoals({ ...result, medications: hydratedMedications }, fullGoals);
       setData({ ...result, medications: hydratedMedications, goals: normalizedGoals, healthGoals: normalizedGoals, today: { ...result.today, activeMedications: hydratedMedications, activeGoalCount: normalizedGoals.filter((goal: any) => ["ACTIVE", "IN_PROGRESS"].includes(String(goal?.status ?? "").toUpperCase())).length } });
       firstLoad.current = false;
@@ -122,9 +125,11 @@ export function useDashboard() {
     firstLoad.current = true;
     void loadDashboard();
     const handleNavigation = () => void loadDashboard();
+    const handleGoalChange = () => void loadDashboard();
     window.addEventListener("popstate", handleNavigation);
+    window.addEventListener("sympto:health-goal-updated", handleGoalChange);
     const refresh = window.setInterval(() => { if (document.visibilityState === "visible") void loadDashboard(); }, REFRESH_INTERVAL_MS);
-    return () => { window.removeEventListener("popstate", handleNavigation); window.clearInterval(refresh); };
+    return () => { window.removeEventListener("popstate", handleNavigation); window.removeEventListener("sympto:health-goal-updated", handleGoalChange); window.clearInterval(refresh); };
   }, [loadDashboard]);
   return { data, loading, error, reload: loadDashboard };
 }
