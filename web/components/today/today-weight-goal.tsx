@@ -32,10 +32,7 @@ export default function TodayWeightGoal({ goal, fallbackWeight }: Props) {
         const goalBaseline = all.find((event) => event.source === "goal-baseline" && event.sourceId === goalId);
         const goalCreatedAt = new Date(String(goal?.createdAt ?? ""));
         const baselineFromHistory = !Number.isNaN(goalCreatedAt.getTime()) ? [...all].reverse().find((event) => event.source !== "goal-baseline" && new Date(event.occurredAt).getTime() <= goalCreatedAt.getTime()) : null;
-        // Synthetic goal-baseline rows are never current user measurements. A baseline from
-        // another goal must never become today's weight simply because it is the latest row.
         const regular = all.filter((event) => event.source !== "goal-baseline");
-        // Prefer the real measurement at/before creation; the synthetic baseline is only a fallback.
         setBaselineWeight(baselineFromHistory?.loggedValue ?? goalBaseline?.loggedValue ?? null);
         setEvents(regular);
       } catch { if (active) { setEvents([]); setBaselineWeight(null); } }
@@ -71,14 +68,7 @@ export default function TodayWeightGoal({ goal, fallbackWeight }: Props) {
   const expectedProgress = journey.totalDays != null && journey.totalDays > 0 ? Math.min(100, Math.max(0, ((journey.journeyDay - 1) / journey.totalDays) * 100)) : null;
   const onTrack = targetReached || expectedProgress == null || progress >= expectedProgress - 10;
   const weeksLeft = journey.daysLeft != null ? journey.daysLeft / 7 : null;
-  // Remaining is the actual distance from the current weight to the target body weight.
-  // This matters when the user moves in the opposite direction: a 2 kg gain on a 10 kg loss goal
-  // means 12 kg remains to reach the target body weight, not 10 kg.
-  const remainingGoalAmount = targetWeight != null && currentWeight != null
-    ? comparison === "DECREASE_TO"
-      ? Math.max(currentWeight - targetWeight, 0)
-      : Math.max(targetWeight - currentWeight, 0)
-    : null;
+  const remainingGoalAmount = targetWeight != null && currentWeight != null ? comparison === "DECREASE_TO" ? Math.max(currentWeight - targetWeight, 0) : Math.max(targetWeight - currentWeight, 0) : null;
   const requiredWeeklyChange = targetReached ? 0 : remainingGoalAmount != null && weeksLeft && weeksLeft > 0 ? remainingGoalAmount / weeksLeft : null;
   const requiredDailyChange = targetReached ? 0 : remainingGoalAmount != null && journey.daysLeft != null && journey.daysLeft > 0 ? remainingGoalAmount / journey.daysLeft : null;
   const heightCm = numberValue(goal?.patient?.heightCm ?? goal?.heightCm);
@@ -95,7 +85,9 @@ export default function TodayWeightGoal({ goal, fallbackWeight }: Props) {
       : changeKg != null && changeKg < 0
         ? `${formatKg(Math.abs(changeKg))} kg lost from ${formatKg(startingWeight)} kg · moving away from target`
         : `${formatKg(gainedKg)} kg gained from ${formatKg(startingWeight)} kg`;
-  const targetLabel = comparison === "DECREASE_TO" ? `Lose ${formatKg(targetAmount)} kg · target body weight ${formatKg(targetWeight)} kg` : `Gain ${formatKg(targetAmount)} kg · target body weight ${formatKg(targetWeight)} kg`;
+  const targetLabel = comparison === "DECREASE_TO"
+    ? `${formatKg(remainingGoalAmount)} kg to target · target body weight ${formatKg(targetWeight)} kg`
+    : `${formatKg(remainingGoalAmount)} kg to target · target body weight ${formatKg(targetWeight)} kg`;
 
   return (
     <article className="flex h-full min-w-0 flex-col overflow-hidden rounded-[30px] border border-[#dfeaec] bg-white shadow-[0_18px_48px_rgba(11,45,84,.065)]">
