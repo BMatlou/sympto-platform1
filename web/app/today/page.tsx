@@ -105,6 +105,32 @@ const GOAL_META: Record<string, { label: string; icon: typeof Target; accent: st
 export default function TodayPage() {
   const { data, loading, error, reload } = useDashboard();
 
+  useEffect(() => {
+    if (loading || error || !data || typeof window === "undefined") return;
+    const hash = window.location.hash;
+    if (!hash.startsWith("#medication-adherence-card-")) return;
+
+    let attempts = 0;
+    let timer: ReturnType<typeof setTimeout> | null = null;
+    const scrollToMedicationGoal = () => {
+      const targetId = decodeURIComponent(hash.slice(1));
+      const target = document.getElementById(targetId);
+      if (target) {
+        target.scrollIntoView({ behavior: "smooth", block: "center" });
+        return;
+      }
+      if (attempts < 12) {
+        attempts += 1;
+        timer = setTimeout(scrollToMedicationGoal, 100);
+      }
+    };
+
+    requestAnimationFrame(scrollToMedicationGoal);
+    return () => {
+      if (timer) clearTimeout(timer);
+    };
+  }, [loading, error, data]);
+
   if (loading) {
     return <ProtectedRoute><main className="min-h-screen bg-[#f5fafb] p-4 sm:p-8"><div className="mx-auto max-w-[1260px] space-y-5" aria-busy="true"><div className="h-[58px] animate-pulse rounded-[24px] bg-white" /><div className="h-[270px] animate-pulse rounded-[30px] bg-white" /><div className="h-[420px] animate-pulse rounded-[27px] bg-white" /></div></main></ProtectedRoute>;
   }
@@ -140,7 +166,7 @@ export default function TodayPage() {
 
   return (
     <ProtectedRoute>
-      <main className="min-h-screen bg-[#f5fafb] text-[#17314e]"><div className="mx-auto max-w-[1260px] px-4 pb-12 pt-4 sm:px-7 sm:pt-6">
+      <main className="min-h-screen bg-[#f5fafb] text-[#17314e"><div className="mx-auto max-w-[1260px] px-4 pb-12 pt-4 sm:px-7 sm:pt-6">
         <header className="mb-5 flex items-center justify-between"><Link href="/dashboard" className="inline-flex min-h-10 items-center gap-2 rounded-xl px-2 text-sm font-semibold text-[#0b2d54] hover:bg-white"><ArrowLeft className="h-4 w-4" />My Health</Link><span className="rounded-full bg-white px-3 py-1.5 text-[10px] font-black uppercase tracking-[0.16em] text-[#71839a] shadow-sm ring-1 ring-[#e0ebef]">Today</span></header>
         <section className="rounded-[30px] bg-gradient-to-br from-[#08284a] via-[#0e4773] to-[#24babe] p-7 text-white shadow-[0_20px_55px_rgba(11,45,84,0.12)] sm:p-9"><p className="text-sm font-medium text-white/75">Hi {firstName}</p><div className="mt-3 flex flex-col gap-5 sm:flex-row sm:items-end sm:justify-between"><div><h1 className="text-3xl font-black tracking-[-0.04em] sm:text-4xl">What do I do today?</h1><p className="mt-2 max-w-xl text-sm leading-6 text-white/70">Your important health actions, brought together in one place.</p></div><Link href="/log-symptom" className="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl bg-white/12 px-4 py-2 text-xs font-bold text-white ring-1 ring-white/20"><Sparkles className="h-4 w-4" />Log a symptom</Link></div></section>
         <div className="mt-7 flex items-end justify-between gap-5"><h2 className="text-xl font-black tracking-[-.045em] text-[#0b2d54]">Today, organised</h2><p className="hidden text-right text-[11px] text-[#74859a] sm:block">Only the things worth acting on.</p></div>
@@ -151,12 +177,14 @@ export default function TodayPage() {
         <div id="today-goals" className="mt-7 flex items-end justify-between gap-5"><h2 className="text-xl font-black tracking-[-.045em] text-[#0b2d54]">Your active goals</h2><Link href="/health-goals" className="text-[10px] font-black text-[#0b2d54]">Manage goals <ArrowRight className="ml-1 inline h-3.5 w-3.5" /></Link></div>
         {(medicationGoal || smokingGoal || alcoholGoal || weightGoal || exerciseGoal) && <section className="mt-3.5 grid items-stretch gap-4 lg:grid-cols-2">
           {medicationGoal ? <TodayMedicationActions medications={medicationGoalCards.find((item: any) => item.goal?.id === medicationGoal?.id)?.medication ? [medicationGoalCards.find((item: any) => item.goal?.id === medicationGoal?.id).medication] : medications.length > 0 ? [medications[0]] : []} goal={medicationGoal} onUpdated={reload} /> : null}
-          {smokingGoal ? <TodaySmokingGoal goal={smokingGoal} /> : null}
+          {smokingGoal ? <TodaySmokingGoal goal={smokingGoal} onUpdated={reload} /> : null}
           {alcoholGoal ? <TodayAlcoholGoal goal={alcoholGoal} onUpdated={reload} /> : null}
-          {weightGoal ? <TodayWeightGoal goal={weightGoal} fallbackWeight={weightKg} /> : null}
-          {exerciseGoal ? <TodayExerciseGoal goal={exerciseGoal} /> : null}
+          {weightGoal ? <TodayWeightGoal goal={weightGoal} onUpdated={reload} /> : null}
+          {exerciseGoal ? <TodayExerciseGoal goal={exerciseGoal} onUpdated={reload} /> : null}
         </section>}
-        {!medicationGoal && !smokingGoal && !alcoholGoal && !weightGoal && !exerciseGoal && <Link href="/health-goals" className="mt-4 inline-flex min-h-10 items-center gap-2 rounded-xl bg-[#0b2d54] px-4 py-2.5 text-[10px] font-black text-white">Set a health goal <ArrowRight className="h-3.5 w-3.5" /></Link>}
+        {attention.length > 0 && <section className="mt-7 rounded-[27px] border border-amber-200 bg-amber-50/50 p-5"><div className="flex items-center gap-2"><Bell className="h-4 w-4 text-amber-700" /><h2 className="text-sm font-black text-[#0b2d54]">Needs your attention</h2></div><div className="mt-3 space-y-2">{attention.map((item: any, index: number) => <div key={String(item.id ?? index)} className="rounded-xl bg-white p-3 text-xs text-slate-600 ring-1 ring-amber-100">{text(item.title || item.message || item.description)}</div>)}</div></section>}
+        {todayAppointments.length > 0 && <section className="mt-7 rounded-[27px] border border-[#e0ebef] bg-white p-5"><div className="flex items-center gap-2"><CalendarDays className="h-4 w-4 text-[#24c1c4]" /><h2 className="text-sm font-black text-[#0b2d54]">Today&apos;s appointments</h2></div><div className="mt-3 space-y-2">{todayAppointments.map((appointment: any, index: number) => <div key={String(appointment.id ?? index)} className="flex items-center justify-between gap-3 rounded-xl bg-slate-50 p-3 text-xs"><span className="font-semibold text-[#0b2d54]">{text(appointment.title || appointment.type || "Appointment")}</span><span className="text-slate-500">{formatDate(appointment.scheduledStart, true)}</span></div>)}</div></section>}
+        {careTasks.length > 0 && <section className="mt-7 rounded-[27px] border border-[#e0ebef] bg-white p-5"><div className="flex items-center gap-2"><ClipboardCheck className="h-4 w-4 text-[#24c1c4]" /><h2 className="text-sm font-black text-[#0b2d54]">Care plan tasks</h2></div><div className="mt-3 space-y-2">{careTasks.map((task: any, index: number) => <div key={String(task.id ?? index)} className="rounded-xl bg-slate-50 p-3"><p className="text-xs font-semibold text-[#0b2d54]">{text(task.title || task.name || "Care task")}</p><p className="mt-1 text-[11px] text-slate-500">{text(task.carePlanTitle)}</p></div>)}</div></section>}
       </div></main>
     </ProtectedRoute>
   );
