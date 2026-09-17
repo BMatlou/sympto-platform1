@@ -153,10 +153,6 @@ export default function HealthGoalsPage() {
       const height = Number(dashboard?.patient?.heightCm);
       const analysis = weightAdvice(Number.isFinite(weight) ? weight : null, Number.isFinite(height) ? height : null, amount, draft.weightDirection, draft.targetDate);
       if (!analysis) { toast.error("Add your current weight and height before setting a weight goal."); return; }
-      if (draft.weightDirection === "LOSE" && (analysis.underweightNow || analysis.targetBelowHealthy)) {
-        toast.error("This weight-loss target would move you below the adult BMI screening range. Choose a smaller target or a health-focused goal, and consider discussing your weight goal with a healthcare professional.");
-        return;
-      }
     }
     try {
       setSaving(true);
@@ -205,7 +201,7 @@ export default function HealthGoalsPage() {
               <div className="rounded-2xl border border-[#dce9ee] bg-[#f7fbfc] p-4"><div className="flex items-start gap-3"><Target className="mt-0.5 h-4 w-4 shrink-0 text-[#0b6f73]" /><div><p className="text-xs font-black text-[#0b2d54]">Sympto will connect this goal to your health data</p><p className="mt-1 text-[11px] leading-5 text-[#74859a]">{draft.category === "WEIGHT" ? `${draft.weightDirection === "LOSE" ? "Loss" : "Gain"} goal · calculated from your current recorded weight` : `${selectedCategory?.frequency === "DAILY" ? "Daily" : selectedCategory?.frequency === "WEEKLY" ? "Weekly" : "Overall"} tracking · ${selectedCategory?.comparison === "AT_LEAST" ? "at least" : selectedCategory?.comparison === "AT_MOST" ? "at most" : selectedCategory?.comparison === "DECREASE_TO" ? "decrease toward" : "target comparison"} your target.`}</p></div></div></div>
             </>}
           </div>
-          <div className="sticky bottom-0 flex items-center justify-between gap-3 border-t border-[#edf2f5] bg-white/95 px-5 py-4 backdrop-blur sm:px-7"><button type="button" onClick={closeEditor} className="rounded-xl px-4 py-2.5 text-xs font-black text-[#74859a]">Cancel</button><button type="button" onClick={() => void saveGoal()} disabled={saving || !draft.category || !draft.title.trim() || !draft.targetValue || Number(draft.targetValue) <= 0 || (draft.category === "WEIGHT" && !!advisor?.targetBelowHealthy && draft.weightDirection === "LOSE")} className="inline-flex min-h-10 items-center gap-2 rounded-xl bg-[#0b2d54] px-5 py-2.5 text-xs font-black text-white disabled:cursor-not-allowed disabled:opacity-40">{saving ? "Saving…" : editingId ? "Save changes" : "Add goal"}<ArrowRight className="h-3.5 w-3.5" /></button></div>
+          <div className="sticky bottom-0 flex items-center justify-between gap-3 border-t border-[#edf2f5] bg-white/95 px-5 py-4 backdrop-blur sm:px-7"><button type="button" onClick={closeEditor} className="rounded-xl px-4 py-2.5 text-xs font-black text-[#74859a]">Cancel</button><button type="button" onClick={() => void saveGoal()} disabled={saving || !draft.category || !draft.title.trim() || !draft.targetValue || Number(draft.targetValue) <= 0} className="inline-flex min-h-10 items-center gap-2 rounded-xl bg-[#0b2d54] px-5 py-2.5 text-xs font-black text-white disabled:cursor-not-allowed disabled:opacity-40">{saving ? "Saving…" : editingId ? "Save changes" : "Add goal"}<ArrowRight className="h-3.5 w-3.5" /></button></div>
         </div></div>}
       </main>
     </ProtectedRoute>
