@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { healthHomeService, type HealthHomeResponse } from "@/services/health-home.service";
 import { healthGoalsService } from "@/services/health-goals.service";
+import { api } from "@/lib/api";
 
 const REFRESH_INTERVAL_MS = 15_000;
 const DEFAULT_MEDICATION_TARGET = 90;
@@ -13,7 +14,6 @@ function normalizeMedicationDetails(medications: any[]): any[] {
     const saved = medication?.patientMedication ?? medication?.patient_medication ?? {};
     const first = (key: string, fallback: any = "") => medication?.[key] ?? saved?.[key] ?? fallback;
     const status = first("status", "");
-
     return {
       ...medication,
       ...saved,
@@ -36,18 +36,33 @@ function normalizeMedicationDetails(medications: any[]): any[] {
   });
 }
 
+async function hydrateSavedMedicationDetails(medications: any[]): Promise<any[]> {
+  return Promise.all(medications.map(async (medication: any) => {
+    const patientMedicationId = medication?.patientMedicationId ?? medication?.id ?? null;
+    if (!patientMedicationId || medication?.source === "PRESCRIPTION") return medication;
+    try {
+      const response = await api.get(`/patient-medications/${encodeURIComponent(String(patientMedicationId))}`);
+      const payload: any = response.data;
+      const record = payload?.data ?? payload;
+      if (!record || typeof record !== "object") return medication;
+      return normalizeMedicationDetails([{ ...medication, ...record }])[0];
+    } catch (error) {
+      console.warn(`Could not load complete saved medication ${patientMedicationId}; using existing medication data.`, error);
+      return medication;
+    }
+  }));
+}
+
 function normalizeGoals(result: HealthHomeResponse, fullGoals: any[]) {
   const patientWeight = result.patient?.weightKg != null ? Number(result.patient.weightKg) : null;
   const medications = Array.isArray(result.medications) ? result.medications : [];
   const adherenceValues = medications.map((medication: any) => Number(medication?.adherencePercentage)).filter((value: number) => Number.isFinite(value));
   const medicationAdherence = adherenceValues.length ? Number((adherenceValues.reduce((sum, value) => sum + value, 0) / adherenceValues.length).toFixed(2)) : null;
-
   return fullGoals.map((goal: any) => {
     const category = String(goal?.category ?? "").toUpperCase();
     const progress = Array.isArray(goal?.progress) ? goal.progress : [];
     const historicalAchievement = progress.find((item: any) => String(item?.status ?? "").toUpperCase() === "ACHIEVED");
     const latestRecordedProgress = progress[0] ?? null;
-
     if (category === "SMOKING") {
       const targetValue = Number(goal?.targetValue ?? 0);
       const target = Number.isFinite(targetValue) && targetValue > 0 ? targetValue : 0;
@@ -59,7 +74,6 @@ function normalizeGoals(result: HealthHomeResponse, fullGoals: any[]) {
       if (storedAsFalseAchievement || !hasSmokingMeasurement) return { ...goal, status: storedAsFalseAchievement ? "ACTIVE" : goal?.status ?? "ACTIVE", currentValue: null, achievedAt: storedAsFalseAchievement ? null : goal?.achievedAt ?? null, description: guidanceText, latestProgress: { ...(latestRecordedProgress ?? {}), currentValue: null, progressPercent: storedAsFalseAchievement ? 0 : Number(latestRecordedProgress?.progressPercent ?? 0), status: "IMPROVING", notes: guidanceText } };
       return { ...goal, currentValue, description: guidanceText, latestProgress: { ...(latestRecordedProgress ?? {}), currentValue, progressPercent: Number(latestRecordedProgress?.progressPercent ?? 0), status: hasReachedTarget ? "ACHIEVED" : "IMPROVING", notes: guidanceText } };
     }
-
     if (category === "MEDICATION") {
       const targetValue = Number(goal?.targetValue ?? goal?.metricConfig?.frequencyTarget ?? DEFAULT_MEDICATION_TARGET);
       const target = Number.isFinite(targetValue) && targetValue > 0 ? targetValue : DEFAULT_MEDICATION_TARGET;
@@ -69,7 +83,6 @@ function normalizeGoals(result: HealthHomeResponse, fullGoals: any[]) {
       const todayStatus = originalStatus === "NOT_STARTED" ? "ACTIVE" : originalStatus;
       return { ...goal, unit: "%", targetValue: target, currentValue, status: todayStatus, achievedAt: goal?.achievedAt ?? null, latestProgress: { ...(historicalAchievement ?? progress[0] ?? {}), currentValue, progressPercent, status: todayStatus === "ACHIEVED" ? "ACHIEVED" : "IMPROVING" } };
     }
-
     if (!historicalAchievement && String(goal?.status ?? "").toUpperCase() !== "ACHIEVED") return goal;
     const isWeightGoal = category === "WEIGHT";
     const currentValue = isWeightGoal && Number.isFinite(patientWeight) ? patientWeight : goal?.currentValue ?? historicalAchievement?.currentValue ?? null;
@@ -84,24 +97,23 @@ export function useDashboard() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<unknown>(null);
   const firstLoad = useRef(true);
-
   const loadDashboard = useCallback(async () => {
     try {
       if (firstLoad.current) setLoading(true);
       setError(null);
       const result = await healthHomeService.getHealthHome(patientId);
       const normalizedMedications = normalizeMedicationDetails(Array.isArray(result.medications) ? result.medications : []);
+      const hydratedMedications = await hydrateSavedMedicationDetails(normalizedMedications);
       const fullGoalsResponse = await healthGoalsService.list(result.patient.id);
       const fullGoals = (Array.isArray(fullGoalsResponse?.data) ? fullGoalsResponse.data : Array.isArray(fullGoalsResponse) ? fullGoalsResponse : []).filter((goal: any) => String(goal?.status ?? "").toUpperCase() !== "CANCELLED");
-      const normalizedGoals = normalizeGoals({ ...result, medications: normalizedMedications }, fullGoals);
-      setData({ ...result, medications: normalizedMedications, goals: normalizedGoals, healthGoals: normalizedGoals, today: { ...result.today, activeMedications: normalizedMedications, activeGoalCount: normalizedGoals.filter((goal: any) => ["ACTIVE", "IN_PROGRESS"].includes(String(goal?.status ?? "").toUpperCase())).length } });
+      const normalizedGoals = normalizeGoals({ ...result, medications: hydratedMedications }, fullGoals);
+      setData({ ...result, medications: hydratedMedications, goals: normalizedGoals, healthGoals: normalizedGoals, today: { ...result.today, activeMedications: hydratedMedications, activeGoalCount: normalizedGoals.filter((goal: any) => ["ACTIVE", "IN_PROGRESS"].includes(String(goal?.status ?? "").toUpperCase())).length } });
       firstLoad.current = false;
     } catch (requestError) {
       console.error("Failed to load Health Home:", requestError);
       setError(requestError);
     } finally { setLoading(false); }
   }, [patientId]);
-
   useEffect(() => {
     firstLoad.current = true;
     void loadDashboard();
@@ -110,6 +122,5 @@ export function useDashboard() {
     const refresh = window.setInterval(() => { if (document.visibilityState === "visible") void loadDashboard(); }, REFRESH_INTERVAL_MS);
     return () => { window.removeEventListener("popstate", handleNavigation); window.clearInterval(refresh); };
   }, [loadDashboard]);
-
   return { data, loading, error, reload: loadDashboard };
 }
