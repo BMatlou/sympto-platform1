@@ -12,7 +12,11 @@ const DEFAULT_MEDICATION_TARGET = 90;
 function normalizeMedicationDetails(medications: any[]): any[] {
   return medications.map((medication: any) => {
     const saved = medication?.patientMedication ?? medication?.patient_medication ?? {};
-    const first = (key: string, fallback: any = "") => medication?.[key] ?? saved?.[key] ?? fallback;
+    const first = (key: string, fallback: any = "") => {
+      const direct = medication?.[key];
+      const nested = saved?.[key];
+      return direct !== undefined && direct !== null && direct !== "" ? direct : nested !== undefined && nested !== null && nested !== "" ? nested : fallback;
+    };
     const status = first("status", "");
     return {
       ...medication,
@@ -38,8 +42,8 @@ function normalizeMedicationDetails(medications: any[]): any[] {
 
 async function hydrateSavedMedicationDetails(medications: any[]): Promise<any[]> {
   return Promise.all(medications.map(async (medication: any) => {
-    const patientMedicationId = medication?.patientMedicationId ?? medication?.id ?? null;
-    if (!patientMedicationId || medication?.source === "PRESCRIPTION") return medication;
+    const patientMedicationId = medication?.patientMedicationId ?? medication?.patientMedication?.id ?? medication?.id ?? null;
+    if (!patientMedicationId) return medication;
     try {
       const response = await api.get(`/patient-medications/${encodeURIComponent(String(patientMedicationId))}`);
       const payload: any = response.data;
