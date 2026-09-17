@@ -1,0 +1,45 @@
+name: Temporary medication route fix
+
+on:
+  push:
+    branches:
+      - feat/multi-goal-clean
+
+permissions:
+  contents: write
+
+jobs:
+  fix-route-is-known:
+    if: contains(github.event.head_commit.message, '[temp-fix-route-is-known]')
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out branch
+        uses: actions/checkout@v4
+        with:
+          ref: feat/multi-goal-clean
+          token: ${{ secrets.GITHUB_TOKEN }}
+      - name: Add missing routeIsKnown declaration only
+        shell: bash
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          path = Path('web/app/medications/page.tsx')
+          text = path.read_text(encoding='utf-8')
+          old = 'const knownRoute = routeCandidates.length === 1 ? routeCandidates[0] : ""; const routeLabel = knownRoute ? formatRouteLabel(knownRoute) : "";'
+          new = old + ' const routeIsKnown = Boolean(value.route?.trim() || knownRoute);'
+          if 'const routeIsKnown =' in text:
+              raise SystemExit('routeIsKnown is already declared; no change needed')
+          if old not in text:
+              raise SystemExit('Expected route declaration was not found; refusing to modify the file')
+          path.write_text(text.replace(old, new, 1), encoding='utf-8')
+          PY
+      - name: Commit exact fix and remove temporary workflow
+        shell: bash
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          rm -f .github/workflows/fix-route-is-known.yml
+          git add web/app/medications/page.tsx .github/workflows/fix-route-is-known.yml
+          git diff --cached --exit-code && exit 1 || true
+          git commit -m "Fix medication routeIsKnown runtime error"
+          git push origin HEAD:feat/multi-goal-clean
