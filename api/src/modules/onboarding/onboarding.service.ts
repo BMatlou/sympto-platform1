@@ -1,4 +1,4 @@
-import { BadRequestException, Injectable } from '@nestjs/common';
+import { BadRequestException, ConflictException, Injectable } from '@nestjs/common';
 
 import { PrismaService } from '../../database/prisma.service';
 import { OnboardingRepository } from './onboarding.repository';
@@ -89,6 +89,15 @@ export class OnboardingService {
 
       const existingIds=new Set(existing.map((item)=>item.id));
       const submittedExistingIds=new Set<string>();
+      const submittedMedicationCounts=new Map<string, number>();
+      for(const medication of resolvedMedications) {
+        const medicationId=String(medication.medicationId||'');
+        submittedMedicationCounts.set(medicationId,(submittedMedicationCounts.get(medicationId)||0)+1);
+      }
+      for(const [medicationId,count] of submittedMedicationCounts) {
+        if(medicationId && count>1)throw new ConflictException('The same medicine cannot be added more than once.');
+      }
+
       for(const medication of resolvedMedications){
         const frequency=this.normalizeMedicationFrequency(medication.frequency);
         const route=this.normalizeMedicationRoute(medication.route);
@@ -98,9 +107,13 @@ export class OnboardingService {
         const createData={medicationId:medication.medicationId,dosage:medication.dosage,frequency,route,indication:medication.indication,instructions:medication.instructions,prescribedBy:medication.prescribedBy,startedAt,endedAt,ongoing:medication.ongoing??true,adherencePercentage:medication.adherencePercentage,missedDoses:medication.missedDoses,sideEffects:medication.sideEffects,effectiveness:medication.effectiveness,status:medication.status,notes:medication.notes};
         if(medication.patientMedicationId){
           if(!existingIds.has(medication.patientMedicationId))throw new BadRequestException('One or more medication records do not belong to this patient.');
+          const duplicate=await tx.patientMedication.findFirst({where:{healthPassportId,medicationId:createData.medicationId,id:{not:medication.patientMedicationId}},select:{id:true}});
+          if(duplicate)throw new ConflictException('This medicine is already in your medication list.');
           submittedExistingIds.add(medication.patientMedicationId);
           await tx.patientMedication.update({where:{id:medication.patientMedicationId},data:{medicationId:createData.medicationId,dosage:createData.dosage??null,frequency:createData.frequency??null,route:createData.route??null,indication:createData.indication??null,instructions:createData.instructions??null,prescribedBy:createData.prescribedBy??null,startedAt:createData.startedAt??null,endedAt:createData.endedAt??null,ongoing:createData.ongoing,adherencePercentage:createData.adherencePercentage,missedDoses:createData.missedDoses,sideEffects:createData.sideEffects??null,effectiveness:createData.effectiveness??null,status:createData.status,notes:createData.notes??null}});
         } else {
+          const duplicate=await tx.patientMedication.findFirst({where:{healthPassportId,medicationId:createData.medicationId},select:{id:true}});
+          if(duplicate)throw new ConflictException('This medicine is already in your medication list.');
           await tx.patientMedication.create({data:{healthPassportId,...createData}});
         }
       }
