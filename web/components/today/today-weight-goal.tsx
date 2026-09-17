@@ -32,16 +32,6 @@ function journeyFor(goal: any) {
   return { startDate, targetDate, journeyDay, daysLeft, totalDays };
 }
 
-function calculateProgress(start: number | null, current: number | null, target: number | null, comparison: string) {
-  if (start == null || current == null || target == null) return 0;
-  if (comparison === "INCREASE_TO") {
-    const denominator = target - start;
-    return denominator <= 0 ? (current >= target ? 100 : 0) : Math.min(100, Math.max(0, ((current - start) / denominator) * 100));
-  }
-  const denominator = start - target;
-  return denominator <= 0 ? (current <= target ? 100 : 0) : Math.min(100, Math.max(0, ((start - current) / denominator) * 100));
-}
-
 type Props = { goal: any; fallbackWeight?: number | string | null };
 type WeightEvent = { loggedValue: number; occurredAt: string };
 
@@ -77,25 +67,48 @@ export default function TodayWeightGoal({ goal, fallbackWeight }: Props) {
 
   const journey = useMemo(() => journeyFor(goal), [goal]);
   const comparison = String(goal?.metricConfig?.comparison ?? goal?.comparison ?? "DECREASE_TO").toUpperCase();
-  const targetWeight = numberValue(goal?.metricConfig?.frequencyTarget ?? goal?.targetValue);
+  const configuredTarget = numberValue(goal?.metricConfig?.frequencyTarget ?? goal?.targetValue);
   const fallback = numberValue(fallbackWeight);
   const currentEvent = events[events.length - 1] ?? null;
   const startEvent = events[0] ?? null;
   const currentWeight = currentEvent?.loggedValue ?? fallback;
   const startingWeight = startEvent?.loggedValue ?? currentWeight;
-  const progress = Math.round(calculateProgress(startingWeight, currentWeight, targetWeight, comparison));
-  const targetReached = targetWeight != null && currentWeight != null && (comparison === "INCREASE_TO" ? currentWeight >= targetWeight : currentWeight <= targetWeight);
+
+  // Weight goals use DELTA_REDUCTION: targetValue is the amount of weight to lose,
+  // not the final body weight. Example: 68 kg start + 3 kg target loss = 65 kg target.
+  const targetLossKg = comparison === "DECREASE_TO" ? configuredTarget : null;
+  const targetWeight = comparison === "DECREASE_TO" && startingWeight != null && targetLossKg != null
+    ? startingWeight - targetLossKg
+    : comparison === "INCREASE_TO" && startingWeight != null && configuredTarget != null
+      ? startingWeight + configuredTarget
+      : configuredTarget;
   const changeKg = startingWeight != null && currentWeight != null ? currentWeight - startingWeight : null;
   const lostKg = comparison === "INCREASE_TO" || startingWeight == null || currentWeight == null ? null : Math.max(startingWeight - currentWeight, 0);
-  const remainingKg = targetWeight != null && currentWeight != null ? comparison === "INCREASE_TO" ? Math.max(targetWeight - currentWeight, 0) : Math.max(currentWeight - targetWeight, 0) : null;
+  const gainedKg = comparison === "INCREASE_TO" && startingWeight != null && currentWeight != null ? Math.max(currentWeight - startingWeight, 0) : null;
+  const achievedFromGoalStatus = String(goal?.status ?? "").toUpperCase() === "ACHIEVED";
+  const targetReached = achievedFromGoalStatus || (
+    comparison === "DECREASE_TO"
+      ? targetLossKg != null && lostKg != null && lostKg >= targetLossKg
+      : configuredTarget != null && currentWeight != null && currentWeight >= configuredTarget
+  );
+  const progress = comparison === "DECREASE_TO"
+    ? targetLossKg != null && lostKg != null && targetLossKg > 0
+      ? Math.round(Math.min(100, Math.max(0, (lostKg / targetLossKg) * 100)))
+      : targetReached ? 100 : 0
+    : configuredTarget != null && gainedKg != null && configuredTarget > 0
+      ? Math.round(Math.min(100, Math.max(0, (gainedKg / configuredTarget) * 100)))
+      : targetReached ? 100 : 0;
   const weekAgo = Date.now() - 7 * 86400000;
   const olderThanWeek = [...events].reverse().find((event) => new Date(event.occurredAt).getTime() <= weekAgo);
   const weeklyChangeKg = olderThanWeek && currentWeight != null ? currentWeight - olderThanWeek.loggedValue : null;
   const expectedProgress = journey.totalDays != null && journey.totalDays > 0 ? Math.min(100, Math.max(0, ((journey.journeyDay - 1) / journey.totalDays) * 100)) : null;
   const onTrack = targetReached || expectedProgress == null || progress >= expectedProgress - 10;
   const weeksLeft = journey.daysLeft != null ? journey.daysLeft / 7 : null;
-  const goalLossAmount = comparison === "DECREASE_TO" ? numberValue(goal?.targetValue) : null;
-  const remainingGoalAmount = goalLossAmount != null && lostKg != null ? Math.max(goalLossAmount - lostKg, 0) : null;
+  const remainingGoalAmount = comparison === "DECREASE_TO" && targetLossKg != null && lostKg != null
+    ? Math.max(targetLossKg - lostKg, 0)
+    : comparison === "INCREASE_TO" && configuredTarget != null && gainedKg != null
+      ? Math.max(configuredTarget - gainedKg, 0)
+      : null;
   const requiredWeeklyChange = remainingGoalAmount != null && weeksLeft && weeksLeft > 0 ? remainingGoalAmount / weeksLeft : null;
   const ChangeIcon = comparison === "INCREASE_TO" ? TrendingUp : TrendingDown;
 
@@ -117,7 +130,7 @@ export default function TodayWeightGoal({ goal, fallbackWeight }: Props) {
       <div className="flex-1 px-4 pb-5 sm:px-5 sm:pb-6">
         {loading ? (
           <div className="h-[250px] animate-pulse rounded-[26px] bg-[#f5f9fa]" />
-        ) : currentWeight == null || targetWeight == null ? (
+        ) : currentWeight == null || configuredTarget == null ? (
           <div className="rounded-[26px] bg-[#0b2d54] p-6 text-white shadow-[0_14px_30px_rgba(11,45,84,.14)]">
             <p className="text-xl font-black tracking-[-.04em]">Weight progress will update automatically</p>
             <p className="mt-2 text-sm leading-6 text-white/65">Record your weight in Vitals &amp; Measurements and Sympto will use that measurement here.</p>
@@ -133,7 +146,7 @@ export default function TodayWeightGoal({ goal, fallbackWeight }: Props) {
                   <p className="text-[10px] font-black uppercase tracking-[.16em] text-white/50">Latest recorded weight</p>
                   <p className="mt-2 text-[48px] font-black leading-none tracking-[-.08em]">{formatKg(currentWeight)}<span className="ml-1.5 text-lg font-bold tracking-normal text-white/55">kg</span></p>
                   <div className="mt-4 flex flex-wrap items-center gap-2">
-                    <span className="rounded-full bg-white/10 px-3 py-1.5 text-[10px] font-black text-white/80 ring-1 ring-white/10">Target {formatKg(targetWeight)} kg</span>
+                    <span className="rounded-full bg-white/10 px-3 py-1.5 text-[10px] font-black text-white/80 ring-1 ring-white/10">Target {formatKg(configuredTarget)} kg</span>
                     <span className={`rounded-full px-3 py-1.5 text-[10px] font-black ${targetReached ? "bg-[#24c1c4]/20 text-[#7de6e7]" : "bg-white/10 text-white/70 ring-1 ring-white/10"}`}>{progress}% progress</span>
                   </div>
                 </div>
@@ -163,7 +176,7 @@ export default function TodayWeightGoal({ goal, fallbackWeight }: Props) {
           </div>
         )}
 
-        {!loading && currentWeight != null && targetWeight != null && requiredWeeklyChange != null && !targetReached && (
+        {!loading && currentWeight != null && configuredTarget != null && requiredWeeklyChange != null && !targetReached && (
           <div className="mt-4 rounded-[20px] border border-[#e1eaed] bg-[#f8fbfc] px-4 py-3.5 text-[10px] font-semibold leading-5 text-[#74859a]">About {formatKg(requiredWeeklyChange)} kg/week needed to reach your target by {formatDate(journey.targetDate)}.</div>
         )}
       </div>
