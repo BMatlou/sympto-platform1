@@ -116,7 +116,12 @@ export class PatientMedicationsController {
 
   @Permissions('patient-medications.delete')
   @Delete(':id')
-  remove(@Param('id') id: string) {
-    return this.patientMedicationsService.remove(id);
+  remove(
+    @Param('id') id: string,
+    @Req() request: AuthenticatedRequest,
+  ) {
+    const authenticatedUserId = request.user?.sub ?? request.user?.id ?? '';
+
+    return this.patientMedicationsService.remove(id, authenticatedUserId);
   }
 }
