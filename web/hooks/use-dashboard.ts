@@ -8,6 +8,26 @@ import { healthGoalsService } from "@/services/health-goals.service";
 const REFRESH_INTERVAL_MS = 15_000;
 const DEFAULT_MEDICATION_TARGET = 90;
 
+function normalizeMedicationDetails(medications: any[]): any[] {
+  return medications.map((medication: any) => ({
+    ...medication,
+    patientMedicationId: medication?.patientMedicationId ?? medication?.patientMedication?.id ?? medication?.id ?? null,
+    medicationId: medication?.medicationId ?? medication?.medication?.id ?? medication?.medication?.medicationId ?? null,
+    dosage: medication?.dosage ?? medication?.dose ?? "",
+    frequency: medication?.frequency ?? medication?.schedule ?? "",
+    route: String(medication?.route ?? medication?.administrationRoute ?? "").trim().toUpperCase(),
+    indication: medication?.indication ?? medication?.reason ?? "",
+    instructions: medication?.instructions ?? medication?.additionalInstructions ?? "",
+    prescribedBy: medication?.prescribedBy ?? medication?.prescriber ?? medication?.provider ?? "",
+    startedAt: medication?.startedAt ?? medication?.startDate ?? "",
+    endedAt: medication?.endedAt ?? medication?.endDate ?? "",
+    ongoing: medication?.ongoing ?? medication?.isOngoing ?? (medication?.status ? String(medication.status).toUpperCase() === "ACTIVE" : true),
+    sideEffects: medication?.sideEffects ?? medication?.sideEffect ?? "",
+    effectiveness: medication?.effectiveness ?? medication?.efficacy ?? "",
+    notes: medication?.notes ?? medication?.additionalNotes ?? "",
+  }));
+}
+
 function normalizeGoals(result: HealthHomeResponse, fullGoals: any[]) {
   const patientWeight = result.patient?.weightKg != null ? Number(result.patient.weightKg) : null;
   const medications = Array.isArray(result.medications) ? result.medications : [];
@@ -38,9 +58,6 @@ function normalizeGoals(result: HealthHomeResponse, fullGoals: any[]) {
       const currentValue = medicationAdherence;
       const progressPercent = currentValue == null ? 0 : Math.min(100, Math.max(0, Math.round((currentValue / target) * 100)));
       const originalStatus = String(goal?.status ?? "").toUpperCase();
-      // An explicitly selected medication goal may be persisted as NOT_STARTED.
-      // Today must still surface it; NOT_STARTED means no adherence has been logged yet,
-      // not that the user did not choose the goal.
       const todayStatus = originalStatus === "NOT_STARTED" ? "ACTIVE" : originalStatus;
       return { ...goal, unit: "%", targetValue: target, currentValue, status: todayStatus, achievedAt: goal?.achievedAt ?? null, latestProgress: { ...(historicalAchievement ?? progress[0] ?? {}), currentValue, progressPercent, status: todayStatus === "ACHIEVED" ? "ACHIEVED" : "IMPROVING" } };
     }
@@ -65,10 +82,11 @@ export function useDashboard() {
       if (firstLoad.current) setLoading(true);
       setError(null);
       const result = await healthHomeService.getHealthHome(patientId);
+      const normalizedMedications = normalizeMedicationDetails(Array.isArray(result.medications) ? result.medications : []);
       const fullGoalsResponse = await healthGoalsService.list(result.patient.id);
       const fullGoals = (Array.isArray(fullGoalsResponse?.data) ? fullGoalsResponse.data : Array.isArray(fullGoalsResponse) ? fullGoalsResponse : []).filter((goal: any) => String(goal?.status ?? "").toUpperCase() !== "CANCELLED");
-      const normalizedGoals = normalizeGoals(result, fullGoals);
-      setData({ ...result, goals: normalizedGoals, healthGoals: normalizedGoals, today: { ...result.today, activeGoalCount: normalizedGoals.filter((goal: any) => ["ACTIVE", "IN_PROGRESS"].includes(String(goal?.status ?? "").toUpperCase())).length } });
+      const normalizedGoals = normalizeGoals({ ...result, medications: normalizedMedications }, fullGoals);
+      setData({ ...result, medications: normalizedMedications, goals: normalizedGoals, healthGoals: normalizedGoals, today: { ...result.today, activeMedications: normalizedMedications, activeGoalCount: normalizedGoals.filter((goal: any) => ["ACTIVE", "IN_PROGRESS"].includes(String(goal?.status ?? "").toUpperCase())).length } });
       firstLoad.current = false;
     } catch (requestError) {
       console.error("Failed to load Health Home:", requestError);
