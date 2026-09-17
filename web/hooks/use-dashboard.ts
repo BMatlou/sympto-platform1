@@ -9,23 +9,31 @@ const REFRESH_INTERVAL_MS = 15_000;
 const DEFAULT_MEDICATION_TARGET = 90;
 
 function normalizeMedicationDetails(medications: any[]): any[] {
-  return medications.map((medication: any) => ({
-    ...medication,
-    patientMedicationId: medication?.patientMedicationId ?? medication?.patientMedication?.id ?? medication?.id ?? null,
-    medicationId: medication?.medicationId ?? medication?.medication?.id ?? medication?.medication?.medicationId ?? null,
-    dosage: medication?.dosage ?? medication?.dose ?? "",
-    frequency: medication?.frequency ?? medication?.schedule ?? "",
-    route: String(medication?.route ?? medication?.administrationRoute ?? "").trim().toUpperCase(),
-    indication: medication?.indication ?? medication?.reason ?? "",
-    instructions: medication?.instructions ?? medication?.additionalInstructions ?? "",
-    prescribedBy: medication?.prescribedBy ?? medication?.prescriber ?? medication?.provider ?? "",
-    startedAt: medication?.startedAt ?? medication?.startDate ?? "",
-    endedAt: medication?.endedAt ?? medication?.endDate ?? "",
-    ongoing: medication?.ongoing ?? medication?.isOngoing ?? (medication?.status ? String(medication.status).toUpperCase() === "ACTIVE" : true),
-    sideEffects: medication?.sideEffects ?? medication?.sideEffect ?? "",
-    effectiveness: medication?.effectiveness ?? medication?.efficacy ?? "",
-    notes: medication?.notes ?? medication?.additionalNotes ?? "",
-  }));
+  return medications.map((medication: any) => {
+    const saved = medication?.patientMedication ?? medication?.patient_medication ?? {};
+    const first = (key: string, fallback: any = "") => medication?.[key] ?? saved?.[key] ?? fallback;
+    const status = first("status", "");
+
+    return {
+      ...medication,
+      ...saved,
+      patientMedicationId: medication?.patientMedicationId ?? saved?.patientMedicationId ?? saved?.id ?? medication?.id ?? null,
+      medicationId: medication?.medicationId ?? saved?.medicationId ?? medication?.medication?.id ?? saved?.medication?.id ?? saved?.medication?.medicationId ?? null,
+      dosage: first("dosage", first("dose", "")),
+      frequency: first("frequency", first("schedule", "")),
+      route: String(first("route", first("administrationRoute", ""))).trim().toUpperCase(),
+      indication: first("indication", first("reason", "")),
+      instructions: first("instructions", first("additionalInstructions", "")),
+      prescribedBy: first("prescribedBy", first("prescriber", first("provider", ""))),
+      startedAt: first("startedAt", first("startDate", "")),
+      endedAt: first("endedAt", first("endDate", "")),
+      ongoing: first("ongoing", first("isOngoing", status ? String(status).toUpperCase() === "ACTIVE" : true)),
+      sideEffects: first("sideEffects", first("sideEffect", "")),
+      effectiveness: first("effectiveness", first("efficacy", "")),
+      notes: first("notes", first("additionalNotes", "")),
+      status,
+    };
+  });
 }
 
 function normalizeGoals(result: HealthHomeResponse, fullGoals: any[]) {
