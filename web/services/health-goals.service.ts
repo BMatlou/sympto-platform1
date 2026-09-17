@@ -20,7 +20,7 @@ class HealthGoalsService {
   async logAlcohol(id: string, currentWeekTotal: number, drinks: number) { const nextTotal = Math.max(0, Number(currentWeekTotal) + Number(drinks)); const response = await api.patch(`/patient-health-goals/${id}`, { currentValue: String(nextTotal) }); return response.data?.data ?? response.data; }
   async remove(id: string) { const response = await api.delete(`/patient-health-goals/${id}`); const result = response.data?.data ?? response.data; notifyGoalChange(); return result; }
   async recordProgress(goalId: string, currentValue: number, notes?: string): Promise<HealthGoalProgressUpdate> { const { data } = await api.post(`/health-goals/${goalId}/progress`, { currentValue: String(currentValue), ...(notes ? { notes } : {}) }); return data.data ?? data; }
-  async getMetricEvents(metricType: string, metricKey: string, from: Date, to: Date, source?: string): Promise<HealthGoalMetricEventsResponse> { const response = await api.get(`/health-goals/metric-events`, { params: { metricType, metricKey, from: from.toISOString(), to: to.toISOString(), ...(source ? { source } : {}) }); return response.data?.data ?? response.data; }
+  async getMetricEvents(metricType: string, metricKey: string, from: Date, to: Date, source?: string): Promise<HealthGoalMetricEventsResponse> { const response = await api.get(`/health-goals/metric-events`, { params: { metricType, metricKey, from: from.toISOString(), to: to.toISOString(), ...(source ? { source } : {}) } }); return response.data?.data ?? response.data; }
 }
 
 export const healthGoalsService = new HealthGoalsService();
