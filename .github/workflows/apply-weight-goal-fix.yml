@@ -1,0 +1,134 @@
+name: Apply weight goal source-of-truth fix
+
+on:
+  push:
+    branches:
+      - feat/multi-goal-clean
+
+permissions:
+  contents: write
+
+jobs:
+  fix:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          ref: feat/multi-goal-clean
+          fetch-depth: 0
+
+      - name: Patch source of truth
+        run: |
+          python3 <<'PY'
+          from pathlib import Path
+
+          service_path = Path('api/src/modules/health-goals/health-goals.service.ts')
+          text = service_path.read_text()
+
+          old = '''  private async captureWeightGoalBaseline(goalId: string, patientId: string, createdAt: Date, preferCurrentPatientWeight = false) {
+    const existing = await this.prisma.$queryRaw<Array<{ id: string }>>`SELECT "id" FROM "HealthGoalMetricEvent" WHERE "patientId" = ${patientId} AND "metricType" = 'WEIGHT' AND "metricKey" = 'weight.kg' AND "source" = 'goal-baseline' AND "sourceId" = ${goalId} LIMIT 1`;
+    if (existing.length) return;
+    let baseline: number | null = null;
+    if (preferCurrentPatientWeight) {
+      const patient = await this.prisma.patient.findUnique({ where: { id: patientId }, select: { weightKg: true } });
+      baseline = patient?.weightKg == null ? null : Number(patient.weightKg);
+    }
+    if (baseline == null) {
+      const latest = await this.prisma.$queryRaw<Array<{ loggedValue: Prisma.Decimal }>>`SELECT "loggedValue" FROM "HealthGoalMetricEvent" WHERE "patientId" = ${patientId} AND "metricType" = 'WEIGHT' AND "metricKey" = 'weight.kg' AND "source" <> 'goal-baseline' AND "occurredAt" <= ${createdAt} ORDER BY "occurredAt" DESC LIMIT 1`;
+      baseline = latest.length ? Number(latest[0].loggedValue) : null;
+    }
+    if (baseline == null) { const patient = await this.prisma.patient.findUnique({ where: { id: patientId }, select: { weightKg: true } }); baseline = patient?.weightKg == null ? null : Number(patient.weightKg); }
+    if (baseline == null || !Number.isFinite(baseline)) return;
+    await this.prisma.$executeRaw`INSERT INTO "HealthGoalMetricEvent" ("id","patientId","metricType","metricKey","loggedValue","occurredAt","source","sourceId") VALUES (gen_random_uuid(),${patientId},'WEIGHT','weight.kg',${baseline},${createdAt},'goal-baseline',${goalId})`;
+  }
+
+  private async ensureOnboardingWeightGoalMetric(goal: any) {
+    if (String(goal?.category ?? '').toUpperCase() !== 'WEIGHT') return goal;
+    const existing = await this.prisma.$queryRaw<Array<{ id: string }>>`SELECT "id" FROM "HealthGoalMetricEvent" WHERE "patientId" = ${goal.patientId} AND "metricType" = 'WEIGHT' AND "metricKey" = 'weight.kg' AND "source" = 'goal-baseline' AND "sourceId" = ${goal.id} LIMIT 1`;
+    if (!existing.length) await this.captureWeightGoalBaseline(String(goal.id), String(goal.patientId), new Date(goal.createdAt));
+    return goal;
+  }'''
+          new = '''  private async captureWeightGoalBaseline(goalId: string, patientId: string, createdAt: Date) {
+    const existing = await this.prisma.$queryRaw<Array<{ id: string }>>`SELECT "id" FROM "HealthGoalMetricEvent" WHERE "patientId" = ${patientId} AND "metricType" = 'WEIGHT' AND "metricKey" = 'weight.kg' AND "source" = 'goal-baseline' AND "sourceId" = ${goalId} LIMIT 1`;
+    if (existing.length) return;
+
+    // Use the latest real user-recorded weight at or before goal creation.
+    // The patient profile weight is only a fallback when no measurement exists.
+    const latest = await this.prisma.$queryRaw<Array<{ loggedValue: Prisma.Decimal }>>`SELECT "loggedValue" FROM "HealthGoalMetricEvent" WHERE "patientId" = ${patientId} AND "metricType" = 'WEIGHT' AND "metricKey" = 'weight.kg' AND "source" <> 'goal-baseline' AND "occurredAt" <= ${createdAt} ORDER BY "occurredAt" DESC LIMIT 1`;
+    let baseline = latest.length ? Number(latest[0].loggedValue) : null;
+    if (baseline == null) {
+      const patient = await this.prisma.patient.findUnique({ where: { id: patientId }, select: { weightKg: true } });
+      baseline = patient?.weightKg == null ? null : Number(patient.weightKg);
+    }
+    if (baseline == null || !Number.isFinite(baseline)) return;
+    await this.prisma.$executeRaw`INSERT INTO "HealthGoalMetricEvent" ("id","patientId","metricType","metricKey","loggedValue","occurredAt","source","sourceId") VALUES (gen_random_uuid(),${patientId},'WEIGHT','weight.kg',${baseline},${createdAt},'goal-baseline',${goalId})`;
+  }
+
+  private async ensureOnboardingWeightGoalMetric(goal: any) {
+    if (String(goal?.category ?? '').toUpperCase() !== 'WEIGHT') return goal;
+    const patientId = String(goal.patientId);
+    const goalId = String(goal.id);
+    const createdAt = new Date(goal.createdAt);
+    const historical = !Number.isNaN(createdAt.getTime()) ? await this.prisma.$queryRaw<Array<{ loggedValue: Prisma.Decimal }>>`SELECT "loggedValue" FROM "HealthGoalMetricEvent" WHERE "patientId" = ${patientId} AND "metricType" = 'WEIGHT' AND "metricKey" = 'weight.kg' AND "source" <> 'goal-baseline' AND "occurredAt" <= ${createdAt} ORDER BY "occurredAt" DESC LIMIT 1` : [];
+    const existing = await this.prisma.$queryRaw<Array<{ id: string; loggedValue: Prisma.Decimal }>>`SELECT "id", "loggedValue" FROM "HealthGoalMetricEvent" WHERE "patientId" = ${patientId} AND "metricType" = 'WEIGHT' AND "metricKey" = 'weight.kg' AND "source" = 'goal-baseline' AND "sourceId" = ${goalId} LIMIT 1`;
+
+    // Repair an old baseline only when a real recorded measurement exists at/before goal creation.
+    if (historical.length) {
+      const historicalValue = Number(historical[0].loggedValue);
+      const existingValue = existing.length ? Number(existing[0].loggedValue) : null;
+      if (!existing.length || !Number.isFinite(existingValue) || existingValue !== historicalValue) {
+        await this.prisma.$executeRaw`DELETE FROM "HealthGoalMetricEvent" WHERE "patientId" = ${patientId} AND "metricType" = 'WEIGHT' AND "metricKey" = 'weight.kg' AND "source" = 'goal-baseline' AND "sourceId" = ${goalId}`;
+        await this.prisma.$executeRaw`INSERT INTO "HealthGoalMetricEvent" ("id","patientId","metricType","metricKey","loggedValue","occurredAt","source","sourceId") VALUES (gen_random_uuid(),${patientId},'WEIGHT','weight.kg',${historicalValue},${createdAt},'goal-baseline',${goalId})`;
+      }
+      return goal;
+    }
+
+    if (!existing.length) await this.captureWeightGoalBaseline(goalId, patientId, createdAt);
+    return goal;
+  }'''
+          if old not in text:
+              raise SystemExit('Expected weight baseline block not found; refusing partial patch.')
+          text = text.replace(old, new)
+          old_call = '      await this.captureWeightGoalBaseline(goal.id, String(goalData.patientId), goal.createdAt, true);'
+          if old_call not in text:
+              raise SystemExit('Expected create baseline call not found; refusing partial patch.')
+          text = text.replace(old_call, '      await this.captureWeightGoalBaseline(goal.id, String(goalData.patientId), goal.createdAt);')
+          service_path.write_text(text)
+
+          card_path = Path('web/components/today/today-weight-goal.tsx')
+          text = card_path.read_text()
+          old = '''        const goalBaseline = all.find((event) => event.source === "goal-baseline" && event.sourceId === goalId);
+        const goalCreatedAt = new Date(String(goal?.createdAt ?? ""));
+        const baselineFromHistory = !goalBaseline && !Number.isNaN(goalCreatedAt.getTime()) ? [...all].reverse().find((event) => event.source !== "goal-baseline" && new Date(event.occurredAt).getTime() <= goalCreatedAt.getTime()) : null;
+        const regular = all.filter((event) => !(event.source === "goal-baseline" && event.sourceId === goalId));
+        setBaselineWeight(goalBaseline?.loggedValue ?? baselineFromHistory?.loggedValue ?? null);
+        setEvents(regular);'''
+          new = '''        const goalBaseline = all.find((event) => event.source === "goal-baseline" && event.sourceId === goalId);
+        const goalCreatedAt = new Date(String(goal?.createdAt ?? ""));
+        const baselineFromHistory = !Number.isNaN(goalCreatedAt.getTime()) ? [...all].reverse().find((event) => event.source !== "goal-baseline" && new Date(event.occurredAt).getTime() <= goalCreatedAt.getTime()) : null;
+        // Synthetic goal-baseline rows are never current user measurements.
+        const regular = all.filter((event) => event.source !== "goal-baseline");
+        // Prefer the real measurement at/before creation; use the baseline marker only as fallback.
+        setBaselineWeight(baselineFromHistory?.loggedValue ?? goalBaseline?.loggedValue ?? null);
+        setEvents(regular);'''
+          if old not in text:
+              raise SystemExit('Expected Today weight source block not found; refusing partial patch.')
+          text = text.replace(old, new)
+          old_spacing = '{targetLabel}</span><span className={`rounded-full'
+          if old_spacing in text:
+              text = text.replace(old_spacing, '{targetLabel}</span> <span className={`rounded-full', 1)
+          card_path.write_text(text)
+
+          Path('.github/workflows/apply-weight-goal-fix.yml').unlink(missing_ok=True)
+          PY
+
+      - name: Commit source-of-truth fix
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add api/src/modules/health-goals/health-goals.service.ts web/components/today/today-weight-goal.tsx .github/workflows/apply-weight-goal-fix.yml
+          git diff --cached --check
+          git diff --cached --quiet && exit 0
+          git commit -m "fix: use recorded weights as weight goal source of truth"
+          git push origin feat/multi-goal-clean
