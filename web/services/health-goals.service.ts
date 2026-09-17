@@ -80,6 +80,12 @@ const normalizeGoalInput = (input: HealthGoalInput | Partial<HealthGoalInput>) =
   return withMedicationIdentity;
 };
 
+const sameMedicationGoal = (goal: any, patientMedicationId: string) => {
+  if (!goal || String(goal.category ?? "").toUpperCase() !== "MEDICATION") return false;
+  if (String(goal.status ?? "").toUpperCase() === "ARCHIVED") return false;
+  return String(goal.patientMedicationId ?? "") === patientMedicationId;
+};
+
 class HealthGoalsService {
   async list(patientId: string): Promise<HealthGoalListResponse> {
     const response = await api.get("/health-goals", { params: { patientId, page: 1, limit: 100 } });
@@ -87,7 +93,22 @@ class HealthGoalsService {
   }
 
   async create(input: HealthGoalInput) {
-    const response = await api.post("/patient-health-goals", normalizeGoalInput(input));
+    const normalized = normalizeGoalInput(input);
+    const category = String(normalized.category ?? "").toUpperCase();
+    const patientMedicationId = category === "MEDICATION"
+      ? String(normalized.patientMedicationId ?? "").trim()
+      : "";
+
+    // Medication goals are one-to-one with a specific PatientMedication.
+    // Check the current goal list before POSTing so repeated clicks, refreshes,
+    // or reopening the Set medication goal route cannot create a duplicate.
+    if (patientMedicationId) {
+      const existingGoals = await this.list(input.patientId);
+      const existing = existingGoals.data.find((goal: any) => sameMedicationGoal(goal, patientMedicationId));
+      if (existing) return existing;
+    }
+
+    const response = await api.post("/patient-health-goals", normalized);
     return response.data?.data ?? response.data;
   }
 
