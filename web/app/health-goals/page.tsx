@@ -126,7 +126,7 @@ export default function HealthGoalsPage() {
   }, [editingGoal, editorOpen]);
 
   useEffect(() => {
-    if (goalEditHandled.current || goalEditHandled.current || loading || searchParams.get("open") || !dashboard?.goals) return;
+    if (goalEditHandled.current || loading || searchParams.get("open") || !dashboard?.goals) return;
     const editId = searchParams.get("edit")?.trim();
     if (!editId) return;
     const goal = healthGoals.find((item: any) => String(item?.id) === editId);
