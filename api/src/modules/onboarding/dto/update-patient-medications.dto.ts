@@ -10,10 +10,11 @@ import {
   IsUUID,
   MaxLength,
   Min,
+  ValidateIf,
   ValidateNested,
 } from 'class-validator';
 import { MedicationStatus } from '@prisma/client';
-import { Type } from 'class-transformer';
+import { Transform, Type } from 'class-transformer';
 
 const MEDICATION_FREQUENCIES = [
   'ONCE_DAILY',
@@ -35,11 +36,20 @@ const MEDICATION_ROUTES = [
   'OTHER',
 ] as const;
 
+function normalizeMedicationDate(value: unknown): string | undefined {
+  if (value === undefined || value === null || value === '') return undefined;
+  const parsed = new Date(String(value));
+  return Number.isNaN(parsed.getTime()) ? undefined : parsed.toISOString();
+}
+
 export class PatientMedicationItemDto {
   @IsOptional()
   @IsUUID()
   patientMedicationId?: string;
 
+  // Existing PatientMedication rows may arrive from the live page with a blank
+  // catalog medicationId. The manage service resolves that from patientMedicationId.
+  @ValidateIf((object) => !object.patientMedicationId || Boolean(object.medicationId))
   @IsUUID()
   medicationId!: string;
 
@@ -49,8 +59,14 @@ export class PatientMedicationItemDto {
   @IsOptional() @IsString() @MaxLength(255) indication?: string;
   @IsOptional() @IsString() instructions?: string;
   @IsOptional() @IsString() @MaxLength(150) prescribedBy?: string;
-  @IsOptional() @IsDateString() startedAt?: string;
-  @IsOptional() @IsDateString() endedAt?: string;
+  @IsOptional()
+  @Transform(({ value }) => normalizeMedicationDate(value))
+  @IsDateString()
+  startedAt?: string;
+  @IsOptional()
+  @Transform(({ value }) => normalizeMedicationDate(value))
+  @IsDateString()
+  endedAt?: string;
   @IsOptional() @IsBoolean() ongoing?: boolean;
   @IsOptional() @IsNumber() @Min(0) adherencePercentage?: number;
   @IsOptional() @IsNumber() @Min(0) missedDoses?: number;
