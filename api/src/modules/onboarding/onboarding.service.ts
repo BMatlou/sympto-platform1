@@ -66,9 +66,6 @@ export class OnboardingService {
       if(!healthPassport||healthPassport.patientId!==patient.id)throw new BadRequestException('Health Passport not found for this patient.');
       const healthPassportId=healthPassport.id;
 
-      // PatientMedication.id and Medication.id are different identifiers.
-      // Restore the master Medication FK whenever an existing patient medication
-      // arrives from the live page without its medicationId.
       const existing=await tx.patientMedication.findMany({where:{healthPassportId},select:{id:true,medicationId:true}});
       const existingById=new Map(existing.map((item)=>[item.id,item]));
       const processedMedications=await Promise.all(dto.medications.map(async (item)=>{
@@ -77,15 +74,12 @@ export class OnboardingService {
           if(!existingMedication)throw new BadRequestException('One or more medication records do not belong to this patient.');
           return {...item,medicationId:existingMedication.medicationId};
         }
-        if(item.patientMedicationId){
-          const existingMedication=existingById.get(item.patientMedicationId);
-          if(!existingMedication)throw new BadRequestException('One or more medication records do not belong to this patient.');
-        }
+        if(item.patientMedicationId&&!existingById.has(item.patientMedicationId))throw new BadRequestException('One or more medication records do not belong to this patient.');
         return item;
       }));
-      const finalMedications=processedMedications.filter((item)=>Boolean(item.medicationId&&item.medicationId.trim()!=='')||Boolean(item.patientMedicationId));
+      const finalMedications=processedMedications.filter((item)=>Boolean(item.medicationId&&item.medicationId.trim()!==''));
 
-      const submittedMedicationIds=[...new Set(finalMedications.map((item)=>item.medicationId).filter(Boolean))];
+      const submittedMedicationIds=[...new Set(finalMedications.map((item)=>item.medicationId))];
       if(submittedMedicationIds.length>0){
         const medications=await tx.medication.findMany({where:{id:{in:submittedMedicationIds}},select:{id:true}});
         const validMedicationIds=new Set(medications.map((item)=>item.id));
@@ -124,14 +118,13 @@ export class OnboardingService {
         }
       }
       const idsToDelete=existing.map((item)=>item.id).filter((id)=>!submittedExistingIds.has(id));
-      if(idsToDelete.length>0)await tx.patientMedication.deleteMany({where:{healthPassportId,id:{in:idsToDelete}});
+      if(idsToDelete.length>0)await tx.patientMedication.deleteMany({where:{healthPassportId,id:{in:idsToDelete}}});
       return tx.patientMedication.findMany({where:{healthPassportId},include:{medication:true},orderBy:{createdAt:'desc'}});
     });
   }
 
   async updatePatientImmunizations(userId:string,dto:UpdatePatientImmunizationsDto){return this.onboardingRepository.savePatientImmunizations(userId,dto);}
   async updateHealthGoals(userId:string,dto:UpdateHealthGoalsDto){return this.onboardingRepository.saveHealthGoals(userId,dto);}
-  async updateHealthJournalSettings(userId:string,dto:UpdateHealthJournalSettingsDto){return this.onboardingRepository.saveHealthGoals(userId,dto);}
   async updateHealthJournalSettings(userId:string,dto:UpdateHealthJournalSettingsDto){return this.onboardingRepository.saveHealthJournalSettings(userId,dto);}
   async updateConsent(userId:string,dto:UpdateConsentDto){return this.onboardingRepository.saveConsent(userId,dto);}
   async completeOnboarding(userId:string){return this.onboardingRepository.completeOnboarding(userId);}
