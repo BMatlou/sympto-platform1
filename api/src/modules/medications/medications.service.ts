@@ -64,15 +64,19 @@ export class MedicationsService {
   async getClinicalReference(id: string) {
     const medication = await this.prisma.medication.findUnique({ where: { id }, select: { id: true, name: true, genericName: true, category: true } });
     if (!medication) throw new NotFoundException('Medication not found.');
-    type ClinicalReferenceRow = { symptomId: string; symptomName: string; symptomDescription: string | null; symptomCategory: string | null; symptomBodySystem: string | null; evidenceLevel: string | null; source: string | null; notes: string | null };
+    type ClinicalReferenceRow = { relationType: string; symptomId: string; symptomName: string; symptomDescription: string | null; symptomCategory: string | null; symptomBodySystem: string | null; evidenceLevel: string | null; source: string | null; notes: string | null };
     const rows = await this.prisma.$queryRaw<ClinicalReferenceRow[]>`
-      SELECT s."id" AS "symptomId", s."name" AS "symptomName", s."description" AS "symptomDescription", s."category" AS "symptomCategory", s."bodySystem" AS "symptomBodySystem", r."evidenceLevel" AS "evidenceLevel", r."source" AS "source", r."notes" AS "notes"
+      SELECT r."relationType" AS "relationType", s."id" AS "symptomId", s."name" AS "symptomName", s."description" AS "symptomDescription", s."category" AS "symptomCategory", s."bodySystem" AS "symptomBodySystem", r."evidenceLevel" AS "evidenceLevel", r."source" AS "source", r."notes" AS "notes"
       FROM "MedicationClinicalReference" r
       INNER JOIN "Symptom" s ON s."id" = r."symptomId"
-      WHERE r."medicationId" = ${id} AND r."relationType" = 'RELIEVES_SYMPTOM' AND r."active" = true AND s."active" = true
-      ORDER BY s."name" ASC
+      WHERE r."medicationId" = ${id} AND r."relationType" IN ('SIDE_EFFECT', 'RELIEVES_SYMPTOM', 'MAY_MASK_SYMPTOM') AND r."active" = true AND s."active" = true
+      ORDER BY r."relationType" ASC, s."name" ASC
     `;
-    return { medication, relievesSymptoms: rows.map((row) => ({ id: row.symptomId, name: row.symptomName, description: row.symptomDescription, category: row.symptomCategory, bodySystem: row.symptomBodySystem, evidenceLevel: row.evidenceLevel, source: row.source, notes: row.notes })), counts: { relievesSymptoms: rows.length } };
+    const mapSymptom = (row: ClinicalReferenceRow) => ({ id: row.symptomId, name: row.symptomName, description: row.symptomDescription, category: row.symptomCategory, bodySystem: row.symptomBodySystem, evidenceLevel: row.evidenceLevel, source: row.source, notes: row.notes });
+    const sideEffects = rows.filter((row) => row.relationType === 'SIDE_EFFECT').map(mapSymptom);
+    const relievesSymptoms = rows.filter((row) => row.relationType === 'RELIEVES_SYMPTOM').map(mapSymptom);
+    const mayMaskSymptoms = rows.filter((row) => row.relationType === 'MAY_MASK_SYMPTOM').map(mapSymptom);
+    return { medication, sideEffects, relievesSymptoms, mayMaskSymptoms, counts: { sideEffects: sideEffects.length, relievesSymptoms: relievesSymptoms.length, mayMaskSymptoms: mayMaskSymptoms.length } };
   }
 
   async findOne(id: string) {
