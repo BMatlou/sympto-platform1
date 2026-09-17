@@ -24,7 +24,7 @@ const DOSES = ["5 mg", "10 mg", "20 mg", "25 mg", "40 mg", "50 mg", "75 mg", "10
 const PRESCRIBERS = ["Doctor", "Specialist", "Clinic / nurse", "Pharmacist", "Self / over the counter", "Other"];
 const REASONS = ["Pain relief", "Blood pressure", "Diabetes", "Cholesterol", "Heart health", "Infection", "Inflammation", "Allergy", "Asthma / breathing", "Mental health", "Hormone treatment", "Contraception", "Vitamin / supplement", "Other"];
 const INSTRUCTIONS = ["Take with water", "Take with food", "Take after food", "Take before food", "Take on an empty stomach", "Take at bedtime", "Take in the morning", "Use as directed", "Other"];
-const SIDE_EFFECTS = ["None noticed", "Nausea", "Dizziness", "Headache", "Stomach upset", "Sleepiness", "Diarrhoea", "Constipation", "Rash", "Other"];
+const FALLBACK_SIDE_EFFECTS = ["None noticed", "Nausea", "Dizziness", "Headache", "Stomach upset", "Sleepiness", "Diarrhoea", "Constipation", "Rash", "Other"];
 const EFFECTIVENESS = [["Helping", "Helping"], ["Helping a little", "Helping a little"], ["Not helping", "Not helping"], ["Unsure", "Unsure"], ["Too early to tell", "Too early to tell"]] as const;
 
 function medicationId(m: any) { return m?.patientMedicationId || m?.patientMedication?.id || m?.id || null; }
@@ -59,10 +59,12 @@ function MedicationForm({ value, onChange }: { value: MedicationItem; onChange: 
   const [selectedMedication, setSelectedMedication] = useState<any | null>(null);
   const [custom, setCustom] = useState<Record<string, boolean>>({});
   const [indicationOptions, setIndicationOptions] = useState<string[]>([]);
+  const [sideEffectOptions, setSideEffectOptions] = useState<string[]>([]);
   const [loadingIndications, setLoadingIndications] = useState(false);
+  const [loadingSideEffects, setLoadingSideEffects] = useState(false);
 
   async function searchMedication(term: string) {
-    setSearch(term); setSelectedName(""); setSelectedMedication(null); setIndicationOptions([]); onChange({ ...value, medicationId: "", dosage: "", route: "", indication: "" });
+    setSearch(term); setSelectedName(""); setSelectedMedication(null); setIndicationOptions([]); setSideEffectOptions([]); onChange({ ...value, medicationId: "", dosage: "", route: "", indication: "", sideEffects: "" });
     if (term.trim().length < 2) { setResults([]); return; }
     try { setSearching(true); const { data } = await api.get("/medications", { params: { search: term.trim(), limit: 10, page: 1 } }); setResults(Array.isArray(data?.data?.data) ? data.data.data : []); }
     catch { setResults([]); }
@@ -73,21 +75,24 @@ function MedicationForm({ value, onChange }: { value: MedicationItem; onChange: 
 
   useEffect(() => {
     let cancelled = false;
-    async function loadIndications() {
-      if (!value.medicationId) { setIndicationOptions([]); return; }
+    async function loadClinicalReference() {
+      if (!value.medicationId) { setIndicationOptions([]); setSideEffectOptions([]); return; }
       try {
         setLoadingIndications(true);
+        setLoadingSideEffects(true);
         const { data } = await api.get(`/medications/${value.medicationId}/clinical-reference`);
-        const symptoms = Array.isArray(data?.data?.relievesSymptoms) ? data.data.relievesSymptoms : [];
-        const names = Array.from(new Set(symptoms.map((s: any) => String(s?.name || "").trim()).filter(Boolean)));
-        if (!cancelled) setIndicationOptions(names);
+        const indications = Array.isArray(data?.data?.relievesSymptoms) ? data.data.relievesSymptoms : [];
+        const sideEffects = Array.isArray(data?.data?.sideEffects) ? data.data.sideEffects : [];
+        const indicationNames = Array.from(new Set(indications.map((s: any) => String(s?.name || "").trim()).filter(Boolean)));
+        const sideEffectNames = Array.from(new Set(sideEffects.map((s: any) => String(s?.name || "").trim()).filter(Boolean)));
+        if (!cancelled) { setIndicationOptions(indicationNames); setSideEffectOptions(sideEffectNames); }
       } catch {
-        if (!cancelled) setIndicationOptions([]);
+        if (!cancelled) { setIndicationOptions([]); setSideEffectOptions([]); }
       } finally {
-        if (!cancelled) setLoadingIndications(false);
+        if (!cancelled) { setLoadingIndications(false); setLoadingSideEffects(false); }
       }
     }
-    loadIndications();
+    loadClinicalReference();
     return () => { cancelled = true; };
   }, [value.medicationId]);
 
@@ -99,7 +104,9 @@ function MedicationForm({ value, onChange }: { value: MedicationItem; onChange: 
   const doseOptions = strengths.length === 1 ? strengths : strengths.length > 1 ? [...strengths, "Other"] : DOSES;
   const routeIsKnown = Boolean(knownRoute);
   const indicationSelectOptions = indicationOptions.length > 0 ? [...indicationOptions, "Other"] : REASONS;
+  const sideEffectSelectOptions = sideEffectOptions.length > 0 ? ["None noticed", ...sideEffectOptions, "Other"] : FALLBACK_SIDE_EFFECTS;
   const indicationPlaceholder = loadingIndications ? "Loading options…" : indicationOptions.length ? "Choose what you're treating" : "Choose a reason";
+  const sideEffectPlaceholder = loadingSideEffects ? "Loading possible effects…" : "Choose what you noticed";
   const canNext = step === 1 ? Boolean(value.medicationId && value.dosage && value.frequency && value.route) : step === 2 ? Boolean(value.indication && value.instructions && value.startedAt) : true;
 
   return <div className="space-y-6">
@@ -114,14 +121,14 @@ function MedicationForm({ value, onChange }: { value: MedicationItem; onChange: 
             {value.medicationId && <span className="pointer-events-none absolute right-4 top-1/2 flex -translate-y-1/2 items-center gap-1.5 rounded-full bg-emerald-50 px-2.5 py-1 text-[10px] font-bold text-emerald-700"><Check className="h-3.5 w-3.5" />Medicine recognised</span>}
             {searching && !value.medicationId && <span className="absolute right-4 top-1/2 -translate-y-1/2 text-[11px] text-slate-400">Searching…</span>}
           </div>
-          {value.medicationId && <div className="mt-2 flex items-center justify-between gap-3"><p className="text-[11px] text-slate-400">Selected from Sympto's medicine reference library.</p><button type="button" onClick={() => { setSelectedName(""); setSearch(""); setResults([]); setSelectedMedication(null); setIndicationOptions([]); onChange({ ...value, medicationId: "", dosage: "", route: "", indication: "" }); }} className="text-[11px] font-semibold text-[#0b2d54] hover:text-[#24c1c4]">Choose a different medicine</button></div>}
+          {value.medicationId && <div className="mt-2 flex items-center justify-between gap-3"><p className="text-[11px] text-slate-400">Selected from Sympto's medicine reference library.</p><button type="button" onClick={() => { setSelectedName(""); setSearch(""); setResults([]); setSelectedMedication(null); setIndicationOptions([]); setSideEffectOptions([]); onChange({ ...value, medicationId: "", dosage: "", route: "", indication: "", sideEffects: "" }); }} className="text-[11px] font-semibold text-[#0b2d54] hover:text-[#24c1c4]">Choose a different medicine</button></div>}
         {results.length > 0 && !value.medicationId && <div className="mt-2 overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-xl shadow-slate-200/40">{results.map(r => { const formulations = getFormulationSummaries(r); const formulationRows = Array.isArray(r?.strengths) ? r.strengths : []; return <button key={r.id} type="button" onClick={() => {
           const strengthsForMedication = Array.isArray(r?.strengths) ? r.strengths : [];
           const uniqueStrengths = Array.from(new Set(strengthsForMedication.map((s: any) => String(s?.strength || "").trim()).filter(v => v && !/^(unspecified|unknown|n\/a|na|not specified)$/i.test(v))));
           const uniqueRoutes = Array.from(new Set(strengthsForMedication.map((s: any) => String(s?.route || "").trim().toUpperCase() || inferRouteFromDosageForm(s?.dosageForm)).filter(Boolean)));
           const autoRoute = uniqueRoutes.length === 1 ? uniqueRoutes[0] : "";
-          setSelectedName(String(r.name)); setSearch(String(r.name)); setResults([]); setSelectedMedication(r); setIndicationOptions([]);
-          onChange({ ...value, medicationId: String(r.id), dosage: uniqueStrengths.length === 1 ? uniqueStrengths[0] : "", route: autoRoute, indication: "" });
+          setSelectedName(String(r.name)); setSearch(String(r.name)); setResults([]); setSelectedMedication(r); setIndicationOptions([]); setSideEffectOptions([]);
+          onChange({ ...value, medicationId: String(r.id), dosage: uniqueStrengths.length === 1 ? uniqueStrengths[0] : "", route: autoRoute, indication: "", sideEffects: "" });
         }} className="flex w-full items-start justify-between gap-4 border-b border-slate-100 px-4 py-4 text-left last:border-0 hover:bg-[#24c1c4]/5"><span className="min-w-0 flex-1"><span className="block text-sm font-bold text-[#0b2d54]">{r.name || "Medicine"}</span><span className="mt-2 grid gap-x-6 gap-y-1.5 text-[11px] leading-4 sm:grid-cols-2"><span><b className="text-[#0b2d54]">Generic name:</b> {r.genericName || "Not specified"}</span><span><b className="text-[#0b2d54]">Type of medicine:</b> {formatCategoryLabel(r.category)}</span></span>{formulationRows.length > 0 && <span className="mt-3 block rounded-xl bg-slate-50 px-3 py-2.5"><span className="block text-[10px] font-bold uppercase tracking-[0.12em] text-[#24c1c4]">Available options</span><span className="mt-1.5 block space-y-1.5">{formulationRows.map((s: any, index: number) => { const rawStrength = String(s?.strength || "").trim(); const strength = /^(unspecified|unknown|n\/a|na|not specified)$/i.test(rawStrength) ? "Not specified" : rawStrength; const form = formatDosageForm(s?.dosageForm); const route = String(s?.route || "").trim().toUpperCase() || inferRouteFromDosageForm(form); return <span key={`${s?.id || index}-${strength}-${form}-${route}`} className="block text-[11px] text-slate-600"><b className="text-[#0b2d54]">Strength:</b> {strength} <span className="mx-1 text-slate-300">·</span> <b className="text-[#0b2d54]">Form:</b> {form} <span className="mx-1 text-slate-300">·</span> <b className="text-[#0b2d54]">How you take it:</b> {route ? formatRouteLabel(route) : "Not specified"}</span>; })}</span></span>}{formulationRows.length === 0 && formulations.length > 0 && <span className="mt-3 block text-[11px] font-medium text-slate-500">{formulations.join(" / ")}</span>}</span><Plus className="mt-1 h-4 w-4 shrink-0 text-[#24c1c4]" /></button>})}</div>}
           {value.medicationId && <div className="mt-4 rounded-2xl border border-[#24c1c4]/15 bg-white p-4 shadow-sm"><div className="flex items-start gap-3"><span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-[#24c1c4]/10 text-[#0b2d54]"><Check className="h-4 w-4" /></span><div className="min-w-0 flex-1"><p className="text-sm font-bold text-[#0b2d54]">Medicine details filled in</p><div className="mt-3 grid gap-3 sm:grid-cols-2"><div><p className="text-[10px] font-bold uppercase tracking-[0.1em] text-slate-400">Generic name</p><p className="mt-1 text-sm font-semibold text-[#0b2d54]">{selectedMedication?.genericName || "Not specified"}</p></div><div><p className="text-[10px] font-bold uppercase tracking-[0.1em] text-slate-400">Type of medicine</p><p className="mt-1 text-sm font-semibold text-[#0b2d54]">{formatCategoryLabel(selectedMedication?.category)}</p></div><div><p className="text-[10px] font-bold uppercase tracking-[0.1em] text-slate-400">Medicine form</p><p className="mt-1 text-sm font-semibold text-[#0b2d54]">{dosageForms.length ? dosageForms.map(formatDosageForm).join(" / ") : "Not specified"}</p></div><div><p className="text-[10px] font-bold uppercase tracking-[0.1em] text-slate-400">How you take it</p><p className="mt-1 text-sm font-semibold text-[#0b2d54]">{routeIsKnown ? routeLabel : "Choose below"}</p></div></div>{routeIsKnown && <p className="mt-3 text-[11px] font-semibold text-emerald-700">✓ How you take it was recognised automatically.</p>}</div></div></div>}
         </Field>
@@ -144,9 +151,10 @@ function MedicationForm({ value, onChange }: { value: MedicationItem; onChange: 
 
     {step === 3 && <div className="space-y-5 animate-in fade-in slide-in-from-right-2 duration-300">
       <div className="rounded-2xl border border-[#24c1c4]/15 bg-[#24c1c4]/5 p-4"><div className="flex gap-3"><Sparkles className="h-5 w-5 shrink-0 text-[#24c1c4]" /><div><p className="text-sm font-semibold text-[#0b2d54]">Almost there</p><p className="mt-1 text-xs leading-5 text-slate-500">These details help Sympto personalise reminders and your medication health journey. Skip anything you do not know.</p></div></div></div>
+      {sideEffectOptions.length > 0 && <div className="rounded-2xl border border-slate-200 bg-slate-50/70 p-4"><div className="flex gap-3"><ShieldCheck className="mt-0.5 h-4 w-4 shrink-0 text-[#24c1c4]" /><div><p className="text-sm font-semibold text-[#0b2d54]">Possible side effects for this medicine</p><p className="mt-1 text-xs leading-5 text-slate-500">These are reference information for the selected medicine. They are not a diagnosis and do not mean you will experience them.</p><div className="mt-3 flex flex-wrap gap-2">{sideEffectOptions.map(effect => <span key={effect} className="rounded-full bg-white px-2.5 py-1 text-[11px] font-medium text-slate-600 ring-1 ring-slate-200">{effect}</span>)}</div></div></div></div>}
       <div className="grid gap-5 sm:grid-cols-2">
         <Field label="Who prescribed or recommended it?" optional><Select value={custom.prescribedBy ? "Other" : value.prescribedBy || ""} onChange={v => choose("prescribedBy", v)} options={PRESCRIBERS} placeholder="Choose a provider" />{custom.prescribedBy && <div className="mt-2"><TextInput value={value.prescribedBy || ""} onChange={v => set("prescribedBy", v)} placeholder="Doctor, clinic or provider name" /></div>}</Field>
-        <Field label="Have you noticed any side effects?" optional><Select value={custom.sideEffects ? "Other" : value.sideEffects || ""} onChange={v => choose("sideEffects", v)} options={SIDE_EFFECTS} placeholder="Choose what you noticed" />{custom.sideEffects && <div className="mt-2"><TextInput value={value.sideEffects || ""} onChange={v => set("sideEffects", v)} placeholder="Describe what you noticed" /></div>}</Field>
+        <Field label="Have you noticed any side effects?" optional hint={sideEffectOptions.length ? "Select what you have actually noticed. The list above shows possible effects from the medicine reference." : undefined}><Select value={custom.sideEffects ? "Other" : value.sideEffects || ""} onChange={v => choose("sideEffects", v)} options={sideEffectSelectOptions} placeholder={sideEffectPlaceholder} disabled={loadingSideEffects} />{custom.sideEffects && <div className="mt-2"><TextInput value={value.sideEffects || ""} onChange={v => set("sideEffects", v)} placeholder="Describe what you noticed" /></div>}</Field>
         <Field label="How is the medicine working?" optional><Select value={value.effectiveness || ""} onChange={v => set("effectiveness", v)} options={EFFECTIVENESS} placeholder="Choose an option" /></Field>
         <Field label="Anything else to remember?" optional hint="Add anything else you want Sympto to remember."><textarea value={value.notes || ""} onChange={e => set("notes", e.target.value)} rows={3} placeholder="e.g. I take this with my morning routine" className="w-full resize-none rounded-2xl border border-slate-200 bg-white px-4 py-3.5 text-sm text-[#0b2d54] outline-none placeholder:text-slate-400 focus:border-[#24c1c4] focus:ring-4 focus:ring-[#24c1c4]/10" /></Field>
       </div>
