@@ -140,3 +140,5 @@ jobs:
           git add api/src/modules/health-goals/health-goals.service.ts web/components/today/today-weight-goal.tsx .github/workflows/one-time-weight-goal-fix.yml
           git commit -m "fix: use recorded weights as weight goal source of truth"
           git push origin feat/multi-goal-clean
+
+# trigger: 2026-09-17T15:34:00Z
