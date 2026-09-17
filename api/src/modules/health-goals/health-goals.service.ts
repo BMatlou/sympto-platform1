@@ -24,7 +24,7 @@ export class HealthGoalsService {
 
   async syncMetricEventForUser(userId: string, payload: { metricType: string; value?: number; [key: string]: any }) {
     const patient = await this.findPatientForUser(userId); if (!patient) throw new NotFoundException('Patient not found.');
-    const metricType = String(payload?.metricType ?? '').trim().toUpperCase(); const metricKey = String(payload?.metricKey ?? '').trim(); const loggedValue = Number(payload?.loggedValue ?? payload?.value); const source = String(payload?.source ?? 'manual').trim(); const sourceId = payload?.sourceId ? String(payload.sourceId).trim() : null; const occurredAt = payload?.occurredAt instanceof Date ? payload.occurredAt : payload?.occurredAt ? new Date(payload.occurredAt) : new Date();
+    const metricType = String(payload?.metricType ?? '').trim().toUpperCase(); const metricKey = String(payload?.metricKey ?? '').trim(); const loggedValue = Number(payload?.loggedValue ?? payload?.value); const source = String(payload?.source ?? 'manual').trim(); const sourceId = payload?.sourceId ? String(payload.sourceId).trim() : null; const occurredAt = payload?.occurredAt instanceof Date ? payload?.occurredAt : payload?.occurredAt ? new Date(payload.occurredAt) : new Date();
     if (!metricType || !metricKey || !source || !Number.isFinite(loggedValue)) throw new BadRequestException('Metric event data is invalid.'); if (Number.isNaN(occurredAt.getTime())) throw new BadRequestException('Metric event date is invalid.');
     const existing = sourceId ? await this.prisma.$queryRaw<Array<{ id: string }>>`SELECT "id" FROM "HealthGoalMetricEvent" WHERE "patientId" = ${patient.id} AND "source" = ${source} AND "sourceId" = ${sourceId} LIMIT 1` : [];
     let eventId: string;
@@ -45,26 +45,21 @@ export class HealthGoalsService {
     return goals.map((goal) => { const direct = byGoalId.get(String(goal.id)); if (direct?.patientMedicationId) return { ...goal, patientMedicationId: direct.patientMedicationId, medicationId: direct.medicationId, medication: { id: direct.medicationId, name: direct.medicationName }, medicationDosage: direct.dosage, medicationFrequency: direct.frequency }; const title = normalise(goal.title); const description = normalise(goal.description); const candidates = legacyMedicationRows.filter((row) => { if (!goal.patientId || row.patientId !== goal.patientId) return false; const name = normalise(row.medicationName); return Boolean(name) && (title === name || title.includes(name) || description.includes(name)); }); const uniqueMatch = candidates.length === 1 ? candidates[0] : null; if (!uniqueMatch) return goal; return { ...goal, patientMedicationId: uniqueMatch.patientMedicationId, medicationId: uniqueMatch.medicationId, medication: { id: uniqueMatch.medicationId, name: uniqueMatch.medicationName }, medicationDosage: uniqueMatch.dosage, medicationFrequency: uniqueMatch.frequency }; });
   }
 
-  private async captureWeightGoalBaseline(goalId: string, patientId: string, createdAt: Date, preferCurrentPatientWeight = false) {
+  private async captureWeightGoalBaseline(goalId: string, patientId: string, createdAt: Date) {
     let baseline: number | null = null;
-    if (preferCurrentPatientWeight) {
-      const patient = await this.prisma.patient.findUnique({ where: { id: patientId }, select: { weightKg: true } });
-      baseline = patient?.weightKg == null ? null : Number(patient.weightKg);
-    }
-    if (baseline == null) {
-      const latest = await this.prisma.$queryRaw<Array<{ loggedValue: Prisma.Decimal }>>`SELECT "loggedValue" FROM "HealthGoalMetricEvent" WHERE "patientId" = ${patientId} AND "metricType" = 'WEIGHT' AND "metricKey" = 'weight.kg' AND "source" <> 'goal-baseline' AND "occurredAt" <= ${createdAt} ORDER BY "occurredAt" DESC LIMIT 1`;
-      baseline = latest.length ? Number(latest[0].loggedValue) : null;
-    }
+    const latest = await this.prisma.$queryRaw<Array<{ loggedValue: Prisma.Decimal }>>`SELECT "loggedValue" FROM "HealthGoalMetricEvent" WHERE "patientId" = ${patientId} AND "metricType" = 'WEIGHT' AND "metricKey" = 'weight.kg' AND "source" <> 'goal-baseline' AND "occurredAt" <= ${createdAt} ORDER BY "occurredAt" DESC LIMIT 1`;
+    baseline = latest.length ? Number(latest[0].loggedValue) : null;
     if (baseline == null) { const patient = await this.prisma.patient.findUnique({ where: { id: patientId }, select: { weightKg: true } }); baseline = patient?.weightKg == null ? null : Number(patient.weightKg); }
     if (baseline == null || !Number.isFinite(baseline)) return;
-    await this.prisma.$executeRaw`DELETE FROM "HealthGoalMetricEvent" WHERE "patientId" = ${patientId} AND "metricType" = 'WEIGHT' AND "metricKey" = 'weight.kg' AND "source" = 'goal-baseline' AND "sourceId" = ${goalId}`;
+    const existing = await this.prisma.$queryRaw<Array<{ id: string }>>`SELECT "id" FROM "HealthGoalMetricEvent" WHERE "patientId" = ${patientId} AND "metricType" = 'WEIGHT' AND "metricKey" = 'weight.kg' AND "source" = 'goal-baseline' AND "sourceId" = ${goalId} LIMIT 1`;
+    if (existing.length) return;
     await this.prisma.$executeRaw`INSERT INTO "HealthGoalMetricEvent" ("id","patientId","metricType","metricKey","loggedValue","occurredAt","source","sourceId") VALUES (gen_random_uuid(),${patientId},'WEIGHT','weight.kg',${baseline},${createdAt},'goal-baseline',${goalId})`;
   }
 
   private async ensureOnboardingWeightGoalMetric(goal: any) {
     if (String(goal?.category ?? '').toUpperCase() !== 'WEIGHT') return goal;
     const existing = await this.prisma.$queryRaw<Array<{ id: string }>>`SELECT "id" FROM "HealthGoalMetricEvent" WHERE "patientId" = ${goal.patientId} AND "metricType" = 'WEIGHT' AND "metricKey" = 'weight.kg' AND "source" = 'goal-baseline' AND "sourceId" = ${goal.id} LIMIT 1`;
-    if (!existing.length) await this.captureWeightGoalBaseline(String(goal.id), String(goal.patientId), new Date(goal.createdAt), false);
+    if (!existing.length) await this.captureWeightGoalBaseline(String(goal.id), String(goal.patientId), new Date(goal.createdAt));
     return goal;
   }
   private async ensureOnboardingExerciseGoalMetric(goal: any) { return goal; }
@@ -72,7 +67,7 @@ export class HealthGoalsService {
   public async configureMetric(goalId: string, config: any) {
     const existing = await this.prisma.$queryRaw<Array<{ id: string }>>`SELECT "id" FROM "HealthGoalMetricConfig" WHERE "healthGoalId" = ${goalId} LIMIT 1`;
     if (existing.length) await this.prisma.$executeRaw`UPDATE "HealthGoalMetricConfig" SET "metricType" = ${config.metricType ?? null}, "metricKey" = ${config.metricKey ?? null}, "frequency" = ${config.frequency ?? null}, "frequencyTarget" = ${config.frequencyTarget ?? null}, "aggregation" = ${config.aggregation ?? null}, "comparison" = ${config.comparison ?? null}, "guidanceText" = ${config.guidanceText ?? null} WHERE "id" = ${existing[0].id}`;
-    else await this.prisma.$executeRaw`INSERT INTO "HealthGoalMetricConfig" ("id", "healthGoalId", "metricType", "metricKey", "frequency", "frequencyTarget", "aggregation", "comparison", "guidanceText") VALUES (gen_random_uuid(), ${goalId}, ${config.metricType ?? null}, ${config.metricKey ?? null}, ${config.frequency ?? null}, ${config.aggregation ?? null}, ${config.comparison ?? null}, ${config.guidanceText ?? null})`;
+    else await this.prisma.$executeRaw`INSERT INTO "HealthGoalMetricConfig" ("id", "healthGoalId", "metricType", "metricKey", "frequency", "frequencyTarget", "aggregation", "comparison", "guidanceText") VALUES (gen_random_uuid(), ${goalId}, ${config.metricType ?? null}, ${config.metricKey ?? null}, ${config.frequency ?? null}, ${config.frequencyTarget ?? null}, ${config.aggregation ?? null}, ${config.comparison ?? null}, ${config.guidanceText ?? null})`;
   }
 
   async create(dto: CreateHealthGoalDto) {
@@ -83,7 +78,7 @@ export class HealthGoalsService {
     if (patientMedicationId) await this.prisma.$executeRaw`UPDATE "HealthGoal" SET "patientMedicationId" = ${patientMedicationId} WHERE "id" = ${goal.id}`;
     await this.configureMetric(goal.id, { metricType, metricKey, frequency, frequencyTarget: frequencyTarget == null ? (isMedicationGoal ? DEFAULT_MEDICATION_TARGET : undefined) : Number(frequencyTarget), aggregation, comparison, guidanceText });
     if (String(goalData.category).toUpperCase() === 'WEIGHT' && String(metricType).toUpperCase() === 'WEIGHT') {
-      await this.captureWeightGoalBaseline(goal.id, String(goalData.patientId), goal.createdAt, true);
+      await this.captureWeightGoalBaseline(goal.id, String(goalData.patientId), goal.createdAt);
     }
     return this.findOne(goal.id);
   }
