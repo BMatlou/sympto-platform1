@@ -19,6 +19,45 @@ export class PatientHealthGoalsController {
     return request.user?.sub ?? request.user?.userId ?? request.user?.id ?? '';
   }
 
+  private async ensureMetricEventStorage() {
+    await this.prisma.$executeRawUnsafe('CREATE EXTENSION IF NOT EXISTS pgcrypto');
+    await this.prisma.$executeRawUnsafe(`
+      CREATE TABLE IF NOT EXISTS "HealthGoalMetricEvent" (
+        "id" UUID NOT NULL DEFAULT gen_random_uuid(),
+        "patientId" TEXT NOT NULL,
+        "metricType" VARCHAR(64) NOT NULL,
+        "metricKey" VARCHAR(128) NOT NULL,
+        "loggedValue" NUMERIC(12,2) NOT NULL,
+        "occurredAt" TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        "source" VARCHAR(64) NOT NULL,
+        "sourceId" VARCHAR(128),
+        "metadata" JSONB,
+        "createdAt" TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        CONSTRAINT "HealthGoalMetricEvent_pkey" PRIMARY KEY ("id")
+      )
+    `);
+    await this.prisma.$executeRawUnsafe(`
+      ALTER TABLE "HealthGoalMetricEvent"
+        ADD COLUMN IF NOT EXISTS "patientId" TEXT,
+        ADD COLUMN IF NOT EXISTS "metricType" VARCHAR(64),
+        ADD COLUMN IF NOT EXISTS "metricKey" VARCHAR(128),
+        ADD COLUMN IF NOT EXISTS "loggedValue" NUMERIC(12,2),
+        ADD COLUMN IF NOT EXISTS "occurredAt" TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+        ADD COLUMN IF NOT EXISTS "source" VARCHAR(64),
+        ADD COLUMN IF NOT EXISTS "sourceId" VARCHAR(128),
+        ADD COLUMN IF NOT EXISTS "metadata" JSONB,
+        ADD COLUMN IF NOT EXISTS "createdAt" TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
+    `);
+    await this.prisma.$executeRawUnsafe(`
+      CREATE INDEX IF NOT EXISTS "HealthGoalMetricEvent_patient_metric_idx"
+        ON "HealthGoalMetricEvent" ("patientId", "metricType", "metricKey", "occurredAt")
+    `);
+    await this.prisma.$executeRawUnsafe(`
+      CREATE INDEX IF NOT EXISTS "HealthGoalMetricEvent_source_idx"
+        ON "HealthGoalMetricEvent" ("source", "sourceId")
+    `);
+  }
+
   private async assertOwnGoal(goalId: string, userId: string) {
     const goal = await this.healthGoalsService.findOne(goalId);
     if (!userId || goal.patient.userId !== userId) {
@@ -33,108 +72,33 @@ export class PatientHealthGoalsController {
     if (!patient || patient.id !== dto.patientId) {
       throw new ForbiddenException('Patient health goal does not belong to the authenticated user.');
     }
-
-    const {
-      metricType,
-      metricKey,
-      frequency,
-      frequencyTarget,
-      aggregation,
-      comparison,
-      guidanceText,
-      patientId,
-      targetDate,
-      achievedAt,
-      ...goalData
-    } = dto;
-
+    const { metricType, metricKey, frequency, frequencyTarget, aggregation, comparison, guidanceText, patientId, targetDate, achievedAt, ...goalData } = dto;
     const parsedTargetDate = targetDate ? new Date(targetDate) : undefined;
     const parsedAchievedAt = achievedAt ? new Date(achievedAt) : undefined;
     if (parsedTargetDate && Number.isNaN(parsedTargetDate.getTime())) throw new BadRequestException('Target date is invalid.');
     if (parsedAchievedAt && Number.isNaN(parsedAchievedAt.getTime())) throw new BadRequestException('Achievement date is invalid.');
-
-    const goal = await this.prisma.healthGoal.create({
-      data: { ...goalData, patientId, targetDate: parsedTargetDate, achievedAt: parsedAchievedAt },
-      include: { patient: true, practitioner: true, carePlan: true, progress: { orderBy: { measuredAt: 'desc' } } },
-    });
-
-    await this.healthGoalsService.configureMetric(goal.id, {
-      metricType,
-      metricKey,
-      frequency,
-      frequencyTarget: frequencyTarget == null ? undefined : Number(frequencyTarget),
-      aggregation,
-      comparison,
-      guidanceText,
-    });
-
+    const goal = await this.prisma.healthGoal.create({ data: { ...goalData, patientId, targetDate: parsedTargetDate, achievedAt: parsedAchievedAt }, include: { patient: true, practitioner: true, carePlan: true, progress: { orderBy: { measuredAt: 'desc' } } } });
+    await this.healthGoalsService.configureMetric(goal.id, { metricType, metricKey, frequency, frequencyTarget: frequencyTarget == null ? undefined : Number(frequencyTarget), aggregation, comparison, guidanceText });
     return this.healthGoalsService.findOne(goal.id);
   }
 
   @Patch(':id')
   async update(@Param('id') id: string, @Body() dto: UpdateHealthGoalDto, @Req() request: AuthenticatedRequest) {
     const existing = await this.assertOwnGoal(id, this.userId(request));
-    const {
-      patientId: _patientId,
-      metricType,
-      metricKey,
-      frequency,
-      frequencyTarget,
-      aggregation,
-      comparison,
-      guidanceText,
-      targetDate,
-      achievedAt,
-      ...goalData
-    } = dto;
-
+    const { patientId: _patientId, metricType, metricKey, frequency, frequencyTarget, aggregation, comparison, guidanceText, targetDate, achievedAt, ...goalData } = dto;
     const parsedTargetDate = targetDate ? new Date(targetDate) : undefined;
     const parsedAchievedAt = achievedAt ? new Date(achievedAt) : undefined;
     if (parsedTargetDate && Number.isNaN(parsedTargetDate.getTime())) throw new BadRequestException('Target date is invalid.');
     if (parsedAchievedAt && Number.isNaN(parsedAchievedAt.getTime())) throw new BadRequestException('Achievement date is invalid.');
-
     const isSmokingGoal = String(existing.category).toUpperCase() === 'SMOKING' || String(goalData.category ?? '').toUpperCase() === 'SMOKING';
-
-    const updated = await this.prisma.healthGoal.update({
-      where: { id },
-      data: {
-        ...goalData,
-        ...(targetDate !== undefined ? { targetDate: parsedTargetDate } : {}),
-        ...(achievedAt !== undefined ? { achievedAt: parsedAchievedAt } : {}),
-        ...(isSmokingGoal ? { status: 'ACTIVE', achievedAt: null, currentValue: null } : {}),
-      },
-      include: { patient: true, practitioner: true, carePlan: true, progress: { orderBy: { measuredAt: 'desc' } } },
-    });
-
-    if (isSmokingGoal) {
-      await this.prisma.healthGoalProgress.deleteMany({ where: { healthGoalId: id } });
-    }
-
-    if (metricType || metricKey || frequency || frequencyTarget !== undefined || aggregation || comparison || guidanceText !== undefined) {
-      await this.healthGoalsService.configureMetric(id, {
-        metricType,
-        metricKey,
-        frequency,
-        frequencyTarget: frequencyTarget == null ? undefined : Number(frequencyTarget),
-        aggregation,
-        comparison,
-        guidanceText,
-      });
-    }
-
+    const updated = await this.prisma.healthGoal.update({ where: { id }, data: { ...goalData, ...(targetDate !== undefined ? { targetDate: parsedTargetDate } : {}), ...(achievedAt !== undefined ? { achievedAt: parsedAchievedAt } : {}), ...(isSmokingGoal ? { status: 'ACTIVE', achievedAt: null, currentValue: null } : {}) }, include: { patient: true, practitioner: true, carePlan: true, progress: { orderBy: { measuredAt: 'desc' } } } });
+    if (isSmokingGoal) await this.prisma.healthGoalProgress.deleteMany({ where: { healthGoalId: id } });
+    if (metricType || metricKey || frequency || frequencyTarget !== undefined || aggregation || comparison || guidanceText !== undefined) await this.healthGoalsService.configureMetric(id, { metricType, metricKey, frequency, frequencyTarget: frequencyTarget == null ? undefined : Number(frequencyTarget), aggregation, comparison, guidanceText });
     return this.healthGoalsService.findOne(updated.id);
   }
 
   @Patch(':id/metric-config')
-  async configureMetric(@Param('id') id: string, @Body() config: {
-    metricType?: string;
-    metricKey?: string;
-    frequency?: 'DAILY' | 'WEEKLY' | 'TOTAL';
-    frequencyTarget?: number | null;
-    guidanceText?: string | null;
-    aggregation?: 'SUM' | 'LATEST' | 'AVERAGE' | 'MIN' | 'MAX';
-    comparison?: 'AT_LEAST' | 'AT_MOST' | 'CLOSEST' | 'INCREASE_TO' | 'DECREASE_TO';
-  }, @Req() request: AuthenticatedRequest) {
+  async configureMetric(@Param('id') id: string, @Body() config: { metricType?: string; metricKey?: string; frequency?: 'DAILY' | 'WEEKLY' | 'TOTAL'; frequencyTarget?: number | null; guidanceText?: string | null; aggregation?: 'SUM' | 'LATEST' | 'AVERAGE' | 'MIN' | 'MAX'; comparison?: 'AT_LEAST' | 'AT_MOST' | 'CLOSEST' | 'INCREASE_TO' | 'DECREASE_TO'; }, @Req() request: AuthenticatedRequest) {
     const goal = await this.assertOwnGoal(id, this.userId(request));
     if (String(goal.category).toUpperCase() === 'SMOKING') {
       await this.prisma.healthGoalProgress.deleteMany({ where: { healthGoalId: id } });
@@ -148,49 +112,23 @@ export class PatientHealthGoalsController {
   async logSmoking(@Param('id') id: string, @Body() body: { cigarettes?: number; dayKey?: string }, @Req() request: AuthenticatedRequest) {
     const userId = this.userId(request);
     const goal = await this.assertOwnGoal(id, userId);
-    if (String(goal.category).toUpperCase() !== 'SMOKING') {
-      throw new BadRequestException('This health goal is not a smoking goal.');
-    }
-
+    if (String(goal.category).toUpperCase() !== 'SMOKING') throw new BadRequestException('This health goal is not a smoking goal.');
     const cigarettes = Number(body?.cigarettes);
-    if (!Number.isFinite(cigarettes) || cigarettes < 0) {
-      throw new BadRequestException('Cigarettes must be a number greater than or equal to 0.');
-    }
-
+    if (!Number.isFinite(cigarettes) || cigarettes < 0) throw new BadRequestException('Cigarettes must be a number greater than or equal to 0.');
     const dayKey = String(body?.dayKey ?? '');
-    if (!/^\d{4}-\d{2}-\d{2}$/.test(dayKey)) {
-      throw new BadRequestException('A valid local day is required for a smoking log.');
-    }
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(dayKey)) throw new BadRequestException('A valid local day is required for a smoking log.');
 
-    const metricResult = await this.healthGoalsService.syncMetricEventForUser(userId, {
-      metricType: 'SMOKING',
-      metricKey: 'smoking.cigarettes',
-      loggedValue: cigarettes,
-      source: 'patient-smoking-log',
-      sourceId: `${id}:${dayKey}`,
-    });
+    await this.ensureMetricEventStorage();
+    const metricResult = await this.healthGoalsService.syncMetricEventForUser(userId, { metricType: 'SMOKING', metricKey: 'smoking.cigarettes', loggedValue: cigarettes, source: 'patient-smoking-log', sourceId: `${id}:${dayKey}` });
 
     const journalTitle = `Smoking log · ${dayKey}`;
     const journalText = `Smoking log for ${dayKey}: ${cigarettes} ${cigarettes === 1 ? 'cigarette' : 'cigarettes'} smoked.`;
-    const existingJournal = await this.prisma.healthJournal.findFirst({
-      where: { patientId: goal.patientId, title: journalTitle },
-      select: { id: true },
-    });
-
-    if (existingJournal) {
-      await this.prisma.healthJournal.update({
-        where: { id: existingJournal.id },
-        data: { journal: journalText, notes: 'Recorded from the Smoking health-goal card.' },
-      });
-    } else {
-      await this.prisma.healthJournal.create({
-        data: {
-          patientId: goal.patientId,
-          title: journalTitle,
-          journal: journalText,
-          notes: 'Recorded from the Smoking health-goal card.',
-        },
-      });
+    try {
+      const existingJournal = await this.prisma.healthJournal.findFirst({ where: { patientId: goal.patientId, title: journalTitle }, select: { id: true } });
+      if (existingJournal) await this.prisma.healthJournal.update({ where: { id: existingJournal.id }, data: { journal: journalText, notes: 'Recorded from the Smoking health-goal card.' } });
+      else await this.prisma.healthJournal.create({ data: { patientId: goal.patientId, title: journalTitle, journal: journalText, notes: 'Recorded from the Smoking health-goal card.' } });
+    } catch {
+      // The metric event is the authoritative Today-goal record; journal projection must not make saving fail.
     }
 
     return { metricResult, journal: { title: journalTitle, dayKey, cigarettes } };
