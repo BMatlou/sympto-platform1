@@ -3,11 +3,8 @@ import { PrismaService } from '../../database/prisma.service';
 
 /**
  * Runtime safety net for the raw-SQL health-goal metric tables.
- *
- * These tables are intentionally outside the Prisma schema, but Today and the
- * goals engine depend on them. A drifted local migration history must never
- * turn a read-only Today request into a 500. This is idempotent and does not
- * drop, truncate, or rewrite existing data.
+ * Idempotent: it creates missing infrastructure and adds missing columns,
+ * without dropping, truncating, or rewriting existing metric data.
  */
 @Injectable()
 export class HealthGoalMetricSchemaService implements OnModuleInit {
@@ -59,19 +56,34 @@ export class HealthGoalMetricSchemaService implements OnModuleInit {
         )
       `);
 
+      // Repair partial tables left by an interrupted/drifted migration.
       await this.prisma.$executeRawUnsafe(`
         ALTER TABLE "HealthGoalMetricConfig"
+          ADD COLUMN IF NOT EXISTS "id" UUID DEFAULT gen_random_uuid(),
+          ADD COLUMN IF NOT EXISTS "healthGoalId" TEXT,
+          ADD COLUMN IF NOT EXISTS "metricType" VARCHAR(64),
+          ADD COLUMN IF NOT EXISTS "metricKey" VARCHAR(128),
+          ADD COLUMN IF NOT EXISTS "frequency" VARCHAR(16) DEFAULT 'DAILY',
+          ADD COLUMN IF NOT EXISTS "frequencyTarget" NUMERIC(12,2),
           ADD COLUMN IF NOT EXISTS "aggregation" VARCHAR(32),
           ADD COLUMN IF NOT EXISTS "comparison" VARCHAR(32),
           ADD COLUMN IF NOT EXISTS "guidanceText" TEXT,
-          ADD COLUMN IF NOT EXISTS "createdAt" TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
-          ADD COLUMN IF NOT EXISTS "updatedAt" TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
+          ADD COLUMN IF NOT EXISTS "createdAt" TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+          ADD COLUMN IF NOT EXISTS "updatedAt" TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
       `);
 
       await this.prisma.$executeRawUnsafe(`
         ALTER TABLE "HealthGoalMetricEvent"
+          ADD COLUMN IF NOT EXISTS "id" UUID DEFAULT gen_random_uuid(),
+          ADD COLUMN IF NOT EXISTS "patientId" TEXT,
+          ADD COLUMN IF NOT EXISTS "metricType" VARCHAR(64),
+          ADD COLUMN IF NOT EXISTS "metricKey" VARCHAR(128),
+          ADD COLUMN IF NOT EXISTS "loggedValue" NUMERIC(12,2),
+          ADD COLUMN IF NOT EXISTS "occurredAt" TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+          ADD COLUMN IF NOT EXISTS "source" VARCHAR(64),
+          ADD COLUMN IF NOT EXISTS "sourceId" VARCHAR(128),
           ADD COLUMN IF NOT EXISTS "metadata" JSONB,
-          ADD COLUMN IF NOT EXISTS "createdAt" TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
+          ADD COLUMN IF NOT EXISTS "createdAt" TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
       `);
 
       await this.prisma.$executeRawUnsafe(`
@@ -91,7 +103,10 @@ export class HealthGoalMetricSchemaService implements OnModuleInit {
 
       this.logger.log('Health-goal metric database contract verified.');
     } catch (error) {
-      this.logger.error('Health-goal metric database contract could not be verified.', error instanceof Error ? error.stack : String(error));
+      this.logger.error(
+        'Health-goal metric database contract could not be verified.',
+        error instanceof Error ? error.stack : String(error),
+      );
       throw error;
     }
   }
