@@ -137,6 +137,7 @@ export default function TodayWeightGoal({ goal, fallbackWeight }: Props) {
   const currentBmiBelowRange = currentBmi != null && currentBmi < 18.5;
   const currentBmiAboveRange = currentBmi != null && currentBmi >= 25;
   const goalNeedsReview = bmiCaution || currentBmiBelowRange;
+  const reviewGoalHref = goal?.id ? `/health-goals?edit=${encodeURIComponent(String(goal.id))}` : "/health-goals";
   const ChangeIcon = comparison === "INCREASE_TO" ? TrendingUp : TrendingDown;
 
   const journeyLabel = targetReached
@@ -168,7 +169,7 @@ export default function TodayWeightGoal({ goal, fallbackWeight }: Props) {
   const guidanceMessage = currentBmiBelowRange
     ? `Your current BMI is ${currentBmi?.toFixed(1)}, below the adult underweight screening threshold of 18.5. Sympto should shift the guidance toward healthy weight gain rather than further weight loss. At your recorded height, BMI 18.5 corresponds to about ${formatKg(lowerScreeningWeight)} kg. BMI is a screening measure, not a diagnosis.`
     : bmiCaution
-      ? `Your current BMI is ${currentBmi?.toFixed(1)}, while the planned target BMI would be ${targetBmi?.toFixed(1)}, below 18.5. Sympto should not encourage further loss toward ${formatKg(targetWeight)} kg. Consider maintaining your current weight or changing the goal to a weight-gain/maintenance focus. At your recorded height, BMI 18.5 corresponds to about ${formatKg(lowerScreeningWeight)} kg. BMI is a screening measure, not a diagnosis.`
+      ? `Your current BMI is ${currentBmi?.toFixed(1)}, while the planned target BMI would be ${targetBmi?.toFixed(1)}, below 18.5. Sympto will not encourage further loss toward ${formatKg(targetWeight)} kg. The next step is to review this goal and either revise the target or switch to a weight-gain/maintenance focus. At your recorded height, BMI 18.5 corresponds to about ${formatKg(lowerScreeningWeight)} kg. BMI is a screening measure, not a diagnosis.`
       : currentBmiAboveRange
         ? `BMI now ${currentBmi?.toFixed(1)} is at or above 25. Interpret this screening measure alongside the person's wider health information.`
         : null;
@@ -261,7 +262,12 @@ export default function TodayWeightGoal({ goal, fallbackWeight }: Props) {
             <p className="mt-1.5">{trendMessage}</p>
             {guidanceMessage && <p className="mt-1.5">{guidanceMessage}</p>}
             {bmiChange != null && Math.abs(bmiChange) >= 0.1 && <p className="mt-1.5">BMI change since goal start: {bmiChange > 0 ? "+" : ""}{bmiChange.toFixed(1)}.</p>}
-            {bmiCaution && <p className="mt-1.5">The planned target BMI is {targetBmi?.toFixed(1)}, below 18.5. The goal remains saved, but the app will not present further loss toward that target as the required action.</p>}
+            {bmiCaution && <>
+              <p className="mt-1.5">The planned target BMI is {targetBmi?.toFixed(1)}, below 18.5. The goal remains saved while you review what to do next.</p>
+              <div className="mt-3 flex flex-wrap items-center gap-2">
+                <Link href={reviewGoalHref} className="inline-flex min-h-9 items-center justify-center gap-1.5 rounded-xl bg-[#0b2d54] px-3.5 py-2 text-[10px] font-black text-white shadow-sm transition hover:bg-[#123d63]">Review goal <ArrowRight className="h-3 w-3" /></Link>
+              </div>
+            </>}
           </div>
         )}
       </div>
