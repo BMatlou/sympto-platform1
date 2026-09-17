@@ -166,6 +166,12 @@ const modules = fs
 // Medications
 'medications.read',
 
+// Patient medications
+'patient-medications.read',
+'patient-medications.create',
+'patient-medications.update',
+'patient-medications.delete',
+
 // Immunizations
 'immunizations.read',
 
@@ -594,12 +600,6 @@ type SeedMedication = {
 };
 
 const medications: SeedMedication[] = [
-  /*
-  |--------------------------------------------------------------------------
-  | PAIN / FEVER
-  |--------------------------------------------------------------------------
-  */
-
   {
     name: 'Paracetamol',
     genericName: 'Paracetamol',
@@ -653,13 +653,6 @@ const medications: SeedMedication[] = [
     route: 'ORAL',
     prescriptionRequired: true,
   },
-
-  /*
-  |--------------------------------------------------------------------------
-  | OPIOID / STRONG ANALGESICS
-  |--------------------------------------------------------------------------
-  */
-
   {
     name: 'Codeine',
     genericName: 'Codeine',
@@ -705,13 +698,6 @@ const medications: SeedMedication[] = [
     controlled: true,
     prescriptionRequired: true,
   },
-
-  /*
-  |--------------------------------------------------------------------------
-  | DIABETES
-  |--------------------------------------------------------------------------
-  */
-
   {
     name: 'Metformin',
     genericName: 'Metformin',
@@ -797,13 +783,6 @@ const medications: SeedMedication[] = [
     route: 'SUBCUTANEOUS',
     prescriptionRequired: true,
   },
-
-  /*
-  |--------------------------------------------------------------------------
-  | BLOOD PRESSURE / CARDIOVASCULAR
-  |--------------------------------------------------------------------------
-  */
-
   {
     name: 'Amlodipine',
     genericName: 'Amlodipine',
@@ -911,13 +890,6 @@ const medications: SeedMedication[] = [
     route: 'ORAL',
     prescriptionRequired: true,
   },
-
-  /*
-  |--------------------------------------------------------------------------
-  | CHOLESTEROL
-  |--------------------------------------------------------------------------
-  */
-
   {
     name: 'Atorvastatin',
     genericName: 'Atorvastatin',
@@ -960,13 +932,6 @@ const medications: SeedMedication[] = [
     route: 'ORAL',
     prescriptionRequired: true,
   },
-
-  /*
-  |--------------------------------------------------------------------------
-  | ASTHMA / COPD
-  |--------------------------------------------------------------------------
-  */
-
   {
     name: 'Salbutamol',
     genericName: 'Salbutamol',
@@ -1026,13 +991,6 @@ const medications: SeedMedication[] = [
     route: 'ORAL',
     prescriptionRequired: true,
   },
-
-  /*
-  |--------------------------------------------------------------------------
-  | ANTIBIOTICS
-  |--------------------------------------------------------------------------
-  */
-
   {
     name: 'Amoxicillin',
     genericName: 'Amoxicillin',
@@ -1106,13 +1064,6 @@ const medications: SeedMedication[] = [
     route: 'INTRAVENOUS',
     prescriptionRequired: true,
   },
-
-  /*
-  |--------------------------------------------------------------------------
-  | STOMACH / GI
-  |--------------------------------------------------------------------------
-  */
-
   {
     name: 'Omeprazole',
     genericName: 'Omeprazole',
@@ -1155,13 +1106,6 @@ const medications: SeedMedication[] = [
     route: 'ORAL',
     prescriptionRequired: false,
   },
-
-  /*
-  |--------------------------------------------------------------------------
-  | THYROID
-  |--------------------------------------------------------------------------
-  */
-
   {
     name: 'Levothyroxine',
     genericName: 'Levothyroxine',
@@ -1187,13 +1131,6 @@ const medications: SeedMedication[] = [
     route: 'ORAL',
     prescriptionRequired: true,
   },
-
-  /*
-  |--------------------------------------------------------------------------
-  | MENTAL HEALTH
-  |--------------------------------------------------------------------------
-  */
-
   {
     name: 'Fluoxetine',
     genericName: 'Fluoxetine',
@@ -1268,13 +1205,6 @@ const medications: SeedMedication[] = [
     route: 'ORAL',
     prescriptionRequired: true,
   },
-
-  /*
-  |--------------------------------------------------------------------------
-  | EPILEPSY / NEUROLOGY
-  |--------------------------------------------------------------------------
-  */
-
   {
     name: 'Gabapentin',
     genericName: 'Gabapentin',
@@ -1323,13 +1253,6 @@ const medications: SeedMedication[] = [
     route: 'ORAL',
     prescriptionRequired: true,
   },
-
-  /*
-  |--------------------------------------------------------------------------
-  | CORTICOSTEROIDS
-  |--------------------------------------------------------------------------
-  */
-
   {
     name: 'Prednisone',
     genericName: 'Prednisone',
@@ -1362,13 +1285,6 @@ const medications: SeedMedication[] = [
     route: 'ORAL',
     prescriptionRequired: true,
   },
-
-  /*
-  |--------------------------------------------------------------------------
-  | ANTIHISTAMINES / ALLERGY
-  |--------------------------------------------------------------------------
-  */
-
   {
     name: 'Cetirizine',
     genericName: 'Cetirizine',
@@ -1402,13 +1318,6 @@ const medications: SeedMedication[] = [
     route: 'ORAL',
     prescriptionRequired: false,
   },
-
-  /*
-  |--------------------------------------------------------------------------
-  | ANTICOAGULANTS / ANTIPLATELETS
-  |--------------------------------------------------------------------------
-  */
-
   {
     name: 'Warfarin',
     genericName: 'Warfarin',
@@ -1444,13 +1353,6 @@ const medications: SeedMedication[] = [
     route: 'ORAL',
     prescriptionRequired: true,
   },
-
-  /*
-  |--------------------------------------------------------------------------
-  | HIV / ANTIVIRALS
-  |--------------------------------------------------------------------------
-  */
-
   {
     name: 'Dolutegravir',
     genericName: 'Dolutegravir',
@@ -1499,13 +1401,6 @@ const medications: SeedMedication[] = [
     route: 'ORAL',
     prescriptionRequired: true,
   },
-
-  /*
-  |--------------------------------------------------------------------------
-  | KIDNEY / GOUT
-  |--------------------------------------------------------------------------
-  */
-
   {
     name: 'Allopurinol',
     genericName: 'Allopurinol',
@@ -1522,13 +1417,6 @@ const medications: SeedMedication[] = [
     route: 'ORAL',
     prescriptionRequired: true,
   },
-
-  /*
-  |--------------------------------------------------------------------------
-  | CONTRACEPTION / HORMONES
-  |--------------------------------------------------------------------------
-  */
-
   {
     name: 'Ethinylestradiol and Levonorgestrel',
     genericName: 'Ethinylestradiol/Levonorgestrel',
@@ -1553,13 +1441,6 @@ const medications: SeedMedication[] = [
     route: 'ORAL',
     prescriptionRequired: true,
   },
-
-  /*
-  |--------------------------------------------------------------------------
-  | DERMATOLOGY
-  |--------------------------------------------------------------------------
-  */
-
   {
     name: 'Hydrocortisone topical',
     genericName: 'Hydrocortisone',
@@ -1592,13 +1473,6 @@ const medications: SeedMedication[] = [
     route: 'TOPICAL',
     prescriptionRequired: false,
   },
-
-  /*
-  |--------------------------------------------------------------------------
-  | EYE
-  |--------------------------------------------------------------------------
-  */
-
   {
     name: 'Timolol',
     genericName: 'Timolol',
@@ -1615,13 +1489,6 @@ const medications: SeedMedication[] = [
     route: 'OPHTHALMIC',
     prescriptionRequired: true,
   },
-
-  /*
-  |--------------------------------------------------------------------------
-  | MISCELLANEOUS COMMON MEDICINES
-  |--------------------------------------------------------------------------
-  */
-
   {
     name: 'Ferrous sulfate',
     genericName: 'Ferrous sulfate',
