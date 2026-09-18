@@ -70,7 +70,6 @@ export default function TodayWeightGoal({ goal, fallbackWeight }: Props) {
           .filter((event) => Number.isFinite(event.loggedValue) && !Number.isNaN(new Date(event.occurredAt).getTime()))
           .sort((a, b) => new Date(a.occurredAt).getTime() - new Date(b.occurredAt).getTime());
 
-        const goalId = String(goal?.id ?? "");
         const goalBaseline = all.find((event) => event.source === "goal-baseline" && event.sourceId === goalId);
         const goalCreatedAt = new Date(String(goal?.createdAt ?? ""));
         const baselineFromHistory = !Number.isNaN(goalCreatedAt.getTime())
