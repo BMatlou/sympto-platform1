@@ -114,14 +114,11 @@ export default function TodayWeightGoal({ goal, fallbackWeight }: Props) {
   const intelligenceBaseline = numberValue(intelligence?.profile?.baselineWeightKg);
   const currentWeight = currentEvent?.loggedValue ?? intelligenceWeight ?? fallback ?? patientWeight;
   const startingWeight = baselineWeight ?? intelligenceBaseline ?? patientWeight ?? currentWeight;
-  const targetAmount = isMaintenanceGoal ? 0 : configuredTarget != null && configuredTarget > 0 ? configuredTarget : null;
-  const targetWeight = comparison === "DECREASE_TO" && startingWeight != null && targetAmount != null
-    ? startingWeight - targetAmount
-    : comparison === "INCREASE_TO" && startingWeight != null && targetAmount != null
-      ? startingWeight + targetAmount
-      : isMaintenanceGoal && startingWeight != null
-        ? startingWeight
-        : null;
+  const targetAmount = isMaintenanceGoal ? null : configuredTarget != null && configuredTarget > 0 ? configuredTarget : null;
+  const intelligenceTargetWeight = numberValue(intelligence?.weight?.targetWeightKg);
+  const targetWeight = intelligenceTargetWeight
+    ?? (!isMaintenanceGoal ? targetAmount : null)
+    ?? (isMaintenanceGoal && startingWeight != null ? startingWeight : null);
   const goalCompleted = String(goal?.status ?? "").toUpperCase() === "ACHIEVED";
   const completedWeight = numberValue(goal?.currentValue ?? goal?.latestProgress?.currentValue ?? goal?.progress?.[0]?.currentValue);
   const journeyWeight = goalCompleted ? completedWeight ?? currentWeight : currentWeight;
@@ -136,13 +133,18 @@ export default function TodayWeightGoal({ goal, fallbackWeight }: Props) {
   const maintenanceStatus = String(intelligence?.weight?.status ?? "INSUFFICIENT_DATA").toUpperCase();
   const maintenanceStable = intelligence?.weight?.withinMaintenanceBand === true || maintenanceStatus === "STABLE";
   const targetReached = isMaintenanceGoal ? false : goalCompleted || (targetWeight != null && journeyWeight != null && (comparison === "DECREASE_TO" ? journeyWeight <= targetWeight : journeyWeight >= targetWeight));
+  const totalPlannedChange = !isMaintenanceGoal && targetWeight != null && startingWeight != null
+    ? Math.abs(targetWeight - startingWeight)
+    : null;
   const progress = isMaintenanceGoal
     ? (expectedProgress ?? 0)
     : goalCompleted
       ? 100
-      : targetAmount != null && actualChange != null
-        ? Math.round(Math.min(100, Math.max(0, (actualChange / targetAmount) * 100)))
-        : 0;
+      : totalPlannedChange === 0 && targetWeight != null && journeyWeight != null
+        ? Math.abs(journeyWeight - targetWeight) <= 0.5 ? 100 : 0
+        : totalPlannedChange != null && actualChange != null
+          ? Math.round(Math.min(100, Math.max(0, (actualChange / totalPlannedChange) * 100)))
+          : 0;
   const onTrack = isMaintenanceGoal
     ? maintenanceStatus === "STABLE" || maintenanceStable
     : goalCompleted || targetReached || expectedProgress == null || progress >= expectedProgress - 10;
@@ -177,8 +179,7 @@ export default function TodayWeightGoal({ goal, fallbackWeight }: Props) {
 
   const journeyLabel = goalCompleted
     ? completedWeight != null
-      ? `Goal completed at ${formatKg(completedWeight)} kg`
-      : "Goal completed"
+      ? `Goal completed at ${formatKg(completedWeight)} kg`      : "Goal completed"
     : isMaintenanceGoal
       ? maintenanceStatus === "NEEDS_REVIEW"
         ? "Weight trend needs review"
@@ -276,7 +277,7 @@ export default function TodayWeightGoal({ goal, fallbackWeight }: Props) {
       <div className="flex-1 px-4 pb-5 sm:px-5 sm:pb-6">
         {loading ? (
           <div className="h-[250px] animate-pulse rounded-[26px] bg-[#f5f9fa]" />
-        ) : currentWeight == null || startingWeight == null || (!isMaintenanceGoal && targetAmount == null) ? (
+        ) : currentWeight == null || startingWeight == null || (!isMaintenanceGoal && targetWeight == null) ? (
           <div className="rounded-[26px] bg-[#0b2d54] p-6 text-white shadow-[0_14px_30px_rgba(11,45,84,.14)]">
             <p className="text-xl font-black tracking-[-.04em]">Weight progress will update automatically</p>
             <p className="mt-2 text-sm leading-6 text-white/65">Record your weight in Vitals &amp; Measurements and Sympto will use that measurement here.</p>
@@ -357,8 +358,7 @@ export default function TodayWeightGoal({ goal, fallbackWeight }: Props) {
                   <div className="min-w-0">
                     <p className="text-xs font-black text-[#0b2d54]">{intelligence.todayFocus.actions[0].label}</p>
                     <p className="mt-1 text-[10px] leading-4 text-[#74859a]">{intelligence.todayFocus.actions[0].description}</p>
-                  </div>
-                  <Link href={intelligence.todayFocus.actions[0].href} className="inline-flex min-h-9 shrink-0 items-center justify-center gap-1.5 rounded-xl bg-[#0b2d54] px-3.5 py-2 text-[9px] font-black text-white shadow-sm transition hover:bg-[#123d63]">
+                  </div>                  <Link href={intelligence.todayFocus.actions[0].href} className="inline-flex min-h-9 shrink-0 items-center justify-center gap-1.5 rounded-xl bg-[#0b2d54] px-3.5 py-2 text-[9px] font-black text-white shadow-sm transition hover:bg-[#123d63]">
                     Open <ArrowRight className="h-3 w-3 text-[#24c1c4]" />
                   </Link>
                 </div>
@@ -397,7 +397,7 @@ export default function TodayWeightGoal({ goal, fallbackWeight }: Props) {
           <span>{goalCompleted ? "Completed journey" : `Day ${journey.journeyDay} · ${journey.daysLeft === null ? "Journey active" : journey.daysLeft === 0 ? "Target date today" : `${journey.daysLeft} days left`}`}</span>
           {goalCompleted ? <Link href="/health-goals" className="inline-flex min-h-9 shrink-0 items-center justify-center gap-1.5 rounded-xl px-3 text-[10px] font-black text-[#0b2d54] hover:bg-white">New goal <ArrowRight className="h-3 w-3" /></Link> : <Link href="/health-goals" className="inline-flex min-h-9 shrink-0 items-center justify-center gap-1.5 rounded-xl px-3 text-[10px] font-black text-[#0b2d54] hover:bg-white">View goal <ArrowRight className="h-3 w-3" /></Link>}
         </div>
-        <p className="mt-2 text-[9px] leading-4 text-[#9aa8b1]">For weight goals, the measurement recorded when this goal was created or last revised is the baseline. Maintenance goals use recent weight averages and trend rather than requiring an exact daily match to the baseline. Completed loss/gain goals remain at 100% as history.</p>
+        <p className="mt-2 text-[9px] leading-4 text-[#9aa8b1]">For weight goals, the measurement recorded when this goal was created or last revised is the baseline. Lose and Gain goals use an absolute target body weight; Maintenance goals use recent weight averages and trend rather than requiring an exact daily match to the baseline. Completed weight goals remain at 100% as history.</p>
       </div>
     </article>
   );
