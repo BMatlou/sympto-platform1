@@ -309,20 +309,21 @@ export class HealthGoalIntelligenceService {
 
     const age = ageFromDateOfBirth(goal.patient.person.dateOfBirth);
     const adultBmiApplicable = age == null || age >= 20;
-    // Directional weight goals store an absolute destination weight.
-    // Example: current 68 kg + INCREASE_TO + targetValue 100 = target weight 100 kg.
+    // Directional weight goals store the requested amount of change.
+    // Example: baseline 68 kg + INCREASE_TO + targetValue 100 = projected weight 168 kg.
+    const requestedChangeKg = comparison === 'CLOSEST' || targetAmount == null ? null : Math.max(targetAmount, 0);
     const targetWeight =
-      comparison === 'INCREASE_TO' && targetAmount != null
-        ? targetAmount
-        : comparison === 'DECREASE_TO' && targetAmount != null
-          ? targetAmount
+      comparison === 'INCREASE_TO' && baselineKg != null && requestedChangeKg != null
+        ? baselineKg + requestedChangeKg
+        : comparison === 'DECREASE_TO' && baselineKg != null && requestedChangeKg != null
+          ? baselineKg - requestedChangeKg
           : comparison === 'CLOSEST'
             ? baselineKg
             : null;
     const targetBmi = targetWeight != null && heightCm && heightCm > 0 ? targetWeight / ((heightCm / 100) ** 2) : null;
     const lowerScreeningWeightKg = heightCm != null && heightCm > 0 ? 18.5 * ((heightCm / 100) ** 2) : null;
     const upperScreeningWeightKg = heightCm != null && heightCm > 0 ? 24.9 * ((heightCm / 100) ** 2) : null;
-    const targetBmiStatus: 'BELOW_RANGE' | 'WITHIN_RANGE' | 'ABOVE_RANGE' | 'OBESITY_RANGE' | null =
+    const targetBmiStatus: 'BELOW_RANGE' | 'WITHIN_RANGE' | 'OVERWEIGHT' | 'OBESITY_CLASS_1' | 'OBESITY_CLASS_2' | 'OBESITY_CLASS_3' | null =
       !adultBmiApplicable || targetBmi == null
         ? null
         : targetBmi < 18.5
@@ -330,8 +331,12 @@ export class HealthGoalIntelligenceService {
           : targetBmi < 25
             ? 'WITHIN_RANGE'
             : targetBmi < 30
-              ? 'ABOVE_RANGE'
-              : 'OBESITY_RANGE';
+              ? 'OVERWEIGHT'
+              : targetBmi < 35
+                ? 'OBESITY_CLASS_1'
+                : targetBmi < 40
+                  ? 'OBESITY_CLASS_2'
+                  : 'OBESITY_CLASS_3';
     const targetNeedsReview = !['CLOSEST'].includes(comparison)
       && targetBmiStatus != null
       && targetBmiStatus !== 'WITHIN_RANGE';
@@ -549,6 +554,7 @@ export class HealthGoalIntelligenceService {
         maintenanceBand,
         withinMaintenanceBand,
         targetWeightKg: targetWeight,
+        requestedChangeKg,
         targetBmi,
         targetBmiStatus,
         targetNeedsReview,
