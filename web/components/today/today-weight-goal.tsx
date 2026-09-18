@@ -173,7 +173,7 @@ export default function TodayWeightGoal({ goal, fallbackWeight }: Props) {
   const ChangeIcon = isMaintenanceGoal ? Scale : comparison === "INCREASE_TO" ? TrendingUp : TrendingDown;
   const connectedGoals = Array.isArray(goal?.connectedGoals) ? goal.connectedGoals : [];
   const supportingGoals = connectedGoals.filter((relation: any) => relation.relationshipType === "SUPPORTS" && relation.direction === "supportsThisGoal");
-  const relatedGoals = connectedGoals.filter((relation: any) => relation.relationshipType === "RELATED_TO" && relation.direction === "supportsThisGoal");
+  const relatedGoals = connectedGoals.filter((relation: any) => relation.relationshipType === "RELATED_TO" && relation.direction === "relatedToThisGoal");
 
   const journeyLabel = goalCompleted
     ? completedWeight != null
