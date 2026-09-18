@@ -96,25 +96,7 @@ export class HealthGoalIntelligenceService {
       select: { id: true, category: true },
     });
     const weightGoals = goals.filter((goal) => String(goal.category).toUpperCase() === 'WEIGHT');
-    const activeWeightGoalIds = weightGoals.map((goal) => goal.id);
-    const activeRelatedGoalIds = goals.map((goal) => goal.id);
-
-    // Remove stale system-generated links when goals are edited, archived or deleted.
-    // User/manual relationships are preserved.
-    if (activeWeightGoalIds.length > 0) {
-      await this.prisma.$executeRawUnsafe(
-        'DELETE FROM "HealthGoalRelation" WHERE "patientId"=$1 AND "createdBy"=\'SYSTEM\' AND (("sourceGoalId"=ANY($2) OR "targetGoalId"=ANY($2)) OR ("sourceGoalId"=ANY($3) AND "targetGoalId"=ANY($3)))',
-        patientId,
-        activeWeightGoalIds,
-        activeRelatedGoalIds,
-      );
-    } else {
-      await this.prisma.$executeRawUnsafe(
-        'DELETE FROM "HealthGoalRelation" WHERE "patientId"=$1 AND "createdBy"=\'SYSTEM\'',
-        patientId,
-      );
-      return;
-    }
+    const desired = new Map<string, { sourceGoalId: string; targetGoalId: string; relationshipType: 'SUPPORTS' | 'RELATED_TO'; rationale: string | null }>();
 
     for (const weightGoal of weightGoals) {
       for (const relatedGoal of goals) {
@@ -123,17 +105,36 @@ export class HealthGoalIntelligenceService {
 
         if (WEIGHT_SUPPORT_RULES.some((rule) => rule.category === category)) {
           const rationale = WEIGHT_SUPPORT_RULES.find((rule) => rule.category === category)?.rationale ?? null;
-          await this.upsertRelation(patientId, relatedGoal.id, weightGoal.id, 'SUPPORTS', rationale);
+          const relationshipType = 'SUPPORTS' as const;
+          desired.set(`${relatedGoal.id}|${weightGoal.id}|${relationshipType}`, { sourceGoalId: relatedGoal.id, targetGoalId: weightGoal.id, relationshipType, rationale });
         } else if (WEIGHT_RELATED_RULES.has(category)) {
-          await this.upsertRelation(
-            patientId,
-            relatedGoal.id,
-            weightGoal.id,
-            'RELATED_TO',
-            'This health behaviour or outcome can be monitored alongside the weight goal without assuming that it caused the weight change.',
-          );
+          const relationshipType = 'RELATED_TO' as const;
+          const rationale = 'This health behaviour or outcome can be monitored alongside the weight goal without assuming that it caused the weight change.';
+          desired.set(`${relatedGoal.id}|${weightGoal.id}|${relationshipType}`, { sourceGoalId: relatedGoal.id, targetGoalId: weightGoal.id, relationshipType, rationale });
         }
       }
+    }
+
+    const existing = await this.prisma.$queryRawUnsafe<Array<{ id: string; sourceGoalId: string; targetGoalId: string; relationshipType: string }>>(
+      'SELECT r."id",r."sourceGoalId",r."targetGoalId",r."relationshipType" FROM "HealthGoalRelation" r INNER JOIN "HealthGoal" s ON s."id"=r."sourceGoalId" INNER JOIN "HealthGoal" t ON t."id"=r."targetGoalId" WHERE r."patientId"=$1 AND r."createdBy"=\'SYSTEM\' AND (s."category"=\'WEIGHT\' OR t."category"=\'WEIGHT\')',
+      patientId,
+    );
+
+    for (const relation of existing) {
+      const key = `${relation.sourceGoalId}|${relation.targetGoalId}|${relation.relationshipType}`;
+      if (!desired.has(key)) {
+        await this.prisma.$executeRawUnsafe('DELETE FROM "HealthGoalRelation" WHERE "id"=$1::uuid', relation.id);
+      }
+    }
+
+    for (const relation of desired.values()) {
+      await this.upsertRelation(
+        patientId,
+        relation.sourceGoalId,
+        relation.targetGoalId,
+        relation.relationshipType,
+        relation.rationale,
+      );
     }
   }
 
