@@ -209,8 +209,8 @@ export class HealthGoalIntelligenceService {
     for (const patientId of patientIds) await this.syncGoalRelations(patientId);
 
     const goalIds = goals.map((goal) => goal.id);
-    const rows = await this.prisma.$queryRawUnsafe<RelationRow[]>(
-      'SELECT r."id",r."sourceGoalId",r."targetGoalId",r."relationshipType",r."rationale",g."id" AS "relatedGoalId",g."title" AS "relatedTitle",g."category"::text AS "relatedCategory",g."status"::text AS "relatedStatus",g."targetValue"::double precision AS "relatedTargetValue",g."unit" AS "relatedUnit",g."targetDate" AS "relatedTargetDate" FROM "HealthGoalRelation" r INNER JOIN "HealthGoal" g ON g."id"=CASE WHEN r."sourceGoalId" = ANY($1) THEN r."targetGoalId" ELSE r."sourceGoalId" END WHERE r."patientId" = ANY($2) AND (r."sourceGoalId" = ANY($1) OR r."targetGoalId" = ANY($1))',
+    const rows = await this.prisma.$queryRawUnsafe<RelationPairRow[]>(
+      'SELECT r."id",r."sourceGoalId",r."targetGoalId",r."relationshipType",r."rationale",s."title" AS "sourceTitle",s."category"::text AS "sourceCategory",s."status"::text AS "sourceStatus",s."targetValue"::double precision AS "sourceTargetValue",s."unit" AS "sourceUnit",s."targetDate" AS "sourceTargetDate",t."title" AS "targetTitle",t."category"::text AS "targetCategory",t."status"::text AS "targetStatus",t."targetValue"::double precision AS "targetTargetValue",t."unit" AS "targetUnit",t."targetDate" AS "targetTargetDate" FROM "HealthGoalRelation" r INNER JOIN "HealthGoal" s ON s."id"=r."sourceGoalId" INNER JOIN "HealthGoal" t ON t."id"=r."targetGoalId" WHERE r."patientId" = ANY($2) AND (r."sourceGoalId" = ANY($1) OR r."targetGoalId" = ANY($1))',
       goalIds,
       patientIds,
     );
@@ -219,21 +219,26 @@ export class HealthGoalIntelligenceService {
       ...goal,
       connectedGoals: rows
         .filter((row) => row.sourceGoalId === goal.id || row.targetGoalId === goal.id)
-        .map((row) => ({
-          id: row.id,
-          direction: row.targetGoalId === goal.id ? 'supportsThisGoal' : 'thisGoalRelatedTo',
-          relationshipType: row.relationshipType,
-          rationale: row.rationale,
-          goal: {
-            id: row.relatedGoalId,
-            title: row.relatedTitle,
-            category: row.relatedCategory,
-            status: row.relatedStatus,
-            targetValue: row.relatedTargetValue,
-            unit: row.relatedUnit,
-            targetDate: row.relatedTargetDate,
-          },
-        })),
+        .map((row) => {
+          const targetIsCurrent = row.targetGoalId === goal.id;
+          return {
+            id: row.id,
+            direction: row.relationshipType === 'SUPPORTS'
+              ? targetIsCurrent ? 'supportsThisGoal' : 'supportsAnotherGoal'
+              : 'relatedToThisGoal',
+            relationshipType: row.relationshipType,
+            rationale: row.rationale,
+            goal: {
+              id: targetIsCurrent ? row.sourceGoalId : row.targetGoalId,
+              title: targetIsCurrent ? row.sourceTitle : row.targetTitle,
+              category: targetIsCurrent ? row.sourceCategory : row.targetCategory,
+              status: targetIsCurrent ? row.sourceStatus : row.targetStatus,
+              targetValue: targetIsCurrent ? row.sourceTargetValue : row.targetTargetValue,
+              unit: targetIsCurrent ? row.sourceUnit : row.targetUnit,
+              targetDate: targetIsCurrent ? row.sourceTargetDate : row.targetTargetDate,
+            },
+          };
+        }),
     }));
   }
 
@@ -383,8 +388,12 @@ export class HealthGoalIntelligenceService {
       },
     });
 
-    const latestWeightAt = cleanedEvents.length ? cleanedEvents[cleanedEvents.length - 1].at : null;
-    const weightDataNeedsRefresh = latestWeightAt == null || Date.now() - latestWeightAt.getTime() > 7 * 86400000;
+    const latestWeightAt = cleanedEvents.length
+      ? cleanedEvents[cleanedEvents.length - 1].at
+      : baselineKg != null
+        ? new Date(goal.createdAt)
+        : null;
+    const weightDataNeedsRefresh = baselineKg == null || (latestWeightAt != null && Date.now() - latestWeightAt.getTime() > 7 * 86400000);
     const checkInNeedsCompletion = !todayJournal;
     const exerciseSupport = relationshipData.relationships.find((relation) =>
       relation.relationshipType === 'SUPPORTS' && String(relation.goal.category).toUpperCase() === 'EXERCISE',
@@ -406,7 +415,9 @@ export class HealthGoalIntelligenceService {
 
     const todayActions: TodayFocusAction[] = [];
 
-    if (goal.status !== 'ACHIEVED' && (bmiCaution || (currentBmiBelowRange && comparison === 'DECREASE_TO'))) {
+    if (goal.status === 'ACHIEVED') {
+      // Completed outcome goals remain historical and do not generate new goal actions.
+    } else if (goal.status !== 'ACHIEVED' && (bmiCaution || (currentBmiBelowRange && comparison === 'DECREASE_TO'))) {
       todayActions.push({
         id: 'review-weight-goal',
         label: 'Review your weight goal',
