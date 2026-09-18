@@ -73,7 +73,21 @@ function goalCurrent(goal: any) {
 function goalPresentation(goal: any) {
   const category = String(goal?.category ?? "OTHER").toUpperCase();
   const config = CATEGORIES.find((item) => item.value === category) ?? CATEGORIES[CATEGORIES.length - 1];
-  return { config, progress: goalProgress(goal), current: goalCurrent(goal), target: goal?.targetValue != null ? `${goal.targetValue}${config.unit ? ` ${config.unit}` : ""}` : "Target not set", achieved: String(goal?.status ?? "").toUpperCase() === "ACHIEVED" };
+  const comparison = String(goal?.metricConfig?.comparison ?? "").toUpperCase();
+  const numericTarget = Number(goal?.targetValue);
+  const isWeight = category === "WEIGHT" && Number.isFinite(numericTarget);
+  const target = isWeight
+    ? comparison === "INCREASE_TO"
+      ? `Gain ${numericTarget.toFixed(1)} kg`
+      : comparison === "DECREASE_TO"
+        ? `Lose ${numericTarget.toFixed(1)} kg`
+        : comparison === "CLOSEST"
+          ? "Maintain baseline"
+          : `${numericTarget.toFixed(1)} kg`
+    : goal?.targetValue != null
+      ? `${goal.targetValue}${config.unit ? ` ${config.unit}` : ""}`
+      : "Target not set";
+  return { config, progress: goalProgress(goal), current: goalCurrent(goal), target, achieved: String(goal?.status ?? "").toUpperCase() === "ACHIEVED" };
 }
 
 function bmiFor(weightKg: number | null, heightCm: number | null) {
