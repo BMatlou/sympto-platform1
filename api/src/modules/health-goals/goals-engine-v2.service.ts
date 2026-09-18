@@ -187,20 +187,25 @@ export class GoalsEngineService {
       // Maintenance is an ongoing state, not a one-time achievement.
       return { strategy: 'DELTA_REDUCTION', currentValue: latest, progressPercent, achieved: false, guidanceText };
     }
-    // Weight goal targets are absolute destination weights. For example, INCREASE_TO + target=100
-    // means "reach 100 kg", not "gain 100 kg from baseline".
-    const targetWeight = target;
-    const totalPlannedChange = Math.abs(targetWeight - baseline);
+    // Directional weight targets represent the requested amount of change.
+    // INCREASE_TO + target=100 means "gain 100 kg from baseline".
+    // DECREASE_TO + target=20 means "lose 20 kg from baseline".
+    const requestedChangeKg = Math.max(target, 0);
+    const targetWeight = config.comparison === 'INCREASE_TO'
+      ? baseline + requestedChangeKg
+      : baseline - requestedChangeKg;
     const movement = config.comparison === 'INCREASE_TO'
       ? Math.max(latest - baseline, 0)
       : Math.max(baseline - latest, 0);
-    const progressPercent = totalPlannedChange === 0
+    const progressPercent = requestedChangeKg === 0
       ? Math.abs(latest - targetWeight) <= 0.5 ? 100 : 0
-      : Math.max(0, Math.min(100, (movement / totalPlannedChange) * 100));
-    const achieved = config.comparison === 'INCREASE_TO' ? latest >= targetWeight : latest <= targetWeight;
+      : Math.max(0, Math.min(100, (movement / requestedChangeKg) * 100));
+    const achieved = config.comparison === 'INCREASE_TO'
+      ? latest >= targetWeight
+      : latest <= targetWeight;
     const guidanceText = achieved
-      ? `${title}: target met at ${targetWeight.toFixed(1)} kg.`
-      : `${title}: keep tracking weight toward ${targetWeight.toFixed(1)} kg.`;
+      ? `${title}: requested ${config.comparison === 'INCREASE_TO' ? 'gain' : 'loss'} of ${requestedChangeKg.toFixed(1)} kg reached at ${targetWeight.toFixed(1)} kg.`
+      : `${title}: ${config.comparison === 'INCREASE_TO' ? 'gain' : 'loss'} ${requestedChangeKg.toFixed(1)} kg from your ${baseline.toFixed(1)} kg baseline toward ${targetWeight.toFixed(1)} kg.`;
     return { strategy: 'DELTA_REDUCTION', currentValue: latest, progressPercent: achieved ? 100 : progressPercent, achieved, guidanceText };
   }
 
