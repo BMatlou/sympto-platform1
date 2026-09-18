@@ -52,26 +52,9 @@ export type TalkToSymptoResult = {
 };
 
 class HealthJournalService {
-  private async syncExerciseMetric(journal: HealthJournal) {
-    if (journal.exerciseMinutes == null) return;
-    try {
-      await api.post("/health-goals/metric-event", {
-        metricType: "EXERCISE",
-        metricKey: "exercise.minutes",
-        loggedValue: Number(journal.exerciseMinutes),
-        occurredAt: journal.createdAt,
-        source: "health-journal",
-        sourceId: journal.id,
-      });
-    } catch {
-      // The journal remains the source of truth; goal projection can retry through the backend backfill.
-    }
-  }
-
   async create(dto: CreateHealthJournalDto): Promise<HealthJournal> {
     const { data } = await api.post("/health-journals", dto);
     const journal = data.data as HealthJournal;
-    await this.syncExerciseMetric(journal);
     return journal;
   }
 
@@ -107,7 +90,6 @@ class HealthJournalService {
   async update(id: string, dto: Partial<CreateHealthJournalDto>): Promise<HealthJournal> {
     const { data } = await api.patch(`/health-journals/${id}`, dto);
     const journal = data.data as HealthJournal;
-    await this.syncExerciseMetric(journal);
     return journal;
   }
 
