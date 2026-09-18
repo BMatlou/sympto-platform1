@@ -33,6 +33,26 @@ type RelationRow = {
   relatedTargetDate: Date | null;
 };
 
+type RelationPairRow = {
+  id: string;
+  sourceGoalId: string;
+  targetGoalId: string;
+  relationshipType: string;
+  rationale: string | null;
+  sourceTitle: string;
+  sourceCategory: string;
+  sourceStatus: string;
+  sourceTargetValue: number | null;
+  sourceUnit: string | null;
+  sourceTargetDate: Date | null;
+  targetTitle: string;
+  targetCategory: string;
+  targetStatus: string;
+  targetTargetValue: number | null;
+  targetUnit: string | null;
+  targetTargetDate: Date | null;
+};
+
 type WeightEvent = { value: number; at: Date };
 
 const WEIGHT_SUPPORT_RULES = [
@@ -306,6 +326,15 @@ export class HealthGoalIntelligenceService {
     const withinMaintenanceBand = comparison === 'CLOSEST' && average7dKg != null && maintenanceBand != null
       ? average7dKg >= maintenanceBand.min && average7dKg <= maintenanceBand.max
       : null;
+    const isMaintenanceGoal = comparison === 'CLOSEST';
+    const maintenanceStatus =
+      !isMaintenanceGoal
+        ? null
+        : withinMaintenanceBand == null
+          ? 'INSUFFICIENT_DATA'
+          : withinMaintenanceBand
+            ? 'STABLE'
+            : 'NEEDS_REVIEW';
 
     const age = ageFromDateOfBirth(goal.patient.person.dateOfBirth);
     const adultBmiApplicable = age == null || age >= 20;
@@ -431,15 +460,13 @@ export class HealthGoalIntelligenceService {
 
     const lowerScreeningWeight = lowerScreeningWeightKg;
     const upperScreeningWeight = upperScreeningWeightKg;
-    const bmiCaution = goal.status !== 'ACHIEVED' && comparison === 'DECREASE_TO' && targetBmi != null && targetBmi < 18.5;
-    const gainTargetCaution = goal.status !== 'ACHIEVED' && comparison === 'INCREASE_TO' && targetBmi != null && targetBmi >= 25;
+    const bmiCaution = comparison === 'DECREASE_TO' && targetBmi != null && targetBmi < 18.5;
+    const gainTargetCaution = comparison === 'INCREASE_TO' && targetBmi != null && targetBmi >= 25;
     const currentBmiBelowRange = currentBmi != null && currentBmi < 18.5;
 
     const todayActions: TodayFocusAction[] = [];
 
-    if (goal.status === 'ACHIEVED') {
-      // Completed outcome goals remain historical and do not generate new goal actions.
-    } else if (goal.status !== 'ACHIEVED' && (bmiCaution || gainTargetCaution || (currentBmiBelowRange && comparison === 'DECREASE_TO'))) {
+    if (bmiCaution || gainTargetCaution || (currentBmiBelowRange && comparison === 'DECREASE_TO')) {
       todayActions.push({
         id: 'review-weight-goal',
         label: 'Review your weight goal',
@@ -449,7 +476,7 @@ export class HealthGoalIntelligenceService {
         href: `/health-goals?edit=${encodeURIComponent(goal.id)}`,
         priority: 'PRIMARY',
       });
-    } else if (weightDataNeedsRefresh && goal.status !== 'ACHIEVED') {
+    } else if (weightDataNeedsRefresh) {
       todayActions.push({
         id: 'record-weight',
         label: 'Update your recent weight',
@@ -491,7 +518,7 @@ export class HealthGoalIntelligenceService {
       });
     }
 
-    if (goal.status !== 'ACHIEVED' && exerciseSupport && (!todayJournal || Number(todayJournal.exerciseMinutes ?? 0) <= 0)) {
+    if (exerciseSupport && (!todayJournal || Number(todayJournal.exerciseMinutes ?? 0) <= 0)) {
       todayActions.push({
         id: 'movement',
         label: 'Log movement',
@@ -501,7 +528,7 @@ export class HealthGoalIntelligenceService {
       });
     }
 
-    if (goal.status !== 'ACHIEVED' && sleepSupport && (!todayJournal || todayJournal.sleepHours == null)) {
+    if (sleepSupport && (!todayJournal || todayJournal.sleepHours == null)) {
       todayActions.push({
         id: 'sleep',
         label: 'Log your sleep',
@@ -511,7 +538,7 @@ export class HealthGoalIntelligenceService {
       });
     }
 
-    if (goal.status !== 'ACHIEVED' && nutritionSupport) {
+    if (nutritionSupport) {
       todayActions.push({
         id: 'nutrition-goal',
         label: 'Check your nutrition goal',
