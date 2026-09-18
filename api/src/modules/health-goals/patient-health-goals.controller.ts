@@ -1,9 +1,10 @@
-import { BadRequestException, Body, Controller, Delete, ForbiddenException, Param, Patch, Post, Req, UseGuards } from '@nestjs/common';
+import { BadRequestException, Body, Controller, Delete, ForbiddenException, Get, Param, Patch, Post, Req, UseGuards } from '@nestjs/common';
 import { PrismaService } from '../../database/prisma.service';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { HealthGoalsService } from './health-goals.service';
 import { CreateHealthGoalDto } from './dto/create-health-goal.dto';
 import { UpdateHealthGoalDto } from './dto/update-health-goal.dto';
+import { HealthGoalIntelligenceService } from './health-goal-intelligence.service';
 
 type AuthenticatedRequest = { user?: { sub?: string; id?: string; userId?: string } };
 
@@ -13,6 +14,7 @@ export class PatientHealthGoalsController {
   constructor(
     private readonly prisma: PrismaService,
     private readonly healthGoalsService: HealthGoalsService,
+    private readonly healthGoalIntelligence: HealthGoalIntelligenceService,
   ) {}
 
   private userId(request: AuthenticatedRequest) {
@@ -80,6 +82,7 @@ export class PatientHealthGoalsController {
     const goal = await this.prisma.healthGoal.create({ data: { ...goalData, patientId, targetDate: parsedTargetDate, achievedAt: parsedAchievedAt }, include: { patient: true, practitioner: true, carePlan: true, progress: { orderBy: { measuredAt: 'desc' } } } });
     await this.healthGoalsService.configureMetric(goal.id, { metricType, metricKey, frequency, frequencyTarget: frequencyTarget == null ? undefined : Number(frequencyTarget), aggregation, comparison, guidanceText });
     if (String(goalData.category).toUpperCase() === 'WEIGHT' && String(metricType).toUpperCase() === 'WEIGHT') await this.healthGoalsService.captureWeightGoalBaseline(goal.id, String(patient.id), goal.createdAt);
+    await this.healthGoalIntelligence.syncGoalRelations(patient.id);
     return this.healthGoalsService.findOne(goal.id);
   }
 
@@ -114,7 +117,20 @@ export class PatientHealthGoalsController {
     if (metricType || metricKey || frequency || frequencyTarget !== undefined || aggregation || comparison || guidanceText !== undefined) {
       await this.healthGoalsService.configureMetric(id, { metricType, metricKey, frequency, frequencyTarget: frequencyTarget == null ? undefined : Number(frequencyTarget), aggregation, comparison, guidanceText });
     }
+    await this.healthGoalIntelligence.syncGoalRelations(existing.patient.id);
     return this.healthGoalsService.findOne(updated.id);
+  }
+
+  @Get(':id/relationships')
+  async relationships(@Param('id') id: string, @Req() request: AuthenticatedRequest) {
+    const goal = await this.assertOwnGoal(id, this.userId(request));
+    return this.healthGoalIntelligence.getGoalRelationships(goal.id);
+  }
+
+  @Get(':id/intelligence')
+  async intelligence(@Param('id') id: string, @Req() request: AuthenticatedRequest) {
+    const goal = await this.assertOwnGoal(id, this.userId(request));
+    return this.healthGoalIntelligence.getWeightGoalIntelligence(goal.id);
   }
 
   @Patch(':id/metric-config')
@@ -163,6 +179,7 @@ export class PatientHealthGoalsController {
       await tx.$executeRaw`DELETE FROM "HealthGoalMetricEvent" WHERE "patientId" = ${goal.patientId} AND "source" = 'goal-baseline' AND "sourceId" = ${goal.id}`;
       await tx.healthGoal.delete({ where: { id: goal.id } });
     });
+    await this.healthGoalIntelligence.syncGoalRelations(goal.patientId);
     return { message: 'Health goal deleted successfully.' };
   }
 }
