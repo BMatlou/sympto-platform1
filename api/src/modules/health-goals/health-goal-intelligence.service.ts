@@ -174,7 +174,7 @@ export class HealthGoalIntelligenceService {
     return {
       relationships: rows.map((row) => ({
         id: row.id,
-        direction: row.targetGoalId === goalId ? 'supportsThisGoal' : 'thisGoalRelatedTo',
+        direction: row.relationshipType === 'SUPPORTS' ? row.targetGoalId === goalId ? 'supportsThisGoal' : 'supportsAnotherGoal' : 'relatedToThisGoal',
         relationshipType: row.relationshipType,
         rationale: row.rationale,
         goal: {
