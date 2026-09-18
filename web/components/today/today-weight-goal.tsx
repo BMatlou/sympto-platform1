@@ -174,21 +174,33 @@ export default function TodayWeightGoal({ goal, fallbackWeight }: Props) {
     ? completedWeight != null
       ? `Goal completed at ${formatKg(completedWeight)} kg`
       : "Goal completed"
-    : targetReached
-      ? "Target reached"
-      : comparison === "DECREASE_TO"
-        ? changeKg != null && changeKg > 0
-          ? `${formatKg(changeKg)} kg gained from ${formatKg(startingWeight)} kg · moving away from target`
-          : `${formatKg(lostKg)} kg lost from ${formatKg(startingWeight)} kg`
-        : changeKg != null && changeKg < 0
-          ? `${formatKg(Math.abs(changeKg))} kg lost from ${formatKg(startingWeight)} kg · moving away from target`
-          : `${formatKg(gainedKg)} kg gained from ${formatKg(startingWeight)} kg`;
+    : isMaintenanceGoal
+      ? maintenanceStatus === "NEEDS_REVIEW"
+        ? "Weight trend needs review"
+        : maintenanceStatus === "DRIFTING_UP"
+          ? "Weight trending above baseline"
+          : maintenanceStatus === "DRIFTING_DOWN"
+            ? "Weight trending below baseline"
+            : maintenanceStatus === "INSUFFICIENT_DATA"
+              ? "Not enough recent weight data"
+              : "Maintaining your baseline"
+      : targetReached
+        ? "Target reached"
+        : comparison === "DECREASE_TO"
+          ? changeKg != null && changeKg > 0
+            ? `${formatKg(changeKg)} kg gained from ${formatKg(startingWeight)} kg · moving away from target`
+            : `${formatKg(lostKg)} kg lost from ${formatKg(startingWeight)} kg`
+          : changeKg != null && changeKg < 0
+            ? `${formatKg(Math.abs(changeKg))} kg lost from ${formatKg(startingWeight)} kg · moving away from target`
+            : `${formatKg(gainedKg)} kg gained from ${formatKg(startingWeight)} kg`;
 
   const targetLabel = goalCompleted
     ? `Completed · target body weight ${formatKg(targetWeight)} kg`
-    : bmiCaution
-      ? `Goal needs review · planned body weight ${formatKg(targetWeight)} kg`
-      : `${formatKg(remainingGoalAmount)} kg to target · target body weight ${formatKg(targetWeight)} kg`;
+    : isMaintenanceGoal
+      ? `Maintenance baseline · ${formatKg(startingWeight)} kg`
+      : bmiCaution
+        ? `Goal needs review · planned body weight ${formatKg(targetWeight)} kg`
+        : `${formatKg(remainingGoalAmount)} kg to target · target body weight ${formatKg(targetWeight)} kg`;
 
   const trendMessage = goalCompleted
     ? `This goal is complete. Later weight measurements do not change its 100% progress; start a new weight goal for a new journey.`
