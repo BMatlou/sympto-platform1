@@ -91,9 +91,27 @@ export class PatientHealthGoalsController {
     if (parsedTargetDate && Number.isNaN(parsedTargetDate.getTime())) throw new BadRequestException('Target date is invalid.');
     if (parsedAchievedAt && Number.isNaN(parsedAchievedAt.getTime())) throw new BadRequestException('Achievement date is invalid.');
     const isSmokingGoal = String(existing.category).toUpperCase() === 'SMOKING' || String(goalData.category ?? '').toUpperCase() === 'SMOKING';
-    const updated = await this.prisma.healthGoal.update({ where: { id }, data: { ...goalData, ...(targetDate !== undefined ? { targetDate: parsedTargetDate } : {}), ...(achievedAt !== undefined ? { achievedAt: parsedAchievedAt } : {}), ...(isSmokingGoal ? { status: 'ACTIVE', achievedAt: null, currentValue: null } : {}) }, include: { patient: true, practitioner: true, carePlan: true, progress: { orderBy: { measuredAt: 'desc' } } } });
-    if (isSmokingGoal) await this.prisma.healthGoalProgress.deleteMany({ where: { healthGoalId: id } });
-    if (metricType || metricKey || frequency || frequencyTarget !== undefined || aggregation || comparison || guidanceText !== undefined) await this.healthGoalsService.configureMetric(id, { metricType, metricKey, frequency, frequencyTarget: frequencyTarget == null ? undefined : Number(frequencyTarget), aggregation, comparison, guidanceText });
+    const isWeightGoal = String(existing.category).toUpperCase() === 'WEIGHT' || String(goalData.category ?? '').toUpperCase() === 'WEIGHT';
+    const isWeightRevision = isWeightGoal && (
+      goalData.targetValue !== undefined ||
+      comparison !== undefined ||
+      String(goalData.category ?? existing.category).toUpperCase() !== String(existing.category).toUpperCase()
+    );
+    const updated = await this.prisma.healthGoal.update({
+      where: { id },
+      data: {
+        ...goalData,
+        ...(targetDate !== undefined ? { targetDate: parsedTargetDate } : {}),
+        ...(achievedAt !== undefined ? { achievedAt: parsedAchievedAt } : {}),
+        ...((isSmokingGoal || isWeightRevision) ? { status: 'ACTIVE', achievedAt: null, currentValue: null } : {}),
+      },
+      include: { patient: true, practitioner: true, carePlan: true, progress: { orderBy: { measuredAt: 'desc' } } },
+    });
+    if (isSmokingGoal || isWeightRevision) await this.prisma.healthGoalProgress.deleteMany({ where: { healthGoalId: id } });
+    if (isWeightRevision) await this.healthGoalsService.captureWeightGoalBaseline(id, String(existing.patientId), new Date());
+    if (metricType || metricKey || frequency || frequencyTarget !== undefined || aggregation || comparison || guidanceText !== undefined) {
+      await this.healthGoalsService.configureMetric(id, { metricType, metricKey, frequency, frequencyTarget: frequencyTarget == null ? undefined : Number(frequencyTarget), aggregation, comparison, guidanceText });
+    }
     return this.healthGoalsService.findOne(updated.id);
   }
 
