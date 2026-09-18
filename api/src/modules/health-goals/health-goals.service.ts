@@ -5,13 +5,17 @@ import { CreateHealthGoalDto } from './dto/create-health-goal.dto';
 import { QueryHealthGoalDto } from './dto/query-health-goal.dto';
 import { UpdateHealthGoalDto } from './dto/update-health-goal.dto';
 import { RecordHealthGoalProgressDto } from './dto/record-health-goal-progress.dto';
+import { HealthGoalIntelligenceService } from './health-goal-intelligence.service';
 
 const DEFAULT_MEDICATION_TARGET = 90;
 type MedicationGoalAssociation = { healthGoalId: string; patientMedicationId: string | null; medicationId: string | null; medicationName: string | null; dosage: string | null; frequency: string | null };
 
 @Injectable()
 export class HealthGoalsService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly healthGoalIntelligence: HealthGoalIntelligenceService,
+  ) {}
   async getActiveSnapshot(patientId: string) { return this.prisma.healthGoal.findMany({ where: { patientId, status: 'ACTIVE' } }); }
 
   async getMetricEventsForUser(userId: string, filters: any) {
@@ -86,6 +90,7 @@ export class HealthGoalsService {
     if (patientMedicationId) await this.prisma.$executeRaw`UPDATE "HealthGoal" SET "patientMedicationId" = ${patientMedicationId} WHERE "id" = ${goal.id}`;
     await this.configureMetric(goal.id, { metricType, metricKey, frequency, frequencyTarget: frequencyTarget == null ? (isMedicationGoal ? DEFAULT_MEDICATION_TARGET : undefined) : Number(frequencyTarget), aggregation, comparison, guidanceText });
     if (String(goalData.category).toUpperCase() === 'WEIGHT' && String(metricType).toUpperCase() === 'WEIGHT') await this.captureWeightGoalBaseline(goal.id, String(goalData.patientId), goal.createdAt);
+    await this.healthGoalIntelligence.syncGoalRelations(String(goalData.patientId));
     return this.findOne(goal.id);
   }
 
@@ -94,9 +99,11 @@ export class HealthGoalsService {
     const [data, total] = await this.prisma.$transaction([this.prisma.healthGoal.findMany({ where, include: { patient: true, practitioner: true, carePlan: true, progress: { orderBy: { measuredAt: 'desc' } } }, orderBy: { createdAt: 'desc' }, skip: (page - 1) * limit, take: limit }), this.prisma.healthGoal.count({ where })]);
     for (const goal of data) { await this.ensureOnboardingWeightGoalMetric(goal); await this.ensureOnboardingExerciseGoalMetric(goal); }
     const normalizedData = await Promise.all(data.map(async (goal: any) => { if (String(goal.category).toUpperCase() === 'MEDICATION' && goal.targetValue == null) return { ...goal, targetValue: new Prisma.Decimal(DEFAULT_MEDICATION_TARGET), unit: '%' }; const config = await this.prisma.$queryRaw<any[]>`SELECT * FROM "HealthGoalMetricConfig" WHERE "healthGoalId" = ${goal.id} LIMIT 1`; return { ...goal, metricConfig: config[0] ?? null }; }));
-    const withMedicationAssociations = await this.attachMedicationGoalAssociations(normalizedData as any[]); return { data: withMedicationAssociations, pagination: { page, limit, total, totalPages: Math.ceil(total / limit) } };
+    const withMedicationAssociations = await this.attachMedicationGoalAssociations(normalizedData as any[]);
+    const withRelationships = await this.healthGoalIntelligence.attachRelationships(withMedicationAssociations as any[]);
+    return { data: withRelationships, pagination: { page, limit, total, totalPages: Math.ceil(total / limit) } };
   }
-  async findOne(id: string) { const healthGoal = await this.prisma.healthGoal.findUnique({ where: { id }, include: { patient: true, practitioner: true, carePlan: true, progress: { orderBy: { measuredAt: 'desc' } } } }); if (!healthGoal) throw new NotFoundException('Health goal not found.'); let result: any = healthGoal; if (String(healthGoal.category).toUpperCase() === 'MEDICATION' && healthGoal.targetValue == null) result = await this.prisma.healthGoal.update({ where: { id }, data: { targetValue: String(DEFAULT_MEDICATION_TARGET), unit: '%' }, include: { patient: true, practitioner: true, carePlan: true, progress: { orderBy: { measuredAt: 'desc' } } } }); const [hydrated] = await this.attachMedicationGoalAssociations([result] as any[]); return hydrated ?? result; }
+  async findOne(id: string) { const healthGoal = await this.prisma.healthGoal.findUnique({ where: { id }, include: { patient: true, practitioner: true, carePlan: true, progress: { orderBy: { measuredAt: 'desc' } } } }); if (!healthGoal) throw new NotFoundException('Health goal not found.'); let result: any = healthGoal; if (String(healthGoal.category).toUpperCase() === 'MEDICATION' && healthGoal.targetValue == null) result = await this.prisma.healthGoal.update({ where: { id }, data: { targetValue: String(DEFAULT_MEDICATION_TARGET), unit: '%' }, include: { patient: true, practitioner: true, carePlan: true, progress: { orderBy: { measuredAt: 'desc' } } } }); const [hydrated] = await this.attachMedicationGoalAssociations([result] as any[]); const [withRelationships] = await this.healthGoalIntelligence.attachRelationships([(hydrated ?? result) as any]); return withRelationships ?? hydrated ?? result; }
   async update(id: string, dto: UpdateHealthGoalDto) {
     const existing = await this.findOne(id);
     const existingStatus = String(existing.status ?? 'ACTIVE').toUpperCase();
@@ -121,6 +128,7 @@ export class HealthGoalsService {
     if (revisingWeightGoal) {
       await this.captureWeightGoalBaseline(id, String(existing.patientId), new Date());
     }
+    await this.healthGoalIntelligence.syncGoalRelations(String(existing.patientId));
     return this.findOne(id);
   }
   async recordProgress(id: string, dto: RecordHealthGoalProgressDto) { const goal = await this.findOne(id); const currentValue = Number(dto.currentValue); const targetValue = goal.targetValue == null ? null : Number(goal.targetValue); const previousValue = goal.currentValue == null ? null : Number(goal.currentValue); if (!Number.isFinite(currentValue)) throw new BadRequestException('Health goal progress value is invalid.'); const configs = await this.prisma.$queryRaw<Array<{ comparison: string | null }>>`SELECT "comparison" FROM "HealthGoalMetricConfig" WHERE "healthGoalId" = ${id} LIMIT 1`; const comparison = String(configs[0]?.comparison ?? '').toUpperCase(); const isMaintenanceGoal = String(goal.category ?? '').toUpperCase() === 'WEIGHT' && comparison === 'CLOSEST'; const progressPercent = isMaintenanceGoal && targetValue != null && targetValue > 0 ? Math.max(0, Math.min(100, 100 - (Math.abs(currentValue - targetValue) / 0.5) * 100)) : targetValue != null && targetValue > 0 ? Math.min(100, Math.max(0, (currentValue / targetValue) * 100)) : 0; const progressStatus: HealthGoalProgressStatus = isMaintenanceGoal ? (Math.abs(currentValue - (targetValue ?? currentValue)) <= 0.5 ? HealthGoalProgressStatus.IMPROVING : currentValue > (targetValue ?? currentValue) ? HealthGoalProgressStatus.DECLINING : HealthGoalProgressStatus.STAGNANT) : targetValue != null && targetValue > 0 && currentValue >= targetValue ? HealthGoalProgressStatus.ACHIEVED : previousValue == null || currentValue > previousValue ? HealthGoalProgressStatus.IMPROVING : currentValue < previousValue ? HealthGoalProgressStatus.DECLINING : HealthGoalProgressStatus.STAGNANT; return this.prisma.$transaction(async (tx) => { await tx.healthGoal.update({ where: { id }, data: { currentValue: String(currentValue), status: isMaintenanceGoal ? goal.status : progressStatus === HealthGoalProgressStatus.ACHIEVED ? 'ACHIEVED' : goal.status, achievedAt: isMaintenanceGoal ? null : progressStatus === HealthGoalProgressStatus.ACHIEVED ? new Date() : null } }); await tx.healthGoalProgress.create({ data: { healthGoalId: id, currentValue: String(currentValue), progressPercent: String(progressPercent.toFixed(2)), status: progressStatus, notes: dto.notes, measuredAt: new Date() } }); return tx.healthGoal.findUnique({ where: { id }, include: { patient: true, practitioner: true, carePlan: true, progress: { orderBy: { measuredAt: 'desc' } } } }); }); }
