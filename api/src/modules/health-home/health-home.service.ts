@@ -21,32 +21,13 @@ function getBmiCategory(bmi: number | null): string | null {
   return 'OBESITY_CLASS_3';
 }
 
-function optionalNumber(name: string, value: unknown): number | undefined {
-  if (value === undefined || value === null || value === '') return undefined;
-  const parsed = typeof value === 'number' ? value : Number(value);
-  if (!Number.isFinite(parsed)) {
-    throw new BadRequestException(`${name} must be a valid number.`);
-  }
-  return parsed;
-}
-
-function normalizeBodyTemperatureCelsius(value: unknown): number | undefined {
-  const parsed = optionalNumber('Body temperature', value);
-  if (parsed === undefined) return undefined;
-  // Store temperature in Celsius. Also accept a common Fahrenheit body-temperature
-  // entry such as 98.6 and normalize it before validation/storage.
-  if (parsed >= 90 && parsed <= 113) {
-    return Number(((parsed - 32) * 5 / 9).toFixed(2));
-  }
-  return parsed;
-}
-
 function assertRange(name: string, value: number | undefined, min: number, max: number) {
   if (value == null) return;
   if (!Number.isFinite(value) || value < min || value > max) {
     throw new BadRequestException(`${name} is outside the supported range.`);
   }
 }
+
 function southAfricaDayBounds(value: Date) {
   const date = new Intl.DateTimeFormat('en-CA', {
     timeZone: 'Africa/Johannesburg',
@@ -107,62 +88,48 @@ export class HealthHomeService {
     return { weightKg, heightCm: nextHeightCm, bmi, bmiCategory: getBmiCategory(bmi), recordedAt: recordedAt.toISOString() };
   }
 
-  async recordManualVitals(userId: string, input: { systolicPressure?: number | string; diastolicPressure?: number | string; restingHeartRate?: number | string; respiratoryRate?: number | string; oxygenSaturation?: number | string; bodyTemperature?: number | string; weightKg?: number | string; heightCm?: number | string; measuredAt?: string }, requestedPatientId?: string) {
+  async recordManualVitals(userId: string, input: { systolicPressure?: number; diastolicPressure?: number; restingHeartRate?: number; respiratoryRate?: number; oxygenSaturation?: number; bodyTemperature?: number; weightKg?: number; heightCm?: number; measuredAt?: string }, requestedPatientId?: string) {
     const patient = await this.patientForWrite(userId, requestedPatientId);
+    if (Object.values(input).every((value) => value === undefined)) throw new BadRequestException('At least one vital must be entered.');
 
-    // Normalize at the API boundary so HTML number fields and JSON numeric
-    // strings are handled consistently rather than being rejected as strings.
-    const systolicPressure = optionalNumber('Systolic pressure', input.systolicPressure);
-    const diastolicPressure = optionalNumber('Diastolic pressure', input.diastolicPressure);
-    const restingHeartRate = optionalNumber('Heart rate', input.restingHeartRate);
-    const respiratoryRate = optionalNumber('Respiratory rate', input.respiratoryRate);
-    const oxygenSaturation = optionalNumber('Oxygen saturation', input.oxygenSaturation);
-    const bodyTemperature = normalizeBodyTemperatureCelsius(input.bodyTemperature);
-    const weightKg = optionalNumber('Weight', input.weightKg);
-    const heightCm = optionalNumber('Height', input.heightCm);
-
-    if ([systolicPressure, diastolicPressure, restingHeartRate, respiratoryRate, oxygenSaturation, bodyTemperature, weightKg, heightCm].every((value) => value === undefined)) {
-      throw new BadRequestException('At least one vital must be entered.');
-    }
-
-    assertRange('Systolic pressure', systolicPressure, 40, 300);
-    assertRange('Diastolic pressure', diastolicPressure, 20, 200);
-    assertRange('Heart rate', restingHeartRate, 20, 260);
-    assertRange('Respiratory rate', respiratoryRate, 2, 80);
-    assertRange('Oxygen saturation', oxygenSaturation, 50, 100);
-    assertRange('Body temperature', bodyTemperature, 25, 45);
-    assertRange('Weight', weightKg, 1, 500);
-    assertRange('Height', heightCm, 50, 250);
-    if ((systolicPressure != null && diastolicPressure == null) || (systolicPressure == null && diastolicPressure != null)) throw new BadRequestException('Enter both systolic and diastolic blood pressure.');
+    assertRange('Systolic pressure', input.systolicPressure, 40, 300);
+    assertRange('Diastolic pressure', input.diastolicPressure, 20, 200);
+    assertRange('Heart rate', input.restingHeartRate, 20, 260);
+    assertRange('Respiratory rate', input.respiratoryRate, 2, 80);
+    assertRange('Oxygen saturation', input.oxygenSaturation, 50, 100);
+    assertRange('Body temperature', input.bodyTemperature, 25, 45);
+    assertRange('Weight', input.weightKg, 1, 500);
+    assertRange('Height', input.heightCm, 50, 250);
+    if ((input.systolicPressure != null && input.diastolicPressure == null) || (input.systolicPressure == null && input.diastolicPressure != null)) throw new BadRequestException('Enter both systolic and diastolic blood pressure.');
 
     const measuredAt = input.measuredAt ? new Date(input.measuredAt) : new Date();
     if (Number.isNaN(measuredAt.getTime())) throw new BadRequestException('Measurement date is invalid.');
 
-    const currentHeight = heightCm ?? (patient.heightCm != null ? Number(patient.heightCm) : patient.baseline?.heightCm != null ? Number(patient.baseline.heightCm) : null);
-    const currentWeight = weightKg ?? (patient.weightKg != null ? Number(patient.weightKg) : patient.baseline?.weightKg != null ? Number(patient.baseline.weightKg) : null);
+    const currentHeight = input.heightCm ?? (patient.heightCm != null ? Number(patient.heightCm) : patient.baseline?.heightCm != null ? Number(patient.baseline.heightCm) : null);
+    const currentWeight = input.weightKg ?? (patient.weightKg != null ? Number(patient.weightKg) : patient.baseline?.weightKg != null ? Number(patient.baseline.weightKg) : null);
     const bmi = calculateBmi(currentWeight, currentHeight);
     const bmiCategory = getBmiCategory(bmi);
 
-    await this.prisma.patient.update({ where: { id: patient.id }, data: { ...(weightKg !== undefined ? { weightKg: weightKg } : {}), ...(heightCm !== undefined ? { heightCm: heightCm } : {}) } });
+    await this.prisma.patient.update({ where: { id: patient.id }, data: { ...(input.weightKg !== undefined ? { weightKg: input.weightKg } : {}), ...(input.heightCm !== undefined ? { heightCm: input.heightCm } : {}) } });
     const baseline = await this.prisma.patientBaseline.upsert({
       where: { patientId: patient.id },
       update: {
-        ...(weightKg !== undefined ? { weightKg: String(weightKg) } : {}), ...(heightCm !== undefined ? { heightCm: String(heightCm) } : {}), ...(bmi != null ? { bmi: String(bmi) } : {}),
-        ...(systolicPressure !== undefined ? { systolicPressure: systolicPressure } : {}), ...(diastolicPressure !== undefined ? { diastolicPressure: diastolicPressure } : {}), ...(restingHeartRate !== undefined ? { restingHeartRate: restingHeartRate } : {}), ...(respiratoryRate !== undefined ? { respiratoryRate: respiratoryRate } : {}), ...(oxygenSaturation !== undefined ? { oxygenSaturation: String(oxygenSaturation) } : {}), ...(bodyTemperature !== undefined ? { bodyTemperature: String(bodyTemperature) } : {}), establishedAt: measuredAt,
+        ...(input.weightKg !== undefined ? { weightKg: String(input.weightKg) } : {}), ...(input.heightCm !== undefined ? { heightCm: String(input.heightCm) } : {}), ...(bmi != null ? { bmi: String(bmi) } : {}),
+        ...(input.systolicPressure !== undefined ? { systolicPressure: input.systolicPressure } : {}), ...(input.diastolicPressure !== undefined ? { diastolicPressure: input.diastolicPressure } : {}), ...(input.restingHeartRate !== undefined ? { restingHeartRate: input.restingHeartRate } : {}), ...(input.respiratoryRate !== undefined ? { respiratoryRate: input.respiratoryRate } : {}), ...(input.oxygenSaturation !== undefined ? { oxygenSaturation: String(input.oxygenSaturation) } : {}), ...(input.bodyTemperature !== undefined ? { bodyTemperature: String(input.bodyTemperature) } : {}), establishedAt: measuredAt,
       },
       create: {
         patientId: patient.id,
-        ...(weightKg !== undefined ? { weightKg: String(weightKg) } : currentWeight != null ? { weightKg: String(currentWeight) } : {}), ...(heightCm !== undefined ? { heightCm: String(heightCm) } : currentHeight != null ? { heightCm: String(currentHeight) } : {}), ...(bmi != null ? { bmi: String(bmi) } : {}),
-        ...(systolicPressure !== undefined ? { systolicPressure: systolicPressure } : {}), ...(diastolicPressure !== undefined ? { diastolicPressure: diastolicPressure } : {}), ...(restingHeartRate !== undefined ? { restingHeartRate: restingHeartRate } : {}), ...(respiratoryRate !== undefined ? { respiratoryRate: respiratoryRate } : {}), ...(oxygenSaturation !== undefined ? { oxygenSaturation: String(oxygenSaturation) } : {}), ...(bodyTemperature !== undefined ? { bodyTemperature: String(bodyTemperature) } : {}), establishedAt: measuredAt,
+        ...(input.weightKg !== undefined ? { weightKg: String(input.weightKg) } : currentWeight != null ? { weightKg: String(currentWeight) } : {}), ...(input.heightCm !== undefined ? { heightCm: String(input.heightCm) } : currentHeight != null ? { heightCm: String(currentHeight) } : {}), ...(bmi != null ? { bmi: String(bmi) } : {}),
+        ...(input.systolicPressure !== undefined ? { systolicPressure: input.systolicPressure } : {}), ...(input.diastolicPressure !== undefined ? { diastolicPressure: input.diastolicPressure } : {}), ...(input.restingHeartRate !== undefined ? { restingHeartRate: input.restingHeartRate } : {}), ...(input.respiratoryRate !== undefined ? { respiratoryRate: input.respiratoryRate } : {}), ...(input.oxygenSaturation !== undefined ? { oxygenSaturation: String(input.oxygenSaturation) } : {}), ...(input.bodyTemperature !== undefined ? { bodyTemperature: String(input.bodyTemperature) } : {}), establishedAt: measuredAt,
       },
     });
 
-    if (weightKg !== undefined) {
+    if (input.weightKg !== undefined) {
       await this.goalsEngine.recordMetricEvent({
         patientId: patient.id,
         metricType: 'WEIGHT',
         metricKey: 'weight.kg',
-        loggedValue: weightKg,
+        loggedValue: input.weightKg,
         occurredAt: measuredAt,
         source: 'patient-profile',
         sourceId: 'profile',
@@ -171,14 +138,14 @@ export class HealthHomeService {
 
     const { start, end } = southAfricaDayBounds(measuredAt);
     const parts = [
-      weightKg != null ? `Weight: ${Number(weightKg).toFixed(1)} kg.` : null,
-      heightCm != null ? `Height: ${Number(heightCm).toFixed(0)} cm.` : null,
-      weightKg != null && heightCm != null && bmi != null ? `BMI: ${Number(bmi).toFixed(1)}${bmiCategory ? ` (${bmiCategory.replaceAll('_', ' ').toLowerCase()})` : ''}.` : null,
-      systolicPressure != null && diastolicPressure != null ? `Blood pressure: ${systolicPressure}/${diastolicPressure} mmHg.` : null,
-      restingHeartRate != null ? `Heart rate: ${restingHeartRate} bpm.` : null,
-      oxygenSaturation != null ? `Oxygen saturation: ${oxygenSaturation}%.` : null,
-      bodyTemperature != null ? `Temperature: ${bodyTemperature} °C.` : null,
-      respiratoryRate != null ? `Respiratory rate: ${respiratoryRate}/min.` : null,
+      input.weightKg != null ? `Weight: ${Number(input.weightKg).toFixed(1)} kg.` : null,
+      input.heightCm != null ? `Height: ${Number(input.heightCm).toFixed(0)} cm.` : null,
+      input.weightKg != null && input.heightCm != null && bmi != null ? `BMI: ${Number(bmi).toFixed(1)}${bmiCategory ? ` (${bmiCategory.replaceAll('_', ' ').toLowerCase()})` : ''}.` : null,
+      input.systolicPressure != null && input.diastolicPressure != null ? `Blood pressure: ${input.systolicPressure}/${input.diastolicPressure} mmHg.` : null,
+      input.restingHeartRate != null ? `Heart rate: ${input.restingHeartRate} bpm.` : null,
+      input.oxygenSaturation != null ? `Oxygen saturation: ${input.oxygenSaturation}%.` : null,
+      input.bodyTemperature != null ? `Temperature: ${input.bodyTemperature} °C.` : null,
+      input.respiratoryRate != null ? `Respiratory rate: ${input.respiratoryRate}/min.` : null,
     ].filter(Boolean) as string[];
     const journalText = [`Today’s measurements recorded in Sympto.`, ...parts].join('\n');
 
@@ -194,16 +161,16 @@ export class HealthHomeService {
     const journalData = {
       title: '[Sympto] Today\'s measurements',
       journal: journalText,
-      weightKg: weightKg ?? undefined,
-      temperature: bodyTemperature ?? undefined,
-      bloodPressureSystolic: systolicPressure ?? undefined,
-      bloodPressureDiastolic: diastolicPressure ?? undefined,
-      heartRate: restingHeartRate ?? undefined,
-      oxygenSaturation: oxygenSaturation ?? undefined,
-      respiratoryRate: respiratoryRate ?? undefined,
+      weightKg: input.weightKg ?? undefined,
+      temperature: input.bodyTemperature ?? undefined,
+      bloodPressureSystolic: input.systolicPressure ?? undefined,
+      bloodPressureDiastolic: input.diastolicPressure ?? undefined,
+      heartRate: input.restingHeartRate ?? undefined,
+      oxygenSaturation: input.oxygenSaturation ?? undefined,
+      respiratoryRate: input.respiratoryRate ?? undefined,
       notes: [
-        heightCm != null ? `Height: ${Number(heightCm).toFixed(0)} cm.` : null,
-        weightKg != null && heightCm != null && bmi != null ? `BMI: ${Number(bmi).toFixed(1)}.` : null,
+        input.heightCm != null ? `Height: ${Number(input.heightCm).toFixed(0)} cm.` : null,
+        input.weightKg != null && input.heightCm != null && bmi != null ? `BMI: ${Number(bmi).toFixed(1)}.` : null,
       ].filter(Boolean).join(' ') || undefined,
       updatedAt: measuredAt,
     };
