@@ -176,8 +176,6 @@ export class HealthGoalsService {
   async recordProgress(id: string, dto: RecordHealthGoalProgressDto) {
     const goal = await this.findOne(id);
     const currentValue = Number(dto.currentValue);
-    const targetValue = goal.targetValue == null ? null : Number(goal.targetValue);
-    const previousValue = goal.currentValue == null ? null : Number(goal.currentValue);
     if (!Number.isFinite(currentValue)) throw new BadRequestException('Health goal progress value is invalid.');
 
     const configs = await this.prisma.$queryRaw<Array<{ comparison: string | null; frequency: string | null }>>`
@@ -185,13 +183,17 @@ export class HealthGoalsService {
       FROM "HealthGoalMetricConfig"
       WHERE "healthGoalId" = ${id}
       LIMIT 1
-    `;    const comparison = String(configs[0]?.comparison ?? '').toUpperCase();    const frequency = String(configs[0]?.frequency ?? '').toUpperCase();
+    `;
+    const comparison = String(configs[0]?.comparison ?? '').toUpperCase();
+    const frequency = String(configs[0]?.frequency ?? '').toUpperCase();
     const recurring = frequency === 'DAILY' || frequency === 'WEEKLY';
-    const isMaintenanceGoal = String(goal.category ?? '').toUpperCase() === 'WEIGHT' && comparison === 'CLOSEST';
-    const isDirectionalWeight = String(goal.category ?? '').toUpperCase() === 'WEIGHT' && (comparison === 'INCREASE_TO' || comparison === 'DECREASE_TO');
+    const isWeightGoal = String(goal.category ?? '').toUpperCase() === 'WEIGHT' && (comparison === 'INCREASE_TO' || comparison === 'DECREASE_TO' || comparison === 'CLOSEST');
 
-    let weightBaseline: number | null = null;
-    if (isDirectionalWeight) {
+    let progressPercent = 0;
+    let progressStatus: HealthGoalProgressStatus;
+    let terminal = false;
+
+    if (isWeightGoal) {
       const baselineRows = await this.prisma.$queryRaw<Array<{ loggedValue: Prisma.Decimal }>>`
         SELECT "loggedValue"
         FROM "HealthGoalMetricEvent"
@@ -202,62 +204,67 @@ export class HealthGoalsService {
           AND "sourceId" = ${id}
         LIMIT 1
       `;
-      weightBaseline = baselineRows.length ? Number(baselineRows[0].loggedValue) : null;
-    }
+      const baseline = baselineRows.length ? Number(baselineRows[0].loggedValue) : null;
+      const requestedChangeKg = goal.targetValue == null ? null : Number(goal.targetValue);
 
-    const plannedWeightChange = isDirectionalWeight && weightBaseline != null && targetValue != null
-      ? Math.abs(targetValue - weightBaseline)
-      : null;
-    const directedWeightMovement = isDirectionalWeight && weightBaseline != null
-      ? comparison === "INCREASE_TO"
-        ? currentValue - weightBaseline
-        : weightBaseline - currentValue
-      : null;
-
-    const progressPercent = isMaintenanceGoal && targetValue != null && targetValue > 0
-      ? Math.max(0, Math.min(100, 100 - (Math.abs(currentValue - targetValue) / 0.5) * 100))
-      : isDirectionalWeight && plannedWeightChange != null
-        ? plannedWeightChange === 0
-          ? Math.abs(currentValue - (targetValue ?? currentValue)) <= 0.5 ? 100 : 0
-          : Math.max(0, Math.min(100, ((directedWeightMovement ?? 0) / plannedWeightChange) * 100))
-        : targetValue != null && targetValue > 0
-          ? Math.min(100, Math.max(0, (currentValue / targetValue) * 100))
-          : 0;
-
-    let progressStatus: HealthGoalProgressStatus;
-    if (isMaintenanceGoal) {
-      const deviation = Math.abs(currentValue - (targetValue ?? currentValue));
-      progressStatus = deviation <= 0.5
-        ? HealthGoalProgressStatus.ON_TRACK
-        : currentValue > (targetValue ?? currentValue)
-          ? HealthGoalProgressStatus.DECLINING
-          : HealthGoalProgressStatus.IMPROVING;
-    } else if (isDirectionalWeight) {
-      const achieved = comparison === "INCREASE_TO"
-        ? currentValue >= (targetValue ?? currentValue)
-        : currentValue <= (targetValue ?? currentValue);
-      progressStatus = achieved
-        ? recurring ? HealthGoalProgressStatus.ON_TRACK : HealthGoalProgressStatus.ACHIEVED
-        : (directedWeightMovement ?? 0) > 0.01
-          ? HealthGoalProgressStatus.IMPROVING
-          : (directedWeightMovement ?? 0) < -0.01
+      if (baseline == null || !Number.isFinite(baseline) || requestedChangeKg == null || !Number.isFinite(requestedChangeKg)) {
+        progressStatus = HealthGoalProgressStatus.IMPROVING;
+      } else if (comparison === 'CLOSEST') {
+        const deviation = Math.abs(currentValue - baseline);
+        progressPercent = Math.max(0, Math.min(100, 100 - (deviation / 0.5) * 100));
+        progressStatus = deviation <= 0.5
+          ? HealthGoalProgressStatus.ON_TRACK
+          : currentValue > baseline
             ? HealthGoalProgressStatus.DECLINING
-            : HealthGoalProgressStatus.STAGNANT;
-    } else if (targetValue != null && targetValue > 0 && currentValue >= targetValue) {
-      progressStatus = recurring ? HealthGoalProgressStatus.ON_TRACK : HealthGoalProgressStatus.ACHIEVED;
+            : HealthGoalProgressStatus.IMPROVING;
+      } else {
+        const targetWeight = comparison === 'INCREASE_TO'
+          ? baseline + requestedChangeKg
+          : baseline - requestedChangeKg;
+        const movement = comparison === 'INCREASE_TO'
+          ? Math.max(currentValue - baseline, 0)
+          : Math.max(baseline - currentValue, 0);
+        progressPercent = requestedChangeKg === 0
+          ? Math.abs(currentValue - targetWeight) <= 0.5 ? 100 : 0
+          : Math.max(0, Math.min(100, (movement / requestedChangeKg) * 100));
+        const achieved = comparison === 'INCREASE_TO'
+          ? currentValue >= targetWeight
+          : currentValue <= targetWeight;
+        progressStatus = achieved && !recurring
+          ? HealthGoalProgressStatus.ACHIEVED
+          : achieved
+            ? HealthGoalProgressStatus.ON_TRACK
+            : movement > 0
+              ? HealthGoalProgressStatus.IMPROVING
+              : HealthGoalProgressStatus.STAGNANT;
+        terminal = progressStatus === HealthGoalProgressStatus.ACHIEVED && !recurring;
+      }
     } else {
-      progressStatus = previousValue == null
-        ? HealthGoalProgressStatus.IMPROVING
-        : currentValue > previousValue
+      const targetValue = goal.targetValue == null ? null : Number(goal.targetValue);
+      const previousValue = goal.currentValue == null ? null : Number(goal.currentValue);
+      const isMaintenanceGoal = comparison === 'CLOSEST';
+      progressPercent = targetValue != null && targetValue > 0
+        ? Math.min(100, Math.max(0, (currentValue / targetValue) * 100))
+        : 0;
+      if (isMaintenanceGoal) {
+        progressStatus = HealthGoalProgressStatus.ON_TRACK;
+      } else if (targetValue != null && targetValue > 0 && currentValue >= targetValue) {
+        progressStatus = recurring ? HealthGoalProgressStatus.ON_TRACK : HealthGoalProgressStatus.ACHIEVED;
+        terminal = progressStatus === HealthGoalProgressStatus.ACHIEVED;
+      } else {
+        progressStatus = previousValue == null
           ? HealthGoalProgressStatus.IMPROVING
-          : currentValue < previousValue
-            ? HealthGoalProgressStatus.DECLINING
-            : HealthGoalProgressStatus.STAGNANT;
+          : currentValue > previousValue
+            ? HealthGoalProgressStatus.IMPROVING
+            : currentValue < previousValue
+              ? HealthGoalProgressStatus.DECLINING
+              : HealthGoalProgressStatus.STAGNANT;
+      }
     }
 
-    const terminal = progressStatus === HealthGoalProgressStatus.ACHIEVED && !recurring && !isMaintenanceGoal;
     return this.prisma.$transaction(async (tx) => {
-      await tx.healthGoal.update({        where: { id },
+      await tx.healthGoal.update({
+        where: { id },
         data: {
           currentValue: String(currentValue),
           status: terminal ? 'ACHIEVED' : goal.status,
@@ -276,7 +283,7 @@ export class HealthGoalsService {
       });
       return tx.healthGoal.findUnique({
         where: { id },
-        include: { patient: true, practitioner: true, carePlan: true, progress: { orderBy: { measuredAt: 'desc' } } },
+        include: { patient: true, practitioner: true, carePlan: true, progress: { orderBy: { measuredAt: 'desc' }, take: 1 } },
       });
     });
   }
