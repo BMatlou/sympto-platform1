@@ -406,12 +406,12 @@ export class HealthGoalIntelligenceService {
 
     const todayActions: TodayFocusAction[] = [];
 
-    if (goal.status !== 'ACHIEVED' && (bmiCaution || currentBmiBelowRange)) {
+    if (goal.status !== 'ACHIEVED' && (bmiCaution || (currentBmiBelowRange && comparison === 'DECREASE_TO'))) {
       todayActions.push({
         id: 'review-weight-goal',
         label: 'Review your weight goal',
         description: 'Your current weight/BMI needs the goal reviewed before pursuing further loss.',
-        href: reviewGoalHref,
+        href: `/health-goals?edit=${encodeURIComponent(goal.id)}`,
         priority: 'PRIMARY',
       });
     } else if (weightDataNeedsRefresh && goal.status !== 'ACHIEVED') {
