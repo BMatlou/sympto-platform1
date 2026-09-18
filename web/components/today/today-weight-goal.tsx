@@ -127,25 +127,33 @@ export default function TodayWeightGoal({ goal, fallbackWeight }: Props) {
   const lostKg = comparison === "DECREASE_TO" && startingWeight != null && journeyWeight != null ? Math.max(startingWeight - journeyWeight, 0) : null;
   const gainedKg = comparison === "INCREASE_TO" && startingWeight != null && journeyWeight != null ? Math.max(journeyWeight - startingWeight, 0) : null;
   const actualChange = comparison === "DECREASE_TO" ? lostKg : gainedKg;
-  const targetReached = goalCompleted || (targetWeight != null && journeyWeight != null && (comparison === "DECREASE_TO" ? journeyWeight <= targetWeight : journeyWeight >= targetWeight));
-  const progress = goalCompleted
-    ? 100
-    : targetAmount != null && actualChange != null
-      ? Math.round(Math.min(100, Math.max(0, (actualChange / targetAmount) * 100)))
-      : 0;
   const weekAgo = Date.now() - 7 * 86400000;
   const olderThanWeek = [...events].reverse().find((event) => new Date(event.occurredAt).getTime() <= weekAgo);
   const weeklyChangeKg = olderThanWeek && currentWeight != null ? currentWeight - olderThanWeek.loggedValue : null;
   const expectedProgress = journey.totalDays != null && journey.totalDays > 0 ? Math.min(100, Math.max(0, ((journey.journeyDay - 1) / journey.totalDays) * 100)) : null;
-  const onTrack = goalCompleted || targetReached || expectedProgress == null || progress >= expectedProgress - 10;
+  const maintenanceStatus = String(intelligence?.weight?.status ?? "INSUFFICIENT_DATA").toUpperCase();
+  const maintenanceStable = intelligence?.weight?.withinMaintenanceBand === true || maintenanceStatus === "STABLE";
+  const targetReached = isMaintenanceGoal ? false : goalCompleted || (targetWeight != null && journeyWeight != null && (comparison === "DECREASE_TO" ? journeyWeight <= targetWeight : journeyWeight >= targetWeight));
+  const progress = isMaintenanceGoal
+    ? (expectedProgress ?? 0)
+    : goalCompleted
+      ? 100
+      : targetAmount != null && actualChange != null
+        ? Math.round(Math.min(100, Math.max(0, (actualChange / targetAmount) * 100)))
+        : 0;
+  const onTrack = isMaintenanceGoal
+    ? maintenanceStatus === "STABLE" || maintenanceStable
+    : goalCompleted || targetReached || expectedProgress == null || progress >= expectedProgress - 10;
   const weeksLeft = journey.daysLeft != null ? journey.daysLeft / 7 : null;
-  const remainingGoalAmount = goalCompleted
+  const remainingGoalAmount = isMaintenanceGoal
     ? 0
-    : targetWeight != null && journeyWeight != null
-      ? comparison === "DECREASE_TO"
-        ? Math.max(journeyWeight - targetWeight, 0)
-        : Math.max(targetWeight - journeyWeight, 0)
-      : null;
+    : goalCompleted
+      ? 0
+      : targetWeight != null && journeyWeight != null
+        ? comparison === "DECREASE_TO"
+          ? Math.max(journeyWeight - targetWeight, 0)
+          : Math.max(targetWeight - journeyWeight, 0)
+        : null;
   const requiredWeeklyChange = goalCompleted || targetReached ? 0 : remainingGoalAmount != null && weeksLeft && weeksLeft > 0 ? remainingGoalAmount / weeksLeft : null;
   const requiredDailyChange = goalCompleted || targetReached ? 0 : remainingGoalAmount != null && journey.daysLeft != null && journey.daysLeft > 0 ? remainingGoalAmount / journey.daysLeft : null;
 
