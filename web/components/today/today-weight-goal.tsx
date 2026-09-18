@@ -203,38 +203,54 @@ export default function TodayWeightGoal({ goal, fallbackWeight }: Props) {
         : `${formatKg(remainingGoalAmount)} kg to target · target body weight ${formatKg(targetWeight)} kg`;
 
   const trendMessage = goalCompleted
-    ? `This goal is complete. Later weight measurements do not change its 100% progress; start a new weight goal for a new journey.`
-    : comparison === "DECREASE_TO"
-      ? changeKg != null && changeKg > 0
-        ? `Current trend: moving away from your weight target. You have gained ${formatKg(changeKg)} kg since the goal started, and BMI has increased from ${startingBmi?.toFixed(1) ?? "—"} to ${currentBmi?.toFixed(1) ?? "—"}.`
+    ? "This goal is complete. Later weight measurements do not change its 100% progress; start a new weight goal for a new journey."
+    : isMaintenanceGoal
+      ? intelligence?.weight?.average7dKg != null
+        ? `Maintenance view: your 7-day average is ${formatKg(Number(intelligence.weight.average7dKg))} kg against a ${formatKg(startingWeight)} kg baseline. Trend: ${maintenanceStatus.toLowerCase().replaceAll("_", " ")}.`
+        : "Maintenance view: Sympto needs more recent weight measurements before it can judge the trend reliably."
+      : comparison === "DECREASE_TO"
+        ? changeKg != null && changeKg > 0
+          ? `Current trend: moving away from your weight target. You have gained ${formatKg(changeKg)} kg since the goal started, and BMI has increased from ${startingBmi?.toFixed(1) ?? "—"} to ${currentBmi?.toFixed(1) ?? "—"}.`
+          : changeKg != null && changeKg < 0
+            ? `Current trend: moving toward your weight target. You have lost ${formatKg(Math.abs(changeKg))} kg since the goal started, and BMI has changed from ${startingBmi?.toFixed(1) ?? "—"} to ${currentBmi?.toFixed(1) ?? "—"}.`
+            : `Current trend: no recorded weight change from the ${formatKg(startingWeight)} kg starting point. BMI is ${currentBmi?.toFixed(1) ?? "—"}.`
         : changeKg != null && changeKg < 0
-          ? `Current trend: moving toward your weight target. You have lost ${formatKg(Math.abs(changeKg))} kg since the goal started, and BMI has changed from ${startingBmi?.toFixed(1) ?? "—"} to ${currentBmi?.toFixed(1) ?? "—"}.`
-          : `Current trend: no recorded weight change from the ${formatKg(startingWeight)} kg starting point. BMI is ${currentBmi?.toFixed(1) ?? "—"}.`
-      : changeKg != null && changeKg < 0
-        ? `Current trend: moving away from your weight target. You have lost ${formatKg(Math.abs(changeKg))} kg since the goal started, and BMI has decreased from ${startingBmi?.toFixed(1) ?? "—"} to ${currentBmi?.toFixed(1) ?? "—"}.`
-        : changeKg != null && changeKg > 0
-          ? `Current trend: moving toward your weight target. You have gained ${formatKg(changeKg)} kg since the goal started, and BMI has changed from ${startingBmi?.toFixed(1) ?? "—"} to ${currentBmi?.toFixed(1) ?? "—"}.`
-          : `Current trend: no recorded weight change from the ${formatKg(startingWeight)} kg starting point. BMI is ${currentBmi?.toFixed(1) ?? "—"}.`;
+          ? `Current trend: moving away from your weight target. You have lost ${formatKg(Math.abs(changeKg))} kg since the goal started, and BMI has decreased from ${startingBmi?.toFixed(1) ?? "—"} to ${currentBmi?.toFixed(1) ?? "—"}.`
+          : changeKg != null && changeKg > 0
+            ? `Current trend: moving toward your weight target. You have gained ${formatKg(changeKg)} kg since the goal started, and BMI has changed from ${startingBmi?.toFixed(1) ?? "—"} to ${currentBmi?.toFixed(1) ?? "—"}.`
+            : `Current trend: no recorded weight change from the ${formatKg(startingWeight)} kg starting point. BMI is ${currentBmi?.toFixed(1) ?? "—"}.`;
 
-  const guidanceMessage = currentBmi != null && currentBmi < 18.5
-    ? `Your current BMI is ${currentBmi?.toFixed(1)}, below the adult underweight screening threshold of 18.5. Sympto should shift guidance toward healthy weight gain rather than further weight loss. At your recorded height, BMI 18.5 corresponds to about ${formatKg(lowerScreeningWeight)} kg. BMI is a screening measure, not a diagnosis.`
-    : bmiCaution
-      ? `Your current BMI is ${currentBmi?.toFixed(1)}, while the planned target BMI would be ${targetBmi?.toFixed(1)}, below 18.5. Sympto will not encourage further loss toward ${formatKg(targetWeight)} kg. The next step is to review this goal and either revise the target or switch to a weight-gain/maintenance focus. At your recorded height, BMI 18.5 corresponds to about ${formatKg(lowerScreeningWeight)} kg. BMI is a screening measure, not a diagnosis.`
-      : currentBmiAboveRange
-        ? `BMI now ${currentBmi?.toFixed(1)} is at or above 25. Interpret this screening measure alongside the person's wider health information.`
-        : null;
+  const guidanceMessage = isMaintenanceGoal
+    ? intelligence?.weight?.average7dKg != null
+      ? `Sympto is using your 7-day average rather than a single scale reading. Your maintenance band is approximately ${formatKg(intelligence.weight.maintenanceBand?.min ?? startingWeight)}–${formatKg(intelligence.weight.maintenanceBand?.max ?? startingWeight)} kg around your baseline.`
+      : "Record a few recent weight measurements so Sympto can assess your maintenance trend."
+    : currentBmi != null && currentBmi < 18.5
+      ? `Your current BMI is ${currentBmi?.toFixed(1)}, below the adult underweight screening threshold of 18.5. Sympto should shift guidance toward healthy weight gain rather than further weight loss. At your recorded height, BMI 18.5 corresponds to about ${formatKg(lowerScreeningWeight)} kg. BMI is a screening measure, not a diagnosis.`
+      : bmiCaution
+        ? `Your current BMI is ${currentBmi?.toFixed(1)}, while the planned target BMI would be ${targetBmi?.toFixed(1)}, below 18.5. Sympto will not encourage further loss toward ${formatKg(targetWeight)} kg. The next step is to review this goal and either revise the target or switch to a weight-gain/maintenance focus. At your recorded height, BMI 18.5 corresponds to about ${formatKg(lowerScreeningWeight)} kg. BMI is a screening measure, not a diagnosis.`
+        : currentBmiAboveRange
+          ? `BMI now ${currentBmi?.toFixed(1)} is at or above 25. Interpret this screening measure alongside the person's wider health information.`
+          : null;
 
   const statusLabel = goalCompleted
     ? "Completed"
-    : currentBmiBelowRange
-      ? "Gain weight focus"
-      : bmiCaution
-        ? "Goal needs review"
-        : targetReached
-          ? "Target reached"
-          : onTrack
-            ? "On track"
-            : "Needs attention";
+    : isMaintenanceGoal
+      ? maintenanceStatus === "NEEDS_REVIEW"
+        ? "Needs review"
+        : maintenanceStatus === "DRIFTING_UP" || maintenanceStatus === "DRIFTING_DOWN"
+          ? "Trend changing"
+          : maintenanceStatus === "INSUFFICIENT_DATA"
+            ? "Building baseline"
+            : "On track"
+      : currentBmiBelowRange
+        ? "Gain weight focus"
+        : bmiCaution
+          ? "Goal needs review"
+          : targetReached
+            ? "Target reached"
+            : onTrack
+              ? "On track"
+              : "Needs attention";
 
   const displayWeight = goalCompleted ? completedWeight ?? currentWeight : currentWeight;
   const displayLastRecordedDate = goalCompleted ? formatDate(goal?.achievedAt ?? goal?.progress?.[0]?.measuredAt ?? currentEvent?.occurredAt) : formatDate(currentEvent?.occurredAt);
