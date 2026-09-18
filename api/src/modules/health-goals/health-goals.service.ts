@@ -177,17 +177,45 @@ export class HealthGoalsService {
       FROM "HealthGoalMetricConfig"
       WHERE "healthGoalId" = ${id}
       LIMIT 1
-    `;
-    const comparison = String(configs[0]?.comparison ?? '').toUpperCase();
+    `;    const comparison = String(configs[0]?.comparison ?? '').toUpperCase();
     const frequency = String(configs[0]?.frequency ?? '').toUpperCase();
     const recurring = frequency === 'DAILY' || frequency === 'WEEKLY';
     const isMaintenanceGoal = String(goal.category ?? '').toUpperCase() === 'WEIGHT' && comparison === 'CLOSEST';
+    const isDirectionalWeight = String(goal.category ?? '').toUpperCase() === 'WEIGHT' && (comparison === 'INCREASE_TO' || comparison === 'DECREASE_TO');
+
+    let weightBaseline: number | null = null;
+    if (isDirectionalWeight) {
+      const baselineRows = await this.prisma.$queryRaw<Array<{ loggedValue: Prisma.Decimal }>>`
+        SELECT "loggedValue"
+        FROM "HealthGoalMetricEvent"
+        WHERE "patientId" = ${goal.patientId}
+          AND "metricType" = 'WEIGHT'
+          AND "metricKey" = 'weight.kg'
+          AND "source" = 'goal-baseline'
+          AND "sourceId" = ${id}
+        LIMIT 1
+      `;
+      weightBaseline = baselineRows.length ? Number(baselineRows[0].loggedValue) : null;
+    }
+
+    const plannedWeightChange = isDirectionalWeight && weightBaseline != null && targetValue != null
+      ? Math.abs(targetValue - weightBaseline)
+      : null;
+    const directedWeightMovement = isDirectionalWeight && weightBaseline != null
+      ? comparison === "INCREASE_TO"
+        ? currentValue - weightBaseline
+        : weightBaseline - currentValue
+      : null;
 
     const progressPercent = isMaintenanceGoal && targetValue != null && targetValue > 0
       ? Math.max(0, Math.min(100, 100 - (Math.abs(currentValue - targetValue) / 0.5) * 100))
-      : targetValue != null && targetValue > 0
-        ? Math.min(100, Math.max(0, (currentValue / targetValue) * 100))
-        : 0;
+      : isDirectionalWeight && plannedWeightChange != null
+        ? plannedWeightChange === 0
+          ? Math.abs(currentValue - (targetValue ?? currentValue)) <= 0.5 ? 100 : 0
+          : Math.max(0, Math.min(100, ((directedWeightMovement ?? 0) / plannedWeightChange) * 100))
+        : targetValue != null && targetValue > 0
+          ? Math.min(100, Math.max(0, (currentValue / targetValue) * 100))
+          : 0;
 
     let progressStatus: HealthGoalProgressStatus;
     if (isMaintenanceGoal) {
@@ -197,6 +225,17 @@ export class HealthGoalsService {
         : currentValue > (targetValue ?? currentValue)
           ? HealthGoalProgressStatus.DECLINING
           : HealthGoalProgressStatus.IMPROVING;
+    } else if (isDirectionalWeight) {
+      const achieved = comparison === "INCREASE_TO"
+        ? currentValue >= (targetValue ?? currentValue)
+        : currentValue <= (targetValue ?? currentValue);
+      progressStatus = achieved
+        ? recurring ? HealthGoalProgressStatus.ON_TRACK : HealthGoalProgressStatus.ACHIEVED
+        : (directedWeightMovement ?? 0) > 0.01
+          ? HealthGoalProgressStatus.IMPROVING
+          : (directedWeightMovement ?? 0) < -0.01
+            ? HealthGoalProgressStatus.DECLINING
+            : HealthGoalProgressStatus.STAGNANT;
     } else if (targetValue != null && targetValue > 0 && currentValue >= targetValue) {
       progressStatus = recurring ? HealthGoalProgressStatus.ON_TRACK : HealthGoalProgressStatus.ACHIEVED;
     } else {
