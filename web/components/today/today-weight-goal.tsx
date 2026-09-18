@@ -110,8 +110,10 @@ export default function TodayWeightGoal({ goal, fallbackWeight }: Props) {
   const fallback = numberValue(fallbackWeight);
   const patientWeight = numberValue(goal?.patient?.weightKg);
   const currentEvent = events[events.length - 1] ?? null;
-  const currentWeight = currentEvent?.loggedValue ?? fallback ?? patientWeight;
-  const startingWeight = baselineWeight ?? patientWeight ?? currentWeight;
+  const intelligenceWeight = numberValue(intelligence?.weight?.latestKg);
+  const intelligenceBaseline = numberValue(intelligence?.profile?.baselineWeightKg);
+  const currentWeight = currentEvent?.loggedValue ?? intelligenceWeight ?? fallback ?? patientWeight;
+  const startingWeight = baselineWeight ?? intelligenceBaseline ?? patientWeight ?? currentWeight;
   const targetAmount = isMaintenanceGoal ? 0 : configuredTarget != null && configuredTarget > 0 ? configuredTarget : null;
   const targetWeight = comparison === "DECREASE_TO" && startingWeight != null && targetAmount != null
     ? startingWeight - targetAmount
@@ -157,7 +159,7 @@ export default function TodayWeightGoal({ goal, fallbackWeight }: Props) {
   const requiredWeeklyChange = goalCompleted || targetReached ? 0 : remainingGoalAmount != null && weeksLeft && weeksLeft > 0 ? remainingGoalAmount / weeksLeft : null;
   const requiredDailyChange = goalCompleted || targetReached ? 0 : remainingGoalAmount != null && journey.daysLeft != null && journey.daysLeft > 0 ? remainingGoalAmount / journey.daysLeft : null;
 
-  const heightCm = numberValue(goal?.patient?.heightCm ?? goal?.heightCm);
+  const heightCm = numberValue(intelligence?.profile?.heightCm ?? goal?.patient?.heightCm ?? goal?.heightCm);
   const currentBmi = currentWeight != null && heightCm != null && heightCm > 0 ? currentWeight / ((heightCm / 100) ** 2) : null;
   const startingBmi = startingWeight != null && heightCm != null && heightCm > 0 ? startingWeight / ((heightCm / 100) ** 2) : null;
   const targetBmi = targetWeight != null && heightCm != null && heightCm > 0 ? targetWeight / ((heightCm / 100) ** 2) : null;
