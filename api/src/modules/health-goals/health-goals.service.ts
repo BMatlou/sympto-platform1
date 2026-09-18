@@ -85,8 +85,12 @@ export class HealthGoalsService {
   private async assertWeightTargetDirection(patientId: string, targetValue: unknown, comparison: unknown) {
     const direction = String(comparison ?? '').toUpperCase();
     if (direction !== 'INCREASE_TO' && direction !== 'DECREASE_TO') return;
-    const target = Number(targetValue);
-    if (!Number.isFinite(target) || target <= 0) throw new BadRequestException('Weight target must be a positive number.');
+    const requestedChangeKg = Number(targetValue);
+    if (!Number.isFinite(requestedChangeKg) || requestedChangeKg <= 0) {
+      throw new BadRequestException('Weight change must be a positive number.');
+    }
+    if (direction !== 'DECREASE_TO') return;
+
     const rows = await this.prisma.$queryRaw<Array<{ loggedValue: Prisma.Decimal }>>`
       SELECT "loggedValue"
       FROM "HealthGoalMetricEvent"
@@ -97,15 +101,12 @@ export class HealthGoalsService {
       ORDER BY "occurredAt" DESC
       LIMIT 1
     `;
-    const patient = rows.length
+    const fallbackPatient = rows.length
       ? Number(rows[0].loggedValue)
       : Number((await this.prisma.patient.findUnique({ where: { id: patientId }, select: { weightKg: true } }))?.weightKg);
-    if (!Number.isFinite(patient)) return;
-    if (direction === 'INCREASE_TO' && target <= patient) {
-      throw new BadRequestException(`A weight-gain goal must have a target above the current recorded weight (${patient.toFixed(1)} kg).`);
-    }
-    if (direction === 'DECREASE_TO' && target >= patient) {
-      throw new BadRequestException(`A weight-loss goal must have a target below the current recorded weight (${patient.toFixed(1)} kg).`);
+    if (!Number.isFinite(fallbackPatient)) return;
+    if (requestedChangeKg >= fallbackPatient) {
+      throw new BadRequestException(`A weight-loss goal cannot request ${requestedChangeKg.toFixed(1)} kg or more when the current recorded weight is ${fallbackPatient.toFixed(1)} kg. The projected destination must remain above 0 kg.`);
     }
   }
 
