@@ -173,12 +173,11 @@ export default function TodayWeightGoal({ goal, fallbackWeight }: Props) {
   const gainTargetObesityRange = gainTargetCaution && targetBmi != null && targetBmi >= 30;
   const currentBmiBelowRange = !goalCompleted && currentBmi != null && currentBmi < 18.5;
   const currentBmiAboveRange = currentBmi != null && currentBmi >= 25;
-  const goalNeedsReview = !goalCompleted && (bmiCaution || gainTargetCaution || currentBmiBelowRange);
+  const goalNeedsReview = !goalCompleted && (bmiCaution || gainTargetCaution || (currentBmiBelowRange && comparison === "DECREASE_TO"));
   const reviewGoalHref = goal?.id ? `/health-goals?edit=${encodeURIComponent(String(goal.id))}` : "/health-goals";
   const ChangeIcon = isMaintenanceGoal ? Scale : comparison === "INCREASE_TO" ? TrendingUp : TrendingDown;
   const connectedGoals = Array.isArray(goal?.connectedGoals) ? goal.connectedGoals : [];
-  const supportingGoals = connectedGoals.filter((relation: any) => relation.relationshipType === "SUPPORTS" && relation.direction === "supportsThisGoal");
-  const relatedGoals = connectedGoals.filter((relation: any) => relation.relationshipType === "RELATED_TO" && relation.direction === "relatedToThisGoal");
+  const supportingGoals = connectedGoals.filter((relation: any) => relation.relationshipType === "SUPPORTS" && relation.direction === "supportsThisGoal");  const relatedGoals = connectedGoals.filter((relation: any) => relation.relationshipType === "RELATED_TO" && relation.direction === "relatedToThisGoal");
 
   const journeyLabel = goalCompleted    ? completedWeight != null
       ? `Goal completed at ${formatKg(completedWeight)} kg`      : "Goal completed"
@@ -206,7 +205,7 @@ export default function TodayWeightGoal({ goal, fallbackWeight }: Props) {
     ? `Completed · target body weight ${formatKg(targetWeight)} kg`
     : isMaintenanceGoal
       ? `Maintenance baseline · ${formatKg(startingWeight)} kg`
-      : bmiCaution
+      : bmiCaution || gainTargetCaution
         ? `Goal needs review · planned body weight ${formatKg(targetWeight)} kg`
         : `${formatKg(remainingGoalAmount)} kg to target · target body weight ${formatKg(targetWeight)} kg`;
 
@@ -357,8 +356,7 @@ export default function TodayWeightGoal({ goal, fallbackWeight }: Props) {
                 <p className="mt-0.5 text-[11px] font-bold text-[#0b2d54]">One useful next step for this weight goal</p>
               </div>
               {intelligence?.todayFocus?.dataFreshness?.checkInNeedsCompletion && <span className="rounded-full bg-white px-2.5 py-1 text-[8px] font-black text-[#0b7b80] ring-1 ring-[#dbeaec]">Check-in missing</span>}
-            </div>
-            <div className="px-4 py-3">
+            </div>            <div className="px-4 py-3">
               {intelligence.todayFocus.actions[0]?.priority === "PRIMARY" && (
                 <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                   <div className="min-w-0">
