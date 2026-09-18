@@ -4,6 +4,15 @@ export type HealthGoalProgressUpdate = { id: string; title: string; category?: s
 export type HealthGoalMetricEventsResponse = { count: number; events: Array<{ id: string; loggedValue: number; occurredAt: string; source: string; sourceId?: string | null; }>; };
 export type HealthGoalInput = { patientId: string; practitionerId?: string; carePlanId?: string; patientMedicationId?: string; title: string; description?: string; category: string; priority?: string; status?: string; targetValue?: string; currentValue?: string; unit?: string; targetDate?: string; metricType?: string; metricKey?: string; frequency?: "DAILY" | "WEEKLY" | "TOTAL"; frequencyTarget?: string; aggregation?: "SUM" | "LATEST" | "AVERAGE" | "MIN" | "MAX"; comparison?: "AT_LEAST" | "AT_MOST" | "CLOSEST" | "INCREASE_TO" | "DECREASE_TO"; guidanceText?: string; };
 export type HealthGoalListResponse = { data: any[]; pagination?: { page: number; limit: number; total: number; totalPages: number } };
+export type WeightGoalIntelligence = {
+  goal: { id: string; title: string; comparison: string; targetValue: number | null; unit?: string | null; targetDate?: string | null; priority?: string; status?: string; createdAt?: string };
+  profile: { age: number | null; gender?: string | null; heightCm: number | null; currentWeightKg: number | null; currentBmi: number | null; baselineWeightKg: number | null; baselineBmi: number | null; adultBmiApplicable: boolean };
+  weight: { latestKg: number | null; average7dKg: number | null; average30dKg: number | null; changeKg: number | null; percentChange: number | null; trendKgPerWeek: number | null; dataPoints: number; maintenanceBand?: { min: number; max: number } | null; withinMaintenanceBand: boolean | null; targetWeightKg: number | null; targetBmi: number | null; status: "STABLE" | "DRIFTING_UP" | "DRIFTING_DOWN" | "NEEDS_REVIEW" | "INSUFFICIENT_DATA" };
+  checkIn: { dataPoints: number; averageSleepHours: number | null; averageStress: number | null; averageExerciseMinutes: number | null; averageWaterIntakeMl: number | null };
+  clinicalContext: { activeMedicationCount: number; activeConditionCount: number; symptomsReported: boolean };
+  relationships: Array<{ id: string; direction: string; relationshipType: string; rationale?: string | null; goal: { id: string; title: string; category: string; status: string; targetValue?: number | null; unit?: string | null; targetDate?: string | null } }>;
+  recommendedSupportingGoals: Array<{ category: string; rationale: string }>;
+};
 
 const deletedGoalIds = new Set<string>();
 const medicationIdFromCurrentUrl = () => { if (typeof window === "undefined") return undefined; const params = new URLSearchParams(window.location.search); if (params.get("open") !== "medication") return undefined; return params.get("patientMedicationId")?.trim() || params.get("associatedMedicationId")?.trim() || params.get("medicationId")?.trim() || undefined; };
@@ -22,6 +31,7 @@ class HealthGoalsService {
   async logAlcohol(id: string, currentWeekTotal: number, drinks: number) { const nextTotal = Math.max(0, Number(currentWeekTotal) + Number(drinks)); const response = await api.patch(`/patient-health-goals/${id}`, { currentValue: String(nextTotal) }); return response.data?.data ?? response.data; }
   async remove(id: string) { const response = await api.delete(`/patient-health-goals/${id}`); deletedGoalIds.add(String(id)); const result = response.data?.data ?? response.data; notifyGoalChange(String(id)); return result; }
   async recordProgress(goalId: string, currentValue: number, notes?: string): Promise<HealthGoalProgressUpdate> { const { data } = await api.post(`/health-goals/${goalId}/progress`, { currentValue: String(currentValue), ...(notes ? { notes } : {}) }); return data.data ?? data; }
+  async getWeightGoalIntelligence(id: string): Promise<WeightGoalIntelligence> { const response = await api.get(`/patient-health-goals/${id}/intelligence`); return response.data?.data ?? response.data; }
   async getMetricEvents(metricType: string, metricKey: string, from: Date, to: Date, source?: string): Promise<HealthGoalMetricEventsResponse> { const response = await api.get(`/health-goals/metric-events`, { params: { metricType, metricKey, from: from.toISOString(), to: to.toISOString(), ...(source ? { source } : {}) } }); return response.data?.data ?? response.data; }
 }
 
