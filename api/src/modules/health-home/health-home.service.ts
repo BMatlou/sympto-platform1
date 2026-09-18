@@ -107,7 +107,7 @@ export class HealthHomeService {
     return { weightKg, heightCm: nextHeightCm, bmi, bmiCategory: getBmiCategory(bmi), recordedAt: recordedAt.toISOString() };
   }
 
-  async recordManualVitals(userId: string, input: { systolicPressure?: number; diastolicPressure?: number; restingHeartRate?: number; respiratoryRate?: number; oxygenSaturation?: number; bodyTemperature?: number; weightKg?: number; heightCm?: number; measuredAt?: string }, requestedPatientId?: string) {
+  async recordManualVitals(userId: string, input: { systolicPressure?: number | string; diastolicPressure?: number | string; restingHeartRate?: number | string; respiratoryRate?: number | string; oxygenSaturation?: number | string; bodyTemperature?: number | string; weightKg?: number | string; heightCm?: number | string; measuredAt?: string }, requestedPatientId?: string) {
     const patient = await this.patientForWrite(userId, requestedPatientId);
 
     // Normalize at the API boundary so HTML number fields and JSON numeric
