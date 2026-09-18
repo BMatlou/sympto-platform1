@@ -461,7 +461,7 @@ export class HealthGoalIntelligenceService {
       });
     }
 
-    if (exerciseSupport && (!todayJournal || Number(todayJournal.exerciseMinutes ?? 0) <= 0)) {
+    if (goal.status !== 'ACHIEVED' && exerciseSupport && (!todayJournal || Number(todayJournal.exerciseMinutes ?? 0) <= 0)) {
       todayActions.push({
         id: 'movement',
         label: 'Log movement',
@@ -471,7 +471,7 @@ export class HealthGoalIntelligenceService {
       });
     }
 
-    if (sleepSupport && (!todayJournal || todayJournal.sleepHours == null)) {
+    if (goal.status !== 'ACHIEVED' && sleepSupport && (!todayJournal || todayJournal.sleepHours == null)) {
       todayActions.push({
         id: 'sleep',
         label: 'Log your sleep',
@@ -481,7 +481,7 @@ export class HealthGoalIntelligenceService {
       });
     }
 
-    if (nutritionSupport) {
+    if (goal.status !== 'ACHIEVED' && nutritionSupport) {
       todayActions.push({
         id: 'nutrition-goal',
         label: 'Check your nutrition goal',
