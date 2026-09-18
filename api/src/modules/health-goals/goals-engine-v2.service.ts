@@ -137,7 +137,7 @@ export class GoalsEngineService {
   }
 
   private async aggregateMetric(patientId: string, metricType: string, metricKey: string, start: Date, end: Date, aggregation: GoalConfig['aggregation']) {
-    const rows = await this.prisma.$queryRaw<Array<{ loggedValue: Prisma.Decimal }>>`SELECT "loggedValue" FROM "HealthGoalMetricEvent" WHERE "patientId" = ${patientId} AND "metricType" = ${metricType} AND "metricKey" = ${metricKey} AND "occurredAt" >= ${start} AND "occurredAt" <= ${end} ORDER BY "occurredAt" ASC`;
+    const rows = await this.prisma.$queryRaw<Array<{ loggedValue: Prisma.Decimal }>>`SELECT "loggedValue" FROM "HealthGoalMetricEvent" WHERE "patientId" = ${patientId} AND "metricType" = ${metricType} AND "metricKey" = ${metricKey} AND "source" <> 'goal-baseline' AND "occurredAt" >= ${start} AND "occurredAt" <= ${end} ORDER BY "occurredAt" ASC`;
     if (!rows.length) return null;
     const values = rows.map((row) => Number(row.loggedValue)).filter(Number.isFinite);
     if (!values.length) return null;
