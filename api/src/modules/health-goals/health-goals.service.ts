@@ -145,7 +145,15 @@ export class HealthGoalsService {
     if (patientMedicationId) await this.assertPatientMedicationBelongsToPatient(patientMedicationId, String(existing.patientId));
     const revisingWeightGoal = targetCategory === 'WEIGHT';
     if (revisingWeightGoal) {
-      const effectiveComparison = comparison ?? (existing as any)?.metricConfig?.comparison ?? 'DECREASE_TO';
+      const existingConfig = comparison
+        ? null
+        : await this.prisma.$queryRaw<Array<{ comparison: string | null }>>`
+            SELECT "comparison"
+            FROM "HealthGoalMetricConfig"
+            WHERE "healthGoalId" = ${id}
+            LIMIT 1
+          `;
+      const effectiveComparison = comparison ?? existingConfig?.[0]?.comparison ?? 'DECREASE_TO';
       await this.assertWeightTargetDirection(String(existing.patientId), goalData.targetValue ?? existing.targetValue, effectiveComparison);
     }
     const updateData: any = {
@@ -177,8 +185,7 @@ export class HealthGoalsService {
       FROM "HealthGoalMetricConfig"
       WHERE "healthGoalId" = ${id}
       LIMIT 1
-    `;    const comparison = String(configs[0]?.comparison ?? '').toUpperCase();
-    const frequency = String(configs[0]?.frequency ?? '').toUpperCase();
+    `;    const comparison = String(configs[0]?.comparison ?? '').toUpperCase();    const frequency = String(configs[0]?.frequency ?? '').toUpperCase();
     const recurring = frequency === 'DAILY' || frequency === 'WEEKLY';
     const isMaintenanceGoal = String(goal.category ?? '').toUpperCase() === 'WEIGHT' && comparison === 'CLOSEST';
     const isDirectionalWeight = String(goal.category ?? '').toUpperCase() === 'WEIGHT' && (comparison === 'INCREASE_TO' || comparison === 'DECREASE_TO');
