@@ -109,10 +109,34 @@ export class GoalsEngineService {
       const target = Number(config.frequencyTarget ?? goal.targetValue ?? 0);
       if (!Number.isFinite(target)) continue;
       const evaluated = await this.evaluateStrategy(patientId, goal.title, config, goal.createdAt, window.start, now, aggregate, target, strategy);
-      const status = evaluated.achieved ? HealthGoalProgressStatus.ACHIEVED : HealthGoalProgressStatus.IMPROVING;
+      const recurring = config.frequency === 'DAILY' || config.frequency === 'WEEKLY';
+      // Daily/weekly goals are interval goals. Meeting one interval target must not
+      // permanently complete the journey; the next interval should start fresh.
+      const progressStatus = evaluated.achieved
+        ? recurring ? HealthGoalProgressStatus.ON_TRACK : HealthGoalProgressStatus.ACHIEVED
+        : HealthGoalProgressStatus.IMPROVING;
+      const terminal = evaluated.achieved && !recurring;
       await this.prisma.$transaction(async (tx) => {
-        await tx.healthGoal.update({ where: { id: goal.id }, data: { currentValue: String(evaluated.currentValue), status: evaluated.achieved ? 'ACHIEVED' : 'ACTIVE', achievedAt: evaluated.achieved ? now : null } });
-        await tx.healthGoalProgress.create({ data: { healthGoalId: goal.id, currentValue: String(evaluated.currentValue), progressPercent: String(evaluated.progressPercent.toFixed(2)), status, notes: evaluated.guidanceText, measuredAt: now } });
+        await tx.healthGoal.update({
+          where: { id: goal.id },
+          data: {
+            currentValue: String(evaluated.currentValue),
+            status: terminal ? 'ACHIEVED' : 'ACTIVE',
+            achievedAt: terminal ? now : null,
+          },
+        });
+        await tx.healthGoalProgress.create({
+          data: {
+            healthGoalId: goal.id,
+            currentValue: String(evaluated.currentValue),
+            progressPercent: String(evaluated.progressPercent.toFixed(2)),
+            status: progressStatus,
+            notes: recurring && evaluated.achieved
+              ? `${evaluated.guidanceText} Target met for this ${config.frequency.toLowerCase()} interval.`
+              : evaluated.guidanceText,
+            measuredAt: now,
+          },
+        });
       });
       updated.push({ goalId: goal.id, metricType: config.metricType, metricKey: config.metricKey, frequency: config.frequency, strategy: evaluated.strategy, target, currentValue: evaluated.currentValue, progressPercent: evaluated.progressPercent, status, guidanceText: evaluated.guidanceText });
     }
