@@ -82,10 +82,40 @@ export class HealthGoalsService {
     else await this.prisma.$executeRaw`INSERT INTO "HealthGoalMetricConfig" ("id", "healthGoalId", "metricType", "metricKey", "frequency", "frequencyTarget", "aggregation", "comparison", "guidanceText") VALUES (gen_random_uuid(), ${goalId}, ${config.metricType ?? null}, ${config.metricKey ?? null}, ${config.frequency ?? null}, ${config.frequencyTarget ?? null}, ${config.aggregation ?? null}, ${config.comparison ?? null}, ${config.guidanceText ?? null})`;
   }
 
+  private async assertWeightTargetDirection(patientId: string, targetValue: unknown, comparison: unknown) {
+    const direction = String(comparison ?? '').toUpperCase();
+    if (direction !== 'INCREASE_TO' && direction !== 'DECREASE_TO') return;
+    const target = Number(targetValue);
+    if (!Number.isFinite(target) || target <= 0) throw new BadRequestException('Weight target must be a positive number.');
+    const rows = await this.prisma.$queryRaw<Array<{ loggedValue: Prisma.Decimal }>>`
+      SELECT "loggedValue"
+      FROM "HealthGoalMetricEvent"
+      WHERE "patientId" = ${patientId}
+        AND "metricType" = 'WEIGHT'
+        AND "metricKey" = 'weight.kg'
+        AND "source" <> 'goal-baseline'
+      ORDER BY "occurredAt" DESC
+      LIMIT 1
+    `;
+    const patient = rows.length
+      ? Number(rows[0].loggedValue)
+      : Number((await this.prisma.patient.findUnique({ where: { id: patientId }, select: { weightKg: true } }))?.weightKg);
+    if (!Number.isFinite(patient)) return;
+    if (direction === 'INCREASE_TO' && target <= patient) {
+      throw new BadRequestException(`A weight-gain goal must have a target above the current recorded weight (${patient.toFixed(1)} kg).`);
+    }
+    if (direction === 'DECREASE_TO' && target >= patient) {
+      throw new BadRequestException(`A weight-loss goal must have a target below the current recorded weight (${patient.toFixed(1)} kg).`);
+    }
+  }
+
   async create(dto: CreateHealthGoalDto) {
     const { metricType, metricKey, frequency, frequencyTarget, aggregation, comparison, guidanceText, patientMedicationId, ...goalData } = dto; const isMedicationGoal = goalData.category === 'MEDICATION';
     if (patientMedicationId && !isMedicationGoal) throw new BadRequestException('A medication can only be attached to a medication goal.'); await this.assertPatientMedicationBelongsToPatient(patientMedicationId, String(goalData.patientId));
     const targetValue = goalData.targetValue ?? (isMedicationGoal ? String(DEFAULT_MEDICATION_TARGET) : undefined); const unit = goalData.unit ?? (isMedicationGoal ? '%' : undefined);
+    if (String(goalData.category).toUpperCase() === 'WEIGHT') {
+      await this.assertWeightTargetDirection(String(goalData.patientId), targetValue, comparison);
+    }
     const goal = await this.prisma.healthGoal.create({ data: { ...goalData, ...(targetValue !== undefined ? { targetValue } : {}), ...(unit !== undefined ? { unit } : {}) }, include: { patient: true, practitioner: true, carePlan: true, progress: true } });
     if (patientMedicationId) await this.prisma.$executeRaw`UPDATE "HealthGoal" SET "patientMedicationId" = ${patientMedicationId} WHERE "id" = ${goal.id}`;
     await this.configureMetric(goal.id, { metricType, metricKey, frequency, frequencyTarget: frequencyTarget == null ? (isMedicationGoal ? DEFAULT_MEDICATION_TARGET : undefined) : Number(frequencyTarget), aggregation, comparison, guidanceText });
@@ -114,6 +144,10 @@ export class HealthGoalsService {
     if (patientMedicationId && targetCategory !== 'MEDICATION') throw new BadRequestException('A medication can only be attached to a medication goal.');
     if (patientMedicationId) await this.assertPatientMedicationBelongsToPatient(patientMedicationId, String(existing.patientId));
     const revisingWeightGoal = targetCategory === 'WEIGHT';
+    if (revisingWeightGoal) {
+      const effectiveComparison = comparison ?? (existing as any)?.metricConfig?.comparison ?? 'DECREASE_TO';
+      await this.assertWeightTargetDirection(String(existing.patientId), goalData.targetValue ?? existing.targetValue, effectiveComparison);
+    }
     const updateData: any = {
       ...goalData,
       ...(isMedicationGoal && goalData.targetValue == null ? { targetValue: String(DEFAULT_MEDICATION_TARGET) } : {}),
@@ -177,8 +211,7 @@ export class HealthGoalsService {
 
     const terminal = progressStatus === HealthGoalProgressStatus.ACHIEVED && !recurring && !isMaintenanceGoal;
     return this.prisma.$transaction(async (tx) => {
-      await tx.healthGoal.update({
-        where: { id },
+      await tx.healthGoal.update({        where: { id },
         data: {
           currentValue: String(currentValue),
           status: terminal ? 'ACHIEVED' : goal.status,
