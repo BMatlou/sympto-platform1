@@ -177,8 +177,7 @@ export class HealthGoalIntelligenceService {
     if (!goal) throw new NotFoundException('Health goal not found.');
 
     await this.syncGoalRelations(goal.patientId);
-    const rows = await this.prisma.$queryRawUnsafe<RelationRow[]>(      `SELECT r."id",r."sourceGoalId",r."targetGoalId",r."relationshipType",r."rationale",g."id" AS "relatedGoalId",g."title" AS "relatedTitle",g."category"::text AS "relatedCategory",g."status"::text AS "relatedStatus",g."targetValue"::double precision AS "relatedTargetValue",g."unit" AS "relatedUnit",g."targetDate" AS "relatedTargetDate" FROM "HealthGoalRelation" r INNER JOIN "HealthGoal" g ON g."id"=CASE WHEN r."sourceGoalId"=$1 THEN r."targetGoalId" ELSE r."sourceGoalId" END WHERE r."patientId"=$2 AND (r."sourceGoalId"=$1 OR r."targetGoalId"=$1) ORDER BY CASE WHEN r."relationshipType"='SUPPORTS' THEN 0 ELSE 1 END,g."category",g."title"`,
-      goalId,
+    const rows = await this.prisma.$queryRawUnsafe<RelationRow[]>(      `SELECT r."id",r."sourceGoalId",r."targetGoalId",r."relationshipType",r."rationale",g."id" AS "relatedGoalId",g."title" AS "relatedTitle",g."category"::text AS "relatedCategory",g."status"::text AS "relatedStatus",g."targetValue"::double precision AS "relatedTargetValue",g."unit" AS "relatedUnit",g."targetDate" AS "relatedTargetDate" FROM "HealthGoalRelation" r INNER JOIN "HealthGoal" g ON g."id"=CASE WHEN r."sourceGoalId"=$1 THEN r."targetGoalId" ELSE r."sourceGoalId" END WHERE r."patientId"=$2 AND (r."sourceGoalId"=$1 OR r."targetGoalId"=$1) ORDER BY CASE WHEN r."relationshipType"='SUPPORTS' THEN 0 ELSE 1 END,g."category",g."title"`,      goalId,
       goal.patientId,
     );
 
@@ -321,6 +320,21 @@ export class HealthGoalIntelligenceService {
             ? baselineKg
             : null;
     const targetBmi = targetWeight != null && heightCm && heightCm > 0 ? targetWeight / ((heightCm / 100) ** 2) : null;
+    const lowerScreeningWeightKg = heightCm != null && heightCm > 0 ? 18.5 * ((heightCm / 100) ** 2) : null;
+    const upperScreeningWeightKg = heightCm != null && heightCm > 0 ? 24.9 * ((heightCm / 100) ** 2) : null;
+    const targetBmiStatus: 'BELOW_RANGE' | 'WITHIN_RANGE' | 'ABOVE_RANGE' | 'OBESITY_RANGE' | null =
+      !adultBmiApplicable || targetBmi == null
+        ? null
+        : targetBmi < 18.5
+          ? 'BELOW_RANGE'
+          : targetBmi < 25
+            ? 'WITHIN_RANGE'
+            : targetBmi < 30
+              ? 'ABOVE_RANGE'
+              : 'OBESITY_RANGE';
+    const targetNeedsReview = !['CLOSEST'].includes(comparison)
+      && targetBmiStatus != null
+      && targetBmiStatus !== 'WITHIN_RANGE';
 
     let status: 'STABLE' | 'DRIFTING_UP' | 'DRIFTING_DOWN' | 'NEEDS_REVIEW' | 'INSUFFICIENT_DATA' = 'INSUFFICIENT_DATA';
     if (comparison === 'CLOSEST') {
@@ -357,8 +371,7 @@ export class HealthGoalIntelligenceService {
     });
     const activeConditionCount = await this.prisma.patientCondition.count({
       where: { healthPassport: { patientId: goal.patientId }, status: 'ACTIVE' },    });    const recentSymptomCount = await this.prisma.symptomLog.count({
-      where: {
-        clinicalEpisode: { patientId: goal.patientId },
+      where: {        clinicalEpisode: { patientId: goal.patientId },
         status: { in: ['ACTIVE', 'COMPLETED'] },
         startedAt: { gte: new Date(now - 30 * 86400000) },
       },
@@ -411,19 +424,23 @@ export class HealthGoalIntelligenceService {
       priority: 'PRIMARY' | 'SUPPORTING';
     };
 
-    const lowerScreeningWeight = heightCm != null && heightCm > 0 ? 18.5 * ((heightCm / 100) ** 2) : null;
+    const lowerScreeningWeight = lowerScreeningWeightKg;
+    const upperScreeningWeight = upperScreeningWeightKg;
     const bmiCaution = goal.status !== 'ACHIEVED' && comparison === 'DECREASE_TO' && targetBmi != null && targetBmi < 18.5;
+    const gainTargetCaution = goal.status !== 'ACHIEVED' && comparison === 'INCREASE_TO' && targetBmi != null && targetBmi >= 25;
     const currentBmiBelowRange = currentBmi != null && currentBmi < 18.5;
 
     const todayActions: TodayFocusAction[] = [];
 
     if (goal.status === 'ACHIEVED') {
       // Completed outcome goals remain historical and do not generate new goal actions.
-    } else if (goal.status !== 'ACHIEVED' && (bmiCaution || (currentBmiBelowRange && comparison === 'DECREASE_TO'))) {
+    } else if (goal.status !== 'ACHIEVED' && (bmiCaution || gainTargetCaution || (currentBmiBelowRange && comparison === 'DECREASE_TO'))) {
       todayActions.push({
         id: 'review-weight-goal',
         label: 'Review your weight goal',
-        description: 'Your current weight/BMI needs the goal reviewed before pursuing further loss.',
+        description: gainTargetCaution && targetBmi != null
+          ? `Your planned gain target corresponds to BMI ${targetBmi.toFixed(1)}, outside the adult healthy-weight screening range. Review the target before pursuing it.`
+          : 'Your current weight/BMI needs the goal reviewed before pursuing further loss.',
         href: `/health-goals?edit=${encodeURIComponent(goal.id)}`,
         priority: 'PRIMARY',
       });
@@ -533,12 +550,15 @@ export class HealthGoalIntelligenceService {
         withinMaintenanceBand,
         targetWeightKg: targetWeight,
         targetBmi,
+        targetBmiStatus,
+        targetNeedsReview,
+        lowerScreeningWeightKg,
+        upperScreeningWeightKg,
         status,
       },
       checkIn: {
         dataPoints: journals.length,
-        averageSleepHours: average(values.sleep),
-        averageStress: average(values.stress),
+        averageSleepHours: average(values.sleep),        averageStress: average(values.stress),
         averageExerciseMinutes: average(values.exercise),
         averageWaterIntakeMl: average(values.water),
       },      clinicalContext: {
