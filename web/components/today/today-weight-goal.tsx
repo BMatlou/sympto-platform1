@@ -117,7 +117,8 @@ export default function TodayWeightGoal({ goal, fallbackWeight }: Props) {
   const targetAmount = isMaintenanceGoal ? null : configuredTarget != null && configuredTarget > 0 ? configuredTarget : null;
   const intelligenceTargetWeight = numberValue(intelligence?.weight?.targetWeightKg);
   const targetWeight = intelligenceTargetWeight
-    ?? (!isMaintenanceGoal ? targetAmount : null)
+    ?? (comparison === "INCREASE_TO" && startingWeight != null && targetAmount != null ? startingWeight + targetAmount : null)
+    ?? (comparison === "DECREASE_TO" && startingWeight != null && targetAmount != null ? startingWeight - targetAmount : null)
     ?? (isMaintenanceGoal && startingWeight != null ? startingWeight : null);
   const goalCompleted = String(goal?.status ?? "").toUpperCase() === "ACHIEVED";
   const completedWeight = numberValue(goal?.currentValue ?? goal?.latestProgress?.currentValue ?? goal?.progress?.[0]?.currentValue);
@@ -206,8 +207,8 @@ export default function TodayWeightGoal({ goal, fallbackWeight }: Props) {
     : isMaintenanceGoal
       ? `Maintenance baseline · ${formatKg(startingWeight)} kg`
       : bmiCaution || gainTargetCaution
-        ? `Goal needs review · planned body weight ${formatKg(targetWeight)} kg`
-        : `${formatKg(remainingGoalAmount)} kg to target · target body weight ${formatKg(targetWeight)} kg`;
+        ? `Goal needs review · planned change ${formatKg(targetAmount)} kg · projected weight ${formatKg(targetWeight)} kg`
+        : `${formatKg(remainingGoalAmount)} kg remaining · requested change ${formatKg(targetAmount)} kg · projected weight ${formatKg(targetWeight)} kg`;
 
   const trendMessage = goalCompleted
     ? "This goal is complete. Later weight measurements do not change its 100% progress; start a new weight goal for a new journey."
