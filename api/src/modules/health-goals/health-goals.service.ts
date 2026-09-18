@@ -131,6 +131,75 @@ export class HealthGoalsService {
     await this.healthGoalIntelligence.syncGoalRelations(String(existing.patientId));
     return this.findOne(id);
   }
-  async recordProgress(id: string, dto: RecordHealthGoalProgressDto) { const goal = await this.findOne(id); const currentValue = Number(dto.currentValue); const targetValue = goal.targetValue == null ? null : Number(goal.targetValue); const previousValue = goal.currentValue == null ? null : Number(goal.currentValue); if (!Number.isFinite(currentValue)) throw new BadRequestException('Health goal progress value is invalid.'); const configs = await this.prisma.$queryRaw<Array<{ comparison: string | null }>>`SELECT "comparison" FROM "HealthGoalMetricConfig" WHERE "healthGoalId" = ${id} LIMIT 1`; const comparison = String(configs[0]?.comparison ?? '').toUpperCase(); const isMaintenanceGoal = String(goal.category ?? '').toUpperCase() === 'WEIGHT' && comparison === 'CLOSEST'; const progressPercent = isMaintenanceGoal && targetValue != null && targetValue > 0 ? Math.max(0, Math.min(100, 100 - (Math.abs(currentValue - targetValue) / 0.5) * 100)) : targetValue != null && targetValue > 0 ? Math.min(100, Math.max(0, (currentValue / targetValue) * 100)) : 0; const progressStatus: HealthGoalProgressStatus = isMaintenanceGoal ? (Math.abs(currentValue - (targetValue ?? currentValue)) <= 0.5 ? HealthGoalProgressStatus.IMPROVING : currentValue > (targetValue ?? currentValue) ? HealthGoalProgressStatus.DECLINING : HealthGoalProgressStatus.STAGNANT) : targetValue != null && targetValue > 0 && currentValue >= targetValue ? HealthGoalProgressStatus.ACHIEVED : previousValue == null || currentValue > previousValue ? HealthGoalProgressStatus.IMPROVING : currentValue < previousValue ? HealthGoalProgressStatus.DECLINING : HealthGoalProgressStatus.STAGNANT; return this.prisma.$transaction(async (tx) => { await tx.healthGoal.update({ where: { id }, data: { currentValue: String(currentValue), status: isMaintenanceGoal ? goal.status : progressStatus === HealthGoalProgressStatus.ACHIEVED ? 'ACHIEVED' : goal.status, achievedAt: isMaintenanceGoal ? null : progressStatus === HealthGoalProgressStatus.ACHIEVED ? new Date() : null } }); await tx.healthGoalProgress.create({ data: { healthGoalId: id, currentValue: String(currentValue), progressPercent: String(progressPercent.toFixed(2)), status: progressStatus, notes: dto.notes, measuredAt: new Date() } }); return tx.healthGoal.findUnique({ where: { id }, include: { patient: true, practitioner: true, carePlan: true, progress: { orderBy: { measuredAt: 'desc' } } } }); }); }
+  async recordProgress(id: string, dto: RecordHealthGoalProgressDto) {
+    const goal = await this.findOne(id);
+    const currentValue = Number(dto.currentValue);
+    const targetValue = goal.targetValue == null ? null : Number(goal.targetValue);
+    const previousValue = goal.currentValue == null ? null : Number(goal.currentValue);
+    if (!Number.isFinite(currentValue)) throw new BadRequestException('Health goal progress value is invalid.');
+
+    const configs = await this.prisma.$queryRaw<Array<{ comparison: string | null; frequency: string | null }>>`
+      SELECT "comparison","frequency"
+      FROM "HealthGoalMetricConfig"
+      WHERE "healthGoalId" = ${id}
+      LIMIT 1
+    `;
+    const comparison = String(configs[0]?.comparison ?? '').toUpperCase();
+    const frequency = String(configs[0]?.frequency ?? '').toUpperCase();
+    const recurring = frequency === 'DAILY' || frequency === 'WEEKLY';
+    const isMaintenanceGoal = String(goal.category ?? '').toUpperCase() === 'WEIGHT' && comparison === 'CLOSEST';
+
+    const progressPercent = isMaintenanceGoal && targetValue != null && targetValue > 0
+      ? Math.max(0, Math.min(100, 100 - (Math.abs(currentValue - targetValue) / 0.5) * 100))
+      : targetValue != null && targetValue > 0
+        ? Math.min(100, Math.max(0, (currentValue / targetValue) * 100))
+        : 0;
+
+    let progressStatus: HealthGoalProgressStatus;
+    if (isMaintenanceGoal) {
+      const deviation = Math.abs(currentValue - (targetValue ?? currentValue));
+      progressStatus = deviation <= 0.5
+        ? HealthGoalProgressStatus.ON_TRACK
+        : currentValue > (targetValue ?? currentValue)
+          ? HealthGoalProgressStatus.DECLINING
+          : HealthGoalProgressStatus.IMPROVING;
+    } else if (targetValue != null && targetValue > 0 && currentValue >= targetValue) {
+      progressStatus = recurring ? HealthGoalProgressStatus.ON_TRACK : HealthGoalProgressStatus.ACHIEVED;
+    } else {
+      progressStatus = previousValue == null
+        ? HealthGoalProgressStatus.IMPROVING
+        : currentValue > previousValue
+          ? HealthGoalProgressStatus.IMPROVING
+          : currentValue < previousValue
+            ? HealthGoalProgressStatus.DECLINING
+            : HealthGoalProgressStatus.STAGNANT;
+    }
+
+    const terminal = progressStatus === HealthGoalProgressStatus.ACHIEVED && !recurring && !isMaintenanceGoal;
+    return this.prisma.$transaction(async (tx) => {
+      await tx.healthGoal.update({
+        where: { id },
+        data: {
+          currentValue: String(currentValue),
+          status: terminal ? 'ACHIEVED' : goal.status,
+          achievedAt: terminal ? new Date() : null,
+        },
+      });
+      await tx.healthGoalProgress.create({
+        data: {
+          healthGoalId: id,
+          currentValue: String(currentValue),
+          progressPercent: String(progressPercent.toFixed(2)),
+          status: progressStatus,
+          notes: dto.notes,
+          measuredAt: new Date(),
+        },
+      });
+      return tx.healthGoal.findUnique({
+        where: { id },
+        include: { patient: true, practitioner: true, carePlan: true, progress: { orderBy: { measuredAt: 'desc' } } },
+      });
+    });
+  }
   async remove(id: string) { await this.findOne(id); await this.prisma.healthGoal.delete({ where: { id } }); return { message: 'Health goal deleted successfully.' }; }
 }
