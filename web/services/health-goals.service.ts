@@ -12,6 +12,10 @@ export type WeightGoalIntelligence = {
   clinicalContext: { activeMedicationCount: number; activeConditionCount: number; recentSymptomCount: number; symptomsDataAvailable: boolean };
   relationships: Array<{ id: string; direction: string; relationshipType: string; rationale?: string | null; goal: { id: string; title: string; category: string; status: string; targetValue?: number | null; unit?: string | null; targetDate?: string | null } }>;
   recommendedSupportingGoals: Array<{ category: string; rationale: string }>;
+  todayFocus?: {
+    actions: Array<{ id: string; label: string; description: string; href: string; priority: "PRIMARY" | "SUPPORTING" }>;
+    dataFreshness: { weightDataNeedsRefresh: boolean; checkInNeedsCompletion: boolean; latestWeightAt?: string | null };
+  };
 };
 
 const deletedGoalIds = new Set<string>();
