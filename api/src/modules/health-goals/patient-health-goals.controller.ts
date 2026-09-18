@@ -86,6 +86,7 @@ export class PatientHealthGoalsController {
   @Patch(':id')
   async update(@Param('id') id: string, @Body() dto: UpdateHealthGoalDto, @Req() request: AuthenticatedRequest) {
     const existing = await this.assertOwnGoal(id, this.userId(request));
+    if (String(existing.status ?? '').toUpperCase() === 'ACHIEVED') throw new ForbiddenException('Completed health goals are locked. Start a new goal instead.');
     const { patientId: _patientId, metricType, metricKey, frequency, frequencyTarget, aggregation, comparison, guidanceText, targetDate, achievedAt, ...goalData } = dto;
     const parsedTargetDate = targetDate ? new Date(targetDate) : undefined;
     const parsedAchievedAt = achievedAt ? new Date(achievedAt) : undefined;
