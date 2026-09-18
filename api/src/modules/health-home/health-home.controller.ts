@@ -42,6 +42,31 @@ export class HealthHomeController {
     return this.healthHomeService.getHealthHome(req.user.sub, patientId);
   }
 
+  @Post('manual-vitals')
+  async recordManualVitals(
+    @Req() request: AuthenticatedRequest,
+    @Query('patientId') patientId: string | undefined,
+    @Body()
+    body: {
+      systolicPressure?: number | string;
+      diastolicPressure?: number | string;
+      restingHeartRate?: number | string;
+      respiratoryRate?: number | string;
+      oxygenSaturation?: number | string;
+      bodyTemperature?: number | string;
+      weightKg?: number | string;
+      heightCm?: number | string;
+      measuredAt?: string;
+    },
+  ) {
+    const userId = await this.patientContextService.resolvePatientUserId(request.user.sub, patientId, 'VIEW_RECORDS');
+    if (patientId && userId !== request.user.sub) {
+      throw new BadRequestException('Family health records are read-only. The family member must record their own measurements.');
+    }
+
+    return this.healthHomeService.recordManualVitals(userId, body as any, patientId);
+  }
+
   @Post('weight')
   updateWeight(@Req() req: any, @Query('patientId') patientId: string | undefined, @Body() dto: UpdateWeightDto) {
     return this.healthHomeService.updateWeight(req.user.sub, dto.weightKg, dto.heightCm, patientId);
