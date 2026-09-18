@@ -1,6 +1,7 @@
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../../database/prisma.service';
 import { GoalsEngineService } from '../health-goals/goals-engine-v3.service';
+import { HealthGoalIntelligenceService } from '../health-goals/health-goal-intelligence.service';
 
 const ACTIVE_APPOINTMENT_STATUSES = ['PENDING', 'CONFIRMED', 'CHECKED_IN', 'IN_PROGRESS'] as const;
 const ACTIVE_MEDICATION_STATUSES = ['ACTIVE', 'PAUSED'] as const;
@@ -45,6 +46,7 @@ export class HealthHomeService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly goalsEngine: GoalsEngineService,
+    private readonly healthGoalIntelligence: HealthGoalIntelligenceService,
   ) {}
 
   private async patientForWrite(userId: string, requestedPatientId?: string) {
@@ -298,6 +300,7 @@ export class HealthHomeService {
       ...labOrders.flatMap((order) => order.items.flatMap((item) => item.labResults.flatMap((result) => result.items.filter((ri) => ri.abnormal || ri.critical).map((ri) => ({ type: ri.critical ? 'CRITICAL_RESULT' : 'ABNORMAL_RESULT', severity: ri.critical ? 'URGENT' : 'HIGH', title: `${ri.test.name} result needs review`, description: ri.comments ?? 'A recent laboratory result is outside the expected range.', actionUrl: '/health-journal' }))))),
     ].slice(0, 10);
     const goalsWithProgress = goals.map((goal) => ({ ...goal, latestProgress: goal.progress[0] ?? null }));
+    const goalsWithRelationships = await this.healthGoalIntelligence.attachRelationships(goalsWithProgress as any[]);
     const activeAllergies = allergies.filter((item) => item.status === 'ACTIVE' || !item.status);
     const activeConditions = conditions.filter((item) => item.status === 'ACTIVE' && !item.resolvedAt);
     const bloodType = patient.healthPassport?.bloodType ?? medicalRecord?.bloodType ?? null;
@@ -313,7 +316,7 @@ export class HealthHomeService {
       healthPassport: patient.healthPassport ? { ...patient.healthPassport, bloodType, organDonor, emergencyNotes } : medicalRecord ? { bloodType, organDonor, emergencyNotes, source: 'MEDICAL_RECORD' } : null,
       healthSnapshot: { baseline: patient.baseline, activeConditions, activeAllergies, allergies: activeAllergies, immunizations, bloodType, rhesusFactor: patient.healthPassport?.rhesusFactor ?? null, heightCm, weightKg, bmi: finalBmi, bmiCategory: finalBmiCategory, latestMeasurements: journalSignals.signals, normalizedVitals: Array.from(normalizedMap.values()), connectedDevices: devices.map((device) => ({ id: device.id, manufacturer: device.manufacturer, model: device.model, deviceType: device.deviceType, status: device.status, lastSyncAt: device.lastSyncAt, measurementCount: device._count.measurements })) },
       attention, today: { notifications, upcomingAppointments: appointments.slice(0, 5), activeMedications: medications, activeMedicationCount: medications.length, activeGoalCount: goals.length },
-      medications, appointments, goals: goalsWithProgress, healthGoals: goalsWithProgress, family, allergies, conditions, immunizations, emergencyContacts: patient.emergencyContacts,
+      medications, appointments, goals: goalsWithRelationships, healthGoals: goalsWithRelationships, family, allergies, conditions, immunizations, emergencyContacts: patient.emergencyContacts,
       wearables: { devices: devices.map((device) => ({ id: device.id, manufacturer: device.manufacturer, model: device.model, deviceType: device.deviceType, status: device.status, lastSyncAt: device.lastSyncAt, measurementCount: device._count.measurements })), latestMeasurements: journalSignals.signals },
       symptoms: symptomLogs, recentResults: { laboratory: labOrders, imaging: imagingStudies }, carePlans, encounters, prescriptions, attachments, clinicalVitals, patientInsurances, medicalRecord, journal: journalSignals, ai: { recentObservations: aiObservations }, settings: patient.healthJournalSettings, healthJournalSettings: patient.healthJournalSettings,
     };
