@@ -168,7 +168,7 @@ export default function TodayWeightGoal({ goal, fallbackWeight }: Props) {
   const currentBmiAboveRange = currentBmi != null && currentBmi >= 25;
   const goalNeedsReview = !goalCompleted && (bmiCaution || currentBmiBelowRange);
   const reviewGoalHref = goal?.id ? `/health-goals?edit=${encodeURIComponent(String(goal.id))}` : "/health-goals";
-  const ChangeIcon = comparison === "INCREASE_TO" ? TrendingUp : TrendingDown;
+  const ChangeIcon = isMaintenanceGoal ? Scale : comparison === "INCREASE_TO" ? TrendingUp : TrendingDown;
 
   const journeyLabel = goalCompleted
     ? completedWeight != null
@@ -271,7 +271,7 @@ export default function TodayWeightGoal({ goal, fallbackWeight }: Props) {
       <div className="flex-1 px-4 pb-5 sm:px-5 sm:pb-6">
         {loading ? (
           <div className="h-[250px] animate-pulse rounded-[26px] bg-[#f5f9fa]" />
-        ) : currentWeight == null || targetAmount == null || startingWeight == null ? (
+        ) : currentWeight == null || startingWeight == null || (!isMaintenanceGoal && targetAmount == null) ? (
           <div className="rounded-[26px] bg-[#0b2d54] p-6 text-white shadow-[0_14px_30px_rgba(11,45,84,.14)]">
             <p className="text-xl font-black tracking-[-.04em]">Weight progress will update automatically</p>
             <p className="mt-2 text-sm leading-6 text-white/65">Record your weight in Vitals &amp; Measurements and Sympto will use that measurement here.</p>
@@ -317,7 +317,7 @@ export default function TodayWeightGoal({ goal, fallbackWeight }: Props) {
           </div>
         )}
 
-        {!loading && !goalCompleted && currentWeight != null && !bmiCaution && targetAmount != null && remainingGoalAmount != null && (
+        {!loading && !goalCompleted && !isMaintenanceGoal && currentWeight != null && !bmiCaution && targetAmount != null && remainingGoalAmount != null && (
           <div className="mt-4 rounded-[20px] border border-[#e1eaed] bg-[#f8fbfc] px-4 py-3.5 text-[10px] font-semibold leading-5 text-[#74859a]">
             {targetReached
               ? "Goal reached. You need 0.0 kg/day (0.0 kg/week) more."
@@ -348,7 +348,7 @@ export default function TodayWeightGoal({ goal, fallbackWeight }: Props) {
           <span>{goalCompleted ? "Completed journey" : `Day ${journey.journeyDay} · ${journey.daysLeft === null ? "Journey active" : journey.daysLeft === 0 ? "Target date today" : `${journey.daysLeft} days left`}`}</span>
           {goalCompleted ? <Link href="/health-goals" className="inline-flex min-h-9 shrink-0 items-center justify-center gap-1.5 rounded-xl px-3 text-[10px] font-black text-[#0b2d54] hover:bg-white">New goal <ArrowRight className="h-3 w-3" /></Link> : <Link href="/health-goals" className="inline-flex min-h-9 shrink-0 items-center justify-center gap-1.5 rounded-xl px-3 text-[10px] font-black text-[#0b2d54] hover:bg-white">View goal <ArrowRight className="h-3 w-3" /></Link>}
         </div>
-        <p className="mt-2 text-[9px] leading-4 text-[#9aa8b1]">Progress uses the weight recorded when this goal was created or last revised as the baseline, then applies later weight measurements to calculate actual change. Completed goals remain at 100% as history.</p>
+        <p className="mt-2 text-[9px] leading-4 text-[#9aa8b1]">For weight goals, the measurement recorded when this goal was created or last revised is the baseline. Maintenance goals use recent weight averages and trend rather than requiring an exact daily match to the baseline. Completed loss/gain goals remain at 100% as history.</p>
       </div>
     </article>
   );
