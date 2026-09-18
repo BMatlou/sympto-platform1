@@ -96,6 +96,25 @@ export class HealthGoalIntelligenceService {
       select: { id: true, category: true },
     });
     const weightGoals = goals.filter((goal) => String(goal.category).toUpperCase() === 'WEIGHT');
+    const activeWeightGoalIds = weightGoals.map((goal) => goal.id);
+    const activeRelatedGoalIds = goals.map((goal) => goal.id);
+
+    // Remove stale system-generated links when goals are edited, archived or deleted.
+    // User/manual relationships are preserved.
+    if (activeWeightGoalIds.length > 0) {
+      await this.prisma.$executeRawUnsafe(
+        'DELETE FROM "HealthGoalRelation" WHERE "patientId"=$1 AND "createdBy"=\'SYSTEM\' AND (("sourceGoalId"=ANY($2) OR "targetGoalId"=ANY($2)) OR ("sourceGoalId"=ANY($3) AND "targetGoalId"=ANY($3)))',
+        patientId,
+        activeWeightGoalIds,
+        activeRelatedGoalIds,
+      );
+    } else {
+      await this.prisma.$executeRawUnsafe(
+        'DELETE FROM "HealthGoalRelation" WHERE "patientId"=$1 AND "createdBy"=\'SYSTEM\'',
+        patientId,
+      );
+      return;
+    }
 
     for (const weightGoal of weightGoals) {
       for (const relatedGoal of goals) {
@@ -320,6 +339,13 @@ export class HealthGoalIntelligenceService {
     const activeConditionCount = await this.prisma.patientCondition.count({
       where: { healthPassport: { patientId: goal.patientId }, status: 'ACTIVE' },
     });
+    const recentSymptomCount = await this.prisma.symptomLog.count({
+      where: {
+        clinicalEpisode: { patientId: goal.patientId },
+        status: { in: ['ACTIVE', 'COMPLETED'] },
+        startedAt: { gte: new Date(now - 30 * 86400000) },
+      },
+    });
 
     const recommendedSupportingGoals = WEIGHT_SUPPORT_RULES
       .map((rule) => ({ category: rule.category, rationale: rule.rationale }))
@@ -371,7 +397,8 @@ export class HealthGoalIntelligenceService {
       clinicalContext: {
         activeMedicationCount,
         activeConditionCount,
-        symptomsReported: false,
+        recentSymptomCount,
+        symptomsDataAvailable: recentSymptomCount > 0,
       },
       relationships: relationshipData.relationships,
       recommendedSupportingGoals,
