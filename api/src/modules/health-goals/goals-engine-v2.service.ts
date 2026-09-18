@@ -153,6 +153,17 @@ export class GoalsEngineService {
     const baseline = baselineRows.length ? Number(baselineRows[0].loggedValue) : historicalRows.length ? Number(historicalRows[0].loggedValue) : latestRows.length ? Number(latestRows[0].loggedValue) : null;
     const latest = latestRows.length ? Number(latestRows[0].loggedValue) : baseline;
     if (baseline == null || latest == null || !Number.isFinite(baseline) || !Number.isFinite(latest) || target < 0) return { strategy: 'DELTA_REDUCTION', currentValue: latest ?? baseline ?? 0, progressPercent: 0, achieved: false, guidanceText: `${title}: keep tracking weight toward the target.` };
+    if (config.comparison === 'CLOSEST') {
+      const targetWeight = baseline;
+      const toleranceKg = 0.5;
+      const deviation = Math.abs(latest - targetWeight);
+      const progressPercent = Math.max(0, Math.min(100, 100 - (deviation / toleranceKg) * 100));
+      const guidanceText = deviation <= toleranceKg
+        ? `${title}: weight is within ${toleranceKg.toFixed(1)} kg of the maintenance target. Keep tracking your current weight.`
+        : `${title}: weight is ${deviation.toFixed(1)} kg from the maintenance target of ${targetWeight.toFixed(1)} kg. Keep tracking changes from your baseline.`;
+      // Maintenance is an ongoing state, not a one-time achievement.
+      return { strategy: 'DELTA_REDUCTION', currentValue: latest, progressPercent, achieved: false, guidanceText };
+    }
     const targetWeight = config.comparison === 'INCREASE_TO' ? baseline + target : baseline - target;
     const movement = config.comparison === 'INCREASE_TO' ? Math.max(latest - baseline, 0) : Math.max(baseline - latest, 0);
     const progressPercent = target === 0 ? 100 : Math.max(0, Math.min(100, (movement / target) * 100));
