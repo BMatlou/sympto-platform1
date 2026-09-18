@@ -177,8 +177,7 @@ export class HealthGoalIntelligenceService {
     if (!goal) throw new NotFoundException('Health goal not found.');
 
     await this.syncGoalRelations(goal.patientId);
-    const rows = await this.prisma.$queryRawUnsafe<RelationRow[]>(
-      `SELECT r."id",r."sourceGoalId",r."targetGoalId",r."relationshipType",r."rationale",g."id" AS "relatedGoalId",g."title" AS "relatedTitle",g."category"::text AS "relatedCategory",g."status"::text AS "relatedStatus",g."targetValue"::double precision AS "relatedTargetValue",g."unit" AS "relatedUnit",g."targetDate" AS "relatedTargetDate" FROM "HealthGoalRelation" r INNER JOIN "HealthGoal" g ON g."id"=CASE WHEN r."sourceGoalId"=$1 THEN r."targetGoalId" ELSE r."sourceGoalId" END WHERE r."patientId"=$2 AND (r."sourceGoalId"=$1 OR r."targetGoalId"=$1) ORDER BY CASE WHEN r."relationshipType"='SUPPORTS' THEN 0 ELSE 1 END,g."category",g."title"`,
+    const rows = await this.prisma.$queryRawUnsafe<RelationRow[]>(      `SELECT r."id",r."sourceGoalId",r."targetGoalId",r."relationshipType",r."rationale",g."id" AS "relatedGoalId",g."title" AS "relatedTitle",g."category"::text AS "relatedCategory",g."status"::text AS "relatedStatus",g."targetValue"::double precision AS "relatedTargetValue",g."unit" AS "relatedUnit",g."targetDate" AS "relatedTargetDate" FROM "HealthGoalRelation" r INNER JOIN "HealthGoal" g ON g."id"=CASE WHEN r."sourceGoalId"=$1 THEN r."targetGoalId" ELSE r."sourceGoalId" END WHERE r."patientId"=$2 AND (r."sourceGoalId"=$1 OR r."targetGoalId"=$1) ORDER BY CASE WHEN r."relationshipType"='SUPPORTS' THEN 0 ELSE 1 END,g."category",g."title"`,
       goalId,
       goal.patientId,
     );
@@ -357,8 +356,7 @@ export class HealthGoalIntelligenceService {
       where: { healthPassport: { patientId: goal.patientId }, status: { in: ['ACTIVE', 'PAUSED'] } },
     });
     const activeConditionCount = await this.prisma.patientCondition.count({
-      where: { healthPassport: { patientId: goal.patientId }, status: 'ACTIVE' },
-    });    const recentSymptomCount = await this.prisma.symptomLog.count({
+      where: { healthPassport: { patientId: goal.patientId }, status: 'ACTIVE' },    });    const recentSymptomCount = await this.prisma.symptomLog.count({
       where: {
         clinicalEpisode: { patientId: goal.patientId },
         status: { in: ['ACTIVE', 'COMPLETED'] },
@@ -456,10 +454,16 @@ export class HealthGoalIntelligenceService {
     } else {
       todayActions.push({
         id: isMaintenanceGoal ? 'maintain-routine' : comparison === 'INCREASE_TO' ? 'support-weight-gain' : 'support-weight-loss',
-        label: isMaintenanceGoal ? 'Keep today’s routine' : 'Keep today’s plan moving',
+        label: isMaintenanceGoal
+          ? 'Keep today’s routine'
+          : comparison === 'INCREASE_TO'
+            ? targetWeight != null ? `Keep moving toward ${targetWeight.toFixed(1)} kg` : 'Keep your gain plan moving'
+            : targetWeight != null ? `Keep moving toward ${targetWeight.toFixed(1)} kg` : 'Keep your loss plan moving',
         description: isMaintenanceGoal
           ? 'Your recent weight pattern is stable; use today’s check-in to keep the picture current.'
-          : 'Use the supporting habits already connected to this goal rather than adding another task list.',
+          : comparison === 'INCREASE_TO'
+            ? 'Use the supporting habits already connected to this gain goal rather than adding another task list.'
+            : 'Use the supporting habits already connected to this loss goal rather than adding another task list.',
         href: '#daily-health-check-in',
         priority: 'PRIMARY',
       });
@@ -537,8 +541,7 @@ export class HealthGoalIntelligenceService {
         averageStress: average(values.stress),
         averageExerciseMinutes: average(values.exercise),
         averageWaterIntakeMl: average(values.water),
-      },
-      clinicalContext: {
+      },      clinicalContext: {
         activeMedicationCount,
         activeConditionCount,
         recentSymptomCount,        symptomsDataAvailable: recentSymptomCount > 0,
