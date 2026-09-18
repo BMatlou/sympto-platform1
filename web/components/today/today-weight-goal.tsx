@@ -171,6 +171,9 @@ export default function TodayWeightGoal({ goal, fallbackWeight }: Props) {
   const goalNeedsReview = !goalCompleted && (bmiCaution || currentBmiBelowRange);
   const reviewGoalHref = goal?.id ? `/health-goals?edit=${encodeURIComponent(String(goal.id))}` : "/health-goals";
   const ChangeIcon = isMaintenanceGoal ? Scale : comparison === "INCREASE_TO" ? TrendingUp : TrendingDown;
+  const connectedGoals = Array.isArray(goal?.connectedGoals) ? goal.connectedGoals : [];
+  const supportingGoals = connectedGoals.filter((relation: any) => relation.relationshipType === "SUPPORTS" && relation.direction === "supportsThisGoal");
+  const relatedGoals = connectedGoals.filter((relation: any) => relation.relationshipType === "RELATED_TO" && relation.direction === "supportsThisGoal");
 
   const journeyLabel = goalCompleted
     ? completedWeight != null
@@ -326,6 +329,16 @@ export default function TodayWeightGoal({ goal, fallbackWeight }: Props) {
               : comparison === "DECREASE_TO"
                 ? `You need to lose about ${formatKg(remainingGoalAmount)} kg more to reach ${formatKg(targetWeight)} kg by ${formatDate(journey.targetDate)}. That is about ${formatRate(requiredDailyChange)} kg/day or ${formatRate(requiredWeeklyChange)} kg/week.`
                 : `You need to gain about ${formatKg(remainingGoalAmount)} kg more to reach ${formatKg(targetWeight)} kg by ${formatDate(journey.targetDate)}. That is about ${formatRate(requiredDailyChange)} kg/day or ${formatRate(requiredWeeklyChange)} kg/week.`}
+          </div>
+        )}
+
+        {!loading && connectedGoals.length > 0 && (
+          <div className="mt-4 rounded-[18px] border border-[#e1eaed] bg-[#f8fbfc] px-4 py-3 text-[10px] leading-5 text-[#74859a]">
+            <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+              <span className="font-black uppercase tracking-[.12em] text-[#82939f]">Connected goals</span>
+              {supportingGoals.length > 0 && <span className="font-semibold text-[#0b6f73]">Supporting: {supportingGoals.map((relation: any) => String(relation.goal?.title ?? relation.goal?.category ?? "Goal")).join(" · ")}</span>}
+              {relatedGoals.length > 0 && <span className="font-semibold text-[#74859a]">Related: {relatedGoals.map((relation: any) => String(relation.goal?.title ?? relation.goal?.category ?? "Goal")).join(" · ")}</span>}
+            </div>
           </div>
         )}
 
