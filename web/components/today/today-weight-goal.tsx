@@ -166,19 +166,21 @@ export default function TodayWeightGoal({ goal, fallbackWeight }: Props) {
   const startingBmi = startingWeight != null && heightCm != null && heightCm > 0 ? startingWeight / ((heightCm / 100) ** 2) : null;
   const targetBmi = targetWeight != null && heightCm != null && heightCm > 0 ? targetWeight / ((heightCm / 100) ** 2) : null;
   const bmiChange = startingBmi != null && currentBmi != null ? currentBmi - startingBmi : null;
-  const lowerScreeningWeight = heightCm != null && heightCm > 0 ? 18.5 * ((heightCm / 100) ** 2) : null;
+  const lowerScreeningWeight = numberValue(intelligence?.weight?.lowerScreeningWeightKg) ?? (heightCm != null && heightCm > 0 ? 18.5 * ((heightCm / 100) ** 2) : null);
+  const upperScreeningWeight = numberValue(intelligence?.weight?.upperScreeningWeightKg) ?? (heightCm != null && heightCm > 0 ? 24.9 * ((heightCm / 100) ** 2) : null);
   const bmiCaution = !goalCompleted && comparison === "DECREASE_TO" && targetBmi != null && targetBmi < 18.5;
+  const gainTargetCaution = !goalCompleted && comparison === "INCREASE_TO" && targetBmi != null && targetBmi >= 25;
+  const gainTargetObesityRange = gainTargetCaution && targetBmi != null && targetBmi >= 30;
   const currentBmiBelowRange = !goalCompleted && currentBmi != null && currentBmi < 18.5;
   const currentBmiAboveRange = currentBmi != null && currentBmi >= 25;
-  const goalNeedsReview = !goalCompleted && (bmiCaution || currentBmiBelowRange);
+  const goalNeedsReview = !goalCompleted && (bmiCaution || gainTargetCaution || currentBmiBelowRange);
   const reviewGoalHref = goal?.id ? `/health-goals?edit=${encodeURIComponent(String(goal.id))}` : "/health-goals";
   const ChangeIcon = isMaintenanceGoal ? Scale : comparison === "INCREASE_TO" ? TrendingUp : TrendingDown;
   const connectedGoals = Array.isArray(goal?.connectedGoals) ? goal.connectedGoals : [];
   const supportingGoals = connectedGoals.filter((relation: any) => relation.relationshipType === "SUPPORTS" && relation.direction === "supportsThisGoal");
   const relatedGoals = connectedGoals.filter((relation: any) => relation.relationshipType === "RELATED_TO" && relation.direction === "relatedToThisGoal");
 
-  const journeyLabel = goalCompleted
-    ? completedWeight != null
+  const journeyLabel = goalCompleted    ? completedWeight != null
       ? `Goal completed at ${formatKg(completedWeight)} kg`      : "Goal completed"
     : isMaintenanceGoal
       ? maintenanceStatus === "NEEDS_REVIEW"
@@ -226,8 +228,10 @@ export default function TodayWeightGoal({ goal, fallbackWeight }: Props) {
             ? `Current trend: moving toward your weight target. You have gained ${formatKg(changeKg)} kg since the goal started, and BMI has changed from ${startingBmi?.toFixed(1) ?? "—"} to ${currentBmi?.toFixed(1) ?? "—"}.`
             : `Current trend: no recorded weight change from the ${formatKg(startingWeight)} kg starting point. BMI is ${currentBmi?.toFixed(1) ?? "—"}.`;
 
-  const guidanceMessage = isMaintenanceGoal
-    ? intelligence?.weight?.average7dKg != null
+  const guidanceMessage = gainTargetCaution
+    ? `Your planned target of ${formatKg(targetWeight)} kg corresponds to a BMI of ${targetBmi?.toFixed(1) ?? "—"} at your recorded height, which is outside the adult healthy-weight screening range. ${gainTargetObesityRange ? "It is in the adult obesity BMI screening category." : "It is in the adult overweight BMI screening category."} This is a screening signal, not a diagnosis; BMI does not distinguish muscle from fat. Review the target with a healthcare professional before pursuing it.`
+    : isMaintenanceGoal
+      ? intelligence?.weight?.average7dKg != null
       ? `Sympto is using your 7-day average rather than a single scale reading. Your maintenance band is approximately ${formatKg(intelligence.weight.maintenanceBand?.min ?? startingWeight)}–${formatKg(intelligence.weight.maintenanceBand?.max ?? startingWeight)} kg around your baseline.`
       : "Record a few recent weight measurements so Sympto can assess your maintenance trend."
     : currentBmi != null && currentBmi < 18.5
@@ -240,7 +244,9 @@ export default function TodayWeightGoal({ goal, fallbackWeight }: Props) {
 
   const statusLabel = goalCompleted
     ? "Completed"
-    : isMaintenanceGoal
+    : gainTargetCaution || bmiCaution
+      ? "Target needs review"
+      : isMaintenanceGoal
       ? maintenanceStatus === "NEEDS_REVIEW"
         ? "Needs review"
         : maintenanceStatus === "DRIFTING_UP" || maintenanceStatus === "DRIFTING_DOWN"
@@ -357,8 +363,7 @@ export default function TodayWeightGoal({ goal, fallbackWeight }: Props) {
                 <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                   <div className="min-w-0">
                     <p className="text-xs font-black text-[#0b2d54]">{intelligence.todayFocus.actions[0].label}</p>
-                    <p className="mt-1 text-[10px] leading-4 text-[#74859a]">{intelligence.todayFocus.actions[0].description}</p>
-                  </div>                  <Link href={intelligence.todayFocus.actions[0].href} className="inline-flex min-h-9 shrink-0 items-center justify-center gap-1.5 rounded-xl bg-[#0b2d54] px-3.5 py-2 text-[9px] font-black text-white shadow-sm transition hover:bg-[#123d63]">
+                    <p className="mt-1 text-[10px] leading-4 text-[#74859a]">{intelligence.todayFocus.actions[0].description}</p>                  </div>                  <Link href={intelligence.todayFocus.actions[0].href} className="inline-flex min-h-9 shrink-0 items-center justify-center gap-1.5 rounded-xl bg-[#0b2d54] px-3.5 py-2 text-[9px] font-black text-white shadow-sm transition hover:bg-[#123d63]">
                     Open <ArrowRight className="h-3 w-3 text-[#24c1c4]" />
                   </Link>
                 </div>
@@ -376,14 +381,15 @@ export default function TodayWeightGoal({ goal, fallbackWeight }: Props) {
           </div>
         )}
 
-        {!loading && currentWeight != null && ((guidanceMessage || bmiCaution) || goalCompleted) && (
+        {!loading && currentWeight != null && ((guidanceMessage || bmiCaution || gainTargetCaution) || goalCompleted) && (
           <div className={`mt-4 rounded-[20px] border px-4 py-3.5 text-[10px] font-semibold leading-5 ${goalCompleted ? "border-[#dcebed] bg-[#f4fbfa] text-[#496a73]" : goalNeedsReview ? "border-amber-200 bg-amber-50 text-amber-900" : "border-[#dcebed] bg-[#f4fbfa] text-[#496a73]"}`}>
             <p className="font-black uppercase tracking-[.12em]">{goalCompleted ? "Completed weight goal" : "Weight &amp; BMI guidance"}</p>
             <p className="mt-1.5">{trendMessage}</p>
             {!goalCompleted && guidanceMessage && <p className="mt-1.5">{guidanceMessage}</p>}
             {!goalCompleted && bmiChange != null && Math.abs(bmiChange) >= 0.1 && <p className="mt-1.5">BMI change since goal start: {bmiChange > 0 ? "+" : ""}{bmiChange.toFixed(1)}.</p>}
-            {!goalCompleted && bmiCaution && <>
-              <p className="mt-1.5">The planned target BMI is {targetBmi?.toFixed(1)}, below 18.5. The goal remains saved while you review what to do next.</p>
+            {!goalCompleted && gainTargetCaution && upperScreeningWeight != null && <p className="mt-1.5">At your recorded height, BMI 24.9 corresponds to about {formatKg(upperScreeningWeight)} kg. This is screening context, not a required target.</p>}
+            {!goalCompleted && (bmiCaution || gainTargetCaution) && <>
+              <p className="mt-1.5">{bmiCaution ? `The planned target BMI is ${targetBmi?.toFixed(1)}, below 18.5. The goal remains saved while you review what to do next.` : `The planned target BMI is ${targetBmi?.toFixed(1)}, outside the adult healthy-weight screening range${gainTargetObesityRange ? " and in the obesity screening category" : ""}. The goal remains saved while you review what to do next.`}</p>
               <div className="mt-3 flex flex-wrap items-center gap-2">
                 <Link href={reviewGoalHref} className="inline-flex min-h-9 items-center justify-center gap-1.5 rounded-xl bg-[#0b2d54] px-3.5 py-2 text-[10px] font-black text-white shadow-sm transition hover:bg-[#123d63]">Review goal <ArrowRight className="h-3 w-3" /></Link>
               </div>
