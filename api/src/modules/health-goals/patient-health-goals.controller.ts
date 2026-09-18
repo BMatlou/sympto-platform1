@@ -79,6 +79,7 @@ export class PatientHealthGoalsController {
     if (parsedAchievedAt && Number.isNaN(parsedAchievedAt.getTime())) throw new BadRequestException('Achievement date is invalid.');
     const goal = await this.prisma.healthGoal.create({ data: { ...goalData, patientId, targetDate: parsedTargetDate, achievedAt: parsedAchievedAt }, include: { patient: true, practitioner: true, carePlan: true, progress: { orderBy: { measuredAt: 'desc' } } } });
     await this.healthGoalsService.configureMetric(goal.id, { metricType, metricKey, frequency, frequencyTarget: frequencyTarget == null ? undefined : Number(frequencyTarget), aggregation, comparison, guidanceText });
+    if (String(goalData.category).toUpperCase() === 'WEIGHT' && String(metricType).toUpperCase() === 'WEIGHT') await this.healthGoalsService.captureWeightGoalBaseline(goal.id, String(patient.id), goal.createdAt);
     return this.healthGoalsService.findOne(goal.id);
   }
 
