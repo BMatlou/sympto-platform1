@@ -95,6 +95,7 @@ export default function TodayWeightGoal({ goal, fallbackWeight }: Props) {
     const onGoalUpdated = () => { void load(); };
     window.addEventListener("sympto:weight-updated", onWeightUpdated);
     window.addEventListener("sympto:health-goal-updated", onGoalUpdated);
+    window.addEventListener("sympto:health-checkin-updated", onWeightUpdated);
     return () => {
       active = false;
       window.removeEventListener("sympto:weight-updated", onWeightUpdated);
@@ -337,6 +338,40 @@ export default function TodayWeightGoal({ goal, fallbackWeight }: Props) {
               <span className="font-black uppercase tracking-[.12em] text-[#82939f]">Connected goals</span>
               {supportingGoals.length > 0 && <span className="font-semibold text-[#0b6f73]">Supporting: {supportingGoals.map((relation: any) => String(relation.goal?.title ?? relation.goal?.category ?? "Goal")).join(" · ")}</span>}
               {relatedGoals.length > 0 && <span className="font-semibold text-[#74859a]">Related: {relatedGoals.map((relation: any) => String(relation.goal?.title ?? relation.goal?.category ?? "Goal")).join(" · ")}</span>}
+            </div>
+          </div>
+        )}
+
+        {!loading && intelligence?.todayFocus?.actions?.length > 0 && (
+          <div className="mt-4 overflow-hidden rounded-[20px] border border-[#dbeaec] bg-[#f7fbfc]">
+            <div className="flex items-center justify-between gap-3 border-b border-[#e3eef0] px-4 py-3">
+              <div>
+                <p className="text-[9px] font-black uppercase tracking-[.14em] text-[#82939f]">Today’s focus</p>
+                <p className="mt-0.5 text-[11px] font-bold text-[#0b2d54]">One useful next step for this weight goal</p>
+              </div>
+              {intelligence?.todayFocus?.dataFreshness?.checkInNeedsCompletion && <span className="rounded-full bg-white px-2.5 py-1 text-[8px] font-black text-[#0b7b80] ring-1 ring-[#dbeaec]">Check-in missing</span>}
+            </div>
+            <div className="px-4 py-3">
+              {intelligence.todayFocus.actions[0]?.priority === "PRIMARY" && (
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                  <div className="min-w-0">
+                    <p className="text-xs font-black text-[#0b2d54]">{intelligence.todayFocus.actions[0].label}</p>
+                    <p className="mt-1 text-[10px] leading-4 text-[#74859a]">{intelligence.todayFocus.actions[0].description}</p>
+                  </div>
+                  <Link href={intelligence.todayFocus.actions[0].href} className="inline-flex min-h-9 shrink-0 items-center justify-center gap-1.5 rounded-xl bg-[#0b2d54] px-3.5 py-2 text-[9px] font-black text-white shadow-sm transition hover:bg-[#123d63]">
+                    Open <ArrowRight className="h-3 w-3 text-[#24c1c4]" />
+                  </Link>
+                </div>
+              )}
+              {intelligence.todayFocus.actions.slice(1).length > 0 && (
+                <div className="mt-3 flex flex-wrap gap-2">
+                  {intelligence.todayFocus.actions.slice(1, 3).map((action: any) => (
+                    <Link key={String(action.id)} href={String(action.href)} className="inline-flex items-center gap-1.5 rounded-full bg-white px-3 py-1.5 text-[9px] font-bold text-[#0b6f73] ring-1 ring-[#dcebed] hover:bg-[#eff8f8]" title={String(action.description ?? "")}>
+                      {String(action.label)} <ArrowRight className="h-2.5 w-2.5" />
+                    </Link>
+                  ))}
+                </div>
+              )}
             </div>
           </div>
         )}
