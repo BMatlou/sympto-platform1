@@ -42,6 +42,7 @@ type WeightEvent = { loggedValue: number; occurredAt: string; source?: string | 
 export default function TodayWeightGoal({ goal, fallbackWeight }: Props) {
   const [events, setEvents] = useState<WeightEvent[]>([]);
   const [baselineWeight, setBaselineWeight] = useState<number | null>(null);
+  const [intelligence, setIntelligence] = useState<any>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -49,8 +50,16 @@ export default function TodayWeightGoal({ goal, fallbackWeight }: Props) {
     const load = async () => {
       setLoading(true);
       try {
+        const goalId = String(goal?.id ?? "");
         const response = await healthGoalsService.getMetricEvents("WEIGHT", "weight.kg", new Date(0), new Date());
+        let intelligenceResult: any = null;
+        try {
+          intelligenceResult = goalId ? await healthGoalsService.getWeightGoalIntelligence(goalId) : null;
+        } catch {
+          intelligenceResult = null;
+        }
         if (!active) return;
+        setIntelligence(intelligenceResult);
         const all = (response.events ?? [])
           .map((event) => ({
             loggedValue: Number(event.loggedValue),
@@ -75,6 +84,7 @@ export default function TodayWeightGoal({ goal, fallbackWeight }: Props) {
         if (active) {
           setEvents([]);
           setBaselineWeight(null);
+          setIntelligence(null);
         }
       } finally {
         if (active) setLoading(false);
@@ -95,18 +105,21 @@ export default function TodayWeightGoal({ goal, fallbackWeight }: Props) {
 
   const journey = useMemo(() => journeyFor(goal), [goal]);
   const comparison = String(goal?.metricConfig?.comparison ?? goal?.comparison ?? "DECREASE_TO").toUpperCase();
+  const isMaintenanceGoal = comparison === "CLOSEST";
   const configuredTarget = numberValue(goal?.metricConfig?.frequencyTarget ?? goal?.targetValue);
   const fallback = numberValue(fallbackWeight);
   const patientWeight = numberValue(goal?.patient?.weightKg);
   const currentEvent = events[events.length - 1] ?? null;
   const currentWeight = currentEvent?.loggedValue ?? fallback ?? patientWeight;
   const startingWeight = baselineWeight ?? patientWeight ?? currentWeight;
-  const targetAmount = configuredTarget != null && configuredTarget > 0 ? configuredTarget : null;
+  const targetAmount = isMaintenanceGoal ? 0 : configuredTarget != null && configuredTarget > 0 ? configuredTarget : null;
   const targetWeight = comparison === "DECREASE_TO" && startingWeight != null && targetAmount != null
     ? startingWeight - targetAmount
     : comparison === "INCREASE_TO" && startingWeight != null && targetAmount != null
       ? startingWeight + targetAmount
-      : null;
+      : isMaintenanceGoal && startingWeight != null
+        ? startingWeight
+        : null;
   const goalCompleted = String(goal?.status ?? "").toUpperCase() === "ACHIEVED";
   const completedWeight = numberValue(goal?.currentValue ?? goal?.latestProgress?.currentValue ?? goal?.progress?.[0]?.currentValue);
   const journeyWeight = goalCompleted ? completedWeight ?? currentWeight : currentWeight;
