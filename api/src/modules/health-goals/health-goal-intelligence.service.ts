@@ -177,7 +177,6 @@ export class HealthGoalIntelligenceService {
     if (!goal) throw new NotFoundException('Health goal not found.');
 
     await this.syncGoalRelations(goal.patientId);
-
     const rows = await this.prisma.$queryRawUnsafe<RelationRow[]>(
       `SELECT r."id",r."sourceGoalId",r."targetGoalId",r."relationshipType",r."rationale",g."id" AS "relatedGoalId",g."title" AS "relatedTitle",g."category"::text AS "relatedCategory",g."status"::text AS "relatedStatus",g."targetValue"::double precision AS "relatedTargetValue",g."unit" AS "relatedUnit",g."targetDate" AS "relatedTargetDate" FROM "HealthGoalRelation" r INNER JOIN "HealthGoal" g ON g."id"=CASE WHEN r."sourceGoalId"=$1 THEN r."targetGoalId" ELSE r."sourceGoalId" END WHERE r."patientId"=$2 AND (r."sourceGoalId"=$1 OR r."targetGoalId"=$1) ORDER BY CASE WHEN r."relationshipType"='SUPPORTS' THEN 0 ELSE 1 END,g."category",g."title"`,
       goalId,
@@ -312,11 +311,13 @@ export class HealthGoalIntelligenceService {
 
     const age = ageFromDateOfBirth(goal.patient.person.dateOfBirth);
     const adultBmiApplicable = age == null || age >= 20;
+    // Directional weight goals store an absolute destination weight.
+    // Example: current 68 kg + INCREASE_TO + targetValue 100 = target weight 100 kg.
     const targetWeight =
-      comparison === 'INCREASE_TO' && baselineKg != null && targetAmount != null
-        ? baselineKg + targetAmount
-        : comparison === 'DECREASE_TO' && baselineKg != null && targetAmount != null
-          ? baselineKg - targetAmount
+      comparison === 'INCREASE_TO' && targetAmount != null
+        ? targetAmount
+        : comparison === 'DECREASE_TO' && targetAmount != null
+          ? targetAmount
           : comparison === 'CLOSEST'
             ? baselineKg
             : null;
@@ -357,8 +358,7 @@ export class HealthGoalIntelligenceService {
     });
     const activeConditionCount = await this.prisma.patientCondition.count({
       where: { healthPassport: { patientId: goal.patientId }, status: 'ACTIVE' },
-    });
-    const recentSymptomCount = await this.prisma.symptomLog.count({
+    });    const recentSymptomCount = await this.prisma.symptomLog.count({
       where: {
         clinicalEpisode: { patientId: goal.patientId },
         status: { in: ['ACTIVE', 'COMPLETED'] },
@@ -412,6 +412,10 @@ export class HealthGoalIntelligenceService {
       href: string;
       priority: 'PRIMARY' | 'SUPPORTING';
     };
+
+    const lowerScreeningWeight = heightCm != null && heightCm > 0 ? 18.5 * ((heightCm / 100) ** 2) : null;
+    const bmiCaution = goal.status !== 'ACHIEVED' && comparison === 'DECREASE_TO' && targetBmi != null && targetBmi < 18.5;
+    const currentBmiBelowRange = currentBmi != null && currentBmi < 18.5;
 
     const todayActions: TodayFocusAction[] = [];
 
@@ -537,8 +541,7 @@ export class HealthGoalIntelligenceService {
       clinicalContext: {
         activeMedicationCount,
         activeConditionCount,
-        recentSymptomCount,
-        symptomsDataAvailable: recentSymptomCount > 0,
+        recentSymptomCount,        symptomsDataAvailable: recentSymptomCount > 0,
       },
       relationships: relationshipData.relationships,
       recommendedSupportingGoals,
