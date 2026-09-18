@@ -9,7 +9,7 @@ export type WeightGoalIntelligence = {
   profile: { age: number | null; gender?: string | null; heightCm: number | null; currentWeightKg: number | null; currentBmi: number | null; baselineWeightKg: number | null; baselineBmi: number | null; adultBmiApplicable: boolean };
   weight: { latestKg: number | null; average7dKg: number | null; average30dKg: number | null; changeKg: number | null; percentChange: number | null; trendKgPerWeek: number | null; dataPoints: number; maintenanceBand?: { min: number; max: number } | null; withinMaintenanceBand: boolean | null; targetWeightKg: number | null; targetBmi: number | null; status: "STABLE" | "DRIFTING_UP" | "DRIFTING_DOWN" | "NEEDS_REVIEW" | "INSUFFICIENT_DATA" };
   checkIn: { dataPoints: number; averageSleepHours: number | null; averageStress: number | null; averageExerciseMinutes: number | null; averageWaterIntakeMl: number | null };
-  clinicalContext: { activeMedicationCount: number; activeConditionCount: number; symptomsReported: boolean };
+  clinicalContext: { activeMedicationCount: number; activeConditionCount: number; recentSymptomCount: number; symptomsDataAvailable: boolean };
   relationships: Array<{ id: string; direction: string; relationshipType: string; rationale?: string | null; goal: { id: string; title: string; category: string; status: string; targetValue?: number | null; unit?: string | null; targetDate?: string | null } }>;
   recommendedSupportingGoals: Array<{ category: string; rationale: string }>;
 };
