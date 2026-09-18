@@ -155,7 +155,12 @@ export class PatientHealthGoalsController {
   @Delete(':id')
   async remove(@Param('id') id: string, @Req() request: AuthenticatedRequest) {
     const goal = await this.assertOwnGoal(id, this.userId(request));
-    await this.prisma.healthGoal.update({ where: { id: goal.id }, data: { status: 'CANCELLED', achievedAt: null } });
-    return { message: 'Health goal removed successfully.' };
+    await this.prisma.$transaction(async (tx) => {
+      await tx.healthGoalProgress.deleteMany({ where: { healthGoalId: goal.id } });
+      await tx.$executeRaw`DELETE FROM "HealthGoalMetricConfig" WHERE "healthGoalId" = ${goal.id}`;
+      await tx.$executeRaw`DELETE FROM "HealthGoalMetricEvent" WHERE "patientId" = ${goal.patientId} AND "source" = 'goal-baseline' AND "sourceId" = ${goal.id}`;
+      await tx.healthGoal.delete({ where: { id: goal.id } });
+    });
+    return { message: 'Health goal deleted successfully.' };
   }
 }
