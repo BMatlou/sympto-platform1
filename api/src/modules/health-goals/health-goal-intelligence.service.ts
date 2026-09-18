@@ -56,6 +56,19 @@ function average(values: number[]): number | null {
   return values.reduce((sum, value) => sum + value, 0) / values.length;
 }
 
+function southAfricaDayBounds(value = new Date()) {
+  const date = new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'Africa/Johannesburg',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).format(value);
+  const start = new Date(`${date}T00:00:00+02:00`);
+  const end = new Date(start);
+  end.setUTCDate(end.getUTCDate() + 1);
+  return { start, end };
+}
+
 function linearTrendKgPerWeek(events: WeightEvent[]): number | null {
   if (events.length < 2) return null;
   const t0 = events[0].at.getTime();
@@ -352,6 +365,121 @@ export class HealthGoalIntelligenceService {
       .map((rule) => ({ category: rule.category, rationale: rule.rationale }))
       .filter((item) => !relationshipData.relationships.some((relation) => String(relation.goal.category).toUpperCase() === item.category && relation.relationshipType === 'SUPPORTS'));
 
+    const { start: todayStart, end: todayEnd } = southAfricaDayBounds();
+    const todayJournal = await this.prisma.healthJournal.findFirst({
+      where: {
+        patientId: goal.patientId,
+        createdAt: { gte: todayStart, lt: todayEnd },
+        title: 'Daily Health Check-in',
+      },
+      orderBy: { createdAt: 'desc' },
+      select: {
+        id: true,
+        sleepHours: true,
+        stressLevel: true,
+        exerciseMinutes: true,
+        waterIntakeMl: true,
+        mood: true,
+      },
+    });
+
+    const latestWeightAt = cleanedEvents.length ? cleanedEvents[cleanedEvents.length - 1].at : null;
+    const weightDataNeedsRefresh = latestWeightAt == null || Date.now() - latestWeightAt.getTime() > 7 * 86400000;
+    const checkInNeedsCompletion = !todayJournal;
+    const exerciseSupport = relationshipData.relationships.find((relation) =>
+      relation.relationshipType === 'SUPPORTS' && String(relation.goal.category).toUpperCase() === 'EXERCISE',
+    );
+    const sleepSupport = relationshipData.relationships.find((relation) =>
+      relation.relationshipType === 'SUPPORTS' && String(relation.goal.category).toUpperCase() === 'SLEEP',
+    );
+    const nutritionSupport = relationshipData.relationships.find((relation) =>
+      relation.relationshipType === 'SUPPORTS' && String(relation.goal.category).toUpperCase() === 'NUTRITION',
+    );
+
+    type TodayFocusAction = {
+      id: string;
+      label: string;
+      description: string;
+      href: string;
+      priority: 'PRIMARY' | 'SUPPORTING';
+    };
+
+    const todayActions: TodayFocusAction[] = [];
+
+    if (goal.status !== 'ACHIEVED' && (bmiCaution || currentBmiBelowRange)) {
+      todayActions.push({
+        id: 'review-weight-goal',
+        label: 'Review your weight goal',
+        description: 'Your current weight/BMI needs the goal reviewed before pursuing further loss.',
+        href: reviewGoalHref,
+        priority: 'PRIMARY',
+      });
+    } else if (weightDataNeedsRefresh && goal.status !== 'ACHIEVED') {
+      todayActions.push({
+        id: 'record-weight',
+        label: 'Update your recent weight',
+        description: 'Add a recent measurement so Sympto can compare your trend with this goal.',
+        href: '/health-vitals',
+        priority: 'PRIMARY',
+      });
+    } else if (checkInNeedsCompletion) {
+      todayActions.push({
+        id: 'complete-check-in',
+        label: 'Complete today’s health check-in',
+        description: 'Sleep, stress, hydration, mood and movement give your weight goal useful context.',
+        href: '#daily-health-check-in',
+        priority: 'PRIMARY',
+      });
+    } else if (isMaintenanceGoal && maintenanceStatus === 'NEEDS_REVIEW') {
+      todayActions.push({
+        id: 'review-maintenance-trend',
+        label: 'Review your weight trend',
+        description: 'Your recent average has moved outside the maintenance band.',
+        href: '#today-goals',
+        priority: 'PRIMARY',
+      });
+    } else {
+      todayActions.push({
+        id: isMaintenanceGoal ? 'maintain-routine' : comparison === 'INCREASE_TO' ? 'support-weight-gain' : 'support-weight-loss',
+        label: isMaintenanceGoal ? 'Keep today’s routine' : 'Keep today’s plan moving',
+        description: isMaintenanceGoal
+          ? 'Your recent weight pattern is stable; use today’s check-in to keep the picture current.'
+          : 'Use the supporting habits already connected to this goal rather than adding another task list.',
+        href: '#daily-health-check-in',
+        priority: 'PRIMARY',
+      });
+    }
+
+    if (exerciseSupport && (!todayJournal || Number(todayJournal.exerciseMinutes ?? 0) <= 0)) {
+      todayActions.push({
+        id: 'movement',
+        label: 'Log movement',
+        description: `Your connected exercise goal is “${String(exerciseSupport.goal.title)}”.`,
+        href: '#daily-health-check-in',
+        priority: 'SUPPORTING',
+      });
+    }
+
+    if (sleepSupport && (!todayJournal || todayJournal.sleepHours == null)) {
+      todayActions.push({
+        id: 'sleep',
+        label: 'Log your sleep',
+        description: `Your connected sleep goal is “${String(sleepSupport.goal.title)}”.`,
+        href: '#daily-health-check-in',
+        priority: 'SUPPORTING',
+      });
+    }
+
+    if (nutritionSupport) {
+      todayActions.push({
+        id: 'nutrition-goal',
+        label: 'Check your nutrition goal',
+        description: 'Use the goal you already have connected to this weight journey.',
+        href: `/health-goals#goal-${encodeURIComponent(String(nutritionSupport.goal.id))}`,
+        priority: 'SUPPORTING',
+      });
+    }
+
     return {
       goal: {
         id: goal.id,
@@ -403,6 +531,14 @@ export class HealthGoalIntelligenceService {
       },
       relationships: relationshipData.relationships,
       recommendedSupportingGoals,
+      todayFocus: {
+        actions: todayActions.slice(0, 3),
+        dataFreshness: {
+          weightDataNeedsRefresh,
+          checkInNeedsCompletion,
+          latestWeightAt,
+        },
+      },
     };
   }
 }
