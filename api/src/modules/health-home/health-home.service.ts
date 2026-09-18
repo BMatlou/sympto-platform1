@@ -112,14 +112,14 @@ export class HealthHomeService {
 
     // Normalize at the API boundary so HTML number fields and JSON numeric
     // strings are handled consistently rather than being rejected as strings.
-    const systolicPressure = optionalNumber('Systolic pressure', systolicPressure);
-    const diastolicPressure = optionalNumber('Diastolic pressure', diastolicPressure);
-    const restingHeartRate = optionalNumber('Heart rate', restingHeartRate);
-    const respiratoryRate = optionalNumber('Respiratory rate', respiratoryRate);
-    const oxygenSaturation = optionalNumber('Oxygen saturation', oxygenSaturation);
-    const bodyTemperature = normalizeBodyTemperatureCelsius(bodyTemperature);
-    const weightKg = optionalNumber('Weight', weightKg);
-    const heightCm = optionalNumber('Height', heightCm);
+    const systolicPressure = optionalNumber('Systolic pressure', input.systolicPressure);
+    const diastolicPressure = optionalNumber('Diastolic pressure', input.diastolicPressure);
+    const restingHeartRate = optionalNumber('Heart rate', input.restingHeartRate);
+    const respiratoryRate = optionalNumber('Respiratory rate', input.respiratoryRate);
+    const oxygenSaturation = optionalNumber('Oxygen saturation', input.oxygenSaturation);
+    const bodyTemperature = normalizeBodyTemperatureCelsius(input.bodyTemperature);
+    const weightKg = optionalNumber('Weight', input.weightKg);
+    const heightCm = optionalNumber('Height', input.heightCm);
 
     if ([systolicPressure, diastolicPressure, restingHeartRate, respiratoryRate, oxygenSaturation, bodyTemperature, weightKg, heightCm].every((value) => value === undefined)) {
       throw new BadRequestException('At least one vital must be entered.');
