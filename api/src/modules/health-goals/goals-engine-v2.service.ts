@@ -138,7 +138,7 @@ export class GoalsEngineService {
           },
         });
       });
-      updated.push({ goalId: goal.id, metricType: config.metricType, metricKey: config.metricKey, frequency: config.frequency, strategy: evaluated.strategy, target, currentValue: evaluated.currentValue, progressPercent: evaluated.progressPercent, status, guidanceText: evaluated.guidanceText });
+      updated.push({ goalId: goal.id, metricType: config.metricType, metricKey: config.metricKey, frequency: config.frequency, strategy: evaluated.strategy, target, currentValue: evaluated.currentValue, progressPercent: evaluated.progressPercent, status: progressStatus, guidanceText: evaluated.guidanceText });
     }
     return updated;
   }
