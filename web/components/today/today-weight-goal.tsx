@@ -133,21 +133,38 @@ export default function TodayWeightGoal({ goal, fallbackWeight }: Props) {
   const expectedProgress = journey.totalDays != null && journey.totalDays > 0 ? Math.min(100, Math.max(0, ((journey.journeyDay - 1) / journey.totalDays) * 100)) : null;
   const maintenanceStatus = String(intelligence?.weight?.status ?? "INSUFFICIENT_DATA").toUpperCase();
   const maintenanceStable = intelligence?.weight?.withinMaintenanceBand === true || maintenanceStatus === "STABLE";
+  const maintenanceAverage = numberValue(intelligence?.weight?.average7dKg) ?? currentWeight;
+  const maintenanceTolerance = startingWeight != null ? Math.max(0.5, Math.abs(startingWeight) * 0.02) : null;
+  const maintenanceProgress = isMaintenanceGoal && startingWeight != null && maintenanceAverage != null && maintenanceTolerance != null
+    ? Math.round(Math.max(50, Math.min(100, 100 - (Math.abs(maintenanceAverage - startingWeight) / maintenanceTolerance) * 50)))
+    : 0;
+
   const targetReached = isMaintenanceGoal ? false : goalCompleted || (targetWeight != null && journeyWeight != null && (comparison === "DECREASE_TO" ? journeyWeight <= targetWeight : journeyWeight >= targetWeight));
   const totalPlannedChange = !isMaintenanceGoal && targetWeight != null && startingWeight != null
     ? Math.abs(targetWeight - startingWeight)
     : null;
+  const directedMovement = !isMaintenanceGoal && startingWeight != null && journeyWeight != null
+    ? comparison === "DECREASE_TO"
+      ? startingWeight - journeyWeight
+      : journeyWeight - startingWeight
+    : null;
+  const directionalProgress = !isMaintenanceGoal && totalPlannedChange != null
+    ? totalPlannedChange === 0
+      ? targetWeight != null && journeyWeight != null && Math.abs(journeyWeight - targetWeight) <= 0.5 ? 100 : 0
+      : Math.max(-100, Math.min(100, ((directedMovement ?? 0) / totalPlannedChange) * 100))
+    : 0;
   const progress = isMaintenanceGoal
-    ? (expectedProgress ?? 0)
+    ? maintenanceProgress
     : goalCompleted
       ? 100
-      : totalPlannedChange === 0 && targetWeight != null && journeyWeight != null
-        ? Math.abs(journeyWeight - targetWeight) <= 0.5 ? 100 : 0
-        : totalPlannedChange != null && actualChange != null
-          ? Math.round(Math.min(100, Math.max(0, (actualChange / totalPlannedChange) * 100)))
-          : 0;
+      : directionalProgress;
+  const progressMagnitude = Math.min(100, Math.abs(progress));
+  const progressLabel = isMaintenanceGoal
+    ? `${progress}% stability`
+    : `${progress > 0 ? "+" : ""}${progress}% progress`;
+  const progressMovingAway = !isMaintenanceGoal && !goalCompleted && progress < 0;
   const onTrack = isMaintenanceGoal
-    ? maintenanceStatus === "STABLE" || maintenanceStable
+    ? maintenanceStable
     : goalCompleted || targetReached || expectedProgress == null || progress >= expectedProgress - 10;
   const weeksLeft = journey.daysLeft != null ? journey.daysLeft / 7 : null;
   const remainingGoalAmount = isMaintenanceGoal
@@ -161,7 +178,6 @@ export default function TodayWeightGoal({ goal, fallbackWeight }: Props) {
         : null;
   const requiredWeeklyChange = goalCompleted || targetReached ? 0 : remainingGoalAmount != null && weeksLeft && weeksLeft > 0 ? remainingGoalAmount / weeksLeft : null;
   const requiredDailyChange = goalCompleted || targetReached ? 0 : remainingGoalAmount != null && journey.daysLeft != null && journey.daysLeft > 0 ? remainingGoalAmount / journey.daysLeft : null;
-
   const heightCm = numberValue(intelligence?.profile?.heightCm ?? goal?.patient?.heightCm ?? goal?.heightCm);
   const currentBmi = currentWeight != null && heightCm != null && heightCm > 0 ? currentWeight / ((heightCm / 100) ** 2) : null;
   const startingBmi = startingWeight != null && heightCm != null && heightCm > 0 ? startingWeight / ((heightCm / 100) ** 2) : null;
@@ -186,9 +202,9 @@ export default function TodayWeightGoal({ goal, fallbackWeight }: Props) {
       ? maintenanceStatus === "NEEDS_REVIEW"
         ? "Weight trend needs review"
         : maintenanceStatus === "DRIFTING_UP"
-          ? "Weight trending above baseline"
+          ? "Weight trend moving upward"
           : maintenanceStatus === "DRIFTING_DOWN"
-            ? "Weight trending below baseline"
+            ? "Weight trend moving downward"
             : maintenanceStatus === "INSUFFICIENT_DATA"
               ? "Not enough recent weight data"
               : "Maintaining your baseline"
@@ -299,13 +315,13 @@ export default function TodayWeightGoal({ goal, fallbackWeight }: Props) {
                   <p className="mt-2 text-[48px] font-black leading-none tracking-[-.08em]">{formatKg(displayWeight)}<span className="ml-1.5 text-lg font-bold tracking-normal text-white/55">kg</span></p>
                   <div className="mt-4 flex flex-wrap items-center gap-2">
                     <span className="rounded-full bg-white/10 px-3 py-1.5 text-[10px] font-black text-white/80 ring-1 ring-white/10">{targetLabel}</span>
-                    <span className={`rounded-full px-3 py-1.5 text-[10px] font-black ${goalCompleted ? "bg-[#24c1c4]/20 text-[#7de6e7]" : targetReached ? "bg-[#24c1c4]/20 text-[#7de6e7]" : "bg-white/10 text-white/70 ring-1 ring-white/10"}`}>{progress}% progress</span>
+                    <span className={`rounded-full px-3 py-1.5 text-[10px] font-black ${goalCompleted || (!progressMovingAway && (targetReached || maintenanceStable)) ? "bg-[#24c1c4]/20 text-[#7de6e7]" : progressMovingAway ? "bg-[#f59e0b]/20 text-[#ffd58a]" : "bg-white/10 text-white/70 ring-1 ring-white/10"}`}>{progressLabel}</span>
                   </div>
                 </div>
                 <div className="mx-auto sm:mx-0">
-                  <div className="relative grid h-[132px] w-[132px] place-items-center rounded-full" style={{ background: `conic-gradient(#24c1c4 0 ${progress}%, rgba(255,255,255,.12) ${progress}% 100%)` }}>
+                  <div className="relative grid h-[132px] w-[132px] place-items-center rounded-full" style={{ background: `conic-gradient(${progressMovingAway ? "#f59e0b" : "#24c1c4"} 0 ${progressMagnitude}%, rgba(255,255,255,.12) ${progressMagnitude}% 100%)` }}>
                     <div className="absolute inset-[9px] rounded-full bg-[#0b2d54] ring-1 ring-white/10" />
-                    <div className="relative z-10 text-center"><p className="text-[30px] font-black leading-none tracking-[-.07em]">{progress}%</p><p className="mt-1 text-[9px] font-black uppercase tracking-[.15em] text-white/45">progress</p></div>
+                    <div className="relative z-10 text-center"><p className="text-[30px] font-black leading-none tracking-[-.07em]">{isMaintenanceGoal ? progress : `${progress > 0 ? "+" : ""}${progress}%`}</p><p className="mt-1 text-[9px] font-black uppercase tracking-[.15em] text-white/45">{isMaintenanceGoal ? "stability" : progressMovingAway ? "moving away" : "progress"}</p></div>
                   </div>
                 </div>
               </div>
