@@ -7,11 +7,11 @@ import { healthGoalsService } from "@/services/health-goals.service";
 
 export interface AlcoholGoalData {
   id?: string;
-  currentValue: number;
-  targetValue: number;
-  startedAt: string;
-  targetDate: string;
-  createdAt?: string;
+  currentValue?: number | string | null;
+  targetValue?: number | string | null;
+  startedAt?: string | null;
+  targetDate?: string | null;
+  createdAt?: string | null;
   metricConfig?: { frequencyTarget?: number | string | null } | null;
   frequencyTarget?: number | string | null;
 }
@@ -65,7 +65,7 @@ function currentWeekNumber(startedAt: string) {
   return Math.max(1, Math.floor(days / 7) + 1);
 }
 
-function daysUntilTarget(targetDate: string) {
+function daysUntilTarget(targetDate: string | null | undefined) {
   const target = calendarMidnight(targetDate);
   const today = calendarMidnight(new Date());
   if (!target || !today) return 0;
@@ -125,7 +125,7 @@ export const AlcoholGoalCard: React.FC<AlcoholGoalCardProps> = ({ goal, onUpdate
   const programDay = currentProgramDay(goal.startedAt || goal.createdAt || new Date().toISOString());
   const week = currentWeekNumber(goal.startedAt || goal.createdAt || new Date().toISOString());
   const targetDaysLeft = useMemo(() => daysUntilTarget(goal.targetDate), [goal.targetDate]);
-  const targetDateLabel = useMemo(() => formatTargetDate(goal.targetDate), [goal.targetDate]);
+  const targetDateLabel = useMemo(() => goal.targetDate ? formatTargetDate(goal.targetDate) : "No target date", [goal.targetDate]);
 
   async function addDrinks() {
     const drinks = Number(draft);
