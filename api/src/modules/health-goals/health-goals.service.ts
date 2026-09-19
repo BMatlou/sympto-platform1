@@ -219,53 +219,7 @@ export class HealthGoalsService {
           : currentValue > baseline
             ? HealthGoalProgressStatus.DECLINING
             : HealthGoalProgressStatus.IMPROVING;
-      } else {
-        const targetWeight = comparison === 'INCREASE_TO'
-          ? baseline + requestedChangeKg
-          : baseline - requestedChangeKg;
-        const directedMovement = comparison === 'INCREASE_TO'
-          ? currentValue - baseline
-          : baseline - currentValue;
-        progressPercent = requestedChangeKg === 0
-          ? Math.abs(currentValue - targetWeight) <= 0.5 ? 100 : 0
-          : Math.max(-100, Math.min(100, (directedMovement / requestedChangeKg) * 100));
-        const achieved = comparison === 'INCREASE_TO'
-          ? currentValue >= targetWeight
-          : currentValue <= targetWeight;
-        progressStatus = achieved && !recurring
-          ? HealthGoalProgressStatus.ACHIEVED
-          : achieved
-            ? HealthGoalProgressStatus.ON_TRACK
-            : directedMovement > 0.01
-              ? HealthGoalProgressStatus.IMPROVING
-              : directedMovement < -0.01
-                ? HealthGoalProgressStatus.DECLINING
-                : HealthGoalProgressStatus.STAGNANT;
-        terminal = progressStatus === HealthGoalProgressStatus.ACHIEVED && !recurring;
-      }
-    } else {
-        const targetWeight = comparison === 'INCREASE_TO'
-          ? baseline + requestedChangeKg
-          : baseline - requestedChangeKg;
-        const movement = comparison === 'INCREASE_TO'
-          ? Math.max(currentValue - baseline, 0)
-          : Math.max(baseline - currentValue, 0);
-        progressPercent = requestedChangeKg === 0
-          ? Math.abs(currentValue - targetWeight) <= 0.5 ? 100 : 0
-          : Math.max(0, Math.min(100, (movement / requestedChangeKg) * 100));
-        const achieved = comparison === 'INCREASE_TO'
-          ? currentValue >= targetWeight
-          : currentValue <= targetWeight;
-        progressStatus = achieved && !recurring
-          ? HealthGoalProgressStatus.ACHIEVED
-          : achieved
-            ? HealthGoalProgressStatus.ON_TRACK
-            : movement > 0
-              ? HealthGoalProgressStatus.IMPROVING
-              : HealthGoalProgressStatus.STAGNANT;
-        terminal = progressStatus === HealthGoalProgressStatus.ACHIEVED && !recurring;
-      }
-    } else {
+      }    } else {
       const targetValue = goal.targetValue == null ? null : Number(goal.targetValue);
       const previousValue = goal.currentValue == null ? null : Number(goal.currentValue);
       const isMaintenanceGoal = comparison === 'CLOSEST';
