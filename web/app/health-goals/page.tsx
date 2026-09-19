@@ -7,7 +7,7 @@ import { useSearchParams } from "next/navigation";
 import { toast } from "sonner";
 import ProtectedRoute from "@/components/auth/protected-route";
 import { useDashboard } from "@/hooks/use-dashboard";
-import { healthGoalsService } from "@/services/health-goals.service";
+import { healthGoalsService, type HealthGoalInput } from "@/services/health-goals.service";
 import { TextField } from "@/components/ui/forms/TextField";
 
 type GoalDraft = {
@@ -210,8 +210,8 @@ export default function HealthGoalsPage() {
       const height = Number(dashboard?.patient?.heightCm);      const analysis = weightAdvice(Number.isFinite(weight) ? weight : null, Number.isFinite(height) ? height : null, amount, draft.weightDirection, draft.targetDate);      if (!analysis) { toast.error(draft.weightDirection === "MAINTAIN" ? "Add your current weight before setting a weight-maintenance goal." : "Add your current weight and height before setting a weight goal."); return; }
     }    try {
       setSaving(true);
-      const comparison = draft.category === "WEIGHT" ? draft.weightDirection === "GAIN" ? "INCREASE_TO" : draft.weightDirection === "MAINTAIN" ? "CLOSEST" : "DECREASE_TO" : config.comparison;
-      const input = { patientId: dashboard.patient.id, title: draft.title.trim(), description: draft.description.trim() || undefined, category: config.value, priority: draft.priority, targetValue: draft.targetValue, unit: draft.unit || config.unit || undefined, targetDate: draft.targetDate || undefined, metricType: config.metricType, metricKey: config.metricKey, frequency: config.frequency, frequencyTarget: draft.targetValue, aggregation: config.aggregation, comparison };
+      const comparison: HealthGoalInput["comparison"] = draft.category === "WEIGHT" ? draft.weightDirection === "GAIN" ? "INCREASE_TO" : draft.weightDirection === "MAINTAIN" ? "CLOSEST" : "DECREASE_TO" : config.comparison;
+      const input: HealthGoalInput = { patientId: dashboard.patient.id, title: draft.title.trim(), description: draft.description.trim() || undefined, category: config.value, priority: draft.priority, targetValue: draft.targetValue, unit: draft.unit || config.unit || undefined, targetDate: draft.targetDate || undefined, metricType: config.metricType, metricKey: config.metricKey, frequency: config.frequency, frequencyTarget: draft.targetValue, aggregation: config.aggregation, comparison };
       if (editingId) {
         await healthGoalsService.update(editingId, input);
         await healthGoalsService.configureMetric(editingId, { metricType: config.metricType, metricKey: config.metricKey, frequency: config.frequency, frequencyTarget: draft.targetValue, aggregation: config.aggregation, comparison });
