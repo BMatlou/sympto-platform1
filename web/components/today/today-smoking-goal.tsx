@@ -5,7 +5,7 @@ import { ArrowRight, Cigarette } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { healthGoalsService } from "@/services/health-goals.service";
 
-type Props = { goal: any };
+type Props = { goal: any; onUpdated?: () => void | Promise<void> };
 
 function localDayKey(date = new Date()) {
   const parts = new Intl.DateTimeFormat("en-GB", { timeZone: "Africa/Johannesburg", year: "numeric", month: "2-digit", day: "2-digit" }).formatToParts(date);
@@ -32,7 +32,7 @@ function calendarMidnight(value: unknown) {
   return new Date(date.getFullYear(), date.getMonth(), date.getDate());
 }
 
-export default function TodaySmokingGoal({ goal }: Props) {
+export default function TodaySmokingGoal({ goal, onUpdated }: Props) {
   const [todayLogged, setTodayLogged] = useState<number | null>(null);
   const [draft, setDraft] = useState("");
   const [open, setOpen] = useState(false);
@@ -91,6 +91,9 @@ export default function TodaySmokingGoal({ goal }: Props) {
       setTodayLogged(cigarettes);
       setDraft(String(cigarettes));
       setOpen(false);
+      window.dispatchEvent(new Event("sympto:health-goal-updated"));
+      window.dispatchEvent(new Event("sympto:health-checkin-updated"));
+      await onUpdated?.();
     } finally {
       setSaving(false);
     }
