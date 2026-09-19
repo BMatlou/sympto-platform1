@@ -17,10 +17,7 @@ import {
   Smartphone,
 } from "lucide-react";
 import ProtectedRoute from "@/components/auth/protected-route";
-import {
-  patientNotificationsService,
-  type NotificationPreference,
-} from "@/services/patient-notifications.service";
+import { patientNotificationsService } from "@/services/patient-notifications.service";
 
 const types = [
   { key: "APPOINTMENT", label: "Appointments", description: "Upcoming visits, changes and care scheduling.", icon: CalendarDays },
@@ -52,6 +49,7 @@ function preferenceKey(type: string, channel: string) {
 
 export default function NotificationPreferencesPage() {
   const [preferences, setPreferences] = useState<PreferenceState>({});
+  const [savedCount, setSavedCount] = useState(0);
   const [loading, setLoading] = useState(true);
   const [savingKey, setSavingKey] = useState<string | null>(null);
   const [notice, setNotice] = useState("");
@@ -62,6 +60,7 @@ export default function NotificationPreferencesPage() {
       setLoading(true);
       setError("");
       const saved = await patientNotificationsService.getPreferences();
+      setSavedCount(saved.length);
       const next: PreferenceState = {};
       for (const preference of saved) {
         next[preferenceKey(preference.notificationType, preference.channel)] = preference.enabled;
@@ -78,13 +77,9 @@ export default function NotificationPreferencesPage() {
     void load();
   }, [load]);
 
-  const enabledCount = useMemo(
-    () => Object.values(preferences).filter(Boolean).length,
-    [preferences],
-  );
-
   async function toggle(type: string, channel: string) {
     const key = preferenceKey(type, channel);
+    const existingPreference = Object.prototype.hasOwnProperty.call(preferences, key);
     const previous = preferences[key] ?? true;
     const next = !previous;
 
@@ -99,6 +94,7 @@ export default function NotificationPreferencesPage() {
         channel,
         enabled: next,
       });
+      if (!existingPreference) setSavedCount((count) => count + 1);
       setNotice(`${channel === "IN_APP" ? "In-app" : channel} notifications for this category are now ${next ? "on" : "off"}.`);
     } catch {
       setPreferences((current) => ({ ...current, [key]: previous }));
@@ -116,7 +112,7 @@ export default function NotificationPreferencesPage() {
             <Link href="/notifications" className="inline-flex items-center gap-2 text-sm font-semibold text-[#0b2d54] hover:text-[#24c1c4]">
               <ArrowLeft className="h-4 w-4" />Back to Notifications
             </Link>
-            <span className="text-xs font-bold text-slate-400">{enabledCount} saved channel setting{enabledCount === 1 ? "" : "s"}</span>
+            <span className="text-xs font-bold text-slate-400">{savedCount} saved preference{savedCount === 1 ? "" : "s"}</span>
           </div>
         </header>
 
