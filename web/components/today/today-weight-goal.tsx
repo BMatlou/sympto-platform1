@@ -177,6 +177,23 @@ export default function TodayWeightGoal({ goal, fallbackWeight }: Props) {
         : null;
   const requiredWeeklyChange = goalCompleted || targetReached ? 0 : remainingGoalAmount != null && weeksLeft && weeksLeft > 0 ? remainingGoalAmount / weeksLeft : null;
   const requiredDailyChange = goalCompleted || targetReached ? 0 : remainingGoalAmount != null && journey.daysLeft != null && journey.daysLeft > 0 ? remainingGoalAmount / journey.daysLeft : null;
+  const weightPlan = intelligence?.weightPlan ?? null;
+  const healthContext = intelligence?.healthContext ?? null;
+  const planDailyRate = numberValue(weightPlan?.requiredDailyChangeKg);
+  const planWeeklyRate = numberValue(weightPlan?.requiredWeeklyChangeKg);
+  const planRemaining = numberValue(weightPlan?.remainingChangeKg);
+  const planDaysRemaining = numberValue(weightPlan?.daysRemaining);
+  const planTargetWeight = numberValue(weightPlan?.targetWeightKg) ?? targetWeight;
+  const contextGoals = Array.isArray(healthContext?.connectedGoals) ? healthContext.connectedGoals : connectedGoals;
+  const contextConditions = Array.isArray(healthContext?.activeConditions) ? healthContext.activeConditions : [];
+  const contextMedications = Array.isArray(healthContext?.activeMedications) ? healthContext.activeMedications : [];
+  const requiredRateMessage = goalCompleted
+    ? "This weight journey is complete. Start a new goal if you want to set a new destination."
+    : isMaintenanceGoal
+      ? `Maintain around ${formatKg(planTargetWeight)} kg. No planned net loss or gain is required; keep your recent average within the maintenance band shown below.`
+      : planDailyRate != null && planWeeklyRate != null && planDaysRemaining != null
+        ? `To reach ${formatKg(planTargetWeight)} kg by ${formatDate(journey.targetDate)}, you need to ${comparison === "INCREASE_TO" ? "gain" : "lose"} about ${formatRate(planDailyRate)} kg/day or ${formatRate(planWeeklyRate)} kg/week from your current recorded weight. ${planRemaining != null ? `${formatKg(planRemaining)} kg remains.` : ""}`
+        : `Set a target date to calculate the daily and weekly rate needed to reach ${formatKg(planTargetWeight)} kg.`;
   const heightCm = numberValue(intelligence?.profile?.heightCm ?? goal?.patient?.heightCm ?? goal?.heightCm);
   const currentBmi = currentWeight != null && heightCm != null && heightCm > 0 ? currentWeight / ((heightCm / 100) ** 2) : null;
   const startingBmi = startingWeight != null && heightCm != null && heightCm > 0 ? startingWeight / ((heightCm / 100) ** 2) : null;
@@ -399,6 +416,34 @@ export default function TodayWeightGoal({ goal, fallbackWeight }: Props) {
           <div className={`mt-4 rounded-[20px] border px-4 py-3.5 text-[10px] font-semibold leading-5 ${goalCompleted ? "border-[#dcebed] bg-[#f4fbfa] text-[#496a73]" : goalNeedsReview ? "border-amber-200 bg-amber-50 text-amber-900" : "border-[#dcebed] bg-[#f4fbfa] text-[#496a73]"}`}>
             <p className="font-black uppercase tracking-[.12em]">{goalCompleted ? "Completed weight goal" : "Weight &amp; BMI guidance"}</p>
             <p className="mt-1.5">{trendMessage}</p>
+            <div className="mt-3 rounded-[16px] border border-[#dcebed] bg-white/80 px-3.5 py-3">
+              <p className="text-[9px] font-black uppercase tracking-[.12em] text-[#0b6f73]">Plan to target date</p>
+              <p className="mt-1 text-[10px] font-bold leading-5 text-[#0b2d54]">{requiredRateMessage}</p>
+            </div>
+            {(contextGoals.length > 0 || contextConditions.length > 0 || contextMedications.length > 0) && (
+              <div className="mt-3 rounded-[16px] border border-[#dcebed] bg-white/70 px-3.5 py-3">
+                <p className="text-[9px] font-black uppercase tracking-[.12em] text-[#82939f]">Health context considered</p>
+                {contextGoals.length > 0 && (
+                  <p className="mt-1 text-[10px] leading-5 text-[#496a73]">
+                    Connected goals: {contextGoals.slice(0, 4).map((item: any) => String(item.title ?? item.goal?.title ?? item.category ?? "Goal")).join(" · ")}
+                    {contextGoals.length > 4 ? ` · +${contextGoals.length - 4} more` : ""}.
+                  </p>
+                )}
+                {contextConditions.length > 0 && (
+                  <p className="mt-1 text-[10px] leading-5 text-[#496a73]">
+                    Active conditions: {contextConditions.slice(0, 4).map((item: any) => String(item.name)).join(" · ")}
+                    {contextConditions.length > 4 ? ` · +${contextConditions.length - 4} more` : ""}.
+                  </p>
+                )}
+                {contextMedications.length > 0 && (
+                  <p className="mt-1 text-[10px] leading-5 text-[#496a73]">
+                    Active medications: {contextMedications.slice(0, 4).map((item: any) => String(item.name)).join(" · ")}
+                    {contextMedications.length > 4 ? ` · +${contextMedications.length - 4} more` : ""}.
+                  </p>
+                )}
+                <p className="mt-1 text-[9px] leading-4 text-[#8a9aa7]">These records provide context for the weight journey; they do not by themselves establish a cause-and-effect relationship or replace clinical review.</p>
+              </div>
+            )}
             {!goalCompleted && guidanceMessage && <p className="mt-1.5">{guidanceMessage}</p>}
             {!goalCompleted && bmiChange != null && Math.abs(bmiChange) >= 0.1 && <p className="mt-1.5">BMI change since goal start: {bmiChange > 0 ? "+" : ""}{bmiChange.toFixed(1)}.</p>}
             {!goalCompleted && gainTargetCaution && upperScreeningWeight != null && <p className="mt-1.5">At your recorded height, BMI 24.9 corresponds to about {formatKg(upperScreeningWeight)} kg. This is screening context, not a required target.</p>}
@@ -417,7 +462,7 @@ export default function TodayWeightGoal({ goal, fallbackWeight }: Props) {
           <span>{goalCompleted ? "Completed journey" : `Day ${journey.journeyDay} · ${journey.daysLeft === null ? "Journey active" : journey.daysLeft === 0 ? "Target date today" : `${journey.daysLeft} days left`}`}</span>
           {goalCompleted ? <Link href="/health-goals" className="inline-flex min-h-9 shrink-0 items-center justify-center gap-1.5 rounded-xl px-3 text-[10px] font-black text-[#0b2d54] hover:bg-white">New goal <ArrowRight className="h-3 w-3" /></Link> : <Link href="/health-goals" className="inline-flex min-h-9 shrink-0 items-center justify-center gap-1.5 rounded-xl px-3 text-[10px] font-black text-[#0b2d54] hover:bg-white">View goal <ArrowRight className="h-3 w-3" /></Link>}
         </div>
-        <p className="mt-2 text-[9px] leading-4 text-[#9aa8b1]">For weight goals, the measurement recorded when this goal was created or last revised is the baseline. Lose and Gain goals use an absolute target body weight; Maintenance goals use recent weight averages and trend rather than requiring an exact daily match to the baseline. Completed weight goals remain at 100% as history.</p>
+        <p className="mt-2 text-[9px] leading-4 text-[#9aa8b1]">For weight goals, the measurement recorded when this goal was created or last revised is the baseline. Lose and Gain goals store the requested amount of weight change and derive the destination from the baseline; Maintenance goals use recent weight averages and trend rather than requiring an exact daily match to the baseline. Completed weight goals remain at 100% as history.</p>
       </div>
     </article>
   );
