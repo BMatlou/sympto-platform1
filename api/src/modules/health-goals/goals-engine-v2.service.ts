@@ -188,8 +188,9 @@ export class GoalsEngineService {
     if (config.comparison === 'CLOSEST') {
       const targetWeight = baseline;
       const deviation = Math.abs(latest - targetWeight);
+      const maintenanceToleranceKg = Math.max(0.5, Math.abs(baseline) * 0.02);
       const stabilityProgressPercent = Math.max(0, Math.min(100, (1 - (deviation / Math.max(Math.abs(baseline), 0.0001))) * 100));
-      const guidanceText = deviation <= toleranceKg
+      const guidanceText = deviation <= maintenanceToleranceKg
         ? title + ': weight is within the maintenance range around your ' + targetWeight.toFixed(1) + ' kg baseline. Keep tracking your current weight.'
         : title + ': weight is ' + deviation.toFixed(1) + ' kg from the maintenance baseline of ' + targetWeight.toFixed(1) + ' kg. Keep tracking the trend and review a sustained change.';
       // Maintenance is an ongoing state: progress represents stability around the baseline,
