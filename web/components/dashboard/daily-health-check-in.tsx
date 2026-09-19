@@ -175,7 +175,6 @@ export default function DailyHealthCheckIn({ embedded = false, goals = [] }: { e
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
   const hasLoaded = useRef(false);
-  const syncingGoalIds = useRef(new Set<string>());
 
   const hydrationGoal = useMemo(() => goals.find((goal) => goalMatches(goal, "HYDRATION", ["water", "hydration", "hydrate"])), [goals]);
   const exerciseGoal = useMemo(() => goals.find((goal) => goalMatches(goal, "EXERCISE", ["exercise", "movement", "activity", "walk", "steps"])), [goals]);
@@ -251,18 +250,6 @@ export default function DailyHealthCheckIn({ embedded = false, goals = [] }: { e
     return () => { active = false; window.clearInterval(interval); window.removeEventListener("sympto:health-checkin-updated", handleUpdated); };
   }, [exerciseGoal?.id]);
 
-  async function syncGoal(goal: Goal | undefined, category: "HYDRATION" | "SLEEP", currentValue: number) {
-    if (!hasLoaded.current || !goal?.id || syncingGoalIds.current.has(goal.id)) return;
-    syncingGoalIds.current.add(goal.id);
-    try {
-      await healthGoalsService.recordProgress(goal.id, currentValue, `Daily check-in ${category.toLowerCase()} update.`);
-    } catch {
-      setError("Today’s check-in changed, but the linked health goal could not be updated.");
-    } finally {
-      syncingGoalIds.current.delete(goal.id);
-    }
-  }
-
   async function save() {
     setSaving(true);
     setError("");
@@ -333,15 +320,15 @@ export default function DailyHealthCheckIn({ embedded = false, goals = [] }: { e
           <div className="mt-3 rounded-[22px] bg-white p-4 ring-1 ring-[#e4edef]">
             <div className="flex items-center justify-between gap-3"><div className="flex items-center gap-3"><span className="grid h-9 w-9 place-items-center rounded-[13px] bg-[#eef2ff] text-[#5265a9]"><Moon className="h-4 w-4" /></span><div><p className="text-[9px] font-black uppercase tracking-[.15em] text-[#8999a5]">Rest & recovery</p><p className="mt-0.5 text-[20px] font-black tracking-[-.05em] text-[#0b2d54]">{sleepHours}h</p></div></div><span className="rounded-full bg-[#eef2ff] px-2.5 py-1 text-[9px] font-black text-[#5265a9]">{sleepProgress}%</span></div>
             <div className="mt-3 flex items-center justify-between gap-3 rounded-[17px] bg-[#f8f9ff] px-3 py-2.5"><span className="text-[9px] font-black text-[#66779b]">{effectiveSleepQuality ? sleepLabel(effectiveSleepQuality) : "Sleep hours not selected"}</span>{sleepGoal && <span className="text-[9px] font-bold text-[#8996b8]">Goal {sleepGoalHours}h</span>}</div>
-            <div className="mt-3 flex items-center justify-between rounded-[17px] bg-[#fbfdfe] px-3 py-2 ring-1 ring-[#e4edef]"><span className="text-[9px] font-black uppercase tracking-[.13em] text-[#8796a2]">Hours slept</span><div className="flex items-center gap-2"><button type="button" aria-label="Decrease sleep hours" onClick={() => { const next = Math.max(0, Number((sleepHours - .5).toFixed(1))); setSleepHours(next); void syncGoal(sleepGoal, "SLEEP", next); }} className="grid h-8 w-8 place-items-center rounded-[10px] bg-[#f0f5f6] text-[#0b2d54]"><Minus className="h-3.5 w-3.5" /></button><span className="min-w-10 text-center text-sm font-black text-[#0b2d54]">{sleepHours}h</span><button type="button" aria-label="Increase sleep hours" onClick={() => { const next = Math.min(24, Number((sleepHours + .5).toFixed(1))); setSleepHours(next); void syncGoal(sleepGoal, "SLEEP", next); }} className="grid h-8 w-8 place-items-center rounded-[10px] bg-[#e8f8f7] text-[#0b7b80]"><Plus className="h-3.5 w-3.5" /></button></div></div>
+            <div className="mt-3 flex items-center justify-between rounded-[17px] bg-[#fbfdfe] px-3 py-2 ring-1 ring-[#e4edef]"><span className="text-[9px] font-black uppercase tracking-[.13em] text-[#8796a2]">Hours slept</span><div className="flex items-center gap-2"><button type="button" aria-label="Decrease sleep hours" onClick={() => { const next = Math.max(0, Number((sleepHours - .5).toFixed(1))); setSleepHours(next); }} className="grid h-8 w-8 place-items-center rounded-[10px] bg-[#f0f5f6] text-[#0b2d54]"><Minus className="h-3.5 w-3.5" /></button><span className="min-w-10 text-center text-sm font-black text-[#0b2d54]">{sleepHours}h</span><button type="button" aria-label="Increase sleep hours" onClick={() => { const next = Math.min(24, Number((sleepHours + .5).toFixed(1))); setSleepHours(next); }} className="grid h-8 w-8 place-items-center rounded-[10px] bg-[#e8f8f7] text-[#0b7b80]"><Plus className="h-3.5 w-3.5" /></button></div></div>
           </div>
         </article>
 
         <article className="rounded-[27px] bg-white p-4 ring-1 ring-[#e3edef] shadow-[0_7px_22px_rgba(11,45,84,.025)] sm:p-5">
           <div className="flex items-center justify-between gap-3"><div className="flex items-center gap-3"><span className="grid h-9 w-9 place-items-center rounded-[13px] bg-[#e8f8f7] text-[#0b7b80]"><Droplets className="h-4 w-4" /></span><div><p className="text-[9px] font-black uppercase tracking-[.15em] text-[#82939f]">Hydration</p><p className="mt-0.5 text-[11px] text-[#8b9aa5]">Fill your glass as you go</p></div></div><strong className="text-[20px] font-black tracking-[-.05em] text-[#0b2d54]">{waterPercent}%</strong></div>
           <div className="mt-4 flex items-center gap-4"><div className="relative h-[92px] w-[66px] shrink-0 overflow-hidden rounded-[8px_8px_18px_18px] border-2 border-[#b5dfe4] bg-[#f8ffff]"><div className="absolute inset-x-0 bottom-0 bg-[#24c1c4] transition-all duration-500" style={{ height: `${waterPercent}%` }} /><div className="absolute inset-x-0 top-0 h-3 rounded-full border-2 border-[#b5dfe4] bg-white/70" /></div><div className="min-w-0"><p className="text-[27px] font-black leading-none tracking-[-.06em] text-[#0b2d54]">{waterIntakeMl.toLocaleString("en-ZA")} <span className="text-sm tracking-normal text-[#82939f]">ml</span></p><p className="mt-1 text-[10px] text-[#8796a2]">of {waterGoalMl >= 1000 ? `${waterGoalMl / 1000} L` : `${waterGoalMl} ml`} goal</p><p className="mt-1 text-[10px] font-bold text-[#0b7b80]">{waterRemaining > 0 ? `${waterRemaining.toLocaleString("en-ZA")} ml remaining` : "Goal reached"}</p></div></div>
-          <div className="mt-4 flex items-center justify-between rounded-[17px] bg-[#f8fbfb] px-3 py-2.5 ring-1 ring-[#e4edef]"><span className="text-[9px] font-black uppercase tracking-[.13em] text-[#83939e]">Per tap</span><span className="text-[11px] font-black text-[#0b2d54]">250 ml</span><div className="flex gap-1.5"><button type="button" aria-label="Decrease water intake" disabled={waterIntakeMl <= 0} onClick={() => { const next = Math.max(0, waterIntakeMl - WATER_STEP_ML); setWaterIntakeMl(next); void syncGoal(hydrationGoal, "HYDRATION", next); }} className="grid h-8 w-8 place-items-center rounded-[10px] bg-white text-[#0b2d54] ring-1 ring-[#dde9ec] disabled:opacity-30"><Minus className="h-3.5 w-3.5" /></button><button type="button" aria-label="Increase water intake" onClick={() => { const next = waterIntakeMl + WATER_STEP_ML; setWaterIntakeMl(next); void syncGoal(hydrationGoal, "HYDRATION", next); }} className="grid h-8 w-8 place-items-center rounded-[10px] bg-[#e8f8f7] text-[#0b7b80]"><Plus className="h-3.5 w-3.5" /></button></div></div>
-          <button type="button" onClick={() => { setWaterIntakeMl(0); void syncGoal(hydrationGoal, "HYDRATION", 0); }} className="mt-2 text-[9px] font-black text-[#8a99a4]">Reset water</button>
+          <div className="mt-4 flex items-center justify-between rounded-[17px] bg-[#f8fbfb] px-3 py-2.5 ring-1 ring-[#e4edef]"><span className="text-[9px] font-black uppercase tracking-[.13em] text-[#83939e]">Per tap</span><span className="text-[11px] font-black text-[#0b2d54]">250 ml</span><div className="flex gap-1.5"><button type="button" aria-label="Decrease water intake" disabled={waterIntakeMl <= 0} onClick={() => { const next = Math.max(0, waterIntakeMl - WATER_STEP_ML); setWaterIntakeMl(next); }} className="grid h-8 w-8 place-items-center rounded-[10px] bg-white text-[#0b2d54] ring-1 ring-[#dde9ec] disabled:opacity-30"><Minus className="h-3.5 w-3.5" /></button><button type="button" aria-label="Increase water intake" onClick={() => { const next = waterIntakeMl + WATER_STEP_ML; setWaterIntakeMl(next); }} className="grid h-8 w-8 place-items-center rounded-[10px] bg-[#e8f8f7] text-[#0b7b80]"><Plus className="h-3.5 w-3.5" /></button></div></div>
+          <button type="button" onClick={() => { setWaterIntakeMl(0); }} className="mt-2 text-[9px] font-black text-[#8a99a4]">Reset water</button>
         </article>
 
         <article className="rounded-[27px] bg-white p-4 ring-1 ring-[#e3edef] shadow-[0_7px_22px_rgba(11,45,84,.025)] sm:p-5">
