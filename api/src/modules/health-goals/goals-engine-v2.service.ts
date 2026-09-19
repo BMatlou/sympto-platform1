@@ -67,7 +67,7 @@ export class GoalsEngineService {
   }
 
   async recomputeAllMatchingGoals(patientId: string, now = new Date()) {
-    for (const metric of [['WEIGHT', 'weight.kg'], ['EXERCISE', 'exercise.minutes'], ['NUTRITION', 'nutrition.calories'], ['BLOOD_PRESSURE', 'blood_pressure.systolic'], ['BLOOD_PRESSURE', 'blood_pressure.diastolic'], ['BLOOD_GLUCOSE', 'blood_glucose.value'], ['CHOLESTEROL', 'cholesterol.total'], ['MEDICATION', 'medication.adherence'], ['SLEEP', 'sleep.hours'], ['MENTAL_HEALTH', 'mental.stress'], ['HYDRATION', 'hydration.ml'], ['SMOKING', 'smoking.cigarettes'], ['ALCOHOL', 'alcohol.frequency'], ['HEART_RATE', 'heart_rate.bpm']] as const) await this.restoreHistoricalAchievements(patientId, metric[0], metric[1], now);
+    for (const metric of [['WEIGHT', 'weight.kg'], ['EXERCISE', 'exercise.minutes'], ['NUTRITION', 'nutrition.calories'], ['BLOOD_PRESSURE', 'blood_pressure.systolic'], ['BLOOD_PRESSURE', 'blood_pressure.diastolic'], ['BLOOD_GLUCOSE', 'blood_glucose.value'], ['CHOLESTEROL', 'cholesterol.total'], ['MEDICATION', 'medication.adherence'], ['SLEEP', 'sleep.hours'], ['MENTAL_HEALTH', 'mental.stress'], ['HYDRATION', 'hydration.ml'], ['SMOKING', 'smoking.cigarettes'], ['ALCOHOL', 'alcohol.drinks'], ['ALCOHOL', 'alcohol.frequency'], ['HEART_RATE', 'heart_rate.bpm']] as const) await this.restoreHistoricalAchievements(patientId, metric[0], metric[1], now);
     const configs = await this.prisma.$queryRaw<GoalConfig[]>`SELECT c."healthGoalId", c."metricType", c."metricKey", c."frequency", c."frequencyTarget", c."guidanceText", c."aggregation", c."comparison" FROM "HealthGoalMetricConfig" c INNER JOIN "HealthGoal" g ON g."id" = c."healthGoalId" WHERE g."patientId" = ${patientId} AND g."status" = 'ACTIVE' AND NOT EXISTS (SELECT 1 FROM "HealthGoalProgress" p WHERE p."healthGoalId" = g."id" AND p."status" = 'ACHIEVED')`;
     return this.evaluateConfigs(patientId, configs, now);
   }
@@ -124,6 +124,18 @@ export class GoalsEngineService {
               : HealthGoalProgressStatus.STAGNANT
           : HealthGoalProgressStatus.IMPROVING;
       const terminal = evaluated.achieved && !recurring;
+      const progressPercentText = evaluated.progressPercent.toFixed(2);
+      const latestProgress = await this.prisma.healthGoalProgress.findFirst({
+        where: { healthGoalId: goal.id },
+        orderBy: { measuredAt: 'desc' },
+        select: { currentValue: true, progressPercent: true, status: true },
+      });
+      const sameProgress =
+        latestProgress != null &&
+        Number(latestProgress.currentValue ?? NaN) === Number(evaluated.currentValue) &&
+        String(latestProgress.progressPercent ?? '') === progressPercentText &&
+        latestProgress.status === progressStatus;
+
       await this.prisma.$transaction(async (tx) => {
         await tx.healthGoal.update({
           where: { id: goal.id },
@@ -133,18 +145,20 @@ export class GoalsEngineService {
             achievedAt: terminal ? now : null,
           },
         });
-        await tx.healthGoalProgress.create({
-          data: {
-            healthGoalId: goal.id,
-            currentValue: String(evaluated.currentValue),
-            progressPercent: String(evaluated.progressPercent.toFixed(2)),
-            status: progressStatus,
-            notes: recurring && evaluated.achieved
-              ? `${evaluated.guidanceText} Target met for this ${config.frequency.toLowerCase()} interval.`
-              : evaluated.guidanceText,
-            measuredAt: now,
-          },
-        });
+        if (!sameProgress) {
+          await tx.healthGoalProgress.create({
+            data: {
+              healthGoalId: goal.id,
+              currentValue: String(evaluated.currentValue),
+              progressPercent: progressPercentText,
+              status: progressStatus,
+              notes: recurring && evaluated.achieved
+                ? `${evaluated.guidanceText} Target met for this ${config.frequency.toLowerCase()} interval.`
+                : evaluated.guidanceText,
+              measuredAt: now,
+            },
+          });
+        }
       });
       updated.push({ goalId: goal.id, metricType: config.metricType, metricKey: config.metricKey, frequency: config.frequency, strategy: evaluated.strategy, target, currentValue: evaluated.currentValue, progressPercent: evaluated.progressPercent, status: progressStatus, guidanceText: evaluated.guidanceText });
     }
@@ -163,9 +177,43 @@ export class GoalsEngineService {
   }
 
   private strategyWindow(config: GoalConfig, goalCreatedAt: Date, now: Date) {
-    if (config.frequency === 'DAILY') { const start = new Date(now); start.setHours(0, 0, 0, 0); return { start, end: now }; }
-    if (config.frequency === 'WEEKLY') { const start = new Date(now); start.setDate(start.getDate() - 6); start.setHours(0, 0, 0, 0); return { start, end: now }; }
+    if (config.frequency === 'DAILY') return this.southAfricaDayWindow(now);
+    if (config.frequency === 'WEEKLY') return this.southAfricaWeekWindow(now);
     return { start: goalCreatedAt, end: now };
+  }
+
+  private southAfricaDayWindow(value: Date) {
+    const dateKey = new Intl.DateTimeFormat('en-CA', {
+      timeZone: 'Africa/Johannesburg',
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+    }).format(value);
+    const start = new Date(`${dateKey}T00:00:00+02:00`);
+    const end = new Date(start);
+    end.setUTCDate(end.getUTCDate() + 1);
+    return { start, end: end > value ? value : end };
+  }
+
+  private southAfricaWeekWindow(value: Date) {
+    const parts = new Intl.DateTimeFormat('en-CA', {
+      timeZone: 'Africa/Johannesburg',
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+    }).formatToParts(value);
+    const year = Number(parts.find((part) => part.type === 'year')?.value);
+    const month = Number(parts.find((part) => part.type === 'month')?.value);
+    const day = Number(parts.find((part) => part.type === 'day')?.value);
+    const localDate = new Date(Date.UTC(year, month - 1, day));
+    const weekday = localDate.getUTCDay();
+    const daysFromMonday = weekday === 0 ? 6 : weekday - 1;
+    localDate.setUTCDate(localDate.getUTCDate() - daysFromMonday);
+    const weekKey = localDate.toISOString().slice(0, 10);
+    const start = new Date(`${weekKey}T00:00:00+02:00`);
+    const end = new Date(start);
+    end.setUTCDate(end.getUTCDate() + 7);
+    return { start, end: end > value ? value : end };
   }
 
   private async aggregateMetric(patientId: string, metricType: string, metricKey: string, start: Date, end: Date, aggregation: GoalConfig['aggregation']) {
