@@ -1,5 +1,6 @@
 import {
   BadRequestException,
+  ForbiddenException,
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
@@ -243,6 +244,7 @@ export class CarePlanTasksService {
         id: true,
         status: true,
         carePlanId: true,
+        assignedToId: true,
       },
     });
 
@@ -252,6 +254,10 @@ export class CarePlanTasksService {
 
     if (task.status === 'CANCELLED') {
       throw new BadRequestException('Cancelled care-plan tasks cannot be changed.');
+    }
+
+    if (task.assignedToId && task.assignedToId !== userId) {
+      throw new ForbiddenException('This care-plan task is assigned to another care-team member.');
     }
 
     if (status === 'PENDING' && task.status !== 'IN_PROGRESS' && task.status !== 'COMPLETED') {
