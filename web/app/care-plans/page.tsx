@@ -57,7 +57,15 @@ function taskIsCompleted(task: any) {
 function taskIsOverdue(task: any) {
   if (!task?.dueDate || taskIsCompleted(task)) return false;
   const due = new Date(String(task.dueDate));
-  return !Number.isNaN(due.getTime()) && due.getTime() < Date.now();
+  if (Number.isNaN(due.getTime())) return false;
+  const formatDay = (value: Date) =>
+    new Intl.DateTimeFormat("en-CA", {
+      timeZone: "Africa/Johannesburg",
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+    }).format(value);
+  return formatDay(due) < formatDay(new Date());
 }
 
 function nextTaskStatus(status: string): PatientCarePlanTaskStatus | null {
@@ -93,9 +101,10 @@ export default function CarePlansPage() {
 
   const summary = useMemo(() => {
     const tasks = plans.flatMap((plan) => Array.isArray(plan?.tasks) ? plan.tasks : []);
-    const completed = tasks.filter(taskIsCompleted).length;
-    const overdue = tasks.filter(taskIsOverdue).length;
-    const active = tasks.filter((task) => !taskIsCompleted(task) && String(task?.status ?? "").toUpperCase() !== "CANCELLED").length;
+    const activeTasks = tasks.filter((task) => String(task?.status ?? "").toUpperCase() !== "CANCELLED");
+    const completed = activeTasks.filter(taskIsCompleted).length;
+    const overdue = activeTasks.filter(taskIsOverdue).length;
+    const active = activeTasks.filter((task) => !taskIsCompleted(task)).length;
     return {
       plans: plans.length,
       tasks: tasks.length,
@@ -200,8 +209,8 @@ export default function CarePlansPage() {
             <div className="mt-5 space-y-5">
               {plans.map((plan) => {
                 const tasks = Array.isArray(plan?.tasks) ? plan.tasks : [];
-                const completed = tasks.filter(taskIsCompleted).length;
                 const activeTasks = tasks.filter((task: any) => String(task?.status ?? "").toUpperCase() !== "CANCELLED");
+                const completed = activeTasks.filter(taskIsCompleted).length;
                 const progress = activeTasks.length ? Math.round((completed / activeTasks.length) * 100) : 0;
 
                 return (
