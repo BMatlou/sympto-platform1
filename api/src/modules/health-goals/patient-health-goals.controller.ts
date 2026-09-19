@@ -170,6 +170,83 @@ export class PatientHealthGoalsController {
     return { metricResult, journal: { title: journalTitle, dayKey, cigarettes } };
   }
 
+  @Post(':id/alcohol-log')
+  async logAlcohol(@Param('id') id: string, @Body() body: { drinks?: number }, @Req() request: AuthenticatedRequest) {
+    const userId = this.userId(request);
+    const goal = await this.assertOwnGoal(id, userId);
+    if (String(goal.category).toUpperCase() !== 'ALCOHOL') throw new BadRequestException('This health goal is not an alcohol goal.');
+
+    const drinks = Number(body?.drinks);
+    if (!Number.isFinite(drinks) || drinks <= 0) throw new BadRequestException('Drinks must be a number greater than 0.');
+
+    const now = new Date();
+    const parts = new Intl.DateTimeFormat('en-CA', {
+      timeZone: 'Africa/Johannesburg',
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+    }).formatToParts(now);
+    const year = Number(parts.find((part) => part.type === 'year')?.value);
+    const month = Number(parts.find((part) => part.type === 'month')?.value);
+    const day = Number(parts.find((part) => part.type === 'day')?.value);
+    const localDate = new Date(Date.UTC(year, month - 1, day));
+    const weekday = localDate.getUTCDay();
+    const daysFromMonday = weekday === 0 ? 6 : weekday - 1;
+    localDate.setUTCDate(localDate.getUTCDate() - daysFromMonday);
+    const weekKey = localDate.toISOString().slice(0, 10);
+    const source = 'patient-alcohol-log';
+    const sourceId = `${id}:${weekKey}`;
+
+    await this.ensureMetricEventStorage();
+    const existing = await this.prisma.$queryRaw<Array<{ loggedValue: any }>>`
+      SELECT "loggedValue"
+      FROM "HealthGoalMetricEvent"
+      WHERE "patientId" = ${goal.patientId}
+        AND "metricType" = 'ALCOHOL'
+        AND "metricKey" = 'alcohol.drinks'
+        AND "source" = ${source}
+        AND "sourceId" = ${sourceId}
+      LIMIT 1
+    `;
+    const previousTotal = existing.length ? Number(existing[0].loggedValue) : 0;
+    const weeklyTotal = Number((Math.max(0, previousTotal) + drinks).toFixed(2));
+
+    const metricResult = await this.healthGoalsService.syncMetricEventForUser(userId, {
+      metricType: 'ALCOHOL',
+      metricKey: 'alcohol.drinks',
+      loggedValue: weeklyTotal,
+      source,
+      sourceId,
+      occurredAt: now,
+      metadata: { weekKey },
+    });
+
+    const journalTitle = `Alcohol log · ${weekKey}`;
+    const journalText = `Alcohol log for week starting ${weekKey}: ${weeklyTotal} drink${weeklyTotal === 1 ? '' : 's'} recorded.`;
+    let journalUpdated = false;
+    try {
+      const existingJournal = await this.prisma.healthJournal.findFirst({
+        where: { patientId: goal.patientId, title: journalTitle },
+        select: { id: true },
+      });
+      if (existingJournal) {
+        await this.prisma.healthJournal.update({
+          where: { id: existingJournal.id },
+          data: { journal: journalText, notes: 'Recorded from the Alcohol Moderation health-goal card.' },
+        });
+      } else {
+        await this.prisma.healthJournal.create({
+          data: { patientId: goal.patientId, title: journalTitle, journal: journalText, notes: 'Recorded from the Alcohol Moderation health-goal card.' },
+        });
+      }
+      journalUpdated = true;
+    } catch {
+      journalUpdated = false;
+    }
+
+    return { metricResult, journal: { updated: journalUpdated, title: journalTitle, weekKey, weeklyTotal } };
+  }
+
   @Delete(':id')
   async remove(@Param('id') id: string, @Req() request: AuthenticatedRequest) {
     const goal = await this.assertOwnGoal(id, this.userId(request));
