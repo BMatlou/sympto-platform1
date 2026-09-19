@@ -9,9 +9,10 @@ function formatEnum(value: unknown) { if (!value) return "Not specified"; return
 
 export default function TestsResultsPage() {
   const { data, loading } = useDashboard();
-  const laboratory = data?.recentResults?.laboratory ?? [];
-  const imaging = data?.recentResults?.imaging ?? [];
-  const tests = [...laboratory.map((item) => ({ ...item, recordType: "LABORATORY" })), ...imaging.map((item) => ({ ...item, recordType: "IMAGING" }))];
+  type TestRecord = Record<string, unknown> & { id?: string | number; result?: unknown; resultValue?: unknown; status?: unknown; name?: unknown; testName?: unknown; title?: unknown; date?: unknown; performedAt?: unknown; completedAt?: unknown; createdAt?: unknown; value?: unknown; notes?: unknown; comments?: unknown; laboratory?: unknown };
+  const laboratory: TestRecord[] = Array.isArray(data?.recentResults?.laboratory) ? (data.recentResults.laboratory as TestRecord[]) : [];
+  const imaging: TestRecord[] = Array.isArray(data?.recentResults?.imaging) ? (data.recentResults.imaging as TestRecord[]) : [];
+  const tests: Array<TestRecord & { recordType: "LABORATORY" | "IMAGING" }> = [...laboratory.map((item) => ({ ...item, recordType: "LABORATORY" as const })), ...imaging.map((item) => ({ ...item, recordType: "IMAGING" as const }))];
   const completedCount = tests.filter((test) => test?.result != null || test?.resultValue != null || String(test?.status ?? "").toUpperCase() === "COMPLETED").length;
 
   return <main className="min-h-screen bg-[#F7F9FC]"><div className="mx-auto max-w-6xl px-4 py-8 sm:px-6 lg:px-8">
