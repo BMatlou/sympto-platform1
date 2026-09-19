@@ -160,6 +160,70 @@ export class NotificationPreferencesService {
     };
   }
 
+  async findForUser(userId: string) {
+    return this.prisma.notificationPreference.findMany({
+      where: { userId },
+      select: {
+        id: true,
+        notificationType: true,
+        channel: true,
+        enabled: true,
+        quietHoursStart: true,
+        quietHoursEnd: true,
+        createdAt: true,
+        updatedAt: true,
+      },
+      orderBy: [
+        { notificationType: 'asc' },
+        { channel: 'asc' },
+      ],
+    });
+  }
+
+  async upsertForUser(
+    userId: string,
+    dto: {
+      notificationType: Prisma.NotificationPreferenceCreateInput['notificationType'];
+      channel: Prisma.NotificationPreferenceCreateInput['channel'];
+      enabled: boolean;
+      quietHoursStart?: string | null;
+      quietHoursEnd?: string | null;
+    },
+  ) {
+    return this.prisma.notificationPreference.upsert({
+      where: {
+        userId_notificationType_channel: {
+          userId,
+          notificationType: dto.notificationType,
+          channel: dto.channel,
+        },
+      },
+      update: {
+        enabled: dto.enabled,
+        quietHoursStart: dto.quietHoursStart ?? null,
+        quietHoursEnd: dto.quietHoursEnd ?? null,
+      },
+      create: {
+        userId,
+        notificationType: dto.notificationType,
+        channel: dto.channel,
+        enabled: dto.enabled,
+        quietHoursStart: dto.quietHoursStart ?? null,
+        quietHoursEnd: dto.quietHoursEnd ?? null,
+      },
+      select: {
+        id: true,
+        notificationType: true,
+        channel: true,
+        enabled: true,
+        quietHoursStart: true,
+        quietHoursEnd: true,
+        createdAt: true,
+        updatedAt: true,
+      },
+    });
+  }
+
     async findOne(
     id: string,
   ) {
