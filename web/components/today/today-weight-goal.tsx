@@ -100,6 +100,7 @@ export default function TodayWeightGoal({ goal, fallbackWeight }: Props) {
       active = false;
       window.removeEventListener("sympto:weight-updated", onWeightUpdated);
       window.removeEventListener("sympto:health-goal-updated", onGoalUpdated);
+      window.removeEventListener("sympto:health-checkin-updated", onWeightUpdated);
     };
   }, [goal?.id, goal?.createdAt]);
 
