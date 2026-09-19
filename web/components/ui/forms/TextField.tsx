@@ -6,6 +6,7 @@ interface TextFieldProps {
   type?: "text" | "number" | "date" | "type" | "time" | "email";
   placeholder?: string;
   compact?: boolean;
+  disabled?: boolean;
   onChange: (value: string) => void;
 }
 
@@ -15,6 +16,7 @@ export function TextField({
   type = "text",
   placeholder,
   compact = false,
+  disabled = false,
   onChange,
 }: TextFieldProps) {
   return (
@@ -33,6 +35,7 @@ export function TextField({
   type={type}
   value={value ?? ""}
   placeholder={placeholder}
+  disabled={disabled}
   onChange={(e) =>
     onChange(e.target.value)
   }
