@@ -191,7 +191,7 @@ export default function TodayWeightGoal({ goal, fallbackWeight }: Props) {
   const requiredRateMessage = goalCompleted
     ? "This weight journey is complete. Start a new goal if you want to set a new destination."
     : isMaintenanceGoal
-      ? `Maintain around ${formatKg(planTargetWeight)} kg. No planned net loss or gain is required; use the maintenance band of ${formatKg(numberValue(maintenanceBand?.min) ?? startingWeight)}–${formatKg(numberValue(maintenanceBand?.max) ?? startingWeight)} kg as the stability reference.`
+      ? `Maintain around ${formatKg(planTargetWeight)} kg. Required net change: 0.00 kg/day or 0.00 kg/week. Use the maintenance band of ${formatKg(numberValue(maintenanceBand?.min) ?? startingWeight)}–${formatKg(numberValue(maintenanceBand?.max) ?? startingWeight)} kg as the stability reference.`
       : planDailyRate != null && planWeeklyRate != null && planDaysRemaining != null
         ? `To reach ${formatKg(planTargetWeight)} kg by ${formatDate(journey.targetDate)}, you need to ${comparison === "INCREASE_TO" ? "gain" : "lose"} about ${formatRate(planDailyRate)} kg/day or ${formatRate(planWeeklyRate)} kg/week from your current recorded weight. ${planRemaining != null ? `${formatKg(planRemaining)} kg remains.` : ""}`
         : `Set a target date to calculate the daily and weekly rate needed to reach ${formatKg(planTargetWeight)} kg.`;
@@ -419,7 +419,7 @@ export default function TodayWeightGoal({ goal, fallbackWeight }: Props) {
             <p className="mt-1.5">{trendMessage}</p>
             <div className="mt-3 rounded-[16px] border border-[#dcebed] bg-white/80 px-3.5 py-3">
               <p className="text-[9px] font-black uppercase tracking-[.12em] text-[#0b6f73]">Plan to target date</p>
-              <p className="mt-1 text-[10px] font-bold leading-5 text-[#0b2d54]">{requiredRateMessage}</p>
+              <p className="mt-1 text-[10px] font-bold leading-5 text-[#0b2d54]">{requiredRateMessage}</p><p className="mt-1 text-[9px] leading-4 text-[#8a9aa7]">The daily/weekly figure is the mathematical pace needed to meet the selected target date, not a clinical prescription.</p>
             </div>
             {(contextGoals.length > 0 || contextConditions.length > 0 || contextMedications.length > 0) && (
               <div className="mt-3 rounded-[16px] border border-[#dcebed] bg-white/70 px-3.5 py-3">
