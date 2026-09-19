@@ -134,9 +134,8 @@ export default function TodayWeightGoal({ goal, fallbackWeight }: Props) {
   const maintenanceStatus = String(intelligence?.weight?.status ?? "INSUFFICIENT_DATA").toUpperCase();
   const maintenanceStable = intelligence?.weight?.withinMaintenanceBand === true || maintenanceStatus === "STABLE";
   const maintenanceAverage = numberValue(intelligence?.weight?.average7dKg) ?? currentWeight;
-  const maintenanceTolerance = startingWeight != null ? Math.max(0.5, Math.abs(startingWeight) * 0.02) : null;
-  const maintenanceProgress = isMaintenanceGoal && startingWeight != null && maintenanceAverage != null && maintenanceTolerance != null
-    ? Math.round(Math.max(50, Math.min(100, 100 - (Math.abs(maintenanceAverage - startingWeight) / maintenanceTolerance) * 50)))
+  const maintenanceProgress = isMaintenanceGoal && startingWeight != null && maintenanceAverage != null
+    ? Math.round(Math.max(0, Math.min(100, (1 - (Math.abs(maintenanceAverage - startingWeight) / Math.max(Math.abs(startingWeight), 0.0001))) * 100)))
     : 0;
 
   const targetReached = isMaintenanceGoal ? false : goalCompleted || (targetWeight != null && journeyWeight != null && (comparison === "DECREASE_TO" ? journeyWeight <= targetWeight : journeyWeight >= targetWeight));
