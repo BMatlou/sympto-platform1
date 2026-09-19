@@ -187,9 +187,8 @@ export class GoalsEngineService {
     if (baseline == null || latest == null || !Number.isFinite(baseline) || !Number.isFinite(latest) || target < 0) return { strategy: 'DELTA_REDUCTION', currentValue: latest ?? baseline ?? 0, progressPercent: 0, achieved: false, guidanceText: `${title}: keep tracking weight toward the target.` };
     if (config.comparison === 'CLOSEST') {
       const targetWeight = baseline;
-      const toleranceKg = Math.max(0.5, baseline * 0.02);
       const deviation = Math.abs(latest - targetWeight);
-      const stabilityProgressPercent = Math.max(0, Math.min(100, (1 - deviation / toleranceKg) * 100));
+      const stabilityProgressPercent = Math.max(0, Math.min(100, (1 - (deviation / Math.max(Math.abs(baseline), 0.0001))) * 100));
       const guidanceText = deviation <= toleranceKg
         ? title + ': weight is within the maintenance range around your ' + targetWeight.toFixed(1) + ' kg baseline. Keep tracking your current weight.'
         : title + ': weight is ' + deviation.toFixed(1) + ' kg from the maintenance baseline of ' + targetWeight.toFixed(1) + ' kg. Keep tracking the trend and review a sustained change.';
