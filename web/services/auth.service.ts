@@ -2,11 +2,12 @@ import { api } from "@/lib/api";
 import { SignUpSchema } from "@/schemas/auth.schema";
 import type { AuthResponse } from "@/types/auth";
 
-function unwrap<T>(response: { data: { data?: T } | T }): T {
+function unwrap<T>(response: { data: unknown }): T {
   const payload = response.data;
-  return typeof payload === "object" && payload !== null && "data" in payload
-    ? payload.data as T
-    : payload as T;
+  if (typeof payload === "object" && payload !== null && "data" in payload) {
+    return (payload as { data?: unknown }).data as T;
+  }
+  return payload as T;
 }
 
 function createRegistrationPayload(data: SignUpSchema) {
