@@ -112,9 +112,17 @@ export class GoalsEngineService {
       const recurring = config.frequency === 'DAILY' || config.frequency === 'WEEKLY';
       // Daily/weekly goals are interval goals. Meeting one interval target must not
       // permanently complete the journey; the next interval should start fresh.
+      const isWeightDirectional = config.metricType === 'WEIGHT'
+        && (config.comparison === 'INCREASE_TO' || config.comparison === 'DECREASE_TO');
       const progressStatus = evaluated.achieved
         ? recurring ? HealthGoalProgressStatus.ON_TRACK : HealthGoalProgressStatus.ACHIEVED
-        : HealthGoalProgressStatus.IMPROVING;
+        : isWeightDirectional
+          ? evaluated.progressPercent < -0.01
+            ? HealthGoalProgressStatus.DECLINING
+            : evaluated.progressPercent > 0.01
+              ? HealthGoalProgressStatus.IMPROVING
+              : HealthGoalProgressStatus.STAGNANT
+          : HealthGoalProgressStatus.IMPROVING;
       const terminal = evaluated.achieved && !recurring;
       await this.prisma.$transaction(async (tx) => {
         await tx.healthGoal.update({
