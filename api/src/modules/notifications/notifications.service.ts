@@ -33,6 +33,25 @@ export class NotificationsService {
       );
     }
 
+    const preference =
+      await this.prisma.notificationPreference.findUnique({
+        where: {
+          userId_notificationType_channel: {
+            userId: dto.userId,
+            notificationType: dto.type,
+            channel: dto.channel,
+          },
+        },
+        select: { enabled: true },
+      });
+
+    if (preference && !preference.enabled) {
+      return {
+        skipped: true,
+        reason: 'NOTIFICATION_PREFERENCE_DISABLED',
+      };
+    }
+
     return this.prisma.notification.create({
       data: {
         userId: dto.userId,
@@ -226,7 +245,7 @@ export class NotificationsService {
       where: {
         userId,
         readAt: null,
-        status: { not: 'CANCELLED' },
+        status: { in: ['SENT', 'DELIVERED', 'READ'] },
       },
       data: {
         readAt: new Date(),
