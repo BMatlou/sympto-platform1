@@ -129,7 +129,7 @@ export const AlcoholGoalCard: React.FC<AlcoholGoalCardProps> = ({ goal, onUpdate
 
   async function addDrinks() {
     const drinks = Number(draft);
-    if (!goal?.id || !Number.isFinite(drinks) || drinks <= 0 || isAtOrAboveBudget) return;
+    if (!goal?.id || !Number.isFinite(drinks) || drinks <= 0) return;
     try {
       setSaving(true);
       const result = await healthGoalsService.logAlcohol(goal.id!, drinks);
@@ -184,7 +184,7 @@ export const AlcoholGoalCard: React.FC<AlcoholGoalCardProps> = ({ goal, onUpdate
             <div className="flex items-end justify-between gap-3"><div><p className="text-[10px] font-black uppercase tracking-[.14em] text-white/45">Weekly budget</p><p className="mt-1 text-sm font-bold text-white">≤ {formatNumber(weeklyTarget)} drinks</p></div><p className="text-right text-[10px] font-bold text-white/50">{targetDaysLeft === 0 ? "Target date today" : `${targetDaysLeft} days left`}</p></div>
           </div>
 
-          {logOpen && !isAtOrAboveBudget && (
+          {logOpen && (
             <div className="relative mt-4 rounded-[20px] bg-white/8 p-4 ring-1 ring-white/10">
               <label htmlFor="alcohol-goal-drinks" className="text-[9px] font-black uppercase tracking-[.14em] text-white/55">Drinks to add</label>
               <div className="mt-2 flex gap-2"><input id="alcohol-goal-drinks" type="number" min="1" step="1" inputMode="numeric" value={draft} onChange={(event) => setDraft(event.target.value)} className="min-h-10 min-w-0 flex-1 rounded-xl border border-white/15 bg-white/10 px-3 text-sm font-bold text-white outline-none placeholder:text-white/30 focus:border-[#24c1c4]" /><button type="button" disabled={saving || !draft} onClick={() => void addDrinks()} className="min-h-10 rounded-xl bg-white px-4 text-[10px] font-black text-[#0b2d54] disabled:cursor-not-allowed disabled:opacity-50">{saving ? "Saving…" : "Add"}</button></div>
@@ -194,8 +194,8 @@ export const AlcoholGoalCard: React.FC<AlcoholGoalCardProps> = ({ goal, onUpdate
         </div>
 
         <div className="mt-4 flex items-center justify-between gap-3 rounded-[20px] border border-[#e2ecef] bg-[#fbfdfd] px-4 py-3.5">
-          <p className="text-[10px] font-semibold leading-4 text-[#74859a]">{isAboveBudget ? "Your weekly budget has been exceeded. Keep logging honestly and avoid further intake for the remainder of the week." : isAtOrAboveBudget ? "Your weekly budget has been reached. No more drinks can be logged until Monday." : "Pace yourself through the remaining days and keep your entries honest."}</p>
-          <button type="button" disabled={isAtOrAboveBudget} onClick={() => { if (!isAtOrAboveBudget) setLogOpen((value) => !value); }} className={`shrink-0 rounded-xl px-3.5 py-2.5 text-[10px] font-black ${isAtOrAboveBudget ? "cursor-not-allowed bg-[#edf2f4] text-[#94a0aa]" : "bg-[#0b2d54] text-white shadow-[0_7px_16px_rgba(11,45,84,.14)]"}`}>{isAboveBudget ? "Budget exceeded" : isAtOrAboveBudget ? "Target reached" : logOpen ? "Close" : "Log drinks"}</button>
+          <p className="text-[10px] font-semibold leading-4 text-[#74859a]">{isAboveBudget ? "Your weekly target has been exceeded. Keep logging accurately so your health history reflects what actually happened." : isAtOrAboveBudget ? "Your weekly target has been reached. You can still log any additional intake so your record stays accurate." : "Pace yourself through the remaining days and keep your entries honest."}</p>
+          <button type="button" onClick={() => setLogOpen((value) => !value)} className="shrink-0 rounded-xl bg-[#0b2d54] px-3.5 py-2.5 text-[10px] font-black text-white shadow-[0_7px_16px_rgba(11,45,84,.14)]">{logOpen ? "Close" : thisWeekLogged === 0 ? "Log drinks" : isAboveBudget ? "Update log" : "Add drinks"}</button>
         </div>
       </div>
 
