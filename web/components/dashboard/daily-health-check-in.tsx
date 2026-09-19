@@ -172,6 +172,7 @@ export default function DailyHealthCheckIn({ embedded = false, goals = [] }: { e
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [stressTouched, setStressTouched] = useState(false);
+  const [sleepTouched, setSleepTouched] = useState(false);
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
   const hasLoaded = useRef(false);
@@ -197,7 +198,10 @@ export default function DailyHealthCheckIn({ embedded = false, goals = [] }: { e
   const effectiveSleepQuality = derivedSleepQuality ?? sleepQuality;
   const movementRemaining = Math.max(0, exerciseGoalMinutes - projectedWeekMinutes);
 
-  const hasInput = useMemo(() => Boolean(mood || sleepQuality || sleepHours > 0 || exerciseMinutes > 0 || waterIntakeMl > 0 || stressTouched), [mood, sleepQuality, sleepHours, exerciseMinutes, waterIntakeMl, stressTouched]);
+  const hasInput = useMemo(
+    () => Boolean(savedJournal || mood || sleepQuality || sleepHours > 0 || exerciseMinutes > 0 || waterIntakeMl > 0 || stressTouched || sleepTouched),
+    [savedJournal, mood, sleepQuality, sleepHours, exerciseMinutes, waterIntakeMl, stressTouched, sleepTouched],
+  );
 
   const movementTitle = projectedWeekMinutes >= exerciseGoalMinutes && projectedWeekMinutes > 0
     ? ["Weekly goal reached", `You’ve reached your ${exerciseGoalMinutes}-minute weekly exercise goal.`]
@@ -216,7 +220,8 @@ export default function DailyHealthCheckIn({ embedded = false, goals = [] }: { e
           setSavedJournal(existing);
           setMood(existing.mood ?? null);
           setSleepQuality(existing.sleepQuality ?? null);
-          setSleepHours(existing.sleepHours ? Number(existing.sleepHours) : 0);
+          setSleepHours(existing.sleepHours != null ? Number(existing.sleepHours) : 0);
+          setSleepTouched(existing.sleepHours != null);
           setStressLevel(existing.stressLevel ?? 5);
           setStressTouched(existing.stressLevel != null);
           setExerciseMinutes(existing.exerciseMinutes ?? 0);
@@ -261,7 +266,7 @@ export default function DailyHealthCheckIn({ embedded = false, goals = [] }: { e
         journal,
         mood: mood ?? undefined,
         sleepQuality: effectiveSleepQuality ?? undefined,
-        sleepHours: sleepHours > 0 ? String(sleepHours) : undefined,
+        sleepHours: sleepTouched ? String(sleepHours) : undefined,
         stressLevel: stressTouched ? stressLevel : undefined,
         exerciseMinutes,
         waterIntakeMl,
@@ -320,7 +325,7 @@ export default function DailyHealthCheckIn({ embedded = false, goals = [] }: { e
           <div className="mt-3 rounded-[22px] bg-white p-4 ring-1 ring-[#e4edef]">
             <div className="flex items-center justify-between gap-3"><div className="flex items-center gap-3"><span className="grid h-9 w-9 place-items-center rounded-[13px] bg-[#eef2ff] text-[#5265a9]"><Moon className="h-4 w-4" /></span><div><p className="text-[9px] font-black uppercase tracking-[.15em] text-[#8999a5]">Rest & recovery</p><p className="mt-0.5 text-[20px] font-black tracking-[-.05em] text-[#0b2d54]">{sleepHours}h</p></div></div><span className="rounded-full bg-[#eef2ff] px-2.5 py-1 text-[9px] font-black text-[#5265a9]">{sleepProgress}%</span></div>
             <div className="mt-3 flex items-center justify-between gap-3 rounded-[17px] bg-[#f8f9ff] px-3 py-2.5"><span className="text-[9px] font-black text-[#66779b]">{effectiveSleepQuality ? sleepLabel(effectiveSleepQuality) : "Sleep hours not selected"}</span>{sleepGoal && <span className="text-[9px] font-bold text-[#8996b8]">Goal {sleepGoalHours}h</span>}</div>
-            <div className="mt-3 flex items-center justify-between rounded-[17px] bg-[#fbfdfe] px-3 py-2 ring-1 ring-[#e4edef]"><span className="text-[9px] font-black uppercase tracking-[.13em] text-[#8796a2]">Hours slept</span><div className="flex items-center gap-2"><button type="button" aria-label="Decrease sleep hours" onClick={() => { const next = Math.max(0, Number((sleepHours - .5).toFixed(1))); setSleepHours(next); }} className="grid h-8 w-8 place-items-center rounded-[10px] bg-[#f0f5f6] text-[#0b2d54]"><Minus className="h-3.5 w-3.5" /></button><span className="min-w-10 text-center text-sm font-black text-[#0b2d54]">{sleepHours}h</span><button type="button" aria-label="Increase sleep hours" onClick={() => { const next = Math.min(24, Number((sleepHours + .5).toFixed(1))); setSleepHours(next); }} className="grid h-8 w-8 place-items-center rounded-[10px] bg-[#e8f8f7] text-[#0b7b80]"><Plus className="h-3.5 w-3.5" /></button></div></div>
+            <div className="mt-3 flex items-center justify-between rounded-[17px] bg-[#fbfdfe] px-3 py-2 ring-1 ring-[#e4edef]"><span className="text-[9px] font-black uppercase tracking-[.13em] text-[#8796a2]">Hours slept</span><div className="flex items-center gap-2"><button type="button" aria-label="Decrease sleep hours" onClick={() => { const next = Math.max(0, Number((sleepHours - .5).toFixed(1))); setSleepHours(next); setSleepTouched(true); if (next === 0) setSleepQuality(null); }} className="grid h-8 w-8 place-items-center rounded-[10px] bg-[#f0f5f6] text-[#0b2d54]"><Minus className="h-3.5 w-3.5" /></button><span className="min-w-10 text-center text-sm font-black text-[#0b2d54]">{sleepHours}h</span><button type="button" aria-label="Increase sleep hours" onClick={() => { const next = Math.min(24, Number((sleepHours + .5).toFixed(1))); setSleepHours(next); setSleepTouched(true); }} className="grid h-8 w-8 place-items-center rounded-[10px] bg-[#e8f8f7] text-[#0b7b80]"><Plus className="h-3.5 w-3.5" /></button></div></div>
           </div>
         </article>
 
