@@ -307,6 +307,19 @@ export class PatientMedicationsService {
     if (Number.isNaN(scheduledFor.getTime())) throw new ConflictException('The reminder time is invalid.');
     if (scheduledFor.getTime() <= Date.now()) throw new ConflictException('The reminder must be scheduled in the future.');
     const notification = await this.notificationsService.create({ userId: ownerUserId, type: NotificationType.REMINDER, title: `Medication reminder: ${medicationName}`, body: `It is time to take ${medicationName}${medication.dosage ? ` (${medication.dosage})` : ''}. Follow the instructions provided by your healthcare professional.`, channel: dto.channel ?? NotificationChannel.IN_APP, status: NotificationStatus.PENDING, priority: NotificationPriority.NORMAL, actionUrl: '/medications', actionLabel: 'View medication', scheduledFor: scheduledFor.toISOString() });
+
+    // NotificationsService can intentionally skip creation when the user has disabled
+    // this notification type/channel in their preferences. Do not enqueue a reminder
+    // unless an actual Notification record was created.
+    if ('skipped' in notification) {
+      return {
+        reminder: null,
+        skipped: true,
+        reason: notification.reason,
+        scheduledFor: scheduledFor.toISOString(),
+      };
+    }
+
     await this.notificationQueueService.create({ notificationId: notification.id, scheduledFor: scheduledFor.toISOString() });
     return { reminder: notification, scheduledFor: scheduledFor.toISOString() };
   }
