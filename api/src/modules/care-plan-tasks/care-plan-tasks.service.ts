@@ -1,4 +1,6 @@
 import {
+  BadRequestException,
+  ForbiddenException,
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
@@ -209,6 +211,62 @@ export class CarePlanTasksService {
         status: dto.status,
       },
 
+      include: {
+        carePlan: true,
+        assignedTo: true,
+      },
+    });
+  }
+
+
+  async updateStatusForPatient(
+    userId: string,
+    taskId: string,
+    status: 'PENDING' | 'IN_PROGRESS' | 'COMPLETED',
+  ) {
+    const patient = await this.prisma.patient.findUnique({
+      where: { userId },
+      select: { id: true },
+    });
+
+    if (!patient) {
+      throw new NotFoundException('Patient not found.');
+    }
+
+    const task = await this.prisma.carePlanTask.findFirst({
+      where: {
+        id: taskId,
+        carePlan: {
+          patientId: patient.id,
+        },
+      },
+      select: {
+        id: true,
+        status: true,
+        carePlanId: true,
+      },
+    });
+
+    if (!task) {
+      throw new NotFoundException('Care plan task not found.');
+    }
+
+    if (task.status === 'CANCELLED') {
+      throw new BadRequestException('Cancelled care-plan tasks cannot be changed.');
+    }
+
+    if (status === 'PENDING' && task.status !== 'IN_PROGRESS' && task.status !== 'COMPLETED') {
+      throw new BadRequestException('This task is not available to return to pending.');
+    }
+
+    const completedAt = status === 'COMPLETED' ? new Date() : null;
+
+    return this.prisma.carePlanTask.update({
+      where: { id: task.id },
+      data: {
+        status,
+        completedAt,
+      },
       include: {
         carePlan: true,
         assignedTo: true,
