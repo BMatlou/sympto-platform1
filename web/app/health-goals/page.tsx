@@ -93,7 +93,6 @@ function goalPresentation(goal: any) {
     : goal?.targetValue != null
       ? `${goal.targetValue}${config.unit ? ` ${config.unit}` : ""}`
       : "Target not set";
-  const comparison = String(goal?.metricConfig?.comparison ?? "").toUpperCase();
   const progress = goalProgress(goal);
   const isDirectionalWeight = category === "WEIGHT" && (comparison === "INCREASE_TO" || comparison === "DECREASE_TO");
   const progressWidth = isDirectionalWeight ? Math.abs(progress) : progress;
