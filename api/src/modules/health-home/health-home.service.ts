@@ -215,7 +215,7 @@ export class HealthHomeService {
     const now = new Date();
     const immunizations = patient.healthPassport?.immunizations ?? [];
     const medicalRecord = patient.medicalRecord;
-    const [allergies, conditions, medications, goals, family, appointments, notifications, devices, measurements, symptomLogs, aiObservations, labOrders, imagingStudies, carePlans, encounters, prescriptions, patientInsurances] = await Promise.all([
+    const [allergies, conditions, medications, goals, family, appointments, notifications, devices, measurements, symptomLogs, aiObservations, labOrders, imagingStudies, carePlans, encounters, prescriptions, patientInsurances, todayMeasurementJournal] = await Promise.all([
       this.prisma.patientAllergy.findMany({ where: { healthPassportId: healthPassportId ?? '' }, include: { allergy: true }, orderBy: { createdAt: 'desc' } }),
       this.prisma.patientCondition.findMany({ where: { healthPassportId: healthPassportId ?? '' }, include: { condition: true }, orderBy: { createdAt: 'desc' } }),
       this.prisma.patientMedication.findMany({ where: { healthPassportId: healthPassportId ?? '', status: { in: [...ACTIVE_MEDICATION_STATUSES] } }, include: { medication: true }, orderBy: { createdAt: 'desc' } }),
@@ -233,6 +233,14 @@ export class HealthHomeService {
       this.prisma.encounter.findMany({ where: { medicalRecord: { patientId } }, orderBy: { startedAt: 'desc' }, take: 50 }),
       this.prisma.prescription.findMany({ where: { patientId }, orderBy: { issuedAt: 'desc' }, take: 50 }),
       this.prisma.patientInsurance.findMany({ where: { patientId }, include: { insurancePolicy: { include: { provider: true } } }, orderBy: { createdAt: 'desc' }, take: 10 }),
+      this.prisma.healthJournal.findFirst({
+        where: {
+          patientId,
+          title: '[Sympto] Today\'s measurements',
+          createdAt: { gte: southAfricaDayBounds(now).start, lt: southAfricaDayBounds(now).end },
+        },
+        orderBy: { createdAt: 'desc' },
+      }),
     ]);
     const encounterIds = encounters.map((encounter) => encounter.id);
     const [attachments, clinicalVitals] = await Promise.all([
@@ -251,17 +259,15 @@ export class HealthHomeService {
       if (code && !latestClinicalVitals.has(code)) latestClinicalVitals.set(code, vital);
     }
 
-    const baselineRecordedAt = patient.baseline?.establishedAt ?? patient.baseline?.updatedAt ?? null;
-    const { start: todayStart, end: todayEnd } = southAfricaDayBounds(now);
-    const baselineRecordedToday = baselineRecordedAt != null && baselineRecordedAt >= todayStart && baselineRecordedAt < todayEnd;
+    const todayMeasurementAt = todayMeasurementJournal?.updatedAt ?? todayMeasurementJournal?.createdAt ?? null;
     const manualVitals = [
-      baselineRecordedToday && patient.baseline?.weightKg != null ? { type: 'WEIGHT', name: 'Weight', value: Number(patient.baseline.weightKg), unit: 'kg', measuredAt: baselineRecordedAt, source: 'MANUAL_ENTRY' } : null,
-      baselineRecordedToday && patient.baseline?.heightCm != null ? { type: 'HEIGHT', name: 'Height', value: Number(patient.baseline.heightCm), unit: 'cm', measuredAt: baselineRecordedAt, source: 'MANUAL_ENTRY' } : null,
-      baselineRecordedToday && patient.baseline?.systolicPressure != null && patient.baseline?.diastolicPressure != null ? { type: 'BLOOD_PRESSURE', name: 'Blood pressure', value: `${patient.baseline.systolicPressure}/${patient.baseline.diastolicPressure}`, unit: 'mmHg', measuredAt: baselineRecordedAt, source: 'MANUAL_ENTRY' } : null,
-      baselineRecordedToday && patient.baseline?.restingHeartRate != null ? { type: 'HEART_RATE', name: 'Heart rate', value: Number(patient.baseline.restingHeartRate), unit: 'bpm', measuredAt: baselineRecordedAt, source: 'MANUAL_ENTRY' } : null,
-      baselineRecordedToday && patient.baseline?.oxygenSaturation != null ? { type: 'OXYGEN_SATURATION', name: 'Oxygen saturation', value: Number(patient.baseline.oxygenSaturation), unit: '%', measuredAt: baselineRecordedAt, source: 'MANUAL_ENTRY' } : null,
-      baselineRecordedToday && patient.baseline?.bodyTemperature != null ? { type: 'BODY_TEMPERATURE', name: 'Body temperature', value: Number(patient.baseline.bodyTemperature), unit: '°C', measuredAt: baselineRecordedAt, source: 'MANUAL_ENTRY' } : null,
-      baselineRecordedToday && patient.baseline?.respiratoryRate != null ? { type: 'RESPIRATORY_RATE', name: 'Respiratory rate', value: Number(patient.baseline.respiratoryRate), unit: '/min', measuredAt: baselineRecordedAt, source: 'MANUAL_ENTRY' } : null,
+      todayMeasurementJournal?.weightKg != null ? { type: 'WEIGHT', name: 'Weight', value: Number(todayMeasurementJournal.weightKg), unit: 'kg', measuredAt: todayMeasurementAt, source: 'MANUAL_ENTRY' } : null,
+      todayMeasurementJournal?.notes?.match(/Height:\s*([0-9.]+)\s*cm/i)?.[1] != null ? { type: 'HEIGHT', name: 'Height', value: Number(todayMeasurementJournal.notes.match(/Height:\s*([0-9.]+)\s*cm/i)?.[1]), unit: 'cm', measuredAt: todayMeasurementAt, source: 'MANUAL_ENTRY' } : null,
+      todayMeasurementJournal?.bloodPressureSystolic != null && todayMeasurementJournal?.bloodPressureDiastolic != null ? { type: 'BLOOD_PRESSURE', name: 'Blood pressure', value: `${todayMeasurementJournal.bloodPressureSystolic}/${todayMeasurementJournal.bloodPressureDiastolic}`, unit: 'mmHg', measuredAt: todayMeasurementAt, source: 'MANUAL_ENTRY' } : null,
+      todayMeasurementJournal?.heartRate != null ? { type: 'HEART_RATE', name: 'Heart rate', value: Number(todayMeasurementJournal.heartRate), unit: 'bpm', measuredAt: todayMeasurementAt, source: 'MANUAL_ENTRY' } : null,
+      todayMeasurementJournal?.oxygenSaturation != null ? { type: 'OXYGEN_SATURATION', name: 'Oxygen saturation', value: Number(todayMeasurementJournal.oxygenSaturation), unit: '%', measuredAt: todayMeasurementAt, source: 'MANUAL_ENTRY' } : null,
+      todayMeasurementJournal?.temperature != null ? { type: 'BODY_TEMPERATURE', name: 'Body temperature', value: Number(todayMeasurementJournal.temperature), unit: '°C', measuredAt: todayMeasurementAt, source: 'MANUAL_ENTRY' } : null,
+      todayMeasurementJournal?.respiratoryRate != null ? { type: 'RESPIRATORY_RATE', name: 'Respiratory rate', value: Number(todayMeasurementJournal.respiratoryRate), unit: '/min', measuredAt: todayMeasurementAt, source: 'MANUAL_ENTRY' } : null,
     ].filter(Boolean) as Array<{ type: string; name: string; value: number | string; unit: string; measuredAt: Date | null; source: string }>;
 
     const normalizedVitals = [
