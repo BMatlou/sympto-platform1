@@ -36,17 +36,18 @@ export default function PrescribedMedicationsCard({
   const router = useRouter();
 
   const handleAction = (medication: PrescribedMedication, hasGoal: boolean) => {
-    const id = getPatientMedicationId(medication);
+    const patientMedicationId = medication.patientMedicationId || medication.patientMedication?.id || null;
+    const medicationId = medication.medicationId || medication.medication?.id || null;
 
     if (hasGoal) {
-      if (!medication.id) return;
-      const target = document.getElementById(`medication-adherence-card-${String(medication.id)}`);
+      if (!patientMedicationId) return;
+      const target = document.getElementById(`medication-adherence-card-${String(patientMedicationId)}`);
       if (target) target.scrollIntoView({ behavior: "smooth", block: "center" });
-      else window.location.hash = `medication-adherence-card-${encodeURIComponent(String(medication.id))}`;
+      else window.location.hash = `medication-adherence-card-${encodeURIComponent(String(patientMedicationId))}`;
       return;
     }
 
-    const name = medication.name || "Medication";
+    const name = medication.name || medication.medication?.name || "Medication";
     const dosage = medication.dosage || "";
     const frequency = medication.frequency || "";
     const params = new URLSearchParams({
@@ -57,9 +58,11 @@ export default function PrescribedMedicationsCard({
       medicationName: name,
       dosage,
       frequency,
-      patientMedicationId: String(id ?? ""),
-      associatedMedicationId: String(id ?? ""),
-      medicationId: String(id ?? medication.medicationId ?? ""),
+      ...(patientMedicationId ? { patientMedicationId: String(patientMedicationId) } : {}),
+      ...(medicationId ? {
+        associatedMedicationId: String(medicationId),
+        medicationId: String(medicationId),
+      } : {}),
     });
     router.push(`/health-goals?${params.toString()}`);
   };
