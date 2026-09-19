@@ -235,7 +235,60 @@ export class PatientMedicationsService {
     `;
     }
 
-    return { tracked: true, action: dto.action, scheduledFor: dto.scheduledFor ?? null, medication, adherencePercentage, missedDoses, affectedGoals: [] };
+    const dayParts = new Intl.DateTimeFormat('en-CA', {
+      timeZone: 'Africa/Johannesburg',
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+    }).formatToParts(effectiveMeasuredAt);
+    const dayKey = `${dayParts.find((part) => part.type === 'year')?.value}-${dayParts.find((part) => part.type === 'month')?.value}-${dayParts.find((part) => part.type === 'day')?.value}`;
+    const medicationLabel = existing.medication.name || existing.medication.genericName || 'Medication';
+    const journalTitle = `Medication adherence · ${medicationLabel} · ${dayKey}`;
+    let journalUpdated = false;
+    try {
+      const existingJournal = await this.prisma.healthJournal.findFirst({
+        where: { patientId, title: journalTitle },
+        select: { id: true },
+      });
+      const journalText = [
+        `Medication adherence update for ${dayKey}: ${dto.action === MedicationAdherenceAction.TAKEN ? 'dose marked taken' : 'dose marked skipped'}.`,
+        `Current overall adherence: ${adherencePercentage.toFixed(1)}%.`,
+        `Missed doses recorded: ${missedDoses}.`,
+      ].join(' ');
+      if (existingJournal) {
+        await this.prisma.healthJournal.update({
+          where: { id: existingJournal.id },
+          data: {
+            journal: journalText,
+            notes: 'Updated from Today medication actions.',
+          },
+        });
+      } else {
+        await this.prisma.healthJournal.create({
+          data: {
+            patientId,
+            title: journalTitle,
+            journal: journalText,
+            notes: 'Updated from Today medication actions.',
+            createdAt: effectiveMeasuredAt,
+          },
+        });
+      }
+      journalUpdated = true;
+    } catch {
+      journalUpdated = false;
+    }
+
+    return {
+      tracked: true,
+      action: dto.action,
+      scheduledFor: dto.scheduledFor ?? null,
+      medication,
+      adherencePercentage,
+      missedDoses,
+      affectedGoals: [],
+      journal: { updated: journalUpdated, title: journalTitle, dayKey },
+    };
   }
 
   async scheduleReminder(id: string, dto: CreateMedicationReminderDto, authenticatedUserId: string) {
