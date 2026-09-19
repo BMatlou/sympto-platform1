@@ -141,6 +141,102 @@ export class NotificationsService {
     };
   }
 
+  async findForUser(
+    userId: string,
+    page = 1,
+    limit = 50,
+    unreadOnly = false,
+  ) {
+    const where: Prisma.NotificationWhereInput = {
+      userId,
+      ...(unreadOnly ? { readAt: null } : {}),
+    };
+
+    const [data, total] = await this.prisma.$transaction([
+      this.prisma.notification.findMany({
+        where,
+        select: {
+          id: true,
+          type: true,
+          title: true,
+          body: true,
+          channel: true,
+          status: true,
+          priority: true,
+          actionUrl: true,
+          actionLabel: true,
+          scheduledFor: true,
+          sentAt: true,
+          deliveredAt: true,
+          readAt: true,
+          createdAt: true,
+        },
+        orderBy: [
+          { readAt: 'asc' },
+          { priority: 'desc' },
+          { createdAt: 'desc' },
+        ],
+        skip: (page - 1) * limit,
+        take: limit,
+      }),
+      this.prisma.notification.count({ where }),
+    ]);
+
+    return {
+      data,
+      pagination: {
+        page,
+        limit,
+        total,
+        totalPages: Math.ceil(total / limit),
+      },
+    };
+  }
+
+  async markReadForUser(userId: string, notificationId: string) {
+    const notification = await this.prisma.notification.findFirst({
+      where: { id: notificationId, userId },
+      select: { id: true, readAt: true, status: true },
+    });
+
+    if (!notification) {
+      throw new NotFoundException('Notification not found.');
+    }
+
+    if (notification.readAt) {
+      return notification;
+    }
+
+    return this.prisma.notification.update({
+      where: { id: notification.id },
+      data: {
+        readAt: new Date(),
+        status: 'READ',
+      },
+      select: {
+        id: true,
+        readAt: true,
+        status: true,
+      },
+    });
+  }
+
+  async markAllReadForUser(userId: string) {
+    const result = await this.prisma.notification.updateMany({
+      where: {
+        userId,
+        readAt: null,
+        status: { not: 'CANCELLED' },
+      },
+      data: {
+        readAt: new Date(),
+        status: 'READ',
+      },
+    });
+
+    return { updated: result.count };
+  }
+
     async findOne(
     id: string,
   ) {
