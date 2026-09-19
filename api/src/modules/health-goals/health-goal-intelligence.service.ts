@@ -133,6 +133,10 @@ export class HealthGoalIntelligenceService {
     return this.syncTodayFromJournal(snapshot.patientId);
   }
 
+  async recomputeMetric(patientId: string, metricType: string, metricKey: string, at = new Date()) {
+    return this.goalsEngine.recomputeMatchingGoals(patientId, metricType, metricKey, at);
+  }
+
   async syncTodayFromJournal(patientId: string, _date = new Date()) {
     await this.syncGoalRelations(patientId);
     await this.goalsEngine.backfillJournalMetrics(patientId);
