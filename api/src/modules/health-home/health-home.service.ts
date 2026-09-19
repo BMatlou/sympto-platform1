@@ -257,11 +257,11 @@ export class HealthHomeService {
     const manualVitals = [
       baselineRecordedToday && patient.baseline?.weightKg != null ? { type: 'WEIGHT', name: 'Weight', value: Number(patient.baseline.weightKg), unit: 'kg', measuredAt: baselineRecordedAt, source: 'MANUAL_ENTRY' } : null,
       baselineRecordedToday && patient.baseline?.heightCm != null ? { type: 'HEIGHT', name: 'Height', value: Number(patient.baseline.heightCm), unit: 'cm', measuredAt: baselineRecordedAt, source: 'MANUAL_ENTRY' } : null,
-      patient.baseline?.systolicPressure != null && patient.baseline?.diastolicPressure != null ? { type: 'BLOOD_PRESSURE', name: 'Blood pressure', value: `${patient.baseline.systolicPressure}/${patient.baseline.diastolicPressure}`, unit: 'mmHg', measuredAt: baselineRecordedAt, source: 'MANUAL_ENTRY' } : null,
-      patient.baseline?.restingHeartRate != null ? { type: 'HEART_RATE', name: 'Heart rate', value: Number(patient.baseline.restingHeartRate), unit: 'bpm', measuredAt: baselineRecordedAt, source: 'MANUAL_ENTRY' } : null,
-      patient.baseline?.oxygenSaturation != null ? { type: 'OXYGEN_SATURATION', name: 'Oxygen saturation', value: Number(patient.baseline.oxygenSaturation), unit: '%', measuredAt: baselineRecordedAt, source: 'MANUAL_ENTRY' } : null,
-      patient.baseline?.bodyTemperature != null ? { type: 'BODY_TEMPERATURE', name: 'Body temperature', value: Number(patient.baseline.bodyTemperature), unit: '°C', measuredAt: baselineRecordedAt, source: 'MANUAL_ENTRY' } : null,
-      patient.baseline?.respiratoryRate != null ? { type: 'RESPIRATORY_RATE', name: 'Respiratory rate', value: Number(patient.baseline.respiratoryRate), unit: '/min', measuredAt: baselineRecordedAt, source: 'MANUAL_ENTRY' } : null,
+      baselineRecordedToday && patient.baseline?.systolicPressure != null && patient.baseline?.diastolicPressure != null ? { type: 'BLOOD_PRESSURE', name: 'Blood pressure', value: `${patient.baseline.systolicPressure}/${patient.baseline.diastolicPressure}`, unit: 'mmHg', measuredAt: baselineRecordedAt, source: 'MANUAL_ENTRY' } : null,
+      baselineRecordedToday && patient.baseline?.restingHeartRate != null ? { type: 'HEART_RATE', name: 'Heart rate', value: Number(patient.baseline.restingHeartRate), unit: 'bpm', measuredAt: baselineRecordedAt, source: 'MANUAL_ENTRY' } : null,
+      baselineRecordedToday && patient.baseline?.oxygenSaturation != null ? { type: 'OXYGEN_SATURATION', name: 'Oxygen saturation', value: Number(patient.baseline.oxygenSaturation), unit: '%', measuredAt: baselineRecordedAt, source: 'MANUAL_ENTRY' } : null,
+      baselineRecordedToday && patient.baseline?.bodyTemperature != null ? { type: 'BODY_TEMPERATURE', name: 'Body temperature', value: Number(patient.baseline.bodyTemperature), unit: '°C', measuredAt: baselineRecordedAt, source: 'MANUAL_ENTRY' } : null,
+      baselineRecordedToday && patient.baseline?.respiratoryRate != null ? { type: 'RESPIRATORY_RATE', name: 'Respiratory rate', value: Number(patient.baseline.respiratoryRate), unit: '/min', measuredAt: baselineRecordedAt, source: 'MANUAL_ENTRY' } : null,
     ].filter(Boolean) as Array<{ type: string; name: string; value: number | string; unit: string; measuredAt: Date | null; source: string }>;
 
     const normalizedVitals = [
