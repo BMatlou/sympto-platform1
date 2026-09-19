@@ -1,5 +1,37 @@
 import { api } from '@/lib/api';
 
+export interface PrescribedMedication {
+  id?: string | null;
+  patientMedicationId?: string | null;
+  medicationId?: string | null;
+  name?: string | null;
+  dosage?: string | null;
+  frequency?: string | null;
+  route?: string | null;
+  indication?: string | null;
+  instructions?: string | null;
+  prescribedBy?: string | null;
+  startedAt?: string | null;
+  endedAt?: string | null;
+  ongoing?: boolean | null;
+  adherencePercentage?: number | null;
+  missedDoses?: number | null;
+  sideEffects?: string | null;
+  effectiveness?: string | null;
+  status?: string | null;
+  notes?: string | null;
+  prescriptionId?: string | null;
+  prescriptionItemId?: string | null;
+  source?: string | null;
+  patientMedication?: { id?: string | null } | null;
+  medication?: { id?: string | null; name?: string | null; genericName?: string | null; brandName?: string | null } | null;
+}
+
+export interface HealthGoalRecord {
+  id: string;
+  [key: string]: any;
+}
+
 export interface HealthHomeResponse {
   generatedAt: string;
   profile?: { firstName?: string | null; lastName?: string | null; preferredName?: string | null; dateOfBirth?: string | null; gender?: string | null; profileImageUrl?: string | null } | null;
@@ -7,11 +39,11 @@ export interface HealthHomeResponse {
   healthPassport?: Record<string, unknown> | null;
   medicalRecord?: Record<string, any> | null;
   healthSnapshot: { activeAllergies?: Array<Record<string, any>>; activeConditions: Array<Record<string, any>>; allergies: Array<Record<string, any>>; immunizations: Array<Record<string, any>>; bloodType?: string | null; rhesusFactor?: string | null; baseline?: Record<string, unknown> | null; weightKg?: number | null; heightCm?: number | null; bmi?: number | null; bmiCategory?: string | null; latestMeasurements: Array<Record<string, any>>; normalizedVitals?: Array<Record<string, any>>; connectedDevices: Array<Record<string, any>> };
-  today: { upcomingAppointments: Array<Record<string, any>>; activeMedications: Array<Record<string, any>>; activeMedicationCount?: number; activeGoalCount?: number; notifications?: Array<Record<string, any>> };
-  medications?: Array<Record<string, any>>;
+  today: { upcomingAppointments: Array<Record<string, any>>; activeMedications: PrescribedMedication[]; activeMedicationCount?: number; activeGoalCount?: number; notifications?: Array<Record<string, any>> };
+  medications?: PrescribedMedication[];
   appointments?: Array<Record<string, any>>;
-  goals: Array<Record<string, any>>;
-  healthGoals?: Array<Record<string, any>>;
+  goals: HealthGoalRecord[];
+  healthGoals?: HealthGoalRecord[];
   family: Array<Record<string, any>>;
   allergies?: Array<Record<string, any>>;
   conditions?: Array<Record<string, any>>;
