@@ -372,14 +372,16 @@ export class HealthGoalIntelligenceService {
 
     let status: 'STABLE' | 'DRIFTING_UP' | 'DRIFTING_DOWN' | 'NEEDS_REVIEW' | 'INSUFFICIENT_DATA' = 'INSUFFICIENT_DATA';
     if (comparison === 'CLOSEST') {
-      if (average7dKg == null || baselineKg == null) status = 'INSUFFICIENT_DATA';
-      else {
-        const deviationPct = Math.abs(average7dKg - baselineKg) / baselineKg;
-        const drift = trendKgPerWeek ?? 0;
-        if (deviationPct > 0.02) status = 'NEEDS_REVIEW';
-        else if (deviationPct > 0.01 && drift > 0.15) status = 'DRIFTING_UP';
-        else if (deviationPct > 0.01 && drift < -0.15) status = 'DRIFTING_DOWN';
-        else status = 'STABLE';
+      if (average7dKg == null || baselineKg == null) {
+        status = 'INSUFFICIENT_DATA';
+      } else if (withinMaintenanceBand === true) {
+        // A maintenance goal is considered on track while the recent average
+        // stays inside the baseline maintenance band. Trend direction can still
+        // be shown separately without turning a small, in-band fluctuation into
+        // a warning state.
+        status = 'STABLE';
+      } else {
+        status = average7dKg > baselineKg ? 'DRIFTING_UP' : 'DRIFTING_DOWN';
       }
     } else if (latestKg != null && baselineKg != null) {
       const delta = latestKg - baselineKg;
