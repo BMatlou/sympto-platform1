@@ -15,14 +15,14 @@ export default function EmergencyContactsPage() {
   const { data: dashboard, loading: dashboardLoading, error: dashboardError, reload: reloadDashboard } = useDashboard();
   const [contacts, setContacts] = useState<EmergencyContact[]>([]);
   const [contactsLoading, setContactsLoading] = useState(true);
-  const [contactsError, setContactsError] = useState<unknown>(null);
+  const [contactsError, setContactsError] = useState<string | null>(null);
   const selectedPatientId = dashboard?.patient?.id || requestedPatientId;
 
   const loadContacts = useCallback(async () => {
     if (!selectedPatientId) { if (dashboardLoading) return; setContacts([]); setContactsLoading(false); return; }
     setContactsLoading(true); setContactsError(null);
     try { setContacts(await emergencyContactsService.getForPatient(selectedPatientId)); }
-    catch (error) { const healthHomeContacts = (dashboard?.emergencyContacts ?? []) as EmergencyContact[]; if (healthHomeContacts.length > 0) setContacts(healthHomeContacts); else setContactsError(error); }
+    catch (error) { const healthHomeContacts = (dashboard?.emergencyContacts ?? []) as EmergencyContact[]; if (healthHomeContacts.length > 0) setContacts(healthHomeContacts); else setContactsError(error instanceof Error ? error.message : typeof error === "string" ? error : "We could not load emergency contacts."); }
     finally { setContactsLoading(false); }
   }, [selectedPatientId, dashboard?.emergencyContacts, dashboardLoading]);
 
