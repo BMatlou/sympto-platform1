@@ -504,11 +504,13 @@ export class HealthGoalIntelligenceService {
           ? 'ON_TARGET'
           : targetReachedNow
             ? 'TARGET_REACHED'
-            : daysRemaining === 0
-              ? 'DATE_REACHED'
-              : targetWeight != null && latestKg != null
-                ? 'PLANNING'
-                : 'NO_TARGET_DATE',
+            : daysRemaining == null
+              ? 'NO_TARGET_DATE'
+              : daysRemaining === 0
+                ? 'DATE_REACHED'
+                : targetWeight != null && latestKg != null
+                  ? 'PLANNING'
+                  : 'NO_TARGET_DATE',
     };
 
     const activeConditionRows = await this.prisma.patientCondition.findMany({
