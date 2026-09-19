@@ -1,9 +1,9 @@
 /* Hydration wave presentation only. No state, data or event logic is changed. */
-#daily-health-check-in + div article:nth-child(2) .h-\\[92px\\].w-\\[66px\\] > div:first-child {
+#daily-health-check-in + div article:nth-child(2) [class~="h-[92px]"][class~="w-[66px]"] > div:first-child {
   z-index: 2 !important;
 }
 
-#daily-health-check-in + div article:nth-child(2) .h-\\[92px\\].w-\\[66px\\] > div:first-child::before {
+#daily-health-check-in + div article:nth-child(2) [class~="h-[92px]"][class~="w-[66px]"] > div:first-child::before {
   content: "" !important;
   position: absolute !important;
   left: -18% !important;
@@ -21,7 +21,7 @@
   pointer-events: none !important;
 }
 
-#daily-health-check-in + div article:nth-child(2) .h-\\[92px\\].w-\\[66px\\] > div:first-child::after {
+#daily-health-check-in + div article:nth-child(2) [class~="h-[92px]"][class~="w-[66px]"] > div:first-child::after {
   content: "" !important;
   position: absolute !important;
   left: -20% !important;
@@ -52,8 +52,8 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
-  #daily-health-check-in + div article:nth-child(2) .h-\\[92px\\].w-\\[66px\\] > div:first-child::before,
-  #daily-health-check-in + div article:nth-child(2) .h-\\[92px\\].w-\\[66px\\] > div:first-child::after {
+  #daily-health-check-in + div article:nth-child(2) [class~="h-[92px]"][class~="w-[66px]"] > div:first-child::before,
+  #daily-health-check-in + div article:nth-child(2) [class~="h-[92px]"][class~="w-[66px]"] > div:first-child::after {
     animation: none !important;
   }
 }
