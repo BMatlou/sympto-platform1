@@ -177,15 +177,17 @@ export class GoalsEngineService {
     const baseline = baselineRows.length ? Number(baselineRows[0].loggedValue) : historicalRows.length ? Number(historicalRows[0].loggedValue) : latestRows.length ? Number(latestRows[0].loggedValue) : null;
     const latest = latestRows.length ? Number(latestRows[0].loggedValue) : baseline;
     if (baseline == null || latest == null || !Number.isFinite(baseline) || !Number.isFinite(latest) || target < 0) return { strategy: 'DELTA_REDUCTION', currentValue: latest ?? baseline ?? 0, progressPercent: 0, achieved: false, guidanceText: `${title}: keep tracking weight toward the target.` };
-    if (config.comparison === 'CLOSEST') {      const targetWeight = baseline;
-      const toleranceKg = 0.5;
+    if (config.comparison === 'CLOSEST') {
+      const targetWeight = baseline;
+      const toleranceKg = Math.max(0.5, baseline * 0.02);
       const deviation = Math.abs(latest - targetWeight);
-      const progressPercent = Math.max(0, Math.min(100, 100 - (deviation / toleranceKg) * 100));
+      const stabilityProgressPercent = Math.max(0, Math.min(100, (1 - deviation / toleranceKg) * 100));
       const guidanceText = deviation <= toleranceKg
-        ? `${title}: weight is within ${toleranceKg.toFixed(1)} kg of the maintenance target. Keep tracking your current weight.`
-        : `${title}: weight is ${deviation.toFixed(1)} kg from the maintenance target of ${targetWeight.toFixed(1)} kg. Keep tracking changes from your baseline.`;
-      // Maintenance is an ongoing state, not a one-time achievement.
-      return { strategy: 'DELTA_REDUCTION', currentValue: latest, progressPercent, achieved: false, guidanceText };
+        ? title + ': weight is within the maintenance range around your ' + targetWeight.toFixed(1) + ' kg baseline. Keep tracking your current weight.'
+        : title + ': weight is ' + deviation.toFixed(1) + ' kg from the maintenance baseline of ' + targetWeight.toFixed(1) + ' kg. Keep tracking the trend and review a sustained change.';
+      // Maintenance is an ongoing state: progress represents stability around the baseline,
+      // not elapsed time. A small change therefore produces a visible change in the score.
+      return { strategy: 'DELTA_REDUCTION', currentValue: latest, progressPercent: stabilityProgressPercent, achieved: false, guidanceText };
     }
     // Directional weight targets represent the requested amount of change.
     // INCREASE_TO + target=100 means "gain 100 kg from baseline".
@@ -194,21 +196,22 @@ export class GoalsEngineService {
     const targetWeight = config.comparison === 'INCREASE_TO'
       ? baseline + requestedChangeKg
       : baseline - requestedChangeKg;
-    const movement = config.comparison === 'INCREASE_TO'
-      ? Math.max(latest - baseline, 0)
-      : Math.max(baseline - latest, 0);
+    const directedMovement = config.comparison === 'INCREASE_TO'
+      ? latest - baseline
+      : baseline - latest;
     const progressPercent = requestedChangeKg === 0
       ? Math.abs(latest - targetWeight) <= 0.5 ? 100 : 0
-      : Math.max(0, Math.min(100, (movement / requestedChangeKg) * 100));
+      : Math.max(-100, Math.min(100, (directedMovement / requestedChangeKg) * 100));
     const achieved = config.comparison === 'INCREASE_TO'
       ? latest >= targetWeight
       : latest <= targetWeight;
     const guidanceText = achieved
-      ? `${title}: requested ${config.comparison === 'INCREASE_TO' ? 'gain' : 'loss'} of ${requestedChangeKg.toFixed(1)} kg reached at ${targetWeight.toFixed(1)} kg.`
-      : `${title}: ${config.comparison === 'INCREASE_TO' ? 'gain' : 'loss'} ${requestedChangeKg.toFixed(1)} kg from your ${baseline.toFixed(1)} kg baseline toward ${targetWeight.toFixed(1)} kg.`;
+      ? title + ': requested ' + (config.comparison === 'INCREASE_TO' ? 'gain' : 'loss') + ' of ' + requestedChangeKg.toFixed(1) + ' kg reached at ' + targetWeight.toFixed(1) + ' kg.'
+      : directedMovement < 0
+        ? title + ': your current weight has moved ' + Math.abs(directedMovement).toFixed(1) + ' kg away from the planned ' + (config.comparison === 'INCREASE_TO' ? 'gain' : 'loss') + ' direction.'
+        : title + ': ' + (config.comparison === 'INCREASE_TO' ? 'gain' : 'loss') + ' ' + requestedChangeKg.toFixed(1) + ' kg from your ' + baseline.toFixed(1) + ' kg baseline toward ' + targetWeight.toFixed(1) + ' kg.';
     return { strategy: 'DELTA_REDUCTION', currentValue: latest, progressPercent: achieved ? 100 : progressPercent, achieved, guidanceText };
   }
-
   private async evaluateStrategy(patientId: string, title: string, config: GoalConfig, goalCreatedAt: Date, start: Date, now: Date, aggregate: number, target: number, strategy: TrackingStrategy): Promise<StrategyEvaluation> {
     if (strategy === 'DELTA_REDUCTION') return this.evaluateWeightStrategy(patientId, title, config, goalCreatedAt, now, target);
     const history = await this.prisma.$queryRaw<Array<{ loggedValue: Prisma.Decimal; occurredAt: Date }>>`SELECT "loggedValue", "occurredAt" FROM "HealthGoalMetricEvent" WHERE "patientId" = ${patientId} AND "metricType" = ${config.metricType} AND "metricKey" = ${config.metricKey} AND "occurredAt" >= ${goalCreatedAt} AND "occurredAt" <= ${now} ORDER BY "occurredAt" ASC`;
