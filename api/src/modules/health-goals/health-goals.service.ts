@@ -211,10 +211,10 @@ export class HealthGoalsService {
       if (baseline == null || !Number.isFinite(baseline) || requestedChangeKg == null || !Number.isFinite(requestedChangeKg)) {
         progressStatus = HealthGoalProgressStatus.IMPROVING;
       } else if (comparison === 'CLOSEST') {
-        const toleranceKg = Math.max(0.5, Math.abs(baseline) * 0.02);
+        const maintenanceToleranceKg = Math.max(0.5, Math.abs(baseline) * 0.02);
         const deviation = Math.abs(currentValue - baseline);
-        progressPercent = Math.max(0, Math.min(100, 100 - (deviation / toleranceKg) * 100));
-        progressStatus = deviation <= toleranceKg
+        progressPercent = Math.max(0, Math.min(100, (1 - (deviation / Math.max(Math.abs(baseline), 0.0001))) * 100));
+        progressStatus = deviation <= maintenanceToleranceKg
           ? HealthGoalProgressStatus.ON_TRACK
           : currentValue > baseline
             ? HealthGoalProgressStatus.DECLINING
