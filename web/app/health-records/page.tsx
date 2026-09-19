@@ -103,7 +103,7 @@ function PreviewDocument({ document }: { document: HealthDocument }) {
 }
 
 function ReportModal({ record, onClose }: { record: HealthDocument; onClose: () => void }) {
-  const config = kindConfig[window.record.kind];
+  const config = kindConfig[record.kind];
   const Icon = config.icon;
 
   useEffect(() => {
@@ -150,23 +150,23 @@ function ReportModal({ record, onClose }: { record: HealthDocument; onClose: () 
               </div>
               <div>
                 <p className="text-xs font-extrabold uppercase tracking-[0.16em] text-[#24c1c4]">{config.eyebrow}</p>
-                <h1 id="report-title" className="mt-1 text-2xl font-bold tracking-tight text-[#0b2d54] sm:text-3xl">{window.record.title}</h1>
-                <p className="mt-2 text-sm text-slate-500">{window.record.subtitle}</p>
+                <h1 id="report-title" className="mt-1 text-2xl font-bold tracking-tight text-[#0b2d54] sm:text-3xl">{record.title}</h1>
+                <p className="mt-2 text-sm text-slate-500">{record.subtitle}</p>
               </div>
             </div>
-            <span className="inline-flex min-h-10 items-center rounded-full bg-slate-100 px-3 text-xs font-bold text-slate-600">{window.record.status}</span>
+            <span className="inline-flex min-h-10 items-center rounded-full bg-slate-100 px-3 text-xs font-bold text-slate-600">{record.status}</span>
           </div>
 
           <div className="mt-6 rounded-2xl bg-slate-50 p-4">
             <div className="flex items-center gap-2 text-sm font-bold text-[#0b2d54]">
               <CalendarDays className="h-4 w-4" aria-hidden="true" />
-              {displayDate(window.record.date)}
+              {displayDate(record.date)}
             </div>
-            <p className="mt-1 text-xs text-slate-500">Source: {window.record.source}</p>
+            <p className="mt-1 text-xs text-slate-500">Source: {record.source}</p>
           </div>
 
           <dl className="mt-6 divide-y divide-slate-100 rounded-2xl border border-slate-200">
-            {window.record.fields.map((field) => (
+            {record.fields.map((field) => (
               <div key={field.label} className="grid gap-1 px-4 py-4 sm:grid-cols-[180px_1fr] sm:gap-5">
                 <dt className="text-xs font-extrabold uppercase tracking-wide text-slate-400">{field.label}</dt>
                 <dd className="whitespace-pre-wrap text-sm font-semibold leading-6 text-[#0b2d54]">{field.value}</dd>
