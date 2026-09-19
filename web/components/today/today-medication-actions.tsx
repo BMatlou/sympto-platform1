@@ -184,12 +184,25 @@ export default function TodayMedicationActions({ medications, goal: suppliedGoal
     setSavingKey(`${key}:${action}`);
     try {
       const response = await api.post(`/patient-medications/${key}/adherence`, { action, scheduledFor: new Date().toISOString() });
+      if (response.data?.tracked === false) {
+        toast.warning("Medication tracking is disabled", {
+          description: response.data?.message || "Enable medication tracking in your Health Journal settings before recording adherence.",
+        });
+        return;
+      }
       setStates((current) => ({ ...current, [key]: action }));
       await loadTodayEvents();
       const nextAdherence = response.data?.adherencePercentage;
-      toast.success(action === "TAKEN" ? "Medication marked taken" : "Medication marked skipped", {
-        description: `${medicationName(medication)}${typeof nextAdherence === "number" ? ` · ${Math.round(nextAdherence)}% overall adherence` : ""}`,
-      });
+      const journalUpdated = response.data?.journal?.updated;
+      if (journalUpdated === false) {
+        toast.warning(action === "TAKEN" ? "Medication saved" : "Medication skip saved", {
+          description: "Your medication record was updated, but the Health Journal entry could not be updated.",
+        });
+      } else {
+        toast.success(action === "TAKEN" ? "Medication marked taken" : "Medication marked skipped", {
+          description: `${medicationName(medication)}${typeof nextAdherence === "number" ? ` · ${Math.round(nextAdherence)}% overall adherence` : ""}`,
+        });
+      }
       await onUpdated?.();
     } catch (error) {
       toast.error("Medication update failed", { description: errorMessage(error) });
