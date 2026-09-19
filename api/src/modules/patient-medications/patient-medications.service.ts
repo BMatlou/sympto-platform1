@@ -235,6 +235,13 @@ export class PatientMedicationsService {
     `;
     }
 
+    await this.healthGoalsService.recomputeMetricForPatient(
+      patientId,
+      'MEDICATION',
+      'medication.adherence',
+      effectiveMeasuredAt,
+    );
+
     const dayParts = new Intl.DateTimeFormat('en-CA', {
       timeZone: 'Africa/Johannesburg',
       year: 'numeric',
