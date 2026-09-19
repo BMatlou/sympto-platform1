@@ -1,5 +1,6 @@
 import { api } from "@/lib/api";
 import { SignUpSchema } from "@/schemas/auth.schema";
+import type { AuthResponse } from "@/types/auth";
 
 function unwrap<T>(response: { data: { data?: T } | T }): T {
   const payload = response.data;
@@ -20,10 +21,10 @@ function createRegistrationPayload(data: SignUpSchema) {
 
 export const authService = {
   signUp: async (data: SignUpSchema) => unwrap(await api.post("/auth/register", createRegistrationPayload(data))),
-  signIn: async (data: { email: string; password: string }) => unwrap(await api.post("/auth/login", data)),
+  signIn: async (data: { email: string; password: string }): Promise<AuthResponse> => unwrap<AuthResponse>(await api.post("/auth/login", data)),
   logout: async () => unwrap(await api.post("/auth/logout")),
-  me: async () => unwrap(await api.get("/auth/profile")),
-  refresh: async () => { const refreshToken = localStorage.getItem("refreshToken"); return unwrap(await api.post("/auth/refresh", { refreshToken })); },
+  me: async (): Promise<AuthResponse["user"]> => unwrap<AuthResponse["user"]>(await api.get("/auth/profile")),
+  refresh: async (): Promise<Pick<AuthResponse, "accessToken" | "refreshToken">> => { const refreshToken = localStorage.getItem("refreshToken"); return unwrap<Pick<AuthResponse, "accessToken" | "refreshToken">>(await api.post("/auth/refresh", { refreshToken })); },
   forgotPassword: async (email: string) => unwrap(await api.post("/auth/forgot-password", { email })),
   resetPassword: async (data: { token: string; password: string }) => unwrap(await api.post("/auth/reset-password", data)),
   verifyEmail: async (token: string) => unwrap(await api.post("/auth/verify-email", { token })),
