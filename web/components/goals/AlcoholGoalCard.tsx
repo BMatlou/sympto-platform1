@@ -81,29 +81,40 @@ export const AlcoholGoalCard: React.FC<AlcoholGoalCardProps> = ({ goal, onUpdate
   const [logOpen, setLogOpen] = useState(false);
 
   useEffect(() => {
-    if (!goal?.id) return;
-    const weekKey = southAfricanWeekKey();
-    const weekKeyStorage = `sympto:alcohol-week:${goal.id}`;
-    const totalStorage = `sympto:alcohol-total:${goal.id}`;
-    const previousWeekKey = window.localStorage.getItem(weekKeyStorage);
-    const storedTotal = window.localStorage.getItem(totalStorage);
-
-    const syncWeekBaseline = async () => {
-      if (previousWeekKey === weekKey && storedTotal !== null) {
-        const localTotal = Math.max(0, Number(storedTotal));
-        setThisWeekLogged(Number.isFinite(localTotal) ? localTotal : 0);
-        return;
-      }
+    let active = true;
+    async function loadWeek() {
+      if (!goal?.id) return;
+      const today = new Date();
+      const weekKey = southAfricanWeekKey(today);
+      const weekStart = new Date(`${weekKey}T00:00:00+02:00`);
       try {
-        await healthGoalsService.update(goal.id!, { currentValue: "0" });
+        const response = await healthGoalsService.getMetricEvents(
+          "ALCOHOL",
+          "alcohol.drinks",
+          weekStart,
+          today,
+          "patient-alcohol-log",
+        );
+        if (!active) return;
+        const total = (response.events ?? []).reduce((sum, event) => {
+          const value = Number(event.loggedValue);
+          return sum + (Number.isFinite(value) ? value : 0);
+        }, 0);
+        setThisWeekLogged(Math.max(0, Number(total.toFixed(2))));
       } catch {
-        // Keep the UI at zero for a new/unknown weekly baseline.
+        if (active) setThisWeekLogged(0);
       }
-      setThisWeekLogged(0);
-      window.localStorage.setItem(weekKeyStorage, weekKey);
-      window.localStorage.setItem(totalStorage, "0");
+    }
+
+    void loadWeek();
+    const handleUpdated = () => void loadWeek();
+    const interval = window.setInterval(() => void loadWeek(), 15000);
+    window.addEventListener("sympto:health-goal-updated", handleUpdated);
+    return () => {
+      active = false;
+      window.clearInterval(interval);
+      window.removeEventListener("sympto:health-goal-updated", handleUpdated);
     };
-    void syncWeekBaseline();
   }, [goal?.id]);
 
   const differenceDelta = thisWeekLogged - weeklyTarget;
@@ -121,12 +132,12 @@ export const AlcoholGoalCard: React.FC<AlcoholGoalCardProps> = ({ goal, onUpdate
     if (!goal?.id || !Number.isFinite(drinks) || drinks <= 0 || isAtOrAboveBudget) return;
     try {
       setSaving(true);
-      await healthGoalsService.logAlcohol(goal.id, thisWeekLogged, drinks);
-      const nextTotal = thisWeekLogged + drinks;
-      setThisWeekLogged(nextTotal);
-      window.localStorage.setItem(`sympto:alcohol-total:${goal.id}`, String(nextTotal));
+      const result = await healthGoalsService.logAlcohol(goal.id!, drinks);
+      const nextTotal = Number(result?.journal?.weeklyTotal);
+      setThisWeekLogged(Number.isFinite(nextTotal) ? nextTotal : thisWeekLogged + drinks);
       setDraft("");
       setLogOpen(false);
+      window.dispatchEvent(new Event("sympto:health-goal-updated"));
       await onUpdated?.();
     } finally {
       setSaving(false);
