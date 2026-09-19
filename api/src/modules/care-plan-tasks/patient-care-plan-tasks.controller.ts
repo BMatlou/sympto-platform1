@@ -1,4 +1,4 @@
-import { Body, Controller, Param, Patch, Req, UseGuards } from '@nestjs/common';
+import { BadRequestException, Body, Controller, Param, Patch, Req, UseGuards } from '@nestjs/common';
 import { IsEnum } from 'class-validator';
 
 import { CarePlanTaskStatus } from '@prisma/client';
@@ -22,11 +22,7 @@ export class PatientCarePlanTasksController {
     @Body() dto: UpdatePatientCarePlanTaskStatusDto,
   ) {
     if (dto.status === 'CANCELLED') {
-      return this.carePlanTasksService.updateStatusForPatient(
-        req.user.sub,
-        id,
-        'COMPLETED' as const,
-      );
+      throw new BadRequestException('Patients cannot cancel a clinician care-plan task.');
     }
 
     return this.carePlanTasksService.updateStatusForPatient(
