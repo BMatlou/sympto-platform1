@@ -40,6 +40,11 @@ export class HealthGoalsService {
   }
 
   async findPatientForUser(userId: string) { return this.prisma.patient.findUnique({ where: { userId } }); }
+
+  async recomputeMetricForPatient(patientId: string, metricType: string, metricKey: string, at = new Date()) {
+    return this.healthGoalIntelligence.recomputeMetric(patientId, metricType, metricKey, at);
+  }
+
   private async assertPatientMedicationBelongsToPatient(patientMedicationId: string | undefined, patientId: string) { if (!patientMedicationId) return; const row = await this.prisma.$queryRaw<Array<{ id: string }>>`SELECT pm."id" FROM "PatientMedication" pm INNER JOIN "HealthPassport" hp ON hp."id" = pm."healthPassportId" WHERE pm."id" = ${patientMedicationId} AND hp."patientId" = ${patientId} LIMIT 1`; if (!row.length) throw new BadRequestException('The selected medication does not belong to this patient.'); }
   private async medicationGoalAssociations(goalIds: string[]): Promise<MedicationGoalAssociation[]> { if (!goalIds.length) return []; return this.prisma.$queryRaw<MedicationGoalAssociation[]>`SELECT hg."id" AS "healthGoalId", hg."patientMedicationId", pm."medicationId", m."name" AS "medicationName", pm."dosage", pm."frequency" FROM "HealthGoal" hg LEFT JOIN "PatientMedication" pm ON pm."id" = hg."patientMedicationId" LEFT JOIN "Medication" m ON m."id" = pm."medicationId" WHERE hg."id" IN (${Prisma.join(goalIds)})`; }
   private async attachMedicationGoalAssociations<T extends { id: string; category?: unknown; title?: unknown; description?: unknown; patientId?: string }>(goals: T[]) {
