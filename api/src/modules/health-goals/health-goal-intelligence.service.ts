@@ -55,6 +55,23 @@ type RelationPairRow = {
 
 type WeightEvent = { value: number; at: Date };
 
+type WeightPlan = {
+  direction: 'LOSE' | 'GAIN' | 'MAINTAIN';
+  targetWeightKg: number | null;
+  requestedChangeKg: number | null;
+  remainingChangeKg: number | null;
+  daysRemaining: number | null;
+  requiredDailyChangeKg: number | null;
+  requiredWeeklyChangeKg: number | null;
+  status: 'PLANNING' | 'ON_TARGET' | 'TARGET_REACHED' | 'DATE_REACHED' | 'NO_TARGET_DATE';
+};
+
+type WeightHealthContext = {
+  connectedGoals: Array<{ title: string; category: string; relationshipType: string; direction: string }>;
+  activeConditions: Array<{ name: string; chronic: boolean; severity: string | null; stage: string | null }>;
+  activeMedications: Array<{ name: string; dosage: string | null; frequency: string | null; indication: string | null; sideEffectsRecorded: boolean }>;
+};
+
 const WEIGHT_SUPPORT_RULES = [
   { category: 'EXERCISE', rationale: 'Regular physical activity is a supporting behaviour for weight management and overall health.' },
   { category: 'NUTRITION', rationale: 'Nutrition tracking provides context for energy intake and helps make the weight plan actionable.' },
@@ -442,6 +459,104 @@ export class HealthGoalIntelligenceService {
         : null;
     const weightDataNeedsRefresh = baselineKg == null || (latestWeightAt != null && Date.now() - latestWeightAt.getTime() > 7 * 86400000);
     const checkInNeedsCompletion = !todayJournal;
+
+    const direction: WeightPlan['direction'] =
+      comparison === 'INCREASE_TO' ? 'GAIN'
+        : comparison === 'DECREASE_TO' ? 'LOSE'
+          : 'MAINTAIN';
+
+    const targetDateAt = goal.targetDate ? new Date(goal.targetDate) : null;
+    const daysRemaining = targetDateAt && !Number.isNaN(targetDateAt.getTime())
+      ? Math.max(0, Math.ceil((targetDateAt.getTime() - Date.now()) / 86400000))
+      : null;
+
+    let remainingChangeKg: number | null = null;
+    if (latestKg != null && targetWeight != null) {
+      remainingChangeKg = direction === 'GAIN'
+        ? Math.max(targetWeight - latestKg, 0)
+        : direction === 'LOSE'
+          ? Math.max(latestKg - targetWeight, 0)
+          : 0;
+    }
+
+    const targetReachedNow = direction === 'GAIN'
+      ? targetWeight != null && latestKg != null && latestKg >= targetWeight
+      : direction === 'LOSE'
+        ? targetWeight != null && latestKg != null && latestKg <= targetWeight
+        : false;
+
+    const weightPlan: WeightPlan = {
+      direction,
+      targetWeightKg: targetWeight,
+      requestedChangeKg,
+      remainingChangeKg,
+      daysRemaining,
+      requiredDailyChangeKg:
+        daysRemaining != null && daysRemaining > 0 && remainingChangeKg != null && direction !== 'MAINTAIN'
+          ? remainingChangeKg / daysRemaining
+          : null,
+      requiredWeeklyChangeKg:
+        daysRemaining != null && daysRemaining > 0 && remainingChangeKg != null && direction !== 'MAINTAIN'
+          ? remainingChangeKg / (daysRemaining / 7)
+          : null,
+      status:
+        direction === 'MAINTAIN'
+          ? 'ON_TARGET'
+          : targetReachedNow
+            ? 'TARGET_REACHED'
+            : daysRemaining === 0
+              ? 'DATE_REACHED'
+              : targetWeight != null && latestKg != null
+                ? 'PLANNING'
+                : 'NO_TARGET_DATE',
+    };
+
+    const activeConditionRows = await this.prisma.patientCondition.findMany({
+      where: { healthPassport: { patientId: goal.patientId }, status: 'ACTIVE' },
+      select: {
+        chronic: true,
+        severity: true,
+        stage: true,
+        condition: { select: { name: true, chronic: true } },
+      },
+      orderBy: [{ primaryCondition: 'desc' }, { createdAt: 'asc' }],
+      take: 12,
+    });
+
+    const activeMedicationRows = await this.prisma.patientMedication.findMany({
+      where: { healthPassport: { patientId: goal.patientId }, status: { in: ['ACTIVE', 'PAUSED'] } },
+      select: {
+        dosage: true,
+        frequency: true,
+        indication: true,
+        sideEffects: true,
+        medication: { select: { name: true } },
+      },
+      orderBy: { createdAt: 'asc' },
+      take: 12,
+    });
+
+    const weightHealthContext: WeightHealthContext = {
+      connectedGoals: relationshipData.relationships.map((relation) => ({
+        title: String(relation.goal.title),
+        category: String(relation.goal.category),
+        relationshipType: String(relation.relationshipType),
+        direction: String(relation.direction),
+      })),
+      activeConditions: activeConditionRows.map((row) => ({
+        name: String(row.condition.name),
+        chronic: Boolean(row.chronic || row.condition.chronic),
+        severity: row.severity ? String(row.severity) : null,
+        stage: row.stage ? String(row.stage) : null,
+      })),
+      activeMedications: activeMedicationRows.map((row) => ({
+        name: String(row.medication.name),
+        dosage: row.dosage ? String(row.dosage) : null,
+        frequency: row.frequency ? String(row.frequency) : null,
+        indication: row.indication ? String(row.indication) : null,
+        sideEffectsRecorded: Boolean(row.sideEffects?.trim()),
+      })),
+    };
     const exerciseSupport = relationshipData.relationships.find((relation) =>
       relation.relationshipType === 'SUPPORTS' && String(relation.goal.category).toUpperCase() === 'EXERCISE',
     );
@@ -512,9 +627,11 @@ export class HealthGoalIntelligenceService {
             : targetWeight != null ? `Keep moving toward ${targetWeight.toFixed(1)} kg` : 'Keep your loss plan moving',
         description: isMaintenanceGoal
           ? 'Your recent weight pattern is stable; use today’s check-in to keep the picture current.'
-          : comparison === 'INCREASE_TO'
-            ? 'Use the supporting habits already connected to this gain goal rather than adding another task list.'
-            : 'Use the supporting habits already connected to this loss goal rather than adding another task list.',
+          : weightPlan.requiredWeeklyChangeKg != null
+            ? 'You need to ' + (direction === 'GAIN' ? 'gain' : 'lose') + ' about ' + weightPlan.requiredDailyChangeKg!.toFixed(2) + ' kg/day (' + weightPlan.requiredWeeklyChangeKg!.toFixed(2) + ' kg/week) from your current weight to reach the planned target by the target date.'
+            : comparison === 'INCREASE_TO'
+              ? 'Use the supporting habits already connected to this gain goal rather than adding another task list.'
+              : 'Use the supporting habits already connected to this loss goal rather than adding another task list.',
         href: '#daily-health-check-in',
         priority: 'PRIMARY',
       });
@@ -572,6 +689,8 @@ export class HealthGoalIntelligenceService {
         baselineBmi,
         adultBmiApplicable,
       },
+      weightPlan,
+      healthContext: weightHealthContext,
       weight: {
         latestKg,
         average7dKg,
