@@ -84,7 +84,6 @@ export default function TodaySmokingGoal({ goal, onUpdated }: Props) {
   async function save() {
     const cigarettes = Number(draft.trim());
     if (!goalId || !draft.trim() || !Number.isFinite(cigarettes) || cigarettes < 0) return;
-    if (hasTarget && cigarettes > dailyTarget) return;
     try {
       setSaving(true);
       await healthGoalsService.logSmoking(goalId, cigarettes, localDayKey());
@@ -150,7 +149,7 @@ export default function TodaySmokingGoal({ goal, onUpdated }: Props) {
           </div>
         </section>
 
-        {open && !targetReached && !exceeded && (
+        {open && (
           <section className="mt-3 rounded-[18px] border border-[#e1ecee] bg-[#f8fbfb] p-3">
             <label htmlFor={`smoking-${goalId}`} className="text-[8px] font-black uppercase tracking-[.14em] text-[#74859a]">Cigarettes today</label>
             <div className="mt-1.5 flex gap-2"><input id={`smoking-${goalId}`} type="number" min="0" max={hasTarget ? dailyTarget : undefined} step="1" inputMode="numeric" value={draft} onChange={(event) => setDraft(event.target.value)} className="min-h-9 min-w-0 flex-1 rounded-xl border border-[#d7e4e8] bg-white px-3 text-xs font-bold text-[#0b2d54] outline-none focus:border-[#24c1c4]" /><button type="button" disabled={saving} onClick={() => void save()} className="min-h-9 rounded-xl bg-[#0b2d54] px-3.5 text-[9px] font-black text-white disabled:opacity-50">{saving ? "Saving…" : "Save"}</button></div>
@@ -160,7 +159,7 @@ export default function TodaySmokingGoal({ goal, onUpdated }: Props) {
 
         <div className="mt-3 flex items-center justify-between gap-3 rounded-[18px] border border-[#e2ecef] bg-[#fbfdfd] px-3 py-2.5">
           <p className="min-w-0 text-[9px] font-semibold leading-4 text-[#74859a]">{todayLogged === null ? "Keep the number honest — Sympto tracks today against your ceiling." : "Your smoking entry is tracked against today’s ceiling."}</p>
-          <button type="button" disabled={targetReached || exceeded} onClick={() => { if (!targetReached && !exceeded) { setOpen(true); setDraft(todayLogged == null ? "" : String(todayLogged)); } }} className={`shrink-0 rounded-xl px-3 py-2 text-[9px] font-black ${targetReached || exceeded ? "cursor-not-allowed bg-[#edf2f4] text-[#97a3ad]" : "bg-[#0b2d54] text-white"}`}>{targetReached ? "Reached" : exceeded ? "Over" : open ? "Close" : todayLogged === null ? "Log today" : "Update"}</button>
+          <button type="button" onClick={() => { setOpen((value) => !value); setDraft(todayLogged == null ? "" : String(todayLogged)); }} className="shrink-0 rounded-xl bg-[#0b2d54] px-3 py-2 text-[9px] font-black text-white">{open ? "Close" : todayLogged === null ? "Log today" : "Update"}</button>
         </div>
       </div>
 
