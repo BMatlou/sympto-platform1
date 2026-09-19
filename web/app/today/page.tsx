@@ -149,7 +149,7 @@ export default function TodayPage() {
   const goals = allGoals.filter((goal: any) => String(goal?.status).toUpperCase() === "ACTIVE");
   const medicationGoalCards = (Array.isArray(medications) ? medications : []).map((medication: any) => ({ medication, goal: medicationGoalFor(medication, activeGoalsArray, medications.length) }));
   const unmatchedMedicationGoals = activeGoalsArray.filter((goal: any) => isMedicationGoal(goal) && !medicationGoalCards.some((item: any) => item.goal?.id === goal?.id));
-  const matchedMedicationGoalCard = medicationGoalCards.find((item: any) => item.goal?.id === (medicationGoalCards.find((candidate: any) => candidate.goal)?.goal?.id ?? "")); const medicationGoal = matchedMedicationGoalCard?.goal || unmatchedMedicationGoals[0] || null;
+  const matchedMedicationGoalCard = medicationGoalCards.find((item: any) => Boolean(item.goal)) ?? null; const medicationGoal = matchedMedicationGoalCard?.goal || unmatchedMedicationGoals[0] || null;
   const smokingGoal = todayGoalArray.find((goal: any) => String(goal?.category ?? "").toUpperCase() === "SMOKING");
   const alcoholGoal = todayGoalArray.find((goal: any) => String(goal?.category ?? "").toUpperCase() === "ALCOHOL");
   const weightGoal = todayGoalArray.find((goal: any) => String(goal?.category ?? "").toUpperCase() === "WEIGHT");
