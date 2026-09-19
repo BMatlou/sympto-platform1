@@ -184,13 +184,14 @@ export default function TodayWeightGoal({ goal, fallbackWeight }: Props) {
   const planRemaining = numberValue(weightPlan?.remainingChangeKg);
   const planDaysRemaining = numberValue(weightPlan?.daysRemaining);
   const planTargetWeight = numberValue(weightPlan?.targetWeightKg) ?? targetWeight;
-  const contextGoals = Array.isArray(healthContext?.connectedGoals) ? healthContext.connectedGoals : connectedGoals;
+  const maintenanceBand = intelligence?.weight?.maintenanceBand ?? null;
+  const contextGoals = Array.isArray(healthContext?.connectedGoals) ? healthContext.connectedGoals : [];
   const contextConditions = Array.isArray(healthContext?.activeConditions) ? healthContext.activeConditions : [];
   const contextMedications = Array.isArray(healthContext?.activeMedications) ? healthContext.activeMedications : [];
   const requiredRateMessage = goalCompleted
     ? "This weight journey is complete. Start a new goal if you want to set a new destination."
     : isMaintenanceGoal
-      ? `Maintain around ${formatKg(planTargetWeight)} kg. No planned net loss or gain is required; keep your recent average within the maintenance band shown below.`
+      ? `Maintain around ${formatKg(planTargetWeight)} kg. No planned net loss or gain is required; use the maintenance band of ${formatKg(numberValue(maintenanceBand?.min) ?? startingWeight)}–${formatKg(numberValue(maintenanceBand?.max) ?? startingWeight)} kg as the stability reference.`
       : planDailyRate != null && planWeeklyRate != null && planDaysRemaining != null
         ? `To reach ${formatKg(planTargetWeight)} kg by ${formatDate(journey.targetDate)}, you need to ${comparison === "INCREASE_TO" ? "gain" : "lose"} about ${formatRate(planDailyRate)} kg/day or ${formatRate(planWeeklyRate)} kg/week from your current recorded weight. ${planRemaining != null ? `${formatKg(planRemaining)} kg remains.` : ""}`
         : `Set a target date to calculate the daily and weekly rate needed to reach ${formatKg(planTargetWeight)} kg.`;
@@ -412,7 +413,7 @@ export default function TodayWeightGoal({ goal, fallbackWeight }: Props) {
           </div>
         )}
 
-        {!loading && currentWeight != null && ((guidanceMessage || bmiCaution || gainTargetCaution) || goalCompleted) && (
+        {!loading && currentWeight != null && (
           <div className={`mt-4 rounded-[20px] border px-4 py-3.5 text-[10px] font-semibold leading-5 ${goalCompleted ? "border-[#dcebed] bg-[#f4fbfa] text-[#496a73]" : goalNeedsReview ? "border-amber-200 bg-amber-50 text-amber-900" : "border-[#dcebed] bg-[#f4fbfa] text-[#496a73]"}`}>
             <p className="font-black uppercase tracking-[.12em]">{goalCompleted ? "Completed weight goal" : "Weight &amp; BMI guidance"}</p>
             <p className="mt-1.5">{trendMessage}</p>
