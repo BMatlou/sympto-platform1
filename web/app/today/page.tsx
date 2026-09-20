@@ -66,25 +66,53 @@ function isMedicationGoal(goal: any) {
 
 function medicationGoalFor(medication: any, goals: any[], medicationCount: number) {
   const medicationId = patientMedicationId(medication);
-  const medicationCatalogIds = [medication?.medicationId, medication?.medication?.id, medication?.medication?.medicationId].filter(Boolean).map(String);
+  const medicationRecordIds = [
+    medicationId,
+    medication?.patientMedicationId,
+    medication?.patientMedication?.id,
+  ].filter(Boolean).map(String);
+  const medicationCatalogIds = [
+    medication?.medicationId,
+    medication?.medication?.id,
+    medication?.medication?.medicationId,
+  ].filter(Boolean).map(String);
 
   return goals.find((goal: any) => {
     const status = String(goal?.status ?? "").toUpperCase();
     if (!isMedicationGoal(goal) || !["ACTIVE", "IN_PROGRESS"].includes(status)) return false;
 
-    if (goal?.patientMedicationId) {
-      return Boolean(medicationId) && String(goal.patientMedicationId) === String(medicationId);
+    const linkedPatientMedicationId =
+      goal?.patientMedicationId ||
+      goal?.patientMedication?.id ||
+      goal?.associatedPatientMedicationId ||
+      goal?.associatedPatientMedication?.id;
+
+    if (linkedPatientMedicationId) {
+      return medicationRecordIds.includes(String(linkedPatientMedicationId));
     }
 
-    const linkedMedicationId = goal?.associatedMedicationId || goal?.medicationId || goal?.associatedMedication?.id || goal?.patientMedication?.id || goal?.medication?.id;
-    if (linkedMedicationId) return medicationCatalogIds.includes(String(linkedMedicationId));
+    const linkedMedicationId =
+      goal?.associatedMedicationId ||
+      goal?.medicationId ||
+      goal?.associatedMedication?.id ||
+      goal?.medication?.id;
+
+    if (linkedMedicationId) {
+      return medicationCatalogIds.includes(String(linkedMedicationId));
+    }
 
     const title = normalise(goal?.title);
     if (medicationCount === 1 && title === "manage medication") return true;
 
     const name = medicationName(medication);
     if (!name) return false;
-    const goalNames = [goal?.medication?.name, goal?.medication?.genericName, goal?.medication?.brandName, goal?.title, goal?.description].map(normalise).filter(Boolean);
+    const goalNames = [
+      goal?.medication?.name,
+      goal?.medication?.genericName,
+      goal?.medication?.brandName,
+      goal?.title,
+      goal?.description,
+    ].map(normalise).filter(Boolean);
     return goalNames.some((candidate) => candidate === name || candidate.includes(name) || name.includes(candidate));
   }) ?? null;
 }
