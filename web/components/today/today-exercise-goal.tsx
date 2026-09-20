@@ -144,7 +144,7 @@ export default function TodayExerciseGoal({ goal }: Props) {
               <p className="text-[10px] font-black text-white/70">Day {journey.journeyDay} · {journey.daysLeft === null ? "Journey active" : journey.daysLeft === 0 ? "Target date today" : `${journey.daysLeft} days left`}</p>
               <p className="mt-1 text-[9px] text-white/40">Target date: {formatDate(journey.targetDate)}</p>
             </div>
-            <Link href="/health-goals" className="inline-flex min-h-9 shrink-0 items-center gap-1.5 rounded-xl bg-white/10 px-3 py-2 text-[10px] font-black text-white ring-1 ring-white/10 transition hover:bg-white/15">
+            <Link href={`/health-goals#goal-${encodeURIComponent(String(goal?.id ?? ""))}`} className="inline-flex min-h-9 shrink-0 items-center gap-1.5 rounded-xl bg-white/10 px-3 py-2 text-[10px] font-black text-white ring-1 ring-white/10 transition hover:bg-white/15">
               View goal <ArrowRight className="h-3 w-3" />
             </Link>
           </div>
