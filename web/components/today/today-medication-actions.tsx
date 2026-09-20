@@ -121,10 +121,11 @@ export default function TodayMedicationActions({ medications, goal: suppliedGoal
       goal.category === "MEDICATION" ||
       goal.title?.toLowerCase() === "manage medication";
 
-    const isPrimaryMetforminScript = medication.name?.toLowerCase().includes("metformin");
     const isGoalUnlinked = !goal.patientMedicationId;
 
-    return isMedicationGoal && isPrimaryMetforminScript && isGoalUnlinked;
+    // A legacy, unlinked medication goal can only be safely matched when
+    // there is exactly one medication on the Today page.
+    return isMedicationGoal && isGoalUnlinked && medications.length === 1;
   }) || null;
 
   const medicationId = patientMedicationId(trackedMedication);
@@ -145,7 +146,11 @@ export default function TodayMedicationActions({ medications, goal: suppliedGoal
     try {
       const { start, end } = todayBounds();
       const result = await healthGoalsService.getMetricEvents("MEDICATION", "medication.adherence", start, end, "medication-adherence");
-      const eventCount = Number(result?.count);
+      const medicationPrefix = medicationId ? String(medicationId) + ":" : null;
+      const medicationEvents = medicationPrefix
+        ? (result?.events ?? []).filter((event) => String(event?.sourceId ?? "").startsWith(medicationPrefix))
+        : [];
+      const eventCount = medicationPrefix ? medicationEvents.length : 0;
       setDosesLoggedToday(Number.isFinite(eventCount) ? Math.min(totalRequiredDosesPerDay, Math.max(0, eventCount)) : 0);
     } catch {
       // Keep the current UI if event history cannot be loaded.
