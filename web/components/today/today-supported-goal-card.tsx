@@ -77,6 +77,23 @@ function sourceAction(category: string) {
   return { label: "Open health goal", href: "/health-goals" };
 }
 
+function goalNextStep(category: string, current: number | null, target: number | null) {
+  if (current == null || target == null) return "Record a measure to start meaningful progress tracking.";
+  if (category === "NUTRITION" || category === "BLOOD_PRESSURE" || category === "BLOOD_GLUCOSE" || category === "CHOLESTEROL" || category === "MENTAL_HEALTH" || category === "HEART_RATE") {
+    if (current <= target) return "You are currently within your ceiling. Keep tracking the next reading.";
+    return "You are above the goal ceiling. Review the next reading and keep tracking the trend.";
+  }
+  if (category === "SLEEP" || category === "HYDRATION" || category === "EXERCISE") {
+    if (current >= target) return "Target met for the current period. Keep the routine consistent.";
+    return "Keep building toward the target in the current period.";
+  }
+  if (category === "OTHER") {
+    if (Math.abs(current - target) <= Math.max(0.5, Math.abs(target) * 0.05)) return "Your current value is close to the target.";
+    return current < target ? "Continue moving toward the target." : "Your current value is above the target; keep tracking the direction.";
+  }
+  return "Keep tracking this goal.";
+}
+
 const DEFAULT_METRICS: Record<string, { metricType: string; metricKey: string }> = {
   NUTRITION: { metricType: "NUTRITION", metricKey: "nutrition.calories" },
   BLOOD_PRESSURE: { metricType: "BLOOD_PRESSURE", metricKey: "blood_pressure.systolic" },
@@ -99,6 +116,7 @@ export default function TodaySupportedGoalCard({ goal, onUpdated }: SupportedGoa
   const target = targetValue(goal);
   const progress = progressPercent(goal);
   const source = sourceAction(category);
+  const nextStep = goalNextStep(category, current, target);
   const goalId = String(goal?.id ?? "");
   const defaultMetric = DEFAULT_METRICS[category] ?? DEFAULT_METRICS.OTHER;
   const metricType = String(goal?.metricConfig?.metricType ?? defaultMetric.metricType).toUpperCase();
@@ -157,6 +175,7 @@ export default function TodaySupportedGoalCard({ goal, onUpdated }: SupportedGoa
 
         <div className="mt-3 rounded-[17px] bg-[#fbfdfd] p-3.5 ring-1 ring-[#e4edef]">
           <p className="text-[10px] leading-5 text-[#758896]">{meta.helper}</p>
+          <div className="mt-2 rounded-xl bg-[#e9f9fa] px-3 py-2"><p className="text-[9px] font-bold leading-4 text-[#0b6f73]">{nextStep}</p></div>
           {meta.action === "MANUAL" ? (
             <div className="mt-3 flex flex-col gap-2 sm:flex-row">
               <input type="number" inputMode="decimal" step={meta.step} min={meta.min} max={meta.max} value={value} onChange={(event) => setValue(event.target.value)} placeholder={meta.placeholder} aria-label={"Record " + meta.label + " value"} className="min-h-10 w-full rounded-xl border border-[#d8e5e9] bg-white px-3 text-xs font-bold text-[#0b2d54] outline-none placeholder:text-[#a2afb8] focus:border-[#24c1c4]" />
