@@ -42,8 +42,6 @@ async function hydrateSavedMedicationDetails(medications: any[]): Promise<any[]>
 function normalizeGoals(result: HealthHomeResponse, fullGoals: any[]) {
   const patientWeight = result.patient?.weightKg != null ? Number(result.patient.weightKg) : null;
   const medications = Array.isArray(result.medications) ? result.medications : [];
-  const adherenceValues = medications.map((medication: any) => Number(medication?.adherencePercentage)).filter((value: number) => Number.isFinite(value));
-  const medicationAdherence = adherenceValues.length ? Number((adherenceValues.reduce((sum, value) => sum + value, 0) / adherenceValues.length).toFixed(2)) : null;
   return fullGoals.map((goal: any) => {
     const category = String(goal?.category ?? "").toUpperCase();
     const progress = Array.isArray(goal?.progress) ? goal.progress : [];
@@ -53,7 +51,19 @@ function normalizeGoals(result: HealthHomeResponse, fullGoals: any[]) {
       const targetValue = Number(goal?.targetValue ?? 0); const target = Number.isFinite(targetValue) && targetValue > 0 ? targetValue : 0; const hasSmokingMeasurement = latestRecordedProgress?.currentValue != null || latestRecordedProgress?.progressPercent != null; const currentValue = hasSmokingMeasurement && goal?.currentValue != null ? Number(goal.currentValue) : hasSmokingMeasurement && latestRecordedProgress?.currentValue != null ? Number(latestRecordedProgress.currentValue) : null; const hasReachedTarget = currentValue != null && Number.isFinite(currentValue) && target > 0 && currentValue <= target; const storedAsFalseAchievement = String(goal?.status ?? "").toUpperCase() === "ACHIEVED" && !hasReachedTarget; const guidanceText = !hasSmokingMeasurement ? `No daily cigarette count logged yet. Your target is ${target || "your configured"} cigarettes/day; log each day to track the step-down taper.` : currentValue != null && currentValue <= target ? `On track: ${currentValue} cigarette${currentValue === 1 ? "" : "s"} today, at or below your ${target}-cigarette daily target.` : `Above target today. Keep logging your daily count so Sympto can track its step-down taper toward ${target} cigarettes/day.`; if (storedAsFalseAchievement || !hasSmokingMeasurement) return { ...goal, status: storedAsFalseAchievement ? "ACTIVE" : goal?.status ?? "ACTIVE", currentValue: null, achievedAt: storedAsFalseAchievement ? null : goal?.achievedAt ?? null, description: guidanceText, latestProgress: { ...(latestRecordedProgress ?? {}), currentValue: null, progressPercent: storedAsFalseAchievement ? 0 : Number(latestRecordedProgress?.progressPercent ?? 0), status: "IMPROVING", notes: guidanceText } }; return { ...goal, currentValue, description: guidanceText, latestProgress: { ...(latestRecordedProgress ?? {}), currentValue, progressPercent: Number(latestRecordedProgress?.progressPercent ?? 0), status: hasReachedTarget ? "ACHIEVED" : "IMPROVING", notes: guidanceText } };
     }
     if (category === "MEDICATION") {
-      const targetValue = Number(goal?.targetValue ?? goal?.metricConfig?.frequencyTarget ?? DEFAULT_MEDICATION_TARGET); const target = Number.isFinite(targetValue) && targetValue > 0 ? targetValue : DEFAULT_MEDICATION_TARGET; const currentValue = medicationAdherence; const progressPercent = currentValue == null ? 0 : Math.min(100, Math.max(0, Math.round((currentValue / target) * 100))); const originalStatus = String(goal?.status ?? "").toUpperCase(); const todayStatus = originalStatus === "NOT_STARTED" ? "ACTIVE" : originalStatus; return { ...goal, unit: "%", targetValue: target, currentValue, status: todayStatus, achievedAt: goal?.achievedAt ?? null, latestProgress: { ...(historicalAchievement ?? progress[0] ?? {}), currentValue, progressPercent, status: todayStatus === "ACHIEVED" ? "ACHIEVED" : "IMPROVING" } };
+      const targetValue = Number(goal?.targetValue ?? goal?.metricConfig?.frequencyTarget ?? DEFAULT_MEDICATION_TARGET);
+      const target = Number.isFinite(targetValue) && targetValue > 0 ? targetValue : DEFAULT_MEDICATION_TARGET;
+      const linkedPatientMedicationId = goal?.patientMedicationId ?? goal?.patientMedication?.id ?? goal?.associatedPatientMedicationId ?? goal?.associatedPatientMedication?.id ?? null;
+      const linkedMedication = linkedPatientMedicationId
+        ? medications.find((medication: any) => String(medication?.patientMedicationId ?? medication?.patientMedication?.id ?? medication?.id ?? "") === String(linkedPatientMedicationId))
+        : medications.length === 1 ? medications[0] : null;
+      const rawCurrentValue = linkedMedication?.adherencePercentage ?? linkedMedication?.adherence?.percentage ?? null;
+      const currentValue = rawCurrentValue == null ? null : Number(rawCurrentValue);
+      const safeCurrentValue = Number.isFinite(currentValue) ? currentValue : null;
+      const progressPercent = safeCurrentValue == null ? 0 : Math.min(100, Math.max(0, Math.round((safeCurrentValue / target) * 100)));
+      const originalStatus = String(goal?.status ?? "").toUpperCase();
+      const todayStatus = originalStatus === "NOT_STARTED" ? "ACTIVE" : originalStatus;
+      return { ...goal, unit: "%", targetValue: target, currentValue: safeCurrentValue, status: todayStatus, achievedAt: goal?.achievedAt ?? null, latestProgress: { ...(historicalAchievement ?? progress[0] ?? {}), currentValue: safeCurrentValue, progressPercent, status: todayStatus === "ACHIEVED" ? "ACHIEVED" : "IMPROVING" } };
     }
     if (!historicalAchievement && String(goal?.status ?? "").toUpperCase() !== "ACHIEVED") return goal;
     const isWeightGoal = category === "WEIGHT"; const currentValue = isWeightGoal && Number.isFinite(patientWeight) ? patientWeight : goal?.currentValue ?? historicalAchievement?.currentValue ?? null;
