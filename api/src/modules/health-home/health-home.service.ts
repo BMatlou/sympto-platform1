@@ -136,6 +136,30 @@ export class HealthHomeService {
       });
     }
 
+    if (input.systolicPressure !== undefined) {
+      await this.goalsEngine.recordMetricEvent({
+        patientId: patient.id,
+        metricType: 'BLOOD_PRESSURE',
+        metricKey: 'blood_pressure.systolic',
+        loggedValue: input.systolicPressure,
+        occurredAt: measuredAt,
+        source: 'manual-vitals',
+        sourceId: measuredAt.toISOString(),
+      });
+    }
+
+    if (input.restingHeartRate !== undefined) {
+      await this.goalsEngine.recordMetricEvent({
+        patientId: patient.id,
+        metricType: 'HEART_RATE',
+        metricKey: 'heart_rate.bpm',
+        loggedValue: input.restingHeartRate,
+        occurredAt: measuredAt,
+        source: 'manual-vitals',
+        sourceId: measuredAt.toISOString(),
+      });
+    }
+
     const { start, end } = southAfricaDayBounds(measuredAt);
     const parts = [
       input.weightKg != null ? `Weight: ${Number(input.weightKg).toFixed(1)} kg.` : null,
