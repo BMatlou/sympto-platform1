@@ -6,6 +6,7 @@ import { QueryHealthGoalDto } from './dto/query-health-goal.dto';
 import { UpdateHealthGoalDto } from './dto/update-health-goal.dto';
 import { RecordHealthGoalProgressDto } from './dto/record-health-goal-progress.dto';
 import { HealthGoalIntelligenceService } from './health-goal-intelligence.service';
+import { goalRuleFor } from './goal-metric-rules';
 
 const DEFAULT_MEDICATION_TARGET = 90;
 type MedicationGoalAssociation = { healthGoalId: string; patientMedicationId: string | null; medicationId: string | null; medicationName: string | null; dosage: string | null; frequency: string | null };
@@ -79,13 +80,29 @@ export class HealthGoalsService {
   }
   private async ensureOnboardingExerciseGoalMetric(goal: any) { return goal; }
 
+  private canonicalMetricConfig(category: string, config: any) {
+    const normalizedCategory = String(category ?? 'OTHER').toUpperCase();
+    const rule = goalRuleFor(normalizedCategory);
+    return {
+      metricType: rule.metricType,
+      metricKey: rule.metricKey,
+      frequency: rule.frequency,
+      frequencyTarget: config?.frequencyTarget == null ? null : Number(config.frequencyTarget),
+      aggregation: rule.aggregation,
+      comparison: config?.comparison ?? rule.comparison,
+      guidanceText: config?.guidanceText ?? null,
+    };
+  }
+
   public async configureMetric(goalId: string, config: any) {
-    const goal = await this.prisma.healthGoal.findUnique({ where: { id: goalId }, select: { status: true } });
+    const goal = await this.prisma.healthGoal.findUnique({ where: { id: goalId }, select: { status: true, category: true, targetValue: true } });
     if (!goal) throw new NotFoundException('Health goal not found.');
     if (String(goal.status).toUpperCase() === 'ACHIEVED') throw new BadRequestException('Completed health goals are locked. Start a new goal instead.');
+    const canonical = this.canonicalMetricConfig(String(goal.category), { ...config, frequencyTarget: config?.frequencyTarget ?? goal.targetValue });
     const existing = await this.prisma.$queryRaw<Array<{ id: string }>>`SELECT "id" FROM "HealthGoalMetricConfig" WHERE "healthGoalId" = ${goalId} LIMIT 1`;
-    if (existing.length) await this.prisma.$executeRaw`UPDATE "HealthGoalMetricConfig" SET "metricType" = ${config.metricType ?? null}, "metricKey" = ${config.metricKey ?? null}, "frequency" = ${config.frequency ?? null}, "frequencyTarget" = ${config.frequencyTarget ?? null}, "aggregation" = ${config.aggregation ?? null}, "comparison" = ${config.comparison ?? null}, "guidanceText" = ${config.guidanceText ?? null} WHERE "id" = ${existing[0].id}`;
-    else await this.prisma.$executeRaw`INSERT INTO "HealthGoalMetricConfig" ("id", "healthGoalId", "metricType", "metricKey", "frequency", "frequencyTarget", "aggregation", "comparison", "guidanceText") VALUES (gen_random_uuid(), ${goalId}, ${config.metricType ?? null}, ${config.metricKey ?? null}, ${config.frequency ?? null}, ${config.frequencyTarget ?? null}, ${config.aggregation ?? null}, ${config.comparison ?? null}, ${config.guidanceText ?? null})`;
+    if (existing.length) await this.prisma.$executeRaw`UPDATE "HealthGoalMetricConfig" SET "metricType" = ${canonical.metricType}, "metricKey" = ${canonical.metricKey}, "frequency" = ${canonical.frequency}, "frequencyTarget" = ${canonical.frequencyTarget}, "aggregation" = ${canonical.aggregation}, "comparison" = ${canonical.comparison}, "guidanceText" = ${canonical.guidanceText} WHERE "id" = ${existing[0].id}`;
+    else await this.prisma.$executeRaw`INSERT INTO "HealthGoalMetricConfig" ("id", "healthGoalId", "metricType", "metricKey", "frequency", "frequencyTarget", "aggregation", "comparison", "guidanceText") VALUES (gen_random_uuid(), ${goalId}, ${canonical.metricType}, ${canonical.metricKey}, ${canonical.frequency}, ${canonical.frequencyTarget}, ${canonical.aggregation}, ${canonical.comparison}, ${canonical.guidanceText})`;
+    return canonical;
   }
 
   private async assertWeightTargetDirection(patientId: string, targetValue: unknown, comparison: unknown) {
@@ -117,16 +134,29 @@ export class HealthGoalsService {
   }
 
   async create(dto: CreateHealthGoalDto) {
-    const { metricType, metricKey, frequency, frequencyTarget, aggregation, comparison, guidanceText, patientMedicationId, ...goalData } = dto; const isMedicationGoal = goalData.category === 'MEDICATION';
-    if (patientMedicationId && !isMedicationGoal) throw new BadRequestException('A medication can only be attached to a medication goal.'); await this.assertPatientMedicationBelongsToPatient(patientMedicationId, String(goalData.patientId));
-    const targetValue = goalData.targetValue ?? (isMedicationGoal ? String(DEFAULT_MEDICATION_TARGET) : undefined); const unit = goalData.unit ?? (isMedicationGoal ? '%' : undefined);
-    if (String(goalData.category).toUpperCase() === 'WEIGHT') {
-      await this.assertWeightTargetDirection(String(goalData.patientId), targetValue, comparison);
+    const { metricType, metricKey, frequency, frequencyTarget, aggregation, comparison, guidanceText, patientMedicationId, ...goalData } = dto;
+    const category = String(goalData.category).toUpperCase();
+    const isMedicationGoal = category === 'MEDICATION';
+    if (patientMedicationId && !isMedicationGoal) throw new BadRequestException('A medication can only be attached to a medication goal.');
+    await this.assertPatientMedicationBelongsToPatient(patientMedicationId, String(goalData.patientId));
+    const targetValue = goalData.targetValue ?? (isMedicationGoal ? String(DEFAULT_MEDICATION_TARGET) : undefined);
+    const unit = goalData.unit ?? (isMedicationGoal ? '%' : undefined);
+    const effectiveComparison = category === 'WEIGHT' ? (comparison ?? 'DECREASE_TO') : comparison;
+    if (category === 'WEIGHT') {
+      await this.assertWeightTargetDirection(String(goalData.patientId), targetValue, effectiveComparison);
     }
     const goal = await this.prisma.healthGoal.create({ data: { ...goalData, ...(targetValue !== undefined ? { targetValue } : {}), ...(unit !== undefined ? { unit } : {}) }, include: { patient: true, practitioner: true, carePlan: true, progress: true } });
     if (patientMedicationId) await this.prisma.$executeRaw`UPDATE "HealthGoal" SET "patientMedicationId" = ${patientMedicationId} WHERE "id" = ${goal.id}`;
-    await this.configureMetric(goal.id, { metricType, metricKey, frequency, frequencyTarget: frequencyTarget == null ? (isMedicationGoal ? DEFAULT_MEDICATION_TARGET : undefined) : Number(frequencyTarget), aggregation, comparison, guidanceText });
-    if (String(goalData.category).toUpperCase() === 'WEIGHT' && String(metricType).toUpperCase() === 'WEIGHT') await this.captureWeightGoalBaseline(goal.id, String(goalData.patientId), goal.createdAt);
+    await this.configureMetric(goal.id, {
+      metricType: metricType ?? goalRuleFor(category).metricType,
+      metricKey: metricKey ?? goalRuleFor(category).metricKey,
+      frequency: frequency ?? goalRuleFor(category).frequency,
+      frequencyTarget: frequencyTarget == null ? (targetValue == null ? null : Number(targetValue)) : Number(frequencyTarget),
+      aggregation: aggregation ?? goalRuleFor(category).aggregation,
+      comparison: effectiveComparison ?? goalRuleFor(category).comparison,
+      guidanceText,
+    });
+    if (category === 'WEIGHT') await this.captureWeightGoalBaseline(goal.id, String(goalData.patientId), goal.createdAt);
     await this.healthGoalIntelligence.syncGoalRelations(String(goalData.patientId));
     return this.findOne(goal.id);
   }
@@ -147,7 +177,9 @@ export class HealthGoalsService {
     if (existingStatus === 'ACHIEVED') throw new BadRequestException('Completed health goals are locked. Start a new goal instead.');
     const isMedicationGoal = String(existing.category).toUpperCase() === 'MEDICATION';
     const { patientMedicationId, metricType, metricKey, frequency, frequencyTarget, aggregation, comparison, guidanceText, ...goalData } = dto as any;
+    const existingCategory = String(existing.category).toUpperCase();
     const targetCategory = String(goalData.category ?? existing.category).toUpperCase();
+    if (targetCategory !== existingCategory) throw new BadRequestException('A goal category cannot be changed after it is created. Start a new goal for a different category.');
     if (patientMedicationId && targetCategory !== 'MEDICATION') throw new BadRequestException('A medication can only be attached to a medication goal.');
     if (patientMedicationId) await this.assertPatientMedicationBelongsToPatient(patientMedicationId, String(existing.patientId));
     const revisingWeightGoal = targetCategory === 'WEIGHT';
@@ -177,6 +209,15 @@ export class HealthGoalsService {
     if (revisingWeightGoal) {
       await this.captureWeightGoalBaseline(id, String(existing.patientId), new Date());
     }
+    await this.configureMetric(id, {
+      metricType,
+      metricKey,
+      frequency,
+      frequencyTarget: frequencyTarget == null ? (goalData.targetValue ?? existing.targetValue) : frequencyTarget,
+      aggregation,
+      comparison,
+      guidanceText,
+    });
     await this.healthGoalIntelligence.syncGoalRelations(String(existing.patientId));
     return this.findOne(id);
   }
