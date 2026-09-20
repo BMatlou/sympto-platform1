@@ -108,9 +108,7 @@ export default function TodayMedicationActions({ medications, goal: suppliedGoal
   const finalGoal = activeMedicationGoals.find((goal: any) => {
     if (!goal) return false;
 
-    const isGoalLive =
-      String(goal.status).toUpperCase() === "ACTIVE" ||
-      String(goal.status).toUpperCase() === "IN_PROGRESS";
+    const isGoalLive = new Set(["ACTIVE", "IN_PROGRESS", "ON_TRACK", "IMPROVING", "STAGNANT", "DECLINING"]).has(String(goal.status).toUpperCase());
 
     if (!isGoalLive) return false;
 
