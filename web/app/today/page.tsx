@@ -80,7 +80,7 @@ function medicationGoalFor(medication: any, goals: any[], medicationCount: numbe
 
   return goals.find((goal: any) => {
     const status = String(goal?.status ?? "").toUpperCase();
-    if (!isMedicationGoal(goal) || !["ACTIVE", "IN_PROGRESS"].includes(status)) return false;
+    if (!isMedicationGoal(goal) || !ACTIVE_GOAL_STATUSES.has(status)) return false;
 
     const linkedPatientMedicationId =
       goal?.patientMedicationId ||
