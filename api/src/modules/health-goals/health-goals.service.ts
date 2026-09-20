@@ -185,6 +185,19 @@ export class HealthGoalsService {
     const isMedicationGoal = category === 'MEDICATION';
     if (patientMedicationId && !isMedicationGoal) throw new BadRequestException('A medication can only be attached to a medication goal.');
     await this.assertPatientMedicationBelongsToPatient(patientMedicationId, String(goalData.patientId));
+    if (isMedicationGoal && patientMedicationId) {
+      const existingMedicationGoal = await this.prisma.$queryRaw<Array<{ id: string }>>`
+        SELECT "id"
+        FROM "HealthGoal"
+        WHERE "patientMedicationId" = ${patientMedicationId}
+          AND "patientId" = ${goalData.patientId}
+          AND "category" = 'MEDICATION'
+          AND "status" IN ('ACTIVE', 'IN_PROGRESS', 'ON_TRACK', 'IMPROVING', 'STAGNANT', 'DECLINING')
+        ORDER BY "createdAt" DESC
+        LIMIT 1
+      `;
+      if (existingMedicationGoal.length) return this.findOne(existingMedicationGoal[0].id);
+    }
     const targetValue = goalData.targetValue ?? (isMedicationGoal ? String(DEFAULT_MEDICATION_TARGET) : undefined);
     const unit = goalData.unit ?? (isMedicationGoal ? '%' : undefined);
     this.assertGoalDefinition(category, targetValue, goalData.targetDate);
