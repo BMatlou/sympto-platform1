@@ -76,7 +76,6 @@ export const AlcoholGoalCard: React.FC<AlcoholGoalCardProps> = ({ goal, onUpdate
   const targetRaw = goal?.metricConfig?.frequencyTarget ?? goal?.frequencyTarget ?? goal?.targetValue;
   const weeklyTarget = Number(targetRaw);
   const hasTarget = targetRaw !== null && targetRaw !== undefined && targetRaw !== "" && Number.isFinite(weeklyTarget) && weeklyTarget >= 0;
-  const hasTarget = Number.isFinite(weeklyTarget) && weeklyTarget > 0;
   const [thisWeekLogged, setThisWeekLogged] = useState(0);
   const [saving, setSaving] = useState(false);
   const [draft, setDraft] = useState("");
