@@ -73,7 +73,9 @@ function daysUntilTarget(targetDate: string | null | undefined) {
 }
 
 export const AlcoholGoalCard: React.FC<AlcoholGoalCardProps> = ({ goal, onUpdated }) => {
-  const weeklyTarget = Number(goal?.metricConfig?.frequencyTarget ?? goal?.frequencyTarget ?? goal?.targetValue ?? 0);
+  const targetRaw = goal?.metricConfig?.frequencyTarget ?? goal?.frequencyTarget ?? goal?.targetValue;
+  const weeklyTarget = Number(targetRaw);
+  const hasTarget = targetRaw !== null && targetRaw !== undefined && targetRaw !== "" && Number.isFinite(weeklyTarget) && weeklyTarget >= 0;
   const hasTarget = Number.isFinite(weeklyTarget) && weeklyTarget > 0;
   const [thisWeekLogged, setThisWeekLogged] = useState(0);
   const [saving, setSaving] = useState(false);
@@ -118,7 +120,7 @@ export const AlcoholGoalCard: React.FC<AlcoholGoalCardProps> = ({ goal, onUpdate
   }, [goal?.id]);
 
   const differenceDelta = thisWeekLogged - weeklyTarget;
-  const budgetUsedPercentage = hasTarget ? Math.round((thisWeekLogged / weeklyTarget) * 100) : 0;
+  const budgetUsedPercentage = hasTarget ? (weeklyTarget === 0 ? (thisWeekLogged === 0 ? 0 : 100) : Math.round((thisWeekLogged / weeklyTarget) * 100)) : 0;
   const isAboveBudget = hasTarget && thisWeekLogged > weeklyTarget;
   const isAtOrAboveBudget = hasTarget && thisWeekLogged >= weeklyTarget;
   const remaining = Math.max(0, weeklyTarget - thisWeekLogged);
