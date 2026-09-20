@@ -197,7 +197,7 @@ export default function TodayPage() {
   const exerciseGoal = todayGoalArray.find((goal: any) => String(goal?.category ?? "").toUpperCase() === "EXERCISE");
   const dedicatedTodayCategories = new Set(["MEDICATION", "SMOKING", "ALCOHOL", "WEIGHT", "EXERCISE"]);
   const otherTodayGoals = activeGoalsArray.filter((goal: any) => !dedicatedTodayCategories.has(String(goal?.category ?? "").toUpperCase()));
-  const primaryMedicationId = matchedMedicationGoalCard?.medication ? patientMedicationId(matchedMedicationGoalCard.medication) : null;
+  const primaryMedicationId = medicationGoalCardsForToday[0]?.medication ? patientMedicationId(medicationGoalCardsForToday[0].medication) : null;
 
   const attention = data.attention ?? [];
   const carePlans = data.carePlans ?? [];
