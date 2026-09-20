@@ -152,7 +152,7 @@ export default function TodaySmokingGoal({ goal, onUpdated }: Props) {
         {open && (
           <section className="mt-3 rounded-[18px] border border-[#e1ecee] bg-[#f8fbfb] p-3">
             <label htmlFor={`smoking-${goalId}`} className="text-[8px] font-black uppercase tracking-[.14em] text-[#74859a]">Cigarettes today</label>
-            <div className="mt-1.5 flex gap-2"><input id={`smoking-${goalId}`} type="number" min="0" max={hasTarget ? dailyTarget : undefined} step="1" inputMode="numeric" value={draft} onChange={(event) => setDraft(event.target.value)} className="min-h-9 min-w-0 flex-1 rounded-xl border border-[#d7e4e8] bg-white px-3 text-xs font-bold text-[#0b2d54] outline-none focus:border-[#24c1c4]" /><button type="button" disabled={saving} onClick={() => void save()} className="min-h-9 rounded-xl bg-[#0b2d54] px-3.5 text-[9px] font-black text-white disabled:opacity-50">{saving ? "Saving…" : "Save"}</button></div>
+            <div className="mt-1.5 flex gap-2"><input id={`smoking-${goalId}`} type="number" min="0" step="1" inputMode="numeric" value={draft} onChange={(event) => setDraft(event.target.value)} className="min-h-9 min-w-0 flex-1 rounded-xl border border-[#d7e4e8] bg-white px-3 text-xs font-bold text-[#0b2d54] outline-none focus:border-[#24c1c4]" /><button type="button" disabled={saving} onClick={() => void save()} className="min-h-9 rounded-xl bg-[#0b2d54] px-3.5 text-[9px] font-black text-white disabled:opacity-50">{saving ? "Saving…" : "Save"}</button></div>
             <button type="button" onClick={() => setOpen(false)} className="mt-1.5 text-[8px] font-bold text-[#74859a]">Cancel</button>
           </section>
         )}
@@ -165,7 +165,7 @@ export default function TodaySmokingGoal({ goal, onUpdated }: Props) {
 
       <footer className="flex items-center justify-between gap-3 border-t border-[#edf2f4] bg-[#fbfdfd] px-4 py-3 sm:px-5">
         <div className="min-w-0"><p className="text-[8px] font-black uppercase tracking-[.14em] text-[#9aa8b3]">Journey</p><p className="mt-0.5 text-xs font-black text-[#0b2d54]">Day {journeyDay}{daysLeft !== null ? ` · ${daysLeft} days left` : ""}</p></div>
-        <div className="flex items-center gap-2"><p className="hidden text-[8px] text-[#7d8d99] sm:block">until {formatDate(goal?.targetDate)}</p><Link href="/health-goals" className="inline-flex min-h-9 shrink-0 items-center justify-center gap-1 rounded-xl border border-[#d6e4e7] bg-white px-3 py-2 text-[9px] font-black text-[#0b2d54]">View goal <ArrowRight className="h-3 w-3" /></Link></div>
+        <div className="flex items-center gap-2"><p className="hidden text-[8px] text-[#7d8d99] sm:block">until {formatDate(goal?.targetDate)}</p><Link href={`/health-goals#goal-${encodeURIComponent(String(goal?.id ?? ""))}`} className="inline-flex min-h-9 shrink-0 items-center justify-center gap-1 rounded-xl border border-[#d6e4e7] bg-white px-3 py-2 text-[9px] font-black text-[#0b2d54]">View goal <ArrowRight className="h-3 w-3" /></Link></div>
       </footer>
     </article>
   );
