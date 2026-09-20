@@ -200,7 +200,7 @@ export const AlcoholGoalCard: React.FC<AlcoholGoalCardProps> = ({ goal, onUpdate
       </div>
 
       <div className="border-t border-[#edf2f4] bg-[#fbfdfd] px-5 py-4 sm:px-6">
-        <div className="flex items-center justify-between gap-3"><div><p className="text-[9px] font-black uppercase tracking-[.14em] text-[#91a0ae]">Target date</p><p className="mt-1 text-sm font-black text-[#0b2d54]">{targetDateLabel}</p></div><Link href="/health-goals" className="inline-flex min-h-10 items-center justify-center gap-1.5 rounded-xl border border-[#d6e5e8] bg-white px-3.5 py-2 text-[10px] font-black text-[#0b2d54]">View goal <ArrowRight className="h-3 w-3" /></Link></div>
+        <div className="flex items-center justify-between gap-3"><div><p className="text-[9px] font-black uppercase tracking-[.14em] text-[#91a0ae]">Target date</p><p className="mt-1 text-sm font-black text-[#0b2d54]">{targetDateLabel}</p></div><Link href={`/health-goals#goal-${encodeURIComponent(String(goal?.id ?? ""))}`} className="inline-flex min-h-10 items-center justify-center gap-1.5 rounded-xl border border-[#d6e5e8] bg-white px-3.5 py-2 text-[10px] font-black text-[#0b2d54]">View goal <ArrowRight className="h-3 w-3" /></Link></div>
         <p className="mt-1.5 text-[9px] font-medium text-[#7b8da1]">{targetDaysLeft === 0 ? "Target date is today" : `${targetDaysLeft} days left to target`}</p>
       </div>
     </article>
