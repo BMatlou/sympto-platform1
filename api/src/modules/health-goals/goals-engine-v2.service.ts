@@ -103,8 +103,7 @@ export class GoalsEngineService {
       if (!goal || (goal.targetDate && goal.targetDate < now)) continue;
       const strategy = this.strategyFor(config);
       const window = this.strategyWindow(config, goal.createdAt, now);
-      const aggregation = strategy === 'TARGET_RANGE_STABILIZATION' ? 'LATEST' : config.aggregation;
-      const aggregate = await this.aggregateMetric(patientId, config.metricType, config.metricKey, window.start, now, aggregation);
+      const aggregate = await this.aggregateMetric(patientId, config.metricType, config.metricKey, window.start, now, config.aggregation);
       if (aggregate == null) continue;
       const target = Number(config.frequencyTarget ?? goal.targetValue ?? 0);
       if (!Number.isFinite(target)) continue;
