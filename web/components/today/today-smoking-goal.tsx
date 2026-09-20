@@ -42,7 +42,6 @@ export default function TodaySmokingGoal({ goal, onUpdated }: Props) {
   const targetRaw = goal?.metricConfig?.frequencyTarget ?? goal?.frequencyTarget ?? goal?.targetValue;
   const dailyTarget = Number(targetRaw);
   const hasTarget = targetRaw !== null && targetRaw !== undefined && targetRaw !== "" && Number.isFinite(dailyTarget) && dailyTarget >= 0;
-  const hasTarget = Number.isFinite(dailyTarget) && dailyTarget > 0;
   const startDate = useMemo(() => calendarMidnight(goal?.createdAt), [goal?.createdAt]);
   const targetDate = useMemo(() => calendarMidnight(goal?.targetDate), [goal?.targetDate]);
   const today = calendarMidnight(new Date());
