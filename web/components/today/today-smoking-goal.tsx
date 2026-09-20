@@ -144,7 +144,7 @@ export default function TodaySmokingGoal({ goal, onUpdated }: Props) {
                 </div>
               </div>
               <div className="mt-3 flex items-center gap-2">
-                <span className="rounded-full bg-white/10 px-2.5 py-1.5 text-[9px] font-black text-[#b8ffff] ring-1 ring-white/10">{hasTarget ? `${progressPercent}% of ceiling` : "Set a daily ceiling"}</span>
+                <span className="rounded-full bg-white/10 px-2.5 py-1.5 text-[9px] font-black text-[#b8ffff] ring-1 ring-white/10">{hasTarget ? (dailyTarget === 0 ? "Smoke-free target" : `${progressPercent}% of ceiling`) : "Set a daily ceiling"}</span>
                 {todayLogged !== null && hasTarget && <span className="truncate text-[9px] font-semibold text-white/50">{difference < 0 ? `${formatNumber(Math.abs(difference))} remaining` : difference === 0 ? "At ceiling" : `${formatNumber(Math.abs(difference))} over`}</span>}
               </div>
             </div>
