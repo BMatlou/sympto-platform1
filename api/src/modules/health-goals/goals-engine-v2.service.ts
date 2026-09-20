@@ -274,11 +274,64 @@ export class GoalsEngineService {
     const values = history.map((row) => Number(row.loggedValue)).filter(Number.isFinite);
     const latest = values.length ? values[values.length - 1] : aggregate;
     let progressPercent = 0; let achieved = false; let currentValue = latest;
-    if (strategy === 'STEP_DOWN_TAPER') { const baseline = values.length ? values[0] : aggregate; const reduction = baseline - latest; progressPercent = baseline === 0 ? 100 : Math.max(0, Math.min(100, (reduction / Math.abs(baseline)) * 100)); achieved = config.comparison === 'AT_MOST' ? aggregate <= target : latest <= target; }
-    else if (strategy === 'CADENCE_ACCUMULATION') { currentValue = aggregate; progressPercent = target <= 0 ? 100 : Math.max(0, Math.min(100, (aggregate / target) * 100)); achieved = config.comparison === 'AT_LEAST' ? aggregate >= target : aggregate <= target; }
-    else if (strategy === 'ADHERENCE_SCORE') { currentValue = aggregate; progressPercent = Math.max(0, Math.min(100, aggregate)); achieved = aggregate >= target; }
-    else if (strategy === 'TARGET_RANGE_STABILIZATION') { currentValue = latest; progressPercent = target <= 0 ? 100 : Math.max(0, Math.min(100, 100 - (Math.abs(latest - target) / Math.max(Math.abs(target), 1)) * 100)); achieved = config.comparison === 'AT_MOST' ? latest <= target : config.comparison === 'AT_LEAST' ? latest >= target : Math.abs(latest - target) < 0.5; }
-    else { currentValue = latest; progressPercent = target === 0 ? 100 : Math.max(0, Math.min(100, (latest / target) * 100)); achieved = config.comparison === 'AT_MOST' ? latest <= target : latest >= target; }
+    if (strategy === 'STEP_DOWN_TAPER') {
+      const baseline = values.length ? values[0] : aggregate;
+      const reduction = baseline - latest;
+      progressPercent = baseline === 0
+        ? (config.comparison === 'AT_MOST' && latest <= target ? 100 : 0)
+        : Math.max(0, Math.min(100, (reduction / Math.abs(baseline)) * 100));
+      achieved = config.comparison === 'AT_MOST' ? aggregate <= target : latest <= target;
+    } else if (strategy === 'CADENCE_ACCUMULATION') {
+      currentValue = aggregate;
+      if (config.comparison === 'AT_LEAST') {
+        progressPercent = target <= 0 ? 100 : Math.max(0, Math.min(100, (aggregate / target) * 100));
+        achieved = aggregate >= target;
+      } else {
+        progressPercent = target <= 0 ? (aggregate <= 0 ? 100 : 0) : aggregate <= target ? 100 : Math.max(0, Math.min(100, (target / aggregate) * 100));
+        achieved = aggregate <= target;
+      }
+    } else if (strategy === 'ADHERENCE_SCORE') {
+      currentValue = aggregate;
+      progressPercent = Math.max(0, Math.min(100, aggregate));
+      achieved = aggregate >= target;
+    } else if (strategy === 'TARGET_RANGE_STABILIZATION') {
+      currentValue = config.aggregation === 'SUM' ? aggregate : latest;
+      const comparisonValue = currentValue;
+      if (config.comparison === 'AT_LEAST') {
+        progressPercent = target <= 0 ? 100 : comparisonValue >= target ? 100 : Math.max(0, Math.min(100, (comparisonValue / target) * 100));
+        achieved = comparisonValue >= target;
+      } else if (config.comparison === 'AT_MOST') {
+        progressPercent = target <= 0
+          ? (comparisonValue <= 0 ? 100 : 0)
+          : comparisonValue <= target
+            ? 100
+            : Math.max(0, Math.min(100, (target / comparisonValue) * 100));
+        achieved = comparisonValue <= target;
+      } else {
+        const tolerance = Math.max(0.5, Math.abs(target) * 0.05);
+        progressPercent = target <= 0
+          ? (Math.abs(comparisonValue) <= tolerance ? 100 : 0)
+          : Math.max(0, Math.min(100, (1 - (Math.abs(comparisonValue - target) / Math.max(Math.abs(target), 1))) * 100));
+        achieved = Math.abs(comparisonValue - target) <= tolerance;
+      }
+    } else {
+      currentValue = latest;
+      if (config.comparison === 'AT_MOST') {
+        progressPercent = target <= 0
+          ? (latest <= 0 ? 100 : 0)
+          : latest <= target ? 100 : Math.max(0, Math.min(100, (target / latest) * 100));
+        achieved = latest <= target;
+      } else if (config.comparison === 'AT_LEAST') {
+        progressPercent = target <= 0 ? 100 : Math.max(0, Math.min(100, (latest / target) * 100));
+        achieved = latest >= target;
+      } else {
+        const tolerance = Math.max(0.5, Math.abs(target) * 0.05);
+        progressPercent = target <= 0
+          ? (Math.abs(latest) <= tolerance ? 100 : 0)
+          : Math.max(0, Math.min(100, (1 - (Math.abs(latest - target) / Math.max(Math.abs(target), 1))) * 100));
+        achieved = Math.abs(latest - target) <= tolerance;
+      }
+    }
     const guidanceText = achieved ? `${title}: target met based on ${config.metricKey}.` : `${title}: keep tracking ${config.metricKey} toward the target.`;
     return { strategy, currentValue, progressPercent, achieved, guidanceText };
   }
