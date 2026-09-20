@@ -92,12 +92,13 @@ export default function PrescribedMedicationsCard({
 
               if (matchesCanonicalId) return true;
 
-              // 2. Fallback Heuristic: Match generic 'Manage medication' goals to our primary chronic track (Metformin)
-              const isMedicationCategory = goal.metricType === "MEDICATION" || goal.category === "MEDICATION";
-              const isGenericTitle = goal.title?.toLowerCase() === "manage medication";
-              const isTargetMedName = medication.name?.toLowerCase().includes("metformin");
+              // 2. Legacy fallback: a generic unlinked medication goal is only
+              // safe to match when there is exactly one active medication.
+              const isMedicationCategory = String(goal.metricType ?? "").toUpperCase() === "MEDICATION" || String(goal.category ?? "").toUpperCase() === "MEDICATION";
+              const isGenericTitle = normalise(goal.title) === "manage medication";
+              const activeMedicationCount = prescriptionsList.length;
 
-              return isMedicationCategory && isGenericTitle && isTargetMedName;
+              return isMedicationCategory && isGenericTitle && activeMedicationCount === 1;
             });
 
             return (
