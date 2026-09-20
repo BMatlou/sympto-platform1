@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { ArrowLeft, ArrowRight, Activity, Apple, Bell, Brain, CalendarDays, CheckCircle2, ClipboardCheck, Droplets, HeartPulse, Moon, Pill, Scale, ShieldCheck, Sparkles, Target, Wine, Footprints } from "lucide-react";
+import { ArrowLeft, ArrowRight, Bell, CalendarDays, ClipboardCheck, Sparkles } from "lucide-react";
 import { useEffect, useState } from "react";
 import ProtectedRoute from "@/components/auth/protected-route";
 import { useDashboard } from "@/hooks/use-dashboard";
@@ -13,6 +13,7 @@ import TodaySmokingGoal from "@/components/today/today-smoking-goal";
 import TodayAlcoholGoal from "@/components/today/today-alcohol-goal";
 import TodayWeightGoal from "@/components/today/today-weight-goal";
 import TodayExerciseGoal from "@/components/today/today-exercise-goal";
+import TodaySupportedGoalCard from "@/components/today/today-supported-goal-card";
 import { TODAY_GOAL_CARD_CLASS, TODAY_GOAL_FOOTER_CLASS } from "@/components/today/today-goal-card-styles";
 
 const ACTIVE_GOAL_STATUSES = new Set(["IN_PROGRESS", "ACTIVE", "ON_TRACK", "IMPROVING", "STAGNANT", "DECLINING"]);
@@ -117,19 +118,6 @@ function medicationGoalFor(medication: any, goals: any[], medicationCount: numbe
   }) ?? null;
 }
 
-const GOAL_META: Record<string, { label: string; icon: typeof Target; accent: string; surface: string }> = {
-  NUTRITION: { label: "Nutrition", icon: Apple, accent: "text-orange-700", surface: "bg-orange-50" },
-  BLOOD_PRESSURE: { label: "Blood pressure", icon: HeartPulse, accent: "text-rose-700", surface: "bg-rose-50" },
-  BLOOD_GLUCOSE: { label: "Blood glucose", icon: Activity, accent: "text-amber-700", surface: "bg-amber-50" },
-  CHOLESTEROL: { label: "Cholesterol", icon: ShieldCheck, accent: "text-blue-700", surface: "bg-blue-50" },
-  SLEEP: { label: "Sleep", icon: Moon, accent: "text-indigo-700", surface: "bg-indigo-50" },
-  MENTAL_HEALTH: { label: "Mental health", icon: Brain, accent: "text-fuchsia-700", surface: "bg-fuchsia-50" },
-  HYDRATION: { label: "Hydration", icon: Droplets, accent: "text-cyan-700", surface: "bg-cyan-50" },
-  HEART_RATE: { label: "Heart rate", icon: HeartPulse, accent: "text-red-700", surface: "bg-red-50" },
-  MEDICATION: { label: "Medication", icon: Pill, accent: "text-emerald-700", surface: "bg-emerald-50" },
-  OTHER: { label: "Personal goal", icon: Target, accent: "text-[#0b2d54]", surface: "bg-[#edf4ff]" },
-};
-
 export default function TodayPage() {
   const { data, loading, error, reload } = useDashboard();
 
@@ -228,7 +216,7 @@ export default function TodayPage() {
            {weightGoal ? <TodayWeightGoal goal={weightGoal} /> : null}
            {exerciseGoal ? <TodayExerciseGoal goal={exerciseGoal} /> : null}
          </section>}
-         {otherTodayGoals.length > 0 && <section className="mt-7 rounded-[27px] border border-[#e0ebef] bg-white p-5"><div className="flex items-center justify-between gap-3"><div className="flex items-center gap-2"><Target className="h-4 w-4 text-[#24c1c4]" /><div><h2 className="text-sm font-black text-[#0b2d54]">Other goals you are tracking</h2><p className="mt-0.5 text-[10px] text-[#8795a0]">These goals stay connected even when Today has no dedicated action card yet.</p></div></div><Link href="/health-goals" className="inline-flex min-h-9 items-center gap-1 rounded-xl border border-[#d7e4e8] bg-white px-3 py-2 text-[9px] font-black text-[#0b2d54]">All goals <ArrowRight className="h-3 w-3" /></Link></div><div className="mt-3 grid gap-2 sm:grid-cols-2">{otherTodayGoals.map((goal: any, index: number) => { const meta = GOAL_META[String(goal?.category ?? "OTHER").toUpperCase()] ?? GOAL_META.OTHER; const Icon = meta.icon; const current = goal?.latestValue ?? goal?.latestProgress?.currentValue ?? goal?.currentValue; const target = goal?.targetValue; return <Link key={String(goal?.id ?? index)} href={`/health-goals#goal-${encodeURIComponent(String(goal?.id ?? ""))}`} className="group flex items-center justify-between gap-3 rounded-2xl border border-[#e4edef] bg-[#fbfdfd] p-3.5 transition hover:border-[#cfe2e5] hover:bg-white"><div className="flex min-w-0 items-center gap-3"><span className={`grid h-9 w-9 shrink-0 place-items-center rounded-xl ${meta.surface} ${meta.accent}`}><Icon className="h-4 w-4" /></span><div className="min-w-0"><p className="text-[8px] font-black uppercase tracking-[.13em] text-[#80919e]">{meta.label}</p><p className="truncate text-xs font-black text-[#0b2d54]">{text(goal?.title || meta.label, meta.label)}</p></div></div><div className="shrink-0 text-right"><p className="text-[9px] font-bold text-[#8795a0]">{current == null ? "No reading" : `Current ${text(current)}`}</p><p className="mt-0.5 text-[9px] font-black text-[#0b6f73]">Target {target == null ? "—" : text(target)}{goal?.unit ? ` ${text(goal.unit, "")}` : ""}</p></div></Link>; })}</div></section>}
+         {otherTodayGoals.length > 0 && <section className="mt-7"><div className="flex items-end justify-between gap-4"><div><h2 className="text-xl font-black tracking-[-.045em] text-[#0b2d54]">More active goals</h2><p className="mt-1 text-[11px] text-[#74859a]">Every supported goal stays actionable and connected to its matching health data.</p></div><Link href="/health-goals" className="text-[10px] font-black text-[#0b2d54]">Manage goals <ArrowRight className="ml-1 inline h-3.5 w-3.5" /></Link></div><div className="mt-3.5 grid items-stretch gap-4 lg:grid-cols-2">{otherTodayGoals.map((goal: any, index: number) => <TodaySupportedGoalCard key={String(goal?.id ?? "goal-" + index)} goal={goal} onUpdated={reload} />)}</div></section>}
         {attention.length > 0 && <section className="mt-7 rounded-[27px] border border-amber-200 bg-amber-50/50 p-5"><div className="flex items-center gap-2"><Bell className="h-4 w-4 text-amber-700" /><h2 className="text-sm font-black text-[#0b2d54]">Needs your attention</h2></div><div className="mt-3 space-y-2">{attention.map((item: any, index: number) => <div key={String(item.id ?? index)} className="rounded-xl bg-white p-3 text-xs text-slate-600 ring-1 ring-amber-100">{text(item.title || item.message || item.description)}</div>)}</div></section>}
         {todayAppointments.length > 0 && <section className="mt-7 rounded-[27px] border border-[#e0ebef] bg-white p-5"><div className="flex items-center justify-between gap-3"><div className="flex items-center gap-2"><CalendarDays className="h-4 w-4 text-[#24c1c4]" /><h2 className="text-sm font-black text-[#0b2d54]">Today&apos;s appointments</h2></div><Link href="/appointments" className="inline-flex min-h-9 items-center gap-1 rounded-xl border border-[#d7e4e8] bg-white px-3 py-2 text-[9px] font-black text-[#0b2d54]">Open appointments <ArrowRight className="h-3 w-3" /></Link></div><div className="mt-3 space-y-2">{todayAppointments.map((appointment: any, index: number) => <div key={String(appointment.id ?? index)} className="flex items-center justify-between gap-3 rounded-xl bg-slate-50 p-3 text-xs"><span className="font-semibold text-[#0b2d54]">{text(appointment.title || appointment.type || "Appointment")}</span><span className="text-slate-500">{formatDate(appointment.scheduledStart, true)}</span></div>)}</div></section>}
         {careTasks.length > 0 && <section className="mt-7 rounded-[27px] border border-[#e0ebef] bg-white p-5"><div className="flex items-center justify-between gap-3"><div className="flex items-center gap-2"><ClipboardCheck className="h-4 w-4 text-[#24c1c4]" /><h2 className="text-sm font-black text-[#0b2d54]">Care plan tasks</h2></div><Link href="/care-plans" className="inline-flex min-h-9 items-center gap-1 rounded-xl border border-[#d7e4e8] bg-white px-3 py-2 text-[9px] font-black text-[#0b2d54]">Open care plans <ArrowRight className="h-3 w-3" /></Link></div><div className="mt-3 space-y-2">{careTasks.map((task: any, index: number) => <div key={String(task.id ?? index)} className="rounded-xl bg-slate-50 p-3"><p className="text-xs font-semibold text-[#0b2d54]">{text(task.title || task.name || "Care task")}</p><p className="mt-1 text-[11px] text-slate-500">{text(task.carePlanTitle)}</p></div>)}</div></section>}
