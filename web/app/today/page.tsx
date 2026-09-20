@@ -14,7 +14,6 @@ import TodayAlcoholGoal from "@/components/today/today-alcohol-goal";
 import TodayWeightGoal from "@/components/today/today-weight-goal";
 import TodayExerciseGoal from "@/components/today/today-exercise-goal";
 import TodaySupportedGoalCard from "@/components/today/today-supported-goal-card";
-import { TODAY_GOAL_CARD_CLASS, TODAY_GOAL_FOOTER_CLASS } from "@/components/today/today-goal-card-styles";
 
 const ACTIVE_GOAL_STATUSES = new Set(["IN_PROGRESS", "ACTIVE", "ON_TRACK", "IMPROVING", "STAGNANT", "DECLINING"]);
 
@@ -211,67 +210,120 @@ export default function TodayPage() {
       <main className="min-h-screen bg-[#f5fafb] text-[#17314e"><div className="mx-auto max-w-[1260px] px-4 pb-12 pt-4 sm:px-7 sm:pt-6">
         <header className="mb-5 flex items-center justify-between"><Link href="/dashboard" className="inline-flex min-h-10 items-center gap-2 rounded-xl px-2 text-sm font-semibold text-[#0b2d54] hover:bg-white"><ArrowLeft className="h-4 w-4" />My Health</Link><span className="rounded-full bg-white px-3 py-1.5 text-[10px] font-black uppercase tracking-[0.16em] text-[#71839a] shadow-sm ring-1 ring-[#e0ebef]">Today</span></header>
         <section className="rounded-[30px] bg-gradient-to-br from-[#08284a] via-[#0e4773] to-[#24babe] p-7 text-white shadow-[0_20px_55px_rgba(11,45,84,0.12)] sm:p-9"><p className="text-sm font-medium text-white/75">Hi {firstName}</p><div className="mt-3 flex flex-col gap-5 sm:flex-row sm:items-end sm:justify-between"><div><h1 className="text-3xl font-black tracking-[-0.04em] sm:text-4xl">What do I do today?</h1><p className="mt-2 max-w-xl text-sm leading-6 text-white/70">Your important health actions, brought together in one place.</p></div><Link href="/log-symptom" className="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl bg-white/12 px-4 py-2 text-xs font-bold text-white ring-1 ring-white/20"><Sparkles className="h-4 w-4" />Log a symptom</Link></div></section>
-        <div className="mt-7 flex items-end justify-between gap-5"><h2 className="text-xl font-black tracking-[-.045em] text-[#0b2d54]">Today, organised</h2><p className="hidden text-right text-[11px] text-[#74859a] sm:block">Only the things worth acting on.</p></div>
-        <PrescribedMedicationsCard prescriptionsList={Array.isArray(medications) ? medications : []} activeGoalsArray={activeGoalsArray} />
-        <section className="mt-7 rounded-[27px] border border-[#e0ebef] bg-white p-5 shadow-[0_5px_18px_rgba(11,45,84,0.03)] sm:p-6">
-          <div className="flex items-center justify-between gap-3">
-            <div className="flex items-center gap-2">
-              <CalendarDays className="h-4 w-4 text-[#24c1c4]" />
-              <div>
-                <p className="text-[9px] font-black uppercase tracking-[0.16em] text-[#71839a]">Care</p>
-                <h2 className="text-sm font-black text-[#0b2d54]">{appointmentIsToday ? "Today&apos;s appointment" : "Next appointment"}</h2>
-              </div>
+        <section className="mt-7">
+          <div className="mb-3.5 flex items-end justify-between gap-5">
+            <div>
+              <p className="text-[9px] font-black uppercase tracking-[0.2em] text-[#24aeb3]">Start here</p>
+              <h2 className="mt-1 text-xl font-black tracking-[-.045em] text-[#0b2d54]">What needs your attention today</h2>
             </div>
-            <Link href="/appointments" className="inline-flex min-h-9 items-center gap-1 rounded-xl border border-[#d7e4e8] bg-white px-3 py-2 text-[9px] font-black text-[#0b2d54]">Open appointments <ArrowRight className="h-3 w-3" /></Link>
+            <p className="hidden max-w-sm text-right text-[11px] leading-5 text-[#74859a] sm:block">Your scheduled care and daily actions are kept together first.</p>
           </div>
-
-          {nextAppointment ? (
-            <Link href={nextAppointment.id ? `/appointments/${encodeURIComponent(String(nextAppointment.id))}` : "/appointments"} className="mt-4 block rounded-[21px] bg-slate-50 p-4 ring-1 ring-[#e4edef] transition hover:bg-[#f4fafb] hover:ring-[#24c1c4]/30 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#24c1c4]">
-              <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-                <div className="min-w-0">
-                  <div className="flex flex-wrap items-center gap-2">
-                    <h3 className="truncate text-sm font-black text-[#0b2d54]">{text(nextAppointment.title || nextAppointment.type || "Healthcare appointment")}</h3>
-                    {appointmentIsToday && <span className="rounded-full bg-[#e8f8f7] px-2.5 py-1 text-[9px] font-black uppercase tracking-[0.12em] text-[#0b7b80]">Today</span>}
+          <div className="grid gap-4 xl:grid-cols-[1.15fr_.85fr]">
+            <div className="min-w-0"><PrescribedMedicationsCard prescriptionsList={Array.isArray(medications) ? medications : []} activeGoalsArray={activeGoalsArray} /></div>
+            <div className="min-w-0">
+              <section className="h-full rounded-[27px] border border-[#e0ebef] bg-white p-5 shadow-[0_5px_18px_rgba(11,45,84,0.03)] sm:p-6">
+                <div className="flex items-center justify-between gap-3">
+                  <div className="flex items-center gap-2.5">
+                    <span className="grid h-9 w-9 place-items-center rounded-[13px] bg-[#e8f8f7] text-[#0b7b80]"><CalendarDays className="h-4 w-4" /></span>
+                    <div>
+                      <p className="text-[9px] font-black uppercase tracking-[0.16em] text-[#71839a]">Care</p>
+                      <h2 className="text-sm font-black text-[#0b2d54]">{appointmentIsToday ? "Today&apos;s appointment" : "Next appointment"}</h2>
+                    </div>
                   </div>
-                  <p className="mt-2 text-xs font-semibold text-[#0b2d54]">{formatDate(nextAppointment.scheduledStart, true)}</p>
-                  {(nextAppointment.practitioner?.person || nextAppointment.practice?.name) && (
-                    <p className="mt-1 text-[11px] text-slate-500">
-                      {nextAppointment.practitioner?.person
-                        ? [nextAppointment.practitioner.person.firstName, nextAppointment.practitioner.person.lastName].filter(Boolean).join(" ")
-                        : ""}
-                      {nextAppointment.practitioner?.person && nextAppointment.practice?.name ? " · " : ""}
-                      {nextAppointment.practice?.name ? String(nextAppointment.practice.name) : ""}
-                    </p>
-                  )}
+                  <Link href="/appointments" className="inline-flex min-h-9 items-center gap-1 rounded-xl px-2.5 py-2 text-[9px] font-black text-[#0b2d54] hover:bg-[#f4fafb]">View all <ArrowRight className="h-3 w-3" /></Link>
                 </div>
-                <span className="inline-flex min-h-10 shrink-0 items-center justify-center gap-1.5 rounded-xl bg-[#0b2d54] px-3.5 py-2.5 text-[9px] font-black text-white">View appointment <ArrowRight className="h-3.5 w-3.5 text-[#24c1c4]" /></span>
-              </div>
-            </Link>
-          ) : (
-            <div className="mt-4 rounded-[21px] border border-dashed border-[#dce8ec] bg-slate-50/70 p-5">
-              <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                <div>
-                  <p className="text-sm font-black text-[#0b2d54]">No upcoming appointments</p>
-                  <p className="mt-1 text-xs leading-5 text-slate-500">When a healthcare appointment is recorded for you, it will appear here automatically.</p>
-                </div>
-                <Link href="/appointments" className="inline-flex min-h-10 items-center justify-center gap-1.5 rounded-xl bg-[#0b2d54] px-3.5 py-2.5 text-[9px] font-black text-white">Open appointments <ArrowRight className="h-3.5 w-3.5 text-[#24c1c4]" /></Link>
-              </div>
+                {nextAppointment ? (
+                  <Link href={nextAppointment.id ? `/appointments/${encodeURIComponent(String(nextAppointment.id))}` : "/appointments"} className="mt-4 block h-[calc(100%-3.25rem)] rounded-[21px] bg-gradient-to-br from-[#f7fbfb] to-[#f2f8fa] p-4 ring-1 ring-[#e4edef] transition hover:ring-[#24c1c4]/35 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#24c1c4]">
+                    <div className="flex h-full flex-col justify-between gap-5">
+                      <div>
+                        <div className="flex flex-wrap items-center gap-2">
+                          <h3 className="text-base font-black tracking-[-.03em] text-[#0b2d54]">{text(nextAppointment.title || nextAppointment.type || "Healthcare appointment")}</h3>
+                          {appointmentIsToday && <span className="rounded-full bg-[#e8f8f7] px-2.5 py-1 text-[9px] font-black uppercase tracking-[0.12em] text-[#0b7b80]">Today</span>}
+                        </div>
+                        <p className="mt-2 text-sm font-bold text-[#0b2d54]">{formatDate(nextAppointment.scheduledStart, true)}</p>
+                        {(nextAppointment.practitioner?.person || nextAppointment.practice?.name) && (
+                          <p className="mt-1.5 text-[11px] text-slate-500">
+                            {nextAppointment.practitioner?.person ? [nextAppointment.practitioner.person.firstName, nextAppointment.practitioner.person.lastName].filter(Boolean).join(" ") : ""}
+                            {nextAppointment.practitioner?.person && nextAppointment.practice?.name ? " · " : ""}
+                            {nextAppointment.practice?.name ? String(nextAppointment.practice.name) : ""}
+                          </p>
+                        )}
+                      </div>
+                      <div className="flex items-center justify-between gap-3 border-t border-[#dfe9ec] pt-4">
+                        <span className="text-[9px] font-black uppercase tracking-[0.14em] text-[#71839a]">Appointment details</span>
+                        <span className="inline-flex min-h-9 items-center justify-center gap-1.5 rounded-xl bg-[#0b2d54] px-3 py-2 text-[9px] font-black text-white">View <ArrowRight className="h-3 w-3 text-[#24c1c4]" /></span>
+                      </div>
+                    </div>
+                  </Link>
+                ) : (
+                  <div className="mt-4 flex h-[calc(100%-3.25rem)] flex-col justify-between rounded-[21px] border border-dashed border-[#dce8ec] bg-slate-50/70 p-4">
+                    <div>
+                      <p className="text-base font-black text-[#0b2d54]">No upcoming appointments</p>
+                      <p className="mt-1.5 text-xs leading-5 text-slate-500">When a healthcare appointment is recorded for you, it will appear here automatically.</p>
+                    </div>
+                    <Link href="/appointments" className="mt-5 inline-flex min-h-10 w-full items-center justify-center gap-1.5 rounded-xl bg-[#0b2d54] px-3.5 py-2.5 text-[9px] font-black text-white">Open appointments <ArrowRight className="h-3.5 w-3.5 text-[#24c1c4]" /></Link>
+                  </div>
+                )}
+              </section>
             </div>
-          )}
+          </div>
         </section>
-        <div id="daily-health-check-in" className="mt-7 flex items-end justify-between gap-5"><h2 className="text-xl font-black tracking-[-.045em] text-[#0b2d54]">Daily health check-in</h2><p className="hidden text-right text-[11px] text-[#74859a] sm:block">A few answers help Sympto understand your day.</p></div>
-        <div className="mt-3.5"><DailyHealthCheckIn embedded goals={goals} medicationGoalHref={medicationGoal && primaryMedicationId ? `#medication-adherence-card-${String(primaryMedicationId)}` : null} /></div>
-        <section id="current-health" className="mt-7 rounded-[27px] border border-[#e0ebef] bg-white p-5 shadow-[0_5px_18px_rgba(11,45,84,0.03)] sm:p-6"><div className="flex flex-wrap items-end justify-between gap-4"><div><p className="text-[10px] font-black uppercase tracking-[0.18em] text-[#71839a]">Current health</p><h2 className="mt-1 text-xl font-black tracking-[-.045em] text-[#0b2d54]">Vitals and essentials</h2></div><Link href="/health-journal" className="text-[10px] font-black text-[#0b2d54]">Open health journal <ArrowRight className="ml-1 inline h-3.5 w-3.5" /></Link></div><HealthVitalsSummary measurements={healthVitals} bmi={bmi} bmiCategory={bmiCategory} weightKg={weightKg} heightCm={heightCm} /></section>
-        <div id="today-goals" className="mt-7 flex items-end justify-between gap-5"><h2 className="text-xl font-black tracking-[-.045em] text-[#0b2d54]">Your active goals</h2><Link href="/health-goals" className="text-[10px] font-black text-[#0b2d54]">Manage goals <ArrowRight className="ml-1 inline h-3.5 w-3.5" /></Link></div>
-         {(medicationGoalCardsForToday.length > 0 || smokingGoal || alcoholGoal || weightGoal || exerciseGoal) && <section className="mt-3.5 grid items-stretch gap-4 lg:grid-cols-2">
-           {medicationGoalCardsForToday.map((item: any) => item.medication ? <TodayMedicationActions key={`medication-goal-${String(item.goal?.id ?? patientMedicationId(item.medication) ?? "unassigned")}`} medications={[item.medication]} goal={item.goal} onUpdated={reload} /> : null)}
-           {smokingGoal ? <TodaySmokingGoal goal={smokingGoal} onUpdated={reload} /> : null}
-           {alcoholGoal ? <TodayAlcoholGoal goal={alcoholGoal} onUpdated={reload} /> : null}
-           {weightGoal ? <TodayWeightGoal goal={weightGoal} /> : null}
-           {exerciseGoal ? <TodayExerciseGoal goal={exerciseGoal} /> : null}
-         </section>}
-         {otherTodayGoals.length > 0 && <section className="mt-7"><div className="flex items-end justify-between gap-4"><div><h2 className="text-xl font-black tracking-[-.045em] text-[#0b2d54]">More active goals</h2><p className="mt-1 text-[11px] text-[#74859a]">Every supported goal stays actionable and connected to its matching health data.</p></div><Link href="/health-goals" className="text-[10px] font-black text-[#0b2d54]">Manage goals <ArrowRight className="ml-1 inline h-3.5 w-3.5" /></Link></div><div className="mt-3.5 grid items-stretch gap-4 lg:grid-cols-2">{otherTodayGoals.map((goal: any, index: number) => <TodaySupportedGoalCard key={String(goal?.id ?? "goal-" + index)} goal={goal} onUpdated={reload} />)}</div></section>}
-        {attention.length > 0 && <section className="mt-7 rounded-[27px] border border-amber-200 bg-amber-50/50 p-5"><div className="flex items-center gap-2"><Bell className="h-4 w-4 text-amber-700" /><h2 className="text-sm font-black text-[#0b2d54]">Needs your attention</h2></div><div className="mt-3 space-y-2">{attention.map((item: any, index: number) => <div key={String(item.id ?? index)} className="rounded-xl bg-white p-3 text-xs text-slate-600 ring-1 ring-amber-100">{text(item.title || item.message || item.description)}</div>)}</div></section>}
+
+        <section className="mt-8">
+          <div id="daily-health-check-in" className="mb-3.5 flex items-end justify-between gap-5">
+            <div>
+              <p className="text-[9px] font-black uppercase tracking-[0.2em] text-[#24aeb3]">Daily rhythm</p>
+              <h2 className="mt-1 text-xl font-black tracking-[-.045em] text-[#0b2d54]">Check in with yourself</h2>
+            </div>
+            <p className="hidden text-right text-[11px] text-[#74859a] sm:block">A few answers help Sympto understand your day.</p>
+          </div>
+          <div className="overflow-hidden rounded-[30px] bg-white shadow-[0_8px_30px_rgba(11,45,84,0.035)] ring-1 ring-[#e0ebef]">
+            <DailyHealthCheckIn embedded goals={goals} medicationGoalHref={medicationGoal && primaryMedicationId ? `#medication-adherence-card-${String(primaryMedicationId)}` : null} />
+          </div>
+        </section>
+
+        {attention.length > 0 && <section className="mt-8 rounded-[27px] border border-amber-200 bg-gradient-to-br from-amber-50/80 to-white p-5 shadow-[0_8px_24px_rgba(161,98,4,0.05)] sm:p-6"><div className="flex items-start gap-3"><span className="mt-0.5 grid h-9 w-9 shrink-0 place-items-center rounded-[13px] bg-amber-100 text-amber-700"><Bell className="h-4 w-4" /></span><div className="min-w-0"><p className="text-[9px] font-black uppercase tracking-[0.16em] text-amber-700/80">Check this next</p><h2 className="mt-1 text-sm font-black text-[#0b2d54]">Needs your attention</h2></div></div><div className="mt-3 space-y-2">{attention.map((item: any, index: number) => <div key={String(item.id ?? index)} className="rounded-xl bg-white p-3.5 text-xs leading-5 text-slate-600 ring-1 ring-amber-100">{text(item.title || item.message || item.description)}</div>)}</div></section>}
+
+        <section id="current-health" className="mt-8 rounded-[27px] border border-[#e0ebef] bg-white p-5 shadow-[0_5px_18px_rgba(11,45,84,0.03)] sm:p-6">
+          <div className="flex flex-wrap items-end justify-between gap-4">
+            <div>
+              <p className="text-[9px] font-black uppercase tracking-[0.2em] text-[#71839a]">Your snapshot</p>
+              <h2 className="mt-1 text-xl font-black tracking-[-.045em] text-[#0b2d54]">Current health</h2>
+              <p className="mt-1 text-[11px] text-[#74859a]">The latest vitals and essential measurements we have for you.</p>
+            </div>
+            <Link href="/health-journal" className="text-[10px] font-black text-[#0b2d54]">Open health journal <ArrowRight className="ml-1 inline h-3.5 w-3.5" /></Link>
+          </div>
+          <HealthVitalsSummary measurements={healthVitals} bmi={bmi} bmiCategory={bmiCategory} weightKg={weightKg} heightCm={heightCm} />
+        </section>
+
+        <section className="mt-8">
+          <div id="today-goals" className="flex items-end justify-between gap-5">
+            <div>
+              <p className="text-[9px] font-black uppercase tracking-[0.2em] text-[#24aeb3]">Keep momentum</p>
+              <h2 className="mt-1 text-xl font-black tracking-[-.045em] text-[#0b2d54]">Your active goals</h2>
+              <p className="mt-1 text-[11px] text-[#74859a]">Track the goals you are actively working on.</p>
+            </div>
+            <Link href="/health-goals" className="text-[10px] font-black text-[#0b2d54]">Manage goals <ArrowRight className="ml-1 inline h-3.5 w-3.5" /></Link>
+          </div>
+          {(medicationGoalCardsForToday.length > 0 || smokingGoal || alcoholGoal || weightGoal || exerciseGoal) && <div className="mt-3.5 grid items-stretch gap-4 lg:grid-cols-2">
+            {medicationGoalCardsForToday.map((item: any) => item.medication ? <TodayMedicationActions key={`medication-goal-${String(item.goal?.id ?? patientMedicationId(item.medication) ?? "unassigned")}`} medications={[item.medication]} goal={item.goal} onUpdated={reload} /> : null)}
+            {smokingGoal ? <TodaySmokingGoal goal={smokingGoal} onUpdated={reload} /> : null}
+            {alcoholGoal ? <TodayAlcoholGoal goal={alcoholGoal} onUpdated={reload} /> : null}
+            {weightGoal ? <TodayWeightGoal goal={weightGoal} /> : null}
+            {exerciseGoal ? <TodayExerciseGoal goal={exerciseGoal} /> : null}
+          </div>}
+          {otherTodayGoals.length > 0 && <section className="mt-7 rounded-[27px] border border-[#e5edef] bg-[#f8fbfb] p-5 sm:p-6">
+            <div className="flex items-end justify-between gap-4">
+              <div>
+                <p className="text-[9px] font-black uppercase tracking-[0.18em] text-[#71839a]">More to monitor</p>
+                <h3 className="mt-1 text-base font-black tracking-[-.03em] text-[#0b2d54]">Other active goals</h3>
+                <p className="mt-1 text-[11px] leading-5 text-[#74859a]">These stay connected to their matching health data without competing with your main actions.</p>
+              </div>
+              <Link href="/health-goals" className="hidden text-[10px] font-black text-[#0b2d54] sm:inline-flex">Manage goals <ArrowRight className="ml-1 inline h-3.5 w-3.5" /></Link>
+            </div>
+            <div className="mt-3.5 grid items-stretch gap-4 lg:grid-cols-2">{otherTodayGoals.map((goal: any, index: number) => <TodaySupportedGoalCard key={String(goal?.id ?? "goal-" + index)} goal={goal} onUpdated={reload} />)}</div>
+          </section>}
+        </section>
         {careTasks.length > 0 && <section className="mt-7 rounded-[27px] border border-[#e0ebef] bg-white p-5"><div className="flex items-center justify-between gap-3"><div className="flex items-center gap-2"><ClipboardCheck className="h-4 w-4 text-[#24c1c4]" /><h2 className="text-sm font-black text-[#0b2d54]">Care plan tasks</h2></div><Link href="/care-plans" className="inline-flex min-h-9 items-center gap-1 rounded-xl border border-[#d7e4e8] bg-white px-3 py-2 text-[9px] font-black text-[#0b2d54]">Open care plans <ArrowRight className="h-3 w-3" /></Link></div><div className="mt-3 space-y-2">{careTasks.map((task: any, index: number) => <div key={String(task.id ?? index)} className="rounded-xl bg-slate-50 p-3"><p className="text-xs font-semibold text-[#0b2d54]">{text(task.title || task.name || "Care task")}</p><p className="mt-1 text-[11px] text-slate-500">{text(task.carePlanTitle)}</p></div>)}</div></section>}
       </div></main>
     </ProtectedRoute>
