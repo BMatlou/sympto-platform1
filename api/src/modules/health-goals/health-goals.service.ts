@@ -276,7 +276,7 @@ export class HealthGoalsService {
       frequency,
       frequencyTarget: frequencyTarget == null ? (goalData.targetValue ?? existing.targetValue) : frequencyTarget,
       aggregation,
-      comparison,
+      comparison: revisingWeightGoal ? effectiveComparison : comparison,
       guidanceText,
     });
     await this.healthGoalIntelligence.syncGoalRelations(String(existing.patientId));
