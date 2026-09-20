@@ -177,8 +177,20 @@ export default function TodayPage() {
   const medicationGoalCards = (Array.isArray(medications) ? medications : []).map((medication: any) => ({ medication, goal: medicationGoalFor(medication, activeGoalsArray, medications.length) }));
   const unmatchedMedicationGoals = activeGoalsArray.filter((goal: any) => isMedicationGoal(goal) && !medicationGoalCards.some((item: any) => item.goal?.id === goal?.id));
   const matchedMedicationGoalCards = medicationGoalCards.filter((item: any) => Boolean(item.goal));
+  const unmatchedMedicationGoalCards = unmatchedMedicationGoals.map((goal: any) => ({
+    goal,
+    medication: (Array.isArray(medications) ? medications : []).find((medication: any) => {
+      const targetPatientMedicationId =
+        goal?.patientMedicationId ||
+        goal?.patientMedication?.id ||
+        goal?.associatedPatientMedicationId ||
+        goal?.associatedPatientMedication?.id;
+      return targetPatientMedicationId && String(patientMedicationId(medication)) === String(targetPatientMedicationId);
+    }) ?? medications[0] ?? null,
+  }));
+  const medicationGoalCardsForToday = [...matchedMedicationGoalCards, ...unmatchedMedicationGoalCards].filter((item: any) => Boolean(item.goal));
   const matchedMedicationGoalCard = matchedMedicationGoalCards[0] ?? null;
-  const medicationGoal = matchedMedicationGoalCard?.goal || unmatchedMedicationGoals[0] || null;
+  const medicationGoal = medicationGoalCardsForToday[0]?.goal || null;
   const smokingGoal = todayGoalArray.find((goal: any) => String(goal?.category ?? "").toUpperCase() === "SMOKING");
   const alcoholGoal = todayGoalArray.find((goal: any) => String(goal?.category ?? "").toUpperCase() === "ALCOHOL");
   const weightGoal = todayGoalArray.find((goal: any) => String(goal?.category ?? "").toUpperCase() === "WEIGHT");
@@ -209,8 +221,8 @@ export default function TodayPage() {
         <div className="mt-3.5"><DailyHealthCheckIn embedded goals={goals} medicationGoalHref={medicationGoal && primaryMedicationId ? `#medication-adherence-card-${String(primaryMedicationId)}` : null} /></div>
         <section id="current-health" className="mt-7 rounded-[27px] border border-[#e0ebef] bg-white p-5 shadow-[0_5px_18px_rgba(11,45,84,0.03)] sm:p-6"><div className="flex flex-wrap items-end justify-between gap-4"><div><p className="text-[10px] font-black uppercase tracking-[0.18em] text-[#71839a]">Current health</p><h2 className="mt-1 text-xl font-black tracking-[-.045em] text-[#0b2d54]">Vitals and essentials</h2></div><Link href="/health-journal" className="text-[10px] font-black text-[#0b2d54]">Open health journal <ArrowRight className="ml-1 inline h-3.5 w-3.5" /></Link></div><HealthVitalsSummary measurements={healthVitals} bmi={bmi} bmiCategory={bmiCategory} weightKg={weightKg} heightCm={heightCm} /></section>
         <div id="today-goals" className="mt-7 flex items-end justify-between gap-5"><h2 className="text-xl font-black tracking-[-.045em] text-[#0b2d54]">Your active goals</h2><Link href="/health-goals" className="text-[10px] font-black text-[#0b2d54]">Manage goals <ArrowRight className="ml-1 inline h-3.5 w-3.5" /></Link></div>
-         {(matchedMedicationGoalCards.length > 0 || smokingGoal || alcoholGoal || weightGoal || exerciseGoal) && <section className="mt-3.5 grid items-stretch gap-4 lg:grid-cols-2">
-           {matchedMedicationGoalCards.map((item: any) => <TodayMedicationActions key={`medication-goal-${String(item.goal?.id ?? patientMedicationId(item.medication) ?? "unassigned")}`} medications={[item.medication]} goal={item.goal} onUpdated={reload} />)}
+         {(medicationGoalCardsForToday.length > 0 || smokingGoal || alcoholGoal || weightGoal || exerciseGoal) && <section className="mt-3.5 grid items-stretch gap-4 lg:grid-cols-2">
+           {medicationGoalCardsForToday.map((item: any) => item.medication ? <TodayMedicationActions key={`medication-goal-${String(item.goal?.id ?? patientMedicationId(item.medication) ?? "unassigned")}`} medications={[item.medication]} goal={item.goal} onUpdated={reload} /> : null)}
            {smokingGoal ? <TodaySmokingGoal goal={smokingGoal} onUpdated={reload} /> : null}
            {alcoholGoal ? <TodayAlcoholGoal goal={alcoholGoal} onUpdated={reload} /> : null}
            {weightGoal ? <TodayWeightGoal goal={weightGoal} /> : null}
