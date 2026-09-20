@@ -16,7 +16,7 @@ type GoalMeta = {
   unit: string;
   period: string;
   comparison: string;
-  action: "CHECK_IN" | "MANUAL";
+  action: "CHECK_IN" | "VITALS" | "MANUAL";
   helper: string;
   icon: typeof Target;
   step?: string;
@@ -27,13 +27,13 @@ type GoalMeta = {
 
 const GOAL_META: Record<string, GoalMeta> = {
   NUTRITION: { label: "Nutrition", unit: "calories/day", period: "Daily", comparison: "At most", action: "MANUAL", helper: "Record your total calories for today. Your nutrition goal is evaluated from the daily total.", icon: Activity, step: "50", min: "0", max: "10000", placeholder: "e.g. 2000" },
-  BLOOD_PRESSURE: { label: "Blood pressure", unit: "mmHg", period: "Daily", comparison: "At most", action: "MANUAL", helper: "This goal tracks your systolic blood-pressure value. Use Health Vitals when you want to save a complete blood-pressure reading.", icon: HeartPulse, step: "1", min: "40", max: "300", placeholder: "e.g. 130" },
+  BLOOD_PRESSURE: { label: "Blood pressure", unit: "mmHg", period: "Daily", comparison: "At most", action: "VITALS", helper: "Use Health Vitals to save a complete blood-pressure reading; the systolic value is then used by this goal.", icon: HeartPulse, step: "1", min: "40", max: "300", placeholder: "e.g. 130" },
   BLOOD_GLUCOSE: { label: "Blood glucose", unit: "mmol/L", period: "Daily", comparison: "At most", action: "MANUAL", helper: "Record the glucose value you want this goal to monitor.", icon: Activity, step: "0.1", min: "0.1", max: "50", placeholder: "e.g. 7.0" },
   CHOLESTEROL: { label: "Cholesterol", unit: "mmol/L", period: "Journey", comparison: "At most", action: "MANUAL", helper: "Record your total cholesterol result when you have a measured result available.", icon: Activity, step: "0.1", min: "0.1", max: "30", placeholder: "e.g. 5.0" },
   SLEEP: { label: "Sleep", unit: "hours/night", period: "Daily", comparison: "At least", action: "CHECK_IN", helper: "Sleep is recorded through your Daily Health Check-in so the goal stays connected to your health journal.", icon: Moon },
   MENTAL_HEALTH: { label: "Mental health", unit: "score", period: "Daily", comparison: "At most", action: "CHECK_IN", helper: "Your stress score is recorded through the Daily Health Check-in, where 1 is calm and 10 is very stressed.", icon: Activity },
   HYDRATION: { label: "Hydration", unit: "ml/day", period: "Daily", comparison: "At least", action: "CHECK_IN", helper: "Water intake is recorded through the Daily Health Check-in and compared with your daily target.", icon: Droplets },
-  HEART_RATE: { label: "Heart rate", unit: "bpm", period: "Daily", comparison: "At most", action: "MANUAL", helper: "Record a resting heart-rate value, or use supported wearable/clinical readings when available.", icon: HeartPulse, step: "1", min: "20", max: "260", placeholder: "e.g. 72" },
+  HEART_RATE: { label: "Heart rate", unit: "bpm", period: "Daily", comparison: "At most", action: "VITALS", helper: "Use Health Vitals to save a resting heart-rate reading, or let supported wearable/clinical readings provide it.", icon: HeartPulse, step: "1", min: "20", max: "260", placeholder: "e.g. 72" },
   OTHER: { label: "Personal goal", unit: "", period: "Journey", comparison: "Stay close to target", action: "MANUAL", helper: "Record a measurable value for your personal goal. The comparison is based on how close the value is to your target.", icon: PencilLine, step: "0.1", min: "0", placeholder: "Enter today's value" },
 };
 
@@ -77,6 +77,18 @@ function sourceAction(category: string) {
   return { label: "Open health goal", href: "/health-goals" };
 }
 
+const DEFAULT_METRICS: Record<string, { metricType: string; metricKey: string }> = {
+  NUTRITION: { metricType: "NUTRITION", metricKey: "nutrition.calories" },
+  BLOOD_PRESSURE: { metricType: "BLOOD_PRESSURE", metricKey: "blood_pressure.systolic" },
+  BLOOD_GLUCOSE: { metricType: "BLOOD_GLUCOSE", metricKey: "blood_glucose.value" },
+  CHOLESTEROL: { metricType: "CHOLESTEROL", metricKey: "cholesterol.total" },
+  SLEEP: { metricType: "SLEEP", metricKey: "sleep.hours" },
+  MENTAL_HEALTH: { metricType: "MENTAL_HEALTH", metricKey: "mental.stress" },
+  HYDRATION: { metricType: "HYDRATION", metricKey: "hydration.ml" },
+  HEART_RATE: { metricType: "HEART_RATE", metricKey: "heart_rate.bpm" },
+  OTHER: { metricType: "OTHER", metricKey: "other.value" },
+};
+
 export default function TodaySupportedGoalCard({ goal, onUpdated }: SupportedGoalCardProps) {
   const [value, setValue] = useState("");
   const [saving, setSaving] = useState(false);
@@ -88,6 +100,9 @@ export default function TodaySupportedGoalCard({ goal, onUpdated }: SupportedGoa
   const progress = progressPercent(goal);
   const source = sourceAction(category);
   const goalId = String(goal?.id ?? "");
+  const defaultMetric = DEFAULT_METRICS[category] ?? DEFAULT_METRICS.OTHER;
+  const metricType = String(goal?.metricConfig?.metricType ?? defaultMetric.metricType).toUpperCase();
+  const metricKey = String(goal?.metricConfig?.metricKey ?? defaultMetric.metricKey);
 
   async function recordValue() {
     const numeric = Number(value);
@@ -99,8 +114,8 @@ export default function TodaySupportedGoalCard({ goal, onUpdated }: SupportedGoa
     setSaving(true);
     try {
       await healthGoalsService.syncMetricEvent({
-        metricType: String(goal?.metricConfig?.metricType ?? category).toUpperCase(),
-        metricKey: String(goal?.metricConfig?.metricKey ?? ""),
+        metricType,
+        metricKey,
         loggedValue: numeric,
         occurredAt: new Date().toISOString(),
         source: "goal-manual",
@@ -150,6 +165,7 @@ export default function TodaySupportedGoalCard({ goal, onUpdated }: SupportedGoa
           ) : (
             <Link href={source.href} className="mt-3 inline-flex min-h-10 w-full items-center justify-center gap-1.5 rounded-xl bg-[#0b2d54] px-4 py-2 text-[9px] font-black text-white"><ArrowRight className="h-3.5 w-3.5 text-[#24c1c4]" />{source.label}</Link>
           )}
+          {meta.action === "MANUAL" && (category === "BLOOD_GLUCOSE" || category === "CHOLESTEROL") && <Link href="/tests-results" className="mt-2 inline-flex min-h-9 w-full items-center justify-center gap-1.5 rounded-xl border border-[#dce7eb] bg-white px-3 py-2 text-[9px] font-black text-[#0b2d54]">View recorded results <ArrowRight className="h-3.5 w-3.5" /></Link>}
         </div>
       </div>
     </article>
