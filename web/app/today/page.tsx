@@ -145,8 +145,8 @@ export default function TodayPage() {
   const appointments = data.today?.upcomingAppointments ?? [];
   const allGoals = data.goals ?? data.healthGoals ?? [];
   const activeGoalsArray = allGoals.filter((goal: any) => ACTIVE_GOAL_STATUSES.has(String(goal?.status ?? "").toUpperCase()));
-  const todayGoalArray = allGoals.filter((goal: any) => TODAY_GOAL_STATUSES.has(String(goal?.status ?? "").toUpperCase()));
-  const goals = allGoals.filter((goal: any) => String(goal?.status).toUpperCase() === "ACTIVE");
+  const todayGoalArray = activeGoalsArray;
+  const goals = activeGoalsArray;
   const medicationGoalCards = (Array.isArray(medications) ? medications : []).map((medication: any) => ({ medication, goal: medicationGoalFor(medication, activeGoalsArray, medications.length) }));
   const unmatchedMedicationGoals = activeGoalsArray.filter((goal: any) => isMedicationGoal(goal) && !medicationGoalCards.some((item: any) => item.goal?.id === goal?.id));
   const matchedMedicationGoalCards = medicationGoalCards.filter((item: any) => Boolean(item.goal));
