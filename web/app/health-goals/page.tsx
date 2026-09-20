@@ -234,8 +234,7 @@ export default function HealthGoalsPage() {
     const dosage = searchParams.get("dosage")?.trim() || "";
     const frequency = searchParams.get("frequency")?.trim() || "";
     const details = [dosage && `Dosage: ${dosage}`, frequency && `Frequency: ${frequency.replaceAll("_", " ")}`].filter(Boolean).join(" · ");
-    setEditingId(null); setDraft({ title: name, description: details ? `Medication: ${name} · ${details}` : `Medication: ${name}`, category: "MEDICATION", priority: "MEDIUM", targetValue: "90", unit: "%", targetDate: "", weightDirection: "LOSE" }); setEditorOpen(true);
-    setDraft((current) => ({ ...current, patientMedicationId: searchParams.get("patientMedicationId")?.trim() || "" }));
+    setEditingId(null); setDraft({ title: name, description: details ? `Medication: ${name} · ${details}` : `Medication: ${name}`, category: "MEDICATION", priority: "MEDIUM", targetValue: "90", unit: "%", targetDate: "", weightDirection: "LOSE", patientMedicationId: searchParams.get("patientMedicationId")?.trim() || "" }); setEditorOpen(true);
   }, [dashboard?.patient?.id, loading, searchParams]);
 
   function openAdd() { setEditingId(null); setDraft(emptyDraft()); setEditorOpen(true); }
