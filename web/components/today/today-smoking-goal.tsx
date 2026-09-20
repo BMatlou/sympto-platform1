@@ -39,7 +39,9 @@ export default function TodaySmokingGoal({ goal, onUpdated }: Props) {
   const [saving, setSaving] = useState(false);
 
   const goalId = String(goal?.id ?? "");
-  const dailyTarget = Number(goal?.metricConfig?.frequencyTarget ?? goal?.frequencyTarget ?? goal?.targetValue ?? 0);
+  const targetRaw = goal?.metricConfig?.frequencyTarget ?? goal?.frequencyTarget ?? goal?.targetValue;
+  const dailyTarget = Number(targetRaw);
+  const hasTarget = targetRaw !== null && targetRaw !== undefined && targetRaw !== "" && Number.isFinite(dailyTarget) && dailyTarget >= 0;
   const hasTarget = Number.isFinite(dailyTarget) && dailyTarget > 0;
   const startDate = useMemo(() => calendarMidnight(goal?.createdAt), [goal?.createdAt]);
   const targetDate = useMemo(() => calendarMidnight(goal?.targetDate), [goal?.targetDate]);
@@ -76,9 +78,9 @@ export default function TodaySmokingGoal({ goal, onUpdated }: Props) {
   }, [goalId]);
 
   const difference = todayLogged !== null && hasTarget ? todayLogged - dailyTarget : 0;
-  const targetReached = todayLogged !== null && hasTarget && todayLogged >= dailyTarget;
+  const targetReached = todayLogged !== null && hasTarget && (dailyTarget === 0 ? todayLogged === 0 : todayLogged >= dailyTarget);
   const exceeded = todayLogged !== null && hasTarget && todayLogged > dailyTarget;
-  const progress = todayLogged !== null && hasTarget ? Math.min(1, todayLogged / dailyTarget) : 0;
+  const progress = todayLogged !== null && hasTarget ? (dailyTarget === 0 ? 1 : Math.min(1, todayLogged / dailyTarget)) : 0;
   const progressPercent = Math.round(progress * 100);
 
   async function save() {
