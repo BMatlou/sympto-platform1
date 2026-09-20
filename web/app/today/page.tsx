@@ -16,7 +16,6 @@ import TodayExerciseGoal from "@/components/today/today-exercise-goal";
 import { TODAY_GOAL_CARD_CLASS, TODAY_GOAL_FOOTER_CLASS } from "@/components/today/today-goal-card-styles";
 
 const ACTIVE_GOAL_STATUSES = new Set(["IN_PROGRESS", "ACTIVE", "ON_TRACK", "IMPROVING", "STAGNANT", "DECLINING"]);
-const TODAY_GOAL_STATUSES = new Set([...ACTIVE_GOAL_STATUSES, "ACHIEVED"]);
 
 function text(value: unknown, fallback = "—") {
   return value === null || value === undefined || value === "" ? fallback : String(value);
