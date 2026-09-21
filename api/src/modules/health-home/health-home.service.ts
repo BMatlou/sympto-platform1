@@ -390,11 +390,11 @@ export class HealthHomeService {
     // used by the health-goals module. The Prisma model is intentionally kept
     // compatible with older generated clients, so hydrate the association here
     // and expose it in the Home/Today payload instead of dropping the link.
-    const medicationAssociationByGoalId = new Map(
+    const associationByGoalId = new Map(
       medicationGoalRows.map((row) => [String(row.id), row]),
     );
     const goalsWithMedicationAssociations = goalsWithProgress.map((goal: any) => {
-      const association = medicationAssociationByGoalId.get(String(goal.id));
+      const association = associationByGoalId.get(String(goal.id));
       if (!association) return goal;
       return {
         ...goal,
@@ -410,13 +410,16 @@ export class HealthHomeService {
     // Some relationship serializers return a reduced goal shape, so these
     // database-backed identifiers must remain explicit in the Home payload.
     const mappedGoals = goalsWithRelationships.map((goal: any) => {
-      const association = medicationAssociationByGoalId.get(String(goal?.id));
+      const association = associationByGoalId.get(String(goal.id));
+      const patientMedicationId =
+        goal?.patientMedicationId ?? association?.patientMedicationId ?? null;
+      const medicationId =
+        goal?.medicationId ?? association?.medicationId ?? null;
+
       return {
         ...goal,
-        patientMedicationId:
-          goal?.patientMedicationId ?? association?.patientMedicationId ?? null,
-        medicationId:
-          goal?.medicationId ?? association?.medicationId ?? null,
+        patientMedicationId: patientMedicationId ? String(patientMedicationId) : null,
+        medicationId: medicationId ? String(medicationId) : null,
       };
     });
     const activeAllergies = allergies.filter((item) => item.status === 'ACTIVE' || !item.status);
