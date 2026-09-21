@@ -173,6 +173,39 @@ export default function TodaySupportedGoalCard({ goal, onUpdated }: SupportedGoa
 
         <div className="mt-3 h-2 overflow-hidden rounded-full bg-[#edf3f5]"><div className="h-full rounded-full bg-[#24c1c4] transition-all" style={{ width: Math.max(0, progress) + "%" }} /></div>
 
+        {Array.isArray(goal?.connectedGoals) && goal.connectedGoals.length > 0 && (
+          <div className="mt-3 rounded-[17px] border border-[#dcebec] bg-[#f7fbfc] p-3.5">
+            <div className="flex items-center justify-between gap-2">
+              <p className="text-[8px] font-black uppercase tracking-[.14em] text-[#82939f]">Goal connections</p>
+              <span className="text-[8px] font-bold text-[#9aa8b1]">{goal.connectedGoals.length} connected</span>
+            </div>
+            <div className="mt-2 flex flex-wrap gap-2">
+              {goal.connectedGoals.slice(0, 4).map((relation: any) => {
+                const related = relation?.goal;
+                const relatedId = String(related?.id ?? "");
+                const direction = String(relation?.direction ?? "");
+                const relationLabel =
+                  String(relation?.relationshipType ?? "").toUpperCase() === "SUPPORTS"
+                    ? direction === "supportsThisGoal"
+                      ? "Supports this"
+                      : "Supports another"
+                    : "Related";
+                return (
+                  <Link
+                    key={String(relation?.id ?? relatedId)}
+                    href={relatedId ? "/health-goals#goal-" + encodeURIComponent(relatedId) : "/health-goals"}
+                    className="inline-flex min-w-0 items-center gap-1 rounded-full bg-white px-2.5 py-1.5 text-[8px] font-bold text-[#0b6f73] ring-1 ring-[#dce8eb]"
+                    title={String(relation?.rationale ?? "")}
+                  >
+                    <span className="truncate">{String(related?.title ?? related?.category ?? "Connected goal")}</span>
+                    <span className="shrink-0 text-[#91a2ad]">· {relationLabel}</span>
+                  </Link>
+                );
+              })}
+            </div>
+          </div>
+        )}
+
         <div className="mt-3 rounded-[17px] bg-[#fbfdfd] p-3.5 ring-1 ring-[#e4edef]">
           <p className="text-[10px] leading-5 text-[#758896]">{meta.helper}</p>
           <div className="mt-2 rounded-xl bg-[#e9f9fa] px-3 py-2"><p className="text-[9px] font-bold leading-4 text-[#0b6f73]">{nextStep}</p></div>
