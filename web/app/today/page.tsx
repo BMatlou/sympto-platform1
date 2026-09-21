@@ -128,7 +128,10 @@ export default function TodayPage() {
   useEffect(() => {
     if (loading || error || !data || typeof window === "undefined") return;
     const hash = window.location.hash;
-    if (!hash.startsWith("#medication-adherence-card-")) return;
+    const supportedHash =
+      hash.startsWith("#medication-adherence-card-") ||
+      hash.startsWith("#health-goal-card-");
+    if (!supportedHash) return;
 
     let attempts = 0;
     let timer: ReturnType<typeof setTimeout> | null = null;
