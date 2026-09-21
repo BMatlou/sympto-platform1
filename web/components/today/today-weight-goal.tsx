@@ -52,19 +52,21 @@ export default function TodayWeightGoal({ goal, fallbackWeight }: Props) {
   const heightCm = Number(goal?.patient?.heightCm || goal?.heightCm || 187);
   const bmi = (currentWeight && heightCm) ? currentWeight / ((heightCm / 100) ** 2) : 19.6;
 
-  const intelligence = goal?.intelligence ?? null;
+  // 🚀 FIX: Use the live hydrated intelligence first, then fall back to the
+  // intelligence included on the initial goal prop. Do not redeclare the
+  // state variable "intelligence" in this scope.
+  const activeIntelligence = intelligence ?? goal?.intelligence ?? null;
 
-  const connectedMedications = intelligence?.profile?.activeMedications ||
-    intelligence?.medications ||
+  const connectedMedications = activeIntelligence?.profile?.activeMedications ||
+    activeIntelligence?.medications ||
     (goal?.patient?.medications ? [goal.patient.medications] : []);
 
-  const connectedConditions = intelligence?.profile?.conditions ||
-    intelligence?.conditions || [];
+  const connectedConditions = activeIntelligence?.profile?.conditions ||
+    activeIntelligence?.conditions || [];
 
-  const supportiveRecommendations = intelligence?.recommendations ||
-    intelligence?.supportiveGoals ||
-    intelligence?.recommendedSupportingGoals ||
-    intelligence?.targetedSupportiveGoals || [];
+  const supportiveRecommendations = activeIntelligence?.recommendations ||
+    activeIntelligence?.supportiveGoals ||
+    [];
 
   const journey = useMemo(() => {
     const start = new Date(String(goal?.createdAt || "2026-09-01"));
