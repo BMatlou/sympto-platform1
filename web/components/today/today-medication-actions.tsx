@@ -111,7 +111,7 @@ export default function TodayMedicationActions({ medications, goal: suppliedGoal
   const finalGoal = (() => {
     if (!suppliedGoal) return null;
 
-    const isGoalLive = new Set(["ACTIVE", "IN_PROGRESS", "ON_TRACK", "IMPROVING", "STAGNANT", "DECLINING"])
+    const isGoalLive = new Set(["NOT_STARTED", "ACTIVE", "IN_PROGRESS", "ON_TRACK", "IMPROVING", "STAGNANT", "DECLINING"])
       .has(String(suppliedGoal.status).toUpperCase());
     const isMedicationGoal =
       String(suppliedGoal.metricType ?? "").toUpperCase() === "MEDICATION" ||
@@ -121,11 +121,12 @@ export default function TodayMedicationActions({ medications, goal: suppliedGoal
     return isGoalLive && isMedicationGoal ? suppliedGoal : null;
   })();
 
-  const medicationId = patientMedicationId(trackedMedication) ??
+  const medicationId =
     finalGoal?.patientMedicationId ??
     finalGoal?.patientMedication?.id ??
     finalGoal?.associatedPatientMedicationId ??
     finalGoal?.associatedPatientMedication?.id ??
+    patientMedicationId(trackedMedication) ??
     null;
   const frequency = medicationFrequency(trackedMedication);
   const totalRequiredDosesPerDay = requiredDosesForFrequency(frequency);
