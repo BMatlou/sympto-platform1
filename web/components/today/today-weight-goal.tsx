@@ -103,12 +103,39 @@ export default function TodayWeightGoal({ goal, fallbackWeight, bmi: dashboardBm
         // user's journey to Day 1. Only use the baseline/history timestamp as a
         // recovery source when the goal creation timestamp is genuinely absent.
         const validGoalCreatedAt = !Number.isNaN(goalCreatedAt.getTime());
-        const resolvedJourneyStart =
-          validGoalCreatedAt
-            ? goalCreatedAt.toISOString()
-            : goalBaseline?.occurredAt ??
-              baselineFromHistory?.occurredAt ??
-              null;
+
+        const historicalProgressDates = Array.isArray(goal?.progress)
+          ? goal.progress
+              .map((progressEntry: any) =>
+                progressEntry?.measuredAt ?? progressEntry?.createdAt ?? null,
+              )
+              .map((value: unknown) => new Date(String(value)))
+              .filter((value: Date) => !Number.isNaN(value.getTime()))
+          : [];
+
+        const earliestProgressDate = historicalProgressDates.length
+          ? new Date(
+              Math.min(
+                ...historicalProgressDates.map((value: Date) => value.getTime()),
+              ),
+            )
+          : null;
+
+        // Prefer the persistent goal creation date. If previous data repair
+        // accidentally made createdAt newer than the historical progress,
+        // preserve the older documented journey start instead of showing Day 1.
+        const candidateDates = [
+          validGoalCreatedAt ? goalCreatedAt : null,
+          earliestProgressDate,
+        ].filter((value): value is Date => value != null);
+
+        const resolvedJourneyStart = candidateDates.length
+          ? new Date(
+              Math.min(...candidateDates.map((value) => value.getTime())),
+            ).toISOString()
+          : goalBaseline?.occurredAt ??
+            baselineFromHistory?.occurredAt ??
+            null;
 
         setJourneyStartAt(resolvedJourneyStart);
         setEvents(regular);
