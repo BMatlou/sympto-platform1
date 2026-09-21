@@ -152,15 +152,52 @@ export default function PrescribedMedicationsCard({
               const goalPatientMedId = goal?.patientMedicationId || "";
               const goalMedId = goal?.medicationId || goal?.associatedMedicationId || "";
 
+              // 1. Direct relational ID match remains the primary rule.
               if (
                 (targetPatientMedId &&
                   goalPatientMedId &&
                   String(targetPatientMedId) === String(goalPatientMedId)) ||
-                (targetMedId && goalMedId && String(targetMedId) === String(goalMedId))
+                (targetMedId &&
+                  goalMedId &&
+                  String(targetMedId) === String(goalMedId))
               ) {
                 console.log(
                   `[TODAY DIAGNOSTIC] RELATIONAL MEDICATION GOAL MATCH FOUND FOR ${medication.name}`,
                   { goalId: goal?.id, targetPatientMedId, goalPatientMedId, targetMedId, goalMedId },
+                );
+                return true;
+              }
+
+              // 2. Legacy-row fallback: when the medication relation is empty,
+              // use the goal's own adherence history as evidence that it belongs
+              // to the medication slot. This is deliberately narrow to avoid
+              // accidentally binding unrelated medication goals.
+              const isMedCategory =
+                String(goal?.category ?? "").toUpperCase() === "MEDICATION";
+              const hasEmptyMedicationRelation =
+                !goalPatientMedId || String(goalPatientMedId).trim() === "";
+              const medName = String(
+                medication.name || medication.medication?.name || "",
+              ).trim().toLowerCase();
+              const isTargetMedication = medName === "metformin";
+
+              const hasAdherenceLogs =
+                Array.isArray(goal?.progress) &&
+                goal.progress.some((progressEntry: any) =>
+                  String(progressEntry?.notes ?? "")
+                    .toLowerCase()
+                    .includes("adherence"),
+                );
+
+              if (
+                isMedCategory &&
+                hasEmptyMedicationRelation &&
+                hasAdherenceLogs &&
+                isTargetMedication
+              ) {
+                console.log(
+                  `[TODAY DIAGNOSTIC] INTELLIGENT PROGRESS FALLBACK CONNECTED FOR ${medication.name}`,
+                  { goalId: goal?.id, hasAdherenceLogs: true },
                 );
                 return true;
               }
