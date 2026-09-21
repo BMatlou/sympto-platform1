@@ -209,9 +209,28 @@ export default function TodayWeightGoal({ goal, fallbackWeight, bmi: dashboardBm
   const olderThanWeek = [...events].reverse().find((event) => new Date(event.occurredAt).getTime() <= weekAgo);
   const weeklyChangeKg = olderThanWeek && currentWeight != null ? currentWeight - olderThanWeek.loggedValue : null;
   const expectedProgress = journey.totalDays != null && journey.totalDays > 0 ? Math.min(100, Math.max(0, ((journey.journeyDay - 1) / journey.totalDays) * 100)) : null;
-  const maintenanceStatus = String(intelligence?.weight?.status ?? "INSUFFICIENT_DATA").toUpperCase();
-  const maintenanceStable = intelligence?.weight?.withinMaintenanceBand === true || maintenanceStatus === "STABLE";
   const maintenanceAverage = numberValue(intelligence?.weight?.average7dKg) ?? currentWeight;
+  const fallbackMaintenanceBand =
+    startingWeight != null
+      ? { min: startingWeight - 1.5, max: startingWeight + 1.5 }
+      : null;
+  const maintenanceBandFromIntelligence = intelligence?.weight?.maintenanceBand ?? null;
+  const effectiveMaintenanceBand =
+    maintenanceBandFromIntelligence ?? fallbackMaintenanceBand;
+  const fallbackMaintenanceStatus =
+    startingWeight == null || maintenanceAverage == null
+      ? "INSUFFICIENT_DATA"
+      : maintenanceAverage < startingWeight - 1.5
+        ? "DRIFTING_DOWN"
+        : maintenanceAverage > startingWeight + 1.5
+          ? "DRIFTING_UP"
+          : "STABLE";
+  const maintenanceStatus = String(
+    intelligence?.weight?.status ?? fallbackMaintenanceStatus,
+  ).toUpperCase();
+  const maintenanceStable =
+    intelligence?.weight?.withinMaintenanceBand === true ||
+    maintenanceStatus === "STABLE";
   const maintenanceProgress = isMaintenanceGoal && startingWeight != null && maintenanceAverage != null
     ? Math.round(Math.max(0, Math.min(100, (1 - (Math.abs(maintenanceAverage - startingWeight) / Math.max(Math.abs(startingWeight), 0.0001))) * 100)))
     : 0;
@@ -263,7 +282,7 @@ export default function TodayWeightGoal({ goal, fallbackWeight, bmi: dashboardBm
   const planDaysRemaining = numberValue(weightPlan?.daysRemaining);
   const planTargetWeight = numberValue(weightPlan?.targetWeightKg) ?? targetWeight;
   const planIsValid = !isMaintenanceGoal && planTargetWeight != null && planTargetWeight > 0;
-  const maintenanceBand = intelligence?.weight?.maintenanceBand ?? null;
+  const maintenanceBand = effectiveMaintenanceBand;
   const contextGoals = Array.isArray(healthContext?.connectedGoals) ? healthContext.connectedGoals : [];
   const contextConditions = Array.isArray(healthContext?.activeConditions) ? healthContext.activeConditions : [];
   const contextMedications = Array.isArray(healthContext?.activeMedications) ? healthContext.activeMedications : [];
@@ -298,8 +317,29 @@ export default function TodayWeightGoal({ goal, fallbackWeight, bmi: dashboardBm
   const goalNeedsReview = !goalCompleted && (bmiCaution || gainTargetCaution || (currentBmiBelowRange && comparison === "DECREASE_TO"));
   const reviewGoalHref = goal?.id ? `/health-goals?edit=${encodeURIComponent(String(goal.id))}` : "/health-goals";
   const ChangeIcon = isMaintenanceGoal ? Scale : comparison === "INCREASE_TO" ? TrendingUp : TrendingDown;
-  const connectedGoals = Array.isArray(goal?.connectedGoals) ? goal.connectedGoals : [];
-  const supportingGoals = connectedGoals.filter((relation: any) => relation.relationshipType === "SUPPORTS" && relation.direction === "supportsThisGoal");  const relatedGoals = connectedGoals.filter((relation: any) => relation.relationshipType === "RELATED_TO" && relation.direction === "relatedToThisGoal");
+  const directConnectedGoals = Array.isArray(goal?.connectedGoals)
+    ? goal.connectedGoals
+    : [];
+  const intelligenceRelationships = Array.isArray(intelligence?.relationships)
+    ? intelligence.relationships
+    : [];
+  const connectedGoals =
+    directConnectedGoals.length > 0 ? directConnectedGoals : intelligenceRelationships;
+  const supportingGoals = connectedGoals.filter(
+    (relation: any) =>
+      String(relation?.relationshipType ?? "").toUpperCase() === "SUPPORTS" &&
+      String(relation?.direction ?? "") === "supportsThisGoal",
+  );
+  const relatedGoals = connectedGoals.filter(
+    (relation: any) =>
+      String(relation?.relationshipType ?? "").toUpperCase() === "RELATED_TO" &&
+      String(relation?.direction ?? "") === "relatedToThisGoal",
+  );
+  const recommendedSupportingGoals = Array.isArray(
+    intelligence?.recommendedSupportingGoals,
+  )
+    ? intelligence.recommendedSupportingGoals.filter((item: any) => !item?.existingGoalId)
+    : [];
 
   const journeyLabel = goalCompleted    ? completedWeight != null
       ? `Goal completed at ${formatKg(completedWeight)} kg`      : "Goal completed"
@@ -353,8 +393,10 @@ export default function TodayWeightGoal({ goal, fallbackWeight, bmi: dashboardBm
     ? `Your planned target of ${formatKg(targetWeight)} kg corresponds to a BMI of ${targetBmi?.toFixed(1) ?? "—"} at your recorded height, which is outside the adult healthy-weight screening range. ${gainTargetObesityRange ? "It is in the adult obesity BMI screening category." : "It is in the adult overweight BMI screening category."} This is a screening signal, not a diagnosis; BMI does not distinguish muscle from fat. Review the target with a healthcare professional before pursuing it.`
     : isMaintenanceGoal
       ? intelligence?.weight?.average7dKg != null
-      ? `Sympto is using your 7-day average rather than a single scale reading. Your maintenance band is approximately ${formatKg(intelligence.weight.maintenanceBand?.min ?? startingWeight)}–${formatKg(intelligence.weight.maintenanceBand?.max ?? startingWeight)} kg around your baseline.`
-      : "Record a few recent weight measurements so Sympto can assess your maintenance trend."
+      ? `Sympto is using your 7-day average rather than a single scale reading. Your maintenance band is approximately ${formatKg(maintenanceBand?.min)}–${formatKg(maintenanceBand?.max)} kg around your baseline.`
+      : currentWeight != null && startingWeight != null
+        ? `Your current weight is ${formatKg(currentWeight)} kg against a maintenance baseline of ${formatKg(startingWeight)} kg. Keep recording measurements so Sympto can assess the trend more reliably.`
+        : "Record a few recent weight measurements so Sympto can assess your maintenance trend."
     : currentBmi != null && currentBmi < 18.5
       ? `Your current BMI is ${currentBmi?.toFixed(1)}, below the adult underweight screening threshold of 18.5. Sympto should shift guidance toward healthy weight gain rather than further weight loss. At your recorded height, BMI 18.5 corresponds to about ${formatKg(lowerScreeningWeight)} kg. BMI is a screening measure, not a diagnosis.`
       : bmiCaution
@@ -460,13 +502,62 @@ export default function TodayWeightGoal({ goal, fallbackWeight, bmi: dashboardBm
           </div>
         )}
 
-        {!loading && connectedGoals.length > 0 && (
-          <div className="mt-4 rounded-[18px] border border-[#e1eaed] bg-[#f8fbfc] px-4 py-3 text-[10px] leading-5 text-[#74859a]">
-            <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
-              <span className="font-black uppercase tracking-[.12em] text-[#82939f]">Connected goals</span>
-              {supportingGoals.length > 0 && <span className="font-semibold text-[#0b6f73]">Supporting: {supportingGoals.map((relation: any) => String(relation.goal?.title ?? relation.goal?.category ?? "Goal")).join(" · ")}</span>}
-              {relatedGoals.length > 0 && <span className="font-semibold text-[#74859a]">Related: {relatedGoals.map((relation: any) => String(relation.goal?.title ?? relation.goal?.category ?? "Goal")).join(" · ")}</span>}
+        {!loading && (connectedGoals.length > 0 || recommendedSupportingGoals.length > 0) && (
+          <div className="mt-4 rounded-[20px] border border-[#dbeaec] bg-[#f7fbfc] px-4 py-3.5 text-[10px] leading-5 text-[#74859a]">
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="font-black uppercase tracking-[.12em] text-[#82939f]">Goal connections</span>
+              {supportingGoals.length > 0 && <span className="font-semibold text-[#0b6f73]">Supporting {supportingGoals.length}</span>}
+              {relatedGoals.length > 0 && <span className="font-semibold text-[#74859a]">Related {relatedGoals.length}</span>}
             </div>
+            {supportingGoals.length > 0 && (
+              <div className="mt-2 flex flex-wrap gap-2">
+                {supportingGoals.map((relation: any) => {
+                  const relatedGoal = relation?.goal;
+                  const relatedId = String(relatedGoal?.id ?? "");
+                  return (
+                    <Link
+                      key={String(relation?.id ?? relatedId)}
+                      href={relatedId ? "/health-goals#goal-" + encodeURIComponent(relatedId) : "/health-goals"}
+                      className="inline-flex items-center gap-1 rounded-full bg-[#e8f8f7] px-2.5 py-1.5 font-bold text-[#0b6f73] ring-1 ring-[#d4eeec]"
+                      title={String(relation?.rationale ?? "")}
+                    >
+                      {String(relatedGoal?.title ?? relatedGoal?.category ?? "Supporting goal")}
+                      <ArrowRight className="h-2.5 w-2.5" />
+                    </Link>
+                  );
+                })}
+              </div>
+            )}
+            {relatedGoals.length > 0 && (
+              <div className="mt-2 flex flex-wrap gap-2">
+                {relatedGoals.map((relation: any) => {
+                  const relatedGoal = relation?.goal;
+                  const relatedId = String(relatedGoal?.id ?? "");
+                  return (
+                    <Link
+                      key={String(relation?.id ?? relatedId)}
+                      href={relatedId ? "/health-goals#goal-" + encodeURIComponent(relatedId) : "/health-goals"}
+                      className="inline-flex items-center gap-1 rounded-full bg-white px-2.5 py-1.5 font-bold text-[#74859a] ring-1 ring-[#dce7eb]"
+                      title={String(relation?.rationale ?? "")}
+                    >
+                      {String(relatedGoal?.title ?? relatedGoal?.category ?? "Related goal")}
+                      <ArrowRight className="h-2.5 w-2.5" />
+                    </Link>
+                  );
+                })}
+              </div>
+            )}
+            {recommendedSupportingGoals.length > 0 && supportingGoals.length === 0 && (
+              <div className="mt-2 rounded-[14px] bg-white px-3 py-2.5 ring-1 ring-[#e2ecef]">
+                <p className="text-[9px] font-black uppercase tracking-[.12em] text-[#82939f]">Suggested support</p>
+                <p className="mt-1 text-[10px] leading-4 text-[#74859a]">
+                  {recommendedSupportingGoals.slice(0, 3).map((item: any) => String(item?.title ?? item?.category ?? "Supporting goal")).join(" · ")}
+                </p>
+                <Link href="/health-goals" className="mt-2 inline-flex items-center gap-1 text-[9px] font-black text-[#0b6f73]">
+                  Manage supporting goals <ArrowRight className="h-3 w-3" />
+                </Link>
+              </div>
+            )}
           </div>
         )}
 
