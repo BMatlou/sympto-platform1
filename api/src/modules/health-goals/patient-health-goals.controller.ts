@@ -672,4 +672,6 @@ export class PatientHealthGoalsController {
       });
     });
 
-    return { message: 'Health goal deleted successfully.' };}
+    return { message: 'Health goal deleted successfully.' };
+  }
+}
