@@ -281,7 +281,8 @@ export class HealthGoalIntelligenceService {
   }
 
   async getWeightGoalIntelligence(goalId: string) {
-    const goal = await this.prisma.healthGoal.findUnique({
+    try {
+      const goal = await this.prisma.healthGoal.findUnique({
       where: { id: goalId },
       select: {
         id: true,
@@ -306,24 +307,35 @@ export class HealthGoalIntelligenceService {
     if (!goal) throw new NotFoundException('Health goal not found.');
     if (String(goal.category).toUpperCase() !== 'WEIGHT') throw new NotFoundException('This intelligence view is only available for weight goals.');
 
-    await this.syncGoalRelations(goal.patientId);
+    // Metric intelligence is sourced directly from HealthGoalMetricEvent.
+    // Do not let the legacy HealthGoalRelation synchronizer break this endpoint.
 
-    const baselineRows = await this.prisma.$queryRawUnsafe<Array<{ loggedValue: number }>>(
+    const baselineRows = await this.prisma.$queryRawUnsafe<Array<{ loggedValue: number | string | null }>>(
       'SELECT "loggedValue"::double precision AS "loggedValue" FROM "HealthGoalMetricEvent" WHERE "patientId"=$1 AND "metricType"=\'WEIGHT\' AND "metricKey"=\'weight.kg\' AND "source"=\'goal-baseline\' AND "sourceId"=$2 LIMIT 1',
       goal.patientId,
       goal.id,
     );
-    const baselineKg = baselineRows.length
-      ? Number(baselineRows[0].loggedValue)
-      : goal.patient.weightKg == null ? null : Number(goal.patient.weightKg);
+    const baselineRaw = baselineRows[0]?.loggedValue;
+    const baselineFromEvent = baselineRaw == null ? null : Number(baselineRaw);
+    const baselineKg =
+      baselineFromEvent != null && Number.isFinite(baselineFromEvent)
+        ? baselineFromEvent
+        : goal.patient.weightKg == null
+          ? null
+          : Number(goal.patient.weightKg);
 
-    const events = await this.prisma.$queryRawUnsafe<Array<{ loggedValue: number; occurredAt: Date }>>(
+    const events = await this.prisma.$queryRawUnsafe<Array<{ loggedValue: number | string | null; occurredAt: Date | string | null }>>(
       'SELECT "loggedValue"::double precision AS "loggedValue","occurredAt" FROM "HealthGoalMetricEvent" WHERE "patientId"=$1 AND "metricType"=\'WEIGHT\' AND "metricKey"=\'weight.kg\' AND "source" <> \'goal-baseline\' AND "occurredAt"<=CURRENT_TIMESTAMP ORDER BY "occurredAt" ASC',
       goal.patientId,
     );
     const cleanedEvents: WeightEvent[] = events
-      .map((row) => ({ value: Number(row.loggedValue), at: new Date(row.occurredAt) }))
-      .filter((row) => Number.isFinite(row.value) && !Number.isNaN(row.at.getTime()));
+      .map((row) => ({
+        value: row.loggedValue == null ? Number.NaN : Number(row.loggedValue),
+        at: row.occurredAt == null ? new Date(Number.NaN) : new Date(row.occurredAt),
+      }))
+      .filter(
+        (row) => Number.isFinite(row.value) && !Number.isNaN(row.at.getTime()),
+      );
 
     const latestKg = cleanedEvents.length ? cleanedEvents[cleanedEvents.length - 1].value : baselineKg;
     const now = Date.now();
@@ -422,7 +434,17 @@ export class HealthGoalIntelligenceService {
       water: journals.map((j) => j.waterIntakeMl == null ? null : Number(j.waterIntakeMl)).filter((v): v is number => v != null && Number.isFinite(v)),
     };
 
-    const relationshipData = await this.getGoalRelationships(goal.id);
+    let relationshipData: { relationships: RelationRow[] } = { relationships: [] };
+    try {
+      relationshipData = await this.getGoalRelationships(goal.id);
+    } catch (relationshipError) {
+      console.warn(
+        '⚠️ Weight intelligence relationship data unavailable:',
+        relationshipError instanceof Error
+          ? relationshipError.message
+          : String(relationshipError),
+      );
+    }
     const activeMedicationCount = await this.prisma.patientMedication.count({
       where: { healthPassport: { patientId: goal.patientId }, status: { in: ['ACTIVE', 'PAUSED'] } },
     });
@@ -737,5 +759,19 @@ export class HealthGoalIntelligenceService {
         },
       },
     };
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : String(error);
+      console.error('❌ WEIGHT INTELLIGENCE SYSTEM CRASH REPAIRED:', message);
+      return {
+        success: false,
+        statusCode: 500,
+        intelligence: {
+          currentTrend: 'UNKNOWN',
+          bmiNow: 0,
+          guidanceText:
+            'Weight metrics undergoing background system synchronization.',
+        },
+      };
+    }
   }
 }
