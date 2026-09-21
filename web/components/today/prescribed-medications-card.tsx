@@ -17,6 +17,8 @@ type HealthGoal = {
   patientMedication?: { id?: string | null } | null;
   associatedPatientMedicationId?: string | null;
   associatedPatientMedication?: { id?: string | null } | null;
+  healthGoalId?: string | null;
+  medicationGoalId?: string | null;
   metricType?: string | null;
   metricConfig?: { metricType?: string | null; metricKey?: string | null } | null;
 };
@@ -50,6 +52,16 @@ function findMedicationGoal(
     medication.medication?.id ??
     medication.medication?.medicationId ??
     null;
+  const explicitMedicationGoalId = medication.healthGoalId ?? medication.medicationGoalId ?? null;
+  if (explicitMedicationGoalId) {
+    const explicitlyLinkedGoal = goals.find((goal) => {
+      if (!goal || String(goal.id ?? "") !== String(explicitMedicationGoalId)) return false;
+      const status = String(goal.status ?? "").toUpperCase();
+      return !["ARCHIVED", "CANCELLED", "DELETED", "ACHIEVED"].includes(status);
+    });
+    if (explicitlyLinkedGoal) return explicitlyLinkedGoal;
+  }
+
   const medicationName = normalise(
     medication.name ??
     medication.medication?.name ??
