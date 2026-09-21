@@ -105,7 +105,7 @@ export default function TodayWeightGoal({ goal, fallbackWeight }: Props) {
   }, [goal?.id, goal?.createdAt]);
 
   const journey = useMemo(() => journeyFor(goal), [goal]);
-  const comparison = String(goal?.metricConfig?.comparison ?? goal?.comparison ?? "DECREASE_TO").toUpperCase();
+  const comparison = String(goal?.metricConfig?.comparison ?? goal?.comparison ?? intelligence?.goal?.comparison ?? "CLOSEST").toUpperCase();
   const isMaintenanceGoal = comparison === "CLOSEST";
   const configuredTarget = numberValue(goal?.metricConfig?.frequencyTarget ?? goal?.targetValue);
   const fallback = numberValue(fallbackWeight);
@@ -127,7 +127,7 @@ export default function TodayWeightGoal({ goal, fallbackWeight }: Props) {
   const changeKg = startingWeight != null && journeyWeight != null ? journeyWeight - startingWeight : null;
   const lostKg = comparison === "DECREASE_TO" && startingWeight != null && journeyWeight != null ? Math.max(startingWeight - journeyWeight, 0) : null;
   const gainedKg = comparison === "INCREASE_TO" && startingWeight != null && journeyWeight != null ? Math.max(journeyWeight - startingWeight, 0) : null;
-  const actualChange = comparison === "DECREASE_TO" ? lostKg : gainedKg;
+  const actualChange = comparison === "DECREASE_TO" ? lostKg : comparison === "INCREASE_TO" ? gainedKg : null;
   const weekAgo = Date.now() - 7 * 86400000;
   const olderThanWeek = [...events].reverse().find((event) => new Date(event.occurredAt).getTime() <= weekAgo);
   const weeklyChangeKg = olderThanWeek && currentWeight != null ? currentWeight - olderThanWeek.loggedValue : null;
@@ -185,6 +185,7 @@ export default function TodayWeightGoal({ goal, fallbackWeight }: Props) {
   const planRemaining = numberValue(weightPlan?.remainingChangeKg);
   const planDaysRemaining = numberValue(weightPlan?.daysRemaining);
   const planTargetWeight = numberValue(weightPlan?.targetWeightKg) ?? targetWeight;
+  const planIsValid = !isMaintenanceGoal && planTargetWeight != null && planTargetWeight > 0;
   const maintenanceBand = intelligence?.weight?.maintenanceBand ?? null;
   const contextGoals = Array.isArray(healthContext?.connectedGoals) ? healthContext.connectedGoals : [];
   const contextConditions = Array.isArray(healthContext?.activeConditions) ? healthContext.activeConditions : [];
@@ -193,13 +194,15 @@ export default function TodayWeightGoal({ goal, fallbackWeight }: Props) {
     ? "This weight journey is complete. Start a new goal if you want to set a new destination."
     : isMaintenanceGoal
       ? `Maintain around ${formatKg(planTargetWeight)} kg. Required net change: 0.00 kg/day or 0.00 kg/week. Use the maintenance band of ${formatKg(numberValue(maintenanceBand?.min) ?? startingWeight)}–${formatKg(numberValue(maintenanceBand?.max) ?? startingWeight)} kg as the stability reference.`
-      : planDailyRate != null && planWeeklyRate != null && planDaysRemaining != null
+      : planIsValid && planDailyRate != null && planWeeklyRate != null && planDaysRemaining != null
         ? `To reach ${formatKg(planTargetWeight)} kg by ${formatDate(journey.targetDate)}, you need to ${comparison === "INCREASE_TO" ? "gain" : "lose"} about ${formatRate(planDailyRate)} kg/day or ${formatRate(planWeeklyRate)} kg/week from your current recorded weight. ${planRemaining != null ? `${formatKg(planRemaining)} kg remains.` : ""}`
-        : `Set a target date to calculate the daily and weekly rate needed to reach ${formatKg(planTargetWeight)} kg.`;
+        : planIsValid
+        ? `Set a target date to calculate the daily and weekly rate needed to reach ${formatKg(planTargetWeight)} kg.`
+        : "Your configured weight target is being reviewed; no pace is shown until a valid destination is available.";
   const heightCm = numberValue(intelligence?.profile?.heightCm ?? goal?.patient?.heightCm ?? goal?.heightCm);
   const currentBmi = currentWeight != null && heightCm != null && heightCm > 0 ? currentWeight / ((heightCm / 100) ** 2) : null;
   const startingBmi = startingWeight != null && heightCm != null && heightCm > 0 ? startingWeight / ((heightCm / 100) ** 2) : null;
-  const targetBmi = targetWeight != null && heightCm != null && heightCm > 0 ? targetWeight / ((heightCm / 100) ** 2) : null;
+  const targetBmi = targetWeight != null && targetWeight > 0 && heightCm != null && heightCm > 0 ? targetWeight / ((heightCm / 100) ** 2) : null;
   const bmiChange = startingBmi != null && currentBmi != null ? currentBmi - startingBmi : null;
   const lowerScreeningWeight = numberValue(intelligence?.weight?.lowerScreeningWeightKg) ?? (heightCm != null && heightCm > 0 ? 18.5 * ((heightCm / 100) ** 2) : null);
   const upperScreeningWeight = numberValue(intelligence?.weight?.upperScreeningWeightKg) ?? (heightCm != null && heightCm > 0 ? 24.9 * ((heightCm / 100) ** 2) : null);
