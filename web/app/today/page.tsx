@@ -84,6 +84,10 @@ function medicationGoalFor(medication: any, goals: any[], medicationCount: numbe
 
   return goals.find((goal: any) => {
     const status = String(goal?.status ?? "").toUpperCase();
+    const medicationGoalId = medication?.healthGoalId ?? medication?.medicationGoalId ?? null;
+    if (medicationGoalId && String(goal?.id ?? "") === String(medicationGoalId)) {
+      return isMedicationGoal(goal) && !["ARCHIVED", "CANCELLED", "DELETED", "ACHIEVED"].includes(status);
+    }
     const isLiveMedicationGoal =
       ACTIVE_GOAL_STATUSES.has(status) ||
       status === "NOT_STARTED";
