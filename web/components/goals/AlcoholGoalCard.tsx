@@ -37,7 +37,7 @@ function southAfricanWeekKey(date = new Date()) {
   return localDate.toISOString().slice(0, 10);
 }
 
-function calendarMidnight(value: string | Date) {
+function calendarMidnight(value: string | Date | null | undefined) {
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return null;
   return new Date(date.getFullYear(), date.getMonth(), date.getDate());
