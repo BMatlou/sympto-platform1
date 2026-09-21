@@ -28,6 +28,7 @@ export default function TodayWeightGoal({ goal, fallbackWeight }: Props) {
         })).filter((e: any) => Number.isFinite(e.loggedValue));
         if (active) {
           setEvents(next.sort((a, b) => Date.parse(a.occurredAt) - Date.parse(b.occurredAt)));
+          setIntelligence(intelligenceResponse?.intelligence ?? intelligenceResponse ?? null);
         }
       } catch {
         if (active) setEvents([]);
@@ -171,8 +172,8 @@ export default function TodayWeightGoal({ goal, fallbackWeight }: Props) {
         )}
       </div>
 
-                  {/* 🚀 CLINICAL PROFILE CONNECTION BLOCK GRID */}
-      {!loading && (connectedMedications.length > 0 || connectedConditions.length > 0 || supportiveRecommendations.length > 0) && (
+                  {/* 🚀 FIXED LOGICAL RENDERING GATE - USING ACTIVEINTELLIGENCE */}
+      {!loading && (activeIntelligence || connectedMedications.length > 0 || connectedConditions.length > 0 || supportiveRecommendations.length > 0) && (
         <div className="mt-5 px-4 pb-5 sm:px-5 sm:pb-6">
           <div className="space-y-4 border-t border-slate-100 pt-4 text-left">
             <p className="text-[10px] font-black uppercase tracking-[.14em] text-slate-400">Connected Profile Context</p>
