@@ -257,6 +257,7 @@ export class HealthGoalsService {
       effectiveComparison = comparison ?? existingConfig?.[0]?.comparison ?? 'DECREASE_TO';
       await this.assertWeightTargetDirection(String(existing.patientId), goalData.targetValue ?? existing.targetValue, effectiveComparison);
     }
+    const metricComparison = revisingWeightGoal ? effectiveComparison : comparison;
     const updateData: any = {
       ...goalData,
       ...(isMedicationGoal && goalData.targetValue == null ? { targetValue: String(DEFAULT_MEDICATION_TARGET) } : {}),
@@ -277,7 +278,7 @@ export class HealthGoalsService {
       frequency,
       frequencyTarget: frequencyTarget == null ? (goalData.targetValue ?? existing.targetValue) : frequencyTarget,
       aggregation,
-      comparison: revisingWeightGoal ? effectiveComparison : comparison,
+      comparison: metricComparison,
       guidanceText,
     });
     await this.healthGoalIntelligence.syncGoalRelations(String(existing.patientId));
