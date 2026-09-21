@@ -135,7 +135,7 @@ export default function PrescribedMedicationsCard({
                   return goal?.id && !["ARCHIVED", "CANCELLED", "DELETED"].includes(status);
                 })
               : [];
-            const directHealthGoalId = medication.healthGoalId ?? directlyLinkedGoals[0]?.id ?? null;
+            const directHealthGoalId = directlyLinkedGoals[0]?.id ?? medication.healthGoalId ?? null;
 
             const medicationGoalForThisMed = activeGoalsArray.find((goal: HealthGoal) => {
               if (!goal) return false;
