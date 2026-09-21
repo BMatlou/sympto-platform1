@@ -128,7 +128,6 @@ export default function PrescribedMedicationsCard({
       ) : (
         <div className="space-y-3">
           {prescriptionsList.map((medication) => {
-            // 🔍 Next-Gen Matching Predicate resolving repository-level schema drift
             const directlyLinkedGoals = Array.isArray((medication as any).healthGoals)
               ? (medication as any).healthGoals.filter((goal: any) => {
                   const status = String(goal?.status ?? "").toUpperCase();
@@ -136,9 +135,20 @@ export default function PrescribedMedicationsCard({
                 })
               : [];
             const directHealthGoalId = directlyLinkedGoals[0]?.id ?? medication.healthGoalId ?? null;
+            const currentPatientMedicationId = getPatientMedicationId(medication);
+            const currentMedicationId = medication.medicationId || medication.medication?.id || null;
+
+            // Runtime diagnostics: leave these explicit while we verify the
+            // production payload shape and the goal-to-medication mapping.
+            console.log(`[TODAY DIAGNOSTIC] Processing medication: ${medication.name}`, {
+              patientMedicationId: currentPatientMedicationId,
+              medicationId: currentMedicationId,
+              availableGoalsInPayload: activeGoalsArray,
+            });
 
             const medicationGoalForThisMed = activeGoalsArray.find((goal: HealthGoal) => {
               if (!goal) return false;
+
               const status = String(goal.status ?? "").toUpperCase();
               if (["ARCHIVED", "CANCELLED", "DELETED"].includes(status)) return false;
 
@@ -151,47 +161,104 @@ export default function PrescribedMedicationsCard({
                 metricKey === "medication.adherence";
               if (!isMedicationGoal) return false;
 
+              const goalPatientMedId = goalPatientMedicationId(goal);
+
+              // Rule 0: the medication object already carries the goal id.
               if (medication.healthGoalId && goal.id && String(medication.healthGoalId) === String(goal.id)) {
+                console.log("[TODAY DIAGNOSTIC] MATCH: direct medication.healthGoalId", {
+                  medication: medication.name,
+                  goalId: goal.id,
+                });
                 return true;
               }
 
-              const medicationPatientId = getPatientMedicationId(medication);
-              const linkedPatientMedicationId = goalPatientMedicationId(goal);
-              if (linkedPatientMedicationId && medicationPatientId &&
-                  String(linkedPatientMedicationId) === String(medicationPatientId)) {
+              // Rule A: direct PatientMedication relational linkage.
+              if (
+                currentPatientMedicationId &&
+                goalPatientMedId &&
+                String(currentPatientMedicationId) === String(goalPatientMedId)
+              ) {
+                console.log("[TODAY DIAGNOSTIC] MATCH: patientMedicationId", {
+                  medication: medication.name,
+                  currentPatientMedicationId,
+                  goalPatientMedId,
+                  goalId: goal.id,
+                });
                 return true;
               }
 
-              const medicationCatalogId =
-                medication.medicationId ??
-                medication.medication?.id ??
-                medication.medication?.medicationId ??
-                null;
+              // Rule B: catalog Medication linkage.
               const linkedCatalogMedicationId = goalCatalogMedicationId(goal);
-              if (linkedCatalogMedicationId && medicationCatalogId &&
-                  String(linkedCatalogMedicationId) === String(medicationCatalogId)) {
+              if (
+                currentMedicationId &&
+                linkedCatalogMedicationId &&
+                String(currentMedicationId) === String(linkedCatalogMedicationId)
+              ) {
+                console.log("[TODAY DIAGNOSTIC] MATCH: medicationId", {
+                  medication: medication.name,
+                  currentMedicationId,
+                  linkedCatalogMedicationId,
+                  goalId: goal.id,
+                });
                 return true;
               }
 
-              const medicationName = normalise(
+              // Rule C: normalized medication name/title fallback.
+              const currentNormName = normalise(
                 medication.name ??
                 medication.medication?.name ??
                 medication.medication?.genericName ??
                 medication.medication?.brandName ??
                 "",
               );
-              const linkedGoalName = goalMedicationName(goal);
-              if (medicationName && linkedGoalName && linkedGoalName !== "manage medication") {
-                return linkedGoalName === medicationName ||
-                  linkedGoalName.includes(medicationName) ||
-                  medicationName.includes(linkedGoalName);
+              const goalNormName = goalMedicationName(goal);
+              const isGenericManageMedicationGoal = goalNormName === "manage medication";
+
+              if (currentNormName !== "" && goalNormName !== "" && !isGenericManageMedicationGoal) {
+                const nameMatch =
+                  goalNormName.includes(currentNormName) ||
+                  currentNormName.includes(goalNormName);
+                if (nameMatch) {
+                  console.log("[TODAY DIAGNOSTIC] MATCH: normalized medication name", {
+                    medication: medication.name,
+                    currentNormName,
+                    goalNormName,
+                    goalId: goal.id,
+                  });
+                }
+                return nameMatch;
               }
 
-              return linkedGoalName === "manage medication" && prescriptionsList.length === 1;
+              // Rule D: preserve the existing single-medication generic fallback.
+              if (isGenericManageMedicationGoal && prescriptionsList.length === 1) {
+                console.log("[TODAY DIAGNOSTIC] MATCH: single generic medication goal", {
+                  medication: medication.name,
+                  goalId: goal.id,
+                });
+                return true;
+              }
+
+              console.log("[TODAY DIAGNOSTIC] NO MATCH for candidate goal", {
+                medication: medication.name,
+                currentPatientMedicationId,
+                goalPatientMedId,
+                currentMedicationId,
+                linkedCatalogMedicationId,
+                currentNormName,
+                goalNormName,
+                goalId: goal.id,
+              });
+              return false;
             });
 
             const resolvedGoalId = medicationGoalForThisMed?.id ?? directHealthGoalId ?? null;
             const hasMedicationGoal = Boolean(resolvedGoalId);
+
+            console.log(`[TODAY DIAGNOSTIC] Final medication state: ${medication.name}`, {
+              hasMedicationGoal,
+              resolvedGoalId,
+              matchedGoal: medicationGoalForThisMed,
+            });
 
             return (
               <div
