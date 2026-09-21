@@ -84,7 +84,10 @@ function medicationGoalFor(medication: any, goals: any[], medicationCount: numbe
 
   return goals.find((goal: any) => {
     const status = String(goal?.status ?? "").toUpperCase();
-    if (!isMedicationGoal(goal) || !ACTIVE_GOAL_STATUSES.has(status)) return false;
+    const isLiveMedicationGoal =
+      ACTIVE_GOAL_STATUSES.has(status) ||
+      status === "NOT_STARTED";
+    if (!isMedicationGoal(goal) || !isLiveMedicationGoal) return false;
 
     const linkedPatientMedicationId =
       goal?.patientMedicationId ||
@@ -174,10 +177,14 @@ export default function TodayPage() {
   const appointments = data.today?.upcomingAppointments ?? [];
   const allGoals = data.goals ?? data.healthGoals ?? [];
   const activeGoalsArray = allGoals.filter((goal: any) => ACTIVE_GOAL_STATUSES.has(String(goal?.status ?? "").toUpperCase()));
+  const medicationGoalCandidates = allGoals.filter((goal: any) => {
+    const status = String(goal?.status ?? "").toUpperCase();
+    return isMedicationGoal(goal) && !["ARCHIVED", "CANCELLED", "DELETED"].includes(status);
+  });
   const todayGoalArray = activeGoalsArray;
   const goals = activeGoalsArray;
   const medicationGoalCards = (Array.isArray(medications) ? medications : []).map((medication: any) => {
-    const goal = medicationGoalFor(medication, activeGoalsArray, medications.length);
+    const goal = medicationGoalFor(medication, medicationGoalCandidates, medications.length);
     const linkedPatientMedicationId =
       goal?.patientMedicationId ??
       goal?.patientMedication?.id ??
@@ -197,7 +204,7 @@ export default function TodayPage() {
         : medication;
     return { medication: resolvedMedication, goal };
   });
-  const unmatchedMedicationGoals = activeGoalsArray.filter((goal: any) => isMedicationGoal(goal) && !medicationGoalCards.some((item: any) => item.goal?.id === goal?.id));
+  const unmatchedMedicationGoals = medicationGoalCandidates.filter((goal: any) => !medicationGoalCards.some((item: any) => item.goal?.id === goal?.id));
   const matchedMedicationGoalCards = medicationGoalCards.filter((item: any) => Boolean(item.goal));
   const unmatchedMedicationGoalCards = unmatchedMedicationGoals.map((goal: any) => ({
     goal,
@@ -254,7 +261,7 @@ export default function TodayPage() {
             <p className="hidden max-w-sm text-right text-[11px] leading-5 text-[#74859a] sm:block">Your scheduled care and daily actions are kept together first.</p>
           </div>
           <div className="grid gap-4 xl:grid-cols-[1.15fr_.85fr]">
-            <div className="min-w-0"><PrescribedMedicationsCard prescriptionsList={Array.isArray(medications) ? medications : []} activeGoalsArray={activeGoalsArray} /></div>
+            <div className="min-w-0"><PrescribedMedicationsCard prescriptionsList={Array.isArray(medications) ? medications : []} activeGoalsArray={medicationGoalCandidates} /></div>
             <div className="min-w-0">
               <section className="h-full rounded-[27px] border border-[#e0ebef] bg-white p-5 shadow-[0_5px_18px_rgba(11,45,84,0.03)] sm:p-6">
                 <div className="flex items-center justify-between gap-3">
