@@ -39,7 +39,12 @@ function findMedicationGoal(
   goals: HealthGoal[],
   medicationCount: number,
 ) {
-  const medicationPatientId = getPatientMedicationId(medication);
+  const medicationPatientMedicationId = getPatientMedicationId(medication);
+  const medicationPatientId =
+    medicationPatientMedicationId &&
+    !String(medicationPatientMedicationId).startsWith("prescription-item-")
+      ? medicationPatientMedicationId
+      : null;
   const medicationCatalogId =
     medication.medicationId ??
     medication.medication?.id ??
