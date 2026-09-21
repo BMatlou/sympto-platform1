@@ -46,7 +46,12 @@ function normalizeVitals(data: any): DashboardVital[] {
 }
 
 function patientMedicationId(medication: any) {
-  return medication?.patientMedicationId || medication?.patientMedication?.id || medication?.id || null;
+  const source = String(medication?.source ?? "").trim().toLowerCase();
+  const syntheticPrescriptionId = String(medication?.id ?? "").startsWith("prescription-item-");
+  return medication?.patientMedicationId ||
+    medication?.patientMedication?.id ||
+    (source !== "prescription" && !syntheticPrescriptionId ? medication?.id : null) ||
+    null;
 }
 
 function normalise(value: unknown) {
@@ -87,7 +92,7 @@ function medicationGoalFor(medication: any, goals: any[], medicationCount: numbe
       goal?.associatedPatientMedicationId ||
       goal?.associatedPatientMedication?.id;
 
-    if (linkedPatientMedicationId) {
+    if (linkedPatientMedicationId && medicationRecordIds.length > 0) {
       return medicationRecordIds.includes(String(linkedPatientMedicationId));
     }
 
@@ -161,7 +166,27 @@ export default function TodayPage() {
   const activeGoalsArray = allGoals.filter((goal: any) => ACTIVE_GOAL_STATUSES.has(String(goal?.status ?? "").toUpperCase()));
   const todayGoalArray = activeGoalsArray;
   const goals = activeGoalsArray;
-  const medicationGoalCards = (Array.isArray(medications) ? medications : []).map((medication: any) => ({ medication, goal: medicationGoalFor(medication, activeGoalsArray, medications.length) }));
+  const medicationGoalCards = (Array.isArray(medications) ? medications : []).map((medication: any) => {
+    const goal = medicationGoalFor(medication, activeGoalsArray, medications.length);
+    const linkedPatientMedicationId =
+      goal?.patientMedicationId ??
+      goal?.patientMedication?.id ??
+      goal?.associatedPatientMedicationId ??
+      goal?.associatedPatientMedication?.id ??
+      null;
+    const resolvedMedication =
+      linkedPatientMedicationId && !patientMedicationId(medication)
+        ? {
+            ...medication,
+            patientMedicationId: String(linkedPatientMedicationId),
+            patientMedication: {
+              ...(medication?.patientMedication ?? {}),
+              id: String(linkedPatientMedicationId),
+            },
+          }
+        : medication;
+    return { medication: resolvedMedication, goal };
+  });
   const unmatchedMedicationGoals = activeGoalsArray.filter((goal: any) => isMedicationGoal(goal) && !medicationGoalCards.some((item: any) => item.goal?.id === goal?.id));
   const matchedMedicationGoalCards = medicationGoalCards.filter((item: any) => Boolean(item.goal));
   const unmatchedMedicationGoalCards = unmatchedMedicationGoals.map((goal: any) => ({
