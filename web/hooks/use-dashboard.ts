@@ -18,13 +18,25 @@ function normalizeMedicationDetails(medications: any[]): any[] {
       return direct !== undefined && direct !== null && direct !== "" ? direct : nested !== undefined && nested !== null && nested !== "" ? nested : fallback;
     };
     const status = first("status", "");
-    return { ...medication, ...saved, patientMedicationId: medication?.patientMedicationId ?? saved?.patientMedicationId ?? saved?.id ?? medication?.id ?? null, medicationId: medication?.medicationId ?? saved?.medicationId ?? medication?.medication?.id ?? saved?.medication?.id ?? saved?.medication?.medicationId ?? null, dosage: first("dosage", first("dose", "")), frequency: first("frequency", first("schedule", "")), route: String(first("route", first("administrationRoute", ""))).trim().toUpperCase(), indication: first("indication", first("reason", "")), instructions: first("instructions", first("additionalInstructions", "")), prescribedBy: first("prescribedBy", first("prescriber", first("provider", ""))), startedAt: first("startedAt", first("startDate", "")), endedAt: first("endedAt", first("endDate", "")), ongoing: first("ongoing", first("isOngoing", status ? String(status).toUpperCase() === "ACTIVE" : true)), sideEffects: first("sideEffects", first("sideEffect", "")), effectiveness: first("effectiveness", first("efficacy", "")), notes: first("notes", first("additionalNotes", "")), status };
+    const source = String(medication?.source ?? saved?.source ?? "").trim().toUpperCase();
+    const syntheticPrescriptionId = String(medication?.id ?? "").startsWith("prescription-item-");
+    const resolvedPatientMedicationId =
+      medication?.patientMedicationId ??
+      saved?.patientMedicationId ??
+      saved?.id ??
+      (source !== "PRESCRIPTION" && !syntheticPrescriptionId ? medication?.id : null);
+    return { ...medication, ...saved, patientMedicationId: resolvedPatientMedicationId, medicationId: medication?.medicationId ?? saved?.medicationId ?? medication?.medication?.id ?? saved?.medication?.id ?? saved?.medication?.medicationId ?? null, dosage: first("dosage", first("dose", "")), frequency: first("frequency", first("schedule", "")), route: String(first("route", first("administrationRoute", ""))).trim().toUpperCase(), indication: first("indication", first("reason", "")), instructions: first("instructions", first("additionalInstructions", "")), prescribedBy: first("prescribedBy", first("prescriber", first("provider", ""))), startedAt: first("startedAt", first("startDate", "")), endedAt: first("endedAt", first("endDate", "")), ongoing: first("ongoing", first("isOngoing", status ? String(status).toUpperCase() === "ACTIVE" : true)), sideEffects: first("sideEffects", first("sideEffect", "")), effectiveness: first("effectiveness", first("efficacy", "")), notes: first("notes", first("additionalNotes", "")), status };
   });
 }
 
 async function hydrateSavedMedicationDetails(medications: any[]): Promise<any[]> {
   return Promise.all(medications.map(async (medication: any) => {
-    const patientMedicationId = medication?.patientMedicationId ?? medication?.patientMedication?.id ?? medication?.id ?? null;
+    const source = String(medication?.source ?? "").trim().toUpperCase();
+    const syntheticPrescriptionId = String(medication?.id ?? "").startsWith("prescription-item-");
+    const patientMedicationId =
+      medication?.patientMedicationId ??
+      medication?.patientMedication?.id ??
+      (source !== "PRESCRIPTION" && !syntheticPrescriptionId ? medication?.id : null);
     if (!patientMedicationId) return medication;
     try {
       const response = await api.get(`/patient-medications/${encodeURIComponent(String(patientMedicationId))}`);
