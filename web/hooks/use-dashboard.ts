@@ -29,6 +29,63 @@ function normalizeMedicationDetails(medications: any[]): any[] {
   });
 }
 
+function mergeMedicationGoalLinksWithGoals(medications: any[], goals: any[]) {
+  const activeMedicationStatuses = new Set(["ACTIVE", "IN_PROGRESS", "ON_TRACK", "IMPROVING", "STAGNANT", "DECLINING"]);
+
+  return medications.map((medication: any) => {
+    const patientMedicationId =
+      medication?.patientMedicationId ??
+      medication?.patientMedication?.id ??
+      ((String(medication?.source ?? "").toUpperCase() !== "PRESCRIPTION" && !String(medication?.id ?? "").startsWith("prescription-item-")) ? medication?.id : null);
+    const medicationCatalogId =
+      medication?.medicationId ??
+      medication?.medication?.id ??
+      medication?.medication?.medicationId ??
+      null;
+
+    const goal = goals.find((candidate: any) => {
+      const status = String(candidate?.status ?? "").toUpperCase();
+      if (!activeMedicationStatuses.has(status) || String(candidate?.category ?? "").toUpperCase() !== "MEDICATION") return false;
+
+      const linkedPatientMedicationId =
+        candidate?.patientMedicationId ??
+        candidate?.patientMedication?.id ??
+        candidate?.associatedPatientMedicationId ??
+        candidate?.associatedPatientMedication?.id ??
+        null;
+      if (linkedPatientMedicationId && patientMedicationId) {
+        return String(linkedPatientMedicationId) === String(patientMedicationId);
+      }
+
+      const linkedMedicationId =
+        candidate?.associatedMedicationId ??
+        candidate?.medicationId ??
+        candidate?.associatedMedication?.id ??
+        candidate?.medication?.id ??
+        null;
+      return Boolean(linkedMedicationId && medicationCatalogId && String(linkedMedicationId) === String(medicationCatalogId));
+    });
+
+    if (!goal?.id) return medication;
+
+    const linkedPatientMedicationId =
+      goal?.patientMedicationId ??
+      goal?.patientMedication?.id ??
+      goal?.associatedPatientMedicationId ??
+      goal?.associatedPatientMedication?.id ??
+      patientMedicationId ??
+      null;
+
+    return {
+      ...medication,
+      ...(linkedPatientMedicationId && !medication?.patientMedicationId
+        ? { patientMedicationId: String(linkedPatientMedicationId) }
+        : {}),
+      healthGoalId: String(goal.id),
+    };
+  });
+}
+
 async function hydrateSavedMedicationDetails(medications: any[]): Promise<any[]> {
   return Promise.all(medications.map(async (medication: any) => {
     const source = String(medication?.source ?? "").trim().toUpperCase();
@@ -85,7 +142,7 @@ function normalizeGoals(result: HealthHomeResponse, fullGoals: any[]) {
 
 export function useDashboard() {
   const searchParams = useSearchParams(); const patientId = searchParams.get("patientId") || undefined; const [data, setData] = useState<HealthHomeResponse | null>(null); const [loading, setLoading] = useState(true); const [error, setError] = useState<string | null>(null); const firstLoad = useRef(true); const loadSequence = useRef(0);
-  const loadDashboard = useCallback(async () => { const requestId = ++loadSequence.current; try { if (firstLoad.current) setLoading(true); setError(null); const result = await healthHomeService.getHealthHome(patientId); const normalizedMedications = normalizeMedicationDetails(Array.isArray(result.medications) ? result.medications : []); const hydratedMedications = await hydrateSavedMedicationDetails(normalizedMedications); const fullGoalsResponse = await healthGoalsService.list(result.patient.id); const fullGoals = (Array.isArray(fullGoalsResponse?.data) ? fullGoalsResponse.data : Array.isArray(fullGoalsResponse) ? fullGoalsResponse : []).filter((goal: any) => { const status = String(goal?.status ?? "").toUpperCase(); return !["CANCELLED", "DELETED", "ARCHIVED"].includes(status) && !goal?.deletedAt; }); const normalizedGoals = normalizeGoals({ ...result, medications: hydratedMedications }, fullGoals); if (requestId !== loadSequence.current) return; setData({ ...result, medications: hydratedMedications, goals: normalizedGoals, healthGoals: normalizedGoals, today: { ...result.today, activeMedications: hydratedMedications, activeGoalCount: normalizedGoals.filter((goal: any) => ["ACTIVE", "IN_PROGRESS"].includes(String(goal?.status ?? "").toUpperCase())).length } }); firstLoad.current = false; } catch (requestError) { if (requestId !== loadSequence.current) return; console.error("Failed to load Health Home:", requestError); const message = requestError instanceof Error ? requestError.message : typeof requestError === "string" ? requestError : "We could not load your Health Home."; setError(message); } finally { if (requestId === loadSequence.current) setLoading(false); } }, [patientId]);
+  const loadDashboard = useCallback(async () => { const requestId = ++loadSequence.current; try { if (firstLoad.current) setLoading(true); setError(null); const result = await healthHomeService.getHealthHome(patientId); const normalizedMedications = normalizeMedicationDetails(Array.isArray(result.medications) ? result.medications : []); const hydratedMedications = await hydrateSavedMedicationDetails(normalizedMedications); const fullGoalsResponse = await healthGoalsService.list(result.patient.id); const fullGoals = (Array.isArray(fullGoalsResponse?.data) ? fullGoalsResponse.data : Array.isArray(fullGoalsResponse) ? fullGoalsResponse : []).filter((goal: any) => { const status = String(goal?.status ?? "").toUpperCase(); return !["CANCELLED", "DELETED", "ARCHIVED"].includes(status) && !goal?.deletedAt; }); const linkedMedications = mergeMedicationGoalLinksWithGoals(hydratedMedications, fullGoals); const normalizedGoals = normalizeGoals({ ...result, medications: linkedMedications }, fullGoals); if (requestId !== loadSequence.current) return; setData({ ...result, medications: linkedMedications, goals: normalizedGoals, healthGoals: normalizedGoals, today: { ...result.today, activeMedications: linkedMedications, activeGoalCount: normalizedGoals.filter((goal: any) => ["ACTIVE", "IN_PROGRESS"].includes(String(goal?.status ?? "").toUpperCase())).length } }); firstLoad.current = false; } catch (requestError) { if (requestId !== loadSequence.current) return; console.error("Failed to load Health Home:", requestError); const message = requestError instanceof Error ? requestError.message : typeof requestError === "string" ? requestError : "We could not load your Health Home."; setError(message); } finally { if (requestId === loadSequence.current) setLoading(false); } }, [patientId]);
   useEffect(() => { firstLoad.current = true; void loadDashboard(); const handleNavigation = () => void loadDashboard(); const handleGoalChange = () => void loadDashboard(); const handleFocus = () => void loadDashboard(); const handleVisibility = () => { if (document.visibilityState === "visible") void loadDashboard(); }; window.addEventListener("popstate", handleNavigation); window.addEventListener("sympto:health-goal-updated", handleGoalChange); window.addEventListener("focus", handleFocus); document.addEventListener("visibilitychange", handleVisibility); const refresh = window.setInterval(() => { if (document.visibilityState === "visible") void loadDashboard(); }, REFRESH_INTERVAL_MS); return () => { window.removeEventListener("popstate", handleNavigation); window.removeEventListener("sympto:health-goal-updated", handleGoalChange); window.removeEventListener("focus", handleFocus); document.removeEventListener("visibilitychange", handleVisibility); window.clearInterval(refresh); }; }, [loadDashboard]);
   return { data, loading, error, reload: loadDashboard };
 }
