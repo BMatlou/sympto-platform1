@@ -14,6 +14,9 @@ type HealthGoal = {
   associatedMedicationId?: string | null;
   medicationId?: string | null;
   medication?: { id?: string | null; name?: string | null } | null;
+  patientMedication?: { id?: string | null } | null;
+  associatedPatientMedicationId?: string | null;
+  associatedPatientMedication?: { id?: string | null } | null;
   metricType?: string | null;
   metricConfig?: { metricType?: string | null; metricKey?: string | null } | null;
 };
