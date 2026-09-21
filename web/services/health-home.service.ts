@@ -71,7 +71,24 @@ export interface ManualVitalsInput { systolicPressure?: number; diastolicPressur
 export interface ManualVitalsResponse { recordedAt: string; bmi: number | null; bmiCategory: string | null }
 
 function normalizeMedications(medications: any[]): any[] {
-  return medications.map((medication: any) => ({ ...medication, patientMedicationId: medication?.patientMedicationId ?? medication?.id ?? null, medicationId: medication?.medicationId ?? medication?.medication?.id ?? medication?.medication?.medicationId ?? null }));
+  return medications.map((medication: any) => {
+    const source = String(medication?.source ?? "").trim().toUpperCase();
+    const syntheticPrescriptionId = String(medication?.id ?? "").startsWith("prescription-item-");
+    const patientMedicationId =
+      medication?.patientMedicationId ??
+      medication?.patientMedication?.id ??
+      (source !== "PRESCRIPTION" && !syntheticPrescriptionId ? medication?.id : null);
+
+    return {
+      ...medication,
+      patientMedicationId,
+      medicationId:
+        medication?.medicationId ??
+        medication?.medication?.id ??
+        medication?.medication?.medicationId ??
+        null,
+    };
+  });
 }
 
 function normalizeGoals(...sources: any[]): any[] {
