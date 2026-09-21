@@ -122,6 +122,14 @@ export default function TodayMedicationActions({ medications, goal: suppliedGoal
   })();
 
   const medicationId =
+    patientMedicationId(trackedMedication) ??
+    finalGoal?.patientMedicationId ??
+    finalGoal?.patientMedication?.id ??
+    finalGoal?.associatedPatientMedicationId ??
+    finalGoal?.associatedPatientMedication?.id ??
+    null;
+
+  const medicationAnchorId =
     finalGoal?.patientMedicationId ??
     finalGoal?.patientMedication?.id ??
     finalGoal?.associatedPatientMedicationId ??
@@ -225,7 +233,7 @@ export default function TodayMedicationActions({ medications, goal: suppliedGoal
 
   return (
     <section id={finalGoal?.id ? `health-goal-card-${String(finalGoal.id)}` : medicationAnchorId ?? "medication-adherence-card-unassigned"} className={cardClass}>
-      {medicationAnchorId ? <span id={medicationAnchorId} className="block h-0 scroll-mt-24" aria-hidden="true" /> : null}
+      {medicationAnchorId ? <span id={medicationCardAnchorId} className="block h-0 scroll-mt-24" aria-hidden="true" /> : null}
       <header className="flex items-center justify-between gap-3 px-4 pb-3 pt-4 sm:px-5 sm:pt-5"><div className="flex min-w-0 items-center gap-2.5"><span className="grid h-9 w-9 shrink-0 place-items-center rounded-[13px] bg-[#e8f8f7] text-[#24c1c4] ring-1 ring-[#d3efed]"><Pill className="h-4 w-4" /></span><div className="min-w-0"><p className="text-[8px] font-black uppercase tracking-[.16em] text-[#0b7b80]">Medication</p><h3 className="truncate text-sm font-black tracking-[-.035em] text-[#0b2d54]">{goalTitle}</h3></div></div><div className="shrink-0 text-right"><p className="text-sm font-black text-[#0b2d54]">{doseLabel}</p><p className="mt-0.5 text-[8px] font-bold uppercase tracking-[.11em] text-[#8a99a6]">{percent}% today</p></div></header>
 
       <div className="mx-3.5 mb-3.5 rounded-[22px] bg-[#0b2d54] px-4 py-4 text-white shadow-[0_12px_28px_rgba(11,45,84,.14)] sm:mx-4 sm:mb-4 sm:px-5 sm:py-4"><div className="flex items-center gap-4 sm:gap-5"><div className="relative shrink-0" style={{ width: ringSize, height: ringSize }}><svg width={ringSize} height={ringSize} viewBox={`0 0 ${ringSize} ${ringSize}`} className="-rotate-90"><circle cx={ringSize / 2} cy={ringSize / 2} r={radius} fill="none" stroke="rgba(255,255,255,.10)" strokeWidth={ringStroke} /><circle cx={ringSize / 2} cy={ringSize / 2} r={radius} fill="none" stroke="#24c1c4" strokeWidth={ringStroke} strokeLinecap="round" strokeDasharray={circumference} strokeDashoffset={dashOffset} /></svg><div className="absolute inset-0 grid place-items-center text-center"><p className="text-3xl font-black leading-none tracking-[-.07em]">{safeDosesLoggedToday}</p></div></div><div className="min-w-0 flex-1"><p className="text-[8px] font-black uppercase tracking-[.15em] text-white/45">Today’s medication</p><p className="mt-1 truncate text-lg font-black tracking-[-.045em]">{medicationName(trackedMedication)}</p><p className="mt-1 text-[10px] font-semibold uppercase tracking-[.08em] text-white/55">{medicationSchedule(trackedMedication)}</p><div className="mt-2.5 flex flex-wrap items-center gap-2"><span className="rounded-full bg-white/10 px-2.5 py-1 text-[8px] font-black text-white/75 ring-1 ring-white/10">{safeDosesLoggedToday}/{totalRequiredDosesPerDay} doses today</span><span className="rounded-full bg-white/10 px-2.5 py-1 text-[8px] font-black text-[#b8ffff] ring-1 ring-white/10">{percent}% today</span></div></div></div><div className="mt-3.5 border-t border-white/10 pt-3"><div className="flex items-center justify-between gap-3"><p className="text-[9px] font-semibold text-white/60">{safeDosesLoggedToday >= totalRequiredDosesPerDay ? "All scheduled doses logged today." : `${totalRequiredDosesPerDay - safeDosesLoggedToday} dose${totalRequiredDosesPerDay - safeDosesLoggedToday === 1 ? "" : "s"} left to log today.`}</p><p className="text-[9px] font-black text-white/75">{Math.max(0, totalRequiredDosesPerDay - safeDosesLoggedToday)} left today</p></div></div></div>
