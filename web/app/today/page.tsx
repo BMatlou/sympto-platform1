@@ -179,8 +179,10 @@ export default function TodayPage() {
   const firstName = data.patient?.firstName || data.profile?.preferredName || "there";
   const medications = data.today?.activeMedications ?? [];
   const appointments = data.today?.upcomingAppointments ?? [];
-  const allGoals = data.goals ?? data.healthGoals ?? [];
-  const activeGoalsArray = allGoals.filter((goal: any) => ACTIVE_GOAL_STATUSES.has(String(goal?.status ?? "").toUpperCase()));
+  const allGoals = data.activeGoalsArray ?? data.goals ?? data.healthGoals ?? [];
+  const activeGoalsArray = Array.isArray(data.activeGoalsArray)
+    ? data.activeGoalsArray
+    : allGoals.filter((goal: any) => ACTIVE_GOAL_STATUSES.has(String(goal?.status ?? "").toUpperCase()));
   const medicationGoalCandidates = allGoals.filter((goal: any) => {
     const status = String(goal?.status ?? "").toUpperCase();
     return isMedicationGoal(goal) && !["ARCHIVED", "CANCELLED", "DELETED", "ACHIEVED"].includes(status);
