@@ -275,10 +275,14 @@ export class HealthGoalsService {
         }),
       );
 
+      const enrichedData = await this.healthGoalIntelligence.attachRelationships(
+        data as any[],
+      );
+
       return {
         success: true,
         statusCode: 200,
-        data,
+        data: enrichedData,
       };
     } catch (error: unknown) {
       const message = error instanceof Error ? error.message : String(error);
