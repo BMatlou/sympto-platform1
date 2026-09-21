@@ -732,13 +732,16 @@ export class HealthGoalIntelligenceService {
         }
       }
 
+      const targetCategory = String(goal.category).toUpperCase();
       const existingSupportingGoals = relatedGoals.filter((relatedGoal) =>
-        GOAL_SUPPORT_RULES[targetCategory]?.some(
-          (rule) => rule.category === String(relatedGoal.category).toUpperCase(),
+        (GOAL_SUPPORT_RULES[targetCategory] ?? []).some(
+          (rule) => rule.sourceCategory === String(relatedGoal.category).toUpperCase(),
         ),
       );
       const existingRelatedGoals = relatedGoals.filter((relatedGoal) =>
-        WEIGHT_RELATED_RULES.has(String(relatedGoal.category).toUpperCase()),
+        GOAL_RELATED_PAIRS.has(
+          relationshipKey(String(relatedGoal.category).toUpperCase(), targetCategory),
+        ),
       );
 
       const toGoalConnection = (
@@ -753,9 +756,9 @@ export class HealthGoalIntelligenceService {
         relationshipType,
         rationale:
           relationshipType === 'SUPPORTS'
-            ? WEIGHT_SUPPORT_RULES.find(
+            ? (GOAL_SUPPORT_RULES[targetCategory] ?? []).find(
                 (rule) =>
-                  rule.category === String(relatedGoal.category).toUpperCase(),
+                  rule.sourceCategory === String(relatedGoal.category).toUpperCase(),
               )?.rationale ?? null
             : 'This health behaviour or outcome can be monitored alongside the weight goal without assuming that it caused the weight change.',
         goal: {
@@ -785,10 +788,10 @@ export class HealthGoalIntelligenceService {
         id: 'supporting-goal-' + String(relatedGoal.id),
         label: String(relatedGoal.title),
         description:
-          WEIGHT_SUPPORT_RULES.find(
+          (GOAL_SUPPORT_RULES[targetCategory] ?? []).find(
             (rule) =>
-              rule.category === String(relatedGoal.category).toUpperCase(),
-          )?.rationale ?? 'Continue tracking this supporting goal alongside your weight goal.',
+              rule.sourceCategory === String(relatedGoal.category).toUpperCase(),
+          )?.rationale ?? 'Continue tracking this supporting goal alongside your goal.',
         href: '/health-goals#goal-' + encodeURIComponent(String(relatedGoal.id)),
         priority: 'SUPPORTING' as const,
       }));
