@@ -335,7 +335,7 @@ export class HealthHomeService {
       LEFT JOIN "PatientMedication" pm ON pm."id" = hg."patientMedicationId"
       WHERE hg."patientId" = ${patientId}
         AND hg."category" = 'MEDICATION'
-        AND hg."status" = 'ACTIVE'
+        AND hg."status"::text NOT IN ('CANCELLED', 'DELETED', 'ARCHIVED', 'ACHIEVED', 'EXPIRED', 'ON_HOLD')
       ORDER BY hg."createdAt" DESC
     `;
     const goalByPatientMedicationId = new Map<string, Array<{ id: string; status: string; title: string }>>();
