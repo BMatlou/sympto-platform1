@@ -86,11 +86,12 @@ function findMedicationGoal(
     // The explicit patient-medication link is authoritative. This is the
     // original Today behavior and must be checked before any category/name
     // heuristics so a saved goal cannot fall back to "Set medication goal".
-    if (linkedPatientMedicationId && medicationPatientMedicationId) {
-      if (String(linkedPatientMedicationId) === String(medicationPatientMedicationId)) {
-        return true;
-      }
-      return false;
+    if (
+      linkedPatientMedicationId &&
+      medicationPatientMedicationId &&
+      String(linkedPatientMedicationId) === String(medicationPatientMedicationId)
+    ) {
+      return true;
     }
 
     const category = String(goal.category ?? "").toUpperCase();
@@ -158,20 +159,25 @@ export default function PrescribedMedicationsCard({
     const medicationId = medication.medicationId || medication.medication?.id || null;
 
     if (goal) {
-      const goalTarget = goal.id ? document.getElementById(`health-goal-card-${String(goal.id)}`) : null;
-      if (goalTarget) {
-        goalTarget.scrollIntoView({ behavior: "smooth", block: "center" });
-        return;
-      }
-
       if (patientMedicationId) {
-        const target = document.getElementById(`medication-adherence-card-${String(patientMedicationId)}`);
+        const targetId = `medication-adherence-card-${String(patientMedicationId)}`;
+        const target = document.getElementById(targetId);
         if (target) {
           target.scrollIntoView({ behavior: "smooth", block: "center" });
           return;
         }
         window.location.hash = `medication-adherence-card-${encodeURIComponent(String(patientMedicationId))}`;
-      } else if (goal.id) {
+        return;
+      }
+
+      if (goal.id) {
+        const goalTarget =
+          document.getElementById(`health-goal-card-${String(goal.id)}`) ||
+          document.getElementById(`goal-${String(goal.id)}`);
+        if (goalTarget) {
+          goalTarget.scrollIntoView({ behavior: "smooth", block: "center" });
+          return;
+        }
         window.location.hash = `goal-${encodeURIComponent(String(goal.id))}`;
       }
       return;
