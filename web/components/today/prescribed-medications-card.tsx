@@ -99,19 +99,22 @@ function findMedicationGoal(
       return String(linkedMedicationId) === String(medicationCatalogId);
     }
 
-    const goalMedicationName = normalise(
-      (goal as any).medication?.name ??
-      (goal as any).medication?.genericName ??
-      (goal as any).medication?.brandName ??
-      (goal as any).title ??
-      (goal as any).description ??
-      "",
-    );
+    const goalMedicationNames = [
+      (goal as any).medication?.name,
+      (goal as any).medication?.genericName,
+      (goal as any).medication?.brandName,
+      (goal as any).title,
+      (goal as any).description,
+    ].map(normalise).filter(Boolean);
 
-    if (medicationName && goalMedicationName) {
-      return goalMedicationName === medicationName ||
-        goalMedicationName.includes(medicationName) ||
-        medicationName.includes(goalMedicationName);
+    if (medicationName) {
+      const matchesMedicationName = goalMedicationNames.some(
+        (candidate) =>
+          candidate === medicationName ||
+          candidate.includes(medicationName) ||
+          medicationName.includes(candidate),
+      );
+      if (matchesMedicationName) return true;
     }
 
     return normalise(goal.title) === "manage medication" && medicationCount === 1;
@@ -146,7 +149,7 @@ export default function PrescribedMedicationsCard({
         }
         window.location.hash = `medication-adherence-card-${encodeURIComponent(String(patientMedicationId))}`;
       } else if (goal.id) {
-        window.location.hash = `health-goal-card-${encodeURIComponent(String(goal.id))}`;
+        window.location.hash = `goal-${encodeURIComponent(String(goal.id))}`;
       }
       return;
     }
