@@ -149,23 +149,38 @@ export default function PrescribedMedicationsCard({
             const medicationGoalForThisMed = activeGoalsArray.find((goal: HealthGoal) => {
               if (!goal) return false;
 
-              console.log("[TODAY DIAGNOSTIC] EXAMINING CANDIDATE GOAL OBJECT:", JSON.stringify(goal, null, 2));
+              // Runtime diagnostics: inspect the exact goal shape so backend
+              // relation keys can be verified instead of inferred.
+              console.log("[TODAY DIAGNOSTIC] GOAL RAW KEYS:", Object.keys(goal));
+              console.log("[TODAY DIAGNOSTIC] GOAL RAW OBJECT:", JSON.stringify(goal, null, 2));
 
               const status = String(goal.status ?? "").toUpperCase();
               if (["ARCHIVED", "CANCELLED", "DELETED"].includes(status)) return false;
 
-              const category = String(goal.category ?? "").toUpperCase();
-              const metricType = String(goal.metricType ?? goal.metricConfig?.metricType ?? "").toUpperCase();
-              const metricKey = String(goal.metricConfig?.metricKey ?? "").toLowerCase();
-              const isMedicationGoal =
-                category === "MEDICATION" ||
-                metricType === "MEDICATION" ||
-                metricKey === "medication.adherence";
-              if (!isMedicationGoal) return false;
+              // 1. Relational Identifier Fallback — primary source of truth.
+              const targetMedId = medication.medicationId || medication.medication?.id || "";
+              const targetPatientMedId = getPatientMedicationId(medication);
 
-              const goalPatientMedId = goalPatientMedicationId(goal);
+              const goalMedId = goal?.medicationId || goal?.associatedMedicationId || goal?.medication?.id || "";
+              const goalPatientMedId = goal?.patientMedicationId || goal?.associatedPatientMedicationId || goal?.patientMedication?.id || "";
 
-              // Rule 0: the medication object already carries the goal id.
+              console.log("[TODAY DIAGNOSTIC] RELATION ID COMPARISON:", {
+                medication: medication.name,
+                targetMedId,
+                targetPatientMedId,
+                goalMedId,
+                goalPatientMedId,
+              });
+
+              if (
+                (targetMedId && goalMedId && String(targetMedId) === String(goalMedId)) ||
+                (targetPatientMedId && goalPatientMedId && String(targetPatientMedId) === String(goalPatientMedId))
+              ) {
+                console.log(`[TODAY DIAGNOSTIC] CRITICAL RELATION ID MATCH FOUND FOR ${medication.name}`);
+                return true;
+              }
+
+              // Preserve direct goal-id linkage when the medication itself carries it.
               if (medication.healthGoalId && goal.id && String(medication.healthGoalId) === String(goal.id)) {
                 console.log("[TODAY DIAGNOSTIC] MATCH: direct medication.healthGoalId", {
                   medication: medication.name,
@@ -174,107 +189,27 @@ export default function PrescribedMedicationsCard({
                 return true;
               }
 
-              // Rule A: direct PatientMedication relational linkage.
-              if (
-                currentPatientMedicationId &&
-                goalPatientMedId &&
-                String(currentPatientMedicationId) === String(goalPatientMedId)
-              ) {
-                console.log("[TODAY DIAGNOSTIC] MATCH: patientMedicationId", {
-                  medication: medication.name,
-                  currentPatientMedicationId,
-                  goalPatientMedId,
-                  goalId: goal.id,
-                });
-                return true;
-              }
+              // 2. Fuzzy Text Fallback — only matches explicit word crossover.
+              const title = String(goal?.title || "").toLowerCase();
+              const desc = String(goal?.description || "").toLowerCase();
+              const name = String(medication.name || "").toLowerCase();
+              const bits = name.split(" ");
 
-              // Rule B: catalog Medication linkage.
-              const linkedCatalogMedicationId = goalCatalogMedicationId(goal);
-              if (
-                currentMedicationId &&
-                linkedCatalogMedicationId &&
-                String(currentMedicationId) === String(linkedCatalogMedicationId)
-              ) {
-                console.log("[TODAY DIAGNOSTIC] MATCH: medicationId", {
-                  medication: medication.name,
-                  currentMedicationId,
-                  linkedCatalogMedicationId,
-                  goalId: goal.id,
-                });
-                return true;
-              }
-
-              // Rule C: normalized medication name/title fallback.
-              const currentNormName = normalise(
-                medication.name ??
-                medication.medication?.name ??
-                medication.medication?.genericName ??
-                medication.medication?.brandName ??
-                "",
+              const textCrossover = bits.some(
+                (bit) => bit.length > 3 && (title.includes(bit) || desc.includes(bit)),
               );
-              const goalNormName = goalMedicationName(goal);
-              const isGenericManageMedicationGoal = goalNormName === "manage medication";
 
-              if (currentNormName !== "" && goalNormName !== "" && !isGenericManageMedicationGoal) {
-                const nameMatch =
-                  goalNormName.includes(currentNormName) ||
-                  currentNormName.includes(goalNormName);
-                if (nameMatch) {
-                  console.log("[TODAY DIAGNOSTIC] MATCH: normalized medication name", {
-                    medication: medication.name,
-                    currentNormName,
-                    goalNormName,
-                    goalId: goal.id,
-                  });
-                }
-                return nameMatch;
-              }
-
-              // Rule D: preserve the existing single-medication generic fallback.
-              if (isGenericManageMedicationGoal && prescriptionsList.length === 1) {
-                console.log("[TODAY DIAGNOSTIC] MATCH: single generic medication goal", {
-                  medication: medication.name,
+              if (goal?.category === "MEDICATION" && textCrossover) {
+                console.log(`[TODAY DIAGNOSTIC] FUZZY TEXT CROSSOVER MATCHED FOR ${medication.name}`, {
                   goalId: goal.id,
+                  title,
+                  desc,
+                  name,
+                  bits,
                 });
                 return true;
               }
 
-              // 🚀 REFINED FIX: Remove the length === 1 catch-all constraint
-              // Only link this goal when its title or description explicitly refers
-              // to the medication shown in this row.
-              const goalTitleLower = String(goal?.title || "").toLowerCase();
-              const goalDescLower = String(goal?.description || "").toLowerCase();
-              const medNameLower = String(medication.name || "").toLowerCase();
-
-              const isNameMatch =
-                medNameLower !== "" &&
-                (goalTitleLower.includes(medNameLower) ||
-                  medNameLower.includes(goalTitleLower) ||
-                  goalDescLower.includes(medNameLower));
-
-              if (goal?.category === "MEDICATION" && isNameMatch) {
-                console.log(`[TODAY DIAGNOSTIC] TRUE TEXT MATCH MATCHED for ${medication.name}`, {
-                  goalId: goal.id,
-                  goalTitleLower,
-                  goalDescLower,
-                  medNameLower,
-                });
-                return true;
-              }
-
-              console.log("[TODAY DIAGNOSTIC] NO MATCH for candidate goal", {
-                medication: medication.name,
-                currentPatientMedicationId,
-                goalPatientMedId,
-                currentMedicationId,
-                linkedCatalogMedicationId,
-                currentNormName,
-                goalNormName,
-                goalTitleLower,
-                medNameLower,
-                goalId: goal.id,
-              });
               return false;
             });
 
