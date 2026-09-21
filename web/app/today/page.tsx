@@ -106,11 +106,7 @@ function medicationGoalFor(medication: any, goals: any[], medicationCount: numbe
       return medicationCatalogIds.includes(String(linkedMedicationId));
     }
 
-    const title = normalise(goal?.title);
-    if (medicationCount === 1 && title === "manage medication") return true;
-
     const name = medicationName(medication);
-    if (!name) return false;
     const goalNames = [
       goal?.medication?.name,
       goal?.medication?.genericName,
@@ -118,7 +114,18 @@ function medicationGoalFor(medication: any, goals: any[], medicationCount: numbe
       goal?.title,
       goal?.description,
     ].map(normalise).filter(Boolean);
-    return goalNames.some((candidate) => candidate === name || candidate.includes(name) || name.includes(candidate));
+
+    if (name) {
+      const matchesMedicationName = goalNames.some(
+        (candidate) =>
+          candidate === name ||
+          candidate.includes(name) ||
+          name.includes(candidate),
+      );
+      if (matchesMedicationName) return true;
+    }
+
+    return medicationCount === 1 && normalise(goal?.title) === "manage medication";
   }) ?? null;
 }
 
