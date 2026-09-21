@@ -107,6 +107,45 @@ function normalizeGoals(...sources: any[]): any[] {
   return result;
 }
 
+function mergeMedicationGoalLinks(canonicalMedications: any[], healthHomeMedications: any[]) {
+  const byPatientMedicationId = new Map<string, any>();
+  const byMedicationId = new Map<string, any>();
+
+  for (const medication of healthHomeMedications) {
+    const patientMedicationId =
+      medication?.patientMedicationId ??
+      medication?.patientMedication?.id ??
+      medication?.id ??
+      null;
+    const medicationId =
+      medication?.medicationId ??
+      medication?.medication?.id ??
+      null;
+
+    if (patientMedicationId) byPatientMedicationId.set(String(patientMedicationId), medication);
+    if (medicationId) byMedicationId.set(String(medicationId), medication);
+  }
+
+  return canonicalMedications.map((medication) => {
+    const patientMedicationId =
+      medication?.patientMedicationId ??
+      medication?.patientMedication?.id ??
+      null;
+    const medicationId =
+      medication?.medicationId ??
+      medication?.medication?.id ??
+      null;
+    const source =
+      (patientMedicationId && byPatientMedicationId.get(String(patientMedicationId))) ??
+      (medicationId && byMedicationId.get(String(medicationId))) ??
+      null;
+
+    return source?.healthGoalId
+      ? { ...source, ...medication, healthGoalId: source.healthGoalId }
+      : medication;
+  });
+}
+
 function mergePrescriptionMedications(patientMedications: any[], prescriptions: any[]) {
   const result = normalizeMedications(patientMedications);
   const existingMedicationIds = new Set(result.map((item: any) => String(item?.medicationId ?? '')).filter(Boolean));
@@ -179,7 +218,8 @@ class HealthHomeService {
       }
     }
 
-    const canonicalMedications = canonical && canonical.patient?.id === healthHome.patient?.id && Array.isArray(canonical.medications) ? canonical.medications : healthHomeMedications;
+    const canonicalMedicationSource = canonical && canonical.patient?.id === healthHome.patient?.id && Array.isArray(canonical.medications) ? canonical.medications : healthHomeMedications;
+    const canonicalMedications = mergeMedicationGoalLinks(canonicalMedicationSource, healthHomeMedications);
     const medications = mergePrescriptionMedications(canonicalMedications, prescriptionRecords);
 
     if (!canonical || canonical.patient?.id !== healthHome.patient?.id) {
