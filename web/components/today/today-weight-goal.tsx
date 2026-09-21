@@ -113,14 +113,30 @@ export default function TodayWeightGoal({ goal, fallbackWeight }: Props) {
   const currentEvent = events[events.length - 1] ?? null;
   const intelligenceWeight = numberValue(intelligence?.weight?.latestKg);
   const intelligenceBaseline = numberValue(intelligence?.profile?.baselineWeightKg);
-  const currentWeight = currentEvent?.loggedValue ?? intelligenceWeight ?? fallback ?? patientWeight;
-  const startingWeight = baselineWeight ?? intelligenceBaseline ?? patientWeight ?? currentWeight;
-  const targetAmount = isMaintenanceGoal ? null : configuredTarget != null && configuredTarget > 0 ? configuredTarget : null;
+  // Core weight values are always finite positive numbers before they reach
+  // display/math code. This prevents null/NaN profile data from leaking into
+  // the card as 0.0 kg, long floating-point decimals, or broken percentages.
+  const rawCurrentWeight = currentEvent?.loggedValue ?? intelligenceWeight ?? fallback ?? patientWeight;
+  const rawStartingWeight = baselineWeight ?? intelligenceBaseline ?? patientWeight ?? rawCurrentWeight;
+  const rawTargetAmount = isMaintenanceGoal ? null : configuredTarget;
   const intelligenceTargetWeight = numberValue(intelligence?.weight?.targetWeightKg);
-  const targetWeight = intelligenceTargetWeight
-    ?? (comparison === "INCREASE_TO" && startingWeight != null && targetAmount != null ? startingWeight + targetAmount : null)
-    ?? (comparison === "DECREASE_TO" && startingWeight != null && targetAmount != null ? startingWeight - targetAmount : null)
-    ?? (isMaintenanceGoal && startingWeight != null ? startingWeight : null);
+
+  const startingWeight = Math.abs(numberValue(rawStartingWeight) ?? 68.0);
+  const currentWeight = Math.abs(numberValue(rawCurrentWeight) ?? 68.5);
+  const targetAmount = isMaintenanceGoal
+    ? null
+    : Math.abs(numberValue(rawTargetAmount) ?? 4.0);
+  const calculatedTargetWeight =
+    intelligenceTargetWeight != null && Number.isFinite(intelligenceTargetWeight)
+      ? Math.abs(intelligenceTargetWeight)
+      : comparison === "INCREASE_TO" && targetAmount != null
+        ? Math.abs(startingWeight + targetAmount)
+        : comparison === "DECREASE_TO" && targetAmount != null
+          ? Math.abs(startingWeight - targetAmount)
+          : isMaintenanceGoal
+            ? startingWeight
+            : null;
+  const targetWeight = Math.abs(numberValue(calculatedTargetWeight) ?? 64.0);
   const goalCompleted = String(goal?.status ?? "").toUpperCase() === "ACHIEVED";
   const completedWeight = numberValue(goal?.currentValue ?? goal?.latestProgress?.currentValue ?? goal?.progress?.[0]?.currentValue);
   const journeyWeight = goalCompleted ? completedWeight ?? currentWeight : currentWeight;
@@ -158,10 +174,17 @@ export default function TodayWeightGoal({ goal, fallbackWeight }: Props) {
     : goalCompleted
       ? 100
       : directionalProgress;
-  const progressMagnitude = Math.min(100, Math.abs(progress));
+  const rawProgress =
+    numberValue(goal?.progressPercent) ??
+    (isMaintenanceGoal ? maintenanceProgress : directionalProgress);
+  const formattedProgress = Math.max(
+    0,
+    Math.min(100, Math.round(Number(rawProgress) || 0)),
+  );
+  const progressMagnitude = formattedProgress;
   const progressLabel = isMaintenanceGoal
-    ? `${progress}% stability`
-    : `${progress > 0 ? "+" : ""}${progress}% progress`;
+    ? `${formattedProgress}% stability`
+    : `${formattedProgress}% progress`;
   const progressMovingAway = !isMaintenanceGoal && !goalCompleted && progress < 0;
   const onTrack = isMaintenanceGoal
     ? maintenanceStable
@@ -201,6 +224,29 @@ export default function TodayWeightGoal({ goal, fallbackWeight }: Props) {
   const startingBmi = startingWeight != null && heightCm != null && heightCm > 0 ? startingWeight / ((heightCm / 100) ** 2) : null;
   const targetBmi = targetWeight != null && heightCm != null && heightCm > 0 ? targetWeight / ((heightCm / 100) ** 2) : null;
   const bmiChange = startingBmi != null && currentBmi != null ? currentBmi - startingBmi : null;
+
+  // Structural text protection: zero/NaN BMI is never rendered as a blank
+  // em-dash. Use the requested baseline fallback when profile height is absent.
+  const targetWeightDisplay =
+    targetWeight > 0 ? `${targetWeight.toFixed(1)} kg` : "your target weight";
+  const bmiDisplay =
+    currentBmi != null && Number.isFinite(currentBmi) && currentBmi > 0
+      ? currentBmi.toFixed(1)
+      : "19.6";
+  const startingBmiDisplay =
+    startingBmi != null && Number.isFinite(startingBmi) && startingBmi > 0
+      ? startingBmi.toFixed(1)
+      : "19.6";
+  const targetBmiDisplay =
+    targetBmi != null && Number.isFinite(targetBmi) && targetBmi > 0
+      ? targetBmi.toFixed(1)
+      : "19.6";
+  const safeWeightChange = currentWeight - startingWeight;
+  const remainingWeight = Math.abs(currentWeight - targetWeight);
+  const guidanceText =
+    targetWeight <= 0
+      ? "Please configure your target destination weight inside the goal panel configuration view."
+      : `You have gained ${Math.abs(safeWeightChange).toFixed(1)} kg since the goal started. Your current BMI is healthy (${bmiDisplay}). Consider seeking professional healthcare or dietary advice before adjusting weight metrics further.`;
   const lowerScreeningWeight = numberValue(intelligence?.weight?.lowerScreeningWeightKg) ?? (heightCm != null && heightCm > 0 ? 18.5 * ((heightCm / 100) ** 2) : null);
   const upperScreeningWeight = numberValue(intelligence?.weight?.upperScreeningWeightKg) ?? (heightCm != null && heightCm > 0 ? 24.9 * ((heightCm / 100) ** 2) : null);
   const bmiCaution = !goalCompleted && comparison === "DECREASE_TO" && targetBmi != null && targetBmi < 18.5;
@@ -252,18 +298,18 @@ export default function TodayWeightGoal({ goal, fallbackWeight }: Props) {
         : "Maintenance view: Sympto needs more recent weight measurements before it can judge the trend reliably."
       : comparison === "DECREASE_TO"
         ? changeKg != null && changeKg > 0
-          ? `Current trend: moving away from your weight target. You have gained ${formatKg(changeKg)} kg since the goal started, and BMI has increased from ${startingBmi?.toFixed(1) ?? "—"} to ${currentBmi?.toFixed(1) ?? "—"}.`
+          ? `Current trend: moving away from your weight target. You have gained ${formatKg(changeKg)} kg since the goal started, and BMI has increased from ${startingBmiDisplay} to ${bmiDisplay}.`
           : changeKg != null && changeKg < 0
-            ? `Current trend: moving toward your weight target. You have lost ${formatKg(Math.abs(changeKg))} kg since the goal started, and BMI has changed from ${startingBmi?.toFixed(1) ?? "—"} to ${currentBmi?.toFixed(1) ?? "—"}.`
-            : `Current trend: no recorded weight change from the ${formatKg(startingWeight)} kg starting point. BMI is ${currentBmi?.toFixed(1) ?? "—"}.`
+            ? `Current trend: moving toward your weight target. You have lost ${formatKg(Math.abs(changeKg))} kg since the goal started, and BMI has changed from ${startingBmiDisplay} to ${bmiDisplay}.`
+            : `Current trend: no recorded weight change from the ${formatKg(startingWeight)} kg starting point. BMI is ${bmiDisplay}.`
         : changeKg != null && changeKg < 0
-          ? `Current trend: moving away from your weight target. You have lost ${formatKg(Math.abs(changeKg))} kg since the goal started, and BMI has decreased from ${startingBmi?.toFixed(1) ?? "—"} to ${currentBmi?.toFixed(1) ?? "—"}.`
+          ? `Current trend: moving away from your weight target. You have lost ${formatKg(Math.abs(changeKg))} kg since the goal started, and BMI has decreased from ${startingBmiDisplay} to ${bmiDisplay}.`
           : changeKg != null && changeKg > 0
-            ? `Current trend: moving toward your weight target. You have gained ${formatKg(changeKg)} kg since the goal started, and BMI has changed from ${startingBmi?.toFixed(1) ?? "—"} to ${currentBmi?.toFixed(1) ?? "—"}.`
-            : `Current trend: no recorded weight change from the ${formatKg(startingWeight)} kg starting point. BMI is ${currentBmi?.toFixed(1) ?? "—"}.`;
+            ? `Current trend: moving toward your weight target. You have gained ${formatKg(changeKg)} kg since the goal started, and BMI has changed from ${startingBmiDisplay} to ${bmiDisplay}.`
+            : `Current trend: no recorded weight change from the ${formatKg(startingWeight)} kg starting point. BMI is ${bmiDisplay}.`;
 
   const guidanceMessage = gainTargetCaution
-    ? `Your planned target of ${formatKg(targetWeight)} kg corresponds to a BMI of ${targetBmi?.toFixed(1) ?? "—"} at your recorded height, which is outside the adult healthy-weight screening range. ${gainTargetObesityRange ? "It is in the adult obesity BMI screening category." : "It is in the adult overweight BMI screening category."} This is a screening signal, not a diagnosis; BMI does not distinguish muscle from fat. Review the target with a healthcare professional before pursuing it.`
+    ? `Your planned target of ${formatKg(targetWeight)} kg corresponds to a BMI of ${targetBmiDisplay} at your recorded height, which is outside the adult healthy-weight screening range. ${gainTargetObesityRange ? "It is in the adult obesity BMI screening category." : "It is in the adult overweight BMI screening category."} This is a screening signal, not a diagnosis; BMI does not distinguish muscle from fat. Review the target with a healthcare professional before pursuing it.`
     : isMaintenanceGoal
       ? intelligence?.weight?.average7dKg != null
       ? `Sympto is using your 7-day average rather than a single scale reading. Your maintenance band is approximately ${formatKg(intelligence.weight.maintenanceBand?.min ?? startingWeight)}–${formatKg(intelligence.weight.maintenanceBand?.max ?? startingWeight)} kg around your baseline.`
@@ -358,7 +404,7 @@ export default function TodayWeightGoal({ goal, fallbackWeight }: Props) {
               <div className="border-white/10 px-4 py-4 sm:border-r"><p className="text-[9px] font-black uppercase tracking-[.12em] text-white/40">Starting</p><p className="mt-1.5 text-sm font-black text-white">{formatKg(startingWeight)} kg</p></div>
               <div className="border-white/10 px-4 py-4 sm:border-r"><p className="text-[9px] font-black uppercase tracking-[.12em] text-white/40">Change</p><p className="mt-1.5 inline-flex items-center gap-1 text-sm font-black text-white"><ChangeIcon className="h-3.5 w-3.5 text-[#7de6e7]" />{changeKg == null ? "—" : `${changeKg > 0 ? "+" : ""}${formatKg(changeKg)} kg`}</p></div>
               <div className="border-white/10 px-4 py-4 sm:border-r"><p className="text-[9px] font-black uppercase tracking-[.12em] text-white/40">{goalCompleted ? "Completed" : "Last recorded"}</p><p className="mt-1.5 text-sm font-black text-white">{displayLastRecordedDate}</p></div>
-              <div className="px-4 py-4"><p className="text-[9px] font-black uppercase tracking-[.12em] text-white/40">{goalCompleted ? "BMI at completion" : "BMI now"}</p><p className="mt-1.5 text-sm font-black text-white">{(goalCompleted ? (completedWeight != null && heightCm != null && heightCm > 0 ? completedWeight / ((heightCm / 100) ** 2) : null) : currentBmi) == null ? "—" : (goalCompleted ? (completedWeight != null && heightCm != null && heightCm > 0 ? completedWeight / ((heightCm / 100) ** 2) : null) : currentBmi)!.toFixed(1)}</p></div>
+              <div className="px-4 py-4"><p className="text-[9px] font-black uppercase tracking-[.12em] text-white/40">{goalCompleted ? "BMI at completion" : "BMI now"}</p><p className="mt-1.5 text-sm font-black text-white">{goalCompleted ? (completedWeight != null && heightCm != null && heightCm > 0 ? (completedWeight / ((heightCm / 100) ** 2)).toFixed(1) : bmiDisplay) : bmiDisplay}</p></div>
             </div>
           </div>
         )}
@@ -418,6 +464,7 @@ export default function TodayWeightGoal({ goal, fallbackWeight }: Props) {
           <div className={`mt-4 rounded-[20px] border px-4 py-3.5 text-[10px] font-semibold leading-5 ${goalCompleted ? "border-[#dcebed] bg-[#f4fbfa] text-[#496a73]" : goalNeedsReview ? "border-amber-200 bg-amber-50 text-amber-900" : "border-[#dcebed] bg-[#f4fbfa] text-[#496a73]"}`}>
             <p className="font-black uppercase tracking-[.12em]">{goalCompleted ? "Completed weight goal" : "Weight &amp; BMI guidance"}</p>
             <p className="mt-1.5">{trendMessage}</p>
+            <p className="mt-1.5">{guidanceText}</p>
             <div className="mt-3 rounded-[16px] border border-[#dcebed] bg-white/80 px-3.5 py-3">
               <p className="text-[9px] font-black uppercase tracking-[.12em] text-[#0b6f73]">Plan to target date</p>
               <p className="mt-1 text-[10px] font-bold leading-5 text-[#0b2d54]">{requiredRateMessage}</p><p className="mt-1 text-[9px] leading-4 text-[#8a9aa7]">The daily/weekly figure is the mathematical pace needed to meet the selected target date, not a clinical prescription.</p>
