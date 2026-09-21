@@ -283,496 +283,643 @@ export class HealthGoalIntelligenceService {
   async getWeightGoalIntelligence(goalId: string) {
     try {
       const goal = await this.prisma.healthGoal.findUnique({
-      where: { id: goalId },
-      select: {
-        id: true,
-        patientId: true,
-        title: true,
-        category: true,
-        targetValue: true,
-        unit: true,
-        targetDate: true,
-        priority: true,
-        status: true,
-        createdAt: true,
-        patient: {
-          select: {
-            weightKg: true,
-            heightCm: true,
-            person: { select: { dateOfBirth: true, gender: true } },
+        where: { id: goalId },
+        select: {
+          id: true,
+          patientId: true,
+          title: true,
+          category: true,
+          targetValue: true,
+          unit: true,
+          targetDate: true,
+          priority: true,
+          status: true,
+          createdAt: true,
+          patient: {
+            select: {
+              weightKg: true,
+              heightCm: true,
+              person: {
+                select: {
+                  dateOfBirth: true,
+                  gender: true,
+                },
+              },
+            },
           },
         },
-      },
-    });
-    if (!goal) throw new NotFoundException('Health goal not found.');
-    if (String(goal.category).toUpperCase() !== 'WEIGHT') throw new NotFoundException('This intelligence view is only available for weight goals.');
+      });
 
-    // Metric intelligence is sourced directly from HealthGoalMetricEvent.
-    // Do not let the legacy HealthGoalRelation synchronizer break this endpoint.
-
-    const baselineRows = await this.prisma.$queryRawUnsafe<Array<{ loggedValue: number | string | null }>>(
-      'SELECT "loggedValue"::double precision AS "loggedValue" FROM "HealthGoalMetricEvent" WHERE "patientId"=$1 AND "metricType"=\'WEIGHT\' AND "metricKey"=\'weight.kg\' AND "source"=\'goal-baseline\' AND "sourceId"=$2 LIMIT 1',
-      goal.patientId,
-      goal.id,
-    );
-    const baselineRaw = baselineRows[0]?.loggedValue;
-    const baselineFromEvent = baselineRaw == null ? null : Number(baselineRaw);
-    const baselineKg =
-      baselineFromEvent != null && Number.isFinite(baselineFromEvent)
-        ? baselineFromEvent
-        : goal.patient.weightKg == null
-          ? null
-          : Number(goal.patient.weightKg);
-
-    const events = await this.prisma.$queryRawUnsafe<Array<{ loggedValue: number | string | null; occurredAt: Date | string | null }>>(
-      'SELECT "loggedValue"::double precision AS "loggedValue","occurredAt" FROM "HealthGoalMetricEvent" WHERE "patientId"=$1 AND "metricType"=\'WEIGHT\' AND "metricKey"=\'weight.kg\' AND "source" <> \'goal-baseline\' AND "occurredAt"<=CURRENT_TIMESTAMP ORDER BY "occurredAt" ASC',
-      goal.patientId,
-    );
-    const cleanedEvents: WeightEvent[] = events
-      .map((row) => ({
-        value: row.loggedValue == null ? Number.NaN : Number(row.loggedValue),
-        at: row.occurredAt == null ? new Date(Number.NaN) : new Date(row.occurredAt),
-      }))
-      .filter(
-        (row) => Number.isFinite(row.value) && !Number.isNaN(row.at.getTime()),
-      );
-
-    const latestKg = cleanedEvents.length ? cleanedEvents[cleanedEvents.length - 1].value : baselineKg;
-    const now = Date.now();
-    const recent7 = cleanedEvents.filter((row) => now - row.at.getTime() <= 7 * 86400000).map((row) => row.value);
-    const recent30 = cleanedEvents.filter((row) => now - row.at.getTime() <= 30 * 86400000).map((row) => row.value);
-    const average7dKg = average(recent7);
-    const average30dKg = average(recent30);
-    const trendKgPerWeek = linearTrendKgPerWeek(cleanedEvents.slice(-30));
-
-    const heightCm = goal.patient.heightCm == null ? null : Number(goal.patient.heightCm);
-    const currentBmi = latestKg != null && heightCm && heightCm > 0 ? latestKg / ((heightCm / 100) ** 2) : null;
-    const baselineBmi = baselineKg != null && heightCm && heightCm > 0 ? baselineKg / ((heightCm / 100) ** 2) : null;
-    const targetAmount = goal.targetValue == null ? null : Number(goal.targetValue);
-    const comparisonRows = await this.prisma.$queryRawUnsafe<Array<{ comparison: string | null }>>(
-      'SELECT "comparison" FROM "HealthGoalMetricConfig" WHERE "healthGoalId"=$1 LIMIT 1',
-      goal.id,
-    );
-    const comparison = String(comparisonRows[0]?.comparison ?? 'DECREASE_TO').toUpperCase();
-
-    const maintenanceBand = baselineKg == null ? null : { min: baselineKg * 0.98, max: baselineKg * 1.02 };
-    const withinMaintenanceBand = comparison === 'CLOSEST' && average7dKg != null && maintenanceBand != null
-      ? average7dKg >= maintenanceBand.min && average7dKg <= maintenanceBand.max
-      : null;
-    const isMaintenanceGoal = comparison === 'CLOSEST';
-    const maintenanceStatus =
-      !isMaintenanceGoal
-        ? null
-        : withinMaintenanceBand == null
-          ? 'INSUFFICIENT_DATA'
-          : withinMaintenanceBand
-            ? 'STABLE'
-            : 'NEEDS_REVIEW';
-
-    const age = ageFromDateOfBirth(goal.patient.person.dateOfBirth);
-    const adultBmiApplicable = age == null || age >= 20;
-    // Directional weight goals store the requested amount of change.
-    // Example: baseline 68 kg + INCREASE_TO + targetValue 100 = projected weight 168 kg.
-    const requestedChangeKg = comparison === 'CLOSEST' || targetAmount == null ? null : Math.max(targetAmount, 0);
-    const targetWeight =
-      comparison === 'INCREASE_TO' && baselineKg != null && requestedChangeKg != null
-        ? baselineKg + requestedChangeKg
-        : comparison === 'DECREASE_TO' && baselineKg != null && requestedChangeKg != null
-          ? baselineKg - requestedChangeKg
-          : comparison === 'CLOSEST'
-            ? baselineKg
-            : null;
-    const targetBmi = targetWeight != null && heightCm && heightCm > 0 ? targetWeight / ((heightCm / 100) ** 2) : null;
-    const lowerScreeningWeightKg = heightCm != null && heightCm > 0 ? 18.5 * ((heightCm / 100) ** 2) : null;
-    const upperScreeningWeightKg = heightCm != null && heightCm > 0 ? 24.9 * ((heightCm / 100) ** 2) : null;
-    const targetBmiStatus: 'BELOW_RANGE' | 'WITHIN_RANGE' | 'OVERWEIGHT' | 'OBESITY_CLASS_1' | 'OBESITY_CLASS_2' | 'OBESITY_CLASS_3' | null =
-      !adultBmiApplicable || targetBmi == null
-        ? null
-        : targetBmi < 18.5
-          ? 'BELOW_RANGE'
-          : targetBmi < 25
-            ? 'WITHIN_RANGE'
-            : targetBmi < 30
-              ? 'OVERWEIGHT'
-              : targetBmi < 35
-                ? 'OBESITY_CLASS_1'
-                : targetBmi < 40
-                  ? 'OBESITY_CLASS_2'
-                  : 'OBESITY_CLASS_3';
-    const targetNeedsReview = !['CLOSEST'].includes(comparison)
-      && targetBmiStatus != null
-      && targetBmiStatus !== 'WITHIN_RANGE';
-
-    let status: 'STABLE' | 'DRIFTING_UP' | 'DRIFTING_DOWN' | 'NEEDS_REVIEW' | 'INSUFFICIENT_DATA' = 'INSUFFICIENT_DATA';
-    if (comparison === 'CLOSEST') {
-      if (average7dKg == null || baselineKg == null) {
-        status = 'INSUFFICIENT_DATA';
-      } else if (withinMaintenanceBand === true) {
-        // A maintenance goal is considered on track while the recent average
-        // stays inside the baseline maintenance band. Trend direction can still
-        // be shown separately without turning a small, in-band fluctuation into
-        // a warning state.
-        status = 'STABLE';
-      } else {
-        status = average7dKg > baselineKg ? 'DRIFTING_UP' : 'DRIFTING_DOWN';
+      if (!goal) throw new NotFoundException('Health goal not found.');
+      if (String(goal.category).toUpperCase() !== 'WEIGHT') {
+        throw new NotFoundException('This intelligence view is only available for weight goals.');
       }
-    } else if (latestKg != null && baselineKg != null) {
-      const delta = latestKg - baselineKg;
-      const directed = comparison === 'DECREASE_TO' ? -delta : delta;
-      status = directed > 0.05 ? 'DRIFTING_UP' : directed < -0.05 ? 'DRIFTING_DOWN' : 'STABLE';
-    }
 
-    const journals = await this.prisma.healthJournal.findMany({
-      where: { patientId: goal.patientId, createdAt: { gte: new Date(now - 30 * 86400000) } },
-      select: { sleepHours: true, stressLevel: true, exerciseMinutes: true, waterIntakeMl: true },
-      orderBy: { createdAt: 'asc' },
-    });
-    const values = {
-      sleep: journals.map((j) => j.sleepHours == null ? null : Number(j.sleepHours)).filter((v): v is number => v != null && Number.isFinite(v)),
-      stress: journals.map((j) => j.stressLevel == null ? null : Number(j.stressLevel)).filter((v): v is number => v != null && Number.isFinite(v)),
-      exercise: journals.map((j) => j.exerciseMinutes == null ? null : Number(j.exerciseMinutes)).filter((v): v is number => v != null && Number.isFinite(v)),
-      water: journals.map((j) => j.waterIntakeMl == null ? null : Number(j.waterIntakeMl)).filter((v): v is number => v != null && Number.isFinite(v)),
-    };
+      const patientId = goal.patientId;
+      const now = new Date();
 
-    let relationshipData: { relationships: any[] } = { relationships: [] };
-    try {
-      relationshipData = await this.getGoalRelationships(goal.id);
-    } catch (relationshipError) {
-      console.warn(
-        '⚠️ Weight intelligence relationship data unavailable:',
-        relationshipError instanceof Error
-          ? relationshipError.message
-          : String(relationshipError),
+      // The intelligence endpoint must remain independent of the legacy
+      // HealthGoalRelation table. Relationships are derived from current
+      // Prisma data below, so a legacy relation migration can never take
+      // down the weight intelligence response.
+      const [
+        medicationRows,
+        conditionRows,
+        medicalRecord,
+        relatedGoals,
+      ] = await Promise.all([
+        this.prisma.patientMedication.findMany({
+          where: {
+            healthPassport: { patientId },
+            status: { in: ['ACTIVE', 'PAUSED'] },
+          },
+          select: {
+            id: true,
+            dosage: true,
+            frequency: true,
+            indication: true,
+            sideEffects: true,
+            adherencePercentage: true,
+            missedDoses: true,
+            ongoing: true,
+            medication: {
+              select: {
+                id: true,
+                name: true,
+                genericName: true,
+                category: true,
+              },
+            },
+          },
+          orderBy: { createdAt: 'asc' },
+          take: 25,
+        }),
+        this.prisma.patientCondition.findMany({
+          where: {
+            healthPassport: { patientId },
+            status: 'ACTIVE',
+          },
+          select: {
+            chronic: true,
+            severity: true,
+            stage: true,
+            condition: {
+              select: {
+                name: true,
+                chronic: true,
+              },
+            },
+          },
+          orderBy: [{ primaryCondition: 'desc' }, { createdAt: 'asc' }],
+          take: 25,
+        }),
+        this.prisma.medicalRecord.findUnique({
+          where: { patientId },
+          select: {
+            chronicConditions: true,
+            currentMedications: true,
+            pastMedicalHistory: true,
+            familyHistory: true,
+            socialHistory: true,
+          },
+        }),
+        this.prisma.healthGoal.findMany({
+          where: {
+            patientId,
+            status: { in: ['ACTIVE', 'ON_HOLD'] },
+            id: { not: goal.id },
+          },
+          select: {
+            id: true,
+            title: true,
+            category: true,
+            targetValue: true,
+            unit: true,
+            targetDate: true,
+            priority: true,
+            status: true,
+          },
+          orderBy: { createdAt: 'desc' },
+          take: 50,
+        }),
+      ]);
+
+      const baselineRows = await this.prisma.$queryRawUnsafe<Array<{ loggedValue: number | string | null }>>(
+        'SELECT "loggedValue"::double precision AS "loggedValue" FROM "HealthGoalMetricEvent" WHERE "patientId"=$1 AND "metricType"=\'WEIGHT\' AND "metricKey"=\'weight.kg\' AND "source"=\'goal-baseline\' AND "sourceId"=$2 LIMIT 1',
+        patientId,
+        goal.id,
       );
-    }
-    const activeMedicationCount = await this.prisma.patientMedication.count({
-      where: { healthPassport: { patientId: goal.patientId }, status: { in: ['ACTIVE', 'PAUSED'] } },
-    });
-    const activeConditionCount = await this.prisma.patientCondition.count({
-      where: { healthPassport: { patientId: goal.patientId }, status: 'ACTIVE' },    });    const recentSymptomCount = await this.prisma.symptomLog.count({
-      where: {        clinicalEpisode: { patientId: goal.patientId },
-        status: { in: ['ACTIVE', 'COMPLETED'] },
-        startedAt: { gte: new Date(now - 30 * 86400000) },
-      },
-    });
 
-    const recommendedSupportingGoals = WEIGHT_SUPPORT_RULES
-      .map((rule) => ({ category: rule.category, rationale: rule.rationale }))
-      .filter((item) => !relationshipData.relationships.some((relation) => String(relation.goal.category).toUpperCase() === item.category && relation.relationshipType === 'SUPPORTS'));
+      const baselineRaw = baselineRows[0]?.loggedValue;
+      const baselineEvent = baselineRaw == null ? null : Number(baselineRaw);
+      const baselineKg =
+        baselineEvent != null && Number.isFinite(baselineEvent)
+          ? baselineEvent
+          : goal.patient.weightKg == null
+            ? null
+            : Number(goal.patient.weightKg);
 
-    const { start: todayStart, end: todayEnd } = southAfricaDayBounds();
-    const todayJournal = await this.prisma.healthJournal.findFirst({
-      where: {
-        patientId: goal.patientId,
-        createdAt: { gte: todayStart, lt: todayEnd },
-        title: 'Daily Health Check-in',
-      },
-      orderBy: { createdAt: 'desc' },
-      select: {
-        id: true,
-        sleepHours: true,
-        stressLevel: true,
-        exerciseMinutes: true,
-        waterIntakeMl: true,
-        mood: true,
-      },
-    });
+      const weightRows = await this.prisma.$queryRawUnsafe<Array<{
+        loggedValue: number | string | null;
+        occurredAt: Date | string | null;
+      }>>(
+        'SELECT "loggedValue"::double precision AS "loggedValue","occurredAt" FROM "HealthGoalMetricEvent" WHERE "patientId"=$1 AND "metricType"=\'WEIGHT\' AND "metricKey"=\'weight.kg\' AND "source" <> \'goal-baseline\' AND "occurredAt"<=CURRENT_TIMESTAMP ORDER BY "occurredAt" ASC',
+        patientId,
+      );
 
-    const latestWeightAt = cleanedEvents.length
-      ? cleanedEvents[cleanedEvents.length - 1].at
-      : baselineKg != null
-        ? new Date(goal.createdAt)
-        : null;
-    const weightDataNeedsRefresh = baselineKg == null || (latestWeightAt != null && Date.now() - latestWeightAt.getTime() > 7 * 86400000);
-    const checkInNeedsCompletion = !todayJournal;
+      const cleanedEvents: WeightEvent[] = weightRows
+        .map((row) => ({
+          value: row.loggedValue == null ? Number.NaN : Number(row.loggedValue),
+          at: row.occurredAt == null ? new Date(Number.NaN) : new Date(row.occurredAt),
+        }))
+        .filter((row) => Number.isFinite(row.value) && Number.isFinite(row.at.getTime()));
 
-    const direction: WeightPlan['direction'] =
-      comparison === 'INCREASE_TO' ? 'GAIN'
-        : comparison === 'DECREASE_TO' ? 'LOSE'
-          : 'MAINTAIN';
+      const latestKg = cleanedEvents.length
+        ? cleanedEvents[cleanedEvents.length - 1].value
+        : baselineKg;
 
-    const targetDateAt = goal.targetDate ? new Date(goal.targetDate) : null;
-    const daysRemaining = targetDateAt && !Number.isNaN(targetDateAt.getTime())
-      ? Math.max(0, Math.ceil((targetDateAt.getTime() - Date.now()) / 86400000))
-      : null;
+      const recent7 = cleanedEvents
+        .filter((row) => now.getTime() - row.at.getTime() <= 7 * 86400000)
+        .map((row) => row.value);
+      const recent30 = cleanedEvents
+        .filter((row) => now.getTime() - row.at.getTime() <= 30 * 86400000)
+        .map((row) => row.value);
 
-    let remainingChangeKg: number | null = null;
-    if (latestKg != null && targetWeight != null) {
-      remainingChangeKg = direction === 'GAIN'
-        ? Math.max(targetWeight - latestKg, 0)
-        : direction === 'LOSE'
-          ? Math.max(latestKg - targetWeight, 0)
-          : 0;
-    }
+      const average7dKg = average(recent7);
+      const average30dKg = average(recent30);
+      const trendKgPerWeek = linearTrendKgPerWeek(cleanedEvents.slice(-30));
 
-    const targetReachedNow = direction === 'GAIN'
-      ? targetWeight != null && latestKg != null && latestKg >= targetWeight
-      : direction === 'LOSE'
-        ? targetWeight != null && latestKg != null && latestKg <= targetWeight
-        : false;
+      const heightCm = goal.patient.heightCm == null ? null : Number(goal.patient.heightCm);
+      const age = ageFromDateOfBirth(goal.patient.person.dateOfBirth);
+      const gender = goal.patient.person.gender ?? null;
+      const currentBmi =
+        latestKg != null && heightCm != null && heightCm > 0
+          ? latestKg / ((heightCm / 100) ** 2)
+          : null;
+      const baselineBmi =
+        baselineKg != null && heightCm != null && heightCm > 0
+          ? baselineKg / ((heightCm / 100) ** 2)
+          : null;
 
-    const weightPlan: WeightPlan = {
-      direction,
-      targetWeightKg: targetWeight,
-      requestedChangeKg,
-      remainingChangeKg,
-      daysRemaining,
-      requiredDailyChangeKg:
-        daysRemaining != null && daysRemaining > 0 && remainingChangeKg != null && direction !== 'MAINTAIN'
-          ? remainingChangeKg / daysRemaining
-          : null,
-      requiredWeeklyChangeKg:
-        daysRemaining != null && daysRemaining > 0 && remainingChangeKg != null && direction !== 'MAINTAIN'
-          ? remainingChangeKg / (daysRemaining / 7)
-          : null,
-      status:
+      const configRows = await this.prisma.$queryRawUnsafe<Array<{ comparison: string | null; frequencyTarget: number | string | null }>>(
+        'SELECT "comparison","frequencyTarget"::double precision AS "frequencyTarget" FROM "HealthGoalMetricConfig" WHERE "healthGoalId"=$1 LIMIT 1',
+        goal.id,
+      );
+      const comparison = String(configRows[0]?.comparison ?? 'CLOSEST').toUpperCase();
+      const targetAmount = goal.targetValue == null ? null : Number(goal.targetValue);
+      const requestedChangeKg =
+        comparison === 'CLOSEST' || targetAmount == null || !Number.isFinite(targetAmount)
+          ? null
+          : Math.max(targetAmount, 0);
+
+      const direction: WeightPlan['direction'] =
+        comparison === 'INCREASE_TO'
+          ? 'GAIN'
+          : comparison === 'DECREASE_TO'
+            ? 'LOSE'
+            : 'MAINTAIN';
+
+      const targetWeightKg =
+        direction === 'GAIN' && baselineKg != null && requestedChangeKg != null
+          ? baselineKg + requestedChangeKg
+          : direction === 'LOSE' && baselineKg != null && requestedChangeKg != null
+            ? baselineKg - requestedChangeKg
+            : direction === 'MAINTAIN'
+              ? baselineKg
+              : null;
+
+      // Maintenance deliberately has no reduction/gain pacing. Its target is
+      // the baseline and its stability boundary is fixed at ±1.5 kg.
+      const maintenanceBand =
+        baselineKg == null
+          ? null
+          : { min: baselineKg - 1.5, max: baselineKg + 1.5 };
+
+      const maintenanceAverage = average7dKg ?? latestKg;
+      const withinMaintenanceBand =
+        direction === 'MAINTAIN' &&
+        maintenanceAverage != null &&
+        maintenanceBand != null
+          ? maintenanceAverage >= maintenanceBand.min && maintenanceAverage <= maintenanceBand.max
+          : null;
+
+      const status: 'STABLE' | 'DRIFTING_UP' | 'DRIFTING_DOWN' | 'NEEDS_REVIEW' | 'INSUFFICIENT_DATA' =
         direction === 'MAINTAIN'
-          ? 'ON_TARGET'
-          : targetReachedNow
-            ? 'TARGET_REACHED'
-            : daysRemaining == null
-              ? 'NO_TARGET_DATE'
-              : daysRemaining === 0
-                ? 'DATE_REACHED'
-                : targetWeight != null && latestKg != null
-                  ? 'PLANNING'
-                  : 'NO_TARGET_DATE',
-    };
+          ? maintenanceAverage == null || baselineKg == null
+            ? 'INSUFFICIENT_DATA'
+            : withinMaintenanceBand
+              ? 'STABLE'
+              : maintenanceAverage > baselineKg
+                ? 'DRIFTING_UP'
+                : 'DRIFTING_DOWN'
+          : latestKg == null || baselineKg == null
+            ? 'INSUFFICIENT_DATA'
+            : direction === 'LOSE'
+              ? latestKg < baselineKg ? 'DRIFTING_DOWN' : latestKg > baselineKg ? 'DRIFTING_UP' : 'STABLE'
+              : latestKg > baselineKg ? 'DRIFTING_UP' : latestKg < baselineKg ? 'DRIFTING_DOWN' : 'STABLE';
 
-    const activeConditionRows = await this.prisma.patientCondition.findMany({
-      where: { healthPassport: { patientId: goal.patientId }, status: 'ACTIVE' },
-      select: {
-        chronic: true,
-        severity: true,
-        stage: true,
-        condition: { select: { name: true, chronic: true } },
-      },
-      orderBy: [{ primaryCondition: 'desc' }, { createdAt: 'asc' }],
-      take: 12,
-    });
+      const targetBmi =
+        targetWeightKg != null && heightCm != null && heightCm > 0
+          ? targetWeightKg / ((heightCm / 100) ** 2)
+          : null;
 
-    const activeMedicationRows = await this.prisma.patientMedication.findMany({
-      where: { healthPassport: { patientId: goal.patientId }, status: { in: ['ACTIVE', 'PAUSED'] } },
-      select: {
-        dosage: true,
-        frequency: true,
-        indication: true,
-        sideEffects: true,
-        medication: { select: { name: true } },
-      },
-      orderBy: { createdAt: 'asc' },
-      take: 12,
-    });
+      const targetBmiStatus =
+        age != null && age < 20
+          ? null
+          : targetBmi == null
+            ? null
+            : targetBmi < 18.5
+              ? 'BELOW_RANGE'
+              : targetBmi < 25
+                ? 'WITHIN_RANGE'
+                : targetBmi < 30
+                  ? 'OVERWEIGHT'
+                  : targetBmi < 35
+                    ? 'OBESITY_CLASS_1'
+                    : targetBmi < 40
+                      ? 'OBESITY_CLASS_2'
+                      : 'OBESITY_CLASS_3';
 
-    const weightHealthContext: WeightHealthContext = {
-      connectedGoals: relationshipData.relationships.map((relation) => ({
-        title: String(relation.goal.title),
-        category: String(relation.goal.category),
-        relationshipType: String(relation.relationshipType),
-        direction: String(relation.direction),
-      })),
-      activeConditions: activeConditionRows.map((row) => ({
+      const targetNeedsReview =
+        direction !== 'MAINTAIN' &&
+        targetBmiStatus != null &&
+        targetBmiStatus !== 'WITHIN_RANGE';
+
+      const lowerScreeningWeightKg =
+        heightCm != null && heightCm > 0
+          ? 18.5 * ((heightCm / 100) ** 2)
+          : null;
+      const upperScreeningWeightKg =
+        heightCm != null && heightCm > 0
+          ? 24.9 * ((heightCm / 100) ** 2)
+          : null;
+
+      const journals = await this.prisma.healthJournal.findMany({
+        where: {
+          patientId,
+          createdAt: { gte: new Date(now.getTime() - 30 * 86400000) },
+        },
+        select: {
+          sleepHours: true,
+          stressLevel: true,
+          exerciseMinutes: true,
+          waterIntakeMl: true,
+        },
+        orderBy: { createdAt: 'asc' },
+      });
+
+      const numericValues = {
+        sleep: journals.map((j) => Number(j.sleepHours)).filter((v) => Number.isFinite(v)),
+        stress: journals.map((j) => Number(j.stressLevel)).filter((v) => Number.isFinite(v)),
+        exercise: journals.map((j) => Number(j.exerciseMinutes)).filter((v) => Number.isFinite(v)),
+        water: journals.map((j) => Number(j.waterIntakeMl)).filter((v) => Number.isFinite(v)),
+      };
+
+      const activeMedications = medicationRows.map((row) => ({
+        id: row.id,
+        name: String(row.medication.name),
+        genericName: row.medication.genericName ? String(row.medication.genericName) : null,
+        category: row.medication.category ? String(row.medication.category) : null,
+        dosage: row.dosage ? String(row.dosage) : null,
+        frequency: row.frequency ? String(row.frequency) : null,
+        indication: row.indication ? String(row.indication) : null,
+        adherencePercentage:
+          row.adherencePercentage == null ? null : Number(row.adherencePercentage),
+        missedDoses: row.missedDoses == null ? null : Number(row.missedDoses),
+        ongoing: Boolean(row.ongoing),
+        sideEffectsRecorded: Boolean(row.sideEffects?.trim()),
+      }));
+
+      const activeConditions = conditionRows.map((row) => ({
         name: String(row.condition.name),
         chronic: Boolean(row.chronic || row.condition.chronic),
         severity: row.severity ? String(row.severity) : null,
         stage: row.stage ? String(row.stage) : null,
-      })),
-      activeMedications: activeMedicationRows.map((row) => ({
-        name: String(row.medication.name),
-        dosage: row.dosage ? String(row.dosage) : null,
-        frequency: row.frequency ? String(row.frequency) : null,
-        indication: row.indication ? String(row.indication) : null,
-        sideEffectsRecorded: Boolean(row.sideEffects?.trim()),
-      })),
-    };
-    const exerciseSupport = relationshipData.relationships.find((relation) =>
-      relation.relationshipType === 'SUPPORTS' && String(relation.goal.category).toUpperCase() === 'EXERCISE',
-    );
-    const sleepSupport = relationshipData.relationships.find((relation) =>
-      relation.relationshipType === 'SUPPORTS' && String(relation.goal.category).toUpperCase() === 'SLEEP',
-    );
-    const nutritionSupport = relationshipData.relationships.find((relation) =>
-      relation.relationshipType === 'SUPPORTS' && String(relation.goal.category).toUpperCase() === 'NUTRITION',
-    );
+      }));
 
-    type TodayFocusAction = {
-      id: string;
-      label: string;
-      description: string;
-      href: string;
-      priority: 'PRIMARY' | 'SUPPORTING';
-    };
+      const hasMetformin = activeMedications.some((medication) => {
+        const name = medication.name.toLowerCase();
+        const genericName = String(medication.genericName ?? '').toLowerCase();
+        return name === 'metformin' || genericName === 'metformin' || name.includes('metformin');
+      });
 
-    const lowerScreeningWeight = lowerScreeningWeightKg;
-    const upperScreeningWeight = upperScreeningWeightKg;
-    const bmiCaution = comparison === 'DECREASE_TO' && targetBmi != null && targetBmi < 18.5;
-    const gainTargetCaution = comparison === 'INCREASE_TO' && targetBmi != null && targetBmi >= 25;
-    const currentBmiBelowRange = currentBmi != null && currentBmi < 18.5;
+      const existingCategories = new Set(
+        relatedGoals.map((relatedGoal) => String(relatedGoal.category).toUpperCase()),
+      );
 
-    const todayActions: TodayFocusAction[] = [];
+      type SupportiveGoalRecommendation = {
+        id: string;
+        category: string;
+        title: string;
+        target?: number;
+        unit?: string;
+        rationale: string;
+        source: 'CLINICAL_CONTEXT' | 'WEIGHT_CONTEXT';
+        existingGoalId?: string;
+      };
 
-    if (bmiCaution || gainTargetCaution || (currentBmiBelowRange && comparison === 'DECREASE_TO')) {
-      todayActions.push({
-        id: 'review-weight-goal',
-        label: 'Review your weight goal',
-        description: gainTargetCaution && targetBmi != null
-          ? `Your planned gain target corresponds to BMI ${targetBmi.toFixed(1)}, outside the adult healthy-weight screening range. Review the target before pursuing it.`
-          : 'Your current weight/BMI needs the goal reviewed before pursuing further loss.',
-        href: `/health-goals?edit=${encodeURIComponent(goal.id)}`,
-        priority: 'PRIMARY',
-      });
-    } else if (weightDataNeedsRefresh) {
-      todayActions.push({
-        id: 'record-weight',
-        label: 'Update your recent weight',
-        description: 'Add a recent measurement so Sympto can compare your trend with this goal.',
-        href: '/health-vitals',
-        priority: 'PRIMARY',
-      });
-    } else if (checkInNeedsCompletion) {
-      todayActions.push({
-        id: 'complete-check-in',
-        label: 'Complete today’s health check-in',
-        description: 'Sleep, stress, hydration, mood and movement give your weight goal useful context.',
-        href: '#daily-health-check-in',
-        priority: 'PRIMARY',
-      });
-    } else if (isMaintenanceGoal && maintenanceStatus === 'NEEDS_REVIEW') {
-      todayActions.push({
-        id: 'review-maintenance-trend',
-        label: 'Review your weight trend',
-        description: 'Your recent average has moved outside the maintenance band.',
-        href: '#today-goals',
-        priority: 'PRIMARY',
-      });
-    } else {
-      todayActions.push({
-        id: isMaintenanceGoal ? 'maintain-routine' : comparison === 'INCREASE_TO' ? 'support-weight-gain' : 'support-weight-loss',
-        label: isMaintenanceGoal
-          ? 'Keep today’s routine'
-          : comparison === 'INCREASE_TO'
-            ? targetWeight != null ? `Keep moving toward ${targetWeight.toFixed(1)} kg` : 'Keep your gain plan moving'
-            : targetWeight != null ? `Keep moving toward ${targetWeight.toFixed(1)} kg` : 'Keep your loss plan moving',
-        description: isMaintenanceGoal
-          ? 'Your recent weight pattern is stable; use today’s check-in to keep the picture current.'
-          : weightPlan.requiredWeeklyChangeKg != null
-            ? 'You need to ' + (direction === 'GAIN' ? 'gain' : 'lose') + ' about ' + weightPlan.requiredDailyChangeKg!.toFixed(2) + ' kg/day (' + weightPlan.requiredWeeklyChangeKg!.toFixed(2) + ' kg/week) from your current weight to reach the planned target by the target date.'
-            : comparison === 'INCREASE_TO'
-              ? 'Use the supporting habits already connected to this gain goal rather than adding another task list.'
-              : 'Use the supporting habits already connected to this loss goal rather than adding another task list.',
-        href: '#daily-health-check-in',
-        priority: 'PRIMARY',
-      });
-    }
+      const recommendedSupportingGoals: SupportiveGoalRecommendation[] = [];
 
-    if (exerciseSupport && (!todayJournal || Number(todayJournal.exerciseMinutes ?? 0) <= 0)) {
-      todayActions.push({
-        id: 'movement',
-        label: 'Log movement',
-        description: `Your connected exercise goal is “${String(exerciseSupport.goal.title)}”.`,
-        href: '#daily-health-check-in',
-        priority: 'SUPPORTING',
-      });
-    }
+      const addRecommendation = (recommendation: SupportiveGoalRecommendation) => {
+        if (
+          recommendedSupportingGoals.some(
+            (item) => item.id === recommendation.id,
+          )
+        ) {
+          return;
+        }
+        recommendedSupportingGoals.push(recommendation);
+      };
 
-    if (sleepSupport && (!todayJournal || todayJournal.sleepHours == null)) {
-      todayActions.push({
-        id: 'sleep',
-        label: 'Log your sleep',
-        description: `Your connected sleep goal is “${String(sleepSupport.goal.title)}”.`,
-        href: '#daily-health-check-in',
-        priority: 'SUPPORTING',
-      });
-    }
+      // These are recommendations, not silently-created health goals. The user
+      // must explicitly create/accept them in the goals workflow.
+      if (hasMetformin) {
+        if (!existingCategories.has('EXERCISE')) {
+          addRecommendation({
+            id: 'metformin-exercise-support',
+            category: 'EXERCISE',
+            title: 'Build a consistent movement routine',
+            target: 150,
+            unit: 'minutes/week',
+            rationale: 'Regular physical activity can support cardiometabolic health alongside an antidiabetic treatment plan.',
+            source: 'CLINICAL_CONTEXT',
+          });
+        }
 
-    if (nutritionSupport) {
-      todayActions.push({
-        id: 'nutrition-goal',
-        label: 'Check your nutrition goal',
-        description: 'Use the goal you already have connected to this weight journey.',
-        href: `/health-goals#goal-${encodeURIComponent(String(nutritionSupport.goal.id))}`,
-        priority: 'SUPPORTING',
-      });
-    }
+        const metforminMedication = activeMedications.find((medication) => {
+          const name = medication.name.toLowerCase();
+          const genericName = String(medication.genericName ?? '').toLowerCase();
+          return name === 'metformin' || genericName === 'metformin' || name.includes('metformin');
+        });
 
-    return {
-      goal: {
-        id: goal.id,
-        title: goal.title,
-        comparison,
-        targetValue: targetAmount,
-        unit: goal.unit,
-        targetDate: goal.targetDate,
-        priority: goal.priority,
-        status: goal.status,
-        createdAt: goal.createdAt,
-      },
-      profile: {
-        age,
-        gender: goal.patient.person.gender,
-        heightCm,
-        currentWeightKg: latestKg,
-        currentBmi,
-        baselineWeightKg: baselineKg,
-        baselineBmi,
-        adultBmiApplicable,
-      },
-      weightPlan,
-      healthContext: weightHealthContext,
-      weight: {
-        latestKg,
-        average7dKg,
-        average30dKg,
-        changeKg: baselineKg != null && latestKg != null ? latestKg - baselineKg : null,
-        percentChange: baselineKg != null && latestKg != null ? ((latestKg - baselineKg) / baselineKg) * 100 : null,
-        trendKgPerWeek,
-        dataPoints: cleanedEvents.length,
-        maintenanceBand,
-        withinMaintenanceBand,
-        targetWeightKg: targetWeight,
-        requestedChangeKg,
-        targetBmi,
-        targetBmiStatus,
-        targetNeedsReview,
-        lowerScreeningWeightKg,
-        upperScreeningWeightKg,
-        status,
-      },
-      checkIn: {
-        dataPoints: journals.length,
-        averageSleepHours: average(values.sleep),        averageStress: average(values.stress),
-        averageExerciseMinutes: average(values.exercise),
-        averageWaterIntakeMl: average(values.water),
-      },      clinicalContext: {
-        activeMedicationCount,
-        activeConditionCount,
-        recentSymptomCount,        symptomsDataAvailable: recentSymptomCount > 0,
-      },
-      relationships: relationshipData.relationships,
-      recommendedSupportingGoals,
-      todayFocus: {
-        actions: todayActions.slice(0, 3),
-        dataFreshness: {
-          weightDataNeedsRefresh,
-          checkInNeedsCompletion,
-          latestWeightAt,
+        const medicationGoal = relatedGoals.find((relatedGoal) => {
+          if (String(relatedGoal.category).toUpperCase() !== 'MEDICATION') return false;
+          return String(relatedGoal.title).toLowerCase().includes('metformin');
+        });
+
+        addRecommendation({
+          id: medicationGoal
+            ? `medication-adherence-${medicationGoal.id}`
+            : `metformin-adherence-${metforminMedication?.id ?? 'active'}`,
+          category: 'MEDICATION',
+          title: medicationGoal?.title ?? 'Metformin adherence',
+          target: 100,
+          unit: '%',
+          rationale: 'Track prescribed medication adherence so missed doses and tolerability can be reviewed with the care team.',
+          source: 'CLINICAL_CONTEXT',
+          existingGoalId: medicationGoal?.id,
+        });
+      }
+
+      const genericSupportingRules: Array<{
+        category: 'EXERCISE' | 'NUTRITION' | 'SLEEP';
+        title: string;
+        target: number;
+        unit: string;
+        rationale: string;
+      }> = [
+        {
+          category: 'EXERCISE',
+          title: 'Support your weight goal with movement',
+          target: 150,
+          unit: 'minutes/week',
+          rationale: 'Movement provides useful context for weight trends and overall health.',
         },
-      },
-    };
+        {
+          category: 'NUTRITION',
+          title: 'Track nutrition consistently',
+          target: 1,
+          unit: 'daily check-in',
+          rationale: 'Nutrition tracking adds context to weight patterns without assuming a specific diet.',
+        },
+        {
+          category: 'SLEEP',
+          title: 'Monitor sleep consistently',
+          target: 7,
+          unit: 'hours/night',
+          rationale: 'Sleep is useful context alongside weight and broader wellbeing.',
+        },
+      ];
+
+      for (const rule of genericSupportingRules) {
+        if (!existingCategories.has(rule.category)) {
+          addRecommendation({
+            id: `weight-${rule.category.toLowerCase()}-support`,
+            category: rule.category,
+            title: rule.title,
+            target: rule.target,
+            unit: rule.unit,
+            rationale: rule.rationale,
+            source: 'WEIGHT_CONTEXT',
+          });
+        }
+      }
+
+      const targetDate = goal.targetDate ? new Date(goal.targetDate) : null;
+      const daysRemaining =
+        targetDate != null && Number.isFinite(targetDate.getTime())
+          ? Math.max(0, Math.ceil((targetDate.getTime() - now.getTime()) / 86400000))
+          : null;
+
+      const remainingChangeKg =
+        direction === 'MAINTAIN' || latestKg == null || targetWeightKg == null
+          ? null
+          : direction === 'GAIN'
+            ? Math.max(targetWeightKg - latestKg, 0)
+            : Math.max(latestKg - targetWeightKg, 0);
+
+      const weightPlan: WeightPlan = {
+        direction,
+        targetWeightKg,
+        requestedChangeKg,
+        remainingChangeKg,
+        daysRemaining,
+        requiredDailyChangeKg:
+          direction === 'MAINTAIN' || daysRemaining == null || daysRemaining <= 0 || remainingChangeKg == null
+            ? null
+            : remainingChangeKg / daysRemaining,
+        requiredWeeklyChangeKg:
+          direction === 'MAINTAIN' || daysRemaining == null || daysRemaining <= 0 || remainingChangeKg == null
+            ? null
+            : remainingChangeKg / (daysRemaining / 7),
+        status:
+          direction === 'MAINTAIN'
+            ? 'ON_TARGET'
+            : remainingChangeKg === 0
+              ? 'TARGET_REACHED'
+              : daysRemaining == null
+                ? 'NO_TARGET_DATE'
+                : daysRemaining === 0
+                  ? 'DATE_REACHED'
+                  : 'PLANNING',
+      };
+
+      const { start: todayStart, end: todayEnd } = southAfricaDayBounds();
+      const todayJournal = await this.prisma.healthJournal.findFirst({
+        where: {
+          patientId,
+          createdAt: { gte: todayStart, lt: todayEnd },
+          title: 'Daily Health Check-in',
+        },
+        orderBy: { createdAt: 'desc' },
+        select: {
+          id: true,
+          sleepHours: true,
+          stressLevel: true,
+          exerciseMinutes: true,
+          waterIntakeMl: true,
+          mood: true,
+        },
+      });
+
+      const latestWeightAt = cleanedEvents.length
+        ? cleanedEvents[cleanedEvents.length - 1].at
+        : baselineKg != null
+          ? new Date(goal.createdAt)
+          : null;
+
+      const weightDataNeedsRefresh =
+        baselineKg == null ||
+        (latestWeightAt != null &&
+          now.getTime() - latestWeightAt.getTime() > 7 * 86400000);
+
+      const checkInNeedsCompletion = !todayJournal;
+
+      return {
+        goal: {
+          id: goal.id,
+          title: goal.title,
+          comparison,
+          targetValue: targetAmount,
+          unit: goal.unit,
+          targetDate: goal.targetDate,
+          priority: goal.priority,
+          status: goal.status,
+          createdAt: goal.createdAt,
+        },
+        profile: {
+          age,
+          gender,
+          heightCm,
+          currentWeightKg: latestKg,
+          currentBmi,
+          baselineWeightKg: baselineKg,
+          baselineBmi,
+          adultBmiApplicable: age == null || age >= 20,
+        },
+        weightPlan,
+        healthContext: {
+          connectedGoals: relatedGoals.map((relatedGoal) => ({
+            id: relatedGoal.id,
+            title: String(relatedGoal.title),
+            category: String(relatedGoal.category),
+            status: String(relatedGoal.status),
+            targetValue: relatedGoal.targetValue == null ? null : Number(relatedGoal.targetValue),
+            unit: relatedGoal.unit,
+            targetDate: relatedGoal.targetDate,
+          })),
+          activeConditions,
+          activeMedications,
+          medicalRecord: medicalRecord
+            ? {
+                chronicConditions: medicalRecord.chronicConditions,
+                currentMedications: medicalRecord.currentMedications,
+                pastMedicalHistory: medicalRecord.pastMedicalHistory,
+                familyHistory: medicalRecord.familyHistory,
+                socialHistory: medicalRecord.socialHistory,
+              }
+            : null,
+        },
+        weight: {
+          latestKg,
+          average7dKg,
+          average30dKg,
+          changeKg: baselineKg != null && latestKg != null ? latestKg - baselineKg : null,
+          percentChange:
+            baselineKg != null && latestKg != null && baselineKg !== 0
+              ? ((latestKg - baselineKg) / baselineKg) * 100
+              : null,
+          trendKgPerWeek,
+          dataPoints: cleanedEvents.length,
+          maintenanceBand,
+          withinMaintenanceBand,
+          targetWeightKg,
+          requestedChangeKg,
+          targetBmi,
+          targetBmiStatus,
+          targetNeedsReview,
+          lowerScreeningWeightKg,
+          upperScreeningWeightKg,
+          status,
+        },
+        checkIn: {
+          dataPoints: journals.length,
+          averageSleepHours: average(numericValues.sleep),
+          averageStress: average(numericValues.stress),
+          averageExerciseMinutes: average(numericValues.exercise),
+          averageWaterIntakeMl: average(numericValues.water),
+        },
+        clinicalContext: {
+          activeMedicationCount: activeMedications.length,
+          activeConditionCount: activeConditions.length,
+          recentSymptomCount: 0,
+          symptomsDataAvailable: false,
+        },
+        relationships: relatedGoals.map((relatedGoal) => ({
+          id: `derived-${relatedGoal.id}`,
+          direction: 'relatedToThisGoal',
+          relationshipType:
+            ['EXERCISE', 'NUTRITION', 'SLEEP'].includes(String(relatedGoal.category).toUpperCase())
+              ? 'SUPPORTS'
+              : 'RELATED_TO',
+          rationale: 'Derived from the patient’s current active goal set; no legacy relation table is required.',
+          goal: {
+            id: relatedGoal.id,
+            title: String(relatedGoal.title),
+            category: String(relatedGoal.category),
+            status: String(relatedGoal.status),
+            targetValue: relatedGoal.targetValue == null ? null : Number(relatedGoal.targetValue),
+            unit: relatedGoal.unit,
+            targetDate: relatedGoal.targetDate,
+          },
+        })),
+        recommendedSupportingGoals,
+        targetedSupportiveGoals: recommendedSupportingGoals,
+        supportiveGoals: recommendedSupportingGoals,
+        todayFocus: {
+          actions: recommendedSupportingGoals.slice(0, 3).map((recommendation) => ({
+            id: recommendation.id,
+            label: recommendation.title,
+            description: recommendation.rationale,
+            href: recommendation.existingGoalId
+              ? `/health-goals#goal-${encodeURIComponent(recommendation.existingGoalId)}`
+              : '/health-goals',
+            priority: recommendation.existingGoalId ? 'SUPPORTING' : 'PRIMARY',
+          })),
+          dataFreshness: {
+            weightDataNeedsRefresh,
+            checkInNeedsCompletion,
+            latestWeightAt,
+          },
+        },
+      };
     } catch (error: unknown) {
       if (error instanceof NotFoundException) throw error;
+
       const message = error instanceof Error ? error.message : String(error);
-      console.error('❌ WEIGHT INTELLIGENCE SYSTEM CRASH REPAIRED:', message);
+      console.error('❌ WEIGHT INTELLIGENCE PIPELINE RECOVERED:', message);
+
       return {
         success: false,
         statusCode: 500,
         intelligence: {
           currentTrend: 'UNKNOWN',
           bmiNow: 0,
-          guidanceText:
-            'Weight metrics undergoing background system synchronization.',
+          guidanceText: 'Weight intelligence is temporarily using safe fallback data.',
+          recommendedSupportingGoals: [],
+          targetedSupportiveGoals: [],
+          supportiveGoals: [],
         },
       };
     }
   }
-}
