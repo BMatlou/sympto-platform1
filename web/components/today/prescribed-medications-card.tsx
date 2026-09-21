@@ -36,7 +36,7 @@ export default function PrescribedMedicationsCard({
   const router = useRouter();
 
   const handleAction = (medication: PrescribedMedication, hasGoal: boolean) => {
-    const patientMedicationId = medication.patientMedicationId || medication.patientMedication?.id || null;
+    const patientMedicationId = getPatientMedicationId(medication);
     const medicationId = medication.medicationId || medication.medication?.id || null;
 
     if (hasGoal) {
