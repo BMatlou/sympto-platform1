@@ -55,7 +55,12 @@ function goalMedicationName(goal: HealthGoal) {
 }
 
 function getPatientMedicationId(medication: PrescribedMedication) {
-  return medication.patientMedicationId || medication.patientMedication?.id || medication.id || null;
+  const source = String(medication.source ?? "").trim().toUpperCase();
+  const syntheticPrescriptionId = String(medication.id ?? "").startsWith("prescription-item-");
+  return medication.patientMedicationId ||
+    medication.patientMedication?.id ||
+    (source !== "PRESCRIPTION" && !syntheticPrescriptionId ? medication.id : null) ||
+    null;
 }
 
 export default function PrescribedMedicationsCard({
@@ -68,15 +73,14 @@ export default function PrescribedMedicationsCard({
   const router = useRouter();
 
   const handleAction = (medication: PrescribedMedication, goal: HealthGoal | null) => {
-    const patientMedicationId = medication.patientMedicationId || medication.patientMedication?.id || null;
+    const patientMedicationId = getPatientMedicationId(medication);
     const medicationId = medication.medicationId || medication.medication?.id || null;
+    const resolvedGoalId = goal?.id ?? medication.healthGoalId ?? null;
 
-    if (goal) {
-      const targetMedicationId = goalPatientMedicationId(goal) ?? patientMedicationId;
-      if (!targetMedicationId) return;
-      const target = document.getElementById(`medication-adherence-card-${String(targetMedicationId)}`);
+    if (resolvedGoalId) {
+      const target = document.getElementById(`health-goal-card-${String(resolvedGoalId)}`);
       if (target) target.scrollIntoView({ behavior: "smooth", block: "center" });
-      else window.location.hash = `medication-adherence-card-${encodeURIComponent(String(targetMedicationId))}`;
+      else window.location.hash = `health-goal-card-${encodeURIComponent(String(resolvedGoalId))}`;
       return;
     }
 
@@ -169,6 +173,9 @@ export default function PrescribedMedicationsCard({
               return linkedGoalName === "manage medication" && prescriptionsList.length === 1;
             });
 
+            const resolvedGoalId = medicationGoalForThisMed?.id ?? medication.healthGoalId ?? null;
+            const hasMedicationGoal = Boolean(resolvedGoalId);
+
             return (
               <div
                 key={String(medication.id ?? medication.patientMedicationId ?? medication.name)}
@@ -185,15 +192,15 @@ export default function PrescribedMedicationsCard({
                   <span className="text-xs font-medium text-slate-500">Today</span>
                   <button
                     type="button"
-                    onClick={() => handleAction(medication, medicationGoalForThisMed)}
+                    onClick={() => handleAction(medication, medicationGoalForThisMed ?? (resolvedGoalId ? { id: String(resolvedGoalId) } : null))}
                     className={
-                      medicationGoalForThisMed
+                      hasMedicationGoal
                         ? "inline-flex items-center gap-1.5 rounded-lg px-3 py-2 text-xs font-semibold text-emerald-700 transition-all duration-200 hover:bg-emerald-50 hover:text-emerald-800"
                         : "inline-flex items-center gap-1.5 rounded-lg bg-slate-800 px-3 py-2 text-xs font-semibold text-white transition-all duration-200 hover:bg-slate-700"
                     }
                   >
-                    {medicationGoalForThisMed ? <Target className="h-3.5 w-3.5" /> : null}
-                    {medicationGoalForThisMed ? "View Goal" : "Set medication goal"}
+                    {hasMedicationGoal ? <Target className="h-3.5 w-3.5" /> : null}
+                    {hasMedicationGoal ? "View Goal" : "Set medication goal"}
                   </button>
                 </div>
               </div>
