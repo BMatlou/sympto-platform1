@@ -338,7 +338,7 @@ export default function HealthRecordsPage() {
           )}
         </div>
       </main>
-      {selected && <ReportModal document={selected} onClose={closePreview} />}
+      {selected && <ReportModal record={selected} onClose={closePreview} />}
     </ProtectedRoute>
   );
 }
