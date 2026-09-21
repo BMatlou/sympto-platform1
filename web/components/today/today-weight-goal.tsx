@@ -107,6 +107,11 @@ export default function TodayWeightGoal({ goal, fallbackWeight }: Props) {
   const journey = useMemo(() => journeyFor(goal), [goal]);
   const comparison = String(goal?.metricConfig?.comparison ?? goal?.comparison ?? intelligence?.goal?.comparison ?? "CLOSEST").toUpperCase();
   const isMaintenanceGoal = comparison === "CLOSEST";
+  const weightGoalLabel = isMaintenanceGoal
+    ? "Maintain weight goal"
+    : comparison === "INCREASE_TO"
+      ? "Gain weight goal"
+      : "Lose weight goal";
   const configuredTarget = numberValue(goal?.metricConfig?.frequencyTarget ?? goal?.targetValue);
   const fallback = numberValue(fallbackWeight);
   const patientWeight = numberValue(goal?.patient?.weightKg);
@@ -311,7 +316,7 @@ export default function TodayWeightGoal({ goal, fallbackWeight }: Props) {
           <span className="grid h-10 w-10 shrink-0 place-items-center rounded-[14px] bg-[#e8f8f7] text-[#0b7b80] ring-1 ring-[#d8efed]"><Scale className="h-4 w-4" /></span>
           <div className="min-w-0">
             <p className="truncate text-base font-black tracking-[-.035em] text-[#0b2d54]">{String(goal?.title ?? "Weight")}</p>
-            <p className="mt-0.5 text-[10px] font-bold uppercase tracking-[.14em] text-[#84969e]">Weight goal</p>
+            <p className="mt-0.5 text-[10px] font-bold uppercase tracking-[.14em] text-[#84969e]">{weightGoalLabel}</p>
           </div>
         </div>
         <span className={`shrink-0 rounded-full px-3 py-1.5 text-[10px] font-black ${goalCompleted ? "bg-[#eaf8ef] text-[#168660]" : goalNeedsReview ? "bg-[#fff6e5] text-[#a26204]" : targetReached ? "bg-[#eaf8ef] text-[#168660]" : onTrack ? "bg-[#e8f8f7] text-[#0b7b80]" : "bg-[#fff6e5] text-[#a26204]"}`}>{statusLabel}</span>
