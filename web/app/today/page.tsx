@@ -357,7 +357,7 @@ export default function TodayPage() {
             {medicationGoalCardsForToday.map((item: any) => item.medication ? <TodayMedicationActions key={`medication-goal-${String(item.goal?.id ?? patientMedicationId(item.medication) ?? "unassigned")}`} medications={[item.medication]} goal={item.goal} onUpdated={reload} /> : null)}
             {smokingGoal ? <TodaySmokingGoal goal={smokingGoal} onUpdated={reload} /> : null}
             {alcoholGoal ? <TodayAlcoholGoal goal={alcoholGoal} onUpdated={reload} /> : null}
-            {weightGoal ? <TodayWeightGoal goal={weightGoal} /> : null}
+            {weightGoal ? <TodayWeightGoal goal={weightGoal} bmi={bmi} heightCm={heightCm} weightKg={weightKg} /> : null}
             {exerciseGoal ? <TodayExerciseGoal goal={exerciseGoal} /> : null}
           </div>}
           {otherTodayGoals.length > 0 && <section className="mt-7 rounded-[27px] border border-[#e5edef] bg-[#f8fbfb] p-5 sm:p-6">
