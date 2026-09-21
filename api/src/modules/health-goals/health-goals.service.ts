@@ -1,4 +1,4 @@
-import { BadRequestException, Injectable, InternalServerErrorException, NotFoundException } from '@nestjs/common';
+import { BadRequestException, ConflictException, Injectable, InternalServerErrorException, NotFoundException } from '@nestjs/common';
 import { Prisma, HealthGoalProgressStatus } from '@prisma/client';
 import { PrismaService } from '../../database/prisma.service';
 import { CreateHealthGoalDto } from './dto/create-health-goal.dto';
@@ -36,7 +36,7 @@ export class HealthGoalsService {
     if (existing.length) { eventId = String(existing[0].id); await this.prisma.$executeRaw`UPDATE "HealthGoalMetricEvent" SET "metricType" = ${metricType}, "metricKey" = ${metricKey}, "loggedValue" = ${loggedValue}, "occurredAt" = ${occurredAt}, "metadata" = ${payload?.metadata ? JSON.stringify(payload.metadata) : null}::jsonb WHERE "id" = ${eventId}::uuid`; }
     else { const inserted = await this.prisma.$queryRaw<Array<{ id: string }>>`INSERT INTO "HealthGoalMetricEvent" ("id", "patientId", "metricType", "metricKey", "loggedValue", "occurredAt", "source", "sourceId", "metadata") VALUES (gen_random_uuid(), ${patient.id}, ${metricType}, ${metricKey}, ${loggedValue}, ${occurredAt}, ${source}, ${sourceId}, ${payload?.metadata ? JSON.stringify(payload.metadata) : null}::jsonb) RETURNING "id"`; eventId = String(inserted[0].id); }
     await this.healthGoalIntelligence.recomputeMetric(patient.id, metricType, metricKey, occurredAt);
-    const affectedGoals = await this.prisma.$queryRaw<Array<{ id: string; title: string; status: string }>>`SELECT DISTINCT hg."id", hg."title", hg."status"::text AS "status" FROM "HealthGoal" hg INNER JOIN "HealthGoalMetricConfig" hgm ON hgm."healthGoalId" = hg."id" WHERE hg."patientId" = ${patient.id} AND UPPER(hg."status"::text) IN ('ACTIVE', 'IN_PROGRESS') AND UPPER(hgm."metricType") = ${metricType} AND hgm."metricKey" = ${metricKey}`;
+    const affectedGoals = await this.prisma.$queryRaw<Array<{ id: string; title: string; status: string }>>`SELECT DISTINCT hg."id", hg."title", hg."status"::text AS "status" FROM "HealthGoal" hg INNER JOIN "HealthGoalMetricConfig" hgm ON hgm."healthGoalId" = hg."id" WHERE hg."patientId" = ${patient.id} AND UPPER(hg."status"::text) IN ('ACTIVE', 'ON_HOLD') AND UPPER(hgm."metricType") = ${metricType} AND hgm."metricKey" = ${metricKey}`;
     return { success: true, eventId, affectedGoals };
   }
 
@@ -151,6 +151,42 @@ export class HealthGoalsService {
     }
   }
 
+  private async assertNoDuplicateGoal(
+    patientId: string,
+    category: string,
+    patientMedicationId?: string | null,
+    excludeGoalId?: string,
+  ) {
+    const normalizedCategory = String(category ?? '').toUpperCase();
+    if (!patientId || !normalizedCategory) return;
+
+    const where: any = {
+      patientId,
+      category: normalizedCategory,
+      status: { in: ['ACTIVE', 'ON_HOLD'] },
+      ...(excludeGoalId ? { NOT: { id: excludeGoalId } } : {}),
+    };
+
+    if (normalizedCategory === 'MEDICATION') {
+      if (!patientMedicationId) {
+        throw new BadRequestException('A medication goal must be linked to a prescribed medication.');
+      }
+      where.patientMedicationId = patientMedicationId;
+    }
+
+    const existing = await this.prisma.healthGoal.findFirst({
+      where,
+      select: { id: true, title: true, category: true, patientMedicationId: true },
+    });
+
+    if (!existing) return;
+
+    const label = normalizedCategory === 'MEDICATION' ? 'for the selected medication' : 'in this category';
+    throw new ConflictException(
+      `You already have an active ${normalizedCategory.toLowerCase().replaceAll('_', ' ')} goal ${label}. Edit the existing goal instead of creating a duplicate.`,
+    );
+  }
+
   private async assertWeightTargetDirection(patientId: string, targetValue: unknown, comparison: unknown) {
     const direction = String(comparison ?? '').toUpperCase();
     if (direction !== 'INCREASE_TO' && direction !== 'DECREASE_TO') return;
@@ -185,19 +221,7 @@ export class HealthGoalsService {
     const isMedicationGoal = category === 'MEDICATION';
     if (patientMedicationId && !isMedicationGoal) throw new BadRequestException('A medication can only be attached to a medication goal.');
     await this.assertPatientMedicationBelongsToPatient(patientMedicationId, String(goalData.patientId));
-    if (isMedicationGoal && patientMedicationId) {
-      const existingMedicationGoal = await this.prisma.$queryRaw<Array<{ id: string }>>`
-        SELECT "id"
-        FROM "HealthGoal"
-        WHERE "patientMedicationId" = ${patientMedicationId}
-          AND "patientId" = ${goalData.patientId}
-          AND "category" = 'MEDICATION'
-          AND "status" IN ('ACTIVE', 'IN_PROGRESS', 'ON_TRACK', 'IMPROVING', 'STAGNANT', 'DECLINING')
-        ORDER BY "createdAt" DESC
-        LIMIT 1
-      `;
-      if (existingMedicationGoal.length) return this.findOne(existingMedicationGoal[0].id);
-    }
+    await this.assertNoDuplicateGoal(String(goalData.patientId), category, patientMedicationId ?? null);
     const targetValue = goalData.targetValue ?? (isMedicationGoal ? String(DEFAULT_MEDICATION_TARGET) : undefined);
     const unit = goalData.unit ?? (isMedicationGoal ? '%' : undefined);
     this.assertGoalDefinition(category, targetValue, goalData.targetDate);
@@ -321,6 +345,9 @@ export class HealthGoalsService {
       await this.assertWeightTargetDirection(String(existing.patientId), goalData.targetValue ?? existing.targetValue, effectiveComparison);
     }
     const metricComparison = revisingWeightGoal ? effectiveComparison : comparison;
+    if (isMedicationGoal && patientMedicationId !== undefined) {
+      await this.assertNoDuplicateGoal(String(existing.patientId), targetCategory, patientMedicationId ?? null, id);
+    }
     const updateData: any = {
       ...goalData,
       ...(isMedicationGoal && goalData.targetValue == null ? { targetValue: String(DEFAULT_MEDICATION_TARGET) } : {}),
@@ -440,5 +467,10 @@ export class HealthGoalsService {
       });
     });
   }
-  async remove(id: string) { await this.findOne(id); await this.prisma.healthGoal.delete({ where: { id } }); return { message: 'Health goal deleted successfully.' }; }
+  async remove(id: string) {
+    const goal = await this.prisma.healthGoal.findUnique({ where: { id }, select: { id: true } });
+    if (!goal) throw new NotFoundException('Health goal not found.');
+    await this.prisma.healthGoal.delete({ where: { id } });
+    return { message: 'Health goal deleted successfully.' };
+  }
 }
