@@ -406,6 +406,19 @@ export class HealthHomeService {
       };
     });
     const goalsWithRelationships = await this.healthGoalIntelligence.attachRelationships(goalsWithMedicationAssociations as any[]);
+    // Re-apply the medication relation identifiers after relationship enrichment.
+    // Some relationship serializers return a reduced goal shape, so these
+    // database-backed identifiers must remain explicit in the Home payload.
+    const mappedGoals = goalsWithRelationships.map((goal: any) => {
+      const association = medicationAssociationByGoalId.get(String(goal?.id));
+      return {
+        ...goal,
+        patientMedicationId:
+          goal?.patientMedicationId ?? association?.patientMedicationId ?? null,
+        medicationId:
+          goal?.medicationId ?? association?.medicationId ?? null,
+      };
+    });
     const activeAllergies = allergies.filter((item) => item.status === 'ACTIVE' || !item.status);
     const activeConditions = conditions.filter((item) => item.status === 'ACTIVE' && !item.resolvedAt);
     const bloodType = patient.healthPassport?.bloodType ?? medicalRecord?.bloodType ?? null;
@@ -424,11 +437,11 @@ export class HealthHomeService {
       today: { notifications, upcomingAppointments: appointments.slice(0, 5), activeMedications: medicationsWithGoalLinks, activeMedicationCount: medicationsWithGoalLinks.length, activeGoalCount: goals.length },
       // Explicit, unwrapped goal collection for Today clients. This is the
       // canonical source for medication-goal button state.
-      activeGoalsArray: goalsWithRelationships.filter((goal: any) => {
+      activeGoalsArray: mappedGoals.filter((goal: any) => {
         const status = String(goal?.status ?? '').toUpperCase();
         return !['CANCELLED', 'DELETED', 'ARCHIVED', 'ACHIEVED', 'EXPIRED', 'ON_HOLD'].includes(status);
       }),
-      medications: medicationsWithGoalLinks, appointments, goals: goalsWithRelationships, healthGoals: goalsWithRelationships, family, allergies, conditions, immunizations, emergencyContacts: patient.emergencyContacts,
+      medications: medicationsWithGoalLinks, appointments, goals: mappedGoals, healthGoals: mappedGoals, family, allergies, conditions, immunizations, emergencyContacts: patient.emergencyContacts,
       wearables: { devices: devices.map((device) => ({ id: device.id, manufacturer: device.manufacturer, model: device.model, deviceType: device.deviceType, status: device.status, lastSyncAt: device.lastSyncAt, measurementCount: device._count.measurements })), latestMeasurements: journalSignals.signals },
       symptoms: symptomLogs, recentResults: { laboratory: labOrders, imaging: imagingStudies }, carePlans, encounters, prescriptions, attachments, clinicalVitals, patientInsurances, medicalRecord, journal: journalSignals, ai: { recentObservations: aiObservations }, settings: patient.healthJournalSettings, healthJournalSettings: patient.healthJournalSettings,
     };
