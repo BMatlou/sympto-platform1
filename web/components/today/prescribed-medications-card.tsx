@@ -129,6 +129,14 @@ export default function PrescribedMedicationsCard({
         <div className="space-y-3">
           {prescriptionsList.map((medication) => {
             // 🔍 Next-Gen Matching Predicate resolving repository-level schema drift
+            const directlyLinkedGoals = Array.isArray((medication as any).healthGoals)
+              ? (medication as any).healthGoals.filter((goal: any) => {
+                  const status = String(goal?.status ?? "").toUpperCase();
+                  return goal?.id && !["ARCHIVED", "CANCELLED", "DELETED"].includes(status);
+                })
+              : [];
+            const directHealthGoalId = medication.healthGoalId ?? directlyLinkedGoals[0]?.id ?? null;
+
             const medicationGoalForThisMed = activeGoalsArray.find((goal: HealthGoal) => {
               if (!goal) return false;
               const status = String(goal.status ?? "").toUpperCase();
@@ -182,7 +190,7 @@ export default function PrescribedMedicationsCard({
               return linkedGoalName === "manage medication" && prescriptionsList.length === 1;
             });
 
-            const resolvedGoalId = medicationGoalForThisMed?.id ?? medication.healthGoalId ?? null;
+            const resolvedGoalId = medicationGoalForThisMed?.id ?? directHealthGoalId ?? null;
             const hasMedicationGoal = Boolean(resolvedGoalId);
 
             return (
