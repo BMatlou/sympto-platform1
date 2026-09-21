@@ -149,6 +149,8 @@ export default function PrescribedMedicationsCard({
             const medicationGoalForThisMed = activeGoalsArray.find((goal: HealthGoal) => {
               if (!goal) return false;
 
+              console.log("[TODAY DIAGNOSTIC] EXAMINING CANDIDATE GOAL OBJECT:", JSON.stringify(goal, null, 2));
+
               const status = String(goal.status ?? "").toUpperCase();
               if (["ARCHIVED", "CANCELLED", "DELETED"].includes(status)) return false;
 
@@ -238,6 +240,31 @@ export default function PrescribedMedicationsCard({
                 return true;
               }
 
+              // Final safety baseline: when the backend has explicitly supplied a
+              // single active MEDICATION goal, it is unambiguous which goal belongs
+              // to this medication row even if legacy relational keys are absent.
+              const goalTitleLower = String(goal?.title ?? "").toLowerCase();
+              const medNameLower = String(medication.name ?? medication.medication?.name ?? "").toLowerCase().trim();
+              const forceCategoryMatch =
+                category === "MEDICATION" &&
+                (
+                  activeGoalsArray.length === 1 ||
+                  (medNameLower !== "" && goalTitleLower.includes(medNameLower)) ||
+                  (goalTitleLower !== "" && medNameLower.includes(goalTitleLower))
+                );
+
+              if (forceCategoryMatch) {
+                console.log("[TODAY DIAGNOSTIC] FORCE MATCH VIA CATEGORY/TITLE FALLBACK", {
+                  medication: medication.name,
+                  goalId: goal.id,
+                  category,
+                  goalTitleLower,
+                  medNameLower,
+                  activeGoalsArrayLength: activeGoalsArray.length,
+                });
+                return true;
+              }
+
               console.log("[TODAY DIAGNOSTIC] NO MATCH for candidate goal", {
                 medication: medication.name,
                 currentPatientMedicationId,
@@ -246,6 +273,8 @@ export default function PrescribedMedicationsCard({
                 linkedCatalogMedicationId,
                 currentNormName,
                 goalNormName,
+                goalTitleLower,
+                medNameLower,
                 goalId: goal.id,
               });
               return false;
