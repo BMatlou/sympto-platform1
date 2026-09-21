@@ -175,7 +175,9 @@ export default function TodayMedicationActions({ medications, goal: suppliedGoal
   }
 
   const { journeyDay, daysLeft } = journeyProgress(finalGoal);
-  const medicationAnchorId = medicationId ? `medication-adherence-card-${String(medicationId)}` : null;
+  const medicationCardAnchorId = medicationAnchorId
+    ? `medication-adherence-card-${String(medicationAnchorId)}`
+    : null;
   const ringSize = 96;
   const ringStroke = 9;
   const radius = (ringSize - ringStroke) / 2;
