@@ -658,58 +658,18 @@ export class PatientHealthGoalsController {
   async remove(@Param('id') id: string, @Req() request: AuthenticatedRequest) {
     const goal = await this.assertOwnGoal(id, this.userId(request));
 
+    // Keep the proven hard-delete flow used when patient goal deletion was
+    // originally working. HealthGoalRelation is intentionally not touched
+    // here because its foreign keys cascade when the goal is removed.
     await this.prisma.$transaction(async (tx) => {
-      // Do not depend on optional/repair-created tables being present in the
-      // deployment. Older environments can have HealthGoal without the
-      // contextual metric tables yet. We also remove relation rows explicitly
-      // so a stale/non-cascading constraint cannot block the goal deletion.
-      const relationTable = await tx.$queryRaw<Array<{ exists: boolean }>>`
-        SELECT to_regclass('"HealthGoalRelation"') IS NOT NULL AS "exists"
-      `;
-      if (relationTable[0]?.exists) {
-        await tx.$executeRaw`
-          DELETE FROM "HealthGoalRelation"
-          WHERE "sourceGoalId" = ${goal.id}
-             OR "targetGoalId" = ${goal.id}
-        `;
-      }
-
-      const metricConfigTable = await tx.$queryRaw<Array<{ exists: boolean }>>`
-        SELECT to_regclass('"HealthGoalMetricConfig"') IS NOT NULL AS "exists"
-      `;
-      if (metricConfigTable[0]?.exists) {
-        await tx.$executeRaw`
-          DELETE FROM "HealthGoalMetricConfig"
-          WHERE "healthGoalId" = ${goal.id}
-        `;
-      }
-
-      const metricEventTable = await tx.$queryRaw<Array<{ exists: boolean }>>`
-        SELECT to_regclass('"HealthGoalMetricEvent"') IS NOT NULL AS "exists"
-      `;
-      if (metricEventTable[0]?.exists) {
-        // Goal-baseline events belong to the goal itself. Other metric events
-        // are kept because they are part of the patient's longitudinal record.
-        await tx.$executeRaw`
-          DELETE FROM "HealthGoalMetricEvent"
-          WHERE "patientId" = ${goal.patientId}
-            AND "source" = 'goal-baseline'
-            AND "sourceId" = ${goal.id}
-        `;
-      }
-
-      // HealthGoalProgress is a real Prisma relation with ON DELETE CASCADE,
-      // but deleting these rows explicitly also supports older databases that
-      // predate the cascade constraint.
       await tx.healthGoalProgress.deleteMany({
         where: { healthGoalId: goal.id },
       });
-
+      await tx.$executeRaw`DELETE FROM "HealthGoalMetricConfig" WHERE "healthGoalId" = ${goal.id}`;
+      await tx.$executeRaw`DELETE FROM "HealthGoalMetricEvent" WHERE "patientId" = ${goal.patientId} AND "source" = 'goal-baseline' AND "sourceId" = ${goal.id}`;
       await tx.healthGoal.delete({
         where: { id: goal.id },
       });
     });
 
-    return { message: 'Health goal deleted successfully.' };
-  }
-}
+    return { message: 'Health goal deleted successfully.' };}
