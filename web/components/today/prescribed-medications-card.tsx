@@ -73,14 +73,23 @@ export default function PrescribedMedicationsCard({
   const router = useRouter();
 
   const handleAction = (medication: PrescribedMedication, goal: HealthGoal | null) => {
-    const patientMedicationId = getPatientMedicationId(medication);
+    const patientMedicationId = getPatientMedicationId(medication) || goalPatientMedicationId(goal as HealthGoal);
     const medicationId = medication.medicationId || medication.medication?.id || null;
     const resolvedGoalId = goal?.id ?? medication.healthGoalId ?? null;
 
+    if (patientMedicationId && resolvedGoalId) {
+      const targetId = `medication-adherence-card-${String(patientMedicationId)}`;
+      const target = document.getElementById(targetId);
+      if (target) {
+        target.scrollIntoView({ behavior: "smooth", block: "center" });
+      } else {
+        window.location.hash = encodeURI(`#${targetId}`);
+      }
+      return;
+    }
+
     if (resolvedGoalId) {
-      const target = document.getElementById(`health-goal-card-${String(resolvedGoalId)}`);
-      if (target) target.scrollIntoView({ behavior: "smooth", block: "center" });
-      else window.location.hash = `health-goal-card-${encodeURIComponent(String(resolvedGoalId))}`;
+      router.push(`/health-goals#goal-${encodeURIComponent(String(resolvedGoalId))}`);
       return;
     }
 
