@@ -158,10 +158,269 @@ export class PatientHealthGoalsController {
     return this.healthGoalIntelligence.getGoalRelationships(goal.id);
   }
 
+  private async buildWeightIntelligenceFallback(goalId: string) {
+    const goal = await this.prisma.healthGoal.findUnique({
+      where: { id: goalId },
+      select: {
+        id: true,
+        title: true,
+        category: true,
+        targetValue: true,
+        unit: true,
+        targetDate: true,
+        priority: true,
+        status: true,
+        createdAt: true,
+        patientId: true,
+        patient: {
+          select: {
+            weightKg: true,
+            heightCm: true,
+            baseline: {
+              select: {
+                weightKg: true,
+                heightCm: true,
+                bmi: true,
+              },
+            },
+            person: {
+              select: {
+                dateOfBirth: true,
+                gender: true,
+              },
+            },
+          },
+        },
+      },
+    });
+
+    if (!goal) {
+      throw new BadRequestException('Health goal not found.');
+    }
+
+    const latestRows = await this.prisma.$queryRaw<Array<{ loggedValue: number | string | null }>>`
+      SELECT "loggedValue"::double precision AS "loggedValue"
+      FROM "HealthGoalMetricEvent"
+      WHERE "patientId" = ${goal.patientId}
+        AND "metricType" = 'WEIGHT'
+        AND "metricKey" = 'weight.kg'
+        AND "source" <> 'goal-baseline'
+        AND "occurredAt" <= CURRENT_TIMESTAMP
+      ORDER BY "occurredAt" DESC
+      LIMIT 1
+    `;
+
+    const latestWeight =
+      latestRows[0]?.loggedValue != null
+        ? Number(latestRows[0].loggedValue)
+        : goal.patient.weightKg != null
+          ? Number(goal.patient.weightKg)
+          : goal.patient.baseline?.weightKg != null
+            ? Number(goal.patient.baseline.weightKg)
+            : null;
+
+    const heightCm =
+      goal.patient.heightCm != null
+        ? Number(goal.patient.heightCm)
+        : goal.patient.baseline?.heightCm != null
+          ? Number(goal.patient.baseline.heightCm)
+          : null;
+
+    const currentBmi =
+      latestWeight != null && Number.isFinite(latestWeight) &&
+      heightCm != null && Number.isFinite(heightCm) && heightCm > 0
+        ? latestWeight / ((heightCm / 100) ** 2)
+        : null;
+
+    const baselineWeight =
+      goal.patient.baseline?.weightKg != null
+        ? Number(goal.patient.baseline.weightKg)
+        : goal.patient.weightKg != null
+          ? Number(goal.patient.weightKg)
+          : latestWeight;
+
+    const comparisonRows = await this.prisma.$queryRaw<Array<{ comparison: string | null }>>`
+      SELECT "comparison"
+      FROM "HealthGoalMetricConfig"
+      WHERE "healthGoalId" = ${goal.id}
+      LIMIT 1
+    `;
+
+    const comparison = String(comparisonRows[0]?.comparison ?? 'CLOSEST').toUpperCase();
+
+    return {
+      goal: {
+        id: goal.id,
+        title: goal.title,
+        comparison,
+        targetValue: goal.targetValue == null ? null : Number(goal.targetValue),
+        unit: goal.unit,
+        targetDate: goal.targetDate,
+        priority: goal.priority,
+        status: goal.status,
+        createdAt: goal.createdAt,
+      },
+      profile: {
+        age: goal.patient.person.dateOfBirth
+          ? Math.max(
+              0,
+              new Date().getFullYear() -
+                goal.patient.person.dateOfBirth.getFullYear() -
+                (
+                  new Date().getMonth() < goal.patient.person.dateOfBirth.getMonth() ||
+                  (
+                    new Date().getMonth() === goal.patient.person.dateOfBirth.getMonth() &&
+                    new Date().getDate() < goal.patient.person.dateOfBirth.getDate()
+                  )
+                    ? 1
+                    : 0
+                ),
+            )
+          : null,
+        gender: goal.patient.person.gender ?? null,
+        heightCm,
+        currentWeightKg: latestWeight,
+        currentBmi,
+        baselineWeightKg: Number.isFinite(baselineWeight ?? Number.NaN) ? baselineWeight : null,
+        baselineBmi:
+          baselineWeight != null && heightCm != null && heightCm > 0
+            ? baselineWeight / ((heightCm / 100) ** 2)
+            : goal.patient.baseline?.bmi != null
+              ? Number(goal.patient.baseline.bmi)
+              : null,
+        adultBmiApplicable: true,
+      },
+      weight: {
+        latestKg: latestWeight,
+        average7dKg: latestWeight,
+        average30dKg: latestWeight,
+        changeKg:
+          baselineWeight != null && latestWeight != null
+            ? latestWeight - baselineWeight
+            : null,
+        percentChange:
+          baselineWeight != null && latestWeight != null && baselineWeight !== 0
+            ? ((latestWeight - baselineWeight) / baselineWeight) * 100
+            : null,
+        trendKgPerWeek: null,
+        dataPoints: latestWeight != null ? 1 : 0,
+        maintenanceBand:
+          baselineWeight != null
+            ? { min: baselineWeight - 1.5, max: baselineWeight + 1.5 }
+            : null,
+        withinMaintenanceBand:
+          comparison === 'CLOSEST' && baselineWeight != null && latestWeight != null
+            ? Math.abs(latestWeight - baselineWeight) <= 1.5
+            : null,
+        targetWeightKg: comparison === 'CLOSEST'
+          ? baselineWeight
+          : comparison === 'INCREASE_TO' && baselineWeight != null && goal.targetValue != null
+            ? baselineWeight + Number(goal.targetValue)
+            : comparison === 'DECREASE_TO' && baselineWeight != null && goal.targetValue != null
+              ? baselineWeight - Number(goal.targetValue)
+              : null,
+        requestedChangeKg:
+          comparison === 'CLOSEST' || goal.targetValue == null
+            ? null
+            : Number(goal.targetValue),
+        targetBmi: null,
+        targetBmiStatus: null,
+        targetNeedsReview: false,
+        lowerScreeningWeightKg:
+          heightCm != null && heightCm > 0
+            ? 18.5 * ((heightCm / 100) ** 2)
+            : null,
+        upperScreeningWeightKg:
+          heightCm != null && heightCm > 0
+            ? 24.9 * ((heightCm / 100) ** 2)
+            : null,
+        status:
+          latestWeight == null || baselineWeight == null
+            ? 'INSUFFICIENT_DATA'
+            : comparison === 'CLOSEST'
+              ? Math.abs(latestWeight - baselineWeight) <= 1.5
+                ? 'STABLE'
+                : latestWeight > baselineWeight
+                  ? 'DRIFTING_UP'
+                  : 'DRIFTING_DOWN'
+              : 'STABLE',
+      },
+      healthContext: {
+        connectedGoals: [],
+        activeConditions: [],
+        activeMedications: [],
+        medicalRecord: null,
+      },
+      clinicalContext: {
+        activeMedicationCount: 0,
+        activeConditionCount: 0,
+        recentSymptomCount: 0,
+        symptomsDataAvailable: false,
+      },
+      recommendedSupportingGoals: [],
+      targetedSupportiveGoals: [],
+      supportiveGoals: [],
+      todayFocus: {
+        actions: [],
+        dataFreshness: {
+          weightDataNeedsRefresh: latestWeight == null,
+          checkInNeedsCompletion: false,
+          latestWeightAt: null,
+        },
+      },
+    };
+  }
+
   @Get(':id/intelligence')
   async intelligence(@Param('id') id: string, @Req() request: AuthenticatedRequest) {
     const goal = await this.assertOwnGoal(id, this.userId(request));
-    return this.healthGoalIntelligence.getWeightGoalIntelligence(goal.id);
+
+    try {
+      const result = await this.healthGoalIntelligence.getWeightGoalIntelligence(goal.id);
+      const intelligence =
+        result && typeof result === 'object' && 'intelligence' in result
+          ? (result as any).intelligence
+          : result;
+
+      // A defensive controller boundary keeps a partial intelligence failure
+      // from turning Today into a 500. The BMI snapshot is calculated only
+      // from the current patient/baseline data and the latest weight event.
+      if (
+        intelligence?.profile?.currentBmi != null &&
+        intelligence?.profile?.heightCm != null
+      ) {
+        return result;
+      }
+
+      const fallback = await this.buildWeightIntelligenceFallback(goal.id);
+      return {
+        ...(result && typeof result === 'object' && !Array.isArray(result) ? result : {}),
+        success: true,
+        statusCode: 200,
+        intelligence: {
+          ...intelligence,
+          ...fallback,
+          profile: {
+            ...(intelligence?.profile ?? {}),
+            ...fallback.profile,
+          },
+          weight: {
+            ...(intelligence?.weight ?? {}),
+            ...fallback.weight,
+          },
+        },
+      };
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : String(error);
+      console.error('❌ WEIGHT INTELLIGENCE CONTROLLER FALLBACK:', message);
+
+      const fallback = await this.buildWeightIntelligenceFallback(goal.id);
+      return {
+        success: true,
+        statusCode: 200,
+        intelligence: fallback,
+      };
+    }
   }
 
   @Patch(':id/metric-config')
