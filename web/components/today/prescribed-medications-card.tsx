@@ -27,7 +27,7 @@ function normalise(value: unknown) {
   return String(value ?? "").trim().toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
 }
 
-function goalPatientMedicationId(goal: HealthGoal) {
+function goalPatientMedicationId(goal: HealthGoal | null | undefined) {
   return goal.patientMedicationId ??
     goal.patientMedication?.id ??
     goal.associatedPatientMedicationId ??
@@ -35,7 +35,7 @@ function goalPatientMedicationId(goal: HealthGoal) {
     null;
 }
 
-function goalCatalogMedicationId(goal: HealthGoal) {
+function goalCatalogMedicationId(goal: HealthGoal | null | undefined) {
   return goal.associatedMedicationId ??
     goal.medicationId ??
     goal.associatedMedication?.id ??
@@ -43,7 +43,7 @@ function goalCatalogMedicationId(goal: HealthGoal) {
     null;
 }
 
-function goalMedicationName(goal: HealthGoal) {
+function goalMedicationName(goal: HealthGoal | null | undefined) {
   return normalise(
     goal.medication?.name ??
     goal.medication?.genericName ??
@@ -73,7 +73,7 @@ export default function PrescribedMedicationsCard({
   const router = useRouter();
 
   const handleAction = (medication: PrescribedMedication, goal: HealthGoal | null) => {
-    const patientMedicationId = getPatientMedicationId(medication) || goalPatientMedicationId(goal as HealthGoal);
+    const patientMedicationId = getPatientMedicationId(medication) || goalPatientMedicationId(goal);
     const medicationId = medication.medicationId || medication.medication?.id || null;
     const resolvedGoalId = goal?.id ?? medication.healthGoalId ?? null;
 
