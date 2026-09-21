@@ -434,7 +434,7 @@ export class HealthGoalIntelligenceService {
       water: journals.map((j) => j.waterIntakeMl == null ? null : Number(j.waterIntakeMl)).filter((v): v is number => v != null && Number.isFinite(v)),
     };
 
-    let relationshipData: { relationships: RelationRow[] } = { relationships: [] };
+    let relationshipData: { relationships: any[] } = { relationships: [] };
     try {
       relationshipData = await this.getGoalRelationships(goal.id);
     } catch (relationshipError) {
@@ -760,6 +760,7 @@ export class HealthGoalIntelligenceService {
       },
     };
     } catch (error: unknown) {
+      if (error instanceof NotFoundException) throw error;
       const message = error instanceof Error ? error.message : String(error);
       console.error('❌ WEIGHT INTELLIGENCE SYSTEM CRASH REPAIRED:', message);
       return {
