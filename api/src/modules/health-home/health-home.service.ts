@@ -329,13 +329,13 @@ export class HealthHomeService {
       ...aiObservations.filter((o) => o.requiresAttention && !o.reviewed).map((o) => ({ type: 'AI_OBSERVATION', severity: 'HIGH', title: 'Sympto noticed something worth reviewing', description: o.observation, actionUrl: '/health-journal' })),
       ...labOrders.flatMap((order) => order.items.flatMap((item) => item.labResults.flatMap((result) => result.items.filter((ri) => ri.abnormal || ri.critical).map((ri) => ({ type: ri.critical ? 'CRITICAL_RESULT' : 'ABNORMAL_RESULT', severity: ri.critical ? 'URGENT' : 'HIGH', title: `${ri.test.name} result needs review`, description: ri.comments ?? 'A recent laboratory result is outside the expected range.', actionUrl: '/health-journal' }))))),
     ].slice(0, 10);
-    const medicationGoalLinks = await this.prisma.$queryRaw<Array<{ healthGoalId: string; patientMedicationId: string | null; medicationId: string | null }>>\`
+    const medicationGoalLinks = await this.prisma.$queryRaw<Array<{ healthGoalId: string; patientMedicationId: string | null; medicationId: string | null }>>`
       SELECT hg."id" AS "healthGoalId", hg."patientMedicationId", pm."medicationId"
       FROM "HealthGoal" hg
       LEFT JOIN "PatientMedication" pm ON pm."id" = hg."patientMedicationId"
       WHERE hg."patientId" = ${patientId}
         AND hg."category" = 'MEDICATION'
-        AND hg."status" = 'ACTIVE'
+        AND hg."status" IN ('ACTIVE', 'IN_PROGRESS', 'ON_TRACK', 'IMPROVING', 'STAGNANT', 'DECLINING')
       ORDER BY hg."createdAt" DESC
     `;
     const goalByPatientMedicationId = new Map<string, string>();
