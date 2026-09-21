@@ -80,21 +80,7 @@ export default function TodayWeightGoal({ goal, fallbackWeight }: Props) {
   const heightCm = Number(activeIntelligence?.profile?.heightCm || goal?.patient?.heightCm || goal?.heightCm || 187);
   const bmi = (currentWeight && heightCm) ? currentWeight / ((heightCm / 100) ** 2) : 19.6;
 
-  // 🚀 FIX: Use the live hydrated intelligence first, then fall back to the
-  // intelligence included on the initial goal prop. Do not redeclare the
-  // state variable "intelligence" in this scope.
-  const activeIntelligence = intelligence ?? goal?.intelligence ?? null;
 
-  const connectedMedications = activeIntelligence?.profile?.activeMedications ||
-    activeIntelligence?.medications ||
-    (goal?.patient?.medications ? [goal.patient.medications] : []);
-
-  const connectedConditions = activeIntelligence?.profile?.conditions ||
-    activeIntelligence?.conditions || [];
-
-  const supportiveRecommendations = activeIntelligence?.recommendations ||
-    activeIntelligence?.supportiveGoals ||
-    [];
 
   const journey = useMemo(() => {
     const start = new Date(String(goal?.createdAt || "2026-09-01"));
@@ -200,7 +186,7 @@ export default function TodayWeightGoal({ goal, fallbackWeight }: Props) {
       </div>
 
                   {/* 🚀 FIXED LOGICAL RENDERING GATE - USING ACTIVEINTELLIGENCE */}
-      {!loading && (activeIntelligence || connectedMedications.length > 0 || connectedConditions.length > 0 || supportiveRecommendations.length > 0 || true) && (
+      {!loading && (activeIntelligence || connectedMedications.length > 0 || connectedConditions.length > 0 || supportiveRecommendations.length > 0) && (
         <div className="mt-5 px-4 pb-5 sm:px-5 sm:pb-6">
           <div className="space-y-4 border-t border-slate-100 pt-4 text-left">
             <p className="text-[10px] font-black uppercase tracking-[.14em] text-slate-400">Connected Profile Context</p>
