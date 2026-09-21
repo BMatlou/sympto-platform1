@@ -247,10 +247,38 @@ export class HealthGoalsService {
         orderBy: { createdAt: 'desc' },
       });
 
+      // HealthGoalMetricConfig is intentionally hydrated here because the
+      // frontend must never guess a weight-goal direction. In particular,
+      // CLOSEST must remain MAINTAIN and must not silently become LOSE.
+      const data = await Promise.all(
+        healthGoalsList.map(async (goal: any) => {
+          const configRows = await this.prisma.$queryRaw<any[]>\`
+            SELECT
+              "id",
+              "healthGoalId",
+              "metricType",
+              "metricKey",
+              "frequency",
+              "frequencyTarget",
+              "aggregation",
+              "comparison",
+              "guidanceText"
+            FROM "HealthGoalMetricConfig"
+            WHERE "healthGoalId" = ${goal.id}
+            LIMIT 1
+          \`;
+
+          return {
+            ...goal,
+            metricConfig: configRows[0] ?? null,
+          };
+        }),
+      );
+
       return {
         success: true,
         statusCode: 200,
-        data: healthGoalsList,
+        data,
       };
     } catch (error: unknown) {
       const message = error instanceof Error ? error.message : String(error);
