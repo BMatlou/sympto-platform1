@@ -14,11 +14,6 @@ type HealthGoal = {
   associatedMedicationId?: string | null;
   medicationId?: string | null;
   medication?: { id?: string | null; name?: string | null } | null;
-  patientMedication?: { id?: string | null } | null;
-  associatedPatientMedicationId?: string | null;
-  associatedPatientMedication?: { id?: string | null } | null;
-  healthGoalId?: string | null;
-  medicationGoalId?: string | null;
   metricType?: string | null;
   metricConfig?: { metricType?: string | null; metricKey?: string | null } | null;
 };
@@ -28,115 +23,7 @@ function normalise(value: unknown) {
 }
 
 function getPatientMedicationId(medication: PrescribedMedication) {
-  const source = normalise(medication.source);
-  const syntheticPrescriptionId = String(medication.id ?? "").startsWith("prescription-item-");
-  return medication.patientMedicationId ||
-    medication.patientMedication?.id ||
-    (source !== "prescription" && !syntheticPrescriptionId ? medication.id : null) ||
-    null;
-}
-
-function findMedicationGoal(
-  medication: PrescribedMedication,
-  goals: HealthGoal[],
-  medicationCount: number,
-) {
-  const medicationPatientMedicationId = getPatientMedicationId(medication);
-  const medicationPatientId =
-    medicationPatientMedicationId &&
-    !String(medicationPatientMedicationId).startsWith("prescription-item-")
-      ? medicationPatientMedicationId
-      : null;
-  const medicationCatalogId =
-    medication.medicationId ??
-    medication.medication?.id ??
-    medication.medication?.medicationId ??
-    null;
-  const explicitMedicationGoalId = medication.healthGoalId ?? medication.medicationGoalId ?? null;
-  if (explicitMedicationGoalId) {
-    const explicitlyLinkedGoal = goals.find((goal) => {
-      if (!goal || String(goal.id ?? "") !== String(explicitMedicationGoalId)) return false;
-      const status = String(goal.status ?? "").toUpperCase();
-      return !["ARCHIVED", "CANCELLED", "DELETED", "ACHIEVED"].includes(status);
-    });
-    if (explicitlyLinkedGoal) return explicitlyLinkedGoal;
-  }
-
-  const medicationName = normalise(
-    medication.name ??
-    medication.medication?.name ??
-    medication.medication?.genericName ??
-    medication.medication?.brandName ??
-    "",
-  );
-
-  return goals.find((goal) => {
-    if (!goal) return false;
-
-    const status = String(goal.status ?? "").toUpperCase();
-    if (["ARCHIVED", "CANCELLED", "DELETED"].includes(status)) return false;
-
-    const linkedPatientMedicationId =
-      goal.patientMedicationId ??
-      (goal as any).patientMedication?.id ??
-      (goal as any).associatedPatientMedicationId ??
-      (goal as any).associatedPatientMedication?.id ??
-      null;
-
-    // The explicit patient-medication link is authoritative. This is the
-    // original Today behavior and must be checked before any category/name
-    // heuristics so a saved goal cannot fall back to "Set medication goal".
-    if (
-      linkedPatientMedicationId &&
-      medicationPatientMedicationId &&
-      String(linkedPatientMedicationId) === String(medicationPatientMedicationId)
-    ) {
-      return true;
-    }
-
-    const category = String(goal.category ?? "").toUpperCase();
-    const metricType = String(goal.metricType ?? goal.metricConfig?.metricType ?? "").toUpperCase();
-    const metricKey = String(goal.metricConfig?.metricKey ?? "").toLowerCase();
-    const isMedicationGoal =
-      category === "MEDICATION" ||
-      metricType === "MEDICATION" ||
-      metricKey === "medication.adherence";
-
-    if (!isMedicationGoal) return false;
-
-    // Prescription-only rows do not have a patientMedicationId. Resolve those
-    // against the catalog medication ID, then by the stored medication name.
-    const linkedMedicationId =
-      goal.associatedMedicationId ??
-      goal.medicationId ??
-      (goal as any).associatedMedication?.id ??
-      (goal as any).medication?.id ??
-      null;
-
-    if (linkedMedicationId && medicationCatalogId) {
-      if (String(linkedMedicationId) === String(medicationCatalogId)) return true;
-    }
-
-    const goalMedicationNames = [
-      (goal as any).medication?.name,
-      (goal as any).medication?.genericName,
-      (goal as any).medication?.brandName,
-      (goal as any).title,
-      (goal as any).description,
-    ].map(normalise).filter(Boolean);
-
-    if (medicationName) {
-      const matchesMedicationName = goalMedicationNames.some(
-        (candidate) =>
-          candidate === medicationName ||
-          candidate.includes(medicationName) ||
-          medicationName.includes(candidate),
-      );
-      if (matchesMedicationName) return true;
-    }
-
-    return normalise(goal.title) === "manage medication" && medicationCount === 1;
-  }) ?? null;
+  return medication.patientMedicationId || medication.patientMedication?.id || medication.id || null;
 }
 
 export default function PrescribedMedicationsCard({
@@ -148,38 +35,15 @@ export default function PrescribedMedicationsCard({
 }) {
   const router = useRouter();
 
-  const handleAction = (medication: PrescribedMedication, goal: HealthGoal | null) => {
-    const patientMedicationId =
-      goal?.patientMedicationId ||
-      goal?.patientMedication?.id ||
-      goal?.associatedPatientMedicationId ||
-      goal?.associatedPatientMedication?.id ||
-      getPatientMedicationId(medication) ||
-      null;
+  const handleAction = (medication: PrescribedMedication, hasGoal: boolean) => {
+    const patientMedicationId = medication.patientMedicationId || medication.patientMedication?.id || null;
     const medicationId = medication.medicationId || medication.medication?.id || null;
 
-    if (goal) {
-      if (patientMedicationId) {
-        const targetId = `medication-adherence-card-${String(patientMedicationId)}`;
-        const target = document.getElementById(targetId);
-        if (target) {
-          target.scrollIntoView({ behavior: "smooth", block: "center" });
-          return;
-        }
-        window.location.hash = `medication-adherence-card-${encodeURIComponent(String(patientMedicationId))}`;
-        return;
-      }
-
-      if (goal.id) {
-        const goalTarget =
-          document.getElementById(`health-goal-card-${String(goal.id)}`) ||
-          document.getElementById(`goal-${String(goal.id)}`);
-        if (goalTarget) {
-          goalTarget.scrollIntoView({ behavior: "smooth", block: "center" });
-          return;
-        }
-        window.location.hash = `goal-${encodeURIComponent(String(goal.id))}`;
-      }
+    if (hasGoal) {
+      if (!patientMedicationId) return;
+      const target = document.getElementById(`medication-adherence-card-${String(patientMedicationId)}`);
+      if (target) target.scrollIntoView({ behavior: "smooth", block: "center" });
+      else window.location.hash = `medication-adherence-card-${encodeURIComponent(String(patientMedicationId))}`;
       return;
     }
 
@@ -218,8 +82,24 @@ export default function PrescribedMedicationsCard({
       ) : (
         <div className="space-y-3">
           {prescriptionsList.map((medication) => {
-            const matchedGoal = findMedicationGoal(medication, activeGoalsArray, prescriptionsList.length);
-            const isGoalSetForThisMed = Boolean(matchedGoal);
+            // 🔍 Next-Gen Matching Predicate resolving repository-level schema drift
+            const isGoalSetForThisMed = activeGoalsArray.some((goal: any) => {
+              if (!goal || String(goal.status).toUpperCase() === "ARCHIVED") return false;
+
+              // 1. Target the canonical runtime field appended by the backend service
+              const targetMedicationId = medication.patientMedicationId ?? medication.id;
+              const matchesCanonicalId = goal.patientMedicationId === targetMedicationId;
+
+              if (matchesCanonicalId) return true;
+
+              // 2. Legacy fallback: a generic unlinked medication goal is only
+              // safe to match when there is exactly one active medication.
+              const isMedicationCategory = String(goal.metricType ?? "").toUpperCase() === "MEDICATION" || String(goal.category ?? "").toUpperCase() === "MEDICATION";
+              const isGenericTitle = normalise(goal.title) === "manage medication";
+              const activeMedicationCount = prescriptionsList.length;
+
+              return isMedicationCategory && isGenericTitle && activeMedicationCount === 1;
+            });
 
             return (
               <div
@@ -237,7 +117,7 @@ export default function PrescribedMedicationsCard({
                   <span className="text-xs font-medium text-slate-500">Today</span>
                   <button
                     type="button"
-                    onClick={() => handleAction(medication, matchedGoal)}
+                    onClick={() => handleAction(medication, isGoalSetForThisMed)}
                     className={
                       isGoalSetForThisMed
                         ? "inline-flex items-center gap-1.5 rounded-lg px-3 py-2 text-xs font-semibold text-emerald-700 transition-all duration-200 hover:bg-emerald-50 hover:text-emerald-800"
