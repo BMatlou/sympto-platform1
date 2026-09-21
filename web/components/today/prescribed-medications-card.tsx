@@ -240,27 +240,25 @@ export default function PrescribedMedicationsCard({
                 return true;
               }
 
-              // Final safety baseline: when the backend has explicitly supplied a
-              // single active MEDICATION goal, it is unambiguous which goal belongs
-              // to this medication row even if legacy relational keys are absent.
-              const goalTitleLower = String(goal?.title ?? "").toLowerCase();
-              const medNameLower = String(medication.name ?? medication.medication?.name ?? "").toLowerCase().trim();
-              const forceCategoryMatch =
-                category === "MEDICATION" &&
-                (
-                  activeGoalsArray.length === 1 ||
-                  (medNameLower !== "" && goalTitleLower.includes(medNameLower)) ||
-                  (goalTitleLower !== "" && medNameLower.includes(goalTitleLower))
-                );
+              // 🚀 REFINED FIX: Remove the length === 1 catch-all constraint
+              // Only link this goal when its title or description explicitly refers
+              // to the medication shown in this row.
+              const goalTitleLower = String(goal?.title || "").toLowerCase();
+              const goalDescLower = String(goal?.description || "").toLowerCase();
+              const medNameLower = String(medication.name || "").toLowerCase();
 
-              if (forceCategoryMatch) {
-                console.log("[TODAY DIAGNOSTIC] FORCE MATCH VIA CATEGORY/TITLE FALLBACK", {
-                  medication: medication.name,
+              const isNameMatch =
+                medNameLower !== "" &&
+                (goalTitleLower.includes(medNameLower) ||
+                  medNameLower.includes(goalTitleLower) ||
+                  goalDescLower.includes(medNameLower));
+
+              if (goal?.category === "MEDICATION" && isNameMatch) {
+                console.log(`[TODAY DIAGNOSTIC] TRUE TEXT MATCH MATCHED for ${medication.name}`, {
                   goalId: goal.id,
-                  category,
                   goalTitleLower,
+                  goalDescLower,
                   medNameLower,
-                  activeGoalsArrayLength: activeGoalsArray.length,
                 });
                 return true;
               }
