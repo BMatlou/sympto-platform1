@@ -1,4 +1,4 @@
-import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, Injectable, InternalServerErrorException, NotFoundException } from '@nestjs/common';
 import { Prisma, HealthGoalProgressStatus } from '@prisma/client';
 import { PrismaService } from '../../database/prisma.service';
 import { CreateHealthGoalDto } from './dto/create-health-goal.dto';
@@ -222,66 +222,74 @@ export class HealthGoalsService {
   }
 
   async findAll(query: QueryHealthGoalDto) {
-    const { page, limit, patientId, practitionerId, carePlanId, category, priority, status } = query;
-    const where: Prisma.HealthGoalWhereInput = { patientId, practitionerId, carePlanId, category, priority, status };
+    const {
+      page = 1,
+      limit = 50,
+      patientId,
+      practitionerId,
+      carePlanId,
+      category,
+      priority,
+      status,
+    } = query;
+
+    const where: Prisma.HealthGoalWhereInput = {
+      ...(patientId ? { patientId } : {}),
+      ...(practitionerId ? { practitionerId } : {}),
+      ...(carePlanId ? { carePlanId } : {}),
+      ...(category ? { category } : {}),
+      ...(priority ? { priority } : {}),
+      ...(status ? { status } : {}),
+    };
 
     try {
-      // Use only the active Prisma schema for GET /health-goals. patientMedicationId
-      // is nullable, so patientMedication is intentionally an optional relation.
-      // The legacy HealthGoalRelation raw-SQL synchronisation is not invoked here
-      // because its former patientId/sourceGoalId/etc. columns are no longer active.
-      const [data, total] = await this.prisma.$transaction([
+      // Keep GET /health-goals entirely on the canonical Prisma schema.
+      // patientMedicationId is nullable and therefore patientMedication is
+      // intentionally optional. There is no DELETED/INACTIVE HealthGoal enum
+      // value in the current schema, so do not issue a stale status filter.
+      const [healthGoalsList, total] = await this.prisma.$transaction([
         this.prisma.healthGoal.findMany({
           where,
           include: {
             patient: true,
             practitioner: true,
             carePlan: true,
-            patientMedication: { include: { medication: true } },
-            progress: { orderBy: { measuredAt: 'desc' }, take: 10 },
+            patientMedication: {
+              include: {
+                medication: true,
+              },
+            },
+            progress: {
+              orderBy: { createdAt: 'desc' },
+            },
           },
           orderBy: { createdAt: 'desc' },
-          skip: (page - 1) * limit,
+          skip: Math.max(0, (page - 1) * limit),
           take: limit,
         }),
         this.prisma.healthGoal.count({ where }),
       ]);
 
-      for (const goal of data) {
-        await this.ensureOnboardingWeightGoalMetric(goal);
-        await this.ensureOnboardingExerciseGoalMetric(goal);
-      }
-
-      const normalizedData = await Promise.all(
-        data.map(async (goal: any) => {
-          const metricConfig = await this.prisma.$queryRaw<any[]>`
-            SELECT *
-            FROM "HealthGoalMetricConfig"
-            WHERE "healthGoalId" = ${goal.id}
-            LIMIT 1
-          `;
-          return {
-            ...goal,
-            ...(String(goal.category).toUpperCase() === 'MEDICATION' && goal.targetValue == null
-              ? { targetValue: new Prisma.Decimal(DEFAULT_MEDICATION_TARGET), unit: '%' }
-              : {}),
-            metricConfig: metricConfig[0] ?? null,
-          };
-        }),
-      );
-
       return {
         success: true,
         statusCode: 200,
-        data: normalizedData,
-        pagination: { page, limit, total, totalPages: Math.ceil(total / limit) },
+        data: healthGoalsList,
+        pagination: {
+          page,
+          limit,
+          total,
+          totalPages: Math.ceil(total / limit),
+        },
       };
-    } catch (error) {
+    } catch (error: unknown) {
       const message = error instanceof Error ? error.message : String(error);
-      console.error(`[HealthGoalsService] Failed to list health goals: ${message}`);
-      throw new NotFoundException('Health goals could not be loaded.');
+      console.error('❌ FATAL HEALTH GOALS LISTING FAILURE:', message);
+      throw new InternalServerErrorException(
+        `Database query failed: ${message}`,
+      );
     }
   }
+
   async findOne(id: string) { const healthGoal = await this.prisma.healthGoal.findUnique({ where: { id }, include: { patient: true, practitioner: true, carePlan: true, progress: { orderBy: { measuredAt: 'desc' } } } }); if (!healthGoal) throw new NotFoundException('Health goal not found.'); let result: any = healthGoal; if (String(healthGoal.category).toUpperCase() === 'MEDICATION' && healthGoal.targetValue == null) result = await this.prisma.healthGoal.update({ where: { id }, data: { targetValue: String(DEFAULT_MEDICATION_TARGET), unit: '%' }, include: { patient: true, practitioner: true, carePlan: true, progress: { orderBy: { measuredAt: 'desc' } } } }); const [hydrated] = await this.attachMedicationGoalAssociations([result] as any[]); const [withRelationships] = await this.healthGoalIntelligence.attachRelationships([(hydrated ?? result) as any]); return withRelationships ?? hydrated ?? result; }
   async update(id: string, dto: UpdateHealthGoalDto) {
     const existing = await this.findOne(id);
