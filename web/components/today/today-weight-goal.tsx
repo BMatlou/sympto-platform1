@@ -59,7 +59,7 @@ export default function TodayWeightGoal({ goal, fallbackWeight }: Props) {
           intelligenceResult = null;
         }
         if (!active) return;
-        setIntelligence(intelligenceResult);
+        setIntelligence(intelligenceResult?.intelligence ?? intelligenceResult ?? null);
         const all = (response.events ?? [])
           .map((event) => ({
             loggedValue: Number(event.loggedValue),
