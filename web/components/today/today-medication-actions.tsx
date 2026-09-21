@@ -108,32 +108,25 @@ export default function TodayMedicationActions({ medications, goal: suppliedGoal
     ...(trackedMedication ?? {}),
     name: trackedMedication?.name || trackedMedication?.medication?.name || trackedMedication?.medication?.genericName || trackedMedication?.medication?.brandName || "",
   };
-  const activeMedicationGoals = suppliedGoal ? [suppliedGoal] : [];
+  const finalGoal = (() => {
+    if (!suppliedGoal) return null;
 
-  const finalGoal = activeMedicationGoals.find((goal: any) => {
-    if (!goal) return false;
-
-    const isGoalLive = new Set(["ACTIVE", "IN_PROGRESS", "ON_TRACK", "IMPROVING", "STAGNANT", "DECLINING"]).has(String(goal.status).toUpperCase());
-
-    if (!isGoalLive) return false;
-
-    const targetMedicationId = medication.patientMedicationId ?? medication.id;
-    const matchesIdDirectly = goal.patientMedicationId === targetMedicationId;
-    if (matchesIdDirectly) return true;
-
+    const isGoalLive = new Set(["ACTIVE", "IN_PROGRESS", "ON_TRACK", "IMPROVING", "STAGNANT", "DECLINING"])
+      .has(String(suppliedGoal.status).toUpperCase());
     const isMedicationGoal =
-      goal.metricType === "MEDICATION" ||
-      goal.category === "MEDICATION" ||
-      goal.title?.toLowerCase() === "manage medication";
+      String(suppliedGoal.metricType ?? "").toUpperCase() === "MEDICATION" ||
+      String(suppliedGoal.category ?? "").toUpperCase() === "MEDICATION" ||
+      String(suppliedGoal.metricConfig?.metricKey ?? "").toLowerCase() === "medication.adherence";
 
-    const isGoalUnlinked = !goal.patientMedicationId;
+    return isGoalLive && isMedicationGoal ? suppliedGoal : null;
+  })();
 
-    // A legacy, unlinked medication goal can only be safely matched when
-    // there is exactly one medication on the Today page.
-    return isMedicationGoal && isGoalUnlinked && medications.length === 1;
-  }) || null;
-
-  const medicationId = patientMedicationId(trackedMedication) ?? null;
+  const medicationId = patientMedicationId(trackedMedication) ??
+    finalGoal?.patientMedicationId ??
+    finalGoal?.patientMedication?.id ??
+    finalGoal?.associatedPatientMedicationId ??
+    finalGoal?.associatedPatientMedication?.id ??
+    null;
   const frequency = medicationFrequency(trackedMedication);
   const totalRequiredDosesPerDay = requiredDosesForFrequency(frequency);
   const safeDosesLoggedToday = Number.isFinite(Number(dosesLoggedToday))
