@@ -46,6 +46,7 @@ export interface HealthHomeResponse {
   appointments?: Array<Record<string, any>>;
   goals: HealthGoalRecord[];
   healthGoals?: HealthGoalRecord[];
+  activeGoalsArray?: HealthGoalRecord[];
   family: Array<Record<string, any>>;
   allergies?: Array<Record<string, any>>;
   conditions?: Array<Record<string, any>>;
@@ -196,7 +197,7 @@ class HealthHomeService {
     const healthHomeAllergies = Array.isArray(healthHome.allergies) && healthHome.allergies.length > 0 ? healthHome.allergies : (Array.isArray(healthHome.healthSnapshot?.activeAllergies) ? healthHome.healthSnapshot.activeAllergies : (healthHome.healthSnapshot?.allergies ?? []));
     const healthHomeConditions = Array.isArray(healthHome.conditions) && healthHome.conditions.length > 0 ? healthHome.conditions : (Array.isArray(healthHome.healthSnapshot?.activeConditions) ? healthHome.healthSnapshot.activeConditions : []);
     const healthHomeMedications = Array.isArray(healthHome.medications) && healthHome.medications.length > 0 ? healthHome.medications : (Array.isArray(healthHome.today?.activeMedications) ? healthHome.today.activeMedications : []);
-    const healthHomeGoals = normalizeGoals(healthHome.goals, healthHome.healthGoals);
+    const healthHomeGoals = normalizeGoals(healthHome.goals, healthHome.healthGoals, healthHome.activeGoalsArray);
 
     let prescriptionRecords: any[] = Array.isArray(healthHome.prescriptions) ? healthHome.prescriptions : [];
     try {
@@ -225,7 +226,7 @@ class HealthHomeService {
     const medications = mergePrescriptionMedications(canonicalMedications, prescriptionRecords);
 
     if (!canonical || canonical.patient?.id !== healthHome.patient?.id) {
-      return { ...healthHome, allergies: healthHomeAllergies, conditions: healthHomeConditions, medications, immunizations: healthHomeImmunizations, goals: healthHomeGoals, healthGoals: healthHomeGoals, prescriptions: prescriptionRecords, healthSnapshot: { ...healthHome.healthSnapshot, activeAllergies: healthHomeAllergies, activeConditions: healthHomeConditions, allergies: healthHomeAllergies, immunizations: healthHomeImmunizations }, today: { ...healthHome.today, activeMedications: medications, activeMedicationCount: medications.length }, wearables: healthHome.wearables ?? { devices: healthHome.healthSnapshot.connectedDevices, latestMeasurements: healthHome.healthSnapshot.latestMeasurements.map((m: any, index) => ({ id: `${m.type}-${index}`, type: m.type, value: m.value, unit: m.unit, measuredAt: m.measuredAt, source: m.source })) } };
+      return { ...healthHome, allergies: healthHomeAllergies, conditions: healthHomeConditions, medications, immunizations: healthHomeImmunizations, goals: healthHomeGoals, healthGoals: healthHomeGoals, activeGoalsArray: healthHomeGoals.filter((goal: any) => !['CANCELLED', 'DELETED', 'ARCHIVED', 'ACHIEVED', 'EXPIRED', 'ON_HOLD'].includes(String(goal?.status ?? '').toUpperCase())), prescriptions: prescriptionRecords, healthSnapshot: { ...healthHome.healthSnapshot, activeAllergies: healthHomeAllergies, activeConditions: healthHomeConditions, allergies: healthHomeAllergies, immunizations: healthHomeImmunizations }, today: { ...healthHome.today, activeMedications: medications, activeMedicationCount: medications.length }, wearables: healthHome.wearables ?? { devices: healthHome.healthSnapshot.connectedDevices, latestMeasurements: healthHome.healthSnapshot.latestMeasurements.map((m: any, index) => ({ id: `${m.type}-${index}`, type: m.type, value: m.value, unit: m.unit, measuredAt: m.measuredAt, source: m.source })) } };
     }
 
     const canonicalImmunizations = Array.isArray(canonical.immunizations) ? canonical.immunizations : [];
@@ -238,7 +239,7 @@ class HealthHomeService {
     const conditions = canonicalConditions.length > 0 ? canonicalConditions : healthHomeConditions.map((condition: any) => condition?.status ? condition : { ...condition, status: 'ACTIVE' });
     const goals = normalizeGoals(canonical.healthGoals, canonical.goals, healthHomeGoals);
 
-    return { ...healthHome, profile: canonical.profile ?? healthHome.profile, patient: { ...healthHome.patient, ...(canonical.patient ?? {}) }, healthPassport: canonical.healthPassport ?? healthHome.healthPassport, emergencyContacts, allergies, conditions, medications, immunizations, goals, healthGoals: goals, prescriptions: prescriptionRecords, healthSnapshot: { ...healthHome.healthSnapshot, activeAllergies: allergies, activeConditions: conditions, allergies, immunizations, bloodType: canonical.healthPassport?.bloodType ?? healthHome.healthSnapshot.bloodType, rhesusFactor: canonical.healthPassport?.rhesusFactor ?? healthHome.healthSnapshot.rhesusFactor }, today: { ...healthHome.today, activeMedications: medications, activeMedicationCount: medications.length }, wearables: healthHome.wearables ?? { devices: healthHome.healthSnapshot.connectedDevices, latestMeasurements: healthHome.healthSnapshot.latestMeasurements.map((m: any, index: number) => ({ id: `${m.type}-${index}`, type: m.type, value: m.value, unit: m.unit, measuredAt: m.measuredAt, source: m.source })) } };
+    return { ...healthHome, profile: canonical.profile ?? healthHome.profile, patient: { ...healthHome.patient, ...(canonical.patient ?? {}) }, healthPassport: canonical.healthPassport ?? healthHome.healthPassport, emergencyContacts, allergies, conditions, medications, immunizations, goals, healthGoals: goals, activeGoalsArray: goals.filter((goal: any) => !['CANCELLED', 'DELETED', 'ARCHIVED', 'ACHIEVED', 'EXPIRED', 'ON_HOLD'].includes(String(goal?.status ?? '').toUpperCase())), prescriptions: prescriptionRecords, healthSnapshot: { ...healthHome.healthSnapshot, activeAllergies: allergies, activeConditions: conditions, allergies, immunizations, bloodType: canonical.healthPassport?.bloodType ?? healthHome.healthSnapshot.bloodType, rhesusFactor: canonical.healthPassport?.rhesusFactor ?? healthHome.healthSnapshot.rhesusFactor }, today: { ...healthHome.today, activeMedications: medications, activeMedicationCount: medications.length }, wearables: healthHome.wearables ?? { devices: healthHome.healthSnapshot.connectedDevices, latestMeasurements: healthHome.healthSnapshot.latestMeasurements.map((m: any, index: number) => ({ id: `${m.type}-${index}`, type: m.type, value: m.value, unit: m.unit, measuredAt: m.measuredAt, source: m.source })) } };
   }
 
   async updateWeight(weightKg: number, heightCm?: number, patientId?: string): Promise<UpdateWeightResponse> {
