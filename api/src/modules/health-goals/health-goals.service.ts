@@ -244,7 +244,7 @@ export class HealthGoalsService {
     if (patientMedicationId) await this.assertPatientMedicationBelongsToPatient(patientMedicationId, String(existing.patientId));
     this.assertGoalDefinition(targetCategory, goalData.targetValue ?? existing.targetValue, goalData.targetDate ?? existing.targetDate);
     const revisingWeightGoal = targetCategory === 'WEIGHT';
-    let effectiveComparison = comparison;
+    let effectiveComparison: string | undefined = comparison;
     if (revisingWeightGoal) {
       const existingConfig = comparison
         ? null
