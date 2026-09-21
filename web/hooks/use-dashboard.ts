@@ -108,6 +108,52 @@ async function hydrateSavedMedicationDetails(medications: any[]): Promise<any[]>
   }));
 }
 
+function mergeGoalRecords(goalSources: any[][]) {
+  const byId = new Map<string, any>();
+
+  for (const source of goalSources) {
+    for (const goal of Array.isArray(source) ? source : []) {
+      if (!goal || typeof goal !== "object") continue;
+      const id = String(goal.id ?? "").trim();
+      if (!id) continue;
+
+      const existing = byId.get(id);
+      if (!existing) {
+        byId.set(id, { ...goal });
+        continue;
+      }
+
+      byId.set(id, {
+        ...existing,
+        ...goal,
+        metricConfig: goal.metricConfig ?? existing.metricConfig ?? null,
+        patientMedicationId:
+          goal.patientMedicationId ??
+          existing.patientMedicationId ??
+          goal.patientMedication?.id ??
+          existing.patientMedication?.id ??
+          null,
+        medicationId: goal.medicationId ?? existing.medicationId ?? null,
+        connectedGoals:
+          Array.isArray(goal.connectedGoals) && goal.connectedGoals.length > 0
+            ? goal.connectedGoals
+            : Array.isArray(existing.connectedGoals)
+              ? existing.connectedGoals
+              : [],
+        progress:
+          Array.isArray(goal.progress) && goal.progress.length > 0
+            ? goal.progress
+            : Array.isArray(existing.progress)
+              ? existing.progress
+              : [],
+        latestProgress: goal.latestProgress ?? existing.latestProgress ?? null,
+      });
+    }
+  }
+
+  return Array.from(byId.values());
+}
+
 function normalizeGoals(result: HealthHomeResponse, fullGoals: any[]) {
   const patientWeight = result.patient?.weightKg != null ? Number(result.patient.weightKg) : null;
   const medications = Array.isArray(result.medications) ? result.medications : [];
@@ -142,7 +188,15 @@ function normalizeGoals(result: HealthHomeResponse, fullGoals: any[]) {
 
 export function useDashboard() {
   const searchParams = useSearchParams(); const patientId = searchParams.get("patientId") || undefined; const [data, setData] = useState<HealthHomeResponse | null>(null); const [loading, setLoading] = useState(true); const [error, setError] = useState<string | null>(null); const firstLoad = useRef(true); const loadSequence = useRef(0);
-  const loadDashboard = useCallback(async () => { const requestId = ++loadSequence.current; try { if (firstLoad.current) setLoading(true); setError(null); const result = await healthHomeService.getHealthHome(patientId); const normalizedMedications = normalizeMedicationDetails(Array.isArray(result.medications) ? result.medications : []); const hydratedMedications = await hydrateSavedMedicationDetails(normalizedMedications); const fullGoalsResponse = await healthGoalsService.list(result.patient.id); const backendActiveGoals = Array.isArray((result as any).activeGoalsArray) ? (result as any).activeGoalsArray : []; const fullGoalsSource = backendActiveGoals.length > 0 ? [...backendActiveGoals, ...(Array.isArray(fullGoalsResponse?.data) ? fullGoalsResponse.data : Array.isArray(fullGoalsResponse) ? fullGoalsResponse : [])] : (Array.isArray(fullGoalsResponse?.data) ? fullGoalsResponse.data : Array.isArray(fullGoalsResponse) ? fullGoalsResponse : []); const fullGoals = fullGoalsSource.filter((goal: any, index: number, source: any[]) => { const status = String(goal?.status ?? "").toUpperCase(); return !["CANCELLED", "DELETED", "ARCHIVED"].includes(status) && !goal?.deletedAt && source.findIndex((candidate: any) => String(candidate?.id ?? "") === String(goal?.id ?? "")) === index; }); const linkedMedications = mergeMedicationGoalLinksWithGoals(hydratedMedications, fullGoals); const normalizedGoals = normalizeGoals({ ...result, medications: linkedMedications }, fullGoals); if (requestId !== loadSequence.current) return; setData({ ...result, medications: linkedMedications, goals: normalizedGoals, healthGoals: normalizedGoals, activeGoalsArray: normalizedGoals.filter((goal: any) => ["ACTIVE", "IN_PROGRESS", "ON_TRACK", "IMPROVING", "STAGNANT", "DECLINING"].includes(String(goal?.status ?? "").toUpperCase())), today: { ...result.today, activeMedications: linkedMedications, activeGoalCount: normalizedGoals.filter((goal: any) => ["ACTIVE", "IN_PROGRESS"].includes(String(goal?.status ?? "").toUpperCase())).length } }); firstLoad.current = false; } catch (requestError) { if (requestId !== loadSequence.current) return; console.error("Failed to load Health Home:", requestError); const message = requestError instanceof Error ? requestError.message : typeof requestError === "string" ? requestError : "We could not load your Health Home."; setError(message); } finally { if (requestId === loadSequence.current) setLoading(false); } }, [patientId]);
+  const loadDashboard = useCallback(async () => { const requestId = ++loadSequence.current; try { if (firstLoad.current) setLoading(true); setError(null); const result = await healthHomeService.getHealthHome(patientId); const normalizedMedications = normalizeMedicationDetails(Array.isArray(result.medications) ? result.medications : []); const hydratedMedications = await hydrateSavedMedicationDetails(normalizedMedications); const fullGoalsResponse = await healthGoalsService.list(result.patient.id); const backendActiveGoals = Array.isArray((result as any).activeGoalsArray) ? (result as any).activeGoalsArray : []; const fullGoalsResponseData = Array.isArray(fullGoalsResponse?.data)
+    ? fullGoalsResponse.data
+    : Array.isArray(fullGoalsResponse)
+      ? fullGoalsResponse
+      : [];
+    const fullGoals = mergeGoalRecords([backendActiveGoals, fullGoalsResponseData]).filter((goal: any) => {
+      const status = String(goal?.status ?? "").toUpperCase();
+      return !["CANCELLED", "DELETED", "ARCHIVED"].includes(status) && !goal?.deletedAt;
+    }); return !["CANCELLED", "DELETED", "ARCHIVED"].includes(status) && !goal?.deletedAt && source.findIndex((candidate: any) => String(candidate?.id ?? "") === String(goal?.id ?? "")) === index; }); const linkedMedications = mergeMedicationGoalLinksWithGoals(hydratedMedications, fullGoals); const normalizedGoals = normalizeGoals({ ...result, medications: linkedMedications }, fullGoals); if (requestId !== loadSequence.current) return; setData({ ...result, medications: linkedMedications, goals: normalizedGoals, healthGoals: normalizedGoals, activeGoalsArray: normalizedGoals.filter((goal: any) => ["ACTIVE", "IN_PROGRESS", "ON_TRACK", "IMPROVING", "STAGNANT", "DECLINING"].includes(String(goal?.status ?? "").toUpperCase())), today: { ...result.today, activeMedications: linkedMedications, activeGoalCount: normalizedGoals.filter((goal: any) => ["ACTIVE", "IN_PROGRESS"].includes(String(goal?.status ?? "").toUpperCase())).length } }); firstLoad.current = false; } catch (requestError) { if (requestId !== loadSequence.current) return; console.error("Failed to load Health Home:", requestError); const message = requestError instanceof Error ? requestError.message : typeof requestError === "string" ? requestError : "We could not load your Health Home."; setError(message); } finally { if (requestId === loadSequence.current) setLoading(false); } }, [patientId]);
   useEffect(() => { firstLoad.current = true; void loadDashboard(); const handleNavigation = () => void loadDashboard(); const handleGoalChange = () => void loadDashboard(); const handleFocus = () => void loadDashboard(); const handleVisibility = () => { if (document.visibilityState === "visible") void loadDashboard(); }; window.addEventListener("popstate", handleNavigation); window.addEventListener("sympto:health-goal-updated", handleGoalChange); window.addEventListener("focus", handleFocus); document.addEventListener("visibilitychange", handleVisibility); const refresh = window.setInterval(() => { if (document.visibilityState === "visible") void loadDashboard(); }, REFRESH_INTERVAL_MS); return () => { window.removeEventListener("popstate", handleNavigation); window.removeEventListener("sympto:health-goal-updated", handleGoalChange); window.removeEventListener("focus", handleFocus); document.removeEventListener("visibilitychange", handleVisibility); window.clearInterval(refresh); }; }, [loadDashboard]);
   return { data, loading, error, reload: loadDashboard };
 }
