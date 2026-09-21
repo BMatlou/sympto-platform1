@@ -801,6 +801,8 @@ model PatientMedication {
   @@index([medicationId])
   @@index([status])
   @@index([ongoing])
+  healthGoals HealthGoal[]
+
 }
 
 model PatientImmunization {
@@ -3448,8 +3450,10 @@ model SymptomLogAttachment {
 model HealthGoal {
   id             String             @id @default(uuid())
   patientId      String
+  patientMedication PatientMedication? @relation(fields: [patientMedicationId], references: [id], onDelete: SetNull)
   practitionerId String?
   carePlanId     String?
+  patientMedicationId String?
   title          String
   description    String?            @db.Text
   category       HealthGoalCategory
@@ -3471,6 +3475,8 @@ model HealthGoal {
 
   progress HealthGoalProgress[]
 
+  @@unique([patientId, patientMedicationId, category])
+  @@index([patientMedicationId])
   @@index([patientId])
   @@index([carePlanId])
   @@index([status])
