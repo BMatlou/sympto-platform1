@@ -23,6 +23,7 @@ export interface PrescribedMedication {
   prescriptionId?: string | null;
   prescriptionItemId?: string | null;
   source?: string | null;
+  healthGoalId?: string | null;
   patientMedication?: { id?: string | null } | null;
   medication?: { id?: string | null; name?: string | null; genericName?: string | null; brandName?: string | null } | null;
 }
