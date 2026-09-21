@@ -36,10 +36,16 @@ function journeyFor(goal: any) {
   return { startDate, targetDate, journeyDay, daysLeft, totalDays };
 }
 
-type Props = { goal: any; fallbackWeight?: number | string | null };
+type Props = {
+  goal: any;
+  fallbackWeight?: number | string | null;
+  bmi?: number | string | null;
+  heightCm?: number | string | null;
+  weightKg?: number | string | null;
+};
 type WeightEvent = { loggedValue: number; occurredAt: string; source?: string | null; sourceId?: string | null };
 
-export default function TodayWeightGoal({ goal, fallbackWeight }: Props) {
+export default function TodayWeightGoal({ goal, fallbackWeight, bmi: dashboardBmi, heightCm: dashboardHeightCm, weightKg: dashboardWeightKg }: Props) {
   const [events, setEvents] = useState<WeightEvent[]>([]);
   const [baselineWeight, setBaselineWeight] = useState<number | null>(null);
   const [intelligence, setIntelligence] = useState<any>(null);
@@ -59,7 +65,7 @@ export default function TodayWeightGoal({ goal, fallbackWeight }: Props) {
           intelligenceResult = null;
         }
         if (!active) return;
-        setIntelligence(intelligenceResult?.intelligence ?? intelligenceResult ?? null);
+        setIntelligence(intelligenceResult ?? null);
         const all = (response.events ?? [])
           .map((event) => ({
             loggedValue: Number(event.loggedValue),
@@ -114,11 +120,14 @@ export default function TodayWeightGoal({ goal, fallbackWeight }: Props) {
       : "Lose weight goal";
   const configuredTarget = numberValue(goal?.metricConfig?.frequencyTarget ?? goal?.targetValue);
   const fallback = numberValue(fallbackWeight);
+  const dashboardWeight = numberValue(dashboardWeightKg);
+  const dashboardHeight = numberValue(dashboardHeightCm);
+  const dashboardCurrentBmi = numberValue(dashboardBmi);
   const patientWeight = numberValue(goal?.patient?.weightKg);
   const currentEvent = events[events.length - 1] ?? null;
   const intelligenceWeight = numberValue(intelligence?.weight?.latestKg);
   const intelligenceBaseline = numberValue(intelligence?.profile?.baselineWeightKg);
-  const currentWeight = currentEvent?.loggedValue ?? intelligenceWeight ?? fallback ?? patientWeight;
+  const currentWeight = currentEvent?.loggedValue ?? intelligenceWeight ?? dashboardWeight ?? fallback ?? patientWeight;
   const startingWeight = baselineWeight ?? intelligenceBaseline ?? patientWeight ?? currentWeight;
   const targetAmount = isMaintenanceGoal ? null : configuredTarget != null && configuredTarget > 0 ? configuredTarget : null;
   const intelligenceTargetWeight = numberValue(intelligence?.weight?.targetWeightKg);
@@ -204,8 +213,15 @@ export default function TodayWeightGoal({ goal, fallbackWeight }: Props) {
         : planIsValid
         ? `Set a target date to calculate the daily and weekly rate needed to reach ${formatKg(planTargetWeight)} kg.`
         : "Your configured weight target is being reviewed; no pace is shown until a valid destination is available.";
-  const heightCm = numberValue(intelligence?.profile?.heightCm ?? goal?.patient?.heightCm ?? goal?.heightCm);
-  const currentBmi = currentWeight != null && heightCm != null && heightCm > 0 ? currentWeight / ((heightCm / 100) ** 2) : null;
+  const heightCm = dashboardHeight ?? numberValue(intelligence?.profile?.heightCm ?? goal?.patient?.heightCm ?? goal?.heightCm);
+  // BMI is a current health metric. Prefer the canonical Health Home BMI when
+  // available, then calculate from the current weight and recorded height.
+  // This keeps BMI visible even when goal intelligence is temporarily unavailable.
+  const currentBmi =
+    dashboardCurrentBmi ??
+    (currentWeight != null && heightCm != null && heightCm > 0
+      ? currentWeight / ((heightCm / 100) ** 2)
+      : null);
   const startingBmi = startingWeight != null && heightCm != null && heightCm > 0 ? startingWeight / ((heightCm / 100) ** 2) : null;
   const targetBmi = targetWeight != null && targetWeight > 0 && heightCm != null && heightCm > 0 ? targetWeight / ((heightCm / 100) ** 2) : null;
   const bmiChange = startingBmi != null && currentBmi != null ? currentBmi - startingBmi : null;
