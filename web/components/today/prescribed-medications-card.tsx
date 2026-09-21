@@ -64,6 +64,23 @@ function findMedicationGoal(
     const status = String(goal.status ?? "").toUpperCase();
     if (["ARCHIVED", "CANCELLED", "DELETED"].includes(status)) return false;
 
+    const linkedPatientMedicationId =
+      goal.patientMedicationId ??
+      (goal as any).patientMedication?.id ??
+      (goal as any).associatedPatientMedicationId ??
+      (goal as any).associatedPatientMedication?.id ??
+      null;
+
+    // The explicit patient-medication link is authoritative. This is the
+    // original Today behavior and must be checked before any category/name
+    // heuristics so a saved goal cannot fall back to "Set medication goal".
+    if (linkedPatientMedicationId && medicationPatientMedicationId) {
+      if (String(linkedPatientMedicationId) === String(medicationPatientMedicationId)) {
+        return true;
+      }
+      return false;
+    }
+
     const category = String(goal.category ?? "").toUpperCase();
     const metricType = String(goal.metricType ?? goal.metricConfig?.metricType ?? "").toUpperCase();
     const metricKey = String(goal.metricConfig?.metricKey ?? "").toLowerCase();
@@ -74,23 +91,8 @@ function findMedicationGoal(
 
     if (!isMedicationGoal) return false;
 
-    const linkedPatientMedicationId =
-      goal.patientMedicationId ??
-      (goal as any).patientMedication?.id ??
-      (goal as any).associatedPatientMedicationId ??
-      (goal as any).associatedPatientMedication?.id ??
-      null;
-
-    if (linkedPatientMedicationId && medicationPatientId) {
-      if (String(linkedPatientMedicationId) === String(medicationPatientId)) return true;
-      // A stale/non-matching patient-medication link must not stop us from
-      // resolving the same prescribed medicine by its canonical medication ID
-      // or the medication name stored in the goal.
-    }
-
-    // Prescription-only rows do not have a patientMedicationId. In that case
-    // fall through to the canonical medication id/name so a saved goal can
-    // still be resolved to the correct prescribed medicine.
+    // Prescription-only rows do not have a patientMedicationId. Resolve those
+    // against the catalog medication ID, then by the stored medication name.
     const linkedMedicationId =
       goal.associatedMedicationId ??
       goal.medicationId ??
@@ -134,7 +136,13 @@ export default function PrescribedMedicationsCard({
   const router = useRouter();
 
   const handleAction = (medication: PrescribedMedication, goal: HealthGoal | null) => {
-    const patientMedicationId = getPatientMedicationId(medication) || goal?.patientMedicationId || goal?.patientMedication?.id || null;
+    const patientMedicationId =
+      goal?.patientMedicationId ||
+      goal?.patientMedication?.id ||
+      goal?.associatedPatientMedicationId ||
+      goal?.associatedPatientMedication?.id ||
+      getPatientMedicationId(medication) ||
+      null;
     const medicationId = medication.medicationId || medication.medication?.id || null;
 
     if (goal) {
