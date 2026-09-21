@@ -299,6 +299,13 @@ export class HealthGoalIntelligenceService {
             select: {
               weightKg: true,
               heightCm: true,
+              baseline: {
+                select: {
+                  weightKg: true,
+                  heightCm: true,
+                  bmi: true,
+                },
+              },
               person: {
                 select: {
                   dateOfBirth: true,
@@ -449,7 +456,12 @@ export class HealthGoalIntelligenceService {
       const average30dKg = average(recent30);
       const trendKgPerWeek = linearTrendKgPerWeek(cleanedEvents.slice(-30));
 
-      const heightCm = goal.patient.heightCm == null ? null : Number(goal.patient.heightCm);
+      const heightCm =
+        goal.patient.heightCm != null
+          ? Number(goal.patient.heightCm)
+          : goal.patient.baseline?.heightCm != null
+            ? Number(goal.patient.baseline.heightCm)
+            : null;
       const age = ageFromDateOfBirth(goal.patient.person.dateOfBirth);
       const gender = goal.patient.person.gender ?? null;
       const currentBmi =
@@ -459,7 +471,9 @@ export class HealthGoalIntelligenceService {
       const baselineBmi =
         baselineKg != null && heightCm != null && heightCm > 0
           ? baselineKg / ((heightCm / 100) ** 2)
-          : null;
+          : goal.patient.baseline?.bmi != null
+            ? Number(goal.patient.baseline.bmi)
+            : null;
 
       const configRows = await this.prisma.$queryRawUnsafe<Array<{ comparison: string | null; frequencyTarget: number | string | null }>>(
         'SELECT "comparison","frequencyTarget"::double precision AS "frequencyTarget" FROM "HealthGoalMetricConfig" WHERE "healthGoalId"=$1 LIMIT 1',
