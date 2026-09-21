@@ -180,7 +180,7 @@ export class PatientHealthGoalsController {
       gender: string | null;
     };
 
-    const goalRows = await this.prisma.$queryRaw<GoalRow[]>\`
+    const goalRows = await this.prisma.$queryRaw<GoalRow[]>`
       SELECT
         g."id",
         g."patientId",
@@ -221,7 +221,7 @@ export class PatientHealthGoalsController {
     let latestWeightAt: Date | null = null;
 
     try {
-      const rows = await this.prisma.$queryRaw<Array<{ loggedValue: number | string | null; occurredAt: Date | null }>>\`
+      const rows = await this.prisma.$queryRaw<Array<{ loggedValue: number | string | null; occurredAt: Date | null }>>`
         SELECT
           "loggedValue"::double precision AS "loggedValue",
           "occurredAt"
@@ -247,7 +247,7 @@ export class PatientHealthGoalsController {
 
     if (latestWeight == null) {
       try {
-        const rows = await this.prisma.$queryRaw<Array<{ weightKg: number | string | null; createdAt: Date | null }>>\`
+        const rows = await this.prisma.$queryRaw<Array<{ weightKg: number | string | null; createdAt: Date | null }>>`
           SELECT "weightKg"::double precision AS "weightKg", "createdAt"
           FROM "HealthJournal"
           WHERE "patientId" = ${goal.patientId}
@@ -299,7 +299,7 @@ export class PatientHealthGoalsController {
 
     let comparison = 'CLOSEST';
     try {
-      const rows = await this.prisma.$queryRaw<Array<{ comparison: string | null }>>\`
+      const rows = await this.prisma.$queryRaw<Array<{ comparison: string | null }>>`
         SELECT "comparison"
         FROM "HealthGoalMetricConfig"
         WHERE "healthGoalId" = ${goal.id}
@@ -481,7 +481,7 @@ export class PatientHealthGoalsController {
 
     // Authorize directly against the current HealthGoal -> Patient schema.
     // Do not call findOne()/relationship hydration here.
-    const ownershipRows = await this.prisma.$queryRaw<Array<{ id: string }>>\`
+    const ownershipRows = await this.prisma.$queryRaw<Array<{ id: string }>>`
       SELECT g."id"
       FROM "HealthGoal" g
       INNER JOIN "Patient" p ON p."id" = g."patientId"
