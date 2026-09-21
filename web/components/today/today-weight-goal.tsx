@@ -283,12 +283,12 @@ export default function TodayWeightGoal({ goal, fallbackWeight }: Props) {
             : `${formatKg(gainedKg)} kg gained from ${formatKg(startingWeight)} kg`;
 
   const targetLabel = goalCompleted
-    ? `Completed · target body weight ${formatKg(targetWeight)} kg`
+    ? `Completed · target body weight ${targetWeightDisplay`
     : isMaintenanceGoal
       ? `Maintenance baseline · ${formatKg(startingWeight)} kg`
       : bmiCaution || gainTargetCaution
-        ? `Goal needs review · planned change ${formatKg(targetAmount)} kg · projected weight ${formatKg(targetWeight)} kg`
-        : `${formatKg(remainingGoalAmount)} kg remaining · requested change ${formatKg(targetAmount)} kg · projected weight ${formatKg(targetWeight)} kg`;
+        ? `Goal needs review · planned change ${formatKg(targetAmount)} kg · projected weight ${targetWeightDisplay`
+        : `${formatKg(remainingGoalAmount)} kg remaining · requested change ${formatKg(targetAmount)} kg · projected weight ${targetWeightDisplay`;
 
   const trendMessage = goalCompleted
     ? "This goal is complete. Later weight measurements do not change its 100% progress; start a new weight goal for a new journey."
@@ -309,17 +309,17 @@ export default function TodayWeightGoal({ goal, fallbackWeight }: Props) {
             : `Current trend: no recorded weight change from the ${formatKg(startingWeight)} kg starting point. BMI is ${bmiDisplay}.`;
 
   const guidanceMessage = gainTargetCaution
-    ? `Your planned target of ${formatKg(targetWeight)} kg corresponds to a BMI of ${targetBmiDisplay} at your recorded height, which is outside the adult healthy-weight screening range. ${gainTargetObesityRange ? "It is in the adult obesity BMI screening category." : "It is in the adult overweight BMI screening category."} This is a screening signal, not a diagnosis; BMI does not distinguish muscle from fat. Review the target with a healthcare professional before pursuing it.`
+    ? `Your planned target of ${targetWeightDisplay corresponds to a BMI of ${targetBmiDisplay} at your recorded height, which is outside the adult healthy-weight screening range. ${gainTargetObesityRange ? "It is in the adult obesity BMI screening category." : "It is in the adult overweight BMI screening category."} This is a screening signal, not a diagnosis; BMI does not distinguish muscle from fat. Review the target with a healthcare professional before pursuing it.`
     : isMaintenanceGoal
       ? intelligence?.weight?.average7dKg != null
       ? `Sympto is using your 7-day average rather than a single scale reading. Your maintenance band is approximately ${formatKg(intelligence.weight.maintenanceBand?.min ?? startingWeight)}–${formatKg(intelligence.weight.maintenanceBand?.max ?? startingWeight)} kg around your baseline.`
       : "Record a few recent weight measurements so Sympto can assess your maintenance trend."
     : currentBmi != null && currentBmi < 18.5
-      ? `Your current BMI is ${currentBmi?.toFixed(1)}, below the adult underweight screening threshold of 18.5. Sympto should shift guidance toward healthy weight gain rather than further weight loss. At your recorded height, BMI 18.5 corresponds to about ${formatKg(lowerScreeningWeight)} kg. BMI is a screening measure, not a diagnosis.`
+      ? `Your current BMI is ${bmiDisplay}, below the adult underweight screening threshold of 18.5. Sympto should shift guidance toward healthy weight gain rather than further weight loss. At your recorded height, BMI 18.5 corresponds to about ${formatKg(lowerScreeningWeight)} kg. BMI is a screening measure, not a diagnosis.`
       : bmiCaution
-        ? `Your current BMI is ${currentBmi?.toFixed(1)}, while the planned target BMI would be ${targetBmi?.toFixed(1)}, below 18.5. Sympto will not encourage further loss toward ${formatKg(targetWeight)} kg. The next step is to review this goal and either revise the target or switch to a weight-gain/maintenance focus. At your recorded height, BMI 18.5 corresponds to about ${formatKg(lowerScreeningWeight)} kg. BMI is a screening measure, not a diagnosis.`
+        ? `Your current BMI is ${bmiDisplay}, while the planned target BMI would be ${targetBmiDisplay}, below 18.5. Sympto will not encourage further loss toward ${targetWeightDisplay. The next step is to review this goal and either revise the target or switch to a weight-gain/maintenance focus. At your recorded height, BMI 18.5 corresponds to about ${formatKg(lowerScreeningWeight)} kg. BMI is a screening measure, not a diagnosis.`
         : currentBmiAboveRange
-          ? `BMI now ${currentBmi?.toFixed(1)} is at or above 25. Interpret this screening measure alongside the person's wider health information.`
+          ? `BMI now ${bmiDisplay} is at or above 25. Interpret this screening measure alongside the person's wider health information.`
           : null;
 
   const statusLabel = goalCompleted
@@ -385,7 +385,7 @@ export default function TodayWeightGoal({ goal, fallbackWeight }: Props) {
                 <div className="mx-auto sm:mx-0">
                   <div className="relative grid h-[132px] w-[132px] place-items-center rounded-full" style={{ background: `conic-gradient(${progressMovingAway ? "#f59e0b" : "#24c1c4"} 0 ${progressMagnitude}%, rgba(255,255,255,.12) ${progressMagnitude}% 100%)` }}>
                     <div className="absolute inset-[9px] rounded-full bg-[#0b2d54] ring-1 ring-white/10" />
-                    <div className="relative z-10 text-center"><p className="text-[30px] font-black leading-none tracking-[-.07em]">{isMaintenanceGoal ? progress : `${progress > 0 ? "+" : ""}${progress}%`}</p><p className="mt-1 text-[9px] font-black uppercase tracking-[.15em] text-white/45">{isMaintenanceGoal ? "stability" : progressMovingAway ? "moving away" : "progress"}</p></div>
+                    <div className="relative z-10 text-center"><p className="text-[30px] font-black leading-none tracking-[-.07em]">{formattedProgress}</p><p className="mt-1 text-[9px] font-black uppercase tracking-[.15em] text-white/45">{isMaintenanceGoal ? "stability" : progressMovingAway ? "moving away" : "progress"}</p></div>
                   </div>
                 </div>
               </div>
@@ -414,8 +414,8 @@ export default function TodayWeightGoal({ goal, fallbackWeight }: Props) {
             {targetReached
               ? "Goal reached. You need 0.0 kg/day (0.0 kg/week) more."
               : comparison === "DECREASE_TO"
-                ? `You need to lose about ${formatKg(remainingGoalAmount)} kg more to reach ${formatKg(targetWeight)} kg by ${formatDate(journey.targetDate)}. That is about ${formatRate(requiredDailyChange)} kg/day or ${formatRate(requiredWeeklyChange)} kg/week.`
-                : `You need to gain about ${formatKg(remainingGoalAmount)} kg more to reach ${formatKg(targetWeight)} kg by ${formatDate(journey.targetDate)}. That is about ${formatRate(requiredDailyChange)} kg/day or ${formatRate(requiredWeeklyChange)} kg/week.`}
+                ? `You need to lose about ${formatKg(remainingGoalAmount)} kg more to reach ${targetWeightDisplay by ${formatDate(journey.targetDate)}. That is about ${formatRate(requiredDailyChange)} kg/day or ${formatRate(requiredWeeklyChange)} kg/week.`
+                : `You need to gain about ${formatKg(remainingGoalAmount)} kg more to reach ${targetWeightDisplay by ${formatDate(journey.targetDate)}. That is about ${formatRate(requiredDailyChange)} kg/day or ${formatRate(requiredWeeklyChange)} kg/week.`}
           </div>
         )}
 
@@ -497,7 +497,7 @@ export default function TodayWeightGoal({ goal, fallbackWeight }: Props) {
             {!goalCompleted && bmiChange != null && Math.abs(bmiChange) >= 0.1 && <p className="mt-1.5">BMI change since goal start: {bmiChange > 0 ? "+" : ""}{bmiChange.toFixed(1)}.</p>}
             {!goalCompleted && gainTargetCaution && upperScreeningWeight != null && <p className="mt-1.5">At your recorded height, BMI 24.9 corresponds to about {formatKg(upperScreeningWeight)} kg. This is screening context, not a required target.</p>}
             {!goalCompleted && (bmiCaution || gainTargetCaution) && <>
-              <p className="mt-1.5">{bmiCaution ? `The planned target BMI is ${targetBmi?.toFixed(1)}, below 18.5. The goal remains saved while you review what to do next.` : `The planned target BMI is ${targetBmi?.toFixed(1)}, outside the adult healthy-weight screening range${gainTargetObesityRange ? " and in the obesity screening category" : ""}. The goal remains saved while you review what to do next.`}</p>
+              <p className="mt-1.5">{bmiCaution ? `The planned target BMI is ${targetBmiDisplay}, below 18.5. The goal remains saved while you review what to do next.` : `The planned target BMI is ${targetBmiDisplay}, outside the adult healthy-weight screening range${gainTargetObesityRange ? " and in the obesity screening category" : ""}. The goal remains saved while you review what to do next.`}</p>
               <div className="mt-3 flex flex-wrap items-center gap-2">
                 <Link href={reviewGoalHref} className="inline-flex min-h-9 items-center justify-center gap-1.5 rounded-xl bg-[#0b2d54] px-3.5 py-2 text-[10px] font-black text-white shadow-sm transition hover:bg-[#123d63]">Review goal <ArrowRight className="h-3 w-3" /></Link>
               </div>
