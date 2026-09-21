@@ -82,7 +82,10 @@ function findMedicationGoal(
       null;
 
     if (linkedPatientMedicationId && medicationPatientId) {
-      return String(linkedPatientMedicationId) === String(medicationPatientId);
+      if (String(linkedPatientMedicationId) === String(medicationPatientId)) return true;
+      // A stale/non-matching patient-medication link must not stop us from
+      // resolving the same prescribed medicine by its canonical medication ID
+      // or the medication name stored in the goal.
     }
 
     // Prescription-only rows do not have a patientMedicationId. In that case
@@ -96,7 +99,7 @@ function findMedicationGoal(
       null;
 
     if (linkedMedicationId && medicationCatalogId) {
-      return String(linkedMedicationId) === String(medicationCatalogId);
+      if (String(linkedMedicationId) === String(medicationCatalogId)) return true;
     }
 
     const goalMedicationNames = [
