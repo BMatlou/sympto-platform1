@@ -1,6 +1,6 @@
 "use client";
 import Link from "next/link";
-import { ArrowRight, Scale, Clock } from "lucide-react";
+import { ArrowRight, Scale, Clock, Activity } from "lucide-react";
 import { useEffect, useState, useMemo } from "react";
 import { healthGoalsService } from "@/services/health-goals.service";
 import { TODAY_GOAL_FOOTER_CLASS } from "@/components/today/today-goal-card-styles";
@@ -47,6 +47,20 @@ export default function TodayWeightGoal({ goal, fallbackWeight }: Props) {
 
   const heightCm = Number(goal?.patient?.heightCm || goal?.heightCm || 187);
   const bmi = (currentWeight && heightCm) ? currentWeight / ((heightCm / 100) ** 2) : 19.6;
+
+  const intelligence = goal?.intelligence ?? null;
+
+  const connectedMedications = intelligence?.profile?.activeMedications ||
+    intelligence?.medications ||
+    (goal?.patient?.medications ? [goal.patient.medications] : []);
+
+  const connectedConditions = intelligence?.profile?.conditions ||
+    intelligence?.conditions || [];
+
+  const supportiveRecommendations = intelligence?.recommendations ||
+    intelligence?.supportiveGoals ||
+    intelligence?.recommendedSupportingGoals ||
+    intelligence?.targetedSupportiveGoals || [];
 
   const journey = useMemo(() => {
     const start = new Date(String(goal?.createdAt || "2026-09-01"));
@@ -150,6 +164,53 @@ export default function TodayWeightGoal({ goal, fallbackWeight }: Props) {
           </div>
         )}
       </div>
+
+            {/* RESTORED CLINICAL INTELLIGENCE CONNECTION PANELS */}
+            {!loading && (connectedMedications.length > 0 || connectedConditions.length > 0 || supportiveRecommendations.length > 0) && (
+              <div className="mt-5 space-y-4 border-t border-slate-100 pt-4">
+                <p className="text-[10px] font-black uppercase tracking-[.14em] text-slate-400">Connected Health Profile Context</p>
+                {connectedMedications.length > 0 && (
+                  <div className="rounded-2xl border border-[#dfeaec] bg-white p-4">
+                    <span className="block text-[9px] font-black uppercase tracking-[.12em] text-[#0b7b80]">Linked Medications</span>
+                    <div className="mt-2 space-y-2">
+                      {connectedMedications.flat().map((med: any, idx: number) => (
+                        <div key={med?.id ?? idx} className="flex items-center justify-between text-xs">
+                          <span className="font-bold text-[#0b2d54]">{med?.name || med?.customName || med?.medication?.name || "Medication"}</span>
+                          <span className="font-medium text-slate-400">{med?.frequency || "Prescribed"}</span>
+                        </div>
+                      ))}
+                    </div>
+                    <p className="mt-2 text-[10px] leading-normal text-slate-400">Active medications are shown as clinical context alongside the weight-maintenance profile.</p>
+                  </div>
+                )}
+                {connectedConditions.length > 0 && (
+                  <div className="rounded-2xl border border-slate-100 bg-white p-4">
+                    <span className="block text-[9px] font-black uppercase tracking-[.12em] text-amber-600">Active Health Conditions</span>
+                    <div className="mt-2 flex flex-wrap gap-1.5">
+                      {connectedConditions.flat().map((cond: any, idx: number) => (
+                        <span key={cond?.id ?? idx} className="rounded-lg bg-amber-50 px-2.5 py-1 text-xs font-bold text-amber-700">{cond?.name || cond?.title || cond?.condition?.name || "Active condition"}</span>
+                      ))}
+                    </div>
+                  </div>
+                )}
+                {supportiveRecommendations.length > 0 && (
+                  <div className="rounded-2xl bg-gradient-to-br from-[#0b2d54] to-[#123e66] p-4 text-white shadow-md">
+                    <span className="block text-[9px] font-black uppercase tracking-[.12em] text-[#7de6e7]">Recommended Supporting Goals</span>
+                    <div className="mt-3 space-y-3">
+                      {supportiveRecommendations.map((rec: any, idx: number) => (
+                        <div key={rec?.id ?? idx} className="flex items-start gap-2.5 border-b border-white/10 pb-2.5 text-xs last:border-0 last:pb-0">
+                          <div className="mt-0.5 rounded bg-white/10 p-1 text-[#7de6e7]"><Activity className="h-3 w-3" /></div>
+                          <div>
+                            <p className="font-bold text-white">{rec?.title || rec?.name || "Supporting health goal"}</p>
+                            <p className="mt-0.5 text-[11px] text-white/70">{rec?.description || rec?.rationale || "Recommended as supporting context for your weight-maintenance profile."}</p>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
 
       <div className={`${TODAY_GOAL_FOOTER_CLASS} bg-[#fbfdfd]`}>
         <div className="flex items-center justify-between text-[10px] font-semibold text-[#74859a]">
