@@ -26,8 +26,10 @@ function formatDate(value: unknown) {
   return new Intl.DateTimeFormat("en-ZA", { day: "2-digit", month: "short", year: "numeric" }).format(date);
 }
 
-function journeyFor(goal: any) {
-  const startDate = new Date(String(goal?.createdAt ?? ""));
+function journeyFor(goal: any, journeyStartAt?: unknown) {
+  const startDate = new Date(
+    String(journeyStartAt ?? goal?.createdAt ?? ""),
+  );
   const targetDate = new Date(String(goal?.targetDate ?? ""));
   const now = Date.now();
   const journeyDay = Number.isNaN(startDate.getTime()) ? 1 : Math.max(1, Math.floor((now - startDate.getTime()) / 86400000) + 1);
@@ -48,6 +50,7 @@ type WeightEvent = { loggedValue: number; occurredAt: string; source?: string | 
 export default function TodayWeightGoal({ goal, fallbackWeight, bmi: dashboardBmi, heightCm: dashboardHeightCm, weightKg: dashboardWeightKg }: Props) {
   const [events, setEvents] = useState<WeightEvent[]>([]);
   const [baselineWeight, setBaselineWeight] = useState<number | null>(null);
+  const [journeyStartAt, setJourneyStartAt] = useState<string | null>(null);
   const [intelligence, setIntelligence] = useState<any>(null);
   const [loading, setLoading] = useState(true);
 
@@ -76,19 +79,49 @@ export default function TodayWeightGoal({ goal, fallbackWeight, bmi: dashboardBm
           .filter((event) => Number.isFinite(event.loggedValue) && !Number.isNaN(new Date(event.occurredAt).getTime()))
           .sort((a, b) => new Date(a.occurredAt).getTime() - new Date(b.occurredAt).getTime());
 
-        const goalBaseline = all.find((event) => event.source === "goal-baseline" && event.sourceId === goalId);
+        const goalBaseline = all.find(
+          (event) => event.source === "goal-baseline" && event.sourceId === goalId,
+        );
         const goalCreatedAt = new Date(String(goal?.createdAt ?? ""));
         const baselineFromHistory = !Number.isNaN(goalCreatedAt.getTime())
-          ? [...all].reverse().find((event) => event.source !== "goal-baseline" && new Date(event.occurredAt).getTime() <= goalCreatedAt.getTime())
+          ? [...all].reverse().find(
+              (event) =>
+                event.source !== "goal-baseline" &&
+                new Date(event.occurredAt).getTime() <= goalCreatedAt.getTime(),
+            )
           : null;
 
         const regular = all.filter((event) => event.source !== "goal-baseline");
-        setBaselineWeight(goalBaseline?.loggedValue ?? baselineFromHistory?.loggedValue ?? null);
+        setBaselineWeight(
+          goalBaseline?.loggedValue ??
+            baselineFromHistory?.loggedValue ??
+            null,
+        );
+
+        // The journey start is the original goal creation date. A goal revision
+        // may create/refresh a goal-baseline event, but that must not reset the
+        // user's journey to Day 1. Only use the baseline/history timestamp as a
+        // recovery source when the goal creation timestamp is genuinely absent.
+        const validGoalCreatedAt = !Number.isNaN(goalCreatedAt.getTime());
+        const resolvedJourneyStart =
+          validGoalCreatedAt
+            ? goalCreatedAt.toISOString()
+            : goalBaseline?.occurredAt ??
+              baselineFromHistory?.occurredAt ??
+              null;
+
+        setJourneyStartAt(resolvedJourneyStart);
         setEvents(regular);
       } catch {
         if (active) {
           setEvents([]);
           setBaselineWeight(null);
+          setJourneyStartAt(
+            goal?.createdAt &&
+              !Number.isNaN(new Date(String(goal.createdAt)).getTime())
+              ? new Date(String(goal.createdAt)).toISOString()
+              : null,
+          );
           setIntelligence(null);
         }
       } finally {
@@ -110,7 +143,10 @@ export default function TodayWeightGoal({ goal, fallbackWeight, bmi: dashboardBm
     };
   }, [goal?.id, goal?.createdAt]);
 
-  const journey = useMemo(() => journeyFor(goal), [goal]);
+  const journey = useMemo(
+    () => journeyFor(goal, journeyStartAt ?? intelligence?.goal?.createdAt),
+    [goal, journeyStartAt, intelligence?.goal?.createdAt],
+  );
   const comparison = String(goal?.metricConfig?.comparison ?? goal?.comparison ?? intelligence?.goal?.comparison ?? "CLOSEST").toUpperCase();
   const isMaintenanceGoal = comparison === "CLOSEST";
   const weightGoalLabel = isMaintenanceGoal
