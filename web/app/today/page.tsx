@@ -179,7 +179,7 @@ export default function TodayPage() {
   const activeGoalsArray = allGoals.filter((goal: any) => ACTIVE_GOAL_STATUSES.has(String(goal?.status ?? "").toUpperCase()));
   const medicationGoalCandidates = allGoals.filter((goal: any) => {
     const status = String(goal?.status ?? "").toUpperCase();
-    return isMedicationGoal(goal) && !["ARCHIVED", "CANCELLED", "DELETED"].includes(status);
+    return isMedicationGoal(goal) && !["ARCHIVED", "CANCELLED", "DELETED", "ACHIEVED"].includes(status);
   });
   const todayGoalArray = activeGoalsArray;
   const goals = activeGoalsArray;
