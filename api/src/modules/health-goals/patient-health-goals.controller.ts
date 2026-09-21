@@ -479,6 +479,21 @@ export class PatientHealthGoalsController {
   async intelligence(@Param('id') id: string, @Req() request: AuthenticatedRequest) {
     const userId = this.userId(request);
 
+    // Authorize directly against the current HealthGoal -> Patient schema.
+    // Do not call findOne()/relationship hydration here.
+    const ownershipRows = await this.prisma.$queryRaw<Array<{ id: string }>>\`
+      SELECT g."id"
+      FROM "HealthGoal" g
+      INNER JOIN "Patient" p ON p."id" = g."patientId"
+      WHERE g."id" = ${id}
+        AND p."userId" = ${userId}
+      LIMIT 1
+    `;
+
+    if (!ownershipRows.length) {
+      throw new ForbiddenException('Patient health goal does not belong to the authenticated user.');
+    }
+
     try {
       const result = await this.healthGoalIntelligence.getWeightGoalIntelligence(id);
       const intelligence =
