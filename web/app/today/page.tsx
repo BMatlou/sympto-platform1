@@ -93,7 +93,7 @@ function medicationGoalFor(medication: any, goals: any[], medicationCount: numbe
       goal?.associatedPatientMedication?.id;
 
     if (linkedPatientMedicationId && medicationRecordIds.length > 0) {
-      return medicationRecordIds.includes(String(linkedPatientMedicationId));
+      if (medicationRecordIds.includes(String(linkedPatientMedicationId))) return true;
     }
 
     const linkedMedicationId =
@@ -102,8 +102,8 @@ function medicationGoalFor(medication: any, goals: any[], medicationCount: numbe
       goal?.associatedMedication?.id ||
       goal?.medication?.id;
 
-    if (linkedMedicationId) {
-      return medicationCatalogIds.includes(String(linkedMedicationId));
+    if (linkedMedicationId && medicationCatalogIds.length > 0) {
+      if (medicationCatalogIds.includes(String(linkedMedicationId))) return true;
     }
 
     const name = medicationName(medication);
