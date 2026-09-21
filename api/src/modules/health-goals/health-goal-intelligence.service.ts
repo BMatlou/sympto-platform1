@@ -72,13 +72,46 @@ type WeightHealthContext = {
   activeMedications: Array<{ name: string; dosage: string | null; frequency: string | null; indication: string | null; sideEffectsRecorded: boolean }>;
 };
 
-const WEIGHT_SUPPORT_RULES = [
-  { category: 'EXERCISE', rationale: 'Regular physical activity is a supporting behaviour for weight management and overall health.' },
-  { category: 'NUTRITION', rationale: 'Nutrition tracking provides context for energy intake and helps make the weight plan actionable.' },
-  { category: 'SLEEP', rationale: 'Sleep is part of a broader weight-management and wellbeing pattern and is useful to monitor alongside weight.' },
-] as const;
+const GOAL_SUPPORT_RULES: Record<string, Array<{ sourceCategory: string; rationale: string }>> = {
+  WEIGHT: [
+    { sourceCategory: 'EXERCISE', rationale: 'Exercise provides a supporting behaviour signal alongside the weight goal.' },
+    { sourceCategory: 'NUTRITION', rationale: 'Nutrition tracking provides context that can make the weight plan actionable.' },
+    { sourceCategory: 'SLEEP', rationale: 'Sleep provides additional context alongside the weight journey.' },
+  ],
+  BLOOD_PRESSURE: [
+    { sourceCategory: 'EXERCISE', rationale: 'Exercise is a relevant behaviour signal to monitor alongside this cardiovascular goal.' },
+    { sourceCategory: 'NUTRITION', rationale: 'Nutrition tracking provides contextual information alongside this cardiovascular goal.' },
+  ],
+  BLOOD_GLUCOSE: [
+    { sourceCategory: 'EXERCISE', rationale: 'Exercise provides a useful activity signal alongside glucose tracking.' },
+    { sourceCategory: 'NUTRITION', rationale: 'Nutrition tracking provides contextual information alongside glucose monitoring.' },
+  ],
+  CHOLESTEROL: [
+    { sourceCategory: 'EXERCISE', rationale: 'Exercise provides a useful activity signal alongside cholesterol tracking.' },
+    { sourceCategory: 'NUTRITION', rationale: 'Nutrition tracking provides contextual information alongside cholesterol monitoring.' },
+  ],
+  MENTAL_HEALTH: [
+    { sourceCategory: 'SLEEP', rationale: 'Sleep provides useful context alongside a mental-health tracking goal.' },
+  ],
+  HEART_RATE: [
+    { sourceCategory: 'EXERCISE', rationale: 'Exercise provides an activity signal that can be viewed alongside heart-rate measurements.' },
+  ],
+};
 
-const WEIGHT_RELATED_RULES = new Set(['SMOKING', 'ALCOHOL', 'BLOOD_PRESSURE', 'BLOOD_GLUCOSE', 'CHOLESTEROL']);
+const GOAL_RELATED_PAIRS = new Set([
+  'SMOKING|BLOOD_PRESSURE',
+  'SMOKING|HEART_RATE',
+  'ALCOHOL|WEIGHT',
+  'ALCOHOL|BLOOD_PRESSURE',
+  'ALCOHOL|BLOOD_GLUCOSE',
+  'ALCOHOL|CHOLESTEROL',
+  'BLOOD_PRESSURE|HEART_RATE',
+  'SLEEP|EXERCISE',
+  'HYDRATION|EXERCISE',
+]);
+
+const relationshipKey = (left: string, right: string) =>
+  left < right ? left + '|' + right : right + '|' + left;
 
 function ageFromDateOfBirth(value: Date | null | undefined): number | null {
   if (!value) return null;
@@ -149,26 +182,39 @@ export class HealthGoalIntelligenceService {
       where: { patientId, status: { in: ['ACTIVE', 'ON_HOLD'] } },
       select: { id: true, category: true },
     });
-    const weightGoals = goals.filter((goal) => String(goal.category).toUpperCase() === 'WEIGHT');
     const desired = new Map<string, { sourceGoalId: string; targetGoalId: string; relationshipType: 'SUPPORTS' | 'RELATED_TO'; rationale: string | null }>();
 
-    for (const weightGoal of weightGoals) {
-      for (const relatedGoal of goals) {
-        if (relatedGoal.id === weightGoal.id) continue;
-        const category = String(relatedGoal.category).toUpperCase();
+    for (const targetGoal of goals) {
+      const targetCategory = String(targetGoal.category).toUpperCase();
+      for (const sourceGoal of goals) {
+        if (sourceGoal.id === targetGoal.id) continue;
+        const sourceCategory = String(sourceGoal.category).toUpperCase();
 
-        if (WEIGHT_SUPPORT_RULES.some((rule) => rule.category === category)) {
-          const rationale = WEIGHT_SUPPORT_RULES.find((rule) => rule.category === category)?.rationale ?? null;
+        const supportRule = (GOAL_SUPPORT_RULES[targetCategory] ?? []).find(
+          (rule) => rule.sourceCategory === sourceCategory,
+        );
+        if (supportRule) {
           const relationshipType = 'SUPPORTS' as const;
-          desired.set(`${relatedGoal.id}|${weightGoal.id}|${relationshipType}`, { sourceGoalId: relatedGoal.id, targetGoalId: weightGoal.id, relationshipType, rationale });
-        } else if (WEIGHT_RELATED_RULES.has(category)) {
+          desired.set(sourceGoal.id + '|' + targetGoal.id + '|' + relationshipType, {
+            sourceGoalId: sourceGoal.id,
+            targetGoalId: targetGoal.id,
+            relationshipType,
+            rationale: supportRule.rationale,
+          });
+          continue;
+        }
+
+        if (GOAL_RELATED_PAIRS.has(relationshipKey(sourceCategory, targetCategory))) {
           const relationshipType = 'RELATED_TO' as const;
-          const rationale = 'This health behaviour or outcome can be monitored alongside the weight goal without assuming that it caused the weight change.';
-          desired.set(`${relatedGoal.id}|${weightGoal.id}|${relationshipType}`, { sourceGoalId: relatedGoal.id, targetGoalId: weightGoal.id, relationshipType, rationale });
+          desired.set(sourceGoal.id + '|' + targetGoal.id + '|' + relationshipType, {
+            sourceGoalId: sourceGoal.id,
+            targetGoalId: targetGoal.id,
+            relationshipType,
+            rationale: 'This goal provides related context that can be monitored alongside the other goal without assuming causation.',
+          });
         }
       }
     }
-
     const existing = await this.prisma.$queryRawUnsafe<Array<{ id: string; sourceGoalId: string; targetGoalId: string; relationshipType: string }>>(
       'SELECT r."id",r."sourceGoalId",r."targetGoalId",r."relationshipType" FROM "HealthGoalRelation" r INNER JOIN "HealthGoal" s ON s."id"=r."sourceGoalId" INNER JOIN "HealthGoal" t ON t."id"=r."targetGoalId" WHERE r."patientId"=$1 AND r."createdBy"=\'SYSTEM\' AND (s."category"=\'WEIGHT\' OR t."category"=\'WEIGHT\')',
       patientId,
@@ -687,7 +733,7 @@ export class HealthGoalIntelligenceService {
       }
 
       const existingSupportingGoals = relatedGoals.filter((relatedGoal) =>
-        WEIGHT_SUPPORT_RULES.some(
+        GOAL_SUPPORT_RULES[targetCategory]?.some(
           (rule) => rule.category === String(relatedGoal.category).toUpperCase(),
         ),
       );
