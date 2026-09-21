@@ -28,28 +28,28 @@ function normalise(value: unknown) {
 }
 
 function goalPatientMedicationId(goal: HealthGoal | null | undefined) {
-  return goal.patientMedicationId ??
-    goal.patientMedication?.id ??
-    goal.associatedPatientMedicationId ??
-    goal.associatedPatientMedication?.id ??
+  return goal?.patientMedicationId ??
+    goal?.patientMedication?.id ??
+    goal?.associatedPatientMedicationId ??
+    goal?.associatedPatientMedication?.id ??
     null;
 }
 
 function goalCatalogMedicationId(goal: HealthGoal | null | undefined) {
-  return goal.associatedMedicationId ??
-    goal.medicationId ??
-    goal.associatedMedication?.id ??
-    goal.medication?.id ??
+  return goal?.associatedMedicationId ??
+    goal?.medicationId ??
+    goal?.associatedMedication?.id ??
+    goal?.medication?.id ??
     null;
 }
 
 function goalMedicationName(goal: HealthGoal | null | undefined) {
   return normalise(
-    goal.medication?.name ??
-    goal.medication?.genericName ??
-    goal.medication?.brandName ??
-    goal.title ??
-    goal.description ??
+    goal?.medication?.name ??
+    goal?.medication?.genericName ??
+    goal?.medication?.brandName ??
+    goal?.title ??
+    goal?.description ??
     "",
   );
 }
