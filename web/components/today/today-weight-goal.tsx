@@ -11,13 +11,14 @@ type Props = { goal: any; fallbackWeight?: number | string | null };
 export default function TodayWeightGoal({ goal, fallbackWeight }: Props) {
   const [events, setEvents] = useState<WeightEvent[]>([]);
   const [loading, setLoading] = useState(true);
+  const [intelligence, setIntelligence] = useState<any>(null);
 
   useEffect(() => {
     let active = true;
     const load = async () => {
       setLoading(true);
       try {
-        const response = await healthGoalsService.getMetricEvents("WEIGHT", "weight.kg", new Date(0), new Date());
+        const [response, intelligenceResponse] = await Promise.all([\n          healthGoalsService.getMetricEvents("WEIGHT", "weight.kg", new Date(0), new Date()),\n          goal?.id ? healthGoalsService.getWeightGoalIntelligence(String(goal.id)).catch(() => null) : Promise.resolve(null),\n        ]);
         const next = (response.events ?? []).map((e: any) => ({
           loggedValue: Number(e.loggedValue),
           occurredAt: String(e.occurredAt),
@@ -165,54 +166,7 @@ export default function TodayWeightGoal({ goal, fallbackWeight }: Props) {
         )}
       </div>
 
-            {/* RESTORED CLINICAL INTELLIGENCE CONNECTION PANELS */}
-            {!loading && (connectedMedications.length > 0 || connectedConditions.length > 0 || supportiveRecommendations.length > 0) && (
-              <div className="mt-5 space-y-4 border-t border-slate-100 pt-4">
-                <p className="text-[10px] font-black uppercase tracking-[.14em] text-slate-400">Connected Health Profile Context</p>
-                {connectedMedications.length > 0 && (
-                  <div className="rounded-2xl border border-[#dfeaec] bg-white p-4">
-                    <span className="block text-[9px] font-black uppercase tracking-[.12em] text-[#0b7b80]">Linked Medications</span>
-                    <div className="mt-2 space-y-2">
-                      {connectedMedications.flat().map((med: any, idx: number) => (
-                        <div key={med?.id ?? idx} className="flex items-center justify-between text-xs">
-                          <span className="font-bold text-[#0b2d54]">{med?.name || med?.customName || med?.medication?.name || "Medication"}</span>
-                          <span className="font-medium text-slate-400">{med?.frequency || "Prescribed"}</span>
-                        </div>
-                      ))}
-                    </div>
-                    <p className="mt-2 text-[10px] leading-normal text-slate-400">Active medications are shown as clinical context alongside the weight-maintenance profile.</p>
-                  </div>
-                )}
-                {connectedConditions.length > 0 && (
-                  <div className="rounded-2xl border border-slate-100 bg-white p-4">
-                    <span className="block text-[9px] font-black uppercase tracking-[.12em] text-amber-600">Active Health Conditions</span>
-                    <div className="mt-2 flex flex-wrap gap-1.5">
-                      {connectedConditions.flat().map((cond: any, idx: number) => (
-                        <span key={cond?.id ?? idx} className="rounded-lg bg-amber-50 px-2.5 py-1 text-xs font-bold text-amber-700">{cond?.name || cond?.title || cond?.condition?.name || "Active condition"}</span>
-                      ))}
-                    </div>
-                  </div>
-                )}
-                {supportiveRecommendations.length > 0 && (
-                  <div className="rounded-2xl bg-gradient-to-br from-[#0b2d54] to-[#123e66] p-4 text-white shadow-md">
-                    <span className="block text-[9px] font-black uppercase tracking-[.12em] text-[#7de6e7]">Recommended Supporting Goals</span>
-                    <div className="mt-3 space-y-3">
-                      {supportiveRecommendations.map((rec: any, idx: number) => (
-                        <div key={rec?.id ?? idx} className="flex items-start gap-2.5 border-b border-white/10 pb-2.5 text-xs last:border-0 last:pb-0">
-                          <div className="mt-0.5 rounded bg-white/10 p-1 text-[#7de6e7]"><Activity className="h-3 w-3" /></div>
-                          <div>
-                            <p className="font-bold text-white">{rec?.title || rec?.name || "Supporting health goal"}</p>
-                            <p className="mt-0.5 text-[11px] text-white/70">{rec?.description || rec?.rationale || "Recommended as supporting context for your weight-maintenance profile."}</p>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                )}
-              </div>
-            )}
-
-      <div className={`${TODAY_GOAL_FOOTER_CLASS} bg-[#fbfdfd]`}>
+                  {/* 🚀 CLINICAL PROFILE CONNECTION BLOCK GRID */}\n      {!loading && (connectedMedications.length > 0 || connectedConditions.length > 0 || supportiveRecommendations.length > 0) && (\n        <div className="mt-5 px-4 pb-5 sm:px-5 sm:pb-6">\n          <div className="space-y-4 border-t border-slate-100 pt-4 text-left">\n            <p className="text-[10px] font-black uppercase tracking-[.14em] text-slate-400">Connected Profile Context</p>\n            {connectedMedications.length > 0 && <div className="rounded-2xl border border-[#dfeaec] bg-white p-4"><span className="block text-[9px] font-black uppercase tracking-[.12em] text-[#0b7b80]">Linked Medications</span><div className="mt-2 space-y-2">{connectedMedications.flat().map((med: any, idx: number) => <div key={med?.id ?? idx} className="flex items-center justify-between gap-3 text-xs"><span className="font-bold text-[#0b2d54]">{med?.name || med?.customName || med?.medication?.name || med?.medication?.genericName || "Medication"}</span><span className="shrink-0 text-right font-medium text-slate-400">{med?.dosage ? med.dosage + " · " : ""}{med?.frequency || "Prescribed"}</span></div>)}</div><p className="mt-2 text-[10px] leading-normal text-slate-400">Sympto dynamically cross-references available medication and metabolic tracking context relative to your weight-maintenance profile.</p></div>}\n            {connectedConditions.length > 0 && <div className="rounded-2xl border border-slate-100 bg-white p-4"><span className="block text-[9px] font-black uppercase tracking-[.12em] text-amber-600">Active Health Conditions</span><div className="mt-2 flex flex-wrap gap-1.5">{connectedConditions.flat().map((condition: any, idx: number) => <span key={condition?.id ?? idx} className="rounded-lg bg-amber-50 px-2.5 py-1 text-xs font-bold text-amber-700">{condition?.name || condition?.title || condition?.condition?.name || "Active condition"}</span>)}</div></div>}\n            {supportiveRecommendations.length > 0 && <div className="rounded-2xl bg-gradient-to-br from-[#0b2d54] to-[#123e66] p-4 text-white shadow-md"><span className="block text-[9px] font-black uppercase tracking-[.12em] text-[#7de6e7]">Supportive Goal Recommendations</span><div className="mt-3 space-y-3">{supportiveRecommendations.map((recommendation: any, idx: number) => <div key={recommendation?.id ?? idx} className="flex items-start gap-2.5 text-xs"><div className="mt-0.5 rounded bg-white/10 p-1 text-[#7de6e7]"><Activity className="h-3 w-3" /></div><div><p className="font-bold text-white">{recommendation?.title || recommendation?.name || "Supporting health goal"}</p><p className="mt-0.5 text-[11px] text-white/70">{recommendation?.description || recommendation?.rationale || "Recommended as supporting context for your weight-maintenance profile."}</p></div></div>)}</div></div>}\n          </div>\n          <p className="mt-4 text-[9px] leading-4 text-slate-400">General health information only. This context is not medical advice. Please consult a healthcare provider regarding health conditions, treatments, or medication management.</p>\n        </div>\n      )}\n      <div className={`${TODAY_GOAL_FOOTER_CLASS} bg-[#fbfdfd]`}>
         <div className="flex items-center justify-between text-[10px] font-semibold text-[#74859a]">
           <span>Weight tracking</span>
           <Link href={`/health-goals#goal-${encodeURIComponent(String(goal?.id ?? ""))}`} className="inline-flex min-h-9 items-center gap-1.5 rounded-xl px-3 text-[10px] font-black text-[#0b2d54]">
