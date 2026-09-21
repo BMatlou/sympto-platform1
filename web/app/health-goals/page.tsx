@@ -267,7 +267,25 @@ export default function HealthGoalsPage() {
       const weight = Number(dashboard?.patient?.weightKg);
       if (!Number.isFinite(amount) || amount <= 0) { toast.error("Enter a positive target weight."); return; }
       const height = Number(dashboard?.patient?.heightCm);      const analysis = weightAdvice(Number.isFinite(weight) ? weight : null, Number.isFinite(height) ? height : null, amount, draft.weightDirection, draft.targetDate);      if (!analysis) { toast.error(draft.weightDirection === "MAINTAIN" ? "Add your current weight before setting a weight-maintenance goal." : "Add your current weight and height before setting a weight goal."); return; }
-    }    try {
+    }    const liveGoals = healthGoals.filter((goal: any) => {
+      if (editingId && String(goal?.id) === String(editingId)) return false;
+      return ["ACTIVE", "ON_HOLD"].includes(String(goal?.status ?? "").toUpperCase()) &&
+        String(goal?.category ?? "").toUpperCase() === draft.category;
+    });
+    const duplicateGoal = draft.category === "MEDICATION"
+      ? liveGoals.find((goal: any) => String(goal?.patientMedicationId ?? goal?.patientMedication?.id ?? "") === String(draft.patientMedicationId ?? ""))
+      : liveGoals[0];
+
+    if (duplicateGoal) {
+      toast.error(
+        draft.category === "MEDICATION"
+          ? "This medication already has an active medication goal. Edit that goal instead of creating another."
+          : `You already have an active ${draft.category.toLowerCase().replaceAll("_", " ")} goal. Edit the existing goal instead of creating another.`,
+      );
+      return;
+    }
+
+    try {
       setSaving(true);
       const comparison: HealthGoalInput["comparison"] = draft.category === "WEIGHT" ? draft.weightDirection === "GAIN" ? "INCREASE_TO" : draft.weightDirection === "MAINTAIN" ? "CLOSEST" : "DECREASE_TO" : config.comparison;
       const input: HealthGoalInput = { patientId: dashboard.patient.id, patientMedicationId: draft.category === "MEDICATION" ? draft.patientMedicationId || undefined : undefined, title: draft.title.trim(), description: draft.description.trim() || undefined, category: config.value, priority: draft.priority, targetValue: draft.targetValue, unit: draft.unit || config.unit || undefined, targetDate: draft.targetDate || undefined, metricType: config.metricType, metricKey: config.metricKey, frequency: config.frequency, frequencyTarget: draft.targetValue, aggregation: config.aggregation, comparison };
