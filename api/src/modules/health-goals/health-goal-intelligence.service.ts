@@ -686,6 +686,80 @@ export class HealthGoalIntelligenceService {
         }
       }
 
+      const existingSupportingGoals = relatedGoals.filter((relatedGoal) =>
+        WEIGHT_SUPPORT_RULES.some(
+          (rule) => rule.category === String(relatedGoal.category).toUpperCase(),
+        ),
+      );
+      const existingRelatedGoals = relatedGoals.filter((relatedGoal) =>
+        WEIGHT_RELATED_RULES.has(String(relatedGoal.category).toUpperCase()),
+      );
+
+      const toGoalConnection = (
+        relatedGoal: (typeof relatedGoals)[number],
+        relationshipType: 'SUPPORTS' | 'RELATED_TO',
+      ) => ({
+        id: String(relatedGoal.id),
+        direction:
+          relationshipType === 'SUPPORTS'
+            ? 'supportsThisGoal'
+            : 'relatedToThisGoal',
+        relationshipType,
+        rationale:
+          relationshipType === 'SUPPORTS'
+            ? WEIGHT_SUPPORT_RULES.find(
+                (rule) =>
+                  rule.category === String(relatedGoal.category).toUpperCase(),
+              )?.rationale ?? null
+            : 'This health behaviour or outcome can be monitored alongside the weight goal without assuming that it caused the weight change.',
+        goal: {
+          id: String(relatedGoal.id),
+          title: String(relatedGoal.title),
+          category: String(relatedGoal.category),
+          status: String(relatedGoal.status),
+          targetValue:
+            relatedGoal.targetValue == null
+              ? null
+              : Number(relatedGoal.targetValue),
+          unit: relatedGoal.unit,
+          targetDate: relatedGoal.targetDate,
+        },
+      });
+
+      const derivedConnections = [
+        ...existingSupportingGoals.map((relatedGoal) =>
+          toGoalConnection(relatedGoal, 'SUPPORTS'),
+        ),
+        ...existingRelatedGoals.map((relatedGoal) =>
+          toGoalConnection(relatedGoal, 'RELATED_TO'),
+        ),
+      ];
+
+      const supportingGoalActions = existingSupportingGoals.map((relatedGoal) => ({
+        id: 'supporting-goal-' + String(relatedGoal.id),
+        label: String(relatedGoal.title),
+        description:
+          WEIGHT_SUPPORT_RULES.find(
+            (rule) =>
+              rule.category === String(relatedGoal.category).toUpperCase(),
+          )?.rationale ?? 'Continue tracking this supporting goal alongside your weight goal.',
+        href: '/health-goals#goal-' + encodeURIComponent(String(relatedGoal.id)),
+        priority: 'SUPPORTING' as const,
+      }));
+
+      const recommendedGoalActions = recommendedSupportingGoals.map((recommendation) => ({
+        id: recommendation.id,
+        label: recommendation.title,
+        description: recommendation.rationale,
+        href: '/health-goals',
+        priority: 'PRIMARY' as const,
+      }));
+
+      const todayFocusActions = [
+        ...supportingGoalActions,
+        ...recommendedGoalActions,
+      ].slice(0, 3);
+
       const targetDate = goal.targetDate ? new Date(goal.targetDate) : null;
       const daysRemaining =
         targetDate != null && Number.isFinite(targetDate.getTime())
@@ -780,14 +854,17 @@ export class HealthGoalIntelligenceService {
         },
         weightPlan,
         healthContext: {
-          connectedGoals: relatedGoals.map((relatedGoal) => ({
-            id: relatedGoal.id,
-            title: String(relatedGoal.title),
-            category: String(relatedGoal.category),
-            status: String(relatedGoal.status),
-            targetValue: relatedGoal.targetValue == null ? null : Number(relatedGoal.targetValue),
-            unit: relatedGoal.unit,
-            targetDate: relatedGoal.targetDate,
+          connectedGoals: derivedConnections.map((connection) => ({
+            id: connection.goal.id,
+            title: connection.goal.title,
+            category: connection.goal.category,
+            status: connection.goal.status,
+            relationshipType: connection.relationshipType,
+            direction: connection.direction,
+            rationale: connection.rationale,
+            targetValue: connection.goal.targetValue,
+            unit: connection.goal.unit,
+            targetDate: connection.goal.targetDate,
           })),
           activeConditions,
           activeMedications,
@@ -836,37 +913,24 @@ export class HealthGoalIntelligenceService {
           recentSymptomCount: 0,
           symptomsDataAvailable: false,
         },
-        relationships: relatedGoals.map((relatedGoal) => ({
-          id: `derived-${relatedGoal.id}`,
-          direction: 'relatedToThisGoal',
-          relationshipType:
-            ['EXERCISE', 'NUTRITION', 'SLEEP'].includes(String(relatedGoal.category).toUpperCase())
-              ? 'SUPPORTS'
-              : 'RELATED_TO',
-          rationale: 'Derived from the patient’s current active goal set; no legacy relation table is required.',
-          goal: {
-            id: relatedGoal.id,
-            title: String(relatedGoal.title),
-            category: String(relatedGoal.category),
-            status: String(relatedGoal.status),
-            targetValue: relatedGoal.targetValue == null ? null : Number(relatedGoal.targetValue),
-            unit: relatedGoal.unit,
-            targetDate: relatedGoal.targetDate,
-          },
-        })),
+        relationships: derivedConnections,
         recommendedSupportingGoals,
         targetedSupportiveGoals: recommendedSupportingGoals,
         supportiveGoals: recommendedSupportingGoals,
+        supportingGoals: existingSupportingGoals.map((relatedGoal) => ({
+          id: String(relatedGoal.id),
+          title: String(relatedGoal.title),
+          category: String(relatedGoal.category),
+          status: String(relatedGoal.status),
+          targetValue:
+            relatedGoal.targetValue == null
+              ? null
+              : Number(relatedGoal.targetValue),
+          unit: relatedGoal.unit,
+          targetDate: relatedGoal.targetDate,
+        })),
         todayFocus: {
-          actions: recommendedSupportingGoals.slice(0, 3).map((recommendation) => ({
-            id: recommendation.id,
-            label: recommendation.title,
-            description: recommendation.rationale,
-            href: recommendation.existingGoalId
-              ? `/health-goals#goal-${encodeURIComponent(recommendation.existingGoalId)}`
-              : '/health-goals',
-            priority: recommendation.existingGoalId ? 'SUPPORTING' : 'PRIMARY',
-          })),
+          actions: todayFocusActions,
           dataFreshness: {
             weightDataNeedsRefresh,
             checkInNeedsCompletion,
