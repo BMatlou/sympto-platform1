@@ -222,64 +222,35 @@ export class HealthGoalsService {
   }
 
   async findAll(query: QueryHealthGoalDto) {
-    const {
-      page = 1,
-      limit = 50,
-      patientId,
-      practitionerId,
-      carePlanId,
-      category,
-      priority,
-      status,
-    } = query;
-
-    const where: Prisma.HealthGoalWhereInput = {
-      ...(patientId ? { patientId } : {}),
-      ...(practitionerId ? { practitionerId } : {}),
-      ...(carePlanId ? { carePlanId } : {}),
-      ...(category ? { category } : {}),
-      ...(priority ? { priority } : {}),
-      ...(status ? { status } : {}),
-    };
+    const patientId = String(query?.patientId ?? '').trim();
 
     try {
-      // Keep GET /health-goals entirely on the canonical Prisma schema.
-      // patientMedicationId is nullable and therefore patientMedication is
-      // intentionally optional. There is no DELETED/INACTIVE HealthGoal enum
-      // value in the current schema, so do not issue a stale status filter.
-      const [healthGoalsList, total] = await this.prisma.$transaction([
-        this.prisma.healthGoal.findMany({
-          where,
-          include: {
-            patient: true,
-            practitioner: true,
-            carePlan: true,
-            patientMedication: {
-              include: {
-                medication: true,
-              },
-            },
-            progress: {
-              orderBy: { createdAt: 'desc' },
+      const healthGoalsList = await this.prisma.healthGoal.findMany({
+        where: {
+          ...(patientId ? { patientId } : {}),
+          ...(query?.practitionerId ? { practitionerId: query.practitionerId } : {}),
+          ...(query?.carePlanId ? { carePlanId: query.carePlanId } : {}),
+          ...(query?.category ? { category: query.category } : {}),
+          ...(query?.priority ? { priority: query.priority } : {}),
+          ...(query?.status ? { status: query.status } : {}),
+        },
+        include: {
+          patientMedication: {
+            include: {
+              medication: true,
             },
           },
-          orderBy: { createdAt: 'desc' },
-          skip: Math.max(0, (page - 1) * limit),
-          take: limit,
-        }),
-        this.prisma.healthGoal.count({ where }),
-      ]);
+          progress: {
+            orderBy: { createdAt: 'desc' },
+          },
+        },
+        orderBy: { createdAt: 'desc' },
+      });
 
       return {
         success: true,
         statusCode: 200,
         data: healthGoalsList,
-        pagination: {
-          page,
-          limit,
-          total,
-          totalPages: Math.ceil(total / limit),
-        },
       };
     } catch (error: unknown) {
       const message = error instanceof Error ? error.message : String(error);
