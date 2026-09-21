@@ -82,23 +82,74 @@ export default function PrescribedMedicationsCard({
       ) : (
         <div className="space-y-3">
           {prescriptionsList.map((medication) => {
-            // 🔍 Next-Gen Matching Predicate resolving repository-level schema drift
-            const isGoalSetForThisMed = activeGoalsArray.some((goal: any) => {
-              if (!goal || String(goal.status).toUpperCase() === "ARCHIVED") return false;
+            const medicationPatientId = getPatientMedicationId(medication);
+            const medicationCatalogId =
+              medication.medicationId ??
+              medication.medication?.id ??
+              medication.medication?.medicationId ??
+              null;
+            const medicationName = normalise(
+              medication.name ??
+              medication.medication?.name ??
+              medication.medication?.genericName ??
+              medication.medication?.brandName ??
+              "",
+            );
 
-              // 1. Target the canonical runtime field appended by the backend service
-              const targetMedicationId = medication.patientMedicationId ?? medication.id;
-              const matchesCanonicalId = goal.patientMedicationId === targetMedicationId;
+            const isGoalSetForThisMed = activeGoalsArray.some((goal: HealthGoal) => {
+              if (!goal) return false;
 
-              if (matchesCanonicalId) return true;
+              const status = String(goal.status ?? "").toUpperCase();
+              if (["ARCHIVED", "CANCELLED", "DELETED"].includes(status)) return false;
 
-              // 2. Legacy fallback: a generic unlinked medication goal is only
-              // safe to match when there is exactly one active medication.
-              const isMedicationCategory = String(goal.metricType ?? "").toUpperCase() === "MEDICATION" || String(goal.category ?? "").toUpperCase() === "MEDICATION";
-              const isGenericTitle = normalise(goal.title) === "manage medication";
-              const activeMedicationCount = prescriptionsList.length;
+              const category = String(goal.category ?? "").toUpperCase();
+              const metricType = String(goal.metricType ?? goal.metricConfig?.metricType ?? "").toUpperCase();
+              const metricKey = String(goal.metricConfig?.metricKey ?? "").toLowerCase();
+              const isMedicationGoal =
+                category === "MEDICATION" ||
+                metricType === "MEDICATION" ||
+                metricKey === "medication.adherence";
 
-              return isMedicationCategory && isGenericTitle && activeMedicationCount === 1;
+              if (!isMedicationGoal) return false;
+
+              const linkedPatientMedicationId =
+                goal.patientMedicationId ??
+                (goal as any).patientMedication?.id ??
+                (goal as any).associatedPatientMedicationId ??
+                (goal as any).associatedPatientMedication?.id ??
+                null;
+
+              if (linkedPatientMedicationId && medicationPatientId) {
+                return String(linkedPatientMedicationId) === String(medicationPatientId);
+              }
+
+              const linkedMedicationId =
+                goal.associatedMedicationId ??
+                goal.medicationId ??
+                (goal as any).associatedMedication?.id ??
+                (goal as any).medication?.id ??
+                null;
+
+              if (linkedMedicationId && medicationCatalogId) {
+                return String(linkedMedicationId) === String(medicationCatalogId);
+              }
+
+              const goalMedicationName = normalise(
+                (goal as any).medication?.name ??
+                (goal as any).medication?.genericName ??
+                (goal as any).medication?.brandName ??
+                (goal as any).title ??
+                (goal as any).description ??
+                "",
+              );
+
+              if (medicationName && goalMedicationName) {
+                return goalMedicationName === medicationName ||
+                  goalMedicationName.includes(medicationName) ||
+                  medicationName.includes(goalMedicationName);
+              }
+
+              return normalise(goal.title) === "manage medication" && prescriptionsList.length === 1;
             });
 
             return (
