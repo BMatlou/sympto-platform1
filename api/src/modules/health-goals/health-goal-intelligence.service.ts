@@ -611,12 +611,6 @@ export class HealthGoalIntelligenceService {
         stage: row.stage ? String(row.stage) : null,
       }));
 
-      const hasMetformin = activeMedications.some((medication) => {
-        const name = medication.name.toLowerCase();
-        const genericName = String(medication.genericName ?? '').toLowerCase();
-        return name === 'metformin' || genericName === 'metformin' || name.includes('metformin');
-      });
-
       const existingCategories = new Set(
         relatedGoals.map((relatedGoal) => String(relatedGoal.category).toUpperCase()),
       );
@@ -628,7 +622,7 @@ export class HealthGoalIntelligenceService {
         target?: number;
         unit?: string;
         rationale: string;
-        source: 'CLINICAL_CONTEXT' | 'WEIGHT_CONTEXT';
+        source: 'WEIGHT_CONTEXT';
         existingGoalId?: string;
       };
 
@@ -645,46 +639,9 @@ export class HealthGoalIntelligenceService {
         recommendedSupportingGoals.push(recommendation);
       };
 
-      // These are recommendations, not silently-created health goals. The user
-      // must explicitly create/accept them in the goals workflow.
-      if (hasMetformin) {
-        if (!existingCategories.has('EXERCISE')) {
-          addRecommendation({
-            id: 'metformin-exercise-support',
-            category: 'EXERCISE',
-            title: 'Build a consistent movement routine',
-            target: 150,
-            unit: 'minutes/week',
-            rationale: 'Regular physical activity can support cardiometabolic health alongside an antidiabetic treatment plan.',
-            source: 'CLINICAL_CONTEXT',
-          });
-        }
-
-        const metforminMedication = activeMedications.find((medication) => {
-          const name = medication.name.toLowerCase();
-          const genericName = String(medication.genericName ?? '').toLowerCase();
-          return name === 'metformin' || genericName === 'metformin' || name.includes('metformin');
-        });
-
-        const medicationGoal = relatedGoals.find((relatedGoal) => {
-          if (String(relatedGoal.category).toUpperCase() !== 'MEDICATION') return false;
-          return String(relatedGoal.title).toLowerCase().includes('metformin');
-        });
-
-        addRecommendation({
-          id: medicationGoal
-            ? `medication-adherence-${medicationGoal.id}`
-            : `metformin-adherence-${metforminMedication?.id ?? 'active'}`,
-          category: 'MEDICATION',
-          title: medicationGoal?.title ?? 'Metformin adherence',
-          target: 100,
-          unit: '%',
-          rationale: 'Track prescribed medication adherence so missed doses and tolerability can be reviewed with the care team.',
-          source: 'CLINICAL_CONTEXT',
-          existingGoalId: medicationGoal?.id,
-        });
-      }
-
+      // Recommendations are deliberately separate from existing relationships.
+      // Sympto must never silently create a new health goal just because the
+      // weight goal would benefit from one.
       const genericSupportingRules: Array<{
         category: 'EXERCISE' | 'NUTRITION' | 'SLEEP';
         title: string;
