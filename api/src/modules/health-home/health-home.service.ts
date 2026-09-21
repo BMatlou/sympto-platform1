@@ -329,30 +329,54 @@ export class HealthHomeService {
       ...aiObservations.filter((o) => o.requiresAttention && !o.reviewed).map((o) => ({ type: 'AI_OBSERVATION', severity: 'HIGH', title: 'Sympto noticed something worth reviewing', description: o.observation, actionUrl: '/health-journal' })),
       ...labOrders.flatMap((order) => order.items.flatMap((item) => item.labResults.flatMap((result) => result.items.filter((ri) => ri.abnormal || ri.critical).map((ri) => ({ type: ri.critical ? 'CRITICAL_RESULT' : 'ABNORMAL_RESULT', severity: ri.critical ? 'URGENT' : 'HIGH', title: `${ri.test.name} result needs review`, description: ri.comments ?? 'A recent laboratory result is outside the expected range.', actionUrl: '/health-journal' }))))),
     ].slice(0, 10);
-    const medicationGoalLinks = await this.prisma.$queryRaw<Array<{ healthGoalId: string; patientMedicationId: string | null; medicationId: string | null }>>`
-      SELECT hg."id" AS "healthGoalId", hg."patientMedicationId", pm."medicationId"
+    const medicationGoalLinks = await this.prisma.$queryRaw<Array<{ healthGoalId: string; patientMedicationId: string | null; medicationId: string | null; title: string; status: string }>>`
+      SELECT hg."id" AS "healthGoalId", hg."patientMedicationId", pm."medicationId", hg."title", hg."status"::text AS "status"
       FROM "HealthGoal" hg
       LEFT JOIN "PatientMedication" pm ON pm."id" = hg."patientMedicationId"
       WHERE hg."patientId" = ${patientId}
         AND hg."category" = 'MEDICATION'
-        AND hg."status" IN ('ACTIVE', 'IN_PROGRESS', 'ON_TRACK', 'IMPROVING', 'STAGNANT', 'DECLINING')
+        AND hg."status" NOT IN ('CANCELLED', 'DELETED', 'ARCHIVED')
       ORDER BY hg."createdAt" DESC
     `;
-    const goalByPatientMedicationId = new Map<string, string>();
-    const goalByMedicationId = new Map<string, string>();
+    const goalByPatientMedicationId = new Map<string, Array<{ id: string; status: string; title: string }>>();
+    const goalByMedicationId = new Map<string, Array<{ id: string; status: string; title: string }>>();
+    const addGoal = (map: Map<string, Array<{ id: string; status: string; title: string }>>, key: string | null, goal: { id: string; status: string; title: string }) => {
+      if (!key) return;
+      const existing = map.get(String(key)) ?? [];
+      if (!existing.some((item) => item.id === goal.id)) existing.push(goal);
+      map.set(String(key), existing);
+    };
     for (const link of medicationGoalLinks) {
-      if (link.patientMedicationId && !goalByPatientMedicationId.has(String(link.patientMedicationId))) {
-        goalByPatientMedicationId.set(String(link.patientMedicationId), String(link.healthGoalId));
-      }
-      if (link.medicationId && !goalByMedicationId.has(String(link.medicationId))) {
-        goalByMedicationId.set(String(link.medicationId), String(link.healthGoalId));
-      }
+      const goal = { id: String(link.healthGoalId), status: String(link.status), title: String(link.title ?? '') };
+      addGoal(goalByPatientMedicationId, link.patientMedicationId, goal);
+      addGoal(goalByMedicationId, link.medicationId, goal);
     }
+    const normalizeMedicationName = (value: unknown) => String(value ?? '').trim().toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
+    const medicationGoalRows = medicationGoalLinks.map((link) => ({
+      id: String(link.healthGoalId),
+      status: String(link.status),
+      title: String(link.title ?? ''),
+      patientMedicationId: link.patientMedicationId ? String(link.patientMedicationId) : null,
+      medicationId: link.medicationId ? String(link.medicationId) : null,
+    }));
     const medicationsWithGoalLinks = medications.map((medication) => {
-      const linkedGoalId =
-        goalByPatientMedicationId.get(String(medication.id)) ??
-        goalByMedicationId.get(String(medication.medicationId));
-      return linkedGoalId ? { ...medication, healthGoalId: linkedGoalId } : medication;
+      const patientMedicationId = medication.id ? String(medication.id) : null;
+      const medicationId = medication.medicationId ? String(medication.medicationId) : null;
+      const medicationName = normalizeMedicationName((medication as any).medication?.name ?? (medication as any).name);
+      let linkedGoals = patientMedicationId ? (goalByPatientMedicationId.get(patientMedicationId) ?? []) : [];
+      if (!linkedGoals.length && medicationId) linkedGoals = goalByMedicationId.get(medicationId) ?? [];
+      if (!linkedGoals.length && medicationName) {
+        linkedGoals = medicationGoalRows
+          .filter((goal) => {
+            const title = normalizeMedicationName(goal.title);
+            return Boolean(title && title !== 'manage medication' && (title === medicationName || title.includes(medicationName) || medicationName.includes(title)));
+          })
+          .map(({ id, status, title }) => ({ id, status, title }));
+      }
+      const healthGoals = linkedGoals.map((goal) => ({ id: String(goal.id), status: String(goal.status), title: String(goal.title ?? '') }));
+      return healthGoals.length
+        ? { ...medication, healthGoalId: healthGoals[0].id, healthGoals }
+        : medication;
     });
 
     const goalsWithProgress = goals.map((goal) => ({ ...goal, latestProgress: goal.progress[0] ?? null }));
