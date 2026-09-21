@@ -283,12 +283,12 @@ export default function TodayWeightGoal({ goal, fallbackWeight }: Props) {
             : `${formatKg(gainedKg)} kg gained from ${formatKg(startingWeight)} kg`;
 
   const targetLabel = goalCompleted
-    ? `Completed · target body weight ${targetWeightDisplay`
+    ? `Completed · target body weight ${targetWeightDisplay}`
     : isMaintenanceGoal
       ? `Maintenance baseline · ${formatKg(startingWeight)} kg`
       : bmiCaution || gainTargetCaution
-        ? `Goal needs review · planned change ${formatKg(targetAmount)} kg · projected weight ${targetWeightDisplay`
-        : `${formatKg(remainingGoalAmount)} kg remaining · requested change ${formatKg(targetAmount)} kg · projected weight ${targetWeightDisplay`;
+        ? `Goal needs review · planned change ${formatKg(targetAmount)} kg · projected weight ${targetWeightDisplay}`
+        : `${formatKg(remainingGoalAmount)} kg remaining · requested change ${formatKg(targetAmount)} kg · projected weight ${targetWeightDisplay}`;
 
   const trendMessage = goalCompleted
     ? "This goal is complete. Later weight measurements do not change its 100% progress; start a new weight goal for a new journey."
@@ -309,7 +309,7 @@ export default function TodayWeightGoal({ goal, fallbackWeight }: Props) {
             : `Current trend: no recorded weight change from the ${formatKg(startingWeight)} kg starting point. BMI is ${bmiDisplay}.`;
 
   const guidanceMessage = gainTargetCaution
-    ? `Your planned target of ${targetWeightDisplay corresponds to a BMI of ${targetBmiDisplay} at your recorded height, which is outside the adult healthy-weight screening range. ${gainTargetObesityRange ? "It is in the adult obesity BMI screening category." : "It is in the adult overweight BMI screening category."} This is a screening signal, not a diagnosis; BMI does not distinguish muscle from fat. Review the target with a healthcare professional before pursuing it.`
+    ? `Your planned target of ${targetWeightDisplay} corresponds to a BMI of ${targetBmiDisplay} at your recorded height, which is outside the adult healthy-weight screening range. ${gainTargetObesityRange ? "It is in the adult obesity BMI screening category." : "It is in the adult overweight BMI screening category."} This is a screening signal, not a diagnosis; BMI does not distinguish muscle from fat. Review the target with a healthcare professional before pursuing it.`
     : isMaintenanceGoal
       ? intelligence?.weight?.average7dKg != null
       ? `Sympto is using your 7-day average rather than a single scale reading. Your maintenance band is approximately ${formatKg(intelligence.weight.maintenanceBand?.min ?? startingWeight)}–${formatKg(intelligence.weight.maintenanceBand?.max ?? startingWeight)} kg around your baseline.`
@@ -317,7 +317,7 @@ export default function TodayWeightGoal({ goal, fallbackWeight }: Props) {
     : currentBmi != null && currentBmi < 18.5
       ? `Your current BMI is ${bmiDisplay}, below the adult underweight screening threshold of 18.5. Sympto should shift guidance toward healthy weight gain rather than further weight loss. At your recorded height, BMI 18.5 corresponds to about ${formatKg(lowerScreeningWeight)} kg. BMI is a screening measure, not a diagnosis.`
       : bmiCaution
-        ? `Your current BMI is ${bmiDisplay}, while the planned target BMI would be ${targetBmiDisplay}, below 18.5. Sympto will not encourage further loss toward ${targetWeightDisplay. The next step is to review this goal and either revise the target or switch to a weight-gain/maintenance focus. At your recorded height, BMI 18.5 corresponds to about ${formatKg(lowerScreeningWeight)} kg. BMI is a screening measure, not a diagnosis.`
+        ? `Your current BMI is ${bmiDisplay}, while the planned target BMI would be ${targetBmiDisplay}, below 18.5. Sympto will not encourage further loss toward ${targetWeightDisplay}. The next step is to review this goal and either revise the target or switch to a weight-gain/maintenance focus. At your recorded height, BMI 18.5 corresponds to about ${formatKg(lowerScreeningWeight)} kg. BMI is a screening measure, not a diagnosis.`
         : currentBmiAboveRange
           ? `BMI now ${bmiDisplay} is at or above 25. Interpret this screening measure alongside the person's wider health information.`
           : null;
@@ -414,8 +414,8 @@ export default function TodayWeightGoal({ goal, fallbackWeight }: Props) {
             {targetReached
               ? "Goal reached. You need 0.0 kg/day (0.0 kg/week) more."
               : comparison === "DECREASE_TO"
-                ? `You need to lose about ${formatKg(remainingGoalAmount)} kg more to reach ${targetWeightDisplay by ${formatDate(journey.targetDate)}. That is about ${formatRate(requiredDailyChange)} kg/day or ${formatRate(requiredWeeklyChange)} kg/week.`
-                : `You need to gain about ${formatKg(remainingGoalAmount)} kg more to reach ${targetWeightDisplay by ${formatDate(journey.targetDate)}. That is about ${formatRate(requiredDailyChange)} kg/day or ${formatRate(requiredWeeklyChange)} kg/week.`}
+                ? `You need to lose about ${formatKg(remainingGoalAmount)} kg more to reach ${targetWeightDisplay} by ${formatDate(journey.targetDate)}. That is about ${formatRate(requiredDailyChange)} kg/day or ${formatRate(requiredWeeklyChange)} kg/week.`
+                : `You need to gain about ${formatKg(remainingGoalAmount)} kg more to reach ${targetWeightDisplay} by ${formatDate(journey.targetDate)}. That is about ${formatRate(requiredDailyChange)} kg/day or ${formatRate(requiredWeeklyChange)} kg/week.`}
           </div>
         )}
 
