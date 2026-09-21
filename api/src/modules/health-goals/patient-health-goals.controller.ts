@@ -61,10 +61,41 @@ export class PatientHealthGoalsController {
   }
 
   private async assertOwnGoal(goalId: string, userId: string) {
-    const goal = await this.healthGoalsService.findOne(goalId);
-    if (!userId || goal.patient.userId !== userId) {
+    // Authorization must not depend on the legacy relationship hydrator.
+    // findOne() still performs relationship work that can fail when the old
+    // HealthGoalRelation table is out of sync. Ownership only needs the goal
+    // and its patient's user id, so keep this check on the current Prisma schema.
+    const goal = await this.prisma.healthGoal.findUnique({
+      where: { id: goalId },
+      select: {
+        id: true,
+        patientId: true,
+        title: true,
+        category: true,
+        status: true,
+        targetValue: true,
+        currentValue: true,
+        unit: true,
+        targetDate: true,
+        priority: true,
+        createdAt: true,
+        patient: {
+          select: {
+            id: true,
+            userId: true,
+          },
+        },
+      },
+    });
+
+    if (!goal) {
+      throw new BadRequestException('Health goal not found.');
+    }
+
+    if (!userId || goal.patient?.userId !== userId) {
       throw new ForbiddenException('Patient health goal does not belong to the authenticated user.');
     }
+
     return goal;
   }
 
