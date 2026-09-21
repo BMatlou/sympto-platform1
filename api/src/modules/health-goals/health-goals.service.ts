@@ -276,7 +276,7 @@ export class HealthGoalsService {
       // CLOSEST must remain MAINTAIN and must not silently become LOSE.
       const data = await Promise.all(
         healthGoalsList.map(async (goal: any) => {
-          const configRows = await this.prisma.$queryRaw<any[]>\`
+          const configRows = await this.prisma.$queryRaw<any[]>`
             SELECT
               "id",
               "healthGoalId",
@@ -290,7 +290,7 @@ export class HealthGoalsService {
             FROM "HealthGoalMetricConfig"
             WHERE "healthGoalId" = ${goal.id}
             LIMIT 1
-          \`;
+          `;
 
           return {
             ...goal,
