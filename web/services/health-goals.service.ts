@@ -37,7 +37,20 @@ class HealthGoalsService {
   async logAlcohol(id: string, drinks: number) { const response = await api.post(`/patient-health-goals/${id}/alcohol-log`, { drinks }); return response.data?.data ?? response.data; }
   async remove(id: string) { const response = await api.delete(`/patient-health-goals/${id}`); deletedGoalIds.add(String(id)); const result = response.data?.data ?? response.data; notifyGoalChange(String(id)); return result; }
   async recordProgress(goalId: string, currentValue: number, notes?: string): Promise<HealthGoalProgressUpdate> { const { data } = await api.post(`/health-goals/${goalId}/progress`, { currentValue: String(currentValue), ...(notes ? { notes } : {}) }); return data.data ?? data; }
-  async getWeightGoalIntelligence(id: string): Promise<WeightGoalIntelligence> { const response = await api.get(`/patient-health-goals/${id}/intelligence`); return response.data?.data ?? response.data; }
+  async getWeightGoalIntelligence(id: string): Promise<WeightGoalIntelligence> {
+    const response = await api.get(`/patient-health-goals/${id}/intelligence`);
+    const payload = response.data;
+
+    // The global API interceptor wraps controller responses as { success, data }.
+    // The weight-intelligence controller then returns { success, statusCode, intelligence }.
+    // Normalize both layers here so consumers always receive the actual intelligence object.
+    return (
+      payload?.data?.intelligence ??
+      payload?.intelligence ??
+      payload?.data ??
+      payload
+    );
+  }
   async getMetricEvents(metricType: string, metricKey: string, from: Date, to: Date, source?: string): Promise<HealthGoalMetricEventsResponse> { const response = await api.get(`/health-goals/metric-events`, { params: { metricType, metricKey, from: from.toISOString(), to: to.toISOString(), ...(source ? { source } : {}) } }); return response.data?.data ?? response.data; }
 }
 
