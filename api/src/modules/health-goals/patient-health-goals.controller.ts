@@ -158,102 +158,210 @@ export class PatientHealthGoalsController {
     return this.healthGoalIntelligence.getGoalRelationships(goal.id);
   }
 
-  private async buildWeightIntelligenceFallback(goalId: string) {
-    const goal = await this.prisma.healthGoal.findUnique({
-      where: { id: goalId },
-      select: {
-        id: true,
-        title: true,
-        category: true,
-        targetValue: true,
-        unit: true,
-        targetDate: true,
-        priority: true,
-        status: true,
-        createdAt: true,
-        patientId: true,
-        patient: {
-          select: {
-            weightKg: true,
-            heightCm: true,
-            baseline: {
-              select: {
-                weightKg: true,
-                heightCm: true,
-                bmi: true,
-              },
-            },
-            person: {
-              select: {
-                dateOfBirth: true,
-                gender: true,
-              },
-            },
-          },
-        },
-      },
-    });
+  private async buildWeightIntelligenceFallback(goalId: string, userId: string) {
+    type GoalRow = {
+      id: string;
+      patientId: string;
+      title: string;
+      category: string;
+      targetValue: number | string | null;
+      unit: string | null;
+      targetDate: Date | null;
+      priority: string;
+      status: string;
+      createdAt: Date;
+      userId: string;
+      patientWeightKg: number | string | null;
+      patientHeightCm: number | string | null;
+      baselineWeightKg: number | string | null;
+      baselineHeightCm: number | string | null;
+      baselineBmi: number | string | null;
+      dateOfBirth: Date | null;
+      gender: string | null;
+    };
 
-    if (!goal) {
-      throw new BadRequestException('Health goal not found.');
-    }
-
-    const latestRows = await this.prisma.$queryRaw<Array<{ loggedValue: number | string | null }>>`
-      SELECT "loggedValue"::double precision AS "loggedValue"
-      FROM "HealthGoalMetricEvent"
-      WHERE "patientId" = ${goal.patientId}
-        AND "metricType" = 'WEIGHT'
-        AND "metricKey" = 'weight.kg'
-        AND "source" <> 'goal-baseline'
-        AND "occurredAt" <= CURRENT_TIMESTAMP
-      ORDER BY "occurredAt" DESC
+    const goalRows = await this.prisma.$queryRaw<GoalRow[]>\`
+      SELECT
+        g."id",
+        g."patientId",
+        g."title",
+        g."category"::text AS "category",
+        g."targetValue"::double precision AS "targetValue",
+        g."unit",
+        g."targetDate",
+        g."priority"::text AS "priority",
+        g."status"::text AS "status",
+        g."createdAt",
+        p."userId",
+        p."weightKg"::double precision AS "patientWeightKg",
+        p."heightCm"::double precision AS "patientHeightCm",
+        pb."weightKg"::double precision AS "baselineWeightKg",
+        pb."heightCm"::double precision AS "baselineHeightCm",
+        pb."bmi"::double precision AS "baselineBmi",
+        pe."dateOfBirth",
+        pe."gender"::text AS "gender"
+      FROM "HealthGoal" g
+      INNER JOIN "Patient" p ON p."id" = g."patientId"
+      INNER JOIN "Person" pe ON pe."id" = p."personId"
+      LEFT JOIN "PatientBaseline" pb ON pb."patientId" = p."id"
+      WHERE g."id" = ${goalId}
       LIMIT 1
     `;
 
-    const latestWeight =
-      latestRows[0]?.loggedValue != null
-        ? Number(latestRows[0].loggedValue)
-        : goal.patient.weightKg != null
-          ? Number(goal.patient.weightKg)
-          : goal.patient.baseline?.weightKg != null
-            ? Number(goal.patient.baseline.weightKg)
-            : null;
+    const goal = goalRows[0];
+    if (!goal) throw new BadRequestException('Health goal not found.');
+    if (String(goal.userId) !== String(userId)) {
+      throw new ForbiddenException('Patient health goal does not belong to the authenticated user.');
+    }
+    if (String(goal.category).toUpperCase() !== 'WEIGHT') {
+      throw new BadRequestException('This intelligence view is only available for weight goals.');
+    }
+
+    let latestWeight: number | null = null;
+    let latestWeightAt: Date | null = null;
+
+    try {
+      const rows = await this.prisma.$queryRaw<Array<{ loggedValue: number | string | null; occurredAt: Date | null }>>\`
+        SELECT
+          "loggedValue"::double precision AS "loggedValue",
+          "occurredAt"
+        FROM "HealthGoalMetricEvent"
+        WHERE "patientId" = ${goal.patientId}
+          AND "metricType" = 'WEIGHT'
+          AND "metricKey" = 'weight.kg'
+          AND "source" <> 'goal-baseline'
+          AND "occurredAt" <= CURRENT_TIMESTAMP
+        ORDER BY "occurredAt" DESC
+        LIMIT 1
+      `;
+      if (rows[0]?.loggedValue != null && Number.isFinite(Number(rows[0].loggedValue))) {
+        latestWeight = Number(rows[0].loggedValue);
+        latestWeightAt = rows[0].occurredAt ?? null;
+      }
+    } catch (error) {
+      console.error(
+        '❌ Weight metric-event fallback query failed:',
+        error instanceof Error ? error.message : String(error),
+      );
+    }
+
+    if (latestWeight == null) {
+      try {
+        const rows = await this.prisma.$queryRaw<Array<{ weightKg: number | string | null; createdAt: Date | null }>>\`
+          SELECT "weightKg"::double precision AS "weightKg", "createdAt"
+          FROM "HealthJournal"
+          WHERE "patientId" = ${goal.patientId}
+            AND "weightKg" IS NOT NULL
+          ORDER BY "createdAt" DESC
+          LIMIT 1
+        `;
+        if (rows[0]?.weightKg != null && Number.isFinite(Number(rows[0].weightKg))) {
+          latestWeight = Number(rows[0].weightKg);
+          latestWeightAt = rows[0].createdAt ?? null;
+        }
+      } catch (error) {
+        console.error(
+          '❌ Weight journal fallback query failed:',
+          error instanceof Error ? error.message : String(error),
+        );
+      }
+    }
+
+    if (latestWeight == null && goal.patientWeightKg != null && Number.isFinite(Number(goal.patientWeightKg))) {
+      latestWeight = Number(goal.patientWeightKg);
+    }
 
     const heightCm =
-      goal.patient.heightCm != null
-        ? Number(goal.patient.heightCm)
-        : goal.patient.baseline?.heightCm != null
-          ? Number(goal.patient.baseline.heightCm)
+      goal.patientHeightCm != null && Number.isFinite(Number(goal.patientHeightCm))
+        ? Number(goal.patientHeightCm)
+        : goal.baselineHeightCm != null && Number.isFinite(Number(goal.baselineHeightCm))
+          ? Number(goal.baselineHeightCm)
           : null;
 
+    const baselineWeight =
+      goal.baselineWeightKg != null && Number.isFinite(Number(goal.baselineWeightKg))
+        ? Number(goal.baselineWeightKg)
+        : goal.patientWeightKg != null && Number.isFinite(Number(goal.patientWeightKg))
+          ? Number(goal.patientWeightKg)
+          : latestWeight;
+
     const currentBmi =
-      latestWeight != null && Number.isFinite(latestWeight) &&
-      heightCm != null && Number.isFinite(heightCm) && heightCm > 0
+      latestWeight != null && heightCm != null && heightCm > 0
         ? latestWeight / ((heightCm / 100) ** 2)
         : null;
 
-    const baselineWeight =
-      goal.patient.baseline?.weightKg != null
-        ? Number(goal.patient.baseline.weightKg)
-        : goal.patient.weightKg != null
-          ? Number(goal.patient.weightKg)
-          : latestWeight;
+    const baselineBmi =
+      baselineWeight != null && heightCm != null && heightCm > 0
+        ? baselineWeight / ((heightCm / 100) ** 2)
+        : goal.baselineBmi != null && Number.isFinite(Number(goal.baselineBmi))
+          ? Number(goal.baselineBmi)
+          : null;
 
-    const comparisonRows = await this.prisma.$queryRaw<Array<{ comparison: string | null }>>`
-      SELECT "comparison"
-      FROM "HealthGoalMetricConfig"
-      WHERE "healthGoalId" = ${goal.id}
-      LIMIT 1
-    `;
+    let comparison = 'CLOSEST';
+    try {
+      const rows = await this.prisma.$queryRaw<Array<{ comparison: string | null }>>\`
+        SELECT "comparison"
+        FROM "HealthGoalMetricConfig"
+        WHERE "healthGoalId" = ${goal.id}
+        LIMIT 1
+      `;
+      comparison = String(rows[0]?.comparison ?? 'CLOSEST').toUpperCase();
+    } catch (error) {
+      console.error(
+        '❌ Weight metric-config fallback query failed:',
+        error instanceof Error ? error.message : String(error),
+      );
+    }
 
-    const comparison = String(comparisonRows[0]?.comparison ?? 'CLOSEST').toUpperCase();
+    const targetValue = goal.targetValue == null ? null : Number(goal.targetValue);
+    const direction =
+      comparison === 'INCREASE_TO'
+        ? 'GAIN'
+        : comparison === 'DECREASE_TO'
+          ? 'LOSE'
+          : 'MAINTAIN';
+
+    const targetWeight =
+      direction === 'GAIN' && baselineWeight != null && targetValue != null
+        ? baselineWeight + targetValue
+        : direction === 'LOSE' && baselineWeight != null && targetValue != null
+          ? baselineWeight - targetValue
+          : baselineWeight;
+
+    const maintenanceBand =
+      baselineWeight != null
+        ? { min: baselineWeight - 1.5, max: baselineWeight + 1.5 }
+        : null;
+
+    const withinMaintenanceBand =
+      direction === 'MAINTAIN' && baselineWeight != null && latestWeight != null
+        ? latestWeight >= baselineWeight - 1.5 && latestWeight <= baselineWeight + 1.5
+        : null;
+
+    const age =
+      goal.dateOfBirth != null
+        ? Math.max(
+            0,
+            new Date().getFullYear() -
+              goal.dateOfBirth.getFullYear() -
+              (
+                new Date().getMonth() < goal.dateOfBirth.getMonth() ||
+                (
+                  new Date().getMonth() === goal.dateOfBirth.getMonth() &&
+                  new Date().getDate() < goal.dateOfBirth.getDate()
+                )
+                  ? 1
+                  : 0
+              ),
+          )
+        : null;
 
     return {
       goal: {
         id: goal.id,
         title: goal.title,
         comparison,
-        targetValue: goal.targetValue == null ? null : Number(goal.targetValue),
+        targetValue,
         unit: goal.unit,
         targetDate: goal.targetDate,
         priority: goal.priority,
@@ -261,34 +369,38 @@ export class PatientHealthGoalsController {
         createdAt: goal.createdAt,
       },
       profile: {
-        age: goal.patient.person.dateOfBirth
-          ? Math.max(
-              0,
-              new Date().getFullYear() -
-                goal.patient.person.dateOfBirth.getFullYear() -
-                (
-                  new Date().getMonth() < goal.patient.person.dateOfBirth.getMonth() ||
-                  (
-                    new Date().getMonth() === goal.patient.person.dateOfBirth.getMonth() &&
-                    new Date().getDate() < goal.patient.person.dateOfBirth.getDate()
-                  )
-                    ? 1
-                    : 0
-                ),
-            )
-          : null,
-        gender: goal.patient.person.gender ?? null,
+        age,
+        gender: goal.gender,
         heightCm,
         currentWeightKg: latestWeight,
         currentBmi,
-        baselineWeightKg: Number.isFinite(baselineWeight ?? Number.NaN) ? baselineWeight : null,
-        baselineBmi:
-          baselineWeight != null && heightCm != null && heightCm > 0
-            ? baselineWeight / ((heightCm / 100) ** 2)
-            : goal.patient.baseline?.bmi != null
-              ? Number(goal.patient.baseline.bmi)
-              : null,
-        adultBmiApplicable: true,
+        baselineWeightKg: baselineWeight,
+        baselineBmi,
+        adultBmiApplicable: age == null || age >= 20,
+      },
+      weightPlan: {
+        direction,
+        targetWeightKg: targetWeight,
+        requestedChangeKg: direction === 'MAINTAIN' ? null : targetValue,
+        remainingChangeKg:
+          direction === 'MAINTAIN' || latestWeight == null || targetWeight == null
+            ? null
+            : direction === 'GAIN'
+              ? Math.max(targetWeight - latestWeight, 0)
+              : Math.max(latestWeight - targetWeight, 0),
+        daysRemaining:
+          goal.targetDate != null
+            ? Math.max(0, Math.ceil((new Date(goal.targetDate).getTime() - Date.now()) / 86400000))
+            : null,
+        requiredDailyChangeKg: null,
+        requiredWeeklyChangeKg: null,
+        status: direction === 'MAINTAIN' ? 'ON_TARGET' : 'PLANNING',
+      },
+      healthContext: {
+        connectedGoals: [],
+        activeConditions: [],
+        activeMedications: [],
+        medicalRecord: null,
       },
       weight: {
         latestKg: latestWeight,
@@ -304,26 +416,14 @@ export class PatientHealthGoalsController {
             : null,
         trendKgPerWeek: null,
         dataPoints: latestWeight != null ? 1 : 0,
-        maintenanceBand:
-          baselineWeight != null
-            ? { min: baselineWeight - 1.5, max: baselineWeight + 1.5 }
+        maintenanceBand,
+        withinMaintenanceBand,
+        targetWeightKg: targetWeight,
+        requestedChangeKg: direction === 'MAINTAIN' ? null : targetValue,
+        targetBmi:
+          targetWeight != null && heightCm != null && heightCm > 0
+            ? targetWeight / ((heightCm / 100) ** 2)
             : null,
-        withinMaintenanceBand:
-          comparison === 'CLOSEST' && baselineWeight != null && latestWeight != null
-            ? Math.abs(latestWeight - baselineWeight) <= 1.5
-            : null,
-        targetWeightKg: comparison === 'CLOSEST'
-          ? baselineWeight
-          : comparison === 'INCREASE_TO' && baselineWeight != null && goal.targetValue != null
-            ? baselineWeight + Number(goal.targetValue)
-            : comparison === 'DECREASE_TO' && baselineWeight != null && goal.targetValue != null
-              ? baselineWeight - Number(goal.targetValue)
-              : null,
-        requestedChangeKg:
-          comparison === 'CLOSEST' || goal.targetValue == null
-            ? null
-            : Number(goal.targetValue),
-        targetBmi: null,
         targetBmiStatus: null,
         targetNeedsReview: false,
         lowerScreeningWeightKg:
@@ -337,19 +437,20 @@ export class PatientHealthGoalsController {
         status:
           latestWeight == null || baselineWeight == null
             ? 'INSUFFICIENT_DATA'
-            : comparison === 'CLOSEST'
-              ? Math.abs(latestWeight - baselineWeight) <= 1.5
+            : direction === 'MAINTAIN'
+              ? withinMaintenanceBand
                 ? 'STABLE'
                 : latestWeight > baselineWeight
                   ? 'DRIFTING_UP'
                   : 'DRIFTING_DOWN'
               : 'STABLE',
       },
-      healthContext: {
-        connectedGoals: [],
-        activeConditions: [],
-        activeMedications: [],
-        medicalRecord: null,
+      checkIn: {
+        dataPoints: 0,
+        averageSleepHours: null,
+        averageStress: null,
+        averageExerciseMinutes: null,
+        averageWaterIntakeMl: null,
       },
       clinicalContext: {
         activeMedicationCount: 0,
@@ -357,15 +458,18 @@ export class PatientHealthGoalsController {
         recentSymptomCount: 0,
         symptomsDataAvailable: false,
       },
+      relationships: [],
       recommendedSupportingGoals: [],
       targetedSupportiveGoals: [],
       supportiveGoals: [],
       todayFocus: {
         actions: [],
         dataFreshness: {
-          weightDataNeedsRefresh: latestWeight == null,
+          weightDataNeedsRefresh:
+            latestWeightAt == null ||
+            Date.now() - latestWeightAt.getTime() > 7 * 86400000,
           checkInNeedsCompletion: false,
-          latestWeightAt: null,
+          latestWeightAt,
         },
       },
     };
@@ -373,18 +477,15 @@ export class PatientHealthGoalsController {
 
   @Get(':id/intelligence')
   async intelligence(@Param('id') id: string, @Req() request: AuthenticatedRequest) {
-    const goal = await this.assertOwnGoal(id, this.userId(request));
+    const userId = this.userId(request);
 
     try {
-      const result = await this.healthGoalIntelligence.getWeightGoalIntelligence(goal.id);
+      const result = await this.healthGoalIntelligence.getWeightGoalIntelligence(id);
       const intelligence =
         result && typeof result === 'object' && 'intelligence' in result
           ? (result as any).intelligence
           : result;
 
-      // A defensive controller boundary keeps a partial intelligence failure
-      // from turning Today into a 500. The BMI snapshot is calculated only
-      // from the current patient/baseline data and the latest weight event.
       if (
         intelligence?.profile?.currentBmi != null &&
         intelligence?.profile?.heightCm != null
@@ -392,13 +493,12 @@ export class PatientHealthGoalsController {
         return result;
       }
 
-      const fallback = await this.buildWeightIntelligenceFallback(goal.id);
+      const fallback = await this.buildWeightIntelligenceFallback(id, userId);
       return {
-        ...(result && typeof result === 'object' && !Array.isArray(result) ? result : {}),
         success: true,
         statusCode: 200,
         intelligence: {
-          ...intelligence,
+          ...(intelligence ?? {}),
           ...fallback,
           profile: {
             ...(intelligence?.profile ?? {}),
@@ -411,10 +511,12 @@ export class PatientHealthGoalsController {
         },
       };
     } catch (error: unknown) {
-      const message = error instanceof Error ? error.message : String(error);
-      console.error('❌ WEIGHT INTELLIGENCE CONTROLLER FALLBACK:', message);
+      console.error(
+        '❌ WEIGHT INTELLIGENCE PIPELINE FALLBACK:',
+        error instanceof Error ? error.message : String(error),
+      );
 
-      const fallback = await this.buildWeightIntelligenceFallback(goal.id);
+      const fallback = await this.buildWeightIntelligenceFallback(id, userId);
       return {
         success: true,
         statusCode: 200,
