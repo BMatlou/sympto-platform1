@@ -69,7 +69,7 @@ function normalizeGoals(result: HealthHomeResponse, fullGoals: any[]) {
       const linkedMedication = linkedPatientMedicationId
         ? medications.find((medication: any) => String(medication?.patientMedicationId ?? medication?.patientMedication?.id ?? medication?.id ?? "") === String(linkedPatientMedicationId))
         : medications.length === 1 ? medications[0] : null;
-      const rawCurrentValue = linkedMedication?.adherencePercentage ?? linkedMedication?.adherence?.percentage ?? null;
+      const rawCurrentValue = linkedMedication?.adherencePercentage ?? (linkedMedication as any)?.adherence?.percentage ?? null;
       const currentValue = rawCurrentValue == null ? null : Number(rawCurrentValue);
       const safeCurrentValue = Number.isFinite(currentValue) ? currentValue : null;
       const progressPercent = safeCurrentValue == null ? 0 : Math.min(100, Math.max(0, Math.round((safeCurrentValue / target) * 100)));
