@@ -24,6 +24,7 @@ export interface PrescribedMedication {
   prescriptionItemId?: string | null;
   source?: string | null;
   healthGoalId?: string | null;
+  healthGoals?: Array<{ id?: string | null; status?: string | null; title?: string | null }> | null;
   patientMedication?: { id?: string | null } | null;
   medication?: { id?: string | null; name?: string | null; genericName?: string | null; brandName?: string | null } | null;
 }
