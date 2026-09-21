@@ -658,12 +658,14 @@ export class PatientHealthGoalsController {
   async remove(@Param('id') id: string, @Req() request: AuthenticatedRequest) {
     const goal = await this.assertOwnGoal(id, this.userId(request));
     await this.prisma.$transaction(async (tx) => {
+      // Relationship rows use ON DELETE CASCADE. Deleting the goal is the
+      // authoritative operation; do not run the relationship synchronizer
+      // against a goal that no longer exists.
       await tx.healthGoalProgress.deleteMany({ where: { healthGoalId: goal.id } });
       await tx.$executeRaw`DELETE FROM "HealthGoalMetricConfig" WHERE "healthGoalId" = ${goal.id}`;
       await tx.$executeRaw`DELETE FROM "HealthGoalMetricEvent" WHERE "patientId" = ${goal.patientId} AND "source" = 'goal-baseline' AND "sourceId" = ${goal.id}`;
       await tx.healthGoal.delete({ where: { id: goal.id } });
     });
-    await this.healthGoalIntelligence.syncGoalRelations(goal.patientId);
     return { message: 'Health goal deleted successfully.' };
   }
 }
