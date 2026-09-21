@@ -147,103 +147,22 @@ export default function PrescribedMedicationsCard({
             });
 
             const medicationGoalForThisMed = activeGoalsArray.find((goal: any) => {
-              const goalCategory = String(goal?.category || "").toUpperCase();
-
-              const status = String(goal?.status || "").toUpperCase();
-              if (["ARCHIVED", "CANCELLED", "DELETED"].includes(status)) return false;
-
-              // Rule 1: Direct relational identifier mappings (primary truth).
-              const targetMedId = medication.medicationId || medication.medication?.id || "";
               const targetPatientMedId = getPatientMedicationId(medication);
-              const goalMedId =
-                goal?.medicationId ||
-                goal?.associatedMedicationId ||
-                goal?.medication?.id ||
-                "";
-              const goalPatientMedId =
-                goal?.patientMedicationId ||
-                goal?.associatedPatientMedicationId ||
-                goal?.patientMedication?.id ||
-                "";
+              const targetMedId = medication.medicationId || medication.medication?.id || "";
+              const goalPatientMedId = goal?.patientMedicationId || "";
+              const goalMedId = goal?.medicationId || goal?.associatedMedicationId || "";
 
               if (
-                (targetMedId && goalMedId && String(targetMedId) === String(goalMedId)) ||
                 (targetPatientMedId &&
                   goalPatientMedId &&
-                  String(targetPatientMedId) === String(goalPatientMedId))
+                  String(targetPatientMedId) === String(goalPatientMedId)) ||
+                (targetMedId && goalMedId && String(targetMedId) === String(goalMedId))
               ) {
                 console.log(
-                  `[TODAY DIAGNOSTIC] CRITICAL RELATION ID MATCH FOUND FOR ${medication.name}`,
+                  `[TODAY DIAGNOSTIC] RELATIONAL MEDICATION GOAL MATCH FOUND FOR ${medication.name}`,
+                  { goalId: goal?.id, targetPatientMedId, goalPatientMedId, targetMedId, goalMedId },
                 );
                 return true;
-              }
-
-              // Preserve a direct goal-id relationship when the medication row carries it.
-              if (
-                medication.healthGoalId &&
-                goal?.id &&
-                String(medication.healthGoalId) === String(goal.id)
-              ) {
-                console.log("[TODAY DIAGNOSTIC] MATCH: direct medication.healthGoalId", {
-                  medication: medication.name,
-                  goalId: goal.id,
-                });
-                return true;
-              }
-
-              // Rule 2: Dynamic progress-log evaluation — no medication names are hardcoded.
-              // Progress records are treated as the historical tracking signature for the goal.
-              if (goalCategory === "MEDICATION" && Array.isArray(goal?.progress)) {
-                const medNameLower = String(
-                  medication.name || medication.medication?.name || "",
-                )
-                  .toLowerCase()
-                  .trim();
-
-                if (!medNameLower) return false;
-
-                const belongsToThisMedication = goal.progress.some((p: any) => {
-                  const notes = String(p?.notes || "").toLowerCase();
-                  const trackingContext = [
-                    notes,
-                    String(p?.description || "").toLowerCase(),
-                    String(p?.metricKey || "").toLowerCase(),
-                    String(p?.metricType || "").toLowerCase(),
-                  ].join(" ");
-
-                  return (
-                    trackingContext.includes("medication adherence") &&
-                    trackingContext.includes(medNameLower)
-                  );
-                });
-
-                if (belongsToThisMedication) {
-                  console.log(
-                    `[TODAY DIAGNOSTIC] DYNAMIC PROGRESS MATCH FOUND FOR ${medication.name}`,
-                    { goalId: goal?.id },
-                  );
-                  return true;
-                }
-
-                // Dynamic text fallback: compare the medication row name against
-                // goal title/description, without any medication-specific constants.
-                const titleLower = String(goal?.title || "").toLowerCase();
-                const descLower = String(goal?.description || "").toLowerCase();
-                const nameParts = medNameLower.split(/\\s+/).filter((part: string) => part.length > 3);
-                const textMatch =
-                  titleLower.includes(medNameLower) ||
-                  descLower.includes(medNameLower) ||
-                  nameParts.some(
-                    (part: string) => titleLower.includes(part) || descLower.includes(part),
-                  );
-
-                if (textMatch) {
-                  console.log(
-                    `[TODAY DIAGNOSTIC] DYNAMIC GOAL TEXT MATCH FOUND FOR ${medication.name}`,
-                    { goalId: goal?.id },
-                  );
-                  return true;
-                }
               }
 
               return false;
