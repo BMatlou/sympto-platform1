@@ -385,7 +385,27 @@ export class HealthHomeService {
     });
 
     const goalsWithProgress = goals.map((goal) => ({ ...goal, latestProgress: goal.progress[0] ?? null }));
-    const goalsWithRelationships = await this.healthGoalIntelligence.attachRelationships(goalsWithProgress as any[]);
+
+    // Medication goals are linked to PatientMedication through the database column
+    // used by the health-goals module. The Prisma model is intentionally kept
+    // compatible with older generated clients, so hydrate the association here
+    // and expose it in the Home/Today payload instead of dropping the link.
+    const medicationAssociationByGoalId = new Map(
+      medicationGoalRows.map((row) => [String(row.id), row]),
+    );
+    const goalsWithMedicationAssociations = goalsWithProgress.map((goal: any) => {
+      const association = medicationAssociationByGoalId.get(String(goal.id));
+      if (!association) return goal;
+      return {
+        ...goal,
+        patientMedicationId: association.patientMedicationId,
+        medicationId: association.medicationId,
+        medication: association.medicationId
+          ? { id: association.medicationId, name: association.title || null }
+          : null,
+      };
+    });
+    const goalsWithRelationships = await this.healthGoalIntelligence.attachRelationships(goalsWithMedicationAssociations as any[]);
     const activeAllergies = allergies.filter((item) => item.status === 'ACTIVE' || !item.status);
     const activeConditions = conditions.filter((item) => item.status === 'ACTIVE' && !item.resolvedAt);
     const bloodType = patient.healthPassport?.bloodType ?? medicalRecord?.bloodType ?? null;
@@ -400,7 +420,14 @@ export class HealthHomeService {
       patient: { id: patientId, patientNumber: patient.patientNumber, firstName: patient.person?.firstName ?? '', lastName: patient.person?.lastName ?? '', name: [patient.person?.firstName, patient.person?.lastName].filter(Boolean).join(' '), heightCm, weightKg, bmi: finalBmi, bmiCategory: finalBmiCategory, deceased: patient.deceased },
       healthPassport: patient.healthPassport ? { ...patient.healthPassport, bloodType, organDonor, emergencyNotes } : medicalRecord ? { bloodType, organDonor, emergencyNotes, source: 'MEDICAL_RECORD' } : null,
       healthSnapshot: { baseline: patient.baseline, activeConditions, activeAllergies, allergies: activeAllergies, immunizations, bloodType, rhesusFactor: patient.healthPassport?.rhesusFactor ?? null, heightCm, weightKg, bmi: finalBmi, bmiCategory: finalBmiCategory, latestMeasurements: journalSignals.signals, normalizedVitals: Array.from(normalizedMap.values()), connectedDevices: devices.map((device) => ({ id: device.id, manufacturer: device.manufacturer, model: device.model, deviceType: device.deviceType, status: device.status, lastSyncAt: device.lastSyncAt, measurementCount: device._count.measurements })) },
-      attention, today: { notifications, upcomingAppointments: appointments.slice(0, 5), activeMedications: medicationsWithGoalLinks, activeMedicationCount: medicationsWithGoalLinks.length, activeGoalCount: goals.length },
+      attention,
+      today: { notifications, upcomingAppointments: appointments.slice(0, 5), activeMedications: medicationsWithGoalLinks, activeMedicationCount: medicationsWithGoalLinks.length, activeGoalCount: goals.length },
+      // Explicit, unwrapped goal collection for Today clients. This is the
+      // canonical source for medication-goal button state.
+      activeGoalsArray: goalsWithRelationships.filter((goal: any) => {
+        const status = String(goal?.status ?? '').toUpperCase();
+        return !['CANCELLED', 'DELETED', 'ARCHIVED', 'ACHIEVED', 'EXPIRED', 'ON_HOLD'].includes(status);
+      }),
       medications: medicationsWithGoalLinks, appointments, goals: goalsWithRelationships, healthGoals: goalsWithRelationships, family, allergies, conditions, immunizations, emergencyContacts: patient.emergencyContacts,
       wearables: { devices: devices.map((device) => ({ id: device.id, manufacturer: device.manufacturer, model: device.model, deviceType: device.deviceType, status: device.status, lastSyncAt: device.lastSyncAt, measurementCount: device._count.measurements })), latestMeasurements: journalSignals.signals },
       symptoms: symptomLogs, recentResults: { laboratory: labOrders, imaging: imagingStudies }, carePlans, encounters, prescriptions, attachments, clinicalVitals, patientInsurances, medicalRecord, journal: journalSignals, ai: { recentObservations: aiObservations }, settings: patient.healthJournalSettings, healthJournalSettings: patient.healthJournalSettings,
