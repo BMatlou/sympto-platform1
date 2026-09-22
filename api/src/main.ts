@@ -39,9 +39,12 @@ async function bootstrap() {
     }),
   );
 
+  // NestJS evaluates catch-all filters before more specific filters.
+  // Keep the catch-all first so PrismaExceptionFilter can handle Prisma errors
+  // and translate database failures into the correct HTTP response.
   app.useGlobalFilters(
-    new PrismaExceptionFilter(),
     new HttpExceptionFilter(),
+    new PrismaExceptionFilter(),
   );
 
   app.useGlobalInterceptors(
