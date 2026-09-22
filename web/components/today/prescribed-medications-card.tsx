@@ -57,10 +57,29 @@ function goalMedicationName(goal: HealthGoal | null | undefined) {
 function getPatientMedicationId(medication: PrescribedMedication) {
   const source = String(medication.source ?? "").trim().toUpperCase();
   const syntheticPrescriptionId = String(medication.id ?? "").startsWith("prescription-item-");
-  return medication.patientMedicationId ||
+
+  // For a real PatientMedication record, the row's own id is authoritative.
+  // Do not allow a stale/derived patientMedicationId field to override it.
+  const authoritativeId =
     medication.patientMedication?.id ||
     (source !== "PRESCRIPTION" && !syntheticPrescriptionId ? medication.id : null) ||
+    medication.patientMedicationId ||
     null;
+
+  if (
+    medication.patientMedicationId &&
+    authoritativeId &&
+    String(medication.patientMedicationId) !== String(authoritativeId)
+  ) {
+    console.warn("[FORM AUDIT] Ignoring conflicting patientMedicationId; using authoritative PatientMedication.id", {
+      suppliedPatientMedicationId: medication.patientMedicationId,
+      authoritativePatientMedicationId: authoritativeId,
+      medicationId: medication.id,
+      medicationName: medication.name ?? medication.medication?.name,
+    });
+  }
+
+  return authoritativeId;
 }
 
 export default function PrescribedMedicationsCard({
