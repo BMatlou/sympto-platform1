@@ -370,7 +370,7 @@ export class SymptomIntelligenceService {
         },
         medicalRecord: true,
         clinicalEpisodes: {
-          where: { status: { in: [ClinicalEpisodeStatus.ACTIVE, ClinicalEpisodeStatus.COMPLETED] } },
+          where: { status: { in: [ClinicalEpisodeStatus.ACTIVE, ClinicalEpisodeStatus.ONGOING, ClinicalEpisodeStatus.RESOLVED] } },
           include: {
             symptomLogs: {
               orderBy: { startedAt: 'desc' },
