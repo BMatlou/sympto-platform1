@@ -243,7 +243,7 @@ export class HealthHomeService {
       this.prisma.patientAllergy.findMany({ where: { healthPassportId: healthPassportId ?? '' }, include: { allergy: true }, orderBy: { createdAt: 'desc' } }),
       this.prisma.patientCondition.findMany({ where: { healthPassportId: healthPassportId ?? '' }, include: { condition: true }, orderBy: { createdAt: 'desc' } }),
       this.prisma.patientMedication.findMany({ where: { healthPassportId: healthPassportId ?? '', status: { in: [...ACTIVE_MEDICATION_STATUSES] } }, include: { medication: true }, orderBy: { createdAt: 'desc' } }),
-      this.prisma.healthGoal.findMany({ where: { patientId, status: { in: ['ACTIVE', 'ACHIEVED'] } }, include: { progress: { orderBy: { measuredAt: 'desc' }, take: 1 } }, orderBy: [{ priority: 'desc' }, { targetDate: 'asc' }] }),
+      this.prisma.healthGoal.findMany({ where: { patientId, status: { in: ['ACTIVE', 'ACHIEVED', 'ON_HOLD'] } }, include: { progress: { orderBy: { measuredAt: 'desc' }, take: 1 } }, orderBy: [{ priority: 'desc' }, { targetDate: 'asc' }] }),
       this.prisma.familyMember.findMany({ where: { ownerPatientId: ownerPatient.id }, include: { memberPatient: { include: { person: true } } }, orderBy: { createdAt: 'desc' } }),
       this.prisma.appointment.findMany({ where: { patientId, status: { in: [...ACTIVE_APPOINTMENT_STATUSES] }, scheduledStart: { gte: now } }, include: { practitioner: { include: { person: true } }, practice: true, telemedicineSession: true }, orderBy: { scheduledStart: 'asc' }, take: 10 }),
       this.prisma.notification.findMany({ where: { userId: selectedUserId, readAt: null, status: { in: ['PENDING', 'QUEUED', 'SENT', 'DELIVERED'] } }, orderBy: [{ priority: 'desc' }, { createdAt: 'desc' }], take: 10 }),
@@ -335,7 +335,7 @@ export class HealthHomeService {
       LEFT JOIN "PatientMedication" pm ON pm."id" = hg."patientMedicationId"
       WHERE hg."patientId" = ${patientId}
         AND hg."category" = 'MEDICATION'
-        AND hg."status"::text NOT IN ('CANCELLED', 'DELETED', 'ARCHIVED', 'ACHIEVED', 'EXPIRED', 'ON_HOLD')
+        AND hg."status"::text NOT IN ('CANCELLED', 'DELETED', 'ARCHIVED', 'ACHIEVED', 'EXPIRED')
       ORDER BY hg."createdAt" DESC
     `;
     const goalByPatientMedicationId = new Map<string, Array<{ id: string; status: string; title: string }>>();
@@ -437,7 +437,7 @@ export class HealthHomeService {
       healthPassport: patient.healthPassport ? { ...patient.healthPassport, bloodType, organDonor, emergencyNotes } : medicalRecord ? { bloodType, organDonor, emergencyNotes, source: 'MEDICAL_RECORD' } : null,
       healthSnapshot: { baseline: patient.baseline, activeConditions, activeAllergies, allergies: activeAllergies, immunizations, bloodType, rhesusFactor: patient.healthPassport?.rhesusFactor ?? null, heightCm, weightKg, bmi: finalBmi, bmiCategory: finalBmiCategory, latestMeasurements: journalSignals.signals, normalizedVitals: Array.from(normalizedMap.values()), connectedDevices: devices.map((device) => ({ id: device.id, manufacturer: device.manufacturer, model: device.model, deviceType: device.deviceType, status: device.status, lastSyncAt: device.lastSyncAt, measurementCount: device._count.measurements })) },
       attention,
-      today: { notifications, upcomingAppointments: appointments.slice(0, 5), activeMedications: medicationsWithGoalLinks, activeMedicationCount: medicationsWithGoalLinks.length, activeGoalCount: goals.length },
+      today: { notifications, upcomingAppointments: appointments.slice(0, 5), activeMedications: medicationsWithGoalLinks, activeMedicationCount: medicationsWithGoalLinks.length, activeGoalCount: goals.filter((goal: any) => String(goal?.status ?? '').toUpperCase() === 'ACTIVE').length },
       // Explicit, unwrapped goal collection for Today clients. This is the
       // canonical source for medication-goal button state.
       activeGoalsArray: mappedGoals.filter((goal: any) => {
