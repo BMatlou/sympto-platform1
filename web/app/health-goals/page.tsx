@@ -233,8 +233,44 @@ export default function HealthGoalsPage() {
     const name = searchParams.get("name")?.trim() || "Medication adherence";
     const dosage = searchParams.get("dosage")?.trim() || "";
     const frequency = searchParams.get("frequency")?.trim() || "";
+    const patientMedicationId = searchParams.get("patientMedicationId")?.trim() || "";
     const details = [dosage && `Dosage: ${dosage}`, frequency && `Frequency: ${frequency.replaceAll("_", " ")}`].filter(Boolean).join(" · ");
-    setEditingId(null); setDraft({ title: name, description: details ? `Medication: ${name} · ${details}` : `Medication: ${name}`, category: "MEDICATION", priority: "MEDIUM", targetValue: "90", unit: "%", targetDate: "", weightDirection: "LOSE", patientMedicationId: searchParams.get("patientMedicationId")?.trim() || "" }); setEditorOpen(true);
+    const existingMedicationGoal = Array.isArray(dashboard.goals)
+      ? dashboard.goals.find((goal: any) =>
+          String(goal?.category ?? "").toUpperCase() === "MEDICATION" &&
+          String(goal?.patientMedicationId ?? goal?.patientMedication?.id ?? "") === patientMedicationId &&
+          !["CANCELLED", "DELETED", "ARCHIVED", "EXPIRED", "ACHIEVED"].includes(String(goal?.status ?? "").toUpperCase()),
+        )
+      : null;
+
+    if (existingMedicationGoal) {
+      setEditingId(String(existingMedicationGoal.id));
+      setDraft({
+        title: String(existingMedicationGoal.title ?? name),
+        description: String(existingMedicationGoal.description ?? ""),
+        category: "MEDICATION",
+        priority: String(existingMedicationGoal.priority ?? "MEDIUM"),
+        targetValue: existingMedicationGoal.targetValue == null ? "90" : String(existingMedicationGoal.targetValue),
+        unit: String(existingMedicationGoal.unit ?? "%"),
+        targetDate: existingMedicationGoal.targetDate ? String(existingMedicationGoal.targetDate).slice(0, 10) : "",
+        weightDirection: "LOSE",
+        patientMedicationId: String(existingMedicationGoal.patientMedicationId ?? existingMedicationGoal.patientMedication?.id ?? patientMedicationId),
+      });
+    } else {
+      setEditingId(null);
+      setDraft({
+        title: name,
+        description: details ? `Medication: ${name} · ${details}` : `Medication: ${name}`,
+        category: "MEDICATION",
+        priority: "MEDIUM",
+        targetValue: "90",
+        unit: "%",
+        targetDate: "",
+        weightDirection: "LOSE",
+        patientMedicationId,
+      });
+    }
+    setEditorOpen(true);
   }, [dashboard?.patient?.id, loading, searchParams]);
 
   function openAdd() { setEditingId(null); setDraft(emptyDraft()); setEditorOpen(true); }
@@ -287,7 +323,13 @@ export default function HealthGoalsPage() {
 
     try {
       setSaving(true);
-      const shouldResume = Boolean(editingId && searchParams.get("resume") === "1");
+      const shouldResume = Boolean(
+        editingId &&
+        (
+          searchParams.get("resume") === "1" ||
+          String(editingGoal?.status ?? "").toUpperCase() === "ON_HOLD"
+        )
+      );
       const comparison: HealthGoalInput["comparison"] = draft.category === "WEIGHT" ? draft.weightDirection === "GAIN" ? "INCREASE_TO" : draft.weightDirection === "MAINTAIN" ? "CLOSEST" : "DECREASE_TO" : config.comparison;
       const input: HealthGoalInput = { patientId: dashboard.patient.id, patientMedicationId: draft.category === "MEDICATION" ? draft.patientMedicationId || undefined : undefined, title: draft.title.trim(), description: draft.description.trim() || undefined, category: config.value, priority: draft.priority, status: shouldResume ? "ACTIVE" : undefined, targetValue: draft.targetValue, unit: draft.unit || config.unit || undefined, targetDate: draft.targetDate || undefined, metricType: config.metricType, metricKey: config.metricKey, frequency: config.frequency, frequencyTarget: draft.targetValue, aggregation: config.aggregation, comparison };
       if (editingId) {
@@ -342,7 +384,7 @@ export default function HealthGoalsPage() {
               <div className="rounded-2xl border border-[#dce9ee] bg-[#f7fbfc] p-4"><div className="flex items-start gap-3"><Target className="mt-0.5 h-4 w-4 shrink-0 text-[#0b6f73]" /><div><p className="text-xs font-black text-[#0b2d54]">Sympto will connect this goal to your health data</p><p className="mt-1 text-[11px] leading-5 text-[#74859a]">{draft.category === "WEIGHT" ? `${draft.weightDirection === "LOSE" ? "Loss" : draft.weightDirection === "GAIN" ? "Gain" : "Maintenance"} goal · directional target is the requested amount of weight change; destination is calculated from your baseline` : `${selectedCategory?.frequency === "DAILY" ? "Daily" : selectedCategory?.frequency === "WEEKLY" ? "Weekly" : "Overall"} tracking · ${selectedCategory?.comparison === "AT_LEAST" ? "at least" : selectedCategory?.comparison === "AT_MOST" ? "at most" : String(selectedCategory?.comparison ?? "") === "DECREASE_TO" ? "decrease toward" : "target comparison"} your target.`}</p></div></div></div>
             </>}
           </div>
-          <div className="sticky bottom-0 flex items-center justify-between gap-3 border-t border-[#edf2f5] bg-white/95 px-5 py-4 backdrop-blur sm:px-7"><button type="button" onClick={closeEditor} className="rounded-xl px-4 py-2.5 text-xs font-black text-[#74859a]">Cancel</button><button type="button" onClick={() => void saveGoal()} disabled={saving || !draft.category || !draft.title.trim() || !editorTargetValid} className="inline-flex min-h-10 items-center gap-2 rounded-xl bg-[#0b2d54] px-5 py-2.5 text-xs font-black text-white disabled:cursor-not-allowed disabled:opacity-40">{saving ? "Saving…" : editingId ? (searchParams.get("resume") === "1" ? "Resume goal" : "Save changes") : "Add goal"}<ArrowRight className="h-3.5 w-3.5" /></button></div>
+          <div className="sticky bottom-0 flex items-center justify-between gap-3 border-t border-[#edf2f5] bg-white/95 px-5 py-4 backdrop-blur sm:px-7"><button type="button" onClick={closeEditor} className="rounded-xl px-4 py-2.5 text-xs font-black text-[#74859a]">Cancel</button><button type="button" onClick={() => void saveGoal()} disabled={saving || !draft.category || !draft.title.trim() || !editorTargetValid} className="inline-flex min-h-10 items-center gap-2 rounded-xl bg-[#0b2d54] px-5 py-2.5 text-xs font-black text-white disabled:cursor-not-allowed disabled:opacity-40">{saving ? "Saving…" : editingId ? (searchParams.get("resume") === "1" || String(editingGoal?.status ?? "").toUpperCase() === "ON_HOLD" ? "Resume goal" : "Save changes") : "Add goal"}<ArrowRight className="h-3.5 w-3.5" /></button></div>
         </div></div>}
       </main>
     </ProtectedRoute>
