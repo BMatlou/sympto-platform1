@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import { BadRequestException, ConflictException, Injectable, InternalServerErrorException, NotFoundException } from '@nestjs/common';
-import { Prisma, HealthGoalProgressStatus } from '@prisma/client';
+import { HealthGoalCategory, HealthGoalPriority, HealthGoalProgressStatus, HealthGoalStatus, Prisma } from '@prisma/client';
 import { PrismaService } from '../../database/prisma.service';
 import { CreateHealthGoalDto } from './dto/create-health-goal.dto';
 import { QueryHealthGoalDto } from './dto/query-health-goal.dto';
@@ -255,6 +255,73 @@ export class HealthGoalsService {
   }
 
   async create(dto: CreateHealthGoalDto) {
+    /*
+     * Normalize the external payload once, before any persistence.
+     * The frontend sends several numeric/string values as strings, while
+     * Prisma expects the canonical enum members and numeric values that map
+     * cleanly to the database contract.
+     *
+     * Do not replace the transactional create below with a bare
+     * healthGoal.create(): the metric-config row is part of the same
+     * creation contract and must succeed atomically.
+     */
+    const cleanCategory = String(dto.category ?? 'MEDICATION')
+      .trim()
+      .toUpperCase() as HealthGoalCategory;
+    const cleanPriority = String(dto.priority ?? 'MEDIUM')
+      .trim()
+      .toUpperCase() as HealthGoalPriority;
+    const cleanStatus = String(dto.status ?? 'ACTIVE')
+      .trim()
+      .toUpperCase() as HealthGoalStatus;
+
+    const rawTargetValue =
+      dto.targetValue == null || String(dto.targetValue).trim() === ''
+        ? cleanCategory === HealthGoalCategory.MEDICATION
+          ? '90'
+          : undefined
+        : dto.targetValue;
+
+    const numericTargetValue =
+      rawTargetValue == null ? undefined : Number(rawTargetValue);
+
+    if (
+      rawTargetValue != null &&
+      (!Number.isFinite(numericTargetValue) || numericTargetValue < 0)
+    ) {
+      throw new BadRequestException('A valid non-negative numeric goal target is required.');
+    }
+
+    const cleanPatientMedicationId = dto.patientMedicationId
+      ? String(dto.patientMedicationId).trim()
+      : null;
+
+    console.log('[GOALS AUDIT] Normalized creation payload:', {
+      patientId: dto.patientId,
+      category: cleanCategory,
+      priority: cleanPriority,
+      status: cleanStatus,
+      patientMedicationId: cleanPatientMedicationId,
+      targetValue: numericTargetValue,
+      unit: dto.unit ?? (cleanCategory === HealthGoalCategory.MEDICATION ? '%' : null),
+    });
+
+    const normalizedDto: CreateHealthGoalDto = {
+      ...dto,
+      category: cleanCategory,
+      priority: cleanPriority,
+      status: cleanStatus,
+      patientMedicationId: cleanPatientMedicationId ?? undefined,
+      ...(numericTargetValue == null
+        ? cleanCategory === HealthGoalCategory.MEDICATION
+          ? { targetValue: '90' }
+          : {}
+        : { targetValue: String(numericTargetValue) }),
+      ...(dto.unit == null && cleanCategory === HealthGoalCategory.MEDICATION
+        ? { unit: '%' }
+        : {}),
+    };
+
     const {
       metricType,
       metricKey,
@@ -267,7 +334,7 @@ export class HealthGoalsService {
       targetDate,
       achievedAt,
       ...goalData
-    } = dto;
+    } = normalizedDto;
 
     const parsedTargetDate = targetDate ? new Date(targetDate) : undefined;
     const parsedAchievedAt = achievedAt ? new Date(achievedAt) : undefined;
