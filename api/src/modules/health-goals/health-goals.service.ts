@@ -302,32 +302,64 @@ export class HealthGoalsService {
     }
 
     /*
-     * Medication goals must be created with patientMedicationId in the same
-     * database write. The old implementation created the HealthGoal first and
-     * then attached patientMedicationId with raw SQL. That could trip the
-     * compound HealthGoal uniqueness constraint during the second write and
-     * surface as an opaque HTTP 500.
+     * Goal persistence and its metric contract are one unit of work.
+     * A goal must never become visible to Today unless its tracking
+     * configuration was stored successfully as well.
+     *
+     * The migration chain is now the authoritative owner of the metric
+     * tables, so creation does not run DDL on the request path.
      */
+    const metricConfig = this.canonicalMetricConfig(category, {
+      metricType: metricType ?? goalRuleFor(category).metricType,
+      metricKey: metricKey ?? goalRuleFor(category).metricKey,
+      frequency: frequency ?? goalRuleFor(category).frequency,
+      frequencyTarget:
+        frequencyTarget == null
+          ? targetValue == null
+            ? null
+            : Number(targetValue)
+          : Number(frequencyTarget),
+      aggregation: aggregation ?? goalRuleFor(category).aggregation,
+      comparison: effectiveComparison ?? goalRuleFor(category).comparison,
+      guidanceText,
+    });
+
     let goal;
     try {
-      goal = await this.prisma.healthGoal.create({
-        data: {
-          ...goalData,
-          patientId,
-          ...(patientMedicationId ? { patientMedicationId } : {}),
-          ...(targetValue !== undefined ? { targetValue } : {}),
-          ...(unit !== undefined ? { unit } : {}),
-          ...(targetDate !== undefined ? { targetDate: parsedTargetDate } : {}),
-          ...(achievedAt !== undefined ? { achievedAt: parsedAchievedAt } : {}),
-        },
-        include: {
-          patient: true,
-          practitioner: true,
-          carePlan: true,
-          progress: true,
-        },
+      goal = await this.prisma.$transaction(async (tx) => {
+        const createdGoal = await tx.healthGoal.create({
+          data: {
+            ...goalData,
+            patientId,
+            ...(patientMedicationId ? { patientMedicationId } : {}),
+            ...(targetValue !== undefined ? { targetValue } : {}),
+            ...(unit !== undefined ? { unit } : {}),
+            ...(targetDate !== undefined ? { targetDate: parsedTargetDate } : {}),
+            ...(achievedAt !== undefined ? { achievedAt: parsedAchievedAt } : {}),
+          },
+          include: {
+            patient: true,
+            practitioner: true,
+            carePlan: true,
+            progress: true,
+          },
+        });
+
+        await tx.$executeRaw`
+          INSERT INTO "HealthGoalMetricConfig"
+            ("id", "healthGoalId", "metricType", "metricKey", "frequency", "frequencyTarget", "aggregation", "comparison", "guidanceText")
+          VALUES
+            (gen_random_uuid(), ${createdGoal.id}, ${metricConfig.metricType}, ${metricConfig.metricKey}, ${metricConfig.frequency}, ${metricConfig.frequencyTarget}, ${metricConfig.aggregation}, ${metricConfig.comparison}, ${metricConfig.guidanceText})
+        `;
+
+        return createdGoal;
       });
     } catch (error) {
+      console.error(
+        'Health goal creation transaction failed:',
+        error instanceof Error ? error.stack ?? error.message : String(error),
+      );
+
       if (error instanceof Prisma.PrismaClientKnownRequestError) {
         if (error.code === 'P2002') {
           throw new ConflictException(
@@ -344,21 +376,6 @@ export class HealthGoalsService {
       }
       throw error;
     }
-
-    await this.configureMetric(goal.id, {
-      metricType: metricType ?? goalRuleFor(category).metricType,
-      metricKey: metricKey ?? goalRuleFor(category).metricKey,
-      frequency: frequency ?? goalRuleFor(category).frequency,
-      frequencyTarget:
-        frequencyTarget == null
-          ? targetValue == null
-            ? null
-            : Number(targetValue)
-          : Number(frequencyTarget),
-      aggregation: aggregation ?? goalRuleFor(category).aggregation,
-      comparison: effectiveComparison ?? goalRuleFor(category).comparison,
-      guidanceText,
-    });
 
     if (category === 'WEIGHT') {
       await this.captureWeightGoalBaseline(goal.id, patientId, goal.createdAt);
