@@ -58,7 +58,7 @@ export default function HealthJournalPage() {
     (data.symptoms ?? []).forEach((s: any) => {
       const at = s.startedAt || s.createdAt;
       if (!at) return;
-      all.push({ id: `s-${s.id}`, type: "symptom", title: s.title || "Symptom recorded", detail: [s.overallSeverity ? `Severity: ${String(s.overallSeverity).toLowerCase()}` : null, ...(s.symptoms ?? []).map((x: any) => x.symptom?.name || x.name).filter(Boolean)].filter(Boolean).join(" · "), at: String(at), href: "/log-symptom", source: "Symptom tracker" });
+      all.push({ id: `s-${s.id}`, type: "symptom", title: s.title || "Symptom recorded", detail: [s.overallSeverity ? `Severity: ${String(s.overallSeverity).toLowerCase()}` : null, ...(s.symptoms ?? []).map((x: any) => x.symptom?.name || x.name).filter(Boolean)].filter(Boolean).join(" · "), at: String(at), href: `/symptom-logs/${encodeURIComponent(String(s.id))}`, source: "Symptom tracker" });
     });
     (data.clinicalVitals ?? []).forEach((v: any) => {
       if (!v.measuredAt) return;
