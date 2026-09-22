@@ -282,7 +282,7 @@ export class SymptomIntelligenceService {
         },
         medicalRecord: true,
         clinicalEpisodes: {
-          where: { status: ClinicalEpisodeStatus.ACTIVE },
+          where: { status: { in: [ClinicalEpisodeStatus.ACTIVE, ClinicalEpisodeStatus.COMPLETED] } },
           include: {
             symptomLogs: {
               orderBy: { startedAt: 'desc' },
