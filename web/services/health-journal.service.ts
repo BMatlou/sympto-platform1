@@ -20,6 +20,7 @@ interface GetHealthJournalsParams {
 export type SymptomIntelligenceResult = {
   symptomLogId: string;
   episodeId: string;
+  observationId: string;
   assessment: {
     tone: "calm" | "watch" | "urgent";
     title: string;
