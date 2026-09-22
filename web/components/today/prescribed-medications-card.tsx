@@ -92,52 +92,47 @@ export default function PrescribedMedicationsCard({
   const router = useRouter();
 
   const handleAction = (medication: PrescribedMedication, goal: HealthGoal | null) => {
-    const patientMedicationId = getPatientMedicationId(medication) || goalPatientMedicationId(goal);
-    const medicationId = medication.medicationId || medication.medication?.id || null;
+    // Only a real PatientMedication record may populate the relational field.
+    // Synthetic prescription-item rows intentionally produce no ID.
+    const patientMedicationId = getPatientMedicationId(medication);
+    const medicationId = medication.medicationId ?? medication.medication?.id ?? null;
     const resolvedGoalId = goal?.id ?? medication.healthGoalId ?? null;
-    const resolvedGoalStatus = String(goal?.status ?? "").toUpperCase();
 
-    if (resolvedGoalId && resolvedGoalStatus === "ON_HOLD") {
-      router.push(`/health-goals?edit=${encodeURIComponent(String(resolvedGoalId))}&resume=1`);
-      return;
-    }
-
-    if (patientMedicationId && resolvedGoalId) {
-      const targetId = `medication-adherence-card-${String(patientMedicationId)}`;
-      const target = document.getElementById(targetId);
-      if (target) {
-        target.scrollIntoView({ behavior: "smooth", block: "center" });
-      } else {
-        window.location.hash = encodeURI(`#${targetId}`);
-      }
-      return;
-    }
+    console.log("[FORM AUDIT] Opening medication goal form:", {
+      medicationName: medication.name ?? medication.medication?.name ?? "Medication",
+      patientMedicationId,
+      medicationId,
+      source: medication.source ?? null,
+      rowId: medication.id ?? null,
+      synthetic: String(medication.id ?? "").startsWith("prescription-item-"),
+    });
 
     if (resolvedGoalId) {
       router.push(`/health-goals#goal-${encodeURIComponent(String(resolvedGoalId))}`);
       return;
     }
 
-    const name = medication.name || medication.medication?.name || "Medication";
-    const dosage = medication.dosage || "";
-    const frequency = medication.frequency || "";
+    const name = medication.name ?? medication.medication?.name ?? "Medication";
     const params = new URLSearchParams({
       action: "create",
       category: "MEDICATION",
       open: "medication",
       name,
       medicationName: name,
-      dosage,
-      frequency,
-      ...(patientMedicationId ? { patientMedicationId: String(patientMedicationId) } : {}),
-      ...(medicationId ? {
-        associatedMedicationId: String(medicationId),
-        medicationId: String(medicationId),
-      } : {}),
+      dosage: medication.dosage ?? "",
+      frequency: medication.frequency ?? "",
     });
+
+    if (patientMedicationId) {
+      params.set("patientMedicationId", String(patientMedicationId));
+    }
+    if (medicationId) {
+      params.set("medicationId", String(medicationId));
+      params.set("associatedMedicationId", String(medicationId));
+    }
+
     router.push(`/health-goals?${params.toString()}`);
   };
-
   return (
     <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
       <div className="mb-4 flex items-center justify-between">
