@@ -131,22 +131,41 @@ function mergeMedicationGoalLinks(canonicalMedications: any[], healthHomeMedicat
   }
 
   return canonicalMedications.map((medication) => {
-    const patientMedicationId =
-      medication?.patientMedicationId ??
-      medication?.patientMedication?.id ??
-      null;
     const medicationId =
       medication?.medicationId ??
       medication?.medication?.id ??
       null;
+
     const source =
-      (patientMedicationId && byPatientMedicationId.get(String(patientMedicationId))) ??
       (medicationId && byMedicationId.get(String(medicationId))) ??
+      (medication?.patientMedicationId && byPatientMedicationId.get(String(medication.patientMedicationId))) ??
       null;
 
-    return source?.healthGoalId
-      ? { ...source, ...medication, healthGoalId: source.healthGoalId }
-      : medication;
+    // Health Home's directly queried PatientMedication row is authoritative.
+    // Prefer its real row id over any legacy/stale patientMedicationId carried
+    // by the onboarding/canonical medication payload.
+    const sourcePatientMedicationId =
+      source?.patientMedication?.id ??
+      (source && String(source.source ?? "").trim().toUpperCase() !== "PRESCRIPTION"
+        ? source.id
+        : null) ??
+      source?.patientMedicationId ??
+      null;
+
+    if (!sourcePatientMedicationId) return medication;
+
+    return {
+      ...source,
+      ...medication,
+      patientMedicationId: String(sourcePatientMedicationId),
+      patientMedication: {
+        ...(source?.patientMedication ?? {}),
+        ...(medication?.patientMedication ?? {}),
+        id: String(sourcePatientMedicationId),
+      },
+      ...(source?.healthGoalId ? { healthGoalId: source.healthGoalId } : {}),
+      ...(source?.healthGoals ? { healthGoals: source.healthGoals } : {}),
+    };
   });
 }
 
