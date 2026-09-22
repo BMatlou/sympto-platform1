@@ -81,6 +81,63 @@ export default function LogSymptomPage() {
               </div>
             )}
 
+            {result.context && (
+              <div className="mt-5 rounded-2xl border border-[#24c1c4]/15 bg-white p-4 ring-1 ring-slate-100">
+                <div className="flex items-center justify-between gap-3">
+                  <div>
+                    <p className="text-[10px] font-black uppercase tracking-[0.16em] text-[#24aeb3]">Connected health data</p>
+                    <p className="mt-1 text-xs leading-5 text-slate-500">These records stay separate from the symptom itself and provide context for future comparison.</p>
+                  </div>
+                  <span className="rounded-full bg-[#0b2d54]/[0.05] px-2.5 py-1 text-[9px] font-black text-[#0b2d54]">{result.context.recentSymptomCount} recent symptom{result.context.recentSymptomCount === 1 ? "" : "s"}</span>
+                </div>
+
+                <div className="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-4">
+                  <div className="rounded-xl bg-[#f7fbfb] p-3 ring-1 ring-slate-100">
+                    <p className="text-[9px] font-black uppercase tracking-[0.1em] text-slate-400">Medicines</p>
+                    <p className="mt-1 text-sm font-black text-[#0b2d54]">{result.context.activeMedicationCount}</p>
+                  </div>
+                  <div className="rounded-xl bg-[#f7fbfb] p-3 ring-1 ring-slate-100">
+                    <p className="text-[9px] font-black uppercase tracking-[0.1em] text-slate-400">Conditions</p>
+                    <p className="mt-1 text-sm font-black text-[#0b2d54]">{result.context.conditionCount}</p>
+                  </div>
+                  <div className="rounded-xl bg-[#f7fbfb] p-3 ring-1 ring-slate-100">
+                    <p className="text-[9px] font-black uppercase tracking-[0.1em] text-slate-400">Allergies</p>
+                    <p className="mt-1 text-sm font-black text-[#0b2d54]">{result.context.allergyCount}</p>
+                  </div>
+                  <div className="rounded-xl bg-[#f7fbfb] p-3 ring-1 ring-slate-100">
+                    <p className="text-[9px] font-black uppercase tracking-[0.1em] text-slate-400">Active goals</p>
+                    <p className="mt-1 text-sm font-black text-[#0b2d54]">{result.context.activeGoalCount}</p>
+                  </div>
+                </div>
+
+                {(result.context.recentVitals.length > 0 || result.context.wearableHeartRate.length > 0) && (
+                  <div className="mt-3 rounded-xl bg-[#0b2d54]/[0.035] p-3.5">
+                    <p className="text-[9px] font-black uppercase tracking-[0.12em] text-slate-400">Recent measurements</p>
+                    <div className="mt-2 flex flex-wrap gap-2">
+                      {result.context.recentVitals.slice(0, 6).map((vital, index) => (
+                        <span key={`vital-${vital.type}-${vital.measuredAt}-${index}`} className="rounded-full bg-white px-2.5 py-1.5 text-[9px] font-bold text-[#0b2d54] ring-1 ring-slate-200">
+                          {vital.type.replace(/_/g, " ")} · {vital.value}
+                        </span>
+                      ))}
+                      {result.context.wearableHeartRate.slice(0, 3).map((reading, index) => (
+                        <span key={`wearable-hr-${reading.measuredAt}-${index}`} className="rounded-full bg-white px-2.5 py-1.5 text-[9px] font-bold text-[#0b2d54] ring-1 ring-slate-200">
+                          Wearable HR · {reading.value} bpm
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {(result.context.activeMedicationNames.length > 0 || result.context.activeConditionNames.length > 0 || result.context.activeAllergyNames.length > 0) && (
+                  <div className="mt-3 space-y-2 text-[10px] leading-5 text-slate-500">
+                    {result.context.activeMedicationNames.length > 0 && <p><span className="font-black text-slate-600">Medicines:</span> {result.context.activeMedicationNames.slice(0, 5).join(", ")}</p>}
+                    {result.context.activeConditionNames.length > 0 && <p><span className="font-black text-slate-600">Conditions:</span> {result.context.activeConditionNames.slice(0, 5).join(", ")}</p>}
+                    {result.context.activeAllergyNames.length > 0 && <p><span className="font-black text-slate-600">Allergies:</span> {result.context.activeAllergyNames.slice(0, 5).join(", ")}</p>}
+                  </div>
+                )}
+              </div>
+            )}
+
             <div className="mt-5 rounded-2xl bg-[#0b2d54]/[0.04] p-4">
               <p className="text-xs font-black uppercase tracking-[0.16em] text-slate-400">What happens next</p>
               <p className="mt-2 text-sm leading-6 text-slate-600">This entry stays connected to your health history. As you add symptoms, medicines, measurements and care events, Sympto can use the growing record to show you relevant context.</p>
