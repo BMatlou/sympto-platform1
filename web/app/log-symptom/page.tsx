@@ -171,7 +171,7 @@ export default function LogSymptomPage() {
 
             {result.insights.length > 0 && (
               <div className="mt-5 rounded-2xl border border-slate-200 bg-slate-50 p-4">
-                <div className="flex items-center gap-2 text-sm font-black text-[#0b2d54]"><Sparkles className="h-4 w-4 text-[#24c1c4]" /> Sympto safety check</div>
+                <div className="flex items-center gap-2 text-sm font-black text-[#0b2d54]"><Sparkles className="h-4 w-4 text-[#24c1c4]" /> Automated safety check</div>
                 <ul className="mt-3 space-y-2 text-sm leading-6 text-slate-600">
                   {result.insights.map((insight, index) => <li key={index} className="flex gap-2"><span className="mt-2 h-1.5 w-1.5 shrink-0 rounded-full bg-[#24c1c4]" />{insight}</li>)}
                 </ul>
