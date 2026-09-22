@@ -94,7 +94,45 @@ export class HealthGoalsService {
     };
   }
 
+  private async ensureMetricConfigStorage() {
+    await this.prisma.$executeRawUnsafe('CREATE EXTENSION IF NOT EXISTS pgcrypto');
+    await this.prisma.$executeRawUnsafe(`
+      CREATE TABLE IF NOT EXISTS "HealthGoalMetricConfig" (
+        "id" UUID NOT NULL DEFAULT gen_random_uuid(),
+        "healthGoalId" TEXT NOT NULL,
+        "metricType" VARCHAR(64) NOT NULL,
+        "metricKey" VARCHAR(128) NOT NULL,
+        "frequency" VARCHAR(16) NOT NULL DEFAULT 'DAILY',
+        "frequencyTarget" NUMERIC(12,2),
+        "guidanceText" TEXT,
+        "aggregation" VARCHAR(16) NOT NULL DEFAULT 'SUM',
+        "comparison" VARCHAR(16) NOT NULL DEFAULT 'AT_LEAST',
+        "createdAt" TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        "updatedAt" TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        CONSTRAINT "HealthGoalMetricConfig_pkey" PRIMARY KEY ("id")
+      )
+    `);
+    await this.prisma.$executeRawUnsafe(`
+      ALTER TABLE "HealthGoalMetricConfig"
+        ADD COLUMN IF NOT EXISTS "healthGoalId" TEXT,
+        ADD COLUMN IF NOT EXISTS "metricType" VARCHAR(64),
+        ADD COLUMN IF NOT EXISTS "metricKey" VARCHAR(128),
+        ADD COLUMN IF NOT EXISTS "frequency" VARCHAR(16) DEFAULT 'DAILY',
+        ADD COLUMN IF NOT EXISTS "frequencyTarget" NUMERIC(12,2),
+        ADD COLUMN IF NOT EXISTS "guidanceText" TEXT,
+        ADD COLUMN IF NOT EXISTS "aggregation" VARCHAR(16) DEFAULT 'SUM',
+        ADD COLUMN IF NOT EXISTS "comparison" VARCHAR(16) DEFAULT 'AT_LEAST',
+        ADD COLUMN IF NOT EXISTS "createdAt" TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+        ADD COLUMN IF NOT EXISTS "updatedAt" TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
+    `);
+    await this.prisma.$executeRawUnsafe(`
+      CREATE UNIQUE INDEX IF NOT EXISTS "HealthGoalMetricConfig_healthGoalId_key"
+        ON "HealthGoalMetricConfig" ("healthGoalId")
+    `);
+  }
+
   public async configureMetric(goalId: string, config: any) {
+    await this.ensureMetricConfigStorage();
     const goal = await this.prisma.healthGoal.findUnique({ where: { id: goalId }, select: { status: true, category: true, targetValue: true } });
     if (!goal) throw new NotFoundException('Health goal not found.');
     if (String(goal.status).toUpperCase() === 'ACHIEVED') throw new BadRequestException('Completed health goals are locked. Start a new goal instead.');
@@ -326,8 +364,32 @@ export class HealthGoalsService {
       await this.captureWeightGoalBaseline(goal.id, patientId, goal.createdAt);
     }
 
-    await this.healthGoalIntelligence.syncGoalRelations(patientId);
-    return this.findOne(goal.id);
+    try {
+      await this.healthGoalIntelligence.syncGoalRelations(patientId);
+    } catch (error) {
+      console.error(
+        'Health goal relation sync failed after creation:',
+        error instanceof Error ? error.message : String(error),
+      );
+    }
+
+    return {
+      ...goal,
+      metricConfig: {
+        metricType: metricType ?? goalRuleFor(category).metricType,
+        metricKey: metricKey ?? goalRuleFor(category).metricKey,
+        frequency: frequency ?? goalRuleFor(category).frequency,
+        frequencyTarget:
+          frequencyTarget == null
+            ? targetValue == null
+              ? null
+              : Number(targetValue)
+            : Number(frequencyTarget),
+        aggregation: aggregation ?? goalRuleFor(category).aggregation,
+        comparison: effectiveComparison ?? goalRuleFor(category).comparison,
+        guidanceText: guidanceText ?? null,
+      },
+    };
   }
   async findAll(query: QueryHealthGoalDto) {
     const patientId = String(query?.patientId ?? '').trim();
