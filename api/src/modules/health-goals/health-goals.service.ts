@@ -394,67 +394,31 @@ export class HealthGoalsService {
 
     let goal;
     try {
-      goal = await this.prisma.$transaction(async (tx) => {
-        const createdGoal = await tx.healthGoal.create({
-          data: {
-            ...goalData,
-            patientId,
-            ...(patientMedicationId ? { patientMedicationId } : {}),
-            ...(targetValue !== undefined ? { targetValue } : {}),
-            ...(unit !== undefined ? { unit } : {}),
-            ...(targetDate !== undefined ? { targetDate: parsedTargetDate } : {}),
-            ...(achievedAt !== undefined ? { achievedAt: parsedAchievedAt } : {}),
-          },
-          include: {
-            patient: true,
-            practitioner: true,
-            carePlan: true,
-            progress: true,
-          },
-        });
-
-        const metricConfigId = randomUUID();
-        await tx.$executeRaw`
-          INSERT INTO "HealthGoalMetricConfig"
-            ("id", "healthGoalId", "metricType", "metricKey", "frequency", "frequencyTarget", "aggregation", "comparison", "guidanceText")
-          VALUES
-            (${metricConfigId}::uuid, ${createdGoal.id}::text, ${metricConfig.metricType}, ${metricConfig.metricKey}, ${metricConfig.frequency}, ${metricConfig.frequencyTarget}, ${metricConfig.aggregation}, ${metricConfig.comparison}, ${metricConfig.guidanceText})
-        `;
-
-        return createdGoal;
+      // Primary goal persistence is deliberately independent from the metric
+      // metadata write. This prevents a drifted metric table from making a
+      // valid HealthGoal impossible to save.
+      goal = await this.prisma.healthGoal.create({
+        data: {
+          ...goalData,
+          patientId,
+          ...(patientMedicationId ? { patientMedicationId } : {}),
+          ...(targetValue !== undefined ? { targetValue } : {}),
+          ...(unit !== undefined ? { unit } : {}),
+          ...(targetDate !== undefined ? { targetDate: parsedTargetDate } : {}),
+          ...(achievedAt !== undefined ? { achievedAt: parsedAchievedAt } : {}),
+        },
+        include: {
+          patient: true,
+          practitioner: true,
+          carePlan: true,
+          progress: true,
+        },
       });
     } catch (error: unknown) {
-      // CRITICAL AUDIT: dump the complete server-side database exception.
-      // This stays in the API terminal and is intentionally not returned to
-      // the browser, where database internals must never be exposed.
-      console.error('====================================================');
-      console.error('❌ CRITICAL GOAL CREATION FAILURE EXTRACTION');
       console.error(
-        'Error code:',
-        error instanceof Prisma.PrismaClientKnownRequestError
-          ? error.code
-          : (error as { code?: unknown })?.code,
+        'Health goal primary database write failed:',
+        error instanceof Error ? error.stack ?? error.message : String(error),
       );
-      console.error(
-        'Error name:',
-        error instanceof Error ? error.name : typeof error,
-      );
-      console.error(
-        'Error message:',
-        error instanceof Error ? error.message : String(error),
-      );
-      console.error(
-        'Error meta:',
-        error instanceof Prisma.PrismaClientKnownRequestError
-          ? error.meta
-          : (error as { meta?: unknown })?.meta,
-      );
-      console.error('Complete error object:', error);
-      console.error(
-        'Complete error stack:',
-        error instanceof Error ? error.stack : undefined,
-      );
-      console.error('====================================================');
 
       if (error instanceof Prisma.PrismaClientKnownRequestError) {
         if (error.code === 'P2002') {
@@ -473,6 +437,59 @@ export class HealthGoalsService {
       throw error;
     }
 
+    let metricConfigReady = false;
+    let metricConfigFallbackUsed = false;
+
+    try {
+      const metricConfigId = randomUUID();
+
+      // First attempt: write the complete current metric contract.
+      await this.prisma.$executeRaw`
+        INSERT INTO "HealthGoalMetricConfig"
+          ("id", "healthGoalId", "metricType", "metricKey", "frequency", "frequencyTarget", "aggregation", "comparison", "guidanceText")
+        VALUES
+          (${metricConfigId}::uuid, ${goal.id}::text, ${metricConfig.metricType}, ${metricConfig.metricKey}, ${metricConfig.frequency}, ${metricConfig.frequencyTarget}, ${metricConfig.aggregation}, ${metricConfig.comparison}, ${metricConfig.guidanceText})
+      `;
+
+      metricConfigReady = true;
+    } catch (configError: unknown) {
+      console.warn(
+        '⚠️ Full health-goal metric configuration write failed; attempting minimal-schema fallback.',
+        configError instanceof Error ? configError.message : String(configError),
+      );
+
+      try {
+        const fallbackMetricConfigId = randomUUID();
+
+        // Minimal fallback intentionally uses only the columns that are
+        // foundational to the metric contract. The migration defaults supply
+        // optional aggregation/comparison values if those columns exist.
+        await this.prisma.$executeRaw`
+          INSERT INTO "HealthGoalMetricConfig"
+            ("id", "healthGoalId", "metricType", "metricKey", "frequency", "frequencyTarget")
+          VALUES
+            (${fallbackMetricConfigId}::uuid, ${goal.id}::text, ${metricConfig.metricType}, ${metricConfig.metricKey}, ${metricConfig.frequency}, ${metricConfig.frequencyTarget})
+        `;
+
+        metricConfigReady = true;
+        metricConfigFallbackUsed = true;
+
+        console.warn(
+          '✅ Minimal health-goal metric configuration fallback succeeded.',
+          { goalId: goal.id },
+        );
+      } catch (fallbackError: unknown) {
+        // Do not delete a valid primary goal because optional tracking
+        // metadata could not bind. The goal remains visible, while the server
+        // records that metric configuration needs repair.
+        console.error(
+          '❌ Health-goal metric configuration fallback also failed.',
+          fallbackError instanceof Error
+            ? fallbackError.stack ?? fallbackError.message
+            : String(fallbackError),
+        );
+      }
+    }
     if (category === 'WEIGHT') {
       await this.captureWeightGoalBaseline(goal.id, patientId, goal.createdAt);
     }
