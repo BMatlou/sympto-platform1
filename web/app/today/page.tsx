@@ -141,6 +141,7 @@ export default function TodayPage() {
 
   useEffect(() => {
     if (loading || error || !data || typeof window === "undefined") return;
+
     const hash = window.location.hash;
     const supportedHash =
       hash.startsWith("#medication-adherence-card-") ||
@@ -152,10 +153,21 @@ export default function TodayPage() {
     const scrollToMedicationGoal = () => {
       const targetId = decodeURIComponent(hash.slice(1));
       const target = document.getElementById(targetId);
+
       if (target) {
         target.scrollIntoView({ behavior: "smooth", block: "center" });
+
+        // This hash is only a navigation instruction. Consume it after the
+        // initial jump so dashboard/Today reloads cannot force the viewport
+        // back to the goals section again.
+        window.history.replaceState(
+          window.history.state,
+          "",
+          window.location.pathname + window.location.search,
+        );
         return;
       }
+
       if (attempts < 12) {
         attempts += 1;
         timer = setTimeout(scrollToMedicationGoal, 100);
@@ -163,10 +175,11 @@ export default function TodayPage() {
     };
 
     requestAnimationFrame(scrollToMedicationGoal);
+
     return () => {
       if (timer) clearTimeout(timer);
     };
-  }, [loading, error, data]);
+  }, [loading, error]);
 
   if (loading) {
     return <ProtectedRoute><main className="min-h-screen bg-[#f5fafb] p-4 sm:p-8"><div className="mx-auto max-w-[1260px] space-y-5" aria-busy="true"><div className="h-[58px] animate-pulse rounded-[24px] bg-white" /><div className="h-[270px] animate-pulse rounded-[30px] bg-white" /><div className="h-[420px] animate-pulse rounded-[27px] bg-white" /></div></main></ProtectedRoute>;
