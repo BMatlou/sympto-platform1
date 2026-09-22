@@ -76,6 +76,12 @@ export default function PrescribedMedicationsCard({
     const patientMedicationId = getPatientMedicationId(medication) || goalPatientMedicationId(goal);
     const medicationId = medication.medicationId || medication.medication?.id || null;
     const resolvedGoalId = goal?.id ?? medication.healthGoalId ?? null;
+    const resolvedGoalStatus = String(goal?.status ?? "").toUpperCase();
+
+    if (resolvedGoalId && resolvedGoalStatus === "ON_HOLD") {
+      router.push(`/health-goals?edit=${encodeURIComponent(String(resolvedGoalId))}&resume=1`);
+      return;
+    }
 
     if (patientMedicationId && resolvedGoalId) {
       const targetId = `medication-adherence-card-${String(patientMedicationId)}`;
@@ -138,14 +144,6 @@ export default function PrescribedMedicationsCard({
             const currentPatientMedicationId = getPatientMedicationId(medication);
             const currentMedicationId = medication.medicationId || medication.medication?.id || null;
 
-            // Runtime diagnostics: leave these explicit while we verify the
-            // production payload shape and the goal-to-medication mapping.
-            console.log(`[TODAY DIAGNOSTIC] Processing medication: ${medication.name}`, {
-              patientMedicationId: currentPatientMedicationId,
-              medicationId: currentMedicationId,
-              availableGoalsInPayload: activeGoalsArray,
-            });
-
             const medicationGoalForThisMed = activeGoalsArray.find((goal: any) => {
               const targetPatientMedId = getPatientMedicationId(medication);
               const targetMedId = medication.medicationId || medication.medication?.id || "";
@@ -161,10 +159,6 @@ export default function PrescribedMedicationsCard({
                   goalMedId &&
                   String(targetMedId) === String(goalMedId))
               ) {
-                console.log(
-                  `[TODAY DIAGNOSTIC] RELATIONAL MEDICATION GOAL MATCH FOUND FOR ${medication.name}`,
-                  { goalId: goal?.id, targetPatientMedId, goalPatientMedId, targetMedId, goalMedId },
-                );
                 return true;
               }
 
@@ -195,10 +189,6 @@ export default function PrescribedMedicationsCard({
                 hasAdherenceLogs &&
                 isTargetMedication
               ) {
-                console.log(
-                  `[TODAY DIAGNOSTIC] INTELLIGENT PROGRESS FALLBACK CONNECTED FOR ${medication.name}`,
-                  { goalId: goal?.id, hasAdherenceLogs: true },
-                );
                 return true;
               }
 
@@ -206,13 +196,10 @@ export default function PrescribedMedicationsCard({
             });
 
             const resolvedGoalId = medicationGoalForThisMed?.id ?? directHealthGoalId ?? null;
+            const resolvedGoalStatus = String(
+              medicationGoalForThisMed?.status ?? directlyLinkedGoals[0]?.status ?? "",
+            ).toUpperCase();
             const hasMedicationGoal = Boolean(resolvedGoalId);
-
-            console.log(`[TODAY DIAGNOSTIC] Final medication state: ${medication.name}`, {
-              hasMedicationGoal,
-              resolvedGoalId,
-              matchedGoal: medicationGoalForThisMed,
-            });
 
             return (
               <div
@@ -238,7 +225,11 @@ export default function PrescribedMedicationsCard({
                     }
                   >
                     {hasMedicationGoal ? <Target className="h-3.5 w-3.5" /> : null}
-                    {hasMedicationGoal ? "View Goal" : "Set medication goal"}
+                    {hasMedicationGoal
+                      ? resolvedGoalStatus === "ON_HOLD"
+                        ? "Resume goal"
+                        : "View Goal"
+                      : "Set medication goal"}
                   </button>
                 </div>
               </div>
