@@ -102,9 +102,9 @@ export default function LogSymptomPage() {
     setSaving(true);
     setError("");
     try {
-      const exactPainScore = painScore.trim() ? Number(painScore) : undefined;
-      const duration = durationMinutes.trim() ? Number(durationMinutes) : undefined;
-      const effectiveness = medicationEffectiveness.trim() ? Number(medicationEffectiveness) : undefined;
+      const exactPainScore = painScore.trim() ? Number(painScore) : Number.NaN;
+      const duration = durationMinutes.trim() ? Number(durationMinutes) : Number.NaN;
+      const effectiveness = medicationEffectiveness.trim() ? Number(medicationEffectiveness) : Number.NaN;
       const intelligence = await healthJournalService.processSymptom({
         symptomName: symptom.trim(),
         severity,
