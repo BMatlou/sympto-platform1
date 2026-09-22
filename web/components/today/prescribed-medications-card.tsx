@@ -217,7 +217,7 @@ export default function PrescribedMedicationsCard({
                   <span className="text-xs font-medium text-slate-500">Today</span>
                   <button
                     type="button"
-                    onClick={() => handleAction(medication, medicationGoalForThisMed ?? (resolvedGoalId ? { id: String(resolvedGoalId) } : null))}
+                    onClick={() => handleAction(medication, medicationGoalForThisMed ?? directlyLinkedGoals[0] ?? null)}
                     className={
                       hasMedicationGoal
                         ? "inline-flex items-center gap-1.5 rounded-lg px-3 py-2 text-xs font-semibold text-emerald-700 transition-all duration-200 hover:bg-emerald-50 hover:text-emerald-800"
