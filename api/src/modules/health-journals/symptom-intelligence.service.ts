@@ -17,6 +17,7 @@ export interface SymptomIntelligenceAction {
 export interface SymptomIntelligenceResult {
   symptomLogId: string;
   episodeId: string;
+  observationId: string;
   assessment: {
     tone: 'calm' | 'watch' | 'urgent';
     title: string;
@@ -26,9 +27,16 @@ export interface SymptomIntelligenceResult {
   actions: SymptomIntelligenceAction[];
   context: {
     activeMedicationCount: number;
+    activeMedicationNames: string[];
     conditionCount: number;
+    activeConditionNames: string[];
     allergyCount: number;
+    activeAllergyNames: string[];
+    activeGoalCount: number;
+    activeGoalTitles: string[];
     recentSymptomCount: number;
+    recentSymptoms: Array<{ title: string; severity: string | null; startedAt: Date }>;
+    recentJournalCount: number;
     recentVitals: Array<{ type: string; value: number; measuredAt: Date }>;
     wearableHeartRate: Array<{ value: number; measuredAt: Date }>;
     upcomingAppointment: Date | null;
@@ -49,6 +57,13 @@ export class SymptomIntelligenceService {
     const patient = await this.getPatient(userId);
     const symptomName = dto.symptomName.trim();
     const startedAt = dto.startedAt ? new Date(dto.startedAt) : new Date();
+    if (Number.isNaN(startedAt.getTime())) {
+      throw new NotFoundException('Symptom start date is invalid.');
+    }
+    const normalizedInput = `${symptomName} ${dto.details ?? ''}`.toLowerCase();
+    const urgentWarningSign = /chest pain|cannot breathe|can't breathe|difficulty breathing|fainting|unconscious|severe bleeding|stroke/.test(normalizedInput);
+    const severeSymptom = dto.severity === SymptomSeverity.SEVERE || dto.severity === SymptomSeverity.VERY_SEVERE;
+    const episodePriority = urgentWarningSign ? 'URGENT' : severeSymptom ? 'HIGH' : 'ROUTINE';
 
     let episode = await this.prisma.clinicalEpisode.findFirst({
       where: {
@@ -60,6 +75,9 @@ export class SymptomIntelligenceService {
             title: {
               equals: symptomName,
               mode: 'insensitive',
+            },
+            startedAt: {
+              gte: new Date(startedAt.getTime() - 7 * 86400000),
             },
           },
         },
@@ -75,6 +93,7 @@ export class SymptomIntelligenceService {
           description:
             'Patient symptom tracking episode. Sympto links related observations and health information over time.',
           type: ClinicalEpisodeType.ACUTE,
+          priority: episodePriority,
           startedAt,
         },
       });
@@ -94,6 +113,9 @@ export class SymptomIntelligenceService {
         data: { name: symptomName },
       });
     }
+
+    const context = await this.buildContext(patient.id);
+    const analysis = this.evaluateContext(symptomName, dto.severity, dto.details, context);
 
     const symptomLog = await this.prisma.$transaction(async (tx) => {
       const log = await tx.symptomLog.create({
@@ -116,23 +138,42 @@ export class SymptomIntelligenceService {
         },
       });
 
-      return log;
+      const observation = await tx.aIObservation.create({
+        data: {
+          symptomLogId: log.id,
+          observation: [
+            `Symptom recorded: ${symptomName}.`,
+            `Severity: ${dto.severity.toLowerCase().replaceAll('_', ' ')}.`,
+            analysis.assessment.message,
+            analysis.insights.slice(0, 3).join(' '),
+          ].filter(Boolean).join(' '),
+          recommendation: analysis.actions.map((action) => action.label).join(' · ') || null,
+          requiresAttention: urgentWarningSign || severeSymptom,
+        },
+      });
+
+      return { log, observation };
     });
 
-    const context = await this.buildContext(patient.id);
-    const analysis = this.evaluateContext(symptomName, dto.severity, dto.details, context);
-
     return {
-      symptomLogId: symptomLog.id,
+      symptomLogId: symptomLog.log.id,
       episodeId: episode.id,
+      observationId: symptomLog.observation.id,
       assessment: analysis.assessment,
       insights: analysis.insights,
       actions: analysis.actions,
       context: {
         activeMedicationCount: context.activeMedicationCount,
+        activeMedicationNames: context.activeMedicationNames,
         conditionCount: context.conditionCount,
+        activeConditionNames: context.activeConditionNames,
         allergyCount: context.allergyCount,
+        activeAllergyNames: context.activeAllergyNames,
+        activeGoalCount: context.activeGoalCount,
+        activeGoalTitles: context.activeGoalTitles,
         recentSymptomCount: context.recentSymptomCount,
+        recentSymptoms: context.recentSymptoms,
+        recentJournalCount: context.recentJournalCount,
         recentVitals: context.recentVitals,
         wearableHeartRate: context.wearableHeartRate,
         upcomingAppointment: context.upcomingAppointment,
@@ -188,9 +229,16 @@ export class SymptomIntelligenceService {
       actions,
       context: {
         activeMedicationCount: context.activeMedicationCount,
+        activeMedicationNames: context.activeMedicationNames,
         conditionCount: context.conditionCount,
+        activeConditionNames: context.activeConditionNames,
         allergyCount: context.allergyCount,
+        activeAllergyNames: context.activeAllergyNames,
+        activeGoalCount: context.activeGoalCount,
+        activeGoalTitles: context.activeGoalTitles,
         recentSymptomCount: context.recentSymptomCount,
+        recentSymptoms: context.recentSymptoms,
+        recentJournalCount: context.recentJournalCount,
         recentVitals: context.recentVitals,
         wearableHeartRate: context.wearableHeartRate,
         upcomingAppointment: context.upcomingAppointment,
@@ -268,6 +316,23 @@ export class SymptomIntelligenceService {
           orderBy: { createdAt: 'desc' },
           take: 3,
         },
+        healthJournals: {
+          orderBy: { createdAt: 'desc' },
+          take: 7,
+        },
+        healthGoals: {
+          where: { status: 'ACTIVE' },
+          orderBy: { createdAt: 'desc' },
+          take: 20,
+          select: {
+            id: true,
+            title: true,
+            category: true,
+            targetValue: true,
+            unit: true,
+            targetDate: true,
+          },
+        },
       },
     });
 
@@ -305,16 +370,63 @@ export class SymptomIntelligenceService {
       .slice(0, 5)
       .map((measurement) => ({ value: Number(measurement.value), measuredAt: measurement.measuredAt }));
 
+    const activeMedicationNames = (patient.healthPassport?.medications ?? [])
+      .map((item) => item.medication?.name ?? item.medication?.genericName ?? item.medication?.brandName)
+      .filter(Boolean)
+      .map(String);
+
+    const activeConditionNames = (patient.healthPassport?.conditions ?? [])
+      .map((item) => item.condition?.name)
+      .filter(Boolean)
+      .map(String);
+
+    const activeAllergyNames = (patient.healthPassport?.allergies ?? [])
+      .map((item) => item.allergy?.name)
+      .filter(Boolean)
+      .map(String);
+
+    const recentSymptoms = patient.clinicalEpisodes
+      .flatMap((episode) => episode.symptomLogs)
+      .sort((a, b) => b.startedAt.getTime() - a.startedAt.getTime())
+      .slice(0, 10)
+      .map((log) => ({
+        title: log.title ?? 'Symptom recorded',
+        severity: log.overallSeverity,
+        startedAt: log.startedAt,
+      }));
+
+    const journalVitals = patient.healthJournals.flatMap((journal) => {
+      const rows: Array<{ type: string; value: number; measuredAt: Date }> = [];
+      if (journal.bloodPressureSystolic != null) rows.push({ type: 'BLOOD_PRESSURE_SYSTOLIC', value: Number(journal.bloodPressureSystolic), measuredAt: journal.createdAt });
+      if (journal.bloodPressureDiastolic != null) rows.push({ type: 'BLOOD_PRESSURE_DIASTOLIC', value: Number(journal.bloodPressureDiastolic), measuredAt: journal.createdAt });
+      if (journal.heartRate != null) rows.push({ type: 'HEART_RATE', value: Number(journal.heartRate), measuredAt: journal.createdAt });
+      if (journal.oxygenSaturation != null) rows.push({ type: 'OXYGEN_SATURATION', value: Number(journal.oxygenSaturation), measuredAt: journal.createdAt });
+      if (journal.respiratoryRate != null) rows.push({ type: 'RESPIRATORY_RATE', value: Number(journal.respiratoryRate), measuredAt: journal.createdAt });
+      if (journal.temperature != null) rows.push({ type: 'BODY_TEMPERATURE', value: Number(journal.temperature), measuredAt: journal.createdAt });
+      return rows;
+    });
+
+    const combinedVitals = [...recentVitals.map((vital) => ({
+      type: vital.vitalType.name,
+      value: Number(vital.value),
+      measuredAt: vital.measuredAt,
+    })), ...journalVitals]
+      .sort((a, b) => b.measuredAt.getTime() - a.measuredAt.getTime())
+      .slice(0, 12);
+
     return {
       activeMedicationCount: patient.healthPassport?.medications.length ?? 0,
+      activeMedicationNames,
       conditionCount: patient.healthPassport?.conditions.length ?? 0,
+      activeConditionNames,
       allergyCount: patient.healthPassport?.allergies.length ?? 0,
-      recentSymptomCount,
-      recentVitals: recentVitals.map((vital) => ({
-        type: vital.vitalType.name,
-        value: Number(vital.value),
-        measuredAt: vital.measuredAt,
-      })),
+      activeAllergyNames,
+      activeGoalCount: patient.healthGoals.length,
+      activeGoalTitles: patient.healthGoals.map((goal) => String(goal.title)),
+      recentSymptomCount: Math.max(recentSymptomCount, 1),
+      recentSymptoms,
+      recentJournalCount: patient.healthJournals.length,
+      recentVitals: combinedVitals,
       wearableHeartRate,
       upcomingAppointment: patient.appointments[0]?.scheduledStart ?? null,
       recentLabOrderCount: patient.labOrders.length,
@@ -364,6 +476,14 @@ export class SymptomIntelligenceService {
 
     if (context.conditionCount > 0 || context.allergyCount > 0) {
       insights.push('Your recorded conditions and allergies remain available as part of the clinical context.');
+    }
+
+    if (context.activeGoalCount > 0) {
+      insights.push(`Your ${context.activeGoalCount} active health goal${context.activeGoalCount === 1 ? '' : 's'} remain connected so symptom trends can be reviewed alongside the goals you are working on.`);
+    }
+
+    if (context.recentJournalCount > 0) {
+      insights.push(`Your recent journal entries are also available for longitudinal comparison.`);
     }
 
     if (context.upcomingAppointment) {
