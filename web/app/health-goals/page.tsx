@@ -159,7 +159,7 @@ export default function HealthGoalsPage() {
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [search, setSearch] = useState("");
 
-  const healthGoals = useMemo(() => (Array.isArray(dashboard?.goals) ? dashboard.goals : []).filter((goal: any) => ["ACTIVE", "ACHIEVED", "ON_TRACK", "IMPROVING", "STAGNANT", "DECLINING"].includes(String(goal?.status ?? "").toUpperCase())), [dashboard?.goals]);
+  const healthGoals = useMemo(() => (Array.isArray(dashboard?.goals) ? dashboard.goals : []).filter((goal: any) => ["ACTIVE", "ACHIEVED", "ON_HOLD", "ON_TRACK", "IMPROVING", "STAGNANT", "DECLINING"].includes(String(goal?.status ?? "").toUpperCase())), [dashboard?.goals]);
   const filteredGoals = useMemo(() => { const query = search.trim().toLowerCase(); if (!query) return healthGoals; return healthGoals.filter((goal: any) => `${goal?.title ?? ""} ${goal?.category ?? ""} ${goal?.description ?? ""}`.toLowerCase().includes(query)); }, [healthGoals, search]);
   const editingGoal = editingId ? healthGoals.find((goal: any) => String(goal.id) === editingId) : null;
   const selectedCategory = CATEGORIES.find((item) => item.value === draft.category);
@@ -287,12 +287,13 @@ export default function HealthGoalsPage() {
 
     try {
       setSaving(true);
+      const shouldResume = Boolean(editingId && searchParams.get("resume") === "1");
       const comparison: HealthGoalInput["comparison"] = draft.category === "WEIGHT" ? draft.weightDirection === "GAIN" ? "INCREASE_TO" : draft.weightDirection === "MAINTAIN" ? "CLOSEST" : "DECREASE_TO" : config.comparison;
-      const input: HealthGoalInput = { patientId: dashboard.patient.id, patientMedicationId: draft.category === "MEDICATION" ? draft.patientMedicationId || undefined : undefined, title: draft.title.trim(), description: draft.description.trim() || undefined, category: config.value, priority: draft.priority, targetValue: draft.targetValue, unit: draft.unit || config.unit || undefined, targetDate: draft.targetDate || undefined, metricType: config.metricType, metricKey: config.metricKey, frequency: config.frequency, frequencyTarget: draft.targetValue, aggregation: config.aggregation, comparison };
+      const input: HealthGoalInput = { patientId: dashboard.patient.id, patientMedicationId: draft.category === "MEDICATION" ? draft.patientMedicationId || undefined : undefined, title: draft.title.trim(), description: draft.description.trim() || undefined, category: config.value, priority: draft.priority, status: shouldResume ? "ACTIVE" : undefined, targetValue: draft.targetValue, unit: draft.unit || config.unit || undefined, targetDate: draft.targetDate || undefined, metricType: config.metricType, metricKey: config.metricKey, frequency: config.frequency, frequencyTarget: draft.targetValue, aggregation: config.aggregation, comparison };
       if (editingId) {
         await healthGoalsService.update(editingId, input);
         await healthGoalsService.configureMetric(editingId, { metricType: config.metricType, metricKey: config.metricKey, frequency: config.frequency, frequencyTarget: draft.targetValue, aggregation: config.aggregation, comparison });
-        toast.success("Health goal updated. Its baseline and tracking plan were refreshed; the original journey date remains unchanged.");
+        toast.success(shouldResume ? "Medication goal resumed and tracking is active again." : "Health goal updated. Its baseline and tracking plan were refreshed; the original journey date remains unchanged.");
       } else { await healthGoalsService.create(input); toast.success("Health goal added."); }
       closeEditor(); await reload();
     } catch (err: any) { toast.error(String(err?.response?.data?.message || "We could not save this health goal.")); }
@@ -341,7 +342,7 @@ export default function HealthGoalsPage() {
               <div className="rounded-2xl border border-[#dce9ee] bg-[#f7fbfc] p-4"><div className="flex items-start gap-3"><Target className="mt-0.5 h-4 w-4 shrink-0 text-[#0b6f73]" /><div><p className="text-xs font-black text-[#0b2d54]">Sympto will connect this goal to your health data</p><p className="mt-1 text-[11px] leading-5 text-[#74859a]">{draft.category === "WEIGHT" ? `${draft.weightDirection === "LOSE" ? "Loss" : draft.weightDirection === "GAIN" ? "Gain" : "Maintenance"} goal · directional target is the requested amount of weight change; destination is calculated from your baseline` : `${selectedCategory?.frequency === "DAILY" ? "Daily" : selectedCategory?.frequency === "WEEKLY" ? "Weekly" : "Overall"} tracking · ${selectedCategory?.comparison === "AT_LEAST" ? "at least" : selectedCategory?.comparison === "AT_MOST" ? "at most" : String(selectedCategory?.comparison ?? "") === "DECREASE_TO" ? "decrease toward" : "target comparison"} your target.`}</p></div></div></div>
             </>}
           </div>
-          <div className="sticky bottom-0 flex items-center justify-between gap-3 border-t border-[#edf2f5] bg-white/95 px-5 py-4 backdrop-blur sm:px-7"><button type="button" onClick={closeEditor} className="rounded-xl px-4 py-2.5 text-xs font-black text-[#74859a]">Cancel</button><button type="button" onClick={() => void saveGoal()} disabled={saving || !draft.category || !draft.title.trim() || !editorTargetValid} className="inline-flex min-h-10 items-center gap-2 rounded-xl bg-[#0b2d54] px-5 py-2.5 text-xs font-black text-white disabled:cursor-not-allowed disabled:opacity-40">{saving ? "Saving…" : editingId ? "Save changes" : "Add goal"}<ArrowRight className="h-3.5 w-3.5" /></button></div>
+          <div className="sticky bottom-0 flex items-center justify-between gap-3 border-t border-[#edf2f5] bg-white/95 px-5 py-4 backdrop-blur sm:px-7"><button type="button" onClick={closeEditor} className="rounded-xl px-4 py-2.5 text-xs font-black text-[#74859a]">Cancel</button><button type="button" onClick={() => void saveGoal()} disabled={saving || !draft.category || !draft.title.trim() || !editorTargetValid} className="inline-flex min-h-10 items-center gap-2 rounded-xl bg-[#0b2d54] px-5 py-2.5 text-xs font-black text-white disabled:cursor-not-allowed disabled:opacity-40">{saving ? "Saving…" : editingId ? (searchParams.get("resume") === "1" ? "Resume goal" : "Save changes") : "Add goal"}<ArrowRight className="h-3.5 w-3.5" /></button></div>
         </div></div>}
       </main>
     </ProtectedRoute>
