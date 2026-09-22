@@ -353,8 +353,13 @@ export class HealthGoalsService {
     }
 
     const patientId = String(goalData.patientId);
-    await this.assertPatientMedicationBelongsToPatient(patientMedicationId, patientId);
-    await this.assertNoDuplicateGoal(patientId, category, patientMedicationId ?? null);
+
+    // Non-medication duplicates can be checked normally. Medication goals are
+    // checked inside the same transaction as the authoritative PatientMedication
+    // ownership check and primary HealthGoal write.
+    if (category !== 'MEDICATION') {
+      await this.assertNoDuplicateGoal(patientId, category, patientMedicationId ?? null);
+    }
 
     const targetValue =
       goalData.targetValue ?? (isMedicationGoal ? String(DEFAULT_MEDICATION_TARGET) : undefined);
@@ -394,49 +399,92 @@ export class HealthGoalsService {
 
     let goal;
     try {
-      // Primary goal persistence is deliberately independent from the metric
-      // metadata write. This prevents a drifted metric table from making a
-      // valid HealthGoal impossible to save.
-      goal = await this.prisma.healthGoal.create({
-        data: {
-          ...goalData,
-          patientId,
-          ...(patientMedicationId ? { patientMedicationId } : {}),
-          ...(targetValue !== undefined ? { targetValue } : {}),
-          ...(unit !== undefined ? { unit } : {}),
-          ...(targetDate !== undefined ? { targetDate: parsedTargetDate } : {}),
-          ...(achievedAt !== undefined ? { achievedAt: parsedAchievedAt } : {}),
-        },
-        include: {
-          patient: true,
-          practitioner: true,
-          carePlan: true,
-          progress: true,
-        },
+      goal = await this.prisma.$transaction(async (tx) => {
+        // Validate the relational token against the patient's actual saved
+        // PatientMedication row before the HealthGoal insert.
+        if (patientMedicationId) {
+          const ownedMedication = await tx.patientMedication.findFirst({
+            where: {
+              id: patientMedicationId,
+              healthPassport: { patientId },
+            },
+            select: { id: true },
+          });
+
+          if (!ownedMedication) {
+            throw new BadRequestException(
+              'The selected medication is not saved for this patient. Refresh and select a saved prescribed medication.',
+            );
+          }
+        }
+
+        // Race-safe duplicate check for medication goals. Only statuses that
+        // actually exist in HealthGoalStatus are used here.
+        if (category === 'MEDICATION') {
+          const duplicate = await tx.healthGoal.findFirst({
+            where: {
+              patientId,
+              patientMedicationId: patientMedicationId ?? null,
+              category: 'MEDICATION',
+              status: { in: ['ACTIVE', 'ON_HOLD'] },
+            },
+            include: {
+              patient: true,
+              practitioner: true,
+              carePlan: true,
+              progress: true,
+            },
+          });
+
+          if (duplicate) return duplicate;
+        }
+
+        return tx.healthGoal.create({
+          data: {
+            ...goalData,
+            patientId,
+            ...(patientMedicationId ? { patientMedicationId } : {}),
+            ...(targetValue !== undefined ? { targetValue } : {}),
+            ...(unit !== undefined ? { unit } : {}),
+            ...(targetDate !== undefined ? { targetDate: parsedTargetDate } : {}),
+            ...(achievedAt !== undefined ? { achievedAt: parsedAchievedAt } : {}),
+          },
+          include: {
+            patient: true,
+            practitioner: true,
+            carePlan: true,
+            progress: true,
+          },
+        });
       });
     } catch (error: unknown) {
       console.error(
-        'Health goal primary database write failed:',
+        'Health goal primary transaction failed:',
         error instanceof Error ? error.stack ?? error.message : String(error),
       );
+
+      if (error instanceof BadRequestException) {
+        throw error;
+      }
 
       if (error instanceof Prisma.PrismaClientKnownRequestError) {
         if (error.code === 'P2002') {
           throw new ConflictException(
             isMedicationGoal
-              ? 'You already have an active medication goal for the selected prescribed medication. Edit or resume the existing goal instead.'
-              : 'You already have an active health goal in this category. Edit the existing goal instead.',
+              ? 'An active medication goal already exists for the selected prescribed medication.'
+              : 'An active health goal already exists in this category.',
           );
         }
+
         if (error.code === 'P2003') {
           throw new BadRequestException(
-            'The selected medication or related health record is no longer available. Please refresh and try again.',
+            'The selected medication reference is invalid. Please select a valid saved medication.',
           );
         }
       }
+
       throw error;
     }
-
     let metricConfigReady = false;
     let metricConfigFallbackUsed = false;
 
