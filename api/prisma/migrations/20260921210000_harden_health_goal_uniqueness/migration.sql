@@ -44,19 +44,19 @@ WHERE g.id IN (SELECT id FROM ranked WHERE rn > 1);
 -- Non-medication categories: one live goal per patient/category.
 CREATE UNIQUE INDEX IF NOT EXISTS "HealthGoal_one_live_goal_per_category_idx"
   ON "HealthGoal" ("patientId", "category")
-  WHERE "category"::text <> 'MEDICATION'
-    AND "status"::text IN ('ACTIVE', 'ON_HOLD');
+  WHERE "category" <> 'MEDICATION'
+    AND "status" IN ('ACTIVE', 'ON_HOLD');
 
 -- Medication goals: one live goal per prescribed medication.
 CREATE UNIQUE INDEX IF NOT EXISTS "HealthGoal_one_live_medication_goal_per_medication_idx"
   ON "HealthGoal" ("patientMedicationId")
-  WHERE "category"::text = 'MEDICATION'
+  WHERE "category" = 'MEDICATION'
     AND "patientMedicationId" IS NOT NULL
-    AND "status"::text IN ('ACTIVE', 'ON_HOLD');
+    AND "status" IN ('ACTIVE', 'ON_HOLD');
 
 -- Legacy/unlinked medication goals: still prevent duplicates for the patient.
 CREATE UNIQUE INDEX IF NOT EXISTS "HealthGoal_one_live_unlinked_medication_goal_idx"
   ON "HealthGoal" ("patientId", "category")
-  WHERE "category"::text = 'MEDICATION'
+  WHERE "category" = 'MEDICATION'
     AND "patientMedicationId" IS NULL
-    AND "status"::text IN ('ACTIVE', 'ON_HOLD');
+    AND "status" IN ('ACTIVE', 'ON_HOLD');
