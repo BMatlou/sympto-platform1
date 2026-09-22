@@ -48,9 +48,9 @@ function normalizeVitals(data: any): DashboardVital[] {
 function patientMedicationId(medication: any) {
   const source = String(medication?.source ?? "").trim().toLowerCase();
   const syntheticPrescriptionId = String(medication?.id ?? "").startsWith("prescription-item-");
-  return medication?.patientMedicationId ||
-    medication?.patientMedication?.id ||
+  return medication?.patientMedication?.id ||
     (source !== "prescription" && !syntheticPrescriptionId ? medication?.id : null) ||
+    medication?.patientMedicationId ||
     null;
 }
 
