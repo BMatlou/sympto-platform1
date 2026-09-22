@@ -78,9 +78,10 @@ function normalizeMedications(medications: any[]): any[] {
     const source = String(medication?.source ?? "").trim().toUpperCase();
     const syntheticPrescriptionId = String(medication?.id ?? "").startsWith("prescription-item-");
     const patientMedicationId =
-      medication?.patientMedicationId ??
       medication?.patientMedication?.id ??
-      (source !== "PRESCRIPTION" && !syntheticPrescriptionId ? medication?.id : null);
+      (source !== "PRESCRIPTION" && !syntheticPrescriptionId ? medication?.id : null) ??
+      medication?.patientMedicationId ??
+      null;
 
     return {
       ...medication,
