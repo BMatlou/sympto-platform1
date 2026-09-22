@@ -99,6 +99,7 @@ function cumulativeTakenDoses(medication: any): number {
 
 export default function TodayMedicationActions({ medications, goal: suppliedGoal, onUpdated }: TodayMedicationActionsProps) {
   const [dosesLoggedToday, setDosesLoggedToday] = useState(0);
+  const [takenDosesForGoal, setTakenDosesForGoal] = useState(0);
   const [isSyncing, setIsSyncing] = useState(false);
   const [savingKey, setSavingKey] = useState<string | null>(null);
   const [states, setStates] = useState<Record<string, Action | undefined>>({});
@@ -145,28 +146,72 @@ export default function TodayMedicationActions({ medications, goal: suppliedGoal
     ? Math.min(100, Math.max(0, Math.round((safeDosesLoggedToday / totalRequiredDosesPerDay) * 100)))
     : 0;
 
-  async function loadTodayEvents() {
-    if (!medications.length) {
+  async function loadAdherenceEvents() {
+    if (!medications.length || !medicationId) {
       setDosesLoggedToday(0);
+      setTakenDosesForGoal(0);
       return;
     }
+
     try {
-      const { start, end } = todayBounds();
-      const result = await healthGoalsService.getMetricEvents("MEDICATION", "medication.adherence", start, end, "medication-adherence");
-      const medicationPrefix = medicationId ? String(medicationId) + ":" : null;
-      const medicationEvents = medicationPrefix
-        ? (result?.events ?? []).filter((event) => String(event?.sourceId ?? "").startsWith(medicationPrefix))
-        : [];
-      const eventCount = medicationPrefix ? medicationEvents.length : 0;
-      setDosesLoggedToday(Number.isFinite(eventCount) ? Math.min(totalRequiredDosesPerDay, Math.max(0, eventCount)) : 0);
+      const now = new Date();
+      const goalStart = new Date(String(finalGoal?.createdAt ?? now));
+      const from = Number.isNaN(goalStart.getTime()) ? new Date(now.getFullYear(), now.getMonth(), now.getDate()) : goalStart;
+      const to = new Date(now.getTime() + 1000);
+      const result = await healthGoalsService.getMetricEvents(
+        "MEDICATION",
+        "medication.adherence",
+        from,
+        to,
+        "medication-adherence",
+      );
+
+      const medicationPrefix = String(medicationId) + ":";
+      const medicationEvents = (result?.events ?? [])
+        .filter((event) => String(event?.sourceId ?? "").startsWith(medicationPrefix))
+        .sort((a, b) => new Date(String(a.occurredAt)).getTime() - new Date(String(b.occurredAt)).getTime());
+
+      if (!medicationEvents.length) {
+        setDosesLoggedToday(0);
+        setTakenDosesForGoal(0);
+        return;
+      }
+
+      // Each medication-adherence event represents exactly one recorded dose
+      // action. Its loggedValue is the cumulative adherence percentage after
+      // that action, so we can reconstruct cumulative TAKEN doses without
+      // storing a second action field in HealthGoalMetricEvent.
+      const { start: todayStart, end: tomorrowStart } = todayBounds();
+      let cumulativeTakenBeforeToday = 0;
+      let cumulativeTaken = 0;
+      let todayTaken = 0;
+
+      medicationEvents.forEach((event, index) => {
+        const totalActions = index + 1;
+        const adherence = Number(event?.loggedValue);
+        const inferredTaken = Number.isFinite(adherence)
+          ? Math.max(0, Math.min(totalActions, Math.round((totalActions * adherence) / 100)))
+          : cumulativeTaken;
+
+        cumulativeTaken = Math.max(cumulativeTaken, inferredTaken);
+        const occurredAt = new Date(String(event?.occurredAt));
+        if (occurredAt < todayStart) {
+          cumulativeTakenBeforeToday = cumulativeTaken;
+        } else if (occurredAt >= todayStart && occurredAt < tomorrowStart) {
+          todayTaken = Math.max(todayTaken, cumulativeTaken - cumulativeTakenBeforeToday);
+        }
+      });
+
+      setTakenDosesForGoal(Math.max(0, cumulativeTaken));
+      setDosesLoggedToday(Math.min(totalRequiredDosesPerDay, Math.max(0, todayTaken)));
     } catch {
       // Keep the current UI if event history cannot be loaded.
     }
   }
 
   useEffect(() => {
-    void loadTodayEvents();
-  }, [medications.length, totalRequiredDosesPerDay]);
+    void loadAdherenceEvents();
+  }, [medications.length, totalRequiredDosesPerDay, medicationId, finalGoal?.id]);
 
   const doseLabel = useMemo(() => (totalRequiredDosesPerDay === 1 ? "1 dose" : `${totalRequiredDosesPerDay} doses`), [totalRequiredDosesPerDay]);
 
@@ -203,7 +248,7 @@ export default function TodayMedicationActions({ medications, goal: suppliedGoal
         return;
       }
       setStates((current) => ({ ...current, [key]: action }));
-      await loadTodayEvents();
+      await loadAdherenceEvents();
       const nextAdherence = response.data?.adherencePercentage;
       const journalUpdated = response.data?.journal?.updated;
       if (journalUpdated === false) {
@@ -229,7 +274,8 @@ export default function TodayMedicationActions({ medications, goal: suppliedGoal
   const targetAdherence = Number.isFinite(rawTargetAdherence) && rawTargetAdherence > 0 ? rawTargetAdherence : 90;
   const scheduledGoalDoses = Math.max(0, Math.ceil((daysLeft !== null ? daysLeft + journeyDay - 1 : 30) * totalRequiredDosesPerDay));
   const targetDoseCount = Math.ceil((scheduledGoalDoses * targetAdherence) / 100);
-  const takenDosesSoFar = cumulativeTakenDoses(trackedMedication);
+  const fallbackTakenDoses = cumulativeTakenDoses(trackedMedication);
+  const takenDosesSoFar = Math.max(0, takenDosesForGoal || fallbackTakenDoses);
   const dosesNeededForGoal = Math.max(0, targetDoseCount - takenDosesSoFar);
   const cardClass = "w-full overflow-hidden rounded-[26px] border border-[#dce9ee] bg-white shadow-[0_14px_34px_rgba(11,45,84,.06)]";
 
