@@ -22,6 +22,19 @@ type GoalDraft = {
   patientMedicationId?: string;
 };
 
+function getAuthoritativePatientMedicationId(medication: any) {
+  const source = String(medication?.source ?? "").trim().toUpperCase();
+  const syntheticPrescriptionId = String(medication?.id ?? "").startsWith("prescription-item-");
+  return medication?.patientMedication?.id ||
+    (source !== "PRESCRIPTION" && !syntheticPrescriptionId ? medication?.id : null) ||
+    medication?.patientMedicationId ||
+    null;
+}
+
+function normaliseMedicationName(value: unknown) {
+  return String(value ?? "").trim().toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
+}
+
 const CATEGORIES = [
   { value: "WEIGHT", label: "Weight", unit: "kg", metricType: "WEIGHT", metricKey: "weight.kg", frequency: "TOTAL", aggregation: "LATEST", comparison: "DECREASE_TO", targetLabel: "Target weight" },
   { value: "EXERCISE", label: "Exercise", unit: "mins/week", metricType: "EXERCISE", metricKey: "exercise.minutes", frequency: "WEEKLY", aggregation: "SUM", comparison: "AT_LEAST", targetLabel: "Minutes" },
@@ -173,7 +186,15 @@ export default function HealthGoalsPage() {
       return !["ENDED", "INACTIVE", "DISCONTINUED", "CANCELLED"].includes(status);
     });
   }, [dashboard?.medications, dashboard?.today?.activeMedications]);
-  const selectedMedication = useMemo(() => availableMedications.find((medication: any) => String(medication?.patientMedicationId ?? medication?.patientMedication?.id ?? medication?.id ?? "") === String(draft.patientMedicationId)), [availableMedications, draft.patientMedicationId]);
+  const selectedMedication = useMemo(
+    () =>
+      availableMedications.find(
+        (medication: any) =>
+          String(getAuthoritativePatientMedicationId(medication) ?? "") ===
+          String(draft.patientMedicationId ?? ""),
+      ),
+    [availableMedications, draft.patientMedicationId],
+  );
   const editorTargetNumber = Number(draft.targetValue);
   const editorTargetValid = draft.targetValue.trim() !== "" && Number.isFinite(editorTargetNumber) && editorTargetNumber >= 0 && (editorTargetNumber > 0 || Boolean(targetRule.allowZero)) && (draft.category !== "MEDICATION" || (Boolean(draft.patientMedicationId) && editorTargetNumber >= 1 && editorTargetNumber <= 100)) && (draft.category !== "MENTAL_HEALTH" || (editorTargetNumber >= 1 && editorTargetNumber <= 10));
   const currentWeight = Number(dashboard?.patient?.weightKg);
@@ -228,18 +249,72 @@ export default function HealthGoalsPage() {
   }, [dashboard?.goals, healthGoals, loading, searchParams]);
 
   useEffect(() => {
-    if (medicationPrefillHandled.current || !dashboard?.patient?.id || loading || searchParams.get("open") !== "medication") return;
+    if (
+      medicationPrefillHandled.current ||
+      !dashboard?.patient?.id ||
+      loading ||
+      searchParams.get("open") !== "medication" ||
+      !availableMedications.length
+    ) return;
+
     medicationPrefillHandled.current = true;
+
     const name = searchParams.get("name")?.trim() || "Medication adherence";
     const dosage = searchParams.get("dosage")?.trim() || "";
     const frequency = searchParams.get("frequency")?.trim() || "";
-    const patientMedicationId = searchParams.get("patientMedicationId")?.trim() || "";
-    const details = [dosage && `Dosage: ${dosage}`, frequency && `Frequency: ${frequency.replaceAll("_", " ")}`].filter(Boolean).join(" · ");
+    const requestedPatientMedicationId = searchParams.get("patientMedicationId")?.trim() || "";
+    const requestedName = normaliseMedicationName(
+      searchParams.get("medicationName")?.trim() || name,
+    );
+
+    // Resolve the query-string value against the loaded PatientMedication
+    // records. The row's own id is authoritative; a stale legacy ID must not
+    // be copied into the creation payload.
+    const resolvedMedication =
+      availableMedications.find(
+        (medication: any) =>
+          String(getAuthoritativePatientMedicationId(medication) ?? "") ===
+          requestedPatientMedicationId,
+      ) ??
+      availableMedications.find(
+        (medication: any) =>
+          requestedName &&
+          normaliseMedicationName(
+            medication?.medication?.name ??
+            medication?.name ??
+            medication?.medication?.genericName ??
+            medication?.medication?.brandName ??
+            "",
+          ) === requestedName,
+      ) ??
+      null;
+
+    const resolvedPatientMedicationId =
+      getAuthoritativePatientMedicationId(resolvedMedication) ??
+      requestedPatientMedicationId;
+
+    console.log("[FORM AUDIT] Medication goal prefill identity resolution:", {
+      requestedPatientMedicationId,
+      resolvedPatientMedicationId,
+      medicationName: resolvedMedication?.name ?? resolvedMedication?.medication?.name ?? name,
+    });
+
+    const details = [
+      dosage && `Dosage: ${dosage}`,
+      frequency && `Frequency: ${frequency.replaceAll("_", " ")}`,
+    ].filter(Boolean).join(" · ");
+
     const existingMedicationGoal = Array.isArray(dashboard.goals)
       ? dashboard.goals.find((goal: any) =>
           String(goal?.category ?? "").toUpperCase() === "MEDICATION" &&
-          String(goal?.patientMedicationId ?? goal?.patientMedication?.id ?? "") === patientMedicationId &&
-          !["CANCELLED", "DELETED", "ARCHIVED", "EXPIRED", "ACHIEVED"].includes(String(goal?.status ?? "").toUpperCase()),
+          String(
+            goal?.patientMedicationId ??
+            goal?.patientMedication?.id ??
+            "",
+          ) === resolvedPatientMedicationId &&
+          !["CANCELLED", "DELETED", "ARCHIVED", "EXPIRED", "ACHIEVED"].includes(
+            String(goal?.status ?? "").toUpperCase(),
+          ),
         )
       : null;
 
@@ -250,28 +325,39 @@ export default function HealthGoalsPage() {
         description: String(existingMedicationGoal.description ?? ""),
         category: "MEDICATION",
         priority: String(existingMedicationGoal.priority ?? "MEDIUM"),
-        targetValue: existingMedicationGoal.targetValue == null ? "90" : String(existingMedicationGoal.targetValue),
+        targetValue:
+          existingMedicationGoal.targetValue == null
+            ? "90"
+            : String(existingMedicationGoal.targetValue),
         unit: String(existingMedicationGoal.unit ?? "%"),
-        targetDate: existingMedicationGoal.targetDate ? String(existingMedicationGoal.targetDate).slice(0, 10) : "",
+        targetDate: existingMedicationGoal.targetDate
+          ? String(existingMedicationGoal.targetDate).slice(0, 10)
+          : "",
         weightDirection: "LOSE",
-        patientMedicationId: String(existingMedicationGoal.patientMedicationId ?? existingMedicationGoal.patientMedication?.id ?? patientMedicationId),
+        patientMedicationId: String(
+          existingMedicationGoal.patientMedicationId ??
+          existingMedicationGoal.patientMedication?.id ??
+          resolvedPatientMedicationId,
+        ),
       });
     } else {
       setEditingId(null);
       setDraft({
+        ...emptyDraft(),
         title: name,
-        description: details ? `Medication: ${name} · ${details}` : `Medication: ${name}`,
+        description: `Medication: ${name}${details ? ` · ${details}` : ""}`,
         category: "MEDICATION",
         priority: "MEDIUM",
         targetValue: "90",
         unit: "%",
         targetDate: "",
         weightDirection: "LOSE",
-        patientMedicationId,
+        patientMedicationId: String(resolvedPatientMedicationId || ""),
       });
     }
+
     setEditorOpen(true);
-  }, [dashboard?.patient?.id, loading, searchParams]);
+  }, [dashboard?.patient?.id, loading, searchParams, availableMedications, dashboard?.goals]);
 
   function openAdd() { setEditingId(null); setDraft(emptyDraft()); setEditorOpen(true); }
   function openEdit(goal: any) {
