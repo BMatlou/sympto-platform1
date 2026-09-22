@@ -29,9 +29,16 @@ export type SymptomIntelligenceResult = {
   actions: Array<{ label: string; href: string }>;
   context: {
     activeMedicationCount: number;
+    activeMedicationNames: string[];
     conditionCount: number;
+    activeConditionNames: string[];
     allergyCount: number;
+    activeAllergyNames: string[];
+    activeGoalCount: number;
+    activeGoalTitles: string[];
     recentSymptomCount: number;
+    recentSymptoms: Array<{ title: string; severity: string | null; startedAt: string }>;
+    recentJournalCount: number;
     recentVitals: Array<{ type: string; value: number; measuredAt: string }>;
     wearableHeartRate: Array<{ value: number; measuredAt: string }>;
     upcomingAppointment: string | null;
