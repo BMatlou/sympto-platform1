@@ -7,6 +7,7 @@ import {
 } from '@prisma/client';
 
 import { PrismaService } from '../../database/prisma.service';
+import { GoalsEngineService } from '../health-goals/goals-engine-v3.service';
 import { ProcessSymptomDto } from './dto/process-symptom.dto';
 
 export interface SymptomIntelligenceAction {
@@ -48,7 +49,10 @@ export interface SymptomIntelligenceResult {
 
 @Injectable()
 export class SymptomIntelligenceService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly goalsEngine: GoalsEngineService,
+  ) {}
 
   async processSymptomLog(
     userId: string,
@@ -57,6 +61,9 @@ export class SymptomIntelligenceService {
     const patient = await this.getPatient(userId);
     const symptomName = dto.symptomName.trim();
     const startedAt = dto.startedAt ? new Date(dto.startedAt) : new Date();
+    const onsetUncertain = dto.onsetUncertain === true;
+    const resolvedAt = dto.resolved ? new Date() : undefined;
+    const symptomStatus = dto.resolved ? SymptomLogStatus.COMPLETED : SymptomLogStatus.ACTIVE;
     if (Number.isNaN(startedAt.getTime())) {
       throw new BadRequestException('Symptom start date is invalid.');
     }
@@ -117,26 +124,82 @@ export class SymptomIntelligenceService {
     const context = await this.buildContext(patient.id);
     const analysis = this.evaluateContext(symptomName, dto.severity, dto.details, context);
 
+    if (dto.medicationId) {
+      const medication = await this.prisma.medication.findUnique({ where: { id: dto.medicationId }, select: { id: true } });
+      if (!medication) throw new BadRequestException('Selected medication could not be found.');
+    }
+    if (dto.prescriptionId) {
+      const prescription = await this.prisma.prescription.findFirst({
+        where: {
+          id: dto.prescriptionId,
+          patientId: patient.id,
+          ...(dto.medicationId ? { items: { some: { medicationId: dto.medicationId } } } : {}),
+        },
+        select: { id: true },
+      });
+      if (!prescription) throw new BadRequestException('Selected prescription does not belong to this patient.');
+    }
+
     const symptomLog = await this.prisma.$transaction(async (tx) => {
       const log = await tx.symptomLog.create({
         data: {
           clinicalEpisodeId: episode.id,
           title: symptomName,
           notes: dto.details?.trim() || undefined,
-          status: SymptomLogStatus.ACTIVE,
+          status: symptomStatus,
           overallSeverity: dto.severity,
+          progression: dto.progression,
           startedAt,
+          resolvedAt,
         },
       });
 
-      await tx.symptomLogItem.create({
+      const item = await tx.symptomLogItem.create({
         data: {
           symptomLogId: log.id,
           symptomId: symptom.id,
           severity: dto.severity,
+          progression: dto.progression,
+          frequency: dto.frequency,
+          painCharacter: dto.painCharacter,
+          painScore: dto.painScore,
+          durationMinutes: dto.durationMinutes,
           onsetAt: startedAt,
+          onsetUncertain,
+          resolvedAt,
+          intermittent: dto.intermittent ?? dto.frequency === SymptomFrequency.INTERMITTENT,
+          recurring: dto.recurring ?? false,
+          suspectedTrigger: dto.suspectedTrigger?.trim() || undefined,
+          aggravatingFactors: dto.aggravatingFactors?.trim() || undefined,
+          relievingFactors: dto.relievingFactors?.trim() || undefined,
+          notes: dto.details?.trim() || undefined,
         },
       });
+
+      if (dto.suspectedTrigger?.trim()) {
+        await tx.symptomTrigger.create({
+          data: {
+            symptomLogId: log.id,
+            trigger: dto.suspectedTrigger.trim(),
+            description: dto.triggerDetails?.trim() || undefined,
+            suspected: true,
+          },
+        });
+      }
+
+      if (dto.medicationId) {
+        await tx.medicationEffect.create({
+          data: {
+            symptomLogId: log.id,
+            medicationId: dto.medicationId,
+            prescriptionId: dto.prescriptionId,
+            improved: dto.medicationImproved,
+            effectiveness: dto.medicationEffectiveness,
+            sideEffects: dto.medicationSideEffects?.trim() || undefined,
+            notes: dto.medicationSideEffects?.trim() || undefined,
+          },
+        });
+      }
 
       const observation = await tx.aIObservation.create({
         data: {
@@ -152,8 +215,32 @@ export class SymptomIntelligenceService {
         },
       });
 
-      return { log, observation };
+      return { log, item, observation };
     });
+
+    try {
+      await this.goalsEngine.recordMetricEvent({
+        patientId: patient.id,
+        metricType: 'SYMPTOM',
+        metricKey: 'symptom.count',
+        loggedValue: 1,
+        occurredAt: startedAt,
+        source: 'symptom-log',
+        sourceId: symptomLog.log.id,
+      });
+      const severityValue = dto.severity === SymptomSeverity.NONE ? 0 : dto.severity === SymptomSeverity.MILD ? 1 : dto.severity === SymptomSeverity.MODERATE ? 2 : dto.severity === SymptomSeverity.SEVERE ? 3 : 4;
+      await this.goalsEngine.recordMetricEvent({
+        patientId: patient.id,
+        metricType: 'SYMPTOM',
+        metricKey: 'symptom.severity',
+        loggedValue: severityValue,
+        occurredAt: startedAt,
+        source: 'symptom-log',
+        sourceId: symptomLog.log.id + ':severity',
+      });
+    } catch (goalError) {
+      console.warn('[SYMPTOM GOAL] Unable to update symptom goal metrics:', goalError);
+    }
 
     return {
       symptomLogId: symptomLog.log.id,
@@ -255,7 +342,7 @@ export class SymptomIntelligenceService {
   private async getPatient(userId: string) {
     const patient = await this.prisma.patient.findUnique({
       where: { userId },
-      select: { id: true },
+      select: { id: true, healthPassport: { select: { id: true } } },
     });
 
     if (!patient) {
