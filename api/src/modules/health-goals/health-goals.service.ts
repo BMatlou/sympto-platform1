@@ -1,3 +1,4 @@
+import { randomUUID } from 'node:crypto';
 import { BadRequestException, ConflictException, Injectable, InternalServerErrorException, NotFoundException } from '@nestjs/common';
 import { Prisma, HealthGoalProgressStatus } from '@prisma/client';
 import { PrismaService } from '../../database/prisma.service';
@@ -345,11 +346,12 @@ export class HealthGoalsService {
           },
         });
 
+        const metricConfigId = randomUUID();
         await tx.$executeRaw`
           INSERT INTO "HealthGoalMetricConfig"
             ("id", "healthGoalId", "metricType", "metricKey", "frequency", "frequencyTarget", "aggregation", "comparison", "guidanceText")
           VALUES
-            (gen_random_uuid(), ${createdGoal.id}, ${metricConfig.metricType}, ${metricConfig.metricKey}, ${metricConfig.frequency}, ${metricConfig.frequencyTarget}, ${metricConfig.aggregation}, ${metricConfig.comparison}, ${metricConfig.guidanceText})
+            (${metricConfigId}::uuid, ${createdGoal.id}::text, ${metricConfig.metricType}, ${metricConfig.metricKey}, ${metricConfig.frequency}, ${metricConfig.frequencyTarget}, ${metricConfig.aggregation}, ${metricConfig.comparison}, ${metricConfig.guidanceText})
         `;
 
         return createdGoal;
