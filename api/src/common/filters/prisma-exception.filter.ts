@@ -18,6 +18,10 @@ export class PrismaExceptionFilter implements ExceptionFilter {
     const response = ctx.getResponse<Response>();
     const request = ctx.getRequest<Request>();
 
+    console.error(
+      `[PrismaExceptionFilter] ${request.method} ${request.url} — ${exception.code}: ${exception.message}`,
+    );
+
     let status = HttpStatus.BAD_REQUEST;
     let message = exception.message;
 
@@ -27,9 +31,34 @@ export class PrismaExceptionFilter implements ExceptionFilter {
         message = 'Record already exists.';
         break;
 
-      case 'P2025':
-        status = HttpStatus.NOT_FOUND;
-        message = 'Record not found.';
+      case 'P2003':
+        status = HttpStatus.BAD_REQUEST;
+        message = 'The selected health record is no longer valid.';
+        break;
+
+      case 'P2010':
+        status = HttpStatus.INTERNAL_SERVER_ERROR;
+        message = 'Health-goal tracking storage could not complete the database operation.';
+        break;
+
+      case 'P2021':
+        status = HttpStatus.INTERNAL_SERVER_ERROR;
+        message = 'The health-goal database table is missing or unavailable. Apply the latest migrations and restart the API.';
+        break;
+
+      case 'P2022':
+        status = HttpStatus.INTERNAL_SERVER_ERROR;
+        message = 'The health-goal database schema is out of date. Apply the latest migrations and restart the API.';
+        break;
+
+      case 'P2024':
+        status = HttpStatus.SERVICE_UNAVAILABLE;
+        message = 'The health database took too long to respond. Please try again.';
+        break;
+
+      case 'P2034':
+        status = HttpStatus.CONFLICT;
+        message = 'Another health-goal update was processed at the same time. Please retry.';
         break;
     }
 
