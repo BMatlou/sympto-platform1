@@ -105,16 +105,14 @@ export class PatientHealthGoalsController {
     if (!patient || patient.id !== dto.patientId) {
       throw new ForbiddenException('Patient health goal does not belong to the authenticated user.');
     }
-    const { metricType, metricKey, frequency, frequencyTarget, aggregation, comparison, guidanceText, patientId, targetDate, achievedAt, ...goalData } = dto;
-    const parsedTargetDate = targetDate ? new Date(targetDate) : undefined;
-    const parsedAchievedAt = achievedAt ? new Date(achievedAt) : undefined;
-    if (parsedTargetDate && Number.isNaN(parsedTargetDate.getTime())) throw new BadRequestException('Target date is invalid.');
-    if (parsedAchievedAt && Number.isNaN(parsedAchievedAt.getTime())) throw new BadRequestException('Achievement date is invalid.');
-    const goal = await this.prisma.healthGoal.create({ data: { ...goalData, patientId, targetDate: parsedTargetDate, achievedAt: parsedAchievedAt }, include: { patient: true, practitioner: true, carePlan: true, progress: { orderBy: { measuredAt: 'desc' } } } });
-    await this.healthGoalsService.configureMetric(goal.id, { metricType, metricKey, frequency, frequencyTarget: frequencyTarget == null ? undefined : Number(frequencyTarget), aggregation, comparison, guidanceText });
-    if (String(goalData.category).toUpperCase() === 'WEIGHT' && String(metricType).toUpperCase() === 'WEIGHT') await this.healthGoalsService.captureWeightGoalBaseline(goal.id, String(patient.id), goal.createdAt);
-    await this.healthGoalIntelligence.syncGoalRelations(patient.id);
-    return this.healthGoalsService.findOne(goal.id);
+
+    // Keep all creation rules in one place so this patient-owned route cannot
+    // bypass medication ownership, duplicate detection, metric configuration,
+    // weight validation, or relation syncing.
+    return this.healthGoalsService.create({
+      ...dto,
+      patientId: patient.id,
+    });
   }
 
   @Patch(':id')
