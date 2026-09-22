@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import {
   ClinicalEpisodeStatus,
   ClinicalEpisodeType,
@@ -58,7 +58,7 @@ export class SymptomIntelligenceService {
     const symptomName = dto.symptomName.trim();
     const startedAt = dto.startedAt ? new Date(dto.startedAt) : new Date();
     if (Number.isNaN(startedAt.getTime())) {
-      throw new NotFoundException('Symptom start date is invalid.');
+      throw new BadRequestException('Symptom start date is invalid.');
     }
     const normalizedInput = `${symptomName} ${dto.details ?? ''}`.toLowerCase();
     const urgentWarningSign = /chest pain|cannot breathe|can't breathe|difficulty breathing|fainting|unconscious|severe bleeding|stroke/.test(normalizedInput);
@@ -171,8 +171,11 @@ export class SymptomIntelligenceService {
         activeAllergyNames: context.activeAllergyNames,
         activeGoalCount: context.activeGoalCount,
         activeGoalTitles: context.activeGoalTitles,
-        recentSymptomCount: context.recentSymptomCount,
-        recentSymptoms: context.recentSymptoms,
+        recentSymptomCount: context.recentSymptomCount + 1,
+        recentSymptoms: [
+          { title: symptomName, severity: dto.severity, startedAt },
+          ...context.recentSymptoms,
+        ].slice(0, 10),
         recentJournalCount: context.recentJournalCount,
         recentVitals: context.recentVitals,
         wearableHeartRate: context.wearableHeartRate,
@@ -423,7 +426,7 @@ export class SymptomIntelligenceService {
       activeAllergyNames,
       activeGoalCount: patient.healthGoals.length,
       activeGoalTitles: patient.healthGoals.map((goal) => String(goal.title)),
-      recentSymptomCount: Math.max(recentSymptomCount, 1),
+      recentSymptomCount,
       recentSymptoms,
       recentJournalCount: patient.healthJournals.length,
       recentVitals: combinedVitals,
