@@ -1,26 +1,24 @@
--- Keep the first linked medication goal and archive any older duplicates before
--- adding the database guard. This preserves history without showing duplicate
--- medication goals in the active health-goals experience.
+-- Keep one live medication goal per prescribed medication before the
+-- later health-goal uniqueness hardening migration is applied.
+-- HealthGoalStatus does not contain ARCHIVED; cancelled goals are the
+-- supported historical state and remain visible as goal history.
+
 WITH ranked AS (
   SELECT
     "id",
     ROW_NUMBER() OVER (
       PARTITION BY "patientMedicationId"
-      ORDER BY "createdAt" ASC, "id" ASC
+      ORDER BY "createdAt" DESC, "id" DESC
     ) AS row_number
   FROM "HealthGoal"
   WHERE "category" = 'MEDICATION'
     AND "patientMedicationId" IS NOT NULL
+    AND "status"::text IN ('ACTIVE', 'ON_HOLD')
 )
 UPDATE "HealthGoal" AS hg
 SET
-  "patientMedicationId" = NULL,
-  "status" = 'ARCHIVED'
+  "status" = 'CANCELLED',
+  "achievedAt" = NULL
 FROM ranked
 WHERE hg."id" = ranked."id"
   AND ranked.row_number > 1;
-
-CREATE UNIQUE INDEX "HealthGoal_patientMedicationId_medication_unique"
-ON "HealthGoal" ("patientMedicationId")
-WHERE "category" = 'MEDICATION'
-  AND "patientMedicationId" IS NOT NULL;
