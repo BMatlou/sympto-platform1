@@ -423,11 +423,38 @@ export class HealthGoalsService {
 
         return createdGoal;
       });
-    } catch (error) {
+    } catch (error: unknown) {
+      // CRITICAL AUDIT: dump the complete server-side database exception.
+      // This stays in the API terminal and is intentionally not returned to
+      // the browser, where database internals must never be exposed.
+      console.error('====================================================');
+      console.error('❌ CRITICAL GOAL CREATION FAILURE EXTRACTION');
       console.error(
-        'Health goal creation transaction failed:',
-        error instanceof Error ? error.stack ?? error.message : String(error),
+        'Error code:',
+        error instanceof Prisma.PrismaClientKnownRequestError
+          ? error.code
+          : (error as { code?: unknown })?.code,
       );
+      console.error(
+        'Error name:',
+        error instanceof Error ? error.name : typeof error,
+      );
+      console.error(
+        'Error message:',
+        error instanceof Error ? error.message : String(error),
+      );
+      console.error(
+        'Error meta:',
+        error instanceof Prisma.PrismaClientKnownRequestError
+          ? error.meta
+          : (error as { meta?: unknown })?.meta,
+      );
+      console.error('Complete error object:', error);
+      console.error(
+        'Complete error stack:',
+        error instanceof Error ? error.stack : undefined,
+      );
+      console.error('====================================================');
 
       if (error instanceof Prisma.PrismaClientKnownRequestError) {
         if (error.code === 'P2002') {
