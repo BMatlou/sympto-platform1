@@ -98,6 +98,18 @@ export class HealthJournalsController {
   }
 
   @Permissions('health-journals.read')
+  @Get('symptoms/:id')
+  findSymptomOne(
+    @Req() req: any,
+    @Param('id') id: string,
+  ) {
+    return this.healthJournalsService.findSymptomOne(
+      req.user.sub,
+      id,
+    );
+  }
+
+  @Permissions('health-journals.read')
   @Get(':id')
   findOne(
     @Req() req: any,
