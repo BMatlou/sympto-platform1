@@ -216,60 +216,119 @@ export class HealthGoalsService {
   }
 
   async create(dto: CreateHealthGoalDto) {
-    const { metricType, metricKey, frequency, frequencyTarget, aggregation, comparison, guidanceText, patientMedicationId, targetDate, achievedAt, ...goalData } = dto;
+    const {
+      metricType,
+      metricKey,
+      frequency,
+      frequencyTarget,
+      aggregation,
+      comparison,
+      guidanceText,
+      patientMedicationId,
+      targetDate,
+      achievedAt,
+      ...goalData
+    } = dto;
+
     const parsedTargetDate = targetDate ? new Date(targetDate) : undefined;
     const parsedAchievedAt = achievedAt ? new Date(achievedAt) : undefined;
-    if (parsedTargetDate && Number.isNaN(parsedTargetDate.getTime())) throw new BadRequestException('Target date is invalid.');
-    if (parsedAchievedAt && Number.isNaN(parsedAchievedAt.getTime())) throw new BadRequestException('Achievement date is invalid.');
+    if (parsedTargetDate && Number.isNaN(parsedTargetDate.getTime())) {
+      throw new BadRequestException('Target date is invalid.');
+    }
+    if (parsedAchievedAt && Number.isNaN(parsedAchievedAt.getTime())) {
+      throw new BadRequestException('Achievement date is invalid.');
+    }
+
     const category = String(goalData.category).toUpperCase();
     const isMedicationGoal = category === 'MEDICATION';
-    if (patientMedicationId && !isMedicationGoal) throw new BadRequestException('A medication can only be attached to a medication goal.');
-    await this.assertPatientMedicationBelongsToPatient(patientMedicationId, String(goalData.patientId));
-    await this.assertNoDuplicateGoal(String(goalData.patientId), category, patientMedicationId ?? null);
-    const targetValue = goalData.targetValue ?? (isMedicationGoal ? String(DEFAULT_MEDICATION_TARGET) : undefined);
-    const unit = goalData.unit ?? (isMedicationGoal ? '%' : undefined);
-    this.assertGoalDefinition(category, targetValue, goalData.targetDate);
-    const effectiveComparison = category === 'WEIGHT' ? (comparison ?? 'DECREASE_TO') : comparison;
-    if (category === 'WEIGHT') {
-      await this.assertWeightTargetDirection(String(goalData.patientId), targetValue, effectiveComparison);
+
+    if (patientMedicationId && !isMedicationGoal) {
+      throw new BadRequestException('A medication can only be attached to a medication goal.');
     }
+
+    const patientId = String(goalData.patientId);
+    await this.assertPatientMedicationBelongsToPatient(patientMedicationId, patientId);
+    await this.assertNoDuplicateGoal(patientId, category, patientMedicationId ?? null);
+
+    const targetValue =
+      goalData.targetValue ?? (isMedicationGoal ? String(DEFAULT_MEDICATION_TARGET) : undefined);
+    const unit = goalData.unit ?? (isMedicationGoal ? '%' : undefined);
+
+    this.assertGoalDefinition(category, targetValue, targetDate);
+
+    const effectiveComparison =
+      category === 'WEIGHT' ? (comparison ?? 'DECREASE_TO') : comparison;
+
+    if (category === 'WEIGHT') {
+      await this.assertWeightTargetDirection(patientId, targetValue, effectiveComparison);
+    }
+
+    /*
+     * Medication goals must be created with patientMedicationId in the same
+     * database write. The old implementation created the HealthGoal first and
+     * then attached patientMedicationId with raw SQL. That could trip the
+     * compound HealthGoal uniqueness constraint during the second write and
+     * surface as an opaque HTTP 500.
+     */
     let goal;
     try {
       goal = await this.prisma.healthGoal.create({
         data: {
           ...goalData,
+          patientId,
+          ...(patientMedicationId ? { patientMedicationId } : {}),
           ...(targetValue !== undefined ? { targetValue } : {}),
           ...(unit !== undefined ? { unit } : {}),
           ...(targetDate !== undefined ? { targetDate: parsedTargetDate } : {}),
           ...(achievedAt !== undefined ? { achievedAt: parsedAchievedAt } : {}),
         },
-        include: { patient: true, practitioner: true, carePlan: true, progress: true },
+        include: {
+          patient: true,
+          practitioner: true,
+          carePlan: true,
+          progress: true,
+        },
       });
     } catch (error) {
-      if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') {
-        throw new ConflictException(
-          isMedicationGoal
-            ? 'You already have an active medication goal for the selected prescribed medication. Edit or resume the existing goal instead.'
-            : 'You already have an active health goal in this category. Edit the existing goal instead.',
-        );
+      if (error instanceof Prisma.PrismaClientKnownRequestError) {
+        if (error.code === 'P2002') {
+          throw new ConflictException(
+            isMedicationGoal
+              ? 'You already have an active medication goal for the selected prescribed medication. Edit or resume the existing goal instead.'
+              : 'You already have an active health goal in this category. Edit the existing goal instead.',
+          );
+        }
+        if (error.code === 'P2003') {
+          throw new BadRequestException(
+            'The selected medication or related health record is no longer available. Please refresh and try again.',
+          );
+        }
       }
       throw error;
     }
-    if (patientMedicationId) await this.prisma.$executeRaw`UPDATE "HealthGoal" SET "patientMedicationId" = ${patientMedicationId} WHERE "id" = ${goal.id}`;
+
     await this.configureMetric(goal.id, {
       metricType: metricType ?? goalRuleFor(category).metricType,
       metricKey: metricKey ?? goalRuleFor(category).metricKey,
       frequency: frequency ?? goalRuleFor(category).frequency,
-      frequencyTarget: frequencyTarget == null ? (targetValue == null ? null : Number(targetValue)) : Number(frequencyTarget),
+      frequencyTarget:
+        frequencyTarget == null
+          ? targetValue == null
+            ? null
+            : Number(targetValue)
+          : Number(frequencyTarget),
       aggregation: aggregation ?? goalRuleFor(category).aggregation,
       comparison: effectiveComparison ?? goalRuleFor(category).comparison,
       guidanceText,
     });
-    if (category === 'WEIGHT') await this.captureWeightGoalBaseline(goal.id, String(goalData.patientId), goal.createdAt);
-    await this.healthGoalIntelligence.syncGoalRelations(String(goalData.patientId));
+
+    if (category === 'WEIGHT') {
+      await this.captureWeightGoalBaseline(goal.id, patientId, goal.createdAt);
+    }
+
+    await this.healthGoalIntelligence.syncGoalRelations(patientId);
     return this.findOne(goal.id);
   }
-
   async findAll(query: QueryHealthGoalDto) {
     const patientId = String(query?.patientId ?? '').trim();
 
