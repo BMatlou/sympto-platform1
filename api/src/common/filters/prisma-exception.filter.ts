@@ -20,6 +20,7 @@ export class PrismaExceptionFilter implements ExceptionFilter {
 
     console.error(
       `[PrismaExceptionFilter] ${request.method} ${request.url} — ${exception.code}: ${exception.message}`,
+      exception.meta ?? '',
     );
 
     let status = HttpStatus.BAD_REQUEST;
@@ -60,6 +61,23 @@ export class PrismaExceptionFilter implements ExceptionFilter {
         status = HttpStatus.CONFLICT;
         message = 'Another health-goal update was processed at the same time. Please retry.';
         break;
+    }
+
+    if (process.env.NODE_ENV !== 'production' && exception.code === 'P2010') {
+      const meta = exception.meta as Record<string, unknown> | undefined;
+      const dbCode = typeof meta?.code === 'string' ? meta.code : undefined;
+      const dbMessage = typeof meta?.message === 'string' ? meta.message : undefined;
+      if (dbCode || dbMessage) {
+        response.status(status).json({
+          success: false,
+          statusCode: status,
+          timestamp: new Date().toISOString(),
+          path: request.url,
+          message,
+          debug: { prismaCode: exception.code, databaseCode: dbCode, databaseMessage: dbMessage },
+        });
+        return;
+      }
     }
 
     response.status(status).json({
