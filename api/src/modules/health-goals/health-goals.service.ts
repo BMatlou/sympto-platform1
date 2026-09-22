@@ -286,7 +286,7 @@ export class HealthGoalsService {
       rawTargetValue == null ? undefined : Number(rawTargetValue);
 
     if (
-      rawTargetValue != null &&
+      numericTargetValue !== undefined &&
       (!Number.isFinite(numericTargetValue) || numericTargetValue < 0)
     ) {
       throw new BadRequestException('A valid non-negative numeric goal target is required.');
