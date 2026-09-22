@@ -3245,6 +3245,7 @@ model SymptomLogItem {
   painScore          Int?
   durationMinutes    Int?
   onsetAt            DateTime?
+  onsetUncertain      Boolean             @default(false)
   resolvedAt         DateTime?
   intermittent       Boolean             @default(false)
   recurring          Boolean             @default(false)
