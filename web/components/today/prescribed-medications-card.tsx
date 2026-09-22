@@ -97,18 +97,31 @@ export default function PrescribedMedicationsCard({
     const patientMedicationId = getPatientMedicationId(medication);
     const medicationId = medication.medicationId ?? medication.medication?.id ?? null;
     const resolvedGoalId = goal?.id ?? medication.healthGoalId ?? null;
+    const resolvedGoalStatus = String(goal?.status ?? "").toUpperCase();
 
-    console.log("[FORM AUDIT] Opening medication goal form:", {
+    console.log("[FORM AUDIT] Opening medication goal action:", {
       medicationName: medication.name ?? medication.medication?.name ?? "Medication",
       patientMedicationId,
       medicationId,
+      goalId: resolvedGoalId,
+      goalStatus: resolvedGoalStatus || null,
       source: medication.source ?? null,
       rowId: medication.id ?? null,
       synthetic: String(medication.id ?? "").startsWith("prescription-item-"),
     });
 
+    // ON_HOLD goals still use the existing resume/edit flow because their
+    // Today medication-goal card is intentionally not rendered as active.
+    if (resolvedGoalId && resolvedGoalStatus === "ON_HOLD") {
+      router.push(`/health-goals?edit=${encodeURIComponent(String(resolvedGoalId))}&resume=1`);
+      return;
+    }
+
+    // Existing medication goals belong on the Today medication-goal card.
+    // Navigate to Today explicitly so this works even when this card is
+    // triggered from another rendered context.
     if (resolvedGoalId) {
-      router.push(`/health-goals#goal-${encodeURIComponent(String(resolvedGoalId))}`);
+      router.push(`/today#health-goal-card-${encodeURIComponent(String(resolvedGoalId))}`);
       return;
     }
 
