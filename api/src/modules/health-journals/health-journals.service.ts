@@ -164,6 +164,57 @@ export class HealthJournalsService {
     return journal;
   }
 
+  async findSymptomOne(
+    userId: string,
+    id: string,
+  ) {
+    const patientId = await this.getPatientId(userId);
+    const symptom = await this.prisma.symptomLog.findFirst({
+      where: {
+        id,
+        clinicalEpisode: { patientId },
+      },
+      include: {
+        clinicalEpisode: {
+          include: {
+            practitioner: true,
+            appointment: true,
+            encounter: true,
+          },
+        },
+        symptoms: {
+          include: {
+            symptom: true,
+            aisymptom: true,
+          },
+        },
+        triggers: true,
+        medicationEffects: {
+          include: {
+            medication: true,
+            prescription: true,
+          },
+        },
+        observations: {
+          include: {
+            aiAnalysis: true,
+          },
+        },
+        attachments: {
+          include: {
+            attachment: true,
+          },
+        },
+      },
+    });
+
+    if (!symptom) {
+      throw new NotFoundException('Symptom log not found.');
+    }
+
+    return symptom;
+  }
+
   async update(
     userId: string,
     id: string,
