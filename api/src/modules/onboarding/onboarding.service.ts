@@ -112,9 +112,58 @@ export class OnboardingService {
           submittedExistingIds.add(medication.patientMedicationId);
           await tx.patientMedication.update({where:{id:medication.patientMedicationId},data:{medicationId:createData.medicationId,dosage:createData.dosage??null,frequency:createData.frequency??null,route:createData.route??null,indication:createData.indication??null,instructions:createData.instructions??null,prescribedBy:createData.prescribedBy??null,startedAt:createData.startedAt??null,endedAt:createData.endedAt??null,ongoing:createData.ongoing,adherencePercentage:createData.adherencePercentage,missedDoses:createData.missedDoses,sideEffects:createData.sideEffects??null,effectiveness:createData.effectiveness??null,status:createData.status,notes:createData.notes??null}});
         } else {
-          const duplicate=await tx.patientMedication.findFirst({where:{healthPassportId,medicationId:createData.medicationId},select:{id:true}});
-          if(duplicate)throw new ConflictException('This medicine is already in your medication list.');
-          await tx.patientMedication.create({data:{healthPassportId,...createData}});
+          const duplicate=await tx.patientMedication.findFirst({
+            where:{healthPassportId,medicationId:createData.medicationId},
+            select:{id:true,status:true},
+          });
+
+          if(duplicate) {
+            const duplicateStatus=String(duplicate.status).toUpperCase();
+
+            // A non-ACTIVE PatientMedication row can be hidden by the live
+            // Medications page while still being protected by the
+            // healthPassportId + medicationId uniqueness constraint.
+            // Reuse and reactivate that existing row instead of creating a
+            // second record or returning a misleading 409 Conflict.
+            if(duplicateStatus !== 'ACTIVE') {
+              console.log(
+                '[MED AUDIT] Reactivating hidden PatientMedication record:',
+                {
+                  patientMedicationId: duplicate.id,
+                  medicationId: createData.medicationId,
+                  previousStatus: duplicateStatus,
+                },
+              );
+
+              submittedExistingIds.add(duplicate.id);
+
+              await tx.patientMedication.update({
+                where:{id:duplicate.id},
+                data:{
+                  medicationId:createData.medicationId,
+                  dosage:createData.dosage??null,
+                  frequency:createData.frequency??null,
+                  route:createData.route??null,
+                  indication:createData.indication??null,
+                  instructions:createData.instructions??null,
+                  prescribedBy:createData.prescribedBy??null,
+                  startedAt:createData.startedAt??null,
+                  endedAt:createData.endedAt??null,
+                  ongoing:createData.ongoing ?? true,
+                  adherencePercentage:createData.adherencePercentage,
+                  missedDoses:createData.missedDoses,
+                  sideEffects:createData.sideEffects??null,
+                  effectiveness:createData.effectiveness??null,
+                  status:'ACTIVE',
+                  notes:createData.notes??null,
+                },
+              });
+            } else {
+              throw new ConflictException('This medicine is already in your active medication list.');
+            }
+          } else {
+            await tx.patientMedication.create({data:{healthPassportId,...createData}});
+          }
         }
       }
       const idsToDelete=existing.map((item)=>item.id).filter((id)=>!submittedExistingIds.has(id));
