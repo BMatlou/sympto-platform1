@@ -216,7 +216,11 @@ export class HealthGoalsService {
   }
 
   async create(dto: CreateHealthGoalDto) {
-    const { metricType, metricKey, frequency, frequencyTarget, aggregation, comparison, guidanceText, patientMedicationId, ...goalData } = dto;
+    const { metricType, metricKey, frequency, frequencyTarget, aggregation, comparison, guidanceText, patientMedicationId, targetDate, achievedAt, ...goalData } = dto;
+    const parsedTargetDate = targetDate ? new Date(targetDate) : undefined;
+    const parsedAchievedAt = achievedAt ? new Date(achievedAt) : undefined;
+    if (parsedTargetDate && Number.isNaN(parsedTargetDate.getTime())) throw new BadRequestException('Target date is invalid.');
+    if (parsedAchievedAt && Number.isNaN(parsedAchievedAt.getTime())) throw new BadRequestException('Achievement date is invalid.');
     const category = String(goalData.category).toUpperCase();
     const isMedicationGoal = category === 'MEDICATION';
     if (patientMedicationId && !isMedicationGoal) throw new BadRequestException('A medication can only be attached to a medication goal.');
@@ -229,7 +233,28 @@ export class HealthGoalsService {
     if (category === 'WEIGHT') {
       await this.assertWeightTargetDirection(String(goalData.patientId), targetValue, effectiveComparison);
     }
-    const goal = await this.prisma.healthGoal.create({ data: { ...goalData, ...(targetValue !== undefined ? { targetValue } : {}), ...(unit !== undefined ? { unit } : {}) }, include: { patient: true, practitioner: true, carePlan: true, progress: true } });
+    let goal;
+    try {
+      goal = await this.prisma.healthGoal.create({
+        data: {
+          ...goalData,
+          ...(targetValue !== undefined ? { targetValue } : {}),
+          ...(unit !== undefined ? { unit } : {}),
+          ...(targetDate !== undefined ? { targetDate: parsedTargetDate } : {}),
+          ...(achievedAt !== undefined ? { achievedAt: parsedAchievedAt } : {}),
+        },
+        include: { patient: true, practitioner: true, carePlan: true, progress: true },
+      });
+    } catch (error) {
+      if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') {
+        throw new ConflictException(
+          isMedicationGoal
+            ? 'You already have an active medication goal for the selected prescribed medication. Edit or resume the existing goal instead.'
+            : 'You already have an active health goal in this category. Edit the existing goal instead.',
+        );
+      }
+      throw error;
+    }
     if (patientMedicationId) await this.prisma.$executeRaw`UPDATE "HealthGoal" SET "patientMedicationId" = ${patientMedicationId} WHERE "id" = ${goal.id}`;
     await this.configureMetric(goal.id, {
       metricType: metricType ?? goalRuleFor(category).metricType,
