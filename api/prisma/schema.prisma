@@ -3475,7 +3475,6 @@ model HealthGoal {
 
   progress HealthGoalProgress[]
 
-  @@unique([patientId, patientMedicationId, category])
   @@index([patientMedicationId])
   @@index([patientId])
   @@index([carePlanId])
