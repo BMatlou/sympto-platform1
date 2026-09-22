@@ -66,8 +66,36 @@ class HealthJournalService {
     return journal;
   }
 
-  async processSymptom(dto: { symptomName: string; severity: "MILD" | "MODERATE" | "SEVERE" | "VERY_SEVERE"; startedAt?: string; details?: string }): Promise<SymptomIntelligenceResult> {
+  async processSymptom(dto: {
+    symptomName: string;
+    severity: "MILD" | "MODERATE" | "SEVERE" | "VERY_SEVERE";
+    startedAt?: string;
+    onsetUncertain?: boolean;
+    resolved?: boolean;
+    progression?: "IMPROVING" | "STABLE" | "WORSENING" | "FLUCTUATING" | "RESOLVED";
+    frequency?: "CONSTANT" | "INTERMITTENT" | "OCCASIONAL" | "RARE" | "UNKNOWN";
+    painCharacter?: "SHARP" | "DULL" | "THROBBING" | "STABBING" | "BURNING" | "CRAMPING" | "PRESSURE" | "TIGHTNESS" | "ACHING" | "OTHER";
+    painScore?: number;
+    durationMinutes?: number;
+    intermittent?: boolean;
+    recurring?: boolean;
+    suspectedTrigger?: string;
+    triggerDetails?: string;
+    aggravatingFactors?: string;
+    relievingFactors?: string;
+    details?: string;
+    medicationId?: string;
+    prescriptionId?: string;
+    medicationImproved?: boolean;
+    medicationEffectiveness?: number;
+    medicationSideEffects?: string;
+  }): Promise<SymptomIntelligenceResult> {
     const { data } = await api.post("/health-journals/process-symptom", dto);
+    return data.data;
+  }
+
+  async getSymptom(id: string): Promise<any> {
+    const { data } = await api.get(`/health-journals/symptoms/${id}`);
     return data.data;
   }
 
