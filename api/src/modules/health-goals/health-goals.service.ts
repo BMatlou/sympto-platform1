@@ -518,6 +518,8 @@ export class HealthGoalsService {
         aggregation: aggregation ?? goalRuleFor(category).aggregation,
         comparison: effectiveComparison ?? goalRuleFor(category).comparison,
         guidanceText: guidanceText ?? null,
+        status: metricConfigReady ? 'READY' : 'PENDING_REPAIR',
+        fallbackUsed: metricConfigFallbackUsed,
       },
     };
   }
