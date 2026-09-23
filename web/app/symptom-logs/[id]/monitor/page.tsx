@@ -47,6 +47,7 @@ export default function MonitorSymptomPage({ params }: { params: Promise<{ id: s
   const [relievingFactors, setRelievingFactors] = useState("");
   const [notes, setNotes] = useState("");
   const [medicationId, setMedicationId] = useState("");
+  const [reportedMedicationName, setReportedMedicationName] = useState("");
   const [medicationImproved, setMedicationImproved] = useState("");
   const [medicationEffectiveness, setMedicationEffectiveness] = useState("");
   const [medicationSideEffects, setMedicationSideEffects] = useState("");
@@ -117,7 +118,8 @@ export default function MonitorSymptomPage({ params }: { params: Promise<{ id: s
         aggravatingFactors: aggravatingFactors.trim() || undefined,
         relievingFactors: relievingFactors.trim() || undefined,
         notes: notes.trim() || undefined,
-        medicationId: medicationId || undefined,
+        medicationId: medicationId && medicationId !== "__OTHER__" ? medicationId : undefined,
+        reportedMedicationName: medicationId === "__OTHER__" ? reportedMedicationName.trim() || undefined : undefined,
         medicationImproved: medicationImproved === "YES" ? true : medicationImproved === "NO" ? false : undefined,
         medicationEffectiveness: Number.isFinite(effectiveness) ? effectiveness : undefined,
         medicationSideEffects: medicationSideEffects.trim() || undefined,
@@ -459,7 +461,7 @@ export default function MonitorSymptomPage({ params }: { params: Promise<{ id: s
                     onChange={(event) => setMedicationId(event.target.value)}
                     className="mt-2 min-h-12 w-full rounded-xl border-2 border-slate-200 bg-white px-3 text-sm font-semibold"
                   >
-                    <option value="">No medicine linked</option>
+                    <option value="">No medicine taken</option>
                     {activeMedications.map((medication: any) => {
                       const medicationValue =
                         medication?.medicationId ||
@@ -477,9 +479,29 @@ export default function MonitorSymptomPage({ params }: { params: Promise<{ id: s
                         </option>
                       );
                     })}
+                    <option value="__OTHER__">Another medicine / something not listed</option>
                   </select>
 
-                  {medicationId && (
+                  {medicationId === "__OTHER__" && (
+                    <div className="mt-3">
+                      <label className="block text-xs font-black text-[#0b2d54]" htmlFor="reported-medication">
+                        What medicine did you take?
+                      </label>
+                      <input
+                        id="reported-medication"
+                        value={reportedMedicationName}
+                        onChange={(event) => setReportedMedicationName(event.target.value)}
+                        maxLength={300}
+                        placeholder="Type the name exactly as you know it"
+                        className="mt-2 min-h-12 w-full rounded-xl border-2 border-slate-200 bg-white px-3 text-sm font-semibold"
+                      />
+                      <p className="mt-2 text-[10px] leading-5 text-slate-400">
+                        This records what you said you took. It does not mean the medicine was prescribed to you or that it caused or treated the symptom.
+                      </p>
+                    </div>
+                  )}
+
+                  {medicationId && medicationId !== "__OTHER__" && (
                     <div className="mt-3 grid gap-3 sm:grid-cols-2">
                       <select
                         value={medicationImproved}
