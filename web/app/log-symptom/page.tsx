@@ -2,7 +2,8 @@
 
 import Link from "next/link";
 import { ArrowLeft, CheckCircle2, ClipboardPlus, Save, Sparkles, TriangleAlert } from "lucide-react";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import { useSearchParams } from "next/navigation";
 import { useDashboard } from "@/hooks/use-dashboard";
 import { healthJournalService, type SymptomIntelligenceResult } from "@/services/health-journal.service";
 
@@ -68,9 +69,25 @@ export default function LogSymptomPage() {
     [dashboard],
   );
 
+  const searchParams = useSearchParams();
   const [symptom, setSymptom] = useState("");
-  const [severity, setSeverity] = useState<(typeof severityOptions)[number]["value"]>("MILD");
+  const [severity, setSeverity] = useState<(typeof severityOptions)[number]["value"] | "">("");
   const [started, setStarted] = useState("Today");
+
+  useEffect(() => {
+    const symptomParam = searchParams.get("symptom")?.trim();
+    const startedParam = searchParams.get("started");
+    const validStarted = new Set([
+      "Today",
+      "Yesterday",
+      "A few days ago",
+      "More than a week ago",
+      "I am not sure",
+    ]);
+
+    if (symptomParam) setSymptom(symptomParam);
+    if (startedParam && validStarted.has(startedParam)) setStarted(startedParam);
+  }, [searchParams]);
   const [details, setDetails] = useState("");
   const [progression, setProgression] = useState("");
   const [frequency, setFrequency] = useState("");
@@ -107,7 +124,7 @@ export default function LogSymptomPage() {
   );
 
   const save = async () => {
-    if (!symptom.trim() || saving) return;
+    if (!symptom.trim() || !severity || saving) return;
     setSaving(true);
     setError("");
     try {
@@ -116,7 +133,7 @@ export default function LogSymptomPage() {
       const effectiveness = medicationEffectiveness.trim() ? Number(medicationEffectiveness) : Number.NaN;
       const intelligence = await healthJournalService.processSymptom({
         symptomName: symptom.trim(),
-        severity,
+        severity: severity as (typeof severityOptions)[number]["value"],
         startedAt: onsetToDate(started),
         onsetUncertain: started === "I am not sure",
         resolved,
@@ -368,7 +385,7 @@ export default function LogSymptomPage() {
           <label className="mt-7 block text-sm font-black" htmlFor="details">Anything else? <span className="font-medium text-slate-400">Optional</span></label>
           <textarea id="details" value={details} onChange={(e) => setDetails(e.target.value)} rows={4} placeholder="Anything else you want Sympto to remember about this symptom?" className="mt-2 w-full rounded-2xl border-2 border-slate-200 bg-white p-4 text-base font-medium leading-6 outline-none focus:border-[#24c1c4] focus:ring-4 focus:ring-[#24c1c4]/10" />
           {error && <p className="mt-4 rounded-2xl bg-red-50 p-4 text-sm font-semibold text-red-700" role="alert">{error}</p>}
-          <button type="button" onClick={save} disabled={!symptom.trim() || saving} className="mt-7 flex min-h-14 w-full items-center justify-center gap-2 rounded-2xl bg-[#0b2d54] px-5 text-base font-black text-white shadow-lg transition hover:bg-[#071f3a] disabled:cursor-not-allowed disabled:opacity-50 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[#24c1c4]/30"><Save className="h-5 w-5" aria-hidden="true" />{saving ? "Saving your symptom…" : "Save & understand my symptom"}</button>
+          <button type="button" onClick={save} disabled={!symptom.trim() || !severity || saving} className="mt-7 flex min-h-14 w-full items-center justify-center gap-2 rounded-2xl bg-[#0b2d54] px-5 text-base font-black text-white shadow-lg transition hover:bg-[#071f3a] disabled:cursor-not-allowed disabled:opacity-50 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[#24c1c4]/30"><Save className="h-5 w-5" aria-hidden="true" />{saving ? "Saving your symptom…" : "Save & understand my symptom"}</button>
         </section>
       </div>
     </main>
