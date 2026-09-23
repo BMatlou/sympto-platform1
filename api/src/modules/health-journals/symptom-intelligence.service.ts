@@ -738,12 +738,12 @@ export class SymptomIntelligenceService {
     const ruleDraft = this.inferTalkDraft(normalized);
     const aiDraft = await this.symptomAi.understand(message.trim());
     const draft: TalkToSymptoDraft = {
-      symptomName: aiDraft?.symptomName ?? ruleDraft.symptomName,
+      symptomName: ruleDraft.symptomName ?? aiDraft?.symptomName,
       severity: aiDraft?.severity ?? ruleDraft.severity,
       onsetLabel: aiDraft?.onsetLabel ?? ruleDraft.onsetLabel,
       progression: aiDraft?.progression ?? ruleDraft.progression,
       painScore: aiDraft?.painScore ?? ruleDraft.painScore,
-      location: aiDraft?.location ?? null,
+      location: aiDraft?.location ?? ruleDraft.location ?? null,
       medicationName: aiDraft?.medicationName ?? ruleDraft.medicationName ?? null,
       followUpQuestion: aiDraft?.followUpQuestion ?? null,
     };
@@ -1082,6 +1082,9 @@ export class SymptomIntelligenceService {
       [/\b(rash|hives|skin rash)\b/, 'Rash'],
       [/\b(fever|high temperature|temperature)\b/, 'Fever'],
       [/\b(stomach pain|abdominal pain|belly pain|stomach ache|belly ache)\b/, 'Abdominal pain'],
+            [/\b(lower back pain|pain (?:in|on|around) (?:my )?lower back|my lower back (?:hurts?|aches?)|lower back (?:hurts?|aches?)\b/, 'Back pain'],
+      [/\b(upper back pain|pain (?:in|on|around) (?:my )?upper back|my upper back (?:hurts?|aches?)|upper back (?:hurts?|aches?)\b/, 'Back pain'],
+      [/\b(middle back pain|pain (?:in|on|around) (?:my )?middle back|my middle back (?:hurts?|aches?)|middle back (?:hurts?|aches?)\b/, 'Back pain'],
       [/\b(back pain|backache|back ache)\b/, 'Back pain'],
       [/\b(joint pain|joint ache)\b/, 'Joint pain'],
       [/\b(fatigue|extremely tired|very tired|tired all the time|feeling tired|feel tired)\b/, 'Fatigue'],
@@ -1099,9 +1102,29 @@ export class SymptomIntelligenceService {
       }
     }
 
-    if (!symptomName) {
-      const painMatch = normalized.match(/\b(?:pain|ache|aching|hurts?)\s+(?:in|around)\s+(?:my\s+)?(knee|shoulder|neck|wrist|hip|ankle|elbow|leg|arm|foot|hand)\b/);
-      if (painMatch) symptomName = `${painMatch[1].replace(/^./, c => c.toUpperCase())} pain`;
+    let location: string | null = null;
+
+    const locatedPainPatterns: Array<{ pattern: RegExp; symptom: string; location: string }> = [
+      { pattern: /\b(?:pain|ache|aching|hurts?)\s+(?:in|on|around)\s+(?:my\s+)?(lower back)\b/, symptom: 'Back pain', location: 'Lower back' },
+      { pattern: /\b(?:pain|ache|aching|hurts?)\s+(?:in|on|around)\s+(?:my\s+)?(upper back)\b/, symptom: 'Back pain', location: 'Upper back' },
+      { pattern: /\b(?:pain|ache|aching|hurts?)\s+(?:in|on|around)\s+(?:my\s+)?(middle back)\b/, symptom: 'Back pain', location: 'Middle back' },
+      { pattern: /\b(?:pain|ache|aching|hurts?)\s+(?:in|on|around)\s+(?:my\s+)?(left side of (?:my )?back)\b/, symptom: 'Back pain', location: 'Left side of back' },
+      { pattern: /\b(?:pain|ache|aching|hurts?)\s+(?:in|on|around)\s+(?:my\s+)?(right side of (?:my )?back)\b/, symptom: 'Back pain', location: 'Right side of back' },
+      { pattern: /\bmy\s+(lower back|upper back|middle back)\s+(?:hurts?|aches?)\b/, symptom: 'Back pain', location: '$1' },
+      { pattern: /\b(?:pain|ache|aching)\s+(?:in|on|around)\s+(?:my\s+)?(knee|shoulder|neck|wrist|hip|ankle|elbow|leg|arm|foot|hand)\b/, symptom: 'LOCATION pain', location: '$1' },
+    ];
+
+    for (const entry of locatedPainPatterns) {
+      const match = normalized.match(entry.pattern);
+      if (!match) continue;
+
+      symptomName = entry.symptom === 'LOCATION pain'
+        ? `${match[1].replace(/^./, c => c.toUpperCase())} pain`
+        : entry.symptom;
+      location = entry.location.includes('$1')
+        ? entry.location.replace('$1', match[1])
+        : entry.location;
+      break;
     }
 
     const severity =
@@ -1148,7 +1171,7 @@ export class SymptomIntelligenceService {
       onsetLabel,
       progression,
       painScore,
-      location: null,
+      location,
       medicationName,
       followUpQuestion:
         symptomName && !severity
