@@ -17,6 +17,20 @@ export interface SymptomIntelligenceAction {
   href: string;
 }
 
+export interface TalkToSymptoDraft {
+  symptomName: string | null;
+  severity: SymptomSeverity | null;
+  onsetLabel: 'Today' | 'Yesterday' | 'A few days ago' | 'More than a week ago' | 'I am not sure';
+  progression: SymptomProgression | null;
+  painScore: number | null;
+}
+
+export interface TalkToSymptoAnalysis {
+  inputType: 'SYMPTOM' | 'URGENT_CONCERN' | 'GENERAL_HEALTH';
+  draft: TalkToSymptoDraft;
+  safetySignals: string[];
+}
+
 export interface SymptomIntelligenceResult {
   symptomLogId: string;
   episodeId: string;
@@ -92,7 +106,8 @@ export class SymptomIntelligenceService {
       throw new BadRequestException('Medication stop date cannot be before its start date.');
     }
     const normalizedInput = `${symptomName} ${dto.details ?? ''}`.toLowerCase();
-    const urgentWarningSign = /chest pain|cannot breathe|can't breathe|difficulty breathing|fainting|unconscious|severe bleeding|stroke/.test(normalizedInput);
+    const safetySignals = this.detectSafetySignals(normalizedInput);
+    const urgentWarningSign = safetySignals.length > 0;
     const severeSymptom = dto.severity === SymptomSeverity.SEVERE || dto.severity === SymptomSeverity.VERY_SEVERE;
     const episodePriority = urgentWarningSign ? 'URGENT' : severeSymptom ? 'HIGH' : 'ROUTINE';
 
@@ -266,8 +281,10 @@ export class SymptomIntelligenceService {
             symptomLogId: log.id,
             trigger: dto.suspectedTrigger.trim(),
             description: dto.triggerDetails?.trim() || undefined,
-            suspected: dto.triggerConfirmed === true ? false : true,
-            confirmed: dto.triggerConfirmed === true,
+            // Patient-reported certainty is not clinical confirmation. Keep the trigger as suspected
+            // until independent evidence or a clinician confirms the relationship.
+            suspected: true,
+            confirmed: false,
             exposureAt: triggerExposureAt,
             occurredBeforeHours: dto.occurredBeforeHours,
             notes: dto.triggerNotes?.trim() || undefined,
@@ -366,49 +383,105 @@ export class SymptomIntelligenceService {
     };
   }
 
-  async analyzeTalkUpdate(userId: string, message: string) {
+  async analyzeTalkUpdate(userId: string, message: string): Promise<
+    TalkToSymptoAnalysis & {
+      assessment: SymptomIntelligenceResult['assessment'];
+      insights: string[];
+      actions: SymptomIntelligenceAction[];
+      context: SymptomIntelligenceResult['context'];
+    }
+  > {
     const patient = await this.getPatient(userId);
     const context = await this.buildContext(patient.id);
     const normalized = message.trim().toLowerCase();
+    const safetySignals = this.detectSafetySignals(normalized);
+    const draft = this.inferTalkDraft(normalized);
 
-    const urgent = /chest pain|cannot breathe|can't breathe|difficulty breathing|fainting|unconscious|severe bleeding|stroke/.test(normalized);
-    const symptomMentioned = /headache|pain|fever|vomit|vomiting|dizzy|dizziness|breathless|shortness of breath|cough|rash|fatigue|tired|nausea|diarrhea|stomach|abdominal/.test(normalized);
+    const inputType: TalkToSymptoAnalysis['inputType'] =
+      safetySignals.length > 0
+        ? 'URGENT_CONCERN'
+        : draft.symptomName
+          ? 'SYMPTOM'
+          : 'GENERAL_HEALTH';
 
     const insights: string[] = [];
     const actions: SymptomIntelligenceAction[] = [];
 
-    if (urgent) {
-      insights.push('Your message includes a symptom that can require urgent medical attention. If it is severe, sudden, or getting worse, seek emergency care now.');
+    if (safetySignals.length > 0) {
+      insights.push(
+        'Your message includes a possible emergency warning sign. Sympto cannot diagnose you; seek emergency medical care now if this is happening now, is severe, or is getting worse.',
+      );
       actions.push({ label: 'Get urgent help', href: 'tel:112' });
-    } else if (symptomMentioned) {
-      insights.push('I can connect this update with your recorded health information instead of treating it as an isolated note.');
+    } else if (draft.symptomName) {
+      insights.push(
+        `I understood this as “${draft.symptomName}”. I want to capture it as a proper symptom record rather than leaving it as an unstructured note.`,
+      );
+      if (!draft.severity) {
+        insights.push('Sympto still needs the symptom severity before it can create the structured record.');
+      }
+    } else {
+      insights.push(
+        'This looks like a general health update rather than a specific symptom, so it can be saved as a journal entry.',
+      );
     }
 
     if (context.recentSymptomCount > 0) {
-      insights.push(`You have ${context.recentSymptomCount} recent symptom tracking point${context.recentSymptomCount === 1 ? '' : 's'} available for comparison.`);
+      insights.push(
+        `You have ${context.recentSymptomCount} recent symptom tracking point${context.recentSymptomCount === 1 ? '' : 's'} available for comparison.`,
+      );
     }
     if (context.activeMedicationCount > 0) {
-      insights.push('Your active medication record is available when looking at this update.');
+      insights.push('Your active medication record is available when reviewing this update.');
     }
     if (context.recentVitals.length > 0 || context.wearableHeartRate.length > 0) {
       insights.push('Recent vital and wearable measurements are available to help put this update in context.');
     }
-
-    if (actions.length === 0) {
-      actions.push({ label: 'Log as symptom', href: '/log-symptom' });
+    if (context.conditionCount > 0 || context.allergyCount > 0) {
+      insights.push('Your recorded conditions and allergies remain available as part of the clinical context.');
     }
-    actions.push({ label: 'Open My Health Record', href: '/health-journal' });
+    if (context.activeGoalCount > 0) {
+      insights.push(
+        `Your ${context.activeGoalCount} active health goal${context.activeGoalCount === 1 ? '' : 's'} remain connected for longitudinal review.`,
+      );
+    }
+
+    if (inputType === 'SYMPTOM') {
+      actions.push({ label: 'Continue symptom log', href: '/log-symptom' });
+      actions.push({ label: 'Open My Health Record', href: '/health-journal' });
+    } else if (inputType === 'GENERAL_HEALTH') {
+      actions.push({ label: 'Open My Health Record', href: '/health-journal' });
+    }
 
     return {
+      inputType,
+      draft,
+      safetySignals,
       assessment: {
-        tone: urgent ? ('urgent' as const) : symptomMentioned ? ('watch' as const) : ('calm' as const),
-        title: urgent ? 'Please get urgent help' : symptomMentioned ? 'Sympto has connected the context' : 'Health update noted',
-        message: urgent
-          ? 'This is safety guidance, not a diagnosis. Please seek appropriate medical care now if the symptom is severe or worsening.'
-          : 'Your update stays connected to your health record so future symptoms, measurements, medicines and care events can be considered together.',
+        tone:
+          inputType === 'URGENT_CONCERN'
+            ? 'urgent'
+            : inputType === 'SYMPTOM'
+              ? draft.severity === SymptomSeverity.SEVERE || draft.severity === SymptomSeverity.VERY_SEVERE
+                ? 'watch'
+                : 'calm'
+              : 'calm',
+        title:
+          inputType === 'URGENT_CONCERN'
+            ? 'Please get urgent help'
+            : inputType === 'SYMPTOM'
+              ? draft.severity === SymptomSeverity.SEVERE || draft.severity === SymptomSeverity.VERY_SEVERE
+                ? 'Symptom needs a closer look'
+                : 'Let’s capture this symptom properly'
+              : 'Health update understood',
+        message:
+          inputType === 'URGENT_CONCERN'
+            ? 'This is safety guidance, not a diagnosis. Seek appropriate emergency care now when the warning sign is current or severe.'
+            : inputType === 'SYMPTOM'
+              ? 'Sympto has extracted the useful details it could identify. Review the structured symptom before saving it to your health record.'
+              : 'Your update can be stored as a journal entry and kept connected to your wider health history.',
       },
       insights,
-      actions,
+      actions: actions.slice(0, 4),
       context: {
         activeMedicationCount: context.activeMedicationCount,
         activeMedicationNames: context.activeMedicationNames,
@@ -618,6 +691,109 @@ export class SymptomIntelligenceService {
     };
   }
 
+  private detectSafetySignals(text: string): string[] {
+    const normalized = text.toLowerCase().replace(/\s+/g, ' ').trim();
+    const historical = /\b(last year|years ago|months ago|previously|in 20\d{2})\b/.test(normalized);
+
+    const rules: Array<[string, RegExp]> = [
+      ['Chest pain, pressure, tightness or heaviness', /\b(chest\s+(pain|pressure|tightness|heaviness)|heavy\s+chest|pressure\s+in\s+(my\s+)?chest|tightness\s+in\s+(my\s+)?chest)\b/],
+      ['Severe breathing difficulty', /\b(gasping|choking|cannot breathe|can\s*not\s+breathe|can't breathe|unable to breathe|severe(?:ly)?\s+(short of breath|breathless)|not able to get words out|struggling to breathe)\b/],
+      ['Stroke warning sign', /\b(face\s+(droop|drooping)|one[- ]sided\s+(weakness|numbness)|numbness\s+on\s+(one|1)\s+side|weakness\s+on\s+(one|1)\s+side|slurred speech|speech\s+(problem|difficulty)|sudden confusion|sudden loss of vision|vision loss\s+in\s+(one|1)\s+eye)\b/],
+      ['Loss of consciousness or unresponsiveness', /\b(fainted|fainting|passed out|unconscious|not responding|can't wake|cannot wake)\b/],
+      ['Seizure or convulsion', /\b(seizure|convulsion|convulsing|fit|fitting)\b/],
+      ['Severe bleeding', /\b(uncontrolled bleeding|bleeding heavily|bleeding won't stop|bleeding will not stop|vomiting blood|coughing up blood)\b/],
+      ['Possible severe allergic reaction', /\b(swelling\s+(of\s+)?(the\s+)?(lips|tongue|throat)|throat\s+(is\s+)?closing|throat\s+swelling|anaphylaxis)\b/],
+      ['Sudden severe headache', /\b(sudden(?:ly)?\s+.{0,25}\bheadache\b|worst\s+headache|thunderclap\s+headache)\b/],
+      ['Possible poisoning or overdose', /\b(overdose|poisoned|poisoning|took too much|swallowed too much)\b/],
+    ];
+
+    return rules
+      .filter(([, pattern]) => pattern.test(normalized) && !historical)
+      .map(([label]) => label);
+  }
+
+  private inferTalkDraft(text: string): TalkToSymptoDraft {
+    const normalized = text.toLowerCase().replace(/\s+/g, ' ').trim();
+
+    const symptomPatterns: Array<[RegExp, string]> = [
+      [/\b(shortness of breath|breathlessness|breathless|out of breath)\b/, 'Shortness of breath'],
+      [/\b(chest pain|chest pressure|chest tightness|heavy chest)\b/, 'Chest discomfort'],
+      [/\b(headache|head pain|migraine)\b/, 'Headache'],
+      [/\b(sore throat|throat pain)\b/, 'Sore throat'],
+      [/\b(cough|coughing)\b/, 'Cough'],
+      [/\b(feeling sick|nausea|nauseous)\b/, 'Nausea'],
+      [/\b(vomiting|vomit|throwing up|threw up)\b/, 'Vomiting'],
+      [/\b(diarrhea|diarrhoea)\b/, 'Diarrhea'],
+      [/\b(constipation|constipated)\b/, 'Constipation'],
+      [/\b(dizzy|dizziness|light[- ]headed|lightheaded)\b/, 'Dizziness'],
+      [/\b(rash|hives|skin rash)\b/, 'Rash'],
+      [/\b(fever|high temperature|temperature)\b/, 'Fever'],
+      [/\b(stomach pain|abdominal pain|belly pain|stomach ache|belly ache)\b/, 'Abdominal pain'],
+      [/\b(back pain|backache|back ache)\b/, 'Back pain'],
+      [/\b(joint pain|joint ache)\b/, 'Joint pain'],
+      [/\b(fatigue|extremely tired|very tired|tired all the time|feeling tired|feel tired)\b/, 'Fatigue'],
+      [/\b(heart racing|heart pounding|palpitations)\b/, 'Palpitations'],
+      [/\b(runny nose|blocked nose|stuffy nose|nasal congestion)\b/, 'Nasal congestion'],
+      [/\b(ear pain|earache|ear ache)\b/, 'Ear pain'],
+      [/\b(tooth pain|toothache|tooth ache)\b/, 'Tooth pain'],
+    ];
+
+    let symptomName: string | null = null;
+    for (const [pattern, name] of symptomPatterns) {
+      if (pattern.test(normalized)) {
+        symptomName = name;
+        break;
+      }
+    }
+
+    if (!symptomName) {
+      const painMatch = normalized.match(/\b(?:pain|ache|aching|hurts?)\s+(?:in|around)\s+(?:my\s+)?(knee|shoulder|neck|wrist|hip|ankle|elbow|leg|arm|foot|hand)\b/);
+      if (painMatch) symptomName = `${painMatch[1].replace(/^./, c => c.toUpperCase())} pain`;
+    }
+
+    const severity =
+      /\b(excruciating|unbearable|severe|very severe|worst|can't function|cannot function)\b/.test(normalized)
+        ? SymptomSeverity.SEVERE
+        : /\b(moderate|fairly strong|quite painful)\b/.test(normalized)
+          ? SymptomSeverity.MODERATE
+          : /\b(mild|slight|minor|a little)\b/.test(normalized)
+            ? SymptomSeverity.MILD
+            : null;
+
+    const progression =
+      /\b(getting worse|worsening|worse|deteriorating)\b/.test(normalized)
+        ? SymptomProgression.WORSENING
+        : /\b(getting better|improving|better now|easing)\b/.test(normalized)
+          ? SymptomProgression.IMPROVING
+          : /\b(stable|unchanged)\b/.test(normalized)
+            ? SymptomProgression.STABLE
+            : /\b(comes and goes|come and go|on and off|off and on|intermittent)\b/.test(normalized)
+              ? SymptomProgression.FLUCTUATING
+              : null;
+
+    const painScoreMatch = normalized.match(/\b(?:pain\s*(?:is|at)?\s*)?(10|[0-9])\s*(?:\/|out of)\s*10\b/);
+    const painScore = painScoreMatch ? Number(painScoreMatch[1]) : null;
+
+    let onsetLabel: TalkToSymptoDraft['onsetLabel'] = 'I am not sure';
+    if (/\btoday|earlier today|this morning|this afternoon|tonight\b/.test(normalized)) {
+      onsetLabel = 'Today';
+    } else if (/\byesterday|since last night\b/.test(normalized)) {
+      onsetLabel = 'Yesterday';
+    } else if (/\b(?:for|past|last)\s+[2-7]\s+(?:days?|d)\b|\ba few days ago\b/.test(normalized)) {
+      onsetLabel = 'A few days ago';
+    } else if (/\b(?:for|past|last)\s+(?:8|9|[1-9]\d)\+?\s+days?\b|\bmore than a week ago\b|\bfor weeks?\b/.test(normalized)) {
+      onsetLabel = 'More than a week ago';
+    }
+
+    return {
+      symptomName,
+      severity,
+      onsetLabel,
+      progression,
+      painScore,
+    };
+  }
+
   private evaluateContext(
     symptomName: string,
     severity: SymptomSeverity,
@@ -625,7 +801,7 @@ export class SymptomIntelligenceService {
     context: Awaited<ReturnType<SymptomIntelligenceService['buildContext']>>,
   ) {
     const normalized = `${symptomName} ${details ?? ''}`.toLowerCase();
-    const urgent = /chest pain|cannot breathe|can't breathe|difficulty breathing|fainting|unconscious|severe bleeding|stroke/.test(normalized);
+    const urgent = this.detectSafetySignals(normalized).length > 0;
     const severe = severity === SymptomSeverity.SEVERE || severity === SymptomSeverity.VERY_SEVERE;
 
     const insights: string[] = [];
