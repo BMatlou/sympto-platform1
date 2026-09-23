@@ -168,6 +168,19 @@ class HealthJournalService {
     return data.data;
   }
 
+  async getSymptoms(params: { limit?: number } = {}): Promise<any[]> {
+    const { data } = await api.get("/health-journals/symptoms", {
+      params: {
+        limit: params.limit ?? 100,
+      },
+    });
+
+    const payload = data?.data ?? data;
+    if (Array.isArray(payload)) return payload;
+    if (Array.isArray(payload?.data)) return payload.data;
+    return [];
+  }
+
   async talkToSympto(message: string): Promise<TalkToSymptoResult> {
     const { data } = await api.post("/health-journals/talk-to-sympto", { message });
     return data.data;
