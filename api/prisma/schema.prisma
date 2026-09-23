@@ -3354,7 +3354,8 @@ model SymptomTrigger {
 model MedicationEffect {
   id                    String        @id @default(uuid())
   symptomLogId          String
-  medicationId          String
+  medicationId          String?
+  reportedMedicationName String?
   prescriptionId        String? // <-- ADD HERE
   effectiveness         Int?
   improved              Boolean?
@@ -3366,7 +3367,7 @@ model MedicationEffect {
   notes                 String?       @db.Text
   createdAt             DateTime      @default(now())
   symptomLog            SymptomLog    @relation(fields: [symptomLogId], references: [id], onDelete: Cascade)
-  medication            Medication    @relation(fields: [medicationId], references: [id], onDelete: Restrict)
+  medication            Medication?   @relation(fields: [medicationId], references: [id], onDelete: Restrict)
   prescription          Prescription? @relation(fields: [prescriptionId], references: [id], onDelete: SetNull)
 
   @@index([symptomLogId])
