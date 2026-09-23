@@ -12,6 +12,7 @@ import { PrismaService } from '../../database/prisma.service';
 import { GoalsEngineService } from '../health-goals/goals-engine-v3.service';
 import { ProcessSymptomDto } from './dto/process-symptom.dto';
 import { MonitorSymptomDto } from './dto/monitor-symptom.dto';
+import { SymptomAiService } from './symptom-ai.service';
 
 export interface SymptomIntelligenceAction {
   label: string;
@@ -24,12 +25,15 @@ export interface TalkToSymptoDraft {
   onsetLabel: 'Today' | 'Yesterday' | 'A few days ago' | 'More than a week ago' | 'I am not sure';
   progression: SymptomProgression | null;
   painScore: number | null;
+  location: string | null;
+  followUpQuestion: string | null;
 }
 
 export interface TalkToSymptoAnalysis {
   inputType: 'SYMPTOM' | 'URGENT_CONCERN' | 'GENERAL_HEALTH';
   draft: TalkToSymptoDraft;
   safetySignals: string[];
+  understandingSource: 'AI' | 'RULES';
 }
 
 export interface SymptomIntelligenceResult {
@@ -69,6 +73,7 @@ export class SymptomIntelligenceService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly goalsEngine: GoalsEngineService,
+    private readonly symptomAi: SymptomAiService,
   ) {}
 
   async processSymptomLog(
@@ -588,7 +593,19 @@ export class SymptomIntelligenceService {
     const context = await this.buildContext(patient.id);
     const normalized = message.trim().toLowerCase();
     const safetySignals = this.detectSafetySignals(normalized);
-    const draft = this.inferTalkDraft(normalized);
+    const ruleDraft = this.inferTalkDraft(normalized);
+    const aiDraft = await this.symptomAi.understand(message.trim());
+    const draft: TalkToSymptoDraft = {
+      symptomName: aiDraft?.symptomName ?? ruleDraft.symptomName,
+      severity: aiDraft?.severity ?? ruleDraft.severity,
+      onsetLabel: aiDraft?.onsetLabel ?? ruleDraft.onsetLabel,
+      progression: aiDraft?.progression ?? ruleDraft.progression,
+      painScore: aiDraft?.painScore ?? ruleDraft.painScore,
+      location: aiDraft?.location ?? null,
+      followUpQuestion: aiDraft?.followUpQuestion ?? null,
+    };
+    const understandingSource: TalkToSymptoAnalysis['understandingSource'] =
+      aiDraft ? 'AI' : 'RULES';
 
     const inputType: TalkToSymptoAnalysis['inputType'] =
       safetySignals.length > 0
@@ -649,6 +666,7 @@ export class SymptomIntelligenceService {
       inputType,
       draft,
       safetySignals,
+      understandingSource,
       assessment: {
         tone:
           inputType === 'URGENT_CONCERN'
@@ -983,6 +1001,8 @@ export class SymptomIntelligenceService {
       onsetLabel,
       progression,
       painScore,
+      location: null,
+      followUpQuestion: null,
     };
   }
 
