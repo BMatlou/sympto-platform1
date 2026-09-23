@@ -77,6 +77,23 @@ export class ProcessSymptomDto {
   triggerDetails?: string;
 
   @IsOptional()
+  @IsBoolean()
+  triggerConfirmed?: boolean;
+
+  @IsOptional()
+  @IsDateString()
+  triggerExposureAt?: string;
+
+  @IsOptional()
+  @IsInt()
+  @Min(0)
+  occurredBeforeHours?: number;
+
+  @IsOptional()
+  @IsString()
+  triggerNotes?: string;
+
+  @IsOptional()
   @IsString()
   aggravatingFactors?: string;
 
@@ -109,4 +126,26 @@ export class ProcessSymptomDto {
   @IsOptional()
   @IsString()
   medicationSideEffects?: string;
+
+  @IsOptional()
+  @IsInt()
+  @Min(0)
+  @Max(100)
+  medicationImprovementPercentage?: number;
+
+  @IsOptional()
+  @IsDateString()
+  medicationStartedAt?: string;
+
+  @IsOptional()
+  @IsDateString()
+  medicationImprovementObservedAt?: string;
+
+  @IsOptional()
+  @IsDateString()
+  medicationStoppedAt?: string;
+
+  @IsOptional()
+  @IsString()
+  medicationNotes?: string;
 }
