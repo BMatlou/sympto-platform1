@@ -61,7 +61,7 @@ export default function SymptomLogDetailPage({ params }: { params: Promise<{ id:
         id: `baseline-${record.id}`,
         at: baseline?.onsetAt || record.startedAt,
         severity: baseline?.severity || record.overallSeverity,
-        progression: baseline?.progression || record.progression,
+        progression: baseline?.progression || null,
         note: "Initial symptom recorded",
       },
       ...(record.monitorings ?? []).map((item: any) => ({
@@ -124,6 +124,7 @@ export default function SymptomLogDetailPage({ params }: { params: Promise<{ id:
   const latestMonitoring =
     record.monitorings?.[record.monitorings.length - 1] ?? null;
   const isResolved = record.status === "COMPLETED";
+  const intelligence = record.intelligence ?? null;
 
   return (
     <ProtectedRoute>
@@ -239,6 +240,118 @@ export default function SymptomLogDetailPage({ params }: { params: Promise<{ id:
               )}
             </section>
           </div>
+
+          {intelligence && (
+            <section className="mt-4 overflow-hidden rounded-[28px] border border-[#24c1c4]/20 bg-white shadow-sm">
+              <div className="bg-[#f7fbfb] p-5 sm:p-6">
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                  <div className="flex items-center gap-3">
+                    <span className="grid h-10 w-10 place-items-center rounded-xl bg-[#24c1c4]/10 text-[#0b2d54]">
+                      <Sparkles className="h-5 w-5" aria-hidden="true" />
+                    </span>
+                    <div>
+                      <p className="text-[10px] font-black uppercase tracking-[0.16em] text-[#24aeb3]">
+                        Sympto intelligence
+                      </p>
+                      <h2 className="mt-1 text-xl font-black text-[#0b2d54]">
+                        What your record is showing
+                      </h2>
+                    </div>
+                  </div>
+                  <span className="rounded-full bg-white px-3 py-1.5 text-[10px] font-black text-[#0b2d54] ring-1 ring-slate-200">
+                    {intelligence.source === "AI" ? "AI-assisted" : "Pattern engine"}
+                  </span>
+                </div>
+
+                <p className="mt-4 max-w-3xl text-sm leading-6 text-slate-600">
+                  {intelligence.summary}
+                </p>
+
+                <div className="mt-5 grid gap-3 sm:grid-cols-4">
+                  {[
+                    ["Baseline", human(intelligence.metrics?.baselineSeverity)],
+                    ["Latest", human(intelligence.metrics?.latestSeverity)],
+                    ["Updates", String(intelligence.metrics?.monitoringUpdates ?? 0)],
+                    ["Last 90 days", String(intelligence.metrics?.previous90DayOccurrences ?? 0)],
+                  ].map(([label, value]) => (
+                    <div key={label} className="rounded-2xl bg-white p-4 ring-1 ring-slate-200">
+                      <p className="text-[10px] font-black uppercase tracking-[0.12em] text-slate-400">{label}</p>
+                      <p className="mt-2 text-lg font-black text-[#0b2d54]">{value || "0"}</p>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              <div className="grid gap-4 p-5 sm:grid-cols-2 sm:p-6">
+                <section className="rounded-2xl bg-[#f8fbfb] p-4 ring-1 ring-[#e1edef]">
+                  <h3 className="text-sm font-black text-[#0b2d54]">Patterns</h3>
+                  {intelligence.patterns?.length ? (
+                    <div className="mt-3 space-y-2">
+                      {intelligence.patterns.map((text: string, index: number) => (
+                        <p key={index} className="text-sm leading-6 text-slate-600">• {text}</p>
+                      ))}
+                    </div>
+                  ) : (
+                    <p className="mt-3 text-sm text-slate-500">Not enough data yet to identify a pattern.</p>
+                  )}
+                </section>
+
+                <section className="rounded-2xl bg-[#f8fbfb] p-4 ring-1 ring-[#e1edef]">
+                  <h3 className="text-sm font-black text-[#0b2d54]">Associations in your record</h3>
+                  {intelligence.associations?.length ? (
+                    <div className="mt-3 space-y-2">
+                      {intelligence.associations.map((text: string, index: number) => (
+                        <p key={index} className="text-sm leading-6 text-slate-600">• {text}</p>
+                      ))}
+                    </div>
+                  ) : (
+                    <p className="mt-3 text-sm text-slate-500">No linked association has been recorded yet.</p>
+                  )}
+                </section>
+
+                <section className="rounded-2xl bg-[#f8fbfb] p-4 ring-1 ring-[#e1edef]">
+                  <h3 className="text-sm font-black text-[#0b2d54]">Medicine response</h3>
+                  {intelligence.medicationInsights?.length ? (
+                    <div className="mt-3 space-y-2">
+                      {intelligence.medicationInsights.map((text: string, index: number) => (
+                        <p key={index} className="text-sm leading-6 text-slate-600">• {text}</p>
+                      ))}
+                    </div>
+                  ) : (
+                    <p className="mt-3 text-sm text-slate-500">No medicine response has been recorded for this symptom.</p>
+                  )}
+                </section>
+
+                <section className="rounded-2xl bg-[#f8fbfb] p-4 ring-1 ring-[#e1edef]">
+                  <h3 className="text-sm font-black text-[#0b2d54]">What would make this smarter?</h3>
+                  {intelligence.dataGaps?.length ? (
+                    <div className="mt-3 space-y-2">
+                      {intelligence.dataGaps.map((text: string, index: number) => (
+                        <p key={index} className="text-sm leading-6 text-slate-600">• {text}</p>
+                      ))}
+                    </div>
+                  ) : (
+                    <p className="mt-3 text-sm text-slate-500">Your record has enough information for the current summary.</p>
+                  )}
+                </section>
+              </div>
+
+              {intelligence.nextQuestions?.length ? (
+                <div className="border-t border-slate-100 px-5 py-4 sm:px-6">
+                  <p className="text-[10px] font-black uppercase tracking-[0.12em] text-slate-400">Suggested next check</p>
+                  <p className="mt-2 text-sm font-bold text-[#0b2d54]">{intelligence.nextQuestions[0]}</p>
+                </div>
+              ) : null}
+
+              <div className="border-t border-slate-100 px-5 py-4 sm:px-6">
+                <p className="text-[10px] leading-5 text-slate-400">
+                  {intelligence.source === "AI"
+                    ? "AI-assisted analysis uses the information already recorded for this symptom. It does not diagnose, determine causes, or replace clinical judgement."
+                    : "The pattern engine is using recorded symptom observations. More updates allow stronger longitudinal pattern detection; this is not a diagnosis."}
+                </p>
+              </div>
+            </section>
+          )}
 
           <section className="mt-4 rounded-[28px] border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
             <div className="flex flex-wrap items-end justify-between gap-3">
