@@ -61,6 +61,7 @@ export type TalkToSymptoResult = {
       progression: string | null;
       painScore: number | null;
       location: string | null;
+      medicationName: string | null;
       followUpQuestion: string | null;
     };
     safetySignals: string[];
