@@ -65,6 +65,23 @@ export class HealthJournalsController {
     @Req() req: any,
     @Body() dto: TalkToSymptoDto,
   ) {
+    const intelligence = await this.symptomIntelligenceService.analyzeTalkUpdate(
+      req.user.sub,
+      dto.message,
+    );
+
+    // Symptom and urgent messages must enter the structured symptom workflow.
+    // Do not silently save inferred clinical data as an unstructured journal entry.
+    if (
+      intelligence.inputType === 'SYMPTOM' ||
+      intelligence.inputType === 'URGENT_CONCERN'
+    ) {
+      return {
+        journal: null,
+        intelligence,
+      };
+    }
+
     const journal = await this.healthJournalsService.create(
       req.user.sub,
       {
@@ -72,11 +89,6 @@ export class HealthJournalsController {
         journal: dto.message.trim(),
         notes: 'Captured through Talk to Sympto.',
       },
-    );
-
-    const intelligence = await this.symptomIntelligenceService.analyzeTalkUpdate(
-      req.user.sub,
-      dto.message,
     );
 
     return {
