@@ -68,6 +68,26 @@ export type TalkToSymptoResult = {
   };
 };
 
+export type SymptomMonitoringResult = {
+  observationId: string;
+  symptomLogId: string;
+  observedAt: string;
+  currentSeverity: string;
+  status: string;
+  progression: string | null;
+  insight: {
+    tone: "calm" | "watch" | "urgent";
+    title: string;
+    message: string;
+  };
+  summary: {
+    updatesRecorded: number;
+    timelinePoints: number;
+    highestRecordedSeverity: string;
+    stillPresent: boolean;
+  };
+};
+
 class HealthJournalService {
   async create(dto: CreateHealthJournalDto): Promise<HealthJournal> {
     const { data } = await api.post("/health-journals", dto);
@@ -77,6 +97,7 @@ class HealthJournalService {
 
   async processSymptom(dto: {
     symptomName: string;
+    location?: string;
     severity: "MILD" | "MODERATE" | "SEVERE" | "VERY_SEVERE";
     startedAt?: string;
     onsetUncertain?: boolean;
@@ -109,6 +130,25 @@ class HealthJournalService {
     medicationNotes?: string;
   }): Promise<SymptomIntelligenceResult> {
     const { data } = await api.post("/health-journals/process-symptom", dto);
+    return data.data;
+  }
+
+  async monitorSymptom(
+    id: string,
+    dto: {
+      severity: "MILD" | "MODERATE" | "SEVERE" | "VERY_SEVERE";
+      progression?: "IMPROVING" | "STABLE" | "WORSENING" | "FLUCTUATING" | "RESOLVED";
+      frequency?: "CONSTANT" | "INTERMITTENT" | "OCCASIONAL" | "RARE" | "UNKNOWN";
+      durationMinutes?: number;
+      painScore?: number;
+      stillPresent?: boolean;
+      suspectedTrigger?: string;
+      aggravatingFactors?: string;
+      relievingFactors?: string;
+      notes?: string;
+    },
+  ): Promise<SymptomMonitoringResult> {
+    const { data } = await api.post(`/health-journals/symptoms/${id}/monitor`, dto);
     return data.data;
   }
 
