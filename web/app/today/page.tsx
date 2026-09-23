@@ -253,7 +253,6 @@ export default function TodayPage() {
   const attention = data.attention ?? [];
   const carePlans = data.carePlans ?? [];
   const careTasks = carePlans.flatMap((plan: any) => (Array.isArray(plan.tasks) ? plan.tasks : []).filter((task: any) => !["COMPLETED", "CANCELLED"].includes(String(task.status ?? "").toUpperCase())).map((task: any) => ({ ...task, carePlanTitle: plan.title })));
-  const activeSymptomCount = activeSymptoms.length;
   const nextAppointment = Array.isArray(appointments)
     ? appointments
         .filter((appointment: any) => appointment?.scheduledStart && !Number.isNaN(new Date(String(appointment.scheduledStart)).getTime()))
