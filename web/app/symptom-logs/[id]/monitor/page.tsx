@@ -36,7 +36,7 @@ export default function MonitorSymptomPage({ params }: { params: Promise<{ id: s
   const [id, setId] = useState("");
   const [record, setRecord] = useState<any>(null);
   const [loading, setLoading] = useState(true);
-  const [severity, setSeverity] = useState<"MILD" | "MODERATE" | "SEVERE" | "">("");
+  const [severity, setSeverity] = useState<"NONE" | "MILD" | "MODERATE" | "SEVERE" | "">("");
   const [progression, setProgression] = useState("");
   const [frequency, setFrequency] = useState("");
   const [durationMinutes, setDurationMinutes] = useState("");
@@ -67,7 +67,8 @@ export default function MonitorSymptomPage({ params }: { params: Promise<{ id: s
         setRecord(loaded);
 
         const latest = loaded.monitorings?.[loaded.monitorings.length - 1];
-        setSeverity((latest?.severity ?? loaded.overallSeverity ?? "") as typeof severity);
+        const initialSeverity = latest?.severity ?? loaded.overallSeverity ?? "";
+        setSeverity(initialSeverity === "NONE" ? "" : (initialSeverity as typeof severity));
       } catch (requestError: any) {
         if (active) setError(requestError?.response?.data?.message || "We could not load this symptom.");
       } finally {
@@ -175,7 +176,7 @@ export default function MonitorSymptomPage({ params }: { params: Promise<{ id: s
           </Link>
 
           <section className="mt-5 rounded-[30px] bg-white p-6 shadow-[0_18px_55px_rgba(11,45,84,0.08)] ring-1 ring-slate-200 sm:p-8">
-            <div className="mx-auto flex h-18 w-18 items-center justify-center rounded-full bg-slate-50 ring-1 ring-slate-200">
+            <div className="mx-auto flex h-20 w-20 items-center justify-center rounded-full bg-slate-50 ring-1 ring-slate-200">
               {urgent ? (
                 <TriangleAlert className="h-9 w-9 text-red-600" aria-hidden="true" />
               ) : (
@@ -307,6 +308,13 @@ export default function MonitorSymptomPage({ params }: { params: Promise<{ id: s
               </div>
             </fieldset>
 
+            {!stillPresent ? (
+              <div className="mt-7 rounded-2xl border border-[#24c1c4]/20 bg-[#f7fbfb] p-4">
+                <p className="text-xs font-black uppercase tracking-[0.12em] text-[#24aeb3]">Current state</p>
+                <p className="mt-1 text-sm font-black text-[#0b2d54]">Resolved — no current symptom</p>
+              </div>
+            ) : null}
+
             <fieldset className="mt-7">
               <legend className="text-sm font-black">Is it still happening?</legend>
               <div className="mt-3 grid grid-cols-2 gap-3">
@@ -322,6 +330,7 @@ export default function MonitorSymptomPage({ params }: { params: Promise<{ id: s
                   type="button"
                   onClick={() => {
                     setStillPresent(false);
+                    setSeverity("NONE");
                     setProgression("RESOLVED");
                   }}
                   aria-pressed={!stillPresent}
