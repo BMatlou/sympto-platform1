@@ -36,11 +36,6 @@ export default function AIHealthHelperFab() {
   useEffect(() => {
     if (typeof window === "undefined") return;
 
-    const speechWindow = window as typeof window & {
-      SpeechRecognition?: new () => SpeechRecognitionLike;
-      webkitSpeechRecognition?: new () => SpeechRecognitionLike;
-    };
-
     const onKeyDown = (event: KeyboardEvent) => {
       if (event.key === "Escape") closeHelper();
     };
