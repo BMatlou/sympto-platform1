@@ -420,11 +420,21 @@ export class SymptomIntelligenceService {
       throw new NotFoundException('Symptom log not found.');
     }
 
-    if (symptomLog.status === SymptomLogStatus.COMPLETED && dto.stillPresent !== false) {
+    if (symptomLog.status === SymptomLogStatus.COMPLETED) {
       throw new BadRequestException('This symptom has already been marked as resolved.');
     }
 
     const stillPresent = dto.stillPresent !== false;
+
+    if (stillPresent && dto.severity === SymptomSeverity.NONE) {
+      throw new BadRequestException('An active symptom needs a current severity.');
+    }
+
+    if (stillPresent && dto.progression === SymptomProgression.RESOLVED) {
+      throw new BadRequestException('A resolved progression requires the symptom to be marked as resolved.');
+    }
+
+    const storedSeverity = stillPresent ? dto.severity : SymptomSeverity.NONE;
     const observedAt = new Date();
     const previousSeverity =
       symptomLog.monitorings[0]?.severity ?? symptomLog.overallSeverity ?? SymptomSeverity.MILD;
@@ -449,7 +459,7 @@ export class SymptomIntelligenceService {
         data: {
           symptomLogId,
           observedAt,
-          severity: dto.severity,
+          severity: storedSeverity,
           progression,
           frequency: dto.frequency,
           durationMinutes: dto.durationMinutes,
@@ -481,7 +491,7 @@ export class SymptomIntelligenceService {
       const updatedLog = await tx.symptomLog.update({
         where: { id: symptomLogId },
         data: {
-          overallSeverity: dto.severity,
+          overallSeverity: storedSeverity,
           progression,
           status: stillPresent ? SymptomLogStatus.ACTIVE : SymptomLogStatus.COMPLETED,
           resolvedAt: stillPresent ? null : observedAt,
