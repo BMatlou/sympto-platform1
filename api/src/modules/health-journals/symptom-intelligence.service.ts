@@ -459,6 +459,20 @@ export class SymptomIntelligenceService {
         },
       });
 
+      if (dto.medicationId) {
+        await tx.medicationEffect.create({
+          data: {
+            symptomLogId,
+            medicationId: dto.medicationId,
+            prescriptionId: dto.prescriptionId,
+            improved: dto.medicationImproved,
+            effectiveness: dto.medicationEffectiveness,
+            sideEffects: dto.medicationSideEffects?.trim() || undefined,
+            notes: dto.medicationSideEffects?.trim() || undefined,
+          },
+        });
+      }
+
       const updatedLog = await tx.symptomLog.update({
         where: { id: symptomLogId },
         data: {
