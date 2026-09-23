@@ -125,6 +125,21 @@ export class HealthJournalsController {
   }
 
   @Permissions('health-journals.read')
+  @Get('symptom-reference')
+  findSymptomReference(
+    @Req() req: any,
+    @Query('search') search?: string,
+    @Query('limit') limit?: string,
+  ) {
+    const parsedLimit = limit ? Number.parseInt(limit, 10) : 12;
+    return this.healthJournalsService.findSymptomReference(
+      req.user.sub,
+      search,
+      Number.isFinite(parsedLimit) ? parsedLimit : 12,
+    );
+  }
+
+  @Permissions('health-journals.read')
   @Get('symptoms')
   findSymptoms(
     @Req() req: any,
