@@ -525,7 +525,7 @@ export default function SymptomLogDetailPage({ params }: { params: Promise<{ id:
               <div className="flex items-center gap-2">
                 <ShieldCheck className="h-4 w-4 text-[#24c1c4]" />
                 <h2 className="text-sm font-black text-[#0b2d54]">
-                  Safety observation
+                  {observation.requiresAttention ? "Safety observation" : "Sympto record note"}
                 </h2>
               </div>
               <p className="mt-3 text-sm leading-6 text-slate-600">
