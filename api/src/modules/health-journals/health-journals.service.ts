@@ -143,6 +143,160 @@ export class HealthJournalsService {
    * here prevents the Smart Journal timeline from depending on the broader
    * Health Home aggregation to discover symptoms.
    */
+  /**
+   * Search the seeded symptom reference library for the Smart Journal/log flow.
+   * Location options are patient-input aids only; they are not diagnoses.
+   */
+  async findSymptomReference(
+    userId: string,
+    search?: string,
+    limit = 12,
+  ) {
+    await this.getPatientId(userId);
+
+    const normalized = search?.trim();
+    const safeLimit = Math.min(Math.max(limit, 1), 30);
+    const rows = await this.prisma.symptom.findMany({
+      where: {
+        active: true,
+        searchable: true,
+        ...(normalized
+          ? {
+              OR: [
+                { name: { contains: normalized, mode: 'insensitive' } },
+                { description: { contains: normalized, mode: 'insensitive' } },
+                { category: { contains: normalized, mode: 'insensitive' } },
+                { bodySystem: { contains: normalized, mode: 'insensitive' } },
+              ],
+            }
+          : {}),
+      },
+      select: {
+        id: true,
+        name: true,
+        description: true,
+        category: true,
+        bodySystem: true,
+        common: true,
+      },
+      orderBy: [{ common: 'desc' }, { name: 'asc' }],
+      take: safeLimit,
+    });
+
+    const normalize = (value: unknown) =>
+      String(value ?? '').trim().toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
+
+    const locationMap: Record<string, string[]> = {
+      headache: [
+        'Forehead',
+        'Temples',
+        'Back of head',
+        'Behind one eye',
+        'Behind both eyes',
+        'One side of head',
+        'Whole head',
+        'Base of skull',
+      ],
+      migraine: [
+        'One side of head',
+        'Forehead',
+        'Temple',
+        'Behind one eye',
+        'Both sides of head',
+        'Back of head',
+      ],
+      'chest pain': [
+        'Centre of chest',
+        'Left side of chest',
+        'Right side of chest',
+        'Upper chest',
+        'Under the breastbone',
+        'Whole chest',
+      ],
+      'abdominal pain': [
+        'Upper abdomen',
+        'Lower abdomen',
+        'Right side of abdomen',
+        'Left side of abdomen',
+        'Around the belly button',
+        'Whole abdomen',
+      ],
+      'stomach pain': [
+        'Upper abdomen',
+        'Lower abdomen',
+        'Right side of abdomen',
+        'Left side of abdomen',
+        'Around the belly button',
+      ],
+      'back pain': [
+        'Upper back',
+        'Middle back',
+        'Lower back',
+        'Left side of back',
+        'Right side of back',
+        'Whole back',
+      ],
+      'neck pain': [
+        'Front of neck',
+        'Back of neck',
+        'Left side of neck',
+        'Right side of neck',
+        'Base of skull',
+      ],
+      'shoulder pain': [
+        'Left shoulder',
+        'Right shoulder',
+        'Both shoulders',
+        'Front of shoulder',
+        'Back of shoulder',
+      ],
+      'ear pain': [
+        'Left ear',
+        'Right ear',
+        'Both ears',
+        'Behind the ear',
+        'Inside the ear',
+      ],
+      'eye pain': [
+        'Left eye',
+        'Right eye',
+        'Both eyes',
+        'Behind the eye',
+        'Around the eye',
+      ],
+      'tooth pain': [
+        'Upper teeth',
+        'Lower teeth',
+        'Front teeth',
+        'Back teeth',
+        'Left side',
+        'Right side',
+      ],
+      'joint pain': [
+        'Left side',
+        'Right side',
+        'Both sides',
+        'Front of the joint',
+        'Back of the joint',
+      ],
+    };
+
+    const suggestionsFor = (name: string) => {
+      const key = normalize(name);
+      if (locationMap[key]) return locationMap[key];
+      const relatedKey = Object.keys(locationMap).find((candidate) => key.includes(candidate) || candidate.includes(key));
+      return relatedKey ? locationMap[relatedKey] : [];
+    };
+
+    return {
+      data: rows.map((row) => ({
+        ...row,
+        suggestedLocations: suggestionsFor(row.name),
+      })),
+      total: rows.length,
+    };
+  }
+
   async findSymptoms(
     userId: string,
     limit = 100,
