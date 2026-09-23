@@ -49,8 +49,10 @@ export default function LogSymptomPage() {
     const symptomParam = params.get("symptom")?.trim();
     const severityParam = params.get("severity");
     const startedParam = params.get("started");
+    const locationParam = params.get("location")?.trim();
 
     if (symptomParam) setSymptom(symptomParam);
+    if (locationParam) setLocation(locationParam);
 
     if (
       severityParam === "MILD" ||
