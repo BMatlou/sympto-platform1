@@ -67,8 +67,29 @@ export class SymptomIntelligenceService {
     const resolvedAt = dto.resolved ? new Date() : undefined;
     const symptomStatus = dto.resolved ? SymptomLogStatus.COMPLETED : SymptomLogStatus.ACTIVE;
     const storedProgression = dto.progression ?? (dto.resolved ? SymptomProgression.RESOLVED : undefined);
+    const triggerExposureAt = dto.triggerExposureAt ? new Date(dto.triggerExposureAt) : undefined;
+    const medicationStartedAt = dto.medicationStartedAt ? new Date(dto.medicationStartedAt) : undefined;
+    const medicationImprovementObservedAt = dto.medicationImprovementObservedAt
+      ? new Date(dto.medicationImprovementObservedAt)
+      : undefined;
+    const medicationStoppedAt = dto.medicationStoppedAt ? new Date(dto.medicationStoppedAt) : undefined;
+
     if (Number.isNaN(startedAt.getTime())) {
       throw new BadRequestException('Symptom start date is invalid.');
+    }
+    for (const [label, value] of [
+      ['Trigger exposure date', triggerExposureAt],
+      ['Medication start date', medicationStartedAt],
+      ['Medication improvement date', medicationImprovementObservedAt],
+      ['Medication stop date', medicationStoppedAt],
+    ] as const) {
+      if (value && Number.isNaN(value.getTime())) {
+        throw new BadRequestException(label + ' is invalid.');
+      }
+    }
+
+    if (medicationStartedAt && medicationStoppedAt && medicationStoppedAt < medicationStartedAt) {
+      throw new BadRequestException('Medication stop date cannot be before its start date.');
     }
     const normalizedInput = `${symptomName} ${dto.details ?? ''}`.toLowerCase();
     const urgentWarningSign = /chest pain|cannot breathe|can't breathe|difficulty breathing|fainting|unconscious|severe bleeding|stroke/.test(normalizedInput);
@@ -245,7 +266,11 @@ export class SymptomIntelligenceService {
             symptomLogId: log.id,
             trigger: dto.suspectedTrigger.trim(),
             description: dto.triggerDetails?.trim() || undefined,
-            suspected: true,
+            suspected: dto.triggerConfirmed === true ? false : true,
+            confirmed: dto.triggerConfirmed === true,
+            exposureAt: triggerExposureAt,
+            occurredBeforeHours: dto.occurredBeforeHours,
+            notes: dto.triggerNotes?.trim() || undefined,
           },
         });
       }
@@ -258,8 +283,12 @@ export class SymptomIntelligenceService {
             prescriptionId: dto.prescriptionId,
             improved: dto.medicationImproved,
             effectiveness: dto.medicationEffectiveness,
+            improvementPercentage: dto.medicationImprovementPercentage,
+            startedMedicationAt: medicationStartedAt,
+            improvementObservedAt: medicationImprovementObservedAt,
+            stoppedMedicationAt: medicationStoppedAt,
             sideEffects: dto.medicationSideEffects?.trim() || undefined,
-            notes: dto.medicationSideEffects?.trim() || undefined,
+            notes: dto.medicationNotes?.trim() || dto.medicationSideEffects?.trim() || undefined,
           },
         });
       }
