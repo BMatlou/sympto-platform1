@@ -1111,6 +1111,10 @@ export class SymptomIntelligenceService {
     const painScoreMatch = normalized.match(/\b(?:pain\s*(?:is|at)?\s*)?(10|[0-9])\s*(?:\/|out of)\s*10\b/);
     const painScore = painScoreMatch ? Number(painScoreMatch[1]) : null;
 
+    const medicationMatch =
+      normalized.match(/\b(?:i\s+)?(?:took|taken|take|used|using|am\s+taking|have\s+taken)\s+(?:my\s+)?(.{2,80}?)(?=\s+(?:and|but|because|for|which|it|then)\b|[.,;]|$)/i);
+    const medicationName = medicationMatch?.[1]?.trim() || null;
+
     let onsetLabel: TalkToSymptoDraft['onsetLabel'] = 'I am not sure';
     if (/\btoday|earlier today|this morning|this afternoon|tonight\b/.test(normalized)) {
       onsetLabel = 'Today';
@@ -1129,6 +1133,7 @@ export class SymptomIntelligenceService {
       progression,
       painScore,
       location: null,
+      medicationName,
       followUpQuestion:
         symptomName && !severity
           ? 'How strong is it right now?'
