@@ -178,6 +178,23 @@ export default function LogSymptomPage() {
               </div>
             )}
 
+            {result.actions.length > 0 && (
+              <div className="mt-5 rounded-2xl border border-[#dce8ec] bg-white p-4 ring-1 ring-slate-100">
+                <p className="text-[10px] font-black uppercase tracking-[0.16em] text-[#24aeb3]">Recommended next steps</p>
+                <div className="mt-3 grid gap-2 sm:grid-cols-2">
+                  {result.actions.map((action) => (
+                    <Link
+                      key={`${action.label}|${action.href}`}
+                      href={action.href}
+                      className="inline-flex min-h-11 items-center justify-center rounded-xl border border-slate-200 bg-[#f8fbfb] px-3.5 py-2.5 text-center text-[10px] font-black text-[#0b2d54] transition hover:border-[#24c1c4] hover:bg-white"
+                    >
+                      {action.label}
+                    </Link>
+                  ))}
+                </div>
+              </div>
+            )}
+
             <div className="mt-5 rounded-2xl border border-[#24c1c4]/15 bg-white p-4 ring-1 ring-slate-100">
               <div className="flex items-center justify-between gap-3">
                 <div>
