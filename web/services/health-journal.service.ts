@@ -123,6 +123,7 @@ class HealthJournalService {
     relievingFactors?: string;
     details?: string;
     medicationId?: string;
+    reportedMedicationName?: string;
     prescriptionId?: string;
     medicationImproved?: boolean;
     medicationEffectiveness?: number;
