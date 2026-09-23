@@ -65,6 +65,7 @@ export class SymptomIntelligenceService {
     const onsetUncertain = dto.onsetUncertain === true;
     const resolvedAt = dto.resolved ? new Date() : undefined;
     const symptomStatus = dto.resolved ? SymptomLogStatus.COMPLETED : SymptomLogStatus.ACTIVE;
+    const storedProgression = dto.progression ?? (dto.resolved ? SymptomProgression.RESOLVED : undefined);
     if (Number.isNaN(startedAt.getTime())) {
       throw new BadRequestException('Symptom start date is invalid.');
     }
@@ -103,8 +104,44 @@ export class SymptomIntelligenceService {
           type: ClinicalEpisodeType.ACUTE,
           priority: episodePriority,
           startedAt,
+          ...(dto.resolved
+            ? {
+                status: ClinicalEpisodeStatus.RESOLVED,
+                resolvedAt,
+                endedAt: resolvedAt,
+              }
+            : {}),
         },
       });
+    } else {
+      const priorityRank: Record<string, number> = {
+        ROUTINE: 0,
+        LOW: 1,
+        MEDIUM: 2,
+        HIGH: 3,
+        URGENT: 4,
+        CRITICAL: 5,
+      };
+      const incomingPriority = priorityRank[episodePriority] ?? 0;
+      const currentPriority = priorityRank[String(episode.priority)] ?? 0;
+      const shouldRaisePriority = incomingPriority > currentPriority;
+
+      if (dto.resolved) {
+        episode = await this.prisma.clinicalEpisode.update({
+          where: { id: episode.id },
+          data: {
+            ...(shouldRaisePriority ? { priority: episodePriority } : {}),
+            status: ClinicalEpisodeStatus.RESOLVED,
+            resolvedAt,
+            endedAt: resolvedAt,
+          },
+        });
+      } else if (shouldRaisePriority) {
+        episode = await this.prisma.clinicalEpisode.update({
+          where: { id: episode.id },
+          data: { priority: episodePriority },
+        });
+      }
     }
 
     let symptom = await this.prisma.symptom.findFirst({
@@ -125,10 +162,34 @@ export class SymptomIntelligenceService {
     const context = await this.buildContext(patient.id);
     const analysis = this.evaluateContext(symptomName, dto.severity, dto.details, context);
 
-    if (dto.medicationId) {
-      const medication = await this.prisma.medication.findUnique({ where: { id: dto.medicationId }, select: { id: true } });
-      if (!medication) throw new BadRequestException('Selected medication could not be found.');
+    if (dto.prescriptionId && !dto.medicationId) {
+      throw new BadRequestException('A prescription can only be linked when a medicine is selected.');
     }
+
+    if (dto.medicationId) {
+      const medication = await this.prisma.medication.findUnique({
+        where: { id: dto.medicationId },
+        select: { id: true },
+      });
+      if (!medication) {
+        throw new BadRequestException('Selected medication could not be found.');
+      }
+
+      const patientMedication = patient.healthPassport?.id
+        ? await this.prisma.patientMedication.findFirst({
+            where: {
+              healthPassportId: patient.healthPassport.id,
+              medicationId: dto.medicationId,
+            },
+            select: { id: true },
+          })
+        : null;
+
+      if (!patientMedication) {
+        throw new BadRequestException('Selected medication is not on this patient’s medication record.');
+      }
+    }
+
     if (dto.prescriptionId) {
       const prescription = await this.prisma.prescription.findFirst({
         where: {
@@ -149,7 +210,7 @@ export class SymptomIntelligenceService {
           notes: dto.details?.trim() || undefined,
           status: symptomStatus,
           overallSeverity: dto.severity,
-          progression: dto.progression,
+          progression: storedProgression,
           startedAt,
           resolvedAt,
         },
@@ -160,7 +221,7 @@ export class SymptomIntelligenceService {
           symptomLogId: log.id,
           symptomId: symptom.id,
           severity: dto.severity,
-          progression: dto.progression,
+          progression: storedProgression,
           frequency: dto.frequency,
           painCharacter: dto.painCharacter,
           painScore: dto.painScore,
