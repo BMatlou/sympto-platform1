@@ -3,7 +3,6 @@
 import Link from "next/link";
 import { ArrowLeft, CheckCircle2, ClipboardPlus, Save, Sparkles, TriangleAlert } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
-import { useSearchParams } from "next/navigation";
 import { useDashboard } from "@/hooks/use-dashboard";
 import { healthJournalService, type SymptomIntelligenceResult } from "@/services/health-journal.service";
 
@@ -69,14 +68,16 @@ export default function LogSymptomPage() {
     [dashboard],
   );
 
-  const searchParams = useSearchParams();
   const [symptom, setSymptom] = useState("");
   const [severity, setSeverity] = useState<(typeof severityOptions)[number]["value"] | "">("");
   const [started, setStarted] = useState("Today");
 
   useEffect(() => {
-    const symptomParam = searchParams.get("symptom")?.trim();
-    const startedParam = searchParams.get("started");
+    if (typeof window === "undefined") return;
+
+    const params = new URLSearchParams(window.location.search);
+    const symptomParam = params.get("symptom")?.trim();
+    const startedParam = params.get("started");
     const validStarted = new Set([
       "Today",
       "Yesterday",
@@ -87,7 +88,7 @@ export default function LogSymptomPage() {
 
     if (symptomParam) setSymptom(symptomParam);
     if (startedParam && validStarted.has(startedParam)) setStarted(startedParam);
-  }, [searchParams]);
+  }, []);
   const [details, setDetails] = useState("");
   const [progression, setProgression] = useState("");
   const [frequency, setFrequency] = useState("");
