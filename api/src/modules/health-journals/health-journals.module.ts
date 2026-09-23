@@ -6,6 +6,7 @@ import { HealthGoalsModule } from '../health-goals/health-goals.module';
 import { HealthJournalsController } from './health-journals.controller';
 import { HealthJournalsService } from './health-journals.service';
 import { SymptomIntelligenceService } from './symptom-intelligence.service';
+import { SymptomAiService } from './symptom-ai.service';
 
 @Module({
   imports: [
@@ -20,6 +21,7 @@ import { SymptomIntelligenceService } from './symptom-intelligence.service';
   providers: [
     HealthJournalsService,
     SymptomIntelligenceService,
+    SymptomAiService,
   ],
 
   exports: [
