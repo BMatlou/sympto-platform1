@@ -498,8 +498,15 @@ export default function SymptomLogDetailPage({ params }: { params: Promise<{ id:
                   <p className="mt-3 text-sm font-black text-[#0b2d54]">
                     {effect.medication?.name ||
                       effect.medication?.genericName ||
+                      effect.medication?.brandName ||
+                      effect.reportedMedicationName ||
                       "Linked medicine"}
                   </p>
+                  {!effect.medicationId && effect.reportedMedicationName && (
+                    <p className="mt-1 text-[10px] font-black uppercase tracking-[0.1em] text-amber-700">
+                      Patient reported · not matched to prescribed medicines
+                    </p>
+                  )}
                   {effect.improved != null && (
                     <p className="mt-1 text-sm text-slate-600">
                       Reported improvement: {effect.improved ? "Yes" : "No"}
