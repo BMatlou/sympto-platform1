@@ -27,6 +27,7 @@ export interface TalkToSymptoDraft {
   progression: SymptomProgression | null;
   painScore: number | null;
   location: string | null;
+  medicationName: string | null;
   followUpQuestion: string | null;
 }
 
@@ -729,6 +730,7 @@ export class SymptomIntelligenceService {
       progression: aiDraft?.progression ?? ruleDraft.progression,
       painScore: aiDraft?.painScore ?? ruleDraft.painScore,
       location: aiDraft?.location ?? null,
+      medicationName: aiDraft?.medicationName ?? ruleDraft.medicationName ?? null,
       followUpQuestion: aiDraft?.followUpQuestion ?? null,
     };
     const understandingSource: TalkToSymptoAnalysis['understandingSource'] =
