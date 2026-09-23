@@ -2,6 +2,7 @@ import { BadRequestException, Injectable, NotFoundException } from '@nestjs/comm
 import {
   ClinicalEpisodeStatus,
   ClinicalEpisodeType,
+  EpisodePriority,
   SymptomLogStatus,
   SymptomSeverity,
   SymptomFrequency,
@@ -506,18 +507,18 @@ export class SymptomIntelligenceService {
         URGENT: 4,
         CRITICAL: 5,
       };
-      const desiredPriority =
+      const desiredPriority: EpisodePriority =
         !stillPresent
-          ? 'ROUTINE'
+          ? EpisodePriority.ROUTINE
           : dto.severity === SymptomSeverity.SEVERE || dto.severity === SymptomSeverity.VERY_SEVERE
-            ? 'HIGH'
+            ? EpisodePriority.HIGH
             : progression === SymptomProgression.WORSENING
-              ? 'HIGH'
-              : 'ROUTINE';
+              ? EpisodePriority.HIGH
+              : EpisodePriority.ROUTINE;
       const currentPriority = priorityRank[String(symptomLog.clinicalEpisode.priority)] ?? 0;
       const nextPriority = priorityRank[desiredPriority] > currentPriority
         ? desiredPriority
-        : String(symptomLog.clinicalEpisode.priority);
+        : symptomLog.clinicalEpisode.priority;
 
       if (!stillPresent || priorityRank[desiredPriority] > currentPriority) {
         await tx.clinicalEpisode.update({
