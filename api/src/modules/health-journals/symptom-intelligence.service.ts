@@ -1002,7 +1002,14 @@ export class SymptomIntelligenceService {
       progression,
       painScore,
       location: null,
-      followUpQuestion: null,
+      followUpQuestion:
+        symptomName && !severity
+          ? 'How strong is it right now?'
+          : symptomName && onsetLabel === 'I am not sure'
+            ? 'When did it start?'
+            : symptomName
+              ? 'Is there anything that makes it better or worse?'
+              : null,
     };
   }
 
