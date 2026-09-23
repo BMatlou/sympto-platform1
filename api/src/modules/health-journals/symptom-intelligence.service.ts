@@ -13,7 +13,7 @@ import { PrismaService } from '../../database/prisma.service';
 import { GoalsEngineService } from '../health-goals/goals-engine-v3.service';
 import { ProcessSymptomDto } from './dto/process-symptom.dto';
 import { MonitorSymptomDto } from './dto/monitor-symptom.dto';
-import { SymptomAiService } from './symptom-ai.service';
+import { AILongitudinalInsight, SymptomAiService } from './symptom-ai.service';
 
 export interface SymptomIntelligenceAction {
   label: string;
