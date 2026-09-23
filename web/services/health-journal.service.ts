@@ -53,12 +53,15 @@ export type TalkToSymptoResult = {
   journal: HealthJournal | null;
   intelligence: {
     inputType: "SYMPTOM" | "URGENT_CONCERN" | "GENERAL_HEALTH";
+    understandingSource: "AI" | "RULES";
     draft: {
       symptomName: string | null;
       severity: string | null;
       onsetLabel: "Today" | "Yesterday" | "A few days ago" | "More than a week ago" | "I am not sure";
       progression: string | null;
       painScore: number | null;
+      location: string | null;
+      followUpQuestion: string | null;
     };
     safetySignals: string[];
     assessment: SymptomIntelligenceResult["assessment"];
