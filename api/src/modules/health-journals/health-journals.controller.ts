@@ -24,6 +24,7 @@ import { UpdateHealthJournalDto } from './dto/update-health-journal.dto';
 import { QueryHealthJournalDto } from './dto/query-health-journal.dto';
 import { ProcessSymptomDto } from './dto/process-symptom.dto';
 import { TalkToSymptoDto } from './dto/talk-to-sympto.dto';
+import { MonitorSymptomDto } from './dto/monitor-symptom.dto';
 
 @ApiTags('Health Journals')
 @ApiBearerAuth()
@@ -55,6 +56,20 @@ export class HealthJournalsController {
   ) {
     return this.symptomIntelligenceService.processSymptomLog(
       req.user.sub,
+      dto,
+    );
+  }
+
+  @Permissions('health-journals.create')
+  @Post('symptoms/:id/monitor')
+  monitorSymptom(
+    @Req() req: any,
+    @Param('id') id: string,
+    @Body() dto: MonitorSymptomDto,
+  ) {
+    return this.symptomIntelligenceService.addSymptomObservation(
+      req.user.sub,
+      id,
       dto,
     );
   }
