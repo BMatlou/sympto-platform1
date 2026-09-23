@@ -118,6 +118,8 @@ export class SymptomIntelligenceService {
     const severeSymptom = dto.severity === SymptomSeverity.SEVERE || dto.severity === SymptomSeverity.VERY_SEVERE;
     const episodePriority = urgentWarningSign ? 'URGENT' : severeSymptom ? 'HIGH' : 'ROUTINE';
 
+    const reportedMedicationName = dto.reportedMedicationName?.trim() || undefined;
+
     if (dto.prescriptionId && !dto.medicationId) {
       throw new BadRequestException('A prescription can only be linked when a medicine is selected.');
     }
@@ -302,11 +304,12 @@ export class SymptomIntelligenceService {
         });
       }
 
-      if (dto.medicationId) {
+      if (dto.medicationId || reportedMedicationName) {
         await tx.medicationEffect.create({
           data: {
             symptomLogId: log.id,
-            medicationId: dto.medicationId,
+            medicationId: dto.medicationId || undefined,
+            reportedMedicationName,
             prescriptionId: dto.prescriptionId,
             improved: dto.medicationImproved,
             effectiveness: dto.medicationEffectiveness,
@@ -475,11 +478,12 @@ export class SymptomIntelligenceService {
         },
       });
 
-      if (dto.medicationId) {
+      if (dto.medicationId || dto.reportedMedicationName?.trim()) {
         await tx.medicationEffect.create({
           data: {
             symptomLogId,
-            medicationId: dto.medicationId,
+            medicationId: dto.medicationId || undefined,
+            reportedMedicationName: dto.reportedMedicationName?.trim() || undefined,
             prescriptionId: dto.prescriptionId,
             improved: dto.medicationImproved,
             effectiveness: dto.medicationEffectiveness,
