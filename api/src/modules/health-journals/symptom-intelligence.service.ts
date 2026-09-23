@@ -11,6 +11,7 @@ import {
 import { PrismaService } from '../../database/prisma.service';
 import { GoalsEngineService } from '../health-goals/goals-engine-v3.service';
 import { ProcessSymptomDto } from './dto/process-symptom.dto';
+import { MonitorSymptomDto } from './dto/monitor-symptom.dto';
 
 export interface SymptomIntelligenceAction {
   label: string;
@@ -259,6 +260,7 @@ export class SymptomIntelligenceService {
         data: {
           symptomLogId: log.id,
           symptomId: symptom.id,
+          location: dto.location?.trim() || undefined,
           severity: dto.severity,
           progression: storedProgression,
           frequency: dto.frequency,
@@ -381,6 +383,181 @@ export class SymptomIntelligenceService {
         recentLabOrderCount: context.recentLabOrderCount,
         recentImagingCount: context.recentImagingCount,
         recentAiAssessmentCount: context.recentAiAssessmentCount,
+      },
+    };
+  }
+
+  async addSymptomObservation(
+    userId: string,
+    symptomLogId: string,
+    dto: MonitorSymptomDto,
+  ) {
+    const patient = await this.getPatient(userId);
+    const symptomLog = await this.prisma.symptomLog.findFirst({
+      where: {
+        id: symptomLogId,
+        clinicalEpisode: { patientId: patient.id },
+      },
+      include: {
+        clinicalEpisode: true,
+        symptoms: {
+          orderBy: { createdAt: 'asc' },
+          take: 1,
+        },
+        monitorings: {
+          orderBy: { observedAt: 'desc' },
+          take: 30,
+        },
+      },
+    });
+
+    if (!symptomLog) {
+      throw new NotFoundException('Symptom log not found.');
+    }
+
+    if (symptomLog.status === SymptomLogStatus.COMPLETED && dto.stillPresent !== false) {
+      throw new BadRequestException('This symptom has already been marked as resolved.');
+    }
+
+    const stillPresent = dto.stillPresent !== false;
+    const observedAt = new Date();
+    const previousSeverity =
+      symptomLog.monitorings[0]?.severity ?? symptomLog.overallSeverity ?? SymptomSeverity.MILD;
+    const severityScore = (value: SymptomSeverity) =>
+      value === SymptomSeverity.NONE ? 0 :
+      value === SymptomSeverity.MILD ? 1 :
+      value === SymptomSeverity.MODERATE ? 2 :
+      value === SymptomSeverity.SEVERE ? 3 : 4;
+    const currentScore = severityScore(dto.severity);
+    const previousScore = severityScore(previousSeverity);
+
+    let progression = dto.progression;
+    if (!progression) {
+      if (!stillPresent) progression = SymptomProgression.RESOLVED;
+      else if (currentScore > previousScore) progression = SymptomProgression.WORSENING;
+      else if (currentScore < previousScore) progression = SymptomProgression.IMPROVING;
+      else progression = SymptomProgression.STABLE;
+    }
+
+    const result = await this.prisma.$transaction(async (tx) => {
+      const observation = await tx.symptomObservation.create({
+        data: {
+          symptomLogId,
+          observedAt,
+          severity: dto.severity,
+          progression,
+          frequency: dto.frequency,
+          durationMinutes: dto.durationMinutes,
+          painScore: dto.painScore,
+          stillPresent,
+          suspectedTrigger: dto.suspectedTrigger?.trim() || undefined,
+          aggravatingFactors: dto.aggravatingFactors?.trim() || undefined,
+          relievingFactors: dto.relievingFactors?.trim() || undefined,
+          notes: dto.notes?.trim() || undefined,
+          source: 'PATIENT',
+          inputMode: 'MONITORING',
+        },
+      });
+
+      const updatedLog = await tx.symptomLog.update({
+        where: { id: symptomLogId },
+        data: {
+          overallSeverity: dto.severity,
+          progression,
+          status: stillPresent ? SymptomLogStatus.ACTIVE : SymptomLogStatus.COMPLETED,
+          resolvedAt: stillPresent ? null : observedAt,
+        },
+      });
+
+      if (!stillPresent) {
+        await tx.clinicalEpisode.update({
+          where: { id: symptomLog.clinicalEpisodeId },
+          data: {
+            status: ClinicalEpisodeStatus.RESOLVED,
+            resolvedAt: observedAt,
+            endedAt: observedAt,
+          },
+        });
+      }
+
+      return { observation, updatedLog };
+    });
+
+    try {
+      await this.goalsEngine.recordMetricEvent({
+        patientId: patient.id,
+        metricType: 'SYMPTOM',
+        metricKey: 'symptom.severity',
+        loggedValue: severityScore(dto.severity),
+        occurredAt: observedAt,
+        source: 'symptom-monitoring',
+        sourceId: result.observation.id,
+      });
+    } catch (goalError) {
+      console.warn('[SYMPTOM MONITORING GOAL] Unable to update metric:', goalError);
+    }
+
+    const allSeverities = [
+      symptomLog.overallSeverity,
+      ...symptomLog.monitorings.map((item) => item.severity),
+      dto.severity,
+    ].filter(Boolean) as SymptomSeverity[];
+
+    const firstSeverity = allSeverities[0] ?? dto.severity;
+    const highestScore = Math.max(...allSeverities.map(severityScore));
+    const latestScore = severityScore(dto.severity);
+    const baselineScore = severityScore(firstSeverity);
+    const direction =
+      latestScore > baselineScore
+        ? 'increased'
+        : latestScore < baselineScore
+          ? 'decreased'
+          : 'remained similar';
+
+    const insight = !stillPresent
+      ? {
+          tone: 'calm' as const,
+          title: 'Symptom marked as resolved',
+          message: 'This monitoring update closes the active symptom episode. Keep the record available so Sympto can identify recurrence patterns later.',
+        }
+      : {
+          tone:
+            progression === SymptomProgression.WORSENING ||
+            dto.severity === SymptomSeverity.SEVERE ||
+            dto.severity === SymptomSeverity.VERY_SEVERE
+              ? 'watch' as const
+              : 'calm' as const,
+          title:
+            progression === SymptomProgression.WORSENING
+              ? 'Your symptom is getting worse'
+              : progression === SymptomProgression.IMPROVING
+                ? 'Your symptom is improving'
+                : 'Symptom update recorded',
+          message:
+            'Since the baseline entry, the recorded severity has ' +
+            direction +
+            '. This is a tracking observation, not a diagnosis.',
+        };
+
+    const timelineCount = symptomLog.monitorings.length + 2;
+    const highestLabel =
+      highestScore >= 4 ? 'Very severe' :
+      highestScore === 3 ? 'Severe' :
+      highestScore === 2 ? 'Moderate' : 'Mild';
+
+    return {
+      observationId: result.observation.id,
+      symptomLogId,
+      observedAt,
+      currentSeverity: dto.severity,
+      status: result.updatedLog.status,
+      progression,
+      insight,
+      summary: {
+        updatesRecorded: symptomLog.monitorings.length + 1,
+        timelinePoints: timelineCount,
+        highestRecordedSeverity: highestLabel,
+        stillPresent,
       },
     };
   }
