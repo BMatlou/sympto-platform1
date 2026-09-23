@@ -12,7 +12,9 @@ type PickerValue = {
 };
 
 type Props = {
+  // Kept for compatibility with existing callers. Search must never use this list.
   activeMedications?: any[];
+  // MedicationEffect rows already recorded against this symptom.
   recentMedications?: any[];
   value: PickerValue;
   onChange: (value: PickerValue) => void;
@@ -34,30 +36,43 @@ function medicationId(medication: any) {
     medication?.medicationId ||
       medication?.medication?.id ||
       medication?.patientMedication?.medicationId ||
+      medication?.id ||
       "",
   ).trim();
 }
 
-function mergeMedicines(...groups: any[][]) {
-  const seen = new Set<string>();
-  const merged: any[] = [];
+function medicineDate(medicine: any) {
+  const raw =
+    medicine?.createdAt ??
+    medicine?.improvementObservedAt ??
+    medicine?.startedMedicationAt ??
+    medicine?.observedAt ??
+    null;
 
-  for (const group of groups) {
-    for (const item of group) {
-      const id = medicationId(item);
-      const name = medicationName(item);
-      const key = id ? "id:" + id : "name:" + name.toLowerCase();
-      if (!name || seen.has(key)) continue;
-      seen.add(key);
-      merged.push(item);
-    }
-  }
+  if (!raw) return "Date not recorded";
 
-  return merged;
+  const date = new Date(String(raw));
+  if (Number.isNaN(date.getTime())) return "Date not recorded";
+
+  return new Intl.DateTimeFormat("en-ZA", {
+    day: "2-digit",
+    month: "short",
+    year: "numeric",
+  }).format(date);
+}
+
+function medicineOutcome(medicine: any) {
+  if (medicine?.improved === true) return "Helped";
+  if (medicine?.improved === false) return "No help";
+
+  const effectiveness = Number(medicine?.effectiveness);
+  if (Number.isFinite(effectiveness)) return "Effectiveness " + effectiveness + "/10";
+
+  return "Effect recorded";
 }
 
 export default function SymptomMedicationPicker({
-  activeMedications = [],
+  activeMedications: _activeMedications = [],
   recentMedications = [],
   value,
   onChange,
@@ -66,23 +81,53 @@ export default function SymptomMedicationPicker({
   const [results, setResults] = useState<any[]>([]);
   const [open, setOpen] = useState(false);
   const [searching, setSearching] = useState(false);
+  const [selectedReference, setSelectedReference] = useState<any | null>(null);
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  const currentMedication = useMemo(
-    () =>
-      activeMedications.find(
-        (item) => medicationId(item) === String(value.medicationId ?? ""),
-      ) ?? null,
-    [activeMedications, value.medicationId],
-  );
+  const history = useMemo(() => {
+    return recentMedications
+      .filter((item) => Boolean(medicationName(item)))
+      .slice()
+      .sort(
+        (a, b) =>
+          new Date(
+            String(
+              a?.createdAt ??
+                a?.improvementObservedAt ??
+                a?.startedMedicationAt ??
+                a?.observedAt ??
+                "",
+            ),
+          ).getTime() -
+          new Date(
+            String(
+              b?.createdAt ??
+                b?.improvementObservedAt ??
+                b?.startedMedicationAt ??
+                b?.observedAt ??
+                "",
+            ),
+          ).getTime(),
+      );
+  }, [recentMedications]);
+
+  const selectedHistoryMedicine = useMemo(() => {
+    const id = String(value.medicationId ?? "");
+    const reportedName = String(value.reportedMedicationName ?? "").trim().toLowerCase();
+
+    return (
+      history.find((item) => {
+        if (id && medicationId(item) === id) return true;
+        if (reportedName && medicationName(item).toLowerCase() === reportedName) return true;
+        return false;
+      }) ?? null
+    );
+  }, [history, value.medicationId, value.reportedMedicationName]);
 
   const selectedLabel =
-    value.reportedMedicationName?.trim() || medicationName(currentMedication);
-
-  const quickMedicines = useMemo(
-    () => mergeMedicines(recentMedications, activeMedications),
-    [recentMedications, activeMedications],
-  );
+    String(value.reportedMedicationName ?? "").trim() ||
+    medicationName(selectedReference) ||
+    medicationName(selectedHistoryMedicine);
 
   useEffect(() => {
     if (timer.current) clearTimeout(timer.current);
@@ -97,6 +142,7 @@ export default function SymptomMedicationPicker({
     timer.current = setTimeout(async () => {
       try {
         setSearching(true);
+        // This endpoint searches the application's seeded Medication library.
         setResults(await healthJournalService.searchMedicationReference(term, 10));
       } catch {
         setResults([]);
@@ -113,18 +159,20 @@ export default function SymptomMedicationPicker({
   const clearSelection = () => {
     setQuery("");
     setResults([]);
+    setSelectedReference(null);
     onChange({});
   };
 
-  const choose = (item: any, reported = false) => {
+  const choose = (item: any) => {
     const id = medicationId(item);
     const name = medicationName(item);
 
     setQuery("");
     setResults([]);
     setOpen(false);
+    setSelectedReference(item);
 
-    if (id && !reported) {
+    if (id) {
       onChange({
         ...value,
         medicationId: id,
@@ -140,14 +188,6 @@ export default function SymptomMedicationPicker({
     });
   };
 
-  const chooseReference = (item: any) => {
-    const id = medicationId(item);
-    const activeMatch = activeMedications.some(
-      (candidate) => medicationId(candidate) === id,
-    );
-    choose(item, !activeMatch);
-  };
-
   return (
     <section className="rounded-[24px] border border-[#dfeaec] bg-white p-4 shadow-[0_8px_28px_rgba(11,45,84,0.035)]">
       <div className="flex items-start gap-3">
@@ -157,12 +197,16 @@ export default function SymptomMedicationPicker({
         <div className="min-w-0 flex-1">
           <p className="text-sm font-black text-[#0b2d54]">Medicine taken</p>
           <p className="mt-1 text-[11px] leading-5 text-slate-500">
-            Search by name, or choose a medicine you already use or previously recorded for this symptom.
+            Search Sympto&apos;s medication library to record a medicine used during this update.
           </p>
         </div>
       </div>
 
       <div className="relative mt-4">
+        <p className="mb-2 text-[9px] font-black uppercase tracking-[0.14em] text-slate-400">
+          Add medicine for this update
+        </p>
+
         <div className="flex items-center gap-2 rounded-[18px] border-2 border-slate-200 bg-white px-3.5 shadow-sm focus-within:border-[#24c1c4] focus-within:ring-4 focus-within:ring-[#24c1c4]/10">
           <Search className="h-4 w-4 shrink-0 text-slate-400" />
           <input
@@ -173,7 +217,7 @@ export default function SymptomMedicationPicker({
             }}
             onFocus={() => setOpen(true)}
             autoComplete="off"
-            placeholder="Search medicine"
+            placeholder="Search Sympto medications"
             className="min-h-12 min-w-0 flex-1 border-0 bg-transparent text-sm font-semibold text-[#0b2d54] outline-none placeholder:text-slate-400"
           />
           {searching && (
@@ -183,98 +227,68 @@ export default function SymptomMedicationPicker({
 
         {open && (
           <div className="absolute z-30 mt-2 w-full overflow-hidden rounded-[20px] border border-slate-200 bg-white shadow-[0_18px_45px_rgba(11,45,84,0.12)]">
-            {query.trim().length < 2 && quickMedicines.length > 0 && (
+            {query.trim().length < 2 ? (
+              <div className="p-4">
+                <p className="text-sm font-black text-[#0b2d54]">
+                  Search the Sympto medication library
+                </p>
+                <p className="mt-1 text-[11px] leading-5 text-slate-500">
+                  Type at least 2 characters to find a medicine from the medications already seeded in Sympto.
+                </p>
+              </div>
+            ) : results.length > 0 ? (
               <div className="p-2">
                 <p className="px-2 py-1 text-[9px] font-black uppercase tracking-[0.14em] text-slate-400">
-                  Recently used
+                  Sympto medication library
                 </p>
-                {quickMedicines.slice(0, 8).map((item) => {
-                  const id = medicationId(item);
-                  const isCurrent = activeMedications.some(
-                    (candidate) => medicationId(candidate) === id,
-                  );
-                  const isReported = Boolean(item?.reportedMedicationName) && !id;
 
-                  return (
-                    <button
-                      key={id || medicationName(item)}
-                      type="button"
-                      onClick={() => choose(item, isReported)}
-                      className="flex w-full items-center justify-between gap-3 rounded-xl px-3 py-3 text-left hover:bg-[#24c1c4]/5"
-                    >
-                      <span className="min-w-0">
-                        <span className="block truncate text-sm font-black text-[#0b2d54]">
-                          {medicationName(item)}
-                        </span>
-                        <span className="mt-1 block text-[9px] font-black uppercase tracking-[0.1em] text-slate-400">
-                          {isReported ? "Recorded for this symptom" : isCurrent ? "Current medicine" : "Previously recorded"}
-                        </span>
+                {results.map((item) => (
+                  <button
+                    key={String(item.id)}
+                    type="button"
+                    onClick={() => choose(item)}
+                    className="flex w-full items-start justify-between gap-3 rounded-xl px-3 py-3 text-left hover:bg-[#24c1c4]/5"
+                  >
+                    <span className="min-w-0">
+                      <span className="block truncate text-sm font-bold text-[#0b2d54]">
+                        {medicationName(item)}
                       </span>
-                      <ArrowHint />
-                    </button>
-                  );
-                })}
+                      <span className="mt-1 block text-[10px] text-slate-400">
+                        {item.genericName
+                          ? String(item.genericName)
+                          : item.category
+                            ? String(item.category)
+                            : "Medication reference"}
+                      </span>
+                    </span>
+                    <Check className="h-4 w-4 shrink-0 text-[#24c1c4]" />
+                  </button>
+                ))}
               </div>
-            )}
-
-            {results.length > 0 && (
-              <div className="p-2">
-                <p className="px-2 py-1 text-[9px] font-black uppercase tracking-[0.14em] text-slate-400">
-                  Sympto medicine library
-                </p>
-                {results.map((item) => {
-                  const id = medicationId(item);
-                  const active = activeMedications.some(
-                    (candidate) => medicationId(candidate) === id,
-                  );
-
-                  return (
-                    <button
-                      key={String(item.id)}
-                      type="button"
-                      onClick={() => chooseReference(item)}
-                      className="flex w-full items-start justify-between gap-3 rounded-xl px-3 py-3 text-left hover:bg-[#24c1c4]/5"
-                    >
-                      <span className="min-w-0">
-                        <span className="block truncate text-sm font-bold text-[#0b2d54]">
-                          {medicationName(item)}
-                        </span>
-                        <span className="mt-1 block text-[10px] text-slate-400">
-                          {item.genericName
-                            ? String(item.genericName)
-                            : item.category
-                              ? String(item.category)
-                              : "Medicine reference"}
-                        </span>
-                      </span>
-                      <span className="shrink-0 rounded-full bg-slate-100 px-2 py-1 text-[9px] font-black text-slate-500">
-                        {active ? "Current" : "Report"}
-                      </span>
-                    </button>
-                  );
-                })}
-              </div>
-            )}
-
-            {query.trim().length >= 2 && !searching && results.length === 0 && (
+            ) : !searching ? (
               <div className="p-4 text-center">
-                <p className="text-sm font-bold text-[#0b2d54]">No medicine found</p>
+                <p className="text-sm font-bold text-[#0b2d54]">No match in the Sympto library</p>
                 <p className="mt-1 text-[11px] text-slate-500">
-                  You can still record the medicine exactly as you know it.
+                  You can still record the name exactly as reported.
                 </p>
                 <button
                   type="button"
                   onClick={() => {
                     const name = query.trim();
+                    setSelectedReference(null);
                     setOpen(false);
-                    onChange({ ...value, medicationId: undefined, reportedMedicationName: name });
+                    onChange({
+                      ...value,
+                      medicationId: undefined,
+                      reportedMedicationName: name,
+                    });
                   }}
                   className="mt-3 rounded-xl bg-[#0b2d54] px-3.5 py-2.5 text-[10px] font-black text-white"
                 >
                   Record “{query.trim()}”
                 </button>
               </div>
-            )}
+            ) : null}
           </div>
         )}
       </div>
@@ -285,7 +299,7 @@ export default function SymptomMedicationPicker({
             <div className="min-w-0">
               <p className="truncate text-sm font-black text-[#0b2d54]">{selectedLabel}</p>
               <p className="mt-1 text-[9px] font-black uppercase tracking-[0.12em] text-slate-400">
-                {currentMedication ? "Linked to your medication" : "Patient-reported"}
+                Selected for this update
               </p>
             </div>
             <button
@@ -325,7 +339,12 @@ export default function SymptomMedicationPicker({
                           key === "YES" ? true : key === "NO" ? false : undefined,
                       })
                     }
-                    className={"min-h-11 rounded-xl border text-[10px] font-black transition " + (active ? "border-[#24c1c4] bg-[#24c1c4]/10 text-[#0b2d54]" : "border-slate-200 bg-white text-slate-500 hover:border-[#24c1c4]/40")}
+                    className={
+                      "min-h-11 rounded-xl border text-[10px] font-black transition " +
+                      (active
+                        ? "border-[#24c1c4] bg-[#24c1c4]/10 text-[#0b2d54]"
+                        : "border-slate-200 bg-white text-slate-500 hover:border-[#24c1c4]/40")
+                    }
                   >
                     {label}
                   </button>
@@ -335,10 +354,60 @@ export default function SymptomMedicationPicker({
           </div>
         </div>
       ) : null}
+
+      {history.length > 0 ? (
+        <div className="mt-5 border-t border-[#e8eff0] pt-4">
+          <div className="flex items-end justify-between gap-3">
+            <div>
+              <p className="text-xs font-black text-[#0b2d54]">Medicine history for this symptom</p>
+              <p className="mt-1 text-[10px] text-slate-500">
+                From the first medicine recorded through the latest update.
+              </p>
+            </div>
+            <span className="rounded-full bg-[#f2f7f7] px-2.5 py-1 text-[9px] font-black text-slate-500">
+              {history.length} {history.length === 1 ? "entry" : "entries"}
+            </span>
+          </div>
+
+          <div className="mt-3 space-y-2.5">
+            {history.map((item, index) => (
+              <div
+                key={String(item.id ?? index)}
+                className="relative rounded-[18px] border border-slate-200 bg-white p-3.5"
+              >
+                <div className="flex items-start gap-3">
+                  <div className="mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-[#e8f8f7] text-[10px] font-black text-[#0b7b80]">
+                    {index + 1}
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-start justify-between gap-3">
+                      <p className="truncate text-sm font-black text-[#0b2d54]">
+                        {medicationName(item)}
+                      </p>
+                      {index === history.length - 1 && (
+                        <span className="shrink-0 rounded-full bg-[#0b2d54] px-2 py-1 text-[8px] font-black uppercase tracking-[0.1em] text-white">
+                          Latest
+                        </span>
+                      )}
+                    </div>
+                    <p className="mt-1 text-[10px] text-slate-400">{medicineDate(item)}</p>
+                    <div className="mt-2 flex flex-wrap gap-1.5">
+                      <span className="rounded-full bg-[#f6f9f9] px-2 py-1 text-[9px] font-bold text-slate-500">
+                        {medicineOutcome(item)}
+                      </span>
+                      {item?.sideEffects ? (
+                        <span className="rounded-full bg-[#fff8f3] px-2 py-1 text-[9px] font-bold text-amber-700">
+                          Side effects recorded
+                        </span>
+                      ) : null}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      ) : null}
     </section>
   );
-}
-
-function ArrowHint() {
-  return <Check className="h-4 w-4 shrink-0 text-[#24c1c4]" />;
 }
