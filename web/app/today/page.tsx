@@ -192,6 +192,9 @@ export default function TodayPage() {
   const firstName = data.patient?.firstName || data.profile?.preferredName || "there";
   const medications = data.today?.activeMedications ?? [];
   const appointments = data.today?.upcomingAppointments ?? [];
+  const activeSymptoms = (Array.isArray(data.symptoms) ? data.symptoms : []).filter(
+    (symptom: any) => String(symptom?.status ?? "").toUpperCase() === "ACTIVE",
+  );
   const allGoals = data.activeGoalsArray ?? data.goals ?? data.healthGoals ?? [];
   const activeGoalsArray = Array.isArray(data.activeGoalsArray)
     ? data.activeGoalsArray
@@ -250,6 +253,7 @@ export default function TodayPage() {
   const attention = data.attention ?? [];
   const carePlans = data.carePlans ?? [];
   const careTasks = carePlans.flatMap((plan: any) => (Array.isArray(plan.tasks) ? plan.tasks : []).filter((task: any) => !["COMPLETED", "CANCELLED"].includes(String(task.status ?? "").toUpperCase())).map((task: any) => ({ ...task, carePlanTitle: plan.title })));
+  const activeSymptomCount = activeSymptoms.length;
   const nextAppointment = Array.isArray(appointments)
     ? appointments
         .filter((appointment: any) => appointment?.scheduledStart && !Number.isNaN(new Date(String(appointment.scheduledStart)).getTime()))
@@ -279,6 +283,43 @@ export default function TodayPage() {
             </div>
             <p className="hidden max-w-sm text-right text-[11px] leading-5 text-[#74859a] sm:block">Your scheduled care and daily actions are kept together first.</p>
           </div>
+          {activeSymptoms.length > 0 && (
+            <section className="mb-4 rounded-[27px] border border-[#24c1c4]/20 bg-white p-5 shadow-[0_8px_24px_rgba(11,45,84,0.04)] sm:p-6">
+              <div className="flex items-start justify-between gap-4">
+                <div>
+                  <p className="text-[9px] font-black uppercase tracking-[0.16em] text-[#24aeb3]">Needs your attention</p>
+                  <h2 className="mt-1 text-base font-black text-[#0b2d54]">Active symptoms</h2>
+                  <p className="mt-1 text-[11px] leading-5 text-slate-500">Review what is still active and record the latest change.</p>
+                </div>
+                <Link href="/health-journal?filter=symptom" className="inline-flex min-h-9 items-center gap-1 rounded-xl px-2.5 py-2 text-[9px] font-black text-[#0b2d54] hover:bg-[#f4fafb]">
+                  View history <ArrowRight className="h-3 w-3" />
+                </Link>
+              </div>
+              <div className="mt-3 space-y-2">
+                {activeSymptoms.slice(0, 5).map((symptom: any) => (
+                  <div key={String(symptom.id)} className="rounded-[21px] bg-[#f8fbfb] p-4 ring-1 ring-[#e1edef]">
+                    <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                      <div className="min-w-0">
+                        <p className="text-sm font-black text-[#0b2d54]">{symptom.title || "Symptom"}</p>
+                        <p className="mt-1 text-[11px] font-semibold text-slate-500">
+                          Current severity · {String(symptom.overallSeverity ?? "Not recorded").replaceAll("_", " ")}
+                          {symptom.startedAt ? ` · Started ${formatDate(symptom.startedAt)}` : ""}
+                        </p>
+                      </div>
+                      <div className="flex shrink-0 gap-2">
+                        <Link href={`/symptom-logs/${encodeURIComponent(String(symptom.id))}`} className="inline-flex min-h-10 items-center justify-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3 py-2 text-[9px] font-black text-[#0b2d54]">
+                          History <ArrowRight className="h-3 w-3" />
+                        </Link>
+                        <Link href={`/symptom-logs/${encodeURIComponent(String(symptom.id))}/monitor`} className="inline-flex min-h-10 items-center justify-center gap-1.5 rounded-xl bg-[#0b2d54] px-3 py-2 text-[9px] font-black text-white">
+                          Update <ArrowRight className="h-3 w-3 text-[#24c1c4]" />
+                        </Link>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </section>
+          )}
           <div className="grid gap-4 xl:grid-cols-[1.15fr_.85fr]">
             <div className="min-w-0"><PrescribedMedicationsCard prescriptionsList={Array.isArray(medications) ? medications : []} activeGoalsArray={medicationGoalCandidates} /></div>
             <div className="min-w-0">
