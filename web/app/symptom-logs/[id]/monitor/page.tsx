@@ -5,7 +5,6 @@ import Link from "next/link";
 import { ArrowLeft, ArrowRight, Check, ChevronDown, MapPin, Save, Sparkles, TriangleAlert } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import ProtectedRoute from "@/components/auth/protected-route";
-import { useDashboard } from "@/hooks/use-dashboard";
 import { healthJournalService, type SymptomMonitoringResult } from "@/services/health-journal.service";
 import SymptomMedicationPicker from "@/components/symptoms/symptom-medication-picker";
 
@@ -39,7 +38,6 @@ function severityRank(value: string) {
 }
 
 export default function MonitorSymptomPage({ params }: { params: Promise<{ id: string }> }) {
-  const { data: dashboard } = useDashboard();
   const [id, setId] = useState("");
   const [record, setRecord] = useState<any>(null);
   const [reference, setReference] = useState<any | null>(null);
@@ -82,36 +80,6 @@ export default function MonitorSymptomPage({ params }: { params: Promise<{ id: s
         setSeverity(currentSeverity === "NONE" ? "MILD" : currentSeverity);
         setLocation(loaded.symptoms?.[0]?.location ?? "");
 
-        const previousMedicines = Array.isArray(loaded.medicationEffects)
-          ? loaded.medicationEffects
-              .slice()
-              .sort(
-                (a: any, b: any) =>
-                  new Date(String(b.createdAt ?? b.observedAt ?? "")).getTime() -
-                  new Date(String(a.createdAt ?? a.observedAt ?? "")).getTime(),
-              )
-          : [];
-        const latestMedicine = previousMedicines[0];
-        if (latestMedicine) {
-          const latestMedicationId =
-            latestMedicine.medicationId ||
-            latestMedicine.medication?.id ||
-            undefined;
-          const latestReportedName = String(
-            latestMedicine.reportedMedicationName ?? "",
-          ).trim();
-          setMedication({
-            medicationId: latestMedicationId ? String(latestMedicationId) : undefined,
-            reportedMedicationName: latestReportedName || undefined,
-            medicationImproved:
-              latestMedicine.improved === true
-                ? true
-                : latestMedicine.improved === false
-                  ? false
-                  : undefined,
-          });
-        }
-
         const name = loaded.symptoms?.[0]?.symptom?.name ?? loaded.title ?? "";
         if (name) {
           const refs = await healthJournalService.searchSymptomReference({ search: name, limit: 5 });
@@ -129,14 +97,6 @@ export default function MonitorSymptomPage({ params }: { params: Promise<{ id: s
       active = false;
     };
   }, [params]);
-
-  const activeMedications = useMemo(() => {
-    const values = dashboard?.today?.activeMedications ?? dashboard?.medications ?? [];
-    return Array.isArray(values) ? values.filter((medication: any) => {
-      const status = String(medication?.status ?? "ACTIVE").toUpperCase();
-      return status === "ACTIVE" || status === "PAUSED";
-    }) : [];
-  }, [dashboard]);
 
   const symptomName = String(record?.symptoms?.[0]?.symptom?.name || record?.title || "symptom");
   const lastSeverity = String(record?.monitorings?.[record.monitorings.length - 1]?.severity || record?.overallSeverity || "MILD");
@@ -261,7 +221,6 @@ export default function MonitorSymptomPage({ params }: { params: Promise<{ id: s
 
             <div>
               <SymptomMedicationPicker
-                activeMedications={activeMedications}
                 recentMedications={Array.isArray(record?.medicationEffects) ? record.medicationEffects : []}
                 value={medication}
                 onChange={setMedication}
