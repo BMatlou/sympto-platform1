@@ -64,6 +64,11 @@ export class MonitorSymptomDto {
 
   @IsOptional()
   @IsString()
+  @MaxLength(300)
+  reportedMedicationName?: string;
+
+  @IsOptional()
+  @IsString()
   @MaxLength(36)
   medicationId?: string;
 
