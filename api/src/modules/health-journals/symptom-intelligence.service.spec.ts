@@ -34,6 +34,7 @@ describe('SymptomIntelligenceService', () => {
 
     const draft = infer(
       'I have had a moderate headache since yesterday and it gets worse when I work.',
+      [{ name: 'Headache', description: 'Also known as: Cephalgia', common: true }],
     );
 
     expect(draft.symptomName).toBe('Headache');
@@ -43,6 +44,20 @@ describe('SymptomIntelligenceService', () => {
     expect(draft.followUpQuestion).toBe(
       'Is there anything that makes it better or worse?',
     );
+  });
+
+
+
+  it('resolves natural patient wording to a seeded symptom without a hardcoded symptom map', () => {
+    const draft = infer(
+      'I am feeling pain on my lower back',
+      [
+        { name: 'Back pain', description: 'Also known as: Dorsalgia', common: true },
+        { name: 'Headache', description: 'Also known as: Cephalgia', common: true },
+      ],
+    );
+
+    expect(draft.symptomName).toBe('Back pain');
   });
 
   it('does not suppress a safety signal merely because the user mentions a past event', () => {
