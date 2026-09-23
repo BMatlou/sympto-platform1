@@ -81,6 +81,10 @@ class HealthJournalService {
     recurring?: boolean;
     suspectedTrigger?: string;
     triggerDetails?: string;
+    triggerConfirmed?: boolean;
+    triggerExposureAt?: string;
+    occurredBeforeHours?: number;
+    triggerNotes?: string;
     aggravatingFactors?: string;
     relievingFactors?: string;
     details?: string;
@@ -89,6 +93,11 @@ class HealthJournalService {
     medicationImproved?: boolean;
     medicationEffectiveness?: number;
     medicationSideEffects?: string;
+    medicationImprovementPercentage?: number;
+    medicationStartedAt?: string;
+    medicationImprovementObservedAt?: string;
+    medicationStoppedAt?: string;
+    medicationNotes?: string;
   }): Promise<SymptomIntelligenceResult> {
     const { data } = await api.post("/health-journals/process-symptom", dto);
     return data.data;
