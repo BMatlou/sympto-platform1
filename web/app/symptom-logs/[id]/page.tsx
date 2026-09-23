@@ -272,7 +272,7 @@ export default function SymptomLogDetailPage({ params }: { params: Promise<{ id:
                     ["Baseline", human(intelligence.metrics?.baselineSeverity)],
                     ["Latest", human(intelligence.metrics?.latestSeverity)],
                     ["Updates", String(intelligence.metrics?.monitoringUpdates ?? 0)],
-                    ["Last 90 days", String(intelligence.metrics?.previous90DayOccurrences ?? 0)],
+                    ["Other episodes · 90 days", String(intelligence.metrics?.previous90DayOccurrences ?? 0)],
                   ].map(([label, value]) => (
                     <div key={label} className="rounded-2xl bg-white p-4 ring-1 ring-slate-200">
                       <p className="text-[10px] font-black uppercase tracking-[0.12em] text-slate-400">{label}</p>
