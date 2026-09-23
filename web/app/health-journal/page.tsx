@@ -126,41 +126,6 @@ export default function HealthJournalPage() {
     <Link href="/dashboard" className="inline-flex items-center gap-2 text-sm font-bold text-[#0b2d54]"><ArrowLeft className="h-4 w-4"/>Back to My Health</Link>
     <header className="mt-4 overflow-hidden rounded-[32px] bg-gradient-to-br from-[#08284a] via-[#0d4771] to-[#24babe] p-6 text-white shadow-[0_18px_50px_rgba(11,45,84,0.10)] sm:p-8"><div className="flex items-end justify-between gap-4"><div><p className="text-[10px] font-black uppercase tracking-[0.2em] text-white/65">My history</p><h1 className="mt-2 text-3xl font-black tracking-[-0.04em]">Your health story</h1><p className="mt-2 text-sm leading-6 text-white/75">A cleaner view of meaningful health activity, newest first.</p></div><Link href="/log-symptom" className="hidden min-h-11 items-center gap-2 rounded-xl bg-white px-4 text-xs font-black text-[#0b2d54] sm:inline-flex"><HeartPulse className="h-4 w-4"/>Add update</Link></div><div className="mt-5 inline-flex rounded-full bg-white/10 px-3 py-1.5 text-xs font-bold">{events.length} meaningful events</div></header>
 
-    {symptomError && symptomFeed.length === 0 && (
-      <div className="mt-4 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
-        <span className="font-bold">Symptoms could not be loaded.</span> Your symptom records are still stored; refresh this page after the health record service reconnects.
-      </div>
-    )}
-
-    {symptomFeed.filter((s: any) => String(s?.status ?? "").toUpperCase() === "ACTIVE").length > 0 && (
-      <section className="mt-5 rounded-[28px] border border-[#24c1c4]/20 bg-white p-5 shadow-[0_12px_35px_rgba(11,45,84,0.05)] sm:p-6">
-        <div className="flex items-center justify-between gap-3">
-          <div>
-            <p className="text-[10px] font-black uppercase tracking-[0.16em] text-[#24aeb3]">Needs your attention</p>
-            <h2 className="mt-1 text-xl font-black text-[#0b2d54]">Active symptoms</h2>
-            <p className="mt-1 text-sm leading-6 text-slate-500">Open a symptom to review its history or record the latest change.</p>
-          </div>
-          <Activity className="h-5 w-5 text-[#24c1c4]" />
-        </div>
-        <div className="mt-4 space-y-3">
-          {symptomFeed.filter((s: any) => String(s?.status ?? "").toUpperCase() === "ACTIVE").slice(0, 5).map((s: any) => (
-            <div key={String(s.id)} className="flex flex-col gap-3 rounded-2xl bg-[#f8fbfb] p-4 ring-1 ring-[#e1edef] sm:flex-row sm:items-center sm:justify-between">
-              <div className="min-w-0">
-                <p className="text-sm font-black text-[#0b2d54]">{s.title || "Symptom"}</p>
-                <p className="mt-1 text-xs font-semibold text-slate-500">
-                  Current severity · {human(s.overallSeverity)}{s.startedAt ? ` · Started ${dayLabel(String(s.startedAt))}` : ""}
-                </p>
-              </div>
-              <div className="flex shrink-0 gap-2">
-                <Link href={`/symptom-logs/${encodeURIComponent(String(s.id))}`} className="inline-flex min-h-10 items-center justify-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3 py-2 text-[10px] font-black text-[#0b2d54]">Check history <ArrowRight className="h-3 w-3" /></Link>
-                <Link href={`/symptom-logs/${encodeURIComponent(String(s.id))}/monitor`} className="inline-flex min-h-10 items-center justify-center gap-1.5 rounded-xl bg-[#0b2d54] px-3 py-2 text-[10px] font-black text-white">Update <ArrowRight className="h-3 w-3 text-[#24c1c4]" /></Link>
-              </div>
-            </div>
-          ))}
-        </div>
-      </section>
-    )}
-
     <section className="mt-5 grid gap-4 sm:grid-cols-3"><div className="rounded-[24px] border border-slate-200 bg-white p-5 shadow-[0_12px_35px_rgba(11,45,84,0.05)]"><p className="text-[10px] font-black uppercase tracking-[0.14em] text-slate-400">Total history</p><p className="mt-2 text-3xl font-black text-[#0b2d54]">{events.length}</p><p className="mt-1 text-xs text-slate-500">Meaningful activity items</p></div><div className="rounded-[24px] border border-slate-200 bg-white p-5 shadow-[0_12px_35px_rgba(11,45,84,0.05)]"><p className="text-[10px] font-black uppercase tracking-[0.14em] text-slate-400">Journal</p><p className="mt-2 text-3xl font-black text-[#0b2d54]">{journalCount}</p><p className="mt-1 text-xs text-slate-500">Personal and guided entries</p></div><div className="rounded-[24px] border border-slate-200 bg-white p-5 shadow-[0_12px_35px_rgba(11,45,84,0.05)]"><p className="text-[10px] font-black uppercase tracking-[0.14em] text-slate-400">Measurements</p><p className="mt-2 text-3xl font-black text-[#0b2d54]">{measurementCount}</p><p className="mt-1 text-xs text-slate-500">Vitals, weight and connected readings</p></div></section>
 
     <section className="mt-5 rounded-[26px] border border-[#24c1c4]/20 bg-white p-5 shadow-[0_12px_35px_rgba(11,45,84,0.04)] sm:p-6"><div className="flex items-start gap-3"><div className="grid h-10 w-10 shrink-0 place-items-center rounded-2xl bg-[#24c1c4]/10 text-[#0b2d54]"><Sparkles className="h-5 w-5"/></div><div><h2 className="font-black text-[#0b2d54]">How your history works</h2><p className="mt-1 max-w-3xl text-sm leading-6 text-slate-500">Symptom logs, journal entries, vitals, weight updates and connected measurements are brought into one timeline. Open an item to jump to the record behind it.</p></div></div></section>
