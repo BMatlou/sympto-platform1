@@ -146,6 +146,11 @@ class HealthJournalService {
       aggravatingFactors?: string;
       relievingFactors?: string;
       notes?: string;
+      medicationId?: string;
+      prescriptionId?: string;
+      medicationImproved?: boolean;
+      medicationEffectiveness?: number;
+      medicationSideEffects?: string;
     },
   ): Promise<SymptomMonitoringResult> {
     const { data } = await api.post(`/health-journals/symptoms/${id}/monitor`, dto);
