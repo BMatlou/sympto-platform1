@@ -488,16 +488,44 @@ export class SymptomIntelligenceService {
         },
       });
 
-      if (!stillPresent) {
+      const priorityRank: Record<string, number> = {
+        ROUTINE: 0,
+        LOW: 1,
+        MEDIUM: 2,
+        HIGH: 3,
+        URGENT: 4,
+        CRITICAL: 5,
+      };
+      const desiredPriority =
+        !stillPresent
+          ? 'ROUTINE'
+          : dto.severity === SymptomSeverity.SEVERE || dto.severity === SymptomSeverity.VERY_SEVERE
+            ? 'HIGH'
+            : progression === SymptomProgression.WORSENING
+              ? 'HIGH'
+              : 'ROUTINE';
+      const currentPriority = priorityRank[String(symptomLog.clinicalEpisode.priority)] ?? 0;
+      const nextPriority = priorityRank[desiredPriority] > currentPriority
+        ? desiredPriority
+        : String(symptomLog.clinicalEpisode.priority);
+
+      if (!stillPresent || priorityRank[desiredPriority] > currentPriority) {
         await tx.clinicalEpisode.update({
           where: { id: symptomLog.clinicalEpisodeId },
           data: {
-            status: ClinicalEpisodeStatus.RESOLVED,
-            resolvedAt: observedAt,
-            endedAt: observedAt,
+            priority: nextPriority,
+            ...(!stillPresent
+              ? {
+                  status: ClinicalEpisodeStatus.RESOLVED,
+                  resolvedAt: observedAt,
+                  endedAt: observedAt,
+                }
+              : {}),
           },
         });
       }
+
+      // Resolution and priority are handled together above.
 
       return { observation, updatedLog };
     });
@@ -516,13 +544,18 @@ export class SymptomIntelligenceService {
       console.warn('[SYMPTOM MONITORING GOAL] Unable to update metric:', goalError);
     }
 
+    const baselineSeverity =
+      symptomLog.symptoms[0]?.severity ??
+      symptomLog.overallSeverity ??
+      dto.severity;
+
     const allSeverities = [
-      symptomLog.overallSeverity,
+      baselineSeverity,
       ...symptomLog.monitorings.map((item) => item.severity),
       dto.severity,
     ].filter(Boolean) as SymptomSeverity[];
 
-    const firstSeverity = allSeverities[0] ?? dto.severity;
+    const firstSeverity = baselineSeverity;
     const highestScore = Math.max(...allSeverities.map(severityScore));
     const latestScore = severityScore(dto.severity);
     const baselineScore = severityScore(firstSeverity);
