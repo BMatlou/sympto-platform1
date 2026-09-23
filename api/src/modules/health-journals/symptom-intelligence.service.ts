@@ -5,6 +5,7 @@ import {
   SymptomLogStatus,
   SymptomSeverity,
   SymptomFrequency,
+  SymptomProgression,
 } from '@prisma/client';
 
 import { PrismaService } from '../../database/prisma.service';
