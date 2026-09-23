@@ -625,6 +625,85 @@ export class SymptomIntelligenceService {
     };
   }
 
+  async analyzeSymptomTimeline(patientId: string, symptomLog: any) {
+    const baseline = symptomLog.symptoms?.[0] ?? null;
+    const monitorings = Array.isArray(symptomLog.monitorings) ? symptomLog.monitorings : [];
+    const severityScore = (value: string | null | undefined) =>
+      value === SymptomSeverity.NONE ? 0 :
+      value === SymptomSeverity.MILD ? 1 :
+      value === SymptomSeverity.MODERATE ? 2 :
+      value === SymptomSeverity.SEVERE ? 3 :
+      value === SymptomSeverity.VERY_SEVERE ? 4 : 0;
+    const baselineSeverity = baseline?.severity ?? symptomLog.overallSeverity ?? SymptomSeverity.MILD;
+    const latestSeverity = monitorings.length > 0 ? monitorings[monitorings.length - 1].severity : baselineSeverity;
+    const baselineScore = severityScore(baselineSeverity);
+    const latestScore = severityScore(latestSeverity);
+    const direction = latestScore > baselineScore ? 'increased' : latestScore < baselineScore ? 'decreased' : 'remained similar';
+    const recurringSince = new Date(Date.now() - 90 * 86400000);
+    const previousLogs = await this.prisma.symptomLog.findMany({
+      where: { id: { not: symptomLog.id }, clinicalEpisode: { patientId }, title: { equals: symptomLog.title ?? '', mode: 'insensitive' }, startedAt: { gte: recurringSince } },
+      orderBy: { startedAt: 'desc' }, take: 20,
+      select: { id: true, startedAt: true, overallSeverity: true, status: true },
+    });
+    const context = await this.buildContext(patientId);
+    const patterns: string[] = [];
+    const associations: string[] = [];
+    const medicationInsights: string[] = [];
+    const dataGaps: string[] = [];
+    const nextQuestions: string[] = [];
+    if (monitorings.length === 0) {
+      patterns.push('There is only one baseline entry so far; there is not enough longitudinal data to establish a recurring pattern.');
+      dataGaps.push('Add another update when the symptom changes so Sympto can compare severity over time.');
+      nextQuestions.push('Has the symptom changed since you first recorded it?');
+    } else {
+      patterns.push('Recorded severity ' + direction + ' from ' + String(baselineSeverity).toLowerCase().replaceAll('_', ' ') + ' to ' + String(latestSeverity).toLowerCase().replaceAll('_', ' ') + ' across ' + monitorings.length + ' monitoring update' + (monitorings.length === 1 ? '' : 's') + '.');
+      const worseningCount = monitorings.filter((item: any) => item.progression === SymptomProgression.WORSENING).length;
+      const improvingCount = monitorings.filter((item: any) => item.progression === SymptomProgression.IMPROVING).length;
+      const fluctuatingCount = monitorings.filter((item: any) => item.progression === SymptomProgression.FLUCTUATING).length;
+      if (worseningCount > 1) patterns.push('Worsening was recorded ' + worseningCount + ' times.');
+      if (improvingCount > 1) patterns.push('Improvement was recorded ' + improvingCount + ' times.');
+      if (fluctuatingCount > 0) patterns.push('At least one monitoring update describes a fluctuating pattern.');
+      const latestTrigger = [...monitorings].reverse().find((item: any) => item.suspectedTrigger?.trim());
+      if (latestTrigger?.suspectedTrigger?.trim()) associations.push('Patient-reported possible trigger: ' + latestTrigger.suspectedTrigger.trim() + '. This is an observation, not confirmation that the trigger caused the symptom.');
+      const aggravators = monitorings.map((item: any) => item.aggravatingFactors?.trim()).filter(Boolean);
+      const relievers = monitorings.map((item: any) => item.relievingFactors?.trim()).filter(Boolean);
+      if (aggravators.length > 0) associations.push('What was reported as making it worse: ' + aggravators[aggravators.length - 1] + '.');
+      if (relievers.length > 0) associations.push('What was reported as making it better: ' + relievers[relievers.length - 1] + '.');
+      if (aggravators.length === 0 && relievers.length === 0) dataGaps.push('No consistent worse/better pattern has been recorded yet.');
+      if (monitorings.length < 3) dataGaps.push('More monitoring points are needed before a stable pattern can be established.');
+    }
+    if (previousLogs.length > 0) patterns.push('This symptom has been recorded ' + previousLogs.length + ' other time' + (previousLogs.length === 1 ? '' : 's') + ' in the last 90 days.');
+    for (const effect of symptomLog.medicationEffects ?? []) {
+      const medicationName = effect.medication?.name ?? effect.medication?.genericName ?? effect.medication?.brandName ?? 'Linked medicine';
+      const response = effect.improved == null ? 'no improvement response was recorded' : effect.improved ? 'improvement was reported (' + (effect.effectiveness ?? 'not rated') + '/10)' : 'no improvement was reported';
+      medicationInsights.push(medicationName + ': ' + response + '.');
+      if (effect.sideEffects?.trim()) medicationInsights.push(medicationName + ': patient-reported side effect — ' + effect.sideEffects.trim() + '.');
+    }
+    const latestVital = context.recentVitals[0];
+    if (latestVital) associations.push('A recent ' + latestVital.type + ' reading is linked to the wider health record (' + latestVital.value + '). Sympto does not infer that it caused or explains this symptom.');
+    if (context.upcomingAppointment) associations.push('An upcoming appointment is recorded for ' + context.upcomingAppointment.toLocaleDateString('en-ZA') + '.');
+    if (context.activeMedicationCount > 0) dataGaps.push('Medication context is available, but medicine response should be recorded over time rather than assumed.');
+    let ai: AILongitudinalInsight | null = null;
+    try {
+      ai = await this.symptomAi.analyzeLongitudinalTimeline({
+        symptomName: symptomLog.title ?? 'Symptom',
+        baseline: { severity: baselineSeverity, startedAt: new Date(symptomLog.startedAt).toISOString(), location: baseline?.location ?? null, notes: baseline?.notes ?? symptomLog.notes ?? null },
+        monitoring: monitorings.map((item: any) => ({ observedAt: new Date(item.observedAt).toISOString(), severity: item.severity, progression: item.progression ?? null, suspectedTrigger: item.suspectedTrigger ?? null, aggravatingFactors: item.aggravatingFactors ?? null, relievingFactors: item.relievingFactors ?? null, notes: item.notes ?? null })),
+        medicationEffects: (symptomLog.medicationEffects ?? []).map((effect: any) => ({ medication: effect.medication?.name ?? effect.medication?.genericName ?? effect.medication?.brandName ?? 'Linked medicine', improved: effect.improved ?? null, effectiveness: effect.effectiveness ?? null, sideEffects: effect.sideEffects ?? null })),
+        connectedContext: { activeMedicationCount: context.activeMedicationCount, activeConditionCount: context.conditionCount, activeGoalCount: context.activeGoalCount, recentVitals: context.recentVitals.slice(0, 8).map((vital) => ({ type: vital.type, value: vital.value, measuredAt: new Date(vital.measuredAt).toISOString() })) },
+      });
+    } catch { ai = null; }
+    return {
+      source: ai ? 'AI' as const : 'RULES' as const,
+      summary: ai?.summary ?? (monitorings.length === 0 ? (symptomLog.title ?? 'This symptom') + ' has a baseline record. Sympto will look for meaningful changes as you add monitoring updates.' : (symptomLog.title ?? 'This symptom') + ' has ' + monitorings.length + ' monitoring update' + (monitorings.length === 1 ? '' : 's') + '. Recorded severity has ' + direction + ' from baseline.'),
+      patterns: ai?.patterns?.length ? ai.patterns : patterns.slice(0, 5),
+      associations: ai?.associations?.length ? ai.associations : associations.slice(0, 5),
+      medicationInsights: ai?.medicationInsights?.length ? ai.medicationInsights : medicationInsights.slice(0, 5),
+      dataGaps: ai?.dataGaps?.length ? ai.dataGaps : dataGaps.slice(0, 5),
+      nextQuestions: ai?.nextQuestions?.length ? ai.nextQuestions : nextQuestions.slice(0, 3),
+      metrics: { baselineSeverity, latestSeverity, monitoringUpdates: monitorings.length, previous90DayOccurrences: previousLogs.length, severityChange: latestScore - baselineScore },
+    };
+  }
   async analyzeTalkUpdate(userId: string, message: string): Promise<
     TalkToSymptoAnalysis & {
       assessment: SymptomIntelligenceResult['assessment'];
