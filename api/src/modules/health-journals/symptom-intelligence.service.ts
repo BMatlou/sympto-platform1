@@ -1194,7 +1194,7 @@ export class SymptomIntelligenceService {
     }
 
     if (context.activeMedicationCount > 0) {
-      insights.push(`Your ${context.activeMedicationCount} active medication record${context.activeMedicationCount === 1 ? '' : 's'} is part of the context available for follow-up.`);
+      insights.push(`Your ${context.activeMedicationCount} active medication record${context.activeMedicationCount === 1 ? '' : 's'} ${context.activeMedicationCount === 1 ? 'is' : 'are'} part of the context available for follow-up.`);
     }
 
     if (context.conditionCount > 0 || context.allergyCount > 0) {
