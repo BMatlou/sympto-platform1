@@ -173,6 +173,7 @@ export default function AIHealthHelperFab() {
     params.set("symptom", draft.symptomName);
     if (draft.severity) params.set("severity", draft.severity);
     if (draft.onsetLabel) params.set("started", draft.onsetLabel);
+    if (draft.location) params.set("location", draft.location);
 
     return `/log-symptom?${params.toString()}`;
   }, [talkResult]);
@@ -374,6 +375,23 @@ export default function AIHealthHelperFab() {
                       </p>
                     </div>
                   </div>
+
+                  {talkResult.intelligence.draft.location && (
+                    <p className="mt-3 text-xs font-semibold text-slate-600">
+                      Location · {talkResult.intelligence.draft.location}
+                    </p>
+                  )}
+
+                  {talkResult.intelligence.draft.followUpQuestion && (
+                    <div className="mt-3 rounded-xl bg-white p-3 ring-1 ring-slate-200">
+                      <p className="text-[9px] font-black uppercase tracking-[0.12em] text-slate-400">
+                        Sympto needs one more detail
+                      </p>
+                      <p className="mt-1 text-sm font-bold leading-5 text-[#0b2d54]">
+                        {talkResult.intelligence.draft.followUpQuestion}
+                      </p>
+                    </div>
+                  )}
 
                   <p className="mt-3 text-xs leading-5 text-slate-500">
                     Sympto will not silently turn an inferred symptom into a medical record. Review the structured form first, then save it yourself.
