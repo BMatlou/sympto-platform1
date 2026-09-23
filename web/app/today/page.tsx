@@ -14,6 +14,7 @@ import TodayAlcoholGoal from "@/components/today/today-alcohol-goal";
 import TodayWeightGoal from "@/components/today/today-weight-goal";
 import TodayExerciseGoal from "@/components/today/today-exercise-goal";
 import TodaySupportedGoalCard from "@/components/today/today-supported-goal-card";
+import { healthJournalService } from "@/services/health-journal.service";
 
 const ACTIVE_GOAL_STATUSES = new Set(["IN_PROGRESS", "ACTIVE", "ON_TRACK", "IMPROVING", "STAGNANT", "DECLINING"]);
 
@@ -138,6 +139,23 @@ function medicationGoalFor(medication: any, goals: any[], medicationCount: numbe
 
 export default function TodayPage() {
   const { data, loading, error, reload } = useDashboard();
+  const [symptomFeed, setSymptomFeed] = useState<any[]>([]);
+
+  useEffect(() => {
+    let active = true;
+    healthJournalService
+      .getSymptoms({ limit: 100 })
+      .then((records) => {
+        if (active) setSymptomFeed(Array.isArray(records) ? records : []);
+      })
+      .catch((error) => {
+        console.warn("Could not load Today symptom feed:", error);
+        if (active) setSymptomFeed([]);
+      });
+    return () => {
+      active = false;
+    };
+  }, []);
 
   useEffect(() => {
     if (loading || error || !data || typeof window === "undefined") return;
@@ -192,7 +210,7 @@ export default function TodayPage() {
   const firstName = data.patient?.firstName || data.profile?.preferredName || "there";
   const medications = data.today?.activeMedications ?? [];
   const appointments = data.today?.upcomingAppointments ?? [];
-  const activeSymptoms = (Array.isArray(data.symptoms) ? data.symptoms : []).filter(
+  const activeSymptoms = (Array.isArray(symptomFeed) ? symptomFeed : []).filter(
     (symptom: any) => String(symptom?.status ?? "").toUpperCase() === "ACTIVE",
   );
   const allGoals = data.activeGoalsArray ?? data.goals ?? data.healthGoals ?? [];
