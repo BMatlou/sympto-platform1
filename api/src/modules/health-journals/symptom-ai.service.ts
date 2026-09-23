@@ -13,6 +13,7 @@ export interface AIUnderstandingDraft {
   progression: SymptomProgression | null;
   painScore: number | null;
   location: string | null;
+  medicationName: string | null;
   followUpQuestion: string | null;
 }
 
@@ -56,7 +57,7 @@ export class SymptomAiService {
             {
               role: 'system',
               content:
-                'You are Sympto symptom-structure extraction only. Do not diagnose, rank diseases, infer causes, or provide treatment advice. Extract only information explicitly stated by the user. Return JSON with keys symptomName, severity, onsetLabel, progression, painScore, location, followUpQuestion. severity must be MILD, MODERATE, SEVERE, or null. progression must be IMPROVING, STABLE, WORSENING, FLUCTUATING, or null. onsetLabel must be Today, Yesterday, A few days ago, More than a week ago, or I am not sure. painScore must be 0-10 or null. Ask at most one concise follow-up question for the most important missing symptom field.',
+                'You are Sympto symptom-structure extraction only. Do not diagnose, rank diseases, infer causes, or provide treatment advice. Extract only information explicitly stated by the user. Return JSON with keys symptomName, severity, onsetLabel, progression, painScore, location, medicationName, followUpQuestion. severity must be MILD, MODERATE, SEVERE, or null. progression must be IMPROVING, STABLE, WORSENING, FLUCTUATING, or null. onsetLabel must be Today, Yesterday, A few days ago, More than a week ago, or I am not sure. painScore must be 0-10 or null. Extract a medicationName only when the user explicitly says they took, used, or were taking a medicine. Do not infer that a medicine was prescribed. Ask at most one concise follow-up question for the most important missing symptom field.',
             },
             {
               role: 'user',
@@ -114,6 +115,10 @@ export class SymptomAiService {
         location:
           typeof parsed?.location === 'string' && parsed.location.trim()
             ? parsed.location.trim().slice(0, 300)
+            : null,
+        medicationName:
+          typeof parsed?.medicationName === 'string' && parsed.medicationName.trim()
+            ? parsed.medicationName.trim().slice(0, 300)
             : null,
         followUpQuestion:
           typeof parsed?.followUpQuestion === 'string' &&
