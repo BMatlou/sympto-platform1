@@ -111,6 +111,46 @@ export class SymptomIntelligenceService {
     const severeSymptom = dto.severity === SymptomSeverity.SEVERE || dto.severity === SymptomSeverity.VERY_SEVERE;
     const episodePriority = urgentWarningSign ? 'URGENT' : severeSymptom ? 'HIGH' : 'ROUTINE';
 
+    if (dto.prescriptionId && !dto.medicationId) {
+      throw new BadRequestException('A prescription can only be linked when a medicine is selected.');
+    }
+
+    if (dto.medicationId) {
+      const medication = await this.prisma.medication.findUnique({
+        where: { id: dto.medicationId },
+        select: { id: true },
+      });
+      if (!medication) {
+        throw new BadRequestException('Selected medication could not be found.');
+      }
+
+      const patientMedication = patient.healthPassport?.id
+        ? await this.prisma.patientMedication.findFirst({
+            where: {
+              healthPassportId: patient.healthPassport.id,
+              medicationId: dto.medicationId,
+            },
+            select: { id: true },
+          })
+        : null;
+
+      if (!patientMedication) {
+        throw new BadRequestException('Selected medication is not on this patient’s medication record.');
+      }
+    }
+
+    if (dto.prescriptionId) {
+      const prescription = await this.prisma.prescription.findFirst({
+        where: {
+          id: dto.prescriptionId,
+          patientId: patient.id,
+          ...(dto.medicationId ? { items: { some: { medicationId: dto.medicationId } } } : {}),
+        },
+        select: { id: true },
+      });
+      if (!prescription) throw new BadRequestException('Selected prescription does not belong to this patient.');
+    }
+
     let episode = await this.prisma.clinicalEpisode.findFirst({
       where: {
         patientId: patient.id,
@@ -199,45 +239,7 @@ export class SymptomIntelligenceService {
     const context = await this.buildContext(patient.id);
     const analysis = this.evaluateContext(symptomName, dto.severity, dto.details, dto.progression, context);
 
-    if (dto.prescriptionId && !dto.medicationId) {
-      throw new BadRequestException('A prescription can only be linked when a medicine is selected.');
-    }
 
-    if (dto.medicationId) {
-      const medication = await this.prisma.medication.findUnique({
-        where: { id: dto.medicationId },
-        select: { id: true },
-      });
-      if (!medication) {
-        throw new BadRequestException('Selected medication could not be found.');
-      }
-
-      const patientMedication = patient.healthPassport?.id
-        ? await this.prisma.patientMedication.findFirst({
-            where: {
-              healthPassportId: patient.healthPassport.id,
-              medicationId: dto.medicationId,
-            },
-            select: { id: true },
-          })
-        : null;
-
-      if (!patientMedication) {
-        throw new BadRequestException('Selected medication is not on this patient’s medication record.');
-      }
-    }
-
-    if (dto.prescriptionId) {
-      const prescription = await this.prisma.prescription.findFirst({
-        where: {
-          id: dto.prescriptionId,
-          patientId: patient.id,
-          ...(dto.medicationId ? { items: { some: { medicationId: dto.medicationId } } } : {}),
-        },
-        select: { id: true },
-      });
-      if (!prescription) throw new BadRequestException('Selected prescription does not belong to this patient.');
-    }
 
     const symptomLog = await this.prisma.$transaction(async (tx) => {
       const log = await tx.symptomLog.create({
