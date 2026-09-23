@@ -197,7 +197,7 @@ export class SymptomIntelligenceService {
     }
 
     const context = await this.buildContext(patient.id);
-    const analysis = this.evaluateContext(symptomName, dto.severity, dto.details, context);
+    const analysis = this.evaluateContext(symptomName, dto.severity, dto.details, dto.progression, context);
 
     if (dto.prescriptionId && !dto.medicationId) {
       throw new BadRequestException('A prescription can only be linked when a medicine is selected.');
@@ -693,7 +693,6 @@ export class SymptomIntelligenceService {
 
   private detectSafetySignals(text: string): string[] {
     const normalized = text.toLowerCase().replace(/\s+/g, ' ').trim();
-    const historical = /\b(last year|years ago|months ago|previously|in 20\d{2})\b/.test(normalized);
 
     const rules: Array<[string, RegExp]> = [
       ['Chest pain, pressure, tightness or heaviness', /\b(chest\s+(pain|pressure|tightness|heaviness)|heavy\s+chest|pressure\s+in\s+(my\s+)?chest|tightness\s+in\s+(my\s+)?chest)\b/],
@@ -708,7 +707,7 @@ export class SymptomIntelligenceService {
     ];
 
     return rules
-      .filter(([, pattern]) => pattern.test(normalized) && !historical)
+      .filter(([, pattern]) => pattern.test(normalized))
       .map(([label]) => label);
   }
 
@@ -798,11 +797,13 @@ export class SymptomIntelligenceService {
     symptomName: string,
     severity: SymptomSeverity,
     details: string | undefined,
+    progression: SymptomProgression | undefined,
     context: Awaited<ReturnType<SymptomIntelligenceService['buildContext']>>,
   ) {
     const normalized = `${symptomName} ${details ?? ''}`.toLowerCase();
     const urgent = this.detectSafetySignals(normalized).length > 0;
     const severe = severity === SymptomSeverity.SEVERE || severity === SymptomSeverity.VERY_SEVERE;
+    const worsening = progression === SymptomProgression.WORSENING;
 
     const insights: string[] = [];
     const actions: SymptomIntelligenceAction[] = [];
@@ -868,7 +869,7 @@ export class SymptomIntelligenceService {
 
     return {
       assessment: {
-        tone: urgent ? ('urgent' as const) : severe || insights.length > 1 ? ('watch' as const) : ('calm' as const),
+        tone: urgent ? ('urgent' as const) : severe || worsening ? ('watch' as const) : ('calm' as const),
         title: urgent ? 'Please get urgent help' : severe ? 'Symptom recorded — keep a closer watch' : 'Symptom connected to your health context',
         message: urgent
           ? 'This is safety guidance, not a diagnosis. Please seek appropriate medical care when needed.'
