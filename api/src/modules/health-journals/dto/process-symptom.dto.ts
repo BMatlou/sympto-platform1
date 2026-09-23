@@ -8,6 +8,7 @@ import {
   IsString,
   IsUUID,
   Max,
+  MaxLength,
   Min,
 } from 'class-validator';
 import {
@@ -21,6 +22,11 @@ export class ProcessSymptomDto {
   @IsString()
   @MinLength(2)
   symptomName!: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(300)
+  location?: string;
 
   @IsEnum(SymptomSeverity)
   severity!: SymptomSeverity;
