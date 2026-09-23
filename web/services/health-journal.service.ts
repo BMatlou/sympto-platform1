@@ -50,8 +50,17 @@ export type SymptomIntelligenceResult = {
 };
 
 export type TalkToSymptoResult = {
-  journal: HealthJournal;
+  journal: HealthJournal | null;
   intelligence: {
+    inputType: "SYMPTOM" | "URGENT_CONCERN" | "GENERAL_HEALTH";
+    draft: {
+      symptomName: string | null;
+      severity: string | null;
+      onsetLabel: "Today" | "Yesterday" | "A few days ago" | "More than a week ago" | "I am not sure";
+      progression: string | null;
+      painScore: number | null;
+    };
+    safetySignals: string[];
     assessment: SymptomIntelligenceResult["assessment"];
     insights: string[];
     actions: Array<{ label: string; href: string }>;
