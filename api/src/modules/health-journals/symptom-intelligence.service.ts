@@ -735,10 +735,38 @@ export class SymptomIntelligenceService {
     const context = await this.buildContext(patient.id);
     const normalized = message.trim().toLowerCase();
     const safetySignals = this.detectSafetySignals(normalized);
-    const ruleDraft = this.inferTalkDraft(normalized);
+
+    // Talk to Sympto uses the application's seeded symptom vocabulary as the
+    // canonical clinical language. AI can extract wording, but the final
+    // symptom name is resolved back to a seeded Symptom row.
+    const seededSymptoms = await this.prisma.symptom.findMany({
+      where: {
+        active: true,
+        searchable: true,
+      },
+      select: {
+        name: true,
+        description: true,
+        common: true,
+      },
+      orderBy: [
+        { common: 'desc' },
+        { name: 'asc' },
+      ],
+    });
+
+    const ruleDraft = this.inferTalkDraft(normalized, seededSymptoms);
     const aiDraft = await this.symptomAi.understand(message.trim());
+    const aiSymptom = aiDraft?.symptomName
+      ? this.matchSeededSymptom(aiDraft.symptomName, seededSymptoms)
+      : null;
+    const canonicalSymptomName =
+      ruleDraft.symptomName ??
+      aiSymptom?.name ??
+      null;
+
     const draft: TalkToSymptoDraft = {
-      symptomName: ruleDraft.symptomName ?? aiDraft?.symptomName,
+      symptomName: canonicalSymptomName,
       severity: aiDraft?.severity ?? ruleDraft.severity,
       onsetLabel: aiDraft?.onsetLabel ?? ruleDraft.onsetLabel,
       progression: aiDraft?.progression ?? ruleDraft.progression,
@@ -1065,67 +1093,60 @@ export class SymptomIntelligenceService {
       .map(([label]) => label);
   }
 
-  private inferTalkDraft(text: string): TalkToSymptoDraft {
+  private inferTalkDraft(
+    text: string,
+    seededSymptoms: Array<{
+      name: string;
+      description: string | null;
+      common: boolean;
+    }>,
+  ): TalkToSymptoDraft {
     const normalized = text.toLowerCase().replace(/\s+/g, ' ').trim();
 
-    const symptomPatterns: Array<[RegExp, string]> = [
-      [/\b(shortness of breath|breathlessness|breathless|out of breath)\b/, 'Shortness of breath'],
-      [/\b(chest pain|chest pressure|chest tightness|heavy chest)\b/, 'Chest discomfort'],
-      [/\b(headache|head pain|migraine)\b/, 'Headache'],
-      [/\b(sore throat|throat pain)\b/, 'Sore throat'],
-      [/\b(cough|coughing)\b/, 'Cough'],
-      [/\b(feeling sick|nausea|nauseous)\b/, 'Nausea'],
-      [/\b(vomiting|vomit|throwing up|threw up)\b/, 'Vomiting'],
-      [/\b(diarrhea|diarrhoea)\b/, 'Diarrhea'],
-      [/\b(constipation|constipated)\b/, 'Constipation'],
-      [/\b(dizzy|dizziness|light[- ]headed|lightheaded)\b/, 'Dizziness'],
-      [/\b(rash|hives|skin rash)\b/, 'Rash'],
-      [/\b(fever|high temperature|temperature)\b/, 'Fever'],
-      [/\b(stomach pain|abdominal pain|belly pain|stomach ache|belly ache)\b/, 'Abdominal pain'],
-            [/\b(lower back pain|pain (?:in|on|around) (?:my )?lower back|my lower back (?:hurts?|aches?)|lower back (?:hurts?|aches?)\b/, 'Back pain'],
-      [/\b(upper back pain|pain (?:in|on|around) (?:my )?upper back|my upper back (?:hurts?|aches?)|upper back (?:hurts?|aches?)\b/, 'Back pain'],
-      [/\b(middle back pain|pain (?:in|on|around) (?:my )?middle back|my middle back (?:hurts?|aches?)|middle back (?:hurts?|aches?)\b/, 'Back pain'],
-      [/\b(back pain|backache|back ache)\b/, 'Back pain'],
-      [/\b(joint pain|joint ache)\b/, 'Joint pain'],
-      [/\b(fatigue|extremely tired|very tired|tired all the time|feeling tired|feel tired)\b/, 'Fatigue'],
-      [/\b(heart racing|heart pounding|palpitations)\b/, 'Palpitations'],
-      [/\b(runny nose|blocked nose|stuffy nose|nasal congestion)\b/, 'Nasal congestion'],
-      [/\b(ear pain|earache|ear ache)\b/, 'Ear pain'],
-      [/\b(tooth pain|toothache|tooth ache)\b/, 'Tooth pain'],
-    ];
+    const stopWords = new Set([
+      'a', 'an', 'and', 'are', 'as', 'at', 'be', 'been', 'but', 'by', 'for',
+      'from', 'had', 'has', 'have', 'i', 'in', 'is', 'it', 'me', 'my', 'of',
+      'on', 'or', 'the', 'this', 'to', 'was', 'with', 'you',
+    ]);
 
-    let symptomName: string | null = null;
-    for (const [pattern, name] of symptomPatterns) {
-      if (pattern.test(normalized)) {
-        symptomName = name;
-        break;
+    const normalizePhrase = (value: string) =>
+      value
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, ' ')
+        .replace(/\s+/g, ' ')
+        .trim();
+
+    const tokens = (value: string) =>
+      normalizePhrase(value)
+        .split(' ')
+        .filter((token) => token.length >= 2 && !stopWords.has(token));
+
+    const messageTokens = new Set(tokens(normalized));
+
+    const synonymVariants = (reference: {
+      name: string;
+      description: string | null;
+    }) => {
+      const variants = [reference.name];
+      const description = String(reference.description ?? '');
+      const synonymText = description.match(/^Also known as:\s*(.+)$/i)?.[1];
+      if (synonymText) {
+        variants.push(
+          ...synonymText
+            .split(',')
+            .map((value) => value.trim())
+            .filter(Boolean),
+        );
       }
-    }
+      return variants;
+    };
 
-    let location: string | null = null;
-
-    const locatedPainPatterns: Array<{ pattern: RegExp; symptom: string; location: string }> = [
-      { pattern: /\b(?:pain|ache|aching|hurts?)\s+(?:in|on|around)\s+(?:my\s+)?(lower back)\b/, symptom: 'Back pain', location: 'Lower back' },
-      { pattern: /\b(?:pain|ache|aching|hurts?)\s+(?:in|on|around)\s+(?:my\s+)?(upper back)\b/, symptom: 'Back pain', location: 'Upper back' },
-      { pattern: /\b(?:pain|ache|aching|hurts?)\s+(?:in|on|around)\s+(?:my\s+)?(middle back)\b/, symptom: 'Back pain', location: 'Middle back' },
-      { pattern: /\b(?:pain|ache|aching|hurts?)\s+(?:in|on|around)\s+(?:my\s+)?(left side of (?:my )?back)\b/, symptom: 'Back pain', location: 'Left side of back' },
-      { pattern: /\b(?:pain|ache|aching|hurts?)\s+(?:in|on|around)\s+(?:my\s+)?(right side of (?:my )?back)\b/, symptom: 'Back pain', location: 'Right side of back' },
-      { pattern: /\bmy\s+(lower back|upper back|middle back)\s+(?:hurts?|aches?)\b/, symptom: 'Back pain', location: '$1' },
-      { pattern: /\b(?:pain|ache|aching)\s+(?:in|on|around)\s+(?:my\s+)?(knee|shoulder|neck|wrist|hip|ankle|elbow|leg|arm|foot|hand)\b/, symptom: 'LOCATION pain', location: '$1' },
-    ];
-
-    for (const entry of locatedPainPatterns) {
-      const match = normalized.match(entry.pattern);
-      if (!match) continue;
-
-      symptomName = entry.symptom === 'LOCATION pain'
-        ? `${match[1].replace(/^./, c => c.toUpperCase())} pain`
-        : entry.symptom;
-      location = entry.location.includes('$1')
-        ? entry.location.replace('$1', match[1])
-        : entry.location;
-      break;
-    }
+    const match = this.matchSeededSymptom(
+      normalized,
+      seededSymptoms,
+      messageTokens,
+      synonymVariants,
+    );
 
     const severity =
       /\b(excruciating|unbearable|severe|very severe|worst|can't function|cannot function)\b/.test(normalized)
@@ -1166,24 +1187,98 @@ export class SymptomIntelligenceService {
     }
 
     return {
-      symptomName,
+      symptomName: match?.name ?? null,
       severity,
       onsetLabel,
       progression,
       painScore,
-      location,
+      location: null,
       medicationName,
       followUpQuestion:
-        symptomName && !severity
+        match && !severity
           ? 'How strong is it right now?'
-          : symptomName && onsetLabel === 'I am not sure'
+          : match && onsetLabel === 'I am not sure'
             ? 'When did it start?'
-            : symptomName
+            : match
               ? 'Is there anything that makes it better or worse?'
               : null,
     };
   }
 
+  private matchSeededSymptom(
+    text: string,
+    seededSymptoms: Array<{
+      name: string;
+      description: string | null;
+      common: boolean;
+    }>,
+    suppliedTokens?: Set<string>,
+    variantResolver?: (
+      reference: { name: string; description: string | null },
+    ) => string[],
+  ) {
+    const normalized = text.toLowerCase().replace(/\s+/g, ' ').trim();
+    const normalizePhrase = (value: string) =>
+      value
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, ' ')
+        .replace(/\s+/g, ' ')
+        .trim();
+
+    const stopWords = new Set([
+      'a', 'an', 'and', 'are', 'as', 'at', 'be', 'been', 'but', 'by', 'for',
+      'from', 'had', 'has', 'have', 'i', 'in', 'is', 'it', 'me', 'my', 'of',
+      'on', 'or', 'the', 'this', 'to', 'was', 'with', 'you',
+    ]);
+
+    const tokenize = (value: string) =>
+      normalizePhrase(value)
+        .split(' ')
+        .filter((token) => token.length >= 2 && !stopWords.has(token));
+
+    const messageTokens =
+      suppliedTokens ??
+      new Set(tokenize(normalized));
+
+    let best: { name: string; score: number; common: boolean } | null = null;
+
+    for (const reference of seededSymptoms) {
+      const variants = variantResolver
+        ? variantResolver(reference)
+        : [reference.name, ...(String(reference.description ?? '').match(/^Also known as:\s*(.+)$/i)?.[1]?.split(',').map((value) => value.trim()).filter(Boolean) ?? [])];
+
+      for (const variant of variants) {
+        const phrase = normalizePhrase(variant);
+        const candidateTokens = tokenize(variant);
+        if (!phrase || candidateTokens.length === 0) continue;
+
+        if (normalized === phrase || normalized.includes(phrase)) {
+          const score = 100 + candidateTokens.length * 5 + (reference.common ? 1 : 0);
+          if (!best || score > best.score) {
+            best = { name: reference.name, score, common: reference.common };
+          }
+          continue;
+        }
+
+        const overlap = candidateTokens.filter((token) => messageTokens.has(token)).length;
+        const coverage = overlap / candidateTokens.length;
+
+        if (coverage === 1) {
+          const score = 80 + candidateTokens.length * 5 + (reference.common ? 1 : 0);
+          if (!best || score > best.score) {
+            best = { name: reference.name, score, common: reference.common };
+          }
+        } else if (candidateTokens.length >= 2 && coverage >= 0.67) {
+          const score = 55 + overlap * 5 + (reference.common ? 1 : 0);
+          if (!best || score > best.score) {
+            best = { name: reference.name, score, common: reference.common };
+          }
+        }
+      }
+    }
+
+    return best;
+  }
   private evaluateContext(
     symptomName: string,
     severity: SymptomSeverity,
