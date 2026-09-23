@@ -38,6 +38,7 @@ export default function LogSymptomPage() {
   const [severity, setSeverity] = useState<(typeof severityOptions)[number]["value"] | "">("");
   const [started, setStarted] = useState<(typeof startOptions)[number]>("Today");
   const [details, setDetails] = useState("");
+  const [reportedMedicationName, setReportedMedicationName] = useState("");
   const [saving, setSaving] = useState(false);
   const [result, setResult] = useState<SymptomIntelligenceResult | null>(null);
   const [error, setError] = useState("");
@@ -50,9 +51,11 @@ export default function LogSymptomPage() {
     const severityParam = params.get("severity");
     const startedParam = params.get("started");
     const locationParam = params.get("location")?.trim();
+    const medicationParam = params.get("reportedMedicationName")?.trim();
 
     if (symptomParam) setSymptom(symptomParam);
     if (locationParam) setLocation(locationParam);
+    if (medicationParam) setReportedMedicationName(medicationParam);
 
     if (
       severityParam === "MILD" ||
@@ -81,6 +84,7 @@ export default function LogSymptomPage() {
         onsetUncertain: started === "I am not sure",
         location: location.trim() || undefined,
         details: details.trim() || undefined,
+        reportedMedicationName: reportedMedicationName.trim() || undefined,
       });
 
       setResult(intelligence);
@@ -319,6 +323,16 @@ export default function LogSymptomPage() {
               placeholder="Describe anything that feels important in your own words."
               className="mt-2 w-full rounded-2xl border-2 border-slate-200 px-4 py-3 text-sm font-semibold leading-6 outline-none transition focus:border-[#24c1c4] focus:ring-4 focus:ring-[#24c1c4]/10"
             />
+
+            {reportedMedicationName.trim() && (
+              <div className="mt-5 rounded-2xl border border-amber-200 bg-amber-50 p-4">
+                <p className="text-xs font-black text-amber-950">Medicine you mentioned</p>
+                <p className="mt-1 text-sm font-bold text-amber-950">{reportedMedicationName}</p>
+                <p className="mt-1 text-xs leading-5 text-amber-800">
+                  Sympto will record this as a medicine you said you took. It will not assume that it was prescribed for you.
+                </p>
+              </div>
+            )}
 
             <div className="mt-5 rounded-2xl border border-[#dcebed] bg-[#f8fbfb] p-4">
               <p className="text-xs font-black text-[#0b2d54]">You can add more later</p>
