@@ -29,7 +29,6 @@ export default function AIHealthHelperFab() {
   const [listening, setListening] = useState(false);
   const [message, setMessage] = useState("");
   const [talkResult, setTalkResult] = useState<TalkToSymptoResult | null>(null);
-  const [speechSupported, setSpeechSupported] = useState(false);
   const [processing, setProcessing] = useState(false);
   const [processError, setProcessError] = useState("");
   const recognitionRef = useRef<SpeechRecognitionLike | null>(null);
@@ -41,10 +40,6 @@ export default function AIHealthHelperFab() {
       SpeechRecognition?: new () => SpeechRecognitionLike;
       webkitSpeechRecognition?: new () => SpeechRecognitionLike;
     };
-
-    setSpeechSupported(
-      Boolean(speechWindow.SpeechRecognition || speechWindow.webkitSpeechRecognition),
-    );
 
     const onKeyDown = (event: KeyboardEvent) => {
       if (event.key === "Escape") closeHelper();
