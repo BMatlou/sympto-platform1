@@ -118,6 +118,7 @@ export default function SymptomLogDetailPage({ params }: { params: Promise<{ id:
 
   const item = record.symptoms?.[0] ?? null;
   const symptomName = item?.symptom?.name || record.title || "Symptom recorded";
+  const displaySymptomName = human(symptomName);
   const observation = record.observations?.[0] ?? null;
   const effect = record.medicationEffects?.[record.medicationEffects.length - 1] ?? null;
   const trigger = record.triggers?.[record.triggers.length - 1] ?? null;
@@ -149,7 +150,7 @@ export default function SymptomLogDetailPage({ params }: { params: Promise<{ id:
                     Symptom timeline
                   </p>
                   <h1 className="mt-2 text-3xl font-black tracking-[-.04em]">
-                    {symptomName}
+                    {displaySymptomName}
                   </h1>
                   <div className="mt-3 flex flex-wrap gap-2 text-[10px] font-black">
                     <span className="rounded-full bg-white/10 px-2.5 py-1.5">
@@ -188,10 +189,10 @@ export default function SymptomLogDetailPage({ params }: { params: Promise<{ id:
 
               <div className="mt-4 space-y-3 text-sm">
                 {[
-                  ["Severity", item?.severity || record.overallSeverity],
+                  ["Severity", human(item?.severity || record.overallSeverity)],
                   ["Started", item?.onsetUncertain ? "Not sure" : dateLabel(item?.onsetAt || record.startedAt)],
-                  ["Location", item?.location],
-                  ["Notes", item?.notes || record.notes],
+                  ["Location", item?.location || null],
+                  ["Notes", item?.notes || record.notes || null],
                 ].map(([label, value]) => (
                   <div
                     key={String(label)}
@@ -199,7 +200,7 @@ export default function SymptomLogDetailPage({ params }: { params: Promise<{ id:
                   >
                     <p className="text-xs font-bold text-slate-400">{label}</p>
                     <p className="mt-1 font-semibold leading-6 text-[#0b2d54]">
-                      {optionalText(value) ? human(String(value)) : "Not recorded"}
+                      {optionalText(value) ? String(value) : "Not recorded"}
                     </p>
                   </div>
                 ))}
@@ -210,7 +211,7 @@ export default function SymptomLogDetailPage({ params }: { params: Promise<{ id:
               <div className="flex items-center gap-2">
                 <Sparkles className="h-4 w-4 text-[#24c1c4]" />
                 <h2 className="text-sm font-black text-[#0b2d54]">
-                  Sympto insight
+                  Sympto Insights
                 </h2>
               </div>
 
@@ -251,7 +252,7 @@ export default function SymptomLogDetailPage({ params }: { params: Promise<{ id:
                     </span>
                     <div>
                       <p className="text-[10px] font-black uppercase tracking-[0.16em] text-[#24aeb3]">
-                        Sympto Pattern Intelligence
+                        Sympto Insights
                       </p>
                       <h2 className="mt-1 text-xl font-black text-[#0b2d54]">
                         What Sympto noticed
@@ -259,7 +260,7 @@ export default function SymptomLogDetailPage({ params }: { params: Promise<{ id:
                     </div>
                   </div>
                   <span className="rounded-full bg-white px-3 py-1.5 text-[10px] font-black text-[#0b2d54] ring-1 ring-slate-200">
-                    {intelligence.source === "AI" ? "AI-assisted" : "Sympto Pattern Intelligence"}
+                    {intelligence.source === "AI" ? "AI-assisted" : "Sympto Insights"}
                   </span>
                 </div>
 
@@ -272,7 +273,7 @@ export default function SymptomLogDetailPage({ params }: { params: Promise<{ id:
                     ["Baseline", human(intelligence.metrics?.baselineSeverity)],
                     ["Latest", human(intelligence.metrics?.latestSeverity)],
                     ["Updates", String(intelligence.metrics?.monitoringUpdates ?? 0)],
-                    ["Other episodes · 90 days", String(intelligence.metrics?.previous90DayOccurrences ?? 0)],
+                    ["Previous episodes · 90 days", String(intelligence.metrics?.previous90DayOccurrences ?? 0)],
                   ].map(([label, value]) => (
                     <div key={label} className="rounded-2xl bg-white p-4 ring-1 ring-slate-200">
                       <p className="text-[10px] font-black uppercase tracking-[0.12em] text-slate-400">{label}</p>
