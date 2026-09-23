@@ -679,7 +679,12 @@ export class SymptomIntelligenceService {
     }
     if (previousLogs.length > 0) patterns.push('This symptom has been recorded ' + previousLogs.length + ' other time' + (previousLogs.length === 1 ? '' : 's') + ' in the last 90 days.');
     for (const effect of symptomLog.medicationEffects ?? []) {
-      const medicationName = effect.medication?.name ?? effect.medication?.genericName ?? effect.medication?.brandName ?? 'Linked medicine';
+      const medicationName =
+        effect.reportedMedicationName?.trim() ||
+        effect.medication?.name ||
+        effect.medication?.genericName ||
+        effect.medication?.brandName ||
+        'Linked medicine';
       const response = effect.improved == null ? 'no improvement response was recorded' : effect.improved ? 'improvement was reported (' + (effect.effectiveness ?? 'not rated') + '/10)' : 'no improvement was reported';
       medicationInsights.push(medicationName + ': ' + response + '.');
       if (effect.sideEffects?.trim()) medicationInsights.push(medicationName + ': patient-reported side effect — ' + effect.sideEffects.trim() + '.');
