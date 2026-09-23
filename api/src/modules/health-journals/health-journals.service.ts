@@ -11,12 +11,14 @@ import { HealthGoalIntelligenceService } from '../health-goals/health-goal-intel
 import { CreateHealthJournalDto } from './dto/create-health-journal.dto';
 import { UpdateHealthJournalDto } from './dto/update-health-journal.dto';
 import { QueryHealthJournalDto } from './dto/query-health-journal.dto';
+import { SymptomIntelligenceService } from './symptom-intelligence.service';
 
 @Injectable()
 export class HealthJournalsService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly healthGoalIntelligence: HealthGoalIntelligenceService,
+    private readonly symptomIntelligence: SymptomIntelligenceService,
   ) {}
 
   /**
@@ -215,7 +217,15 @@ export class HealthJournalsService {
       throw new NotFoundException('Symptom log not found.');
     }
 
-    return symptom;
+    const intelligence = await this.symptomIntelligence.analyzeSymptomTimeline(
+      patientId,
+      symptom,
+    );
+
+    return {
+      ...symptom,
+      intelligence,
+    };
   }
 
   async update(
