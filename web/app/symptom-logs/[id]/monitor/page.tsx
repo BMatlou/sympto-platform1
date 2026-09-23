@@ -455,7 +455,7 @@ export default function MonitorSymptomPage({ params }: { params: Promise<{ id: s
                       const medicationValue =
                         medication?.medicationId ||
                         medication?.medication?.id ||
-                        medication?.id;
+                        medication?.patientMedication?.medicationId;
                       const medicationLabel =
                         medication?.name ||
                         medication?.medication?.name ||
