@@ -57,7 +57,6 @@ export default function MonitorSymptomPage({ params }: { params: Promise<{ id: s
   const [aggravatingFactors, setAggravatingFactors] = useState("");
   const [relievingFactors, setRelievingFactors] = useState("");
   const [notes, setNotes] = useState("");
-  const [showMedicine, setShowMedicine] = useState(false);
   const [medication, setMedication] = useState<{ medicationId?: string; reportedMedicationName?: string; medicationImproved?: boolean }>({});
   const [medicationEffectiveness, setMedicationEffectiveness] = useState("");
   const [medicationSideEffects, setMedicationSideEffects] = useState("");
@@ -82,6 +81,36 @@ export default function MonitorSymptomPage({ params }: { params: Promise<{ id: s
         const currentSeverity = latest?.severity ?? loaded.overallSeverity ?? "MILD";
         setSeverity(currentSeverity === "NONE" ? "MILD" : currentSeverity);
         setLocation(loaded.symptoms?.[0]?.location ?? "");
+
+        const previousMedicines = Array.isArray(loaded.medicationEffects)
+          ? loaded.medicationEffects
+              .slice()
+              .sort(
+                (a: any, b: any) =>
+                  new Date(String(b.createdAt ?? b.observedAt ?? "")).getTime() -
+                  new Date(String(a.createdAt ?? a.observedAt ?? "")).getTime(),
+              )
+          : [];
+        const latestMedicine = previousMedicines[0];
+        if (latestMedicine) {
+          const latestMedicationId =
+            latestMedicine.medicationId ||
+            latestMedicine.medication?.id ||
+            undefined;
+          const latestReportedName = String(
+            latestMedicine.reportedMedicationName ?? "",
+          ).trim();
+          setMedication({
+            medicationId: latestMedicationId ? String(latestMedicationId) : undefined,
+            reportedMedicationName: latestReportedName || undefined,
+            medicationImproved:
+              latestMedicine.improved === true
+                ? true
+                : latestMedicine.improved === false
+                  ? false
+                  : undefined,
+          });
+        }
 
         const name = loaded.symptoms?.[0]?.symptom?.name ?? loaded.title ?? "";
         if (name) {
@@ -231,26 +260,30 @@ export default function MonitorSymptomPage({ params }: { params: Promise<{ id: s
             )}
 
             <div>
-              <button
-                type="button"
-                onClick={() => setShowMedicine((value) => !value)}
-                className="flex w-full items-center justify-between gap-3 rounded-[18px] border border-slate-200 bg-white px-4 py-3.5 text-left shadow-sm"
-              >
-                <div>
-                  <p className="text-sm font-black text-[#0b2d54]">Medicine</p>
-                  <p className="mt-1 text-[11px] text-slate-500">{medication.medicationId || medication.reportedMedicationName ? "Medicine context added" : "Optional — tell Sympto what you took."}</p>
-                </div>
-                <ChevronDown className={"h-5 w-5 text-slate-400 transition " + (showMedicine ? "rotate-180" : "")} />
-              </button>
-              {showMedicine && (
-                <div className="mt-3">
-                  <SymptomMedicationPicker activeMedications={activeMedications} value={medication} onChange={setMedication} />
-                  {(medication.medicationId || medication.reportedMedicationName) && (
-                    <div className="mt-4 grid gap-3 sm:grid-cols-2">
-                      <input type="number" min={0} max={10} value={medicationEffectiveness} onChange={(event) => setMedicationEffectiveness(event.target.value)} placeholder="Effectiveness 0–10" className="min-h-11 rounded-xl border border-slate-200 bg-white px-3 text-sm font-semibold" />
-                      <textarea value={medicationSideEffects} onChange={(event) => setMedicationSideEffects(event.target.value)} rows={2} placeholder="Any side effects?" className="w-full resize-none rounded-xl border border-slate-200 bg-white px-3 py-3 text-sm font-semibold leading-5" />
-                    </div>
-                  )}
+              <SymptomMedicationPicker
+                activeMedications={activeMedications}
+                recentMedications={Array.isArray(record?.medicationEffects) ? record.medicationEffects : []}
+                value={medication}
+                onChange={setMedication}
+              />
+              {(medication.medicationId || medication.reportedMedicationName) && (
+                <div className="mt-3 grid gap-3 sm:grid-cols-2">
+                  <input
+                    type="number"
+                    min={0}
+                    max={10}
+                    value={medicationEffectiveness}
+                    onChange={(event) => setMedicationEffectiveness(event.target.value)}
+                    placeholder="Effectiveness 0–10"
+                    className="min-h-11 rounded-xl border border-slate-200 bg-white px-3 text-sm font-semibold"
+                  />
+                  <textarea
+                    value={medicationSideEffects}
+                    onChange={(event) => setMedicationSideEffects(event.target.value)}
+                    rows={2}
+                    placeholder="Any side effects?"
+                    className="w-full resize-none rounded-xl border border-slate-200 bg-white px-3 py-3 text-sm font-semibold leading-5"
+                  />
                 </div>
               )}
             </div>
