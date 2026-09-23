@@ -40,7 +40,9 @@ function clean(events: Event[]) {
 export default function HealthJournalPage() {
   const { data, loading, error, reload } = useDashboard();
   const [logs, setLogs] = useState<any[]>([]);
+  const [symptoms, setSymptoms] = useState<any[]>([]);
   const [journalError, setJournalError] = useState(false);
+  const [symptomError, setSymptomError] = useState(false);
   const [visible, setVisible] = useState(10);
   const [expanded, setExpanded] = useState<string | null>(null);
   const [filter, setFilter] = useState<"all" | "journal" | "symptom" | "measurement">("all");
@@ -52,10 +54,23 @@ export default function HealthJournalPage() {
     return () => { active = false; };
   }, []);
 
+  useEffect(() => {
+    let active = true;
+    setSymptomError(false);
+    healthJournalService.getSymptoms({ limit: 100 })
+      .then(records => { if (active) setSymptoms(Array.isArray(records) ? records : []); })
+      .catch(() => { if (active) setSymptomError(true); });
+    return () => { active = false; };
+  }, []);
+
+  const symptomFeed = symptoms.length > 0
+    ? symptoms
+    : (Array.isArray(data?.symptoms) ? data.symptoms : []);
+
   const events = useMemo(() => {
     if (!data) return [] as Event[];
     const all: Event[] = [];
-    (data.symptoms ?? []).forEach((s: any) => {
+    (symptomFeed ?? []).forEach((s: any) => {
       const at = s.startedAt || s.createdAt;
       if (!at) return;
       all.push({ id: `s-${s.id}`, type: "symptom", title: s.title || "Symptom recorded", detail: [s.overallSeverity ? `Severity: ${String(s.overallSeverity).toLowerCase()}` : null, ...(s.symptoms ?? []).map((x: any) => x.symptom?.name || x.name).filter(Boolean)].filter(Boolean).join(" · "), at: String(at), href: `/symptom-logs/${encodeURIComponent(String(s.id))}`, updateHref: String(s.status ?? "ACTIVE").toUpperCase() === "ACTIVE" ? `/symptom-logs/${encodeURIComponent(String(s.id))}/monitor` : undefined, source: "Symptom tracker" });
@@ -96,7 +111,7 @@ export default function HealthJournalPage() {
       else all.push({ id: `j-${l.id}`, type: "journal", title: rawTitle, detail, at: String(at), href: "/health-journal", meta, source: l.practitionerId ? "Clinical journal" : "Personal journal" });
     });
     return clean(all);
-  }, [data, logs]);
+  }, [data, logs, symptomFeed]);
 
   const visibleEvents = useMemo(() => filter === "all" ? events : events.filter(e => e.type === filter), [events, filter]);
   const grouped = visibleEvents.slice(0, visible).reduce<Record<string, Event[]>>((acc, e) => { (acc[dayKey(e.at)] ||= []).push(e); return acc; }, {});
@@ -111,7 +126,13 @@ export default function HealthJournalPage() {
     <Link href="/dashboard" className="inline-flex items-center gap-2 text-sm font-bold text-[#0b2d54]"><ArrowLeft className="h-4 w-4"/>Back to My Health</Link>
     <header className="mt-4 overflow-hidden rounded-[32px] bg-gradient-to-br from-[#08284a] via-[#0d4771] to-[#24babe] p-6 text-white shadow-[0_18px_50px_rgba(11,45,84,0.10)] sm:p-8"><div className="flex items-end justify-between gap-4"><div><p className="text-[10px] font-black uppercase tracking-[0.2em] text-white/65">My history</p><h1 className="mt-2 text-3xl font-black tracking-[-0.04em]">Your health story</h1><p className="mt-2 text-sm leading-6 text-white/75">A cleaner view of meaningful health activity, newest first.</p></div><Link href="/log-symptom" className="hidden min-h-11 items-center gap-2 rounded-xl bg-white px-4 text-xs font-black text-[#0b2d54] sm:inline-flex"><HeartPulse className="h-4 w-4"/>Add update</Link></div><div className="mt-5 inline-flex rounded-full bg-white/10 px-3 py-1.5 text-xs font-bold">{events.length} meaningful events</div></header>
 
-    {Array.isArray(data.symptoms) && data.symptoms.filter((s: any) => String(s?.status ?? "").toUpperCase() === "ACTIVE").length > 0 && (
+    {symptomError && symptomFeed.length === 0 && (
+      <div className="mt-4 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+        <span className="font-bold">Symptoms could not be loaded.</span> Your symptom records are still stored; refresh this page after the health record service reconnects.
+      </div>
+    )}
+
+    {symptomFeed.filter((s: any) => String(s?.status ?? "").toUpperCase() === "ACTIVE").length > 0 && (
       <section className="mt-5 rounded-[28px] border border-[#24c1c4]/20 bg-white p-5 shadow-[0_12px_35px_rgba(11,45,84,0.05)] sm:p-6">
         <div className="flex items-center justify-between gap-3">
           <div>
@@ -122,7 +143,7 @@ export default function HealthJournalPage() {
           <Activity className="h-5 w-5 text-[#24c1c4]" />
         </div>
         <div className="mt-4 space-y-3">
-          {data.symptoms.filter((s: any) => String(s?.status ?? "").toUpperCase() === "ACTIVE").slice(0, 5).map((s: any) => (
+          {symptomFeed.filter((s: any) => String(s?.status ?? "").toUpperCase() === "ACTIVE").slice(0, 5).map((s: any) => (
             <div key={String(s.id)} className="flex flex-col gap-3 rounded-2xl bg-[#f8fbfb] p-4 ring-1 ring-[#e1edef] sm:flex-row sm:items-center sm:justify-between">
               <div className="min-w-0">
                 <p className="text-sm font-black text-[#0b2d54]">{s.title || "Symptom"}</p>
