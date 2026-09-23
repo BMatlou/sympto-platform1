@@ -139,7 +139,7 @@ class HealthJournalService {
   async monitorSymptom(
     id: string,
     dto: {
-      severity: "MILD" | "MODERATE" | "SEVERE" | "VERY_SEVERE";
+      severity: "NONE" | "MILD" | "MODERATE" | "SEVERE" | "VERY_SEVERE";
       progression?: "IMPROVING" | "STABLE" | "WORSENING" | "FLUCTUATING" | "RESOLVED";
       frequency?: "CONSTANT" | "INTERMITTENT" | "OCCASIONAL" | "RARE" | "UNKNOWN";
       durationMinutes?: number;
