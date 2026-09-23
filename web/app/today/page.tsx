@@ -210,7 +210,12 @@ export default function TodayPage() {
   const firstName = data.patient?.firstName || data.profile?.preferredName || "there";
   const medications = data.today?.activeMedications ?? [];
   const appointments = data.today?.upcomingAppointments ?? [];
-  const activeSymptoms = (Array.isArray(symptomFeed) ? symptomFeed : []).filter(
+  const availableSymptoms =
+    symptomFeed.length > 0
+      ? symptomFeed
+      : (Array.isArray(data.symptoms) ? data.symptoms : []);
+
+  const activeSymptoms = availableSymptoms.filter(
     (symptom: any) => String(symptom?.status ?? "").toUpperCase() === "ACTIVE",
   );
   const allGoals = data.activeGoalsArray ?? data.goals ?? data.healthGoals ?? [];
