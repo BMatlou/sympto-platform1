@@ -33,34 +33,39 @@ export class SymptomLogsController {
   @Permissions('symptom-logs.create')
   @Post()
   create(
+    @Req() req: any,
     @Body() dto: CreateSymptomLogDto,
   ) {
-    return this.symptomLogsService.create(dto);
+    return this.symptomLogsService.create(req.user.sub, dto);
   }
 
   @Permissions('symptom-logs.read')
   @Get()
   findAll(
+    @Req() req: any,
     @Query() query: QuerySymptomLogDto,
   ) {
-    return this.symptomLogsService.findAll(query);
+    return this.symptomLogsService.findAll(req.user.sub, query);
   }
 
   @Permissions('symptom-logs.read')
   @Get(':id')
   findOne(
+    @Req() req: any,
     @Param('id') id: string,
   ) {
-    return this.symptomLogsService.findOne(id);
+    return this.symptomLogsService.findOne(req.user.sub, id);
   }
 
   @Permissions('symptom-logs.update')
   @Patch(':id')
   update(
+    @Req() req: any,
     @Param('id') id: string,
     @Body() dto: UpdateSymptomLogDto,
   ) {
     return this.symptomLogsService.update(
+      req.user.sub,
       id,
       dto,
     );
@@ -69,8 +74,9 @@ export class SymptomLogsController {
   @Permissions('symptom-logs.delete')
   @Delete(':id')
   remove(
+    @Req() req: any,
     @Param('id') id: string,
   ) {
-    return this.symptomLogsService.remove(id);
+    return this.symptomLogsService.remove(req.user.sub, id);
   }
 }
