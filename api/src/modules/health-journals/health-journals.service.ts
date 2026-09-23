@@ -3,7 +3,7 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 
-import { Prisma } from '@prisma/client';
+import { Prisma, SymptomLogStatus } from '@prisma/client';
 
 import { PrismaService } from '../../database/prisma.service';
 import { HealthGoalIntelligenceService } from '../health-goals/health-goal-intelligence.service';
@@ -133,6 +133,59 @@ export class HealthJournalsService {
           total / limit,
         ),
       },
+    };
+  }
+
+  /**
+   * Dedicated symptom feed for Smart Journal.
+   *
+   * Symptoms are clinical records, not HealthJournal rows. Keeping this query
+   * here prevents the Smart Journal timeline from depending on the broader
+   * Health Home aggregation to discover symptoms.
+   */
+  async findSymptoms(
+    userId: string,
+    limit = 100,
+  ) {
+    const patientId = await this.getPatientId(userId);
+
+    const data = await this.prisma.symptomLog.findMany({
+      where: {
+        clinicalEpisode: { patientId },
+        status: {
+          notIn: [
+            SymptomLogStatus.DRAFT,
+            SymptomLogStatus.CANCELLED,
+          ],
+        },
+      },
+      include: {
+        clinicalEpisode: true,
+        symptoms: {
+          include: {
+            symptom: true,
+          },
+          orderBy: {
+            createdAt: 'asc',
+          },
+        },
+        triggers: true,
+        monitorings: {
+          orderBy: {
+            observedAt: 'desc',
+          },
+          take: 1,
+        },
+      },
+      orderBy: {
+        startedAt: 'desc',
+      },
+      take: Math.min(Math.max(limit, 1), 200),
+    });
+
+    return {
+      data,
+      total: data.length,
     };
   }
 
