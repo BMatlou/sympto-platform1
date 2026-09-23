@@ -168,6 +168,27 @@ class HealthJournalService {
     return data.data;
   }
 
+  async searchSymptomReference(params: { search?: string; limit?: number } = {}): Promise<any[]> {
+    const { data } = await api.get("/health-journals/symptom-reference", {
+      params: {
+        search: params.search?.trim() || undefined,
+        limit: params.limit ?? 12,
+      },
+    });
+    const payload = data?.data ?? data;
+    return Array.isArray(payload) ? payload : Array.isArray(payload?.data) ? payload.data : [];
+  }
+
+  async searchMedicationReference(search: string, limit = 10): Promise<any[]> {
+    const term = search.trim();
+    if (term.length < 2) return [];
+    const { data } = await api.get("/medications", {
+      params: { search: term, limit, page: 1 },
+    });
+    const payload = data?.data ?? data;
+    return Array.isArray(payload) ? payload : Array.isArray(payload?.data) ? payload.data : [];
+  }
+
   async getSymptoms(params: { limit?: number } = {}): Promise<any[]> {
     const { data } = await api.get("/health-journals/symptoms", {
       params: {
