@@ -216,20 +216,6 @@ export default function SymptomLogDetailPage({ params }: { params: Promise<{ id:
             </section>
           )}
 
-          {medicationEffects.length > 0 && (
-            <section className="mt-4 rounded-[28px] border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
-              <div className="flex items-center gap-2"><Pill className="h-4 w-4 text-[#24c1c4]" /><div><p className="text-[9px] font-black uppercase tracking-[0.15em] text-[#24aeb3]">Medicines</p><h2 className="mt-1 text-xl font-black text-[#0b2d54]">What you reported taking</h2></div></div>
-              <div className="mt-4 space-y-3">
-                {medicationEffects.slice().reverse().map((entry: any) => (
-                  <article key={entry.id} className="flex items-start justify-between gap-3 rounded-[20px] bg-[#f8fbfb] p-4 ring-1 ring-[#e1edef]">
-                    <div className="min-w-0"><p className="text-sm font-black text-[#0b2d54]">{entry.reportedMedicationName || entry.medication?.name || entry.medication?.genericName || entry.medication?.brandName || "Medicine"}</p><p className="mt-1 text-[10px] font-semibold uppercase tracking-[0.1em] text-slate-400">{entry.medicationId ? "Linked medicine" : "Patient reported"}</p></div>
-                    {entry.improved != null && <span className="shrink-0 rounded-full bg-white px-2.5 py-1.5 text-[9px] font-black text-slate-500">{entry.improved ? "Helped" : "No improvement"}</span>}
-                  </article>
-                ))}
-              </div>
-            </section>
-          )}
-
           <div className="mt-4 rounded-[22px] bg-white/70 px-4 py-3.5 text-center ring-1 ring-[#dfeaec]">
             <p className="text-[9px] leading-5 text-slate-400">This record is for tracking and communication. Sympto does not diagnose or replace professional medical judgement.</p>
           </div>
