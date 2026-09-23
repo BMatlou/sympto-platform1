@@ -200,6 +200,9 @@ export class HealthJournalsService {
             aiAnalysis: true,
           },
         },
+        monitorings: {
+          orderBy: { observedAt: 'asc' },
+        },
         attachments: {
           include: {
             attachment: true,
