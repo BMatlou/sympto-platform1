@@ -251,15 +251,15 @@ export default function SymptomLogDetailPage({ params }: { params: Promise<{ id:
                     </span>
                     <div>
                       <p className="text-[10px] font-black uppercase tracking-[0.16em] text-[#24aeb3]">
-                        Sympto intelligence
+                        Sympto Pattern Intelligence
                       </p>
                       <h2 className="mt-1 text-xl font-black text-[#0b2d54]">
-                        What your record is showing
+                        What Sympto noticed
                       </h2>
                     </div>
                   </div>
                   <span className="rounded-full bg-white px-3 py-1.5 text-[10px] font-black text-[#0b2d54] ring-1 ring-slate-200">
-                    {intelligence.source === "AI" ? "AI-assisted" : "Pattern engine"}
+                    {intelligence.source === "AI" ? "AI-assisted" : "Sympto Pattern Intelligence"}
                   </span>
                 </div>
 
@@ -297,7 +297,7 @@ export default function SymptomLogDetailPage({ params }: { params: Promise<{ id:
                 </section>
 
                 <section className="rounded-2xl bg-[#f8fbfb] p-4 ring-1 ring-[#e1edef]">
-                  <h3 className="text-sm font-black text-[#0b2d54]">Associations in your record</h3>
+                  <h3 className="text-sm font-black text-[#0b2d54]">Related health signals</h3>
                   {intelligence.associations?.length ? (
                     <div className="mt-3 space-y-2">
                       {intelligence.associations.map((text: string, index: number) => (
@@ -323,7 +323,7 @@ export default function SymptomLogDetailPage({ params }: { params: Promise<{ id:
                 </section>
 
                 <section className="rounded-2xl bg-[#f8fbfb] p-4 ring-1 ring-[#e1edef]">
-                  <h3 className="text-sm font-black text-[#0b2d54]">What would make this smarter?</h3>
+                  <h3 className="text-sm font-black text-[#0b2d54]">Make your record more useful</h3>
                   {intelligence.dataGaps?.length ? (
                     <div className="mt-3 space-y-2">
                       {intelligence.dataGaps.map((text: string, index: number) => (
@@ -357,10 +357,10 @@ export default function SymptomLogDetailPage({ params }: { params: Promise<{ id:
             <div className="flex flex-wrap items-end justify-between gap-3">
               <div>
                 <p className="text-[10px] font-black uppercase tracking-[0.16em] text-[#24aeb3]">
-                  Longitudinal record
+                  Symptom journey
                 </p>
                 <h2 className="mt-1 text-xl font-black text-[#0b2d54]">
-                  How the symptom changed
+                  How your symptom changed
                 </h2>
               </div>
               <span className="rounded-full bg-[#f4f8fa] px-3 py-1.5 text-[10px] font-black text-slate-500">
@@ -421,7 +421,7 @@ export default function SymptomLogDetailPage({ params }: { params: Promise<{ id:
               <div className="flex items-center gap-2">
                 <ShieldCheck className="h-4 w-4 text-[#24c1c4]" />
                 <h2 className="text-sm font-black text-[#0b2d54]">
-                  What you noticed while monitoring
+                  Your observations
                 </h2>
               </div>
 
@@ -532,7 +532,7 @@ export default function SymptomLogDetailPage({ params }: { params: Promise<{ id:
               <div className="flex items-center gap-2">
                 <ShieldCheck className="h-4 w-4 text-[#24c1c4]" />
                 <h2 className="text-sm font-black text-[#0b2d54]">
-                  {observation.requiresAttention ? "Safety observation" : "Sympto record note"}
+                  {observation.requiresAttention ? "Safety observation" : "Sympto summary"}
                 </h2>
               </div>
               <p className="mt-3 text-sm leading-6 text-slate-600">
