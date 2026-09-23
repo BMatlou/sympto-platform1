@@ -770,7 +770,7 @@ export class SymptomIntelligenceService {
       insights.push('Recent vital and wearable measurements are available to help put this update in context.');
     }
     if (context.conditionCount > 0 || context.allergyCount > 0) {
-      insights.push('Your recorded conditions and allergies remain available as part of the clinical context.');
+      insights.push('Your recorded conditions and allergies are available as connected clinical context.');
     }
     if (context.activeGoalCount > 0) {
       insights.push(
