@@ -287,14 +287,14 @@ export default function LogSymptomPage() {
                 </label>
               )}
 
-              <div className="rounded-[22px] border border-slate-200 bg-[#fbfdfd] p-4">
-                <button type="button" onClick={() => setShowMedicine((value) => !value)} className="flex w-full items-center justify-between gap-3 text-left">
+                            <div>
+                <button type="button" onClick={() => setShowMedicine((value) => !value)} className="flex w-full items-center justify-between gap-3 rounded-[18px] border border-slate-200 bg-white px-4 py-3.5 text-left shadow-sm">
+                  setShowMedicine((value) => !value)} className="flex w-full items-center justify-between gap-3 text-left">
                   <div><p className="text-sm font-black text-[#0b2d54]">Add medicine</p><p className="mt-1 text-[11px] text-slate-500">Optional. Sympto can connect what you took with what you noticed.</p></div>
                   <ChevronDown className={"h-5 w-5 text-slate-400 transition " + (showMedicine ? "rotate-180" : "")} />
                 </button>
-                {showMedicine && <div className="mt-4"><SymptomMedicationPicker activeMedications={activeMedications} value={medication} onChange={setMedication} /></div>}
+                <div className="mt-3"><SymptomMedicationPicker activeMedications={activeMedications} value={medication} onChange={setMedication} /></div>
               </div>
-
               <div className="rounded-[22px] border border-slate-200 bg-[#fbfdfd] p-4">
                 <button type="button" onClick={() => setShowNote((value) => !value)} className="flex w-full items-center justify-between gap-3 text-left">
                   <div><p className="text-sm font-black text-[#0b2d54]">Add a note</p><p className="mt-1 text-[11px] text-slate-500">Tell Sympto anything important in your own words.</p></div>
