@@ -45,7 +45,7 @@ describe('SymptomIntelligenceService', () => {
     );
   });
 
-  it('keeps patient-reported symptom certainty separate from clinical confirmation', () => {
+  it('does not suppress a safety signal merely because the user mentions a past event', () => {
     const detect = (service as any).detectSafetySignals.bind(service);
 
     expect(detect('I had chest pain last year')).toContain(
