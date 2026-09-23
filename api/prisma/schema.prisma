@@ -3226,6 +3226,7 @@ model SymptomLog {
   triggers          SymptomTrigger[]
   medicationEffects MedicationEffect[]
   observations      AIObservation[]
+  monitorings       SymptomObservation[]
   attachments       SymptomLogAttachment[]
 
   @@index([clinicalEpisodeId])
@@ -3238,6 +3239,7 @@ model SymptomLogItem {
   id                 String              @id @default(uuid())
   symptomLogId       String
   symptomId          String
+  location           String?
   severity           SymptomSeverity     @default(MILD)
   progression        SymptomProgression?
   frequency          SymptomFrequency?
@@ -3264,6 +3266,33 @@ model SymptomLogItem {
   @@index([severity])
   @@index([progression])
   @@index([onsetAt])
+  @@index([location])
+}
+
+model SymptomObservation {
+  id                  String             @id @default(uuid())
+  symptomLogId        String
+  observedAt          DateTime           @default(now())
+  severity            SymptomSeverity
+  progression         SymptomProgression?
+  frequency           SymptomFrequency?
+  durationMinutes     Int?
+  painScore           Int?
+  stillPresent        Boolean            @default(true)
+  suspectedTrigger    String?
+  aggravatingFactors  String?
+  relievingFactors    String?
+  notes               String?            @db.Text
+  source              String             @default("MANUAL")
+  inputMode           String             @default("FORM")
+  createdAt           DateTime           @default(now())
+  symptomLog          SymptomLog         @relation(fields: [symptomLogId], references: [id], onDelete: Cascade)
+
+  @@index([symptomLogId])
+  @@index([observedAt])
+  @@index([severity])
+  @@index([progression])
+  @@index([stillPresent])
 }
 
 model HealthJournal {
