@@ -370,6 +370,7 @@ export class SymptomIntelligenceService {
         },
         medicalRecord: true,
         clinicalEpisodes: {
+          // ClinicalEpisodeStatus has no COMPLETED value; resolved/closed lifecycle states are represented explicitly.
           where: { status: { in: [ClinicalEpisodeStatus.ACTIVE, ClinicalEpisodeStatus.ONGOING, ClinicalEpisodeStatus.RESOLVED] } },
           include: {
             symptomLogs: {
