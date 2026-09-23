@@ -443,7 +443,7 @@ export class SymptomIntelligenceService {
       value === SymptomSeverity.MILD ? 1 :
       value === SymptomSeverity.MODERATE ? 2 :
       value === SymptomSeverity.SEVERE ? 3 : 4;
-    const currentScore = severityScore(dto.severity);
+    const currentScore = severityScore(storedSeverity);
     const previousScore = severityScore(previousSeverity);
 
     let progression = dto.progression;
