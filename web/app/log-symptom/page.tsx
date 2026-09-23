@@ -81,6 +81,10 @@ export default function LogSymptomPage() {
   const [recurring, setRecurring] = useState(false);
   const [suspectedTrigger, setSuspectedTrigger] = useState("");
   const [triggerDetails, setTriggerDetails] = useState("");
+  const [triggerConfirmed, setTriggerConfirmed] = useState("");
+  const [triggerExposureAt, setTriggerExposureAt] = useState("");
+  const [occurredBeforeHours, setOccurredBeforeHours] = useState("");
+  const [triggerNotes, setTriggerNotes] = useState("");
   const [aggravatingFactors, setAggravatingFactors] = useState("");
   const [relievingFactors, setRelievingFactors] = useState("");
   const [resolved, setResolved] = useState(false);
@@ -88,7 +92,12 @@ export default function LogSymptomPage() {
   const [prescriptionId, setPrescriptionId] = useState("");
   const [medicationImproved, setMedicationImproved] = useState("");
   const [medicationEffectiveness, setMedicationEffectiveness] = useState("");
+  const [medicationImprovementPercentage, setMedicationImprovementPercentage] = useState("");
+  const [medicationStartedAt, setMedicationStartedAt] = useState("");
+  const [medicationImprovementObservedAt, setMedicationImprovementObservedAt] = useState("");
+  const [medicationStoppedAt, setMedicationStoppedAt] = useState("");
   const [medicationSideEffects, setMedicationSideEffects] = useState("");
+  const [medicationNotes, setMedicationNotes] = useState("");
   const [saving, setSaving] = useState(false);
   const [result, setResult] = useState<SymptomIntelligenceResult | null>(null);
   const [error, setError] = useState("");
@@ -120,6 +129,10 @@ export default function LogSymptomPage() {
         recurring,
         suspectedTrigger: suspectedTrigger.trim() || undefined,
         triggerDetails: triggerDetails.trim() || undefined,
+        triggerConfirmed: triggerConfirmed === "YES" ? true : triggerConfirmed === "NO" ? false : undefined,
+        triggerExposureAt: triggerExposureAt || undefined,
+        occurredBeforeHours: occurredBeforeHours.trim() ? Number(occurredBeforeHours) : undefined,
+        triggerNotes: triggerNotes.trim() || undefined,
         aggravatingFactors: aggravatingFactors.trim() || undefined,
         relievingFactors: relievingFactors.trim() || undefined,
         details: details.trim() || undefined,
@@ -127,7 +140,12 @@ export default function LogSymptomPage() {
         prescriptionId: prescriptionId || undefined,
         medicationImproved: medicationImproved === "YES" ? true : medicationImproved === "NO" ? false : undefined,
         medicationEffectiveness: Number.isFinite(effectiveness) ? effectiveness : undefined,
+        medicationImprovementPercentage: medicationImprovementPercentage.trim() ? Number(medicationImprovementPercentage) : undefined,
+        medicationStartedAt: medicationStartedAt || undefined,
+        medicationImprovementObservedAt: medicationImprovementObservedAt || undefined,
+        medicationStoppedAt: medicationStoppedAt || undefined,
         medicationSideEffects: medicationSideEffects.trim() || undefined,
+        medicationNotes: medicationNotes.trim() || undefined,
       });
       setResult(intelligence);
     } catch (requestError: any) {
@@ -295,7 +313,11 @@ export default function LogSymptomPage() {
 
               <div className="grid gap-4 sm:grid-cols-2">
                 <div><label className="block text-xs font-black uppercase tracking-[0.12em] text-slate-500" htmlFor="trigger">Possible trigger</label><input id="trigger" value={suspectedTrigger} onChange={(e) => setSuspectedTrigger(e.target.value)} placeholder="e.g. after exercise, food, stress" className="mt-2 min-h-12 w-full rounded-xl border-2 border-slate-200 px-3 text-sm font-semibold" /></div>
-                <div><label className="block text-xs font-black uppercase tracking-[0.12em] text-slate-500" htmlFor="triggerDetails">What happened before it?</label><input id="triggerDetails" value={triggerDetails} onChange={(e) => setTriggerDetails(e.target.value)} placeholder="Optional context" className="mt-2 min-h-12 w-full rounded-xl border-2 border-slate-200 px-3 text-sm font-semibold" /></div>
+                <div><label className="block text-xs font-black uppercase tracking-[0.12em] text-slate-500" htmlFor="triggerDetails">What happened before it?</label><input id="triggerDetails" value={triggerDetails} onChange={(e) => setTriggerDetails(e.target.value)} placeholder="Describe the context" className="mt-2 min-h-12 w-full rounded-xl border-2 border-slate-200 px-3 text-sm font-semibold" /></div>
+                <div><label className="block text-xs font-black uppercase tracking-[0.12em] text-slate-500" htmlFor="triggerConfirmed">How certain are you?</label><select id="triggerConfirmed" value={triggerConfirmed} onChange={(e) => setTriggerConfirmed(e.target.value)} className="mt-2 min-h-12 w-full rounded-xl border-2 border-slate-200 px-3 text-sm font-semibold"><option value="">Not sure</option><option value="YES">I am fairly sure</option><option value="NO">I am only suspecting it</option></select></div>
+                <div><label className="block text-xs font-black uppercase tracking-[0.12em] text-slate-500" htmlFor="triggerExposureAt">When did the possible trigger happen?</label><input id="triggerExposureAt" type="datetime-local" value={triggerExposureAt} onChange={(e) => setTriggerExposureAt(e.target.value)} className="mt-2 min-h-12 w-full rounded-xl border-2 border-slate-200 px-3 text-sm font-semibold" /></div>
+                <div><label className="block text-xs font-black uppercase tracking-[0.12em] text-slate-500" htmlFor="occurredBeforeHours">How long before the symptom?</label><div className="mt-2 flex items-center gap-2"><input id="occurredBeforeHours" type="number" min={0} inputMode="numeric" value={occurredBeforeHours} onChange={(e) => setOccurredBeforeHours(e.target.value)} placeholder="Hours" className="min-h-12 w-full rounded-xl border-2 border-slate-200 px-3 text-sm font-semibold" /><span className="text-xs font-bold text-slate-400">hours</span></div></div>
+                <div><label className="block text-xs font-black uppercase tracking-[0.12em] text-slate-500" htmlFor="triggerNotes">Trigger notes</label><textarea id="triggerNotes" value={triggerNotes} onChange={(e) => setTriggerNotes(e.target.value)} rows={2} placeholder="Anything else about the possible trigger" className="mt-2 w-full rounded-xl border-2 border-slate-200 px-3 py-2.5 text-sm font-medium" /></div>
                 <div><label className="block text-xs font-black uppercase tracking-[0.12em] text-slate-500" htmlFor="aggravating">What makes it worse?</label><textarea id="aggravating" value={aggravatingFactors} onChange={(e) => setAggravatingFactors(e.target.value)} rows={2} className="mt-2 w-full rounded-xl border-2 border-slate-200 px-3 py-2.5 text-sm font-medium" /></div>
                 <div><label className="block text-xs font-black uppercase tracking-[0.12em] text-slate-500" htmlFor="relieving">What makes it better?</label><textarea id="relieving" value={relievingFactors} onChange={(e) => setRelievingFactors(e.target.value)} rows={2} className="mt-2 w-full rounded-xl border-2 border-slate-200 px-3 py-2.5 text-sm font-medium" /></div>
               </div>
@@ -329,8 +351,13 @@ export default function LogSymptomPage() {
                       <div className="grid gap-4 sm:grid-cols-2">
                         <div><label className="block text-xs font-black uppercase tracking-[0.12em] text-slate-500">Did it improve the symptom?</label><select value={medicationImproved} onChange={(e) => setMedicationImproved(e.target.value)} className="mt-2 min-h-12 w-full rounded-xl border-2 border-slate-200 px-3 text-sm font-semibold"><option value="">Not sure</option><option value="YES">Yes</option><option value="NO">No</option></select></div>
                         <div><label className="block text-xs font-black uppercase tracking-[0.12em] text-slate-500" htmlFor="effectiveness">How effective was it? <span className="font-medium normal-case tracking-normal text-slate-400">0–10</span></label><input id="effectiveness" type="number" min={0} max={10} inputMode="numeric" value={medicationEffectiveness} onChange={(e) => setMedicationEffectiveness(e.target.value)} placeholder="Not sure" className="mt-2 min-h-12 w-full rounded-xl border-2 border-slate-200 px-3 text-sm font-semibold" /></div>
+                        <div><label className="block text-xs font-black uppercase tracking-[0.12em] text-slate-500" htmlFor="improvementPercentage">How much did it help? <span className="font-medium normal-case tracking-normal text-slate-400">0–100%</span></label><input id="improvementPercentage" type="number" min={0} max={100} inputMode="numeric" value={medicationImprovementPercentage} onChange={(e) => setMedicationImprovementPercentage(e.target.value)} placeholder="Not sure" className="mt-2 min-h-12 w-full rounded-xl border-2 border-slate-200 px-3 text-sm font-semibold" /></div>
+                        <div><label className="block text-xs font-black uppercase tracking-[0.12em] text-slate-500" htmlFor="medicationStartedAt">When did you start this medicine?</label><input id="medicationStartedAt" type="datetime-local" value={medicationStartedAt} onChange={(e) => setMedicationStartedAt(e.target.value)} className="mt-2 min-h-12 w-full rounded-xl border-2 border-slate-200 px-3 text-sm font-semibold" /></div>
+                        <div><label className="block text-xs font-black uppercase tracking-[0.12em] text-slate-500" htmlFor="improvementObservedAt">When did you notice an improvement?</label><input id="improvementObservedAt" type="datetime-local" value={medicationImprovementObservedAt} onChange={(e) => setMedicationImprovementObservedAt(e.target.value)} className="mt-2 min-h-12 w-full rounded-xl border-2 border-slate-200 px-3 text-sm font-semibold" /></div>
+                        <div><label className="block text-xs font-black uppercase tracking-[0.12em] text-slate-500" htmlFor="medicationStoppedAt">When did you stop this medicine?</label><input id="medicationStoppedAt" type="datetime-local" value={medicationStoppedAt} onChange={(e) => setMedicationStoppedAt(e.target.value)} className="mt-2 min-h-12 w-full rounded-xl border-2 border-slate-200 px-3 text-sm font-semibold" /></div>
                       </div>
                       <div><label className="block text-xs font-black uppercase tracking-[0.12em] text-slate-500" htmlFor="sideEffects">What changed after taking it?</label><textarea id="sideEffects" value={medicationSideEffects} onChange={(e) => setMedicationSideEffects(e.target.value)} rows={3} placeholder="Any side effect, improvement, or other change you noticed" className="mt-2 w-full rounded-xl border-2 border-slate-200 px-3 py-2.5 text-sm font-medium" /></div>
+                      <div><label className="block text-xs font-black uppercase tracking-[0.12em] text-slate-500" htmlFor="medicationNotes">Medicine notes</label><textarea id="medicationNotes" value={medicationNotes} onChange={(e) => setMedicationNotes(e.target.value)} rows={2} placeholder="Anything else about the medicine or its effect" className="mt-2 w-full rounded-xl border-2 border-slate-200 px-3 py-2.5 text-sm font-medium" /></div>
                     </div>
                   )}
                 </div>
