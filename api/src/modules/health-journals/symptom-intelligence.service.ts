@@ -126,26 +126,15 @@ export class SymptomIntelligenceService {
     }
 
     if (dto.medicationId) {
+      // medicationId identifies a canonical Medication from Sympto's seeded
+      // medication library. A patient does not need to have that medicine on
+      // their medication record to report that they took/used it for a symptom.
       const medication = await this.prisma.medication.findUnique({
         where: { id: dto.medicationId },
         select: { id: true },
       });
       if (!medication) {
         throw new BadRequestException('Selected medication could not be found.');
-      }
-
-      const patientMedication = patient.healthPassport?.id
-        ? await this.prisma.patientMedication.findFirst({
-            where: {
-              healthPassportId: patient.healthPassport.id,
-              medicationId: dto.medicationId,
-            },
-            select: { id: true },
-          })
-        : null;
-
-      if (!patientMedication) {
-        throw new BadRequestException('Selected medication is not on this patient’s medication record.');
       }
     }
 
