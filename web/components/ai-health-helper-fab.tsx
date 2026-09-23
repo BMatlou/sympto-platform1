@@ -164,6 +164,7 @@ export default function AIHealthHelperFab() {
     if (draft.severity) params.set("severity", draft.severity);
     if (draft.onsetLabel) params.set("started", draft.onsetLabel);
     if (draft.location) params.set("location", draft.location);
+    if (draft.medicationName) params.set("reportedMedicationName", draft.medicationName);
 
     return `/log-symptom?${params.toString()}`;
   }, [talkResult]);
@@ -370,6 +371,20 @@ export default function AIHealthHelperFab() {
                     <p className="mt-3 text-xs font-semibold text-slate-600">
                       Location · {talkResult.intelligence.draft.location}
                     </p>
+                  )}
+
+                  {talkResult.intelligence.draft.medicationName && (
+                    <div className="mt-3 rounded-xl border border-amber-200 bg-amber-50 p-3">
+                      <p className="text-[9px] font-black uppercase tracking-[0.12em] text-amber-700">
+                        Medicine mentioned
+                      </p>
+                      <p className="mt-1 text-sm font-bold text-amber-950">
+                        {talkResult.intelligence.draft.medicationName}
+                      </p>
+                      <p className="mt-1 text-xs leading-5 text-amber-800">
+                        Sympto recorded this as something you said you took. It is not being treated as a prescribed medicine.
+                      </p>
+                    </div>
                   )}
 
                   {talkResult.intelligence.draft.followUpQuestion && (
