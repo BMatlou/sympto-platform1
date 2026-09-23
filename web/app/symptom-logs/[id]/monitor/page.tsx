@@ -230,15 +230,29 @@ export default function MonitorSymptomPage({ params }: { params: Promise<{ id: s
               </section>
             )}
 
-                        <div>
-              <button type="button" onClick={() => setShowMedicine((value) => !value)} className="flex w-full items-center justify-between gap-3 rounded-[18px] border border-slate-200 bg-white px-4 py-3.5 text-left shadow-sm">
-                setShowMedicine((value) => !value)} className="flex w-full items-center justify-between gap-3 text-left">
-                <div><p className="text-sm font-black text-[#0b2d54]">Medicine</p><p className="mt-1 text-[11px] text-slate-500">{medication.medicationId || medication.reportedMedicationName ? "Medicine context added" : "Optional — tell Sympto what you took."}</p></div>
+            <div>
+              <button
+                type="button"
+                onClick={() => setShowMedicine((value) => !value)}
+                className="flex w-full items-center justify-between gap-3 rounded-[18px] border border-slate-200 bg-white px-4 py-3.5 text-left shadow-sm"
+              >
+                <div>
+                  <p className="text-sm font-black text-[#0b2d54]">Medicine</p>
+                  <p className="mt-1 text-[11px] text-slate-500">{medication.medicationId || medication.reportedMedicationName ? "Medicine context added" : "Optional — tell Sympto what you took."}</p>
+                </div>
                 <ChevronDown className={"h-5 w-5 text-slate-400 transition " + (showMedicine ? "rotate-180" : "")} />
               </button>
-              <div className="mt-3">
-                {showMedicine && <SymptomMedicationPicker activeMedications={activeMedications} value={medication} onChange={setMedication} />}
-              </div>
+              {showMedicine && (
+                <div className="mt-3">
+                  <SymptomMedicationPicker activeMedications={activeMedications} value={medication} onChange={setMedication} />
+                  {(medication.medicationId || medication.reportedMedicationName) && (
+                    <div className="mt-4 grid gap-3 sm:grid-cols-2">
+                      <input type="number" min={0} max={10} value={medicationEffectiveness} onChange={(event) => setMedicationEffectiveness(event.target.value)} placeholder="Effectiveness 0–10" className="min-h-11 rounded-xl border border-slate-200 bg-white px-3 text-sm font-semibold" />
+                      <textarea value={medicationSideEffects} onChange={(event) => setMedicationSideEffects(event.target.value)} rows={2} placeholder="Any side effects?" className="w-full resize-none rounded-xl border border-slate-200 bg-white px-3 py-3 text-sm font-semibold leading-5" />
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
             <button type="button" onClick={() => setAdvanced((value) => !value)} className="flex w-full items-center justify-between rounded-[22px] border border-slate-200 bg-[#fbfdfd] p-4 text-left">
               <div><p className="text-sm font-black text-[#0b2d54]">{advanced ? "Hide extra details" : "Add more details"}</p><p className="mt-1 text-[11px] text-slate-500">Only add these when they help explain what changed.</p></div>
