@@ -112,6 +112,11 @@ export class ProcessSymptomDto {
   details?: string;
 
   @IsOptional()
+  @IsString()
+  @MaxLength(300)
+  reportedMedicationName?: string;
+
+  @IsOptional()
   @IsUUID()
   medicationId?: string;
 
