@@ -694,7 +694,16 @@ export class SymptomIntelligenceService {
         symptomName: symptomLog.title ?? 'Symptom',
         baseline: { severity: baselineSeverity, startedAt: new Date(symptomLog.startedAt).toISOString(), location: baseline?.location ?? null, notes: baseline?.notes ?? symptomLog.notes ?? null },
         monitoring: monitorings.map((item: any) => ({ observedAt: new Date(item.observedAt).toISOString(), severity: item.severity, progression: item.progression ?? null, suspectedTrigger: item.suspectedTrigger ?? null, aggravatingFactors: item.aggravatingFactors ?? null, relievingFactors: item.relievingFactors ?? null, notes: item.notes ?? null })),
-        medicationEffects: (symptomLog.medicationEffects ?? []).map((effect: any) => ({ medication: effect.medication?.name ?? effect.medication?.genericName ?? effect.medication?.brandName ?? 'Linked medicine', improved: effect.improved ?? null, effectiveness: effect.effectiveness ?? null, sideEffects: effect.sideEffects ?? null })),
+        medicationEffects: (symptomLog.medicationEffects ?? []).map((effect: any) => ({
+          medication: effect.reportedMedicationName?.trim() ||
+            effect.medication?.name ||
+            effect.medication?.genericName ||
+            effect.medication?.brandName ||
+            'Linked medicine',
+          improved: effect.improved ?? null,
+          effectiveness: effect.effectiveness ?? null,
+          sideEffects: effect.sideEffects ?? null,
+        })),
         connectedContext: { activeMedicationCount: context.activeMedicationCount, activeConditionCount: context.conditionCount, activeGoalCount: context.activeGoalCount, recentVitals: context.recentVitals.slice(0, 8).map((vital) => ({ type: vital.type, value: vital.value, measuredAt: new Date(vital.measuredAt).toISOString() })) },
       });
     } catch { ai = null; }
