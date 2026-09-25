@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import type { ReactNode } from "react";
-import { Activity, ArrowRight, Bell, CalendarDays, CheckCircle2, ChevronRight, ClipboardList, FileText, FolderOpen, HeartPulse, House, MapPin, ShieldCheck, Sparkles, UserRound } from "lucide-react";
+import { ArrowRight, Bell, CalendarDays, CheckCircle2, ChevronRight, FileText, FolderOpen, HeartPulse, House, ShieldCheck, Sparkles, UserRound } from "lucide-react";
 import { useDashboard } from "@/hooks/use-dashboard";
 import ProtectedRoute from "@/components/auth/protected-route";
 
@@ -111,44 +111,6 @@ function ProgressStrip({
         />
       </div>
     </div>
-  );
-}
-
-function FeedRow({
-  icon: Icon,
-  title,
-  meta,
-  time,
-  accent,
-  href,
-}: {
-  icon: typeof CalendarDays;
-  title: string;
-  meta: string;
-  time: string;
-  accent: string;
-  href: string;
-}) {
-  return (
-    <ActionLink
-      href={href}
-      className="group flex items-center gap-3 rounded-2xl px-2 py-3 hover:bg-[#F7FAFB]"
-    >
-      <span className={`grid h-10 w-10 shrink-0 place-items-center rounded-full ${accent}`}>
-        <Icon className="h-4 w-4 text-white" aria-hidden="true" />
-      </span>
-      <span className="min-w-0 flex-1">
-        <span className="block truncate text-[11px] font-black text-[#17344F]">
-          {title}
-        </span>
-        <span className="mt-0.5 block truncate text-[10px] font-medium text-[#8A99A8]">
-          {meta}
-        </span>
-      </span>
-      <span className="shrink-0 text-[9px] font-black uppercase tracking-[0.08em] text-[#A0AFBA]">
-        {time}
-      </span>
-    </ActionLink>
   );
 }
 
@@ -316,67 +278,12 @@ export default function HealthHome() {
     4,
   );
 
-  const latestVital = [...healthVitals].sort((a, b) => new Date(String(b.measuredAt ?? 0)).getTime() - new Date(String(a.measuredAt ?? 0)).getTime())[0];
 
-  const feedItems = [
-    ...appointments.slice(0, 2).map((item: any) => ({
-      icon: CalendarDays,
-      title: display(item?.title ?? item?.name ?? item?.type, "Upcoming visit"),
-      meta: display(
-        item?.provider?.name ?? item?.providerName ?? item?.location,
-        "Care appointment",
-      ),
-      time: formatDashboardDate(
-        item?.scheduledAt ?? item?.appointmentDate ?? item?.date,
-        "Upcoming",
-      ),
-      accent: "bg-[#177E89]",
-      href: "/today",
-      sort: new Date(
-        String(item?.scheduledAt ?? item?.appointmentDate ?? item?.date ?? 0),
-      ).getTime(),
-    })),
-    ...encounters.slice(0, 2).map((item: any) => ({
-      icon: ClipboardList,
-      title: display(item?.title ?? item?.type ?? item?.reason, "Care encounter"),
-      meta: "Health journal",
-      time: formatDashboardDate(item?.occurredAt ?? item?.encounterDate ?? item?.date),
-      accent: "bg-[#177E89]",
-      href: "/health-journal",
-      sort: new Date(
-        String(item?.occurredAt ?? item?.encounterDate ?? item?.date ?? 0),
-      ).getTime(),
-    })),
-    ...laboratoryResults.slice(0, 1).map((item: any) => ({
-      icon: Activity,
-      title: display(item?.name ?? item?.testName ?? item?.title, "Laboratory result"),
-      meta: "Lab result",
-      time: formatDashboardDate(item?.resultDate ?? item?.createdAt ?? item?.date),
-      accent: "bg-[#0F5A62]",
-      href: "/health-journal",
-      sort: new Date(
-        String(item?.resultDate ?? item?.createdAt ?? item?.date ?? 0),
-      ).getTime(),
-    })),
-    ...attachments.slice(0, 1).map((item: any) => ({
-      icon: FileText,
-      title: display(item?.name ?? item?.fileName ?? item?.title, "Health document"),
-      meta: "Document",
-      time: formatDashboardDate(item?.createdAt ?? item?.uploadedAt ?? item?.date),
-      accent: "bg-[#24C1C4]",
-      href: "/health-journal",
-      sort: new Date(
-        String(item?.createdAt ?? item?.uploadedAt ?? item?.date ?? 0),
-      ).getTime(),
-    })),
-  ]
-    .sort((a, b) => (Number.isFinite(b.sort) ? b.sort : 0) - (Number.isFinite(a.sort) ? a.sort : 0))
-    .slice(0, 5);
 
   return (
     <ProtectedRoute>
       <main className="min-h-screen bg-[#F8FAFC] text-[#16324A]">
-        <div className="mx-auto grid max-w-[1500px] grid-cols-1 gap-4 px-3 pb-8 pt-20 sm:px-5 sm:pt-24 lg:grid-cols-[82px_minmax(0,1fr)] lg:gap-5 xl:grid-cols-[82px_minmax(0,1fr)_300px]">
+        <div className="mx-auto grid max-w-[1500px] grid-cols-1 gap-4 px-3 pb-8 pt-20 sm:px-5 sm:pt-24 lg:grid-cols-[82px_minmax(0,1fr)] lg:gap-5">
           <aside className="hidden lg:sticky lg:top-24 lg:flex lg:h-[calc(100vh-8rem)] lg:flex-col lg:items-center lg:justify-between lg:rounded-3xl lg:bg-gradient-to-b lg:from-[#0F5A62] lg:to-[#177E89] lg:px-2.5 lg:py-4 lg:shadow-[0_10px_40px_rgba(0,0,0,0.02)]">
             <div className="flex w-full flex-col items-center gap-2">
               <div className="grid h-11 w-11 place-items-center rounded-2xl bg-white/10 ring-1 ring-white/15">
@@ -437,7 +344,7 @@ export default function HealthHome() {
               </ActionLink>
             </div>
 
-            <div className="grid gap-5 xl:grid-cols-[minmax(0,1.55fr)_minmax(280px,0.7fr)]">
+            <div className="grid gap-5 xl:grid-cols-[minmax(0,1.7fr)_minmax(300px,0.8fr)]">
               <section className="relative overflow-hidden rounded-3xl bg-[#177E89] p-5 text-white shadow-[0_10px_40px_rgba(0,0,0,0.02)] sm:p-6">
                 <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(90deg,rgba(255,255,255,0.055)_1px,transparent_1px),linear-gradient(rgba(255,255,255,0.055)_1px,transparent_1px)] bg-[size:32px_32px]" />
                 <div className="relative">
@@ -670,67 +577,7 @@ export default function HealthHome() {
             </div>
           </section>
 
-          <aside className="min-w-0 rounded-3xl border border-[#E3EBEF] bg-white p-4 shadow-[0_10px_40px_rgba(0,0,0,0.02)] xl:sticky xl:top-24 xl:h-[calc(100vh-8rem)]">
-            <div className="flex items-center justify-between gap-3 border-b border-[#EEF2F4] px-1 pb-4">
-              <div>
-                <p className="text-[9px] font-black uppercase tracking-[0.16em] text-[#177E89]">Health feed</p>
-                <h2 className="mt-1 text-lg font-black tracking-[-0.04em] text-[#0B2D54]">Recent activity</h2>
-              </div>
-              <Activity className="h-4 w-4 text-[#24C1C4]" aria-hidden="true" />
-            </div>
 
-            <div className="mt-2">
-              {feedItems.length ? (
-                feedItems.map((item, index) => (
-                  <FeedRow
-                    key={`${item.title}-${item.time}-${index}`}
-                    icon={item.icon}
-                    title={item.title}
-                    meta={item.meta}
-                    time={item.time}
-                    accent={item.accent}
-                    href={item.href}
-                  />
-                ))
-              ) : (
-                <div className="rounded-2xl bg-[#F7FAFB] px-4 py-5 text-center">
-                  <p className="text-[11px] font-black text-[#64798D]">Your health activity will appear here.</p>
-                  <p className="mt-1 text-[10px] leading-5 text-[#95A4AF]">
-                    Add a visit, record or health update to start your feed.
-                  </p>
-                </div>
-              )}
-            </div>
-
-            <div className="mt-4 border-t border-[#EEF2F4] pt-4">
-              <div className="flex items-center justify-between gap-3">
-                <div>
-                  <p className="text-[9px] font-black uppercase tracking-[0.15em] text-[#177E89]">Care map</p>
-                  <p className="mt-1 text-[10px] text-[#8A99A8]">Your workspace pathways</p>
-                </div>
-                <MapPin className="h-4 w-4 text-[#24C1C4]" aria-hidden="true" />
-              </div>
-
-              <div className="relative mt-3 h-[190px] overflow-hidden rounded-2xl border border-[#E7EEF1] bg-[#F7FAFB]">
-                <div className="absolute inset-0 opacity-60 bg-[linear-gradient(90deg,#E7EEF1_1px,transparent_1px),linear-gradient(#E7EEF1_1px,transparent_1px)] bg-[size:22px_22px]" />
-                <div className="absolute left-[16%] top-[28%] h-2 w-2 rounded-full bg-[#24C1C4] ring-4 ring-[#24C1C4]/15" />
-                <div className="absolute left-[54%] top-[50%] h-2.5 w-2.5 rounded-full bg-[#0F5A62] ring-4 ring-[#0F5A62]/15" />
-                <div className="absolute right-[16%] bottom-[24%] h-2 w-2 rounded-full bg-[#0F5A62] ring-4 ring-[#0F5A62]/15" />
-                <div className="absolute left-[17%] top-[30%] h-px w-[39%] rotate-[23deg] bg-[#24C1C4]/60" />
-                <div className="absolute left-[56%] top-[55%] h-px w-[31%] -rotate-[24deg] bg-[#0F5A62]/55" />
-
-                <div className="absolute left-3 top-3 rounded-full bg-white/90 px-2.5 py-1 text-[8px] font-black uppercase tracking-[0.1em] text-[#177E89] shadow-sm">
-                  Today
-                </div>
-                <div className="absolute left-1/2 top-[43%] -translate-x-1/2 rounded-full bg-white/90 px-2.5 py-1 text-[8px] font-black uppercase tracking-[0.1em] text-[#0F5A62] shadow-sm">
-                  Clinic
-                </div>
-                <div className="absolute bottom-3 right-3 rounded-full bg-white/90 px-2.5 py-1 text-[8px] font-black uppercase tracking-[0.1em] text-[#0F5A62] shadow-sm">
-                  Records
-                </div>
-              </div>
-            </div>
-          </aside>
         </div>
       </main>
     </ProtectedRoute>
