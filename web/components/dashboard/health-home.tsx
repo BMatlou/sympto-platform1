@@ -61,16 +61,6 @@ function itemNames(
     .filter(Boolean) as string[];
 }
 
-function countActiveGoals(data: any) {
-  return (Array.isArray(data?.goals) ? data.goals : []).filter(
-    (goal: any) =>
-      !["ACHIEVED", "ARCHIVED", "CANCELLED", "DELETED"].includes(
-        String(goal?.status ?? "").toUpperCase(),
-      ),
-  ).length;
-}
-
-
 function ActionLink({
   href,
   children,
@@ -154,23 +144,11 @@ export default function HealthHome() {
     data.profile?.firstName ||
     "Dankie";
 
-  const medications = Array.isArray(data.today?.activeMedications)
-    ? data.today.activeMedications
-    : [];
-  const appointments = Array.isArray(data.today?.upcomingAppointments)
-    ? data.today.upcomingAppointments
-    : [];
-
-  const activeGoalCount = countActiveGoals(data);
-  const todayActionCount = medications.length + appointments.length + activeGoalCount;
-
-
-
   return (
     <ProtectedRoute>
       <main className="min-h-screen bg-[#F8FAFC] text-[#16324A]">
         <div className="mx-auto grid max-w-[1500px] grid-cols-1 gap-4 px-3 pb-8 pt-20 sm:px-5 sm:pt-24 lg:grid-cols-[82px_minmax(0,1fr)] lg:gap-5">
-          <aside className="hidden lg:sticky lg:top-24 lg:flex lg:h-[calc(100vh-8rem)] lg:flex-col lg:items-center lg:justify-between lg:rounded-3xl lg:bg-gradient-to-b lg:from-[#0F5A62] lg:to-[#177E89] lg:px-2.5 lg:py-4 lg:shadow-[0_10px_40px_rgba(0,0,0,0.02)]">
+          <aside className="hidden lg:sticky lg:top-24 lg:flex lg:h-[calc(100vh-8rem)] lg:flex-col lg:items-center lg:justify-between lg:rounded-3xl lg:bg-gradient-to-b lg:from-[#0B2D54] lg:to-[#24C1C4] lg:px-2.5 lg:py-4 lg:shadow-[0_10px_40px_rgba(0,0,0,0.02)]">
             <div className="flex w-full flex-col items-center gap-2">
               <div className="grid h-11 w-11 place-items-center rounded-2xl bg-white/10 ring-1 ring-white/15">
                 <HeartPulse className="h-5 w-5 text-[#9AF6F4]" aria-hidden="true" />
@@ -188,7 +166,7 @@ export default function HealthHome() {
                   href={href}
                   ariaLabel={label}
                   className={
-                    `grid h-11 w-11 place-items-center rounded-2xl ${index === 0 ? "bg-white text-[#0F5A62] shadow-sm" : "text-white/[0.72] hover:bg-white/10 hover:text-white"}`
+                    `grid h-11 w-11 place-items-center rounded-2xl ${index === 0 ? "bg-white text-[#0B2D54] shadow-sm" : "text-white/[0.72] hover:bg-white/10 hover:text-white"}`
                   }
                 >
                   <Icon className="h-[18px] w-[18px]" aria-hidden="true" />
@@ -234,9 +212,6 @@ export default function HealthHome() {
                       </p>
                     </div>
 
-                    <div className="hidden h-14 w-14 place-items-center rounded-2xl bg-white/[0.08] ring-1 ring-white/10 sm:grid">
-                      <CheckCircle2 className="h-5 w-5 text-[#9AF6F4]" aria-hidden="true" />
-                    </div>
                   </div>
                 </div>
               </section>
@@ -259,7 +234,7 @@ export default function HealthHome() {
                     </span>
                   </div>
                   <div className="relative">
-                    <p className="text-[9px] font-black uppercase tracking-[0.17em] text-[#0F5A62]">
+                    <p className="text-[9px] font-black uppercase tracking-[0.17em] text-[#0B2D54]">
                       Monitor
                     </p>
                     <p className="mt-1 text-[22px] font-black tracking-[-0.045em]">
@@ -283,7 +258,7 @@ export default function HealthHome() {
                   <div>
                     <div className="flex items-center gap-2">
                       <span className="h-1.5 w-1.5 rounded-full bg-[#24C1C4] shadow-[0_0_10px_rgba(36,193,196,0.65)]" />
-                      <p className="text-[9px] font-black uppercase tracking-[0.17em] text-[#177E89]">
+                      <p className="text-[9px] font-black uppercase tracking-[0.17em] text-[#24C1C4]">
                         Your health, at a glance
                       </p>
                     </div>
@@ -303,9 +278,9 @@ export default function HealthHome() {
                     <div className="relative flex h-full flex-col">
                       <div className="flex items-start justify-between gap-3">
                         <span className="grid h-11 w-11 place-items-center rounded-2xl bg-[#DDF7F5] ring-1 ring-[#24C1C4]/25">
-                          <CheckCircle2 className="h-5 w-5 text-[#0F5A62]" aria-hidden="true" />
+                          <CheckCircle2 className="h-5 w-5 text-[#0B2D54]" aria-hidden="true" />
                         </span>
-                        <span className="text-[8px] font-black uppercase tracking-[0.12em] text-[#177E89]">
+                        <span className="text-[8px] font-black uppercase tracking-[0.12em] text-[#24C1C4]">
                           Daily care
                         </span>
                       </div>
@@ -315,8 +290,8 @@ export default function HealthHome() {
                           What you need to do, monitor and follow up today.
                         </p>
                         <div className="mt-4 flex items-center justify-between gap-3">
-                          <span className="text-[9px] font-black uppercase tracking-[0.12em] text-[#0F5A62]">Open today</span>
-                          <span className="grid h-8 w-8 place-items-center rounded-full bg-[#0F5A62] text-white transition-transform group-hover:translate-x-1">
+                          <span className="text-[9px] font-black uppercase tracking-[0.12em] text-[#0B2D54]">Open today</span>
+                          <span className="grid h-8 w-8 place-items-center rounded-full bg-[#0B2D54] text-white transition-transform group-hover:translate-x-1">
                             <ArrowRight className="h-3.5 w-3.5" aria-hidden="true" />
                           </span>
                         </div>
@@ -357,13 +332,13 @@ export default function HealthHome() {
                     href="/health-journal"
                     className="group relative min-h-[180px] overflow-hidden rounded-[26px] border border-[#BFD9DA] bg-gradient-to-br from-[#F1F9F8] via-white to-[#F7FBFB] p-5 shadow-[0_10px_30px_rgba(15,90,98,0.045)] transition-all duration-200 hover:-translate-y-0.5 hover:shadow-[0_18px_36px_rgba(15,90,98,0.10)]"
                   >
-                    <div className="pointer-events-none absolute -right-8 -top-8 h-24 w-24 rounded-full bg-[#177E89]/12 blur-2xl" />
+                    <div className="pointer-events-none absolute -right-8 -top-8 h-24 w-24 rounded-full bg-[#24C1C4]/12 blur-2xl" />
                     <div className="relative flex h-full flex-col">
                       <div className="flex items-start justify-between gap-3">
-                        <span className="grid h-11 w-11 place-items-center rounded-2xl bg-[#E4F3F3] ring-1 ring-[#0F5A62]/20">
-                          <FolderOpen className="h-5 w-5 text-[#0F5A62]" aria-hidden="true" />
+                        <span className="grid h-11 w-11 place-items-center rounded-2xl bg-[#E4F3F3] ring-1 ring-[#0B2D54]/20">
+                          <FolderOpen className="h-5 w-5 text-[#0B2D54]" aria-hidden="true" />
                         </span>
-                        <span className="text-[8px] font-black uppercase tracking-[0.12em] text-[#0F5A62]">
+                        <span className="text-[8px] font-black uppercase tracking-[0.12em] text-[#0B2D54]">
                           My history & papers
                         </span>
                       </div>
@@ -373,8 +348,8 @@ export default function HealthHome() {
                           Your health story, results and documents in one place.
                         </p>
                         <div className="mt-4 flex items-center justify-between gap-3">
-                          <span className="text-[9px] font-black uppercase tracking-[0.12em] text-[#0F5A62]">Open records</span>
-                          <span className="grid h-8 w-8 place-items-center rounded-full bg-[#0F5A62] text-white transition-transform group-hover:translate-x-1">
+                          <span className="text-[9px] font-black uppercase tracking-[0.12em] text-[#0B2D54]">Open records</span>
+                          <span className="grid h-8 w-8 place-items-center rounded-full bg-[#0B2D54] text-white transition-transform group-hover:translate-x-1">
                             <ArrowRight className="h-3.5 w-3.5" aria-hidden="true" />
                           </span>
                         </div>
