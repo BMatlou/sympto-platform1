@@ -422,7 +422,7 @@ export default function HealthHome() {
                   <p className="text-[10px] font-black uppercase tracking-[0.18em] text-[#0B2D54]/55">Your health</p>
                 </div>
 
-                <div id="dashboard-health-cards" className="grid gap-4 md:grid-cols-3">
+                <div className="grid gap-4 md:grid-cols-3">
                   <ActionLink
                     id="dashboard-today-card"
                     href="/today"
