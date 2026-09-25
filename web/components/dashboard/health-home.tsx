@@ -318,7 +318,7 @@ export default function HealthHome() {
         <div className="mx-auto max-w-[1480px] pb-2">
           <section className="min-w-0">
             <div className="px-4 pb-1 pt-3 sm:px-5 lg:px-7">
-              <div className="mt-3 grid gap-3 xl:grid-cols-[minmax(0,1.55fr)_minmax(320px,0.85fr)]">
+              <div id="dashboard-card-stack" className="mt-3 grid gap-3 xl:grid-cols-[minmax(0,1.55fr)_minmax(320px,0.85fr)]">
                 <section className="group relative min-h-[220px] overflow-hidden rounded-[28px] bg-[#0B2D54] p-6 text-white sm:p-7">
                   <div className="relative flex min-h-[166px] items-center justify-between gap-8">
                     <div className="min-w-0">
@@ -498,6 +498,7 @@ export default function HealthHome() {
                   </ActionLink>
                 </div>
               </section>
+              </div>
             </div>
           </section>
         </div>
