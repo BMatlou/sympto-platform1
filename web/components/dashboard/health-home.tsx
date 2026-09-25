@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import type { ReactNode } from "react";
 import { useDashboard } from "@/hooks/use-dashboard";
 import ProtectedRoute from "@/components/auth/protected-route";
 
@@ -75,7 +76,7 @@ function ActionLink({
   ariaLabel,
 }: {
   href: string;
-  children: React.ReactNode;
+  children: ReactNode;
   className?: string;
   ariaLabel?: string;
 }) {
@@ -107,7 +108,7 @@ function DashboardCard({
   title: string;
   tag: string;
   description: string;
-  children?: React.ReactNode;
+  children?: ReactNode;
   footerLabel?: string;
   accentClass?: string;
 }) {
@@ -317,7 +318,7 @@ export default function HealthHome() {
   return (
     <ProtectedRoute>
       <main className="min-h-screen bg-[#f7fbfb] text-[#14304d]">
-        <div className="mx-auto max-w-2xl px-4 pb-12 pt-4 sm:px-6 sm:pt-6">
+        <div className="mx-auto max-w-2xl px-4 pb-12 pt-20 sm:px-6 sm:pt-24">
           <section className="relative overflow-hidden rounded-t-3xl rounded-b-[42px] bg-gradient-to-b from-[#0F5A62] to-[#177E89] p-5 text-white shadow-[0_16px_38px_rgba(15,90,98,0.14)] sm:p-7">
             <div
               aria-hidden="true"
@@ -329,7 +330,7 @@ export default function HealthHome() {
             />
 
             <div className="relative">
-              <p className="text-[11px] font-bold tracking-[-0.01em] text-white/72">
+              <p className="text-[11px] font-bold tracking-[-0.01em] text-white/70">
                 Good day, {firstName}
               </p>
               <h1 className="mt-3 max-w-md text-3xl font-black tracking-[-0.045em] sm:text-4xl">
