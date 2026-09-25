@@ -677,8 +677,3 @@ export default function HealthHome() {
       </ProtectedRoute>
     );
   }
-
-      </main>
-    </ProtectedRoute>
-  );
-}
