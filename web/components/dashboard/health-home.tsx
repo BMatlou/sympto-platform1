@@ -673,7 +673,9 @@ export default function HealthHome() {
               </div>
             </section>
           </div>
-        </main>
+        </section>
+        </div>
+      </main>
       </ProtectedRoute>
     );
   }
