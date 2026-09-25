@@ -635,33 +635,33 @@ export default function HealthHome() {
 
               <ActionLink
                 href="/health-journal"
-                className="group flex min-h-[280px] flex-col overflow-hidden rounded-3xl border border-[#C7D8F4] bg-white p-5 shadow-[0_10px_40px_rgba(0,0,0,0.02)] transition-all hover:-translate-y-0.5 hover:shadow-[0_16px_40px_rgba(47,111,219,0.08)] sm:p-6"
+                className="group flex min-h-[280px] flex-col overflow-hidden rounded-3xl border border-[#BFD9DA] bg-white p-5 shadow-[0_10px_40px_rgba(0,0,0,0.02)] transition-all hover:-translate-y-0.5 hover:shadow-[0_16px_40px_rgba(15,90,98,0.08)] sm:p-6"
               >
                 <div className="text-center">
-                  <span className="mx-auto grid h-14 w-14 place-items-center rounded-full bg-[#E7EFFF] ring-1 ring-[#4A80E8]/20">
-                    <FolderOpen className="h-6 w-6 text-[#2F6FDB]" aria-hidden="true" />
+                  <span className="mx-auto grid h-14 w-14 place-items-center rounded-full bg-[#E4F3F3] ring-1 ring-[#0F5A62]/20">
+                    <FolderOpen className="h-6 w-6 text-[#0F5A62]" aria-hidden="true" />
                   </span>
-                  <p className="mt-4 text-[9px] font-black uppercase tracking-[0.16em] text-[#2F6FDB]">My history & papers</p>
+                  <p className="mt-4 text-[9px] font-black uppercase tracking-[0.16em] text-[#0F5A62]">My history & papers</p>
                   <h2 className="mt-1 text-[22px] font-black tracking-[-0.045em] text-[#0B2D54]">Records</h2>
                   <p className="mt-2 text-[11px] leading-5 text-[#71839A]">Encounters, results and health documents in one place.</p>
                 </div>
 
                 <div className="mt-5 grid grid-cols-2 gap-2">
-                  <div className="rounded-2xl bg-[#F5F8FF] px-3 py-3">
-                    <p className="text-[8px] font-black uppercase tracking-[0.1em] text-[#8098C8]">Records</p>
-                    <p className="mt-1 text-lg font-black text-[#2F5FAF]">{historyCount}</p>
+                  <div className="rounded-2xl bg-[#F4FAFA] px-3 py-3">
+                    <p className="text-[8px] font-black uppercase tracking-[0.1em] text-[#6C8F94]">Records</p>
+                    <p className="mt-1 text-lg font-black text-[#0F5A62]">{historyCount}</p>
                   </div>
-                  <div className="rounded-2xl bg-[#F5F8FF] px-3 py-3">
-                    <p className="text-[8px] font-black uppercase tracking-[0.1em] text-[#8098C8]">Vitals</p>
-                    <p className="mt-1 text-lg font-black text-[#2F5FAF]">{healthVitals.length}</p>
+                  <div className="rounded-2xl bg-[#F4FAFA] px-3 py-3">
+                    <p className="text-[8px] font-black uppercase tracking-[0.1em] text-[#6C8F94]">Vitals</p>
+                    <p className="mt-1 text-lg font-black text-[#0F5A62]">{healthVitals.length}</p>
                   </div>
                 </div>
 
                 <div className="mt-auto">
-                  <ProgressStrip value={recordsCoverage} accent="bg-[#4A80E8]" label="Record coverage" />
+                  <ProgressStrip value={recordsCoverage} accent="bg-[#0F5A62]" label="Record coverage" />
                   <div className="mt-4 flex items-center justify-between gap-3">
-                    <span className="text-[10px] font-black uppercase tracking-[0.12em] text-[#2F6FDB]">Open records</span>
-                    <span className="inline-flex items-center gap-1.5 rounded-full bg-[#EEF4FF] px-2.5 py-1.5 text-[9px] font-black uppercase tracking-[0.08em] text-[#2F6FDB]">
+                    <span className="text-[10px] font-black uppercase tracking-[0.12em] text-[#0F5A62]">Open records</span>
+                    <span className="inline-flex items-center gap-1.5 rounded-full bg-[#E9F5F5] px-2.5 py-1.5 text-[9px] font-black uppercase tracking-[0.08em] text-[#0F5A62]">
                       <CalendarDays className="h-3 w-3" aria-hidden="true" /> History
                     </span>
                   </div>
@@ -715,9 +715,9 @@ export default function HealthHome() {
                 <div className="absolute inset-0 opacity-60 bg-[linear-gradient(90deg,#E7EEF1_1px,transparent_1px),linear-gradient(#E7EEF1_1px,transparent_1px)] bg-[size:22px_22px]" />
                 <div className="absolute left-[16%] top-[28%] h-2 w-2 rounded-full bg-[#24C1C4] ring-4 ring-[#24C1C4]/15" />
                 <div className="absolute left-[54%] top-[50%] h-2.5 w-2.5 rounded-full bg-[#0F5A62] ring-4 ring-[#0F5A62]/15" />
-                <div className="absolute right-[16%] bottom-[24%] h-2 w-2 rounded-full bg-[#4A80E8] ring-4 ring-[#4A80E8]/15" />
+                <div className="absolute right-[16%] bottom-[24%] h-2 w-2 rounded-full bg-[#0F5A62] ring-4 ring-[#4A80E8]/15" />
                 <div className="absolute left-[17%] top-[30%] h-px w-[39%] rotate-[23deg] bg-[#24C1C4]/60" />
-                <div className="absolute left-[56%] top-[55%] h-px w-[31%] -rotate-[24deg] bg-[#4A80E8]/55" />
+                <div className="absolute left-[56%] top-[55%] h-px w-[31%] -rotate-[24deg] bg-[#0F5A62]/55" />
 
                 <div className="absolute left-3 top-3 rounded-full bg-white/90 px-2.5 py-1 text-[8px] font-black uppercase tracking-[0.1em] text-[#177E89] shadow-sm">
                   Today
@@ -725,7 +725,7 @@ export default function HealthHome() {
                 <div className="absolute left-1/2 top-[43%] -translate-x-1/2 rounded-full bg-white/90 px-2.5 py-1 text-[8px] font-black uppercase tracking-[0.1em] text-[#0F5A62] shadow-sm">
                   Clinic
                 </div>
-                <div className="absolute bottom-3 right-3 rounded-full bg-white/90 px-2.5 py-1 text-[8px] font-black uppercase tracking-[0.1em] text-[#2F6FDB] shadow-sm">
+                <div className="absolute bottom-3 right-3 rounded-full bg-white/90 px-2.5 py-1 text-[8px] font-black uppercase tracking-[0.1em] text-[#0F5A62] shadow-sm">
                   Records
                 </div>
               </div>
