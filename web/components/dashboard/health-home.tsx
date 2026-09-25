@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import type { ReactNode } from "react";
+import { ArrowRight, CheckCircle2, FileText, FolderOpen, ShieldCheck } from "lucide-react";
 import { useDashboard } from "@/hooks/use-dashboard";
 import ProtectedRoute from "@/components/auth/protected-route";
 
@@ -102,7 +103,11 @@ function DashboardCard({
   description,
   children,
   footerLabel = "Open",
-  accentClass,
+  icon: Icon,
+  iconWrapClass,
+  cardClass,
+  badgeClass,
+  footerClass,
 }: {
   href: string;
   title: string;
@@ -110,45 +115,77 @@ function DashboardCard({
   description: string;
   children?: ReactNode;
   footerLabel?: string;
-  accentClass?: string;
+  icon: typeof CheckCircle2;
+  iconWrapClass: string;
+  cardClass: string;
+  badgeClass: string;
+  footerClass: string;
 }) {
   return (
     <ActionLink
       href={href}
       ariaLabel={title}
       className={
-        "group block rounded-3xl border border-slate-200 bg-white p-5 shadow-[0_10px_30px_rgba(0,0,0,0.02)] " +
-        "hover:border-slate-300 hover:shadow-[0_16px_38px_rgba(0,0,0,0.05)] sm:p-6 " +
-        (accentClass ?? "")
+        "group relative block overflow-hidden rounded-3xl border p-5 shadow-[0_10px_30px_rgba(0,0,0,0.02)] " +
+        "transition-all duration-200 hover:-translate-y-0.5 sm:p-6 " +
+        cardClass
       }
     >
-      <div className="flex items-start justify-between gap-4">
-        <div>
-          <h2 className="text-xl font-black tracking-[-0.04em] text-[#0b2d54]">
-            {title}
-          </h2>
-          <p className="mt-1 text-[10px] font-black uppercase tracking-[0.16em] text-slate-400">
-            {tag}
-          </p>
+      <div className="absolute inset-y-0 left-0 w-1.5 bg-current opacity-80" />
+
+      <div className="relative flex items-start justify-between gap-4">
+        <div className="flex min-w-0 items-start gap-3.5">
+          <span
+            className={
+              "grid h-12 w-12 shrink-0 place-items-center rounded-2xl " +
+              iconWrapClass
+            }
+          >
+            <Icon className="h-5.5 w-5.5" aria-hidden="true" />
+          </span>
+
+          <div className="min-w-0">
+            <h2 className="text-xl font-black tracking-[-0.04em] text-[#0b2d54]">
+              {title}
+            </h2>
+            <p
+              className={
+                "mt-1 text-[10px] font-black uppercase tracking-[0.16em] " +
+                badgeClass
+              }
+            >
+              {tag}
+            </p>
+          </div>
         </div>
 
-        <span className="rounded-full bg-slate-50 px-3 py-1.5 text-[9px] font-black uppercase tracking-[0.12em] text-slate-500">
+        <span
+          className={
+            "shrink-0 rounded-full px-3 py-1.5 text-[9px] font-black uppercase tracking-[0.12em] " +
+            badgeClass
+          }
+        >
           {footerLabel}
         </span>
       </div>
 
-      <p className="mt-4 max-w-2xl text-sm leading-6 text-slate-500">
+      <p className="relative mt-5 max-w-2xl text-sm leading-6 text-slate-600">
         {description}
       </p>
 
-      {children ? <div className="mt-5">{children}</div> : null}
+      {children ? <div className="relative mt-5">{children}</div> : null}
 
-      <div className="mt-5 flex items-center justify-between gap-3 border-t border-slate-100 pt-4">
-        <span className="text-[10px] font-black uppercase tracking-[0.14em] text-slate-400">
+      <div
+        className={
+          "relative mt-5 flex items-center justify-between gap-3 border-t pt-4 " +
+          footerClass
+        }
+      >
+        <span className="text-[10px] font-black uppercase tracking-[0.14em]">
           {footerLabel}
         </span>
-        <span className="text-sm font-black text-[#0b2d54] transition-transform duration-200 group-hover:translate-x-1">
-          →
+        <span className="inline-flex h-9 w-9 items-center justify-center rounded-full bg-white/80 ring-1 ring-black/5 transition-transform duration-200 group-hover:translate-x-1">
+          <ArrowRight className="h-4 w-4" aria-hidden="true" />
         </span>
       </div>
     </ActionLink>
@@ -163,7 +200,7 @@ function MetricBadge({
   value: number;
 }) {
   return (
-    <div className="rounded-2xl bg-slate-50 px-3.5 py-3 ring-1 ring-slate-100">
+    <div className="rounded-2xl bg-white/80 px-3.5 py-3 ring-1 ring-black/[0.04] backdrop-blur-sm">
       <p className="text-[9px] font-black uppercase tracking-[0.12em] text-slate-400">
         {label}
       </p>
@@ -187,7 +224,7 @@ function ClinicRow({
     <div
       className={
         "flex items-center justify-between gap-4 rounded-2xl px-4 py-3.5 " +
-        (blood ? "bg-red-50" : "bg-slate-50")
+        (blood ? "bg-red-50 ring-1 ring-red-100" : "bg-white/70 ring-1 ring-slate-100")
       }
     >
       <span className="text-[10px] font-black uppercase tracking-[0.12em] text-slate-400">
@@ -318,7 +355,7 @@ export default function HealthHome() {
   return (
     <ProtectedRoute>
       <main className="min-h-screen bg-[#f7fbfb] text-[#14304d]">
-        <div className="mx-auto max-w-2xl px-4 pb-12 pt-20 sm:px-6 sm:pt-24">
+        <div className="mx-auto max-w-[1180px] px-4 pb-12 pt-20 sm:px-6 sm:pt-24 lg:px-8">
           <section className="relative overflow-hidden rounded-t-3xl rounded-b-[42px] bg-gradient-to-b from-[#0F5A62] to-[#177E89] p-5 text-white shadow-[0_16px_38px_rgba(15,90,98,0.14)] sm:p-7">
             <div
               aria-hidden="true"
@@ -378,6 +415,11 @@ export default function HealthHome() {
               title="Today"
               tag="Today"
               description={`What do I do today? ${todayActionCount} ${todayActionCount === 1 ? "thing needs" : "things need"} your attention.`}
+              icon={CheckCircle2}
+              iconWrapClass="bg-[#E5FAF8] text-[#0B7B80] ring-1 ring-[#24C1C4]/25"
+              cardClass="border-[#B9E7E5] bg-gradient-to-br from-white via-white to-[#F0FCFB] text-[#0B7B80] hover:border-[#24C1C4] hover:shadow-[0_16px_38px_rgba(36,193,196,0.14)]"
+              badgeClass="text-[#0B7B80] bg-[#EAF9F8]"
+              footerClass="border-[#D8EFEE] text-[#0B7B80]"
             >
               <div className="grid grid-cols-3 gap-2.5">
                 <MetricBadge label="Medication" value={medications.length} />
@@ -391,8 +433,11 @@ export default function HealthHome() {
               title="Essentials"
               tag="My Clinic Card"
               description="Your essential health information for quick reference and care."
-              accentClass="border-red-100/80"
-              footerLabel="Open"
+              icon={ShieldCheck}
+              iconWrapClass="bg-[#FFF0F0] text-[#C62828] ring-1 ring-[#E53935]/20"
+              cardClass="border-[#F0B7B7] bg-gradient-to-br from-white via-white to-[#FFF5F5] text-[#C62828] hover:border-[#E53935] hover:shadow-[0_16px_38px_rgba(229,57,53,0.14)]"
+              badgeClass="text-[#B42318] bg-[#FFF1F1]"
+              footerClass="border-[#F3D5D5] text-[#B42318]"
             >
               <div className="space-y-2.5">
                 <ClinicRow label="Allergies" value={allergiesValue} />
@@ -414,7 +459,11 @@ export default function HealthHome() {
               title="Records"
               tag="My History and Papers"
               description="Your encounters, results and important health documents in one place."
-              accentClass="border-slate-200"
+              icon={FolderOpen}
+              iconWrapClass="bg-[#EAF2FF] text-[#2F6FDB] ring-1 ring-[#4A80E8]/20"
+              cardClass="border-[#B9D0F5] bg-gradient-to-br from-white via-white to-[#F2F7FF] text-[#2F6FDB] hover:border-[#4A80E8] hover:shadow-[0_16px_38px_rgba(47,111,219,0.14)]"
+              badgeClass="text-[#2F5FAF] bg-[#EEF4FF]"
+              footerClass="border-[#D8E5FA] text-[#2F5FAF]"
             >
               <div className="grid grid-cols-2 gap-2.5">
                 <MetricBadge label="Records" value={historyCount} />
