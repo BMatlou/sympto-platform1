@@ -384,51 +384,55 @@ export default function HealthHome() {
                 </div>
               </section>
 
-              <section className="group relative flex min-h-[196px] flex-col justify-between overflow-hidden rounded-[32px] bg-gradient-to-br from-[#24C1C4] via-[#24C1C4] to-[#12A7B0] p-5 text-[#0B2D54] shadow-[0_20px_58px_rgba(36,193,196,0.22),inset_0_1px_0_rgba(255,255,255,0.34)] ring-1 ring-inset ring-white/20 sm:p-5">
+              <section className="group relative flex min-h-[196px] flex-col justify-between overflow-hidden rounded-[32px] bg-gradient-to-br from-[#25C9CC] via-[#20BBC0] to-[#0A9DA7] p-5 text-white shadow-[0_0_58px_rgba(36,193,196,0.42),0_24px_70px_rgba(11,45,84,0.16),inset_0_1px_0_rgba(255,255,255,0.42)] ring-1 ring-inset ring-white/25 sm:p-5">
                 <div
                   aria-hidden="true"
-                  className="pointer-events-none absolute -right-14 -top-20 h-52 w-52 rounded-full bg-white/30 blur-3xl transition-transform duration-300 group-hover:scale-110"
+                  className="pointer-events-none absolute -right-20 -top-24 h-64 w-64 rounded-full bg-white/45 blur-3xl transition-transform duration-500 group-hover:scale-110"
                 />
                 <div
                   aria-hidden="true"
-                  className="pointer-events-none absolute -left-20 bottom-[-84px] h-44 w-44 rounded-full bg-[#9AF6F4]/30 blur-3xl transition-transform duration-300 group-hover:translate-x-2"
+                  className="pointer-events-none absolute -left-16 bottom-[-92px] h-52 w-52 rounded-full bg-[#C9FFFF]/45 blur-3xl transition-transform duration-500 group-hover:translate-x-3"
                 />
                 <div
                   aria-hidden="true"
-                  className="pointer-events-none absolute inset-x-10 top-0 h-px bg-white/60"
+                  className="pointer-events-none absolute left-1/3 top-1/2 h-28 w-28 -translate-y-1/2 rounded-full bg-[#7AF4F2]/25 blur-3xl transition-opacity duration-300 group-hover:opacity-100"
                 />
                 <div
                   aria-hidden="true"
-                  className="pointer-events-none absolute -right-24 top-8 h-28 w-56 rotate-[-18deg] rounded-full bg-white/12 blur-2xl"
+                  className="pointer-events-none absolute inset-x-8 top-0 h-px bg-white/75"
+                />
+                <div
+                  aria-hidden="true"
+                  className="pointer-events-none absolute -right-24 top-8 h-32 w-60 rotate-[-18deg] rounded-full bg-white/20 blur-2xl"
                 />
 
                 <div className="relative flex items-start justify-between gap-4">
-                  <span className="grid h-12 w-12 place-items-center rounded-2xl bg-white/30 ring-1 ring-white/40">
-                    <HeartPulse className="h-5 w-5" aria-hidden="true" />
+                  <span className="grid h-12 w-12 place-items-center rounded-2xl bg-white/22 ring-1 ring-white/45 shadow-[0_0_24px_rgba(255,255,255,0.18)]">
+                    <HeartPulse className="h-5 w-5 text-white" aria-hidden="true" />
                   </span>
-                  <span className="text-[10px] font-black uppercase tracking-[0.15em] text-[#0B2D54]/65">
+                  <span className="text-[10px] font-black uppercase tracking-[0.15em] text-white/80">
                     Monitor
                   </span>
                 </div>
 
                 <div className="relative">
-                  <p className="text-[10px] font-black uppercase tracking-[0.15em] text-[#0B2D54]/60">
+                  <p className="text-[10px] font-black uppercase tracking-[0.15em] text-white/72">
                     Recent symptom
                   </p>
 
                   {recentSymptom ? (
                     <>
                       <div className="mt-1 flex items-end justify-between gap-3">
-                        <h2 className="min-w-0 truncate text-[22px] font-black tracking-[-0.045em]">
+                        <h2 className="min-w-0 truncate text-[22px] font-black tracking-[-0.045em] text-white">
                           {symptomLabel(recentSymptom)}
                         </h2>
                         {recentSymptom.overallSeverity && (
-                          <span className="shrink-0 rounded-full bg-white/35 px-2.5 py-1 text-[9px] font-black uppercase tracking-[0.08em]">
+                          <span className="shrink-0 rounded-full bg-white/20 px-2.5 py-1 text-[9px] font-black uppercase tracking-[0.08em] text-white ring-1 ring-inset ring-white/30">
                             {String(recentSymptom.overallSeverity).toLowerCase()}
                           </span>
                         )}
                       </div>
-                      <p className="mt-1 text-[11px] font-semibold text-[#0B2D54]/65">
+                      <p className="mt-1 text-[11px] font-semibold text-white/78">
                         {formatSymptomDate(recentSymptomAt)}
                         {recentSymptomStatus === "ACTIVE" ? " · Active" : ""}
                       </p>
@@ -446,7 +450,7 @@ export default function HealthHome() {
                         </Link>
                         <Link
                           href="/log-symptom"
-                          className="text-[10px] font-black uppercase tracking-[0.1em] text-[#0B2D54]/70 hover:text-[#0B2D54]"
+                          className="text-[10px] font-black uppercase tracking-[0.1em] text-white/80 hover:text-white"
                         >
                           New symptom
                         </Link>
@@ -454,10 +458,10 @@ export default function HealthHome() {
                     </>
                   ) : (
                     <>
-                      <h2 className="mt-1 text-[22px] font-black tracking-[-0.045em]">
+                      <h2 className="mt-1 text-[22px] font-black tracking-[-0.045em] text-white">
                         Log a symptom
                       </h2>
-                      <p className="mt-1 text-[11px] font-semibold text-[#0B2D54]/65">
+                      <p className="mt-1 text-[11px] font-semibold text-white/78">
                         Nothing has been logged yet.
                       </p>
                       <Link
