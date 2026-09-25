@@ -14,7 +14,6 @@ import {
   Menu,
   MessageCircle,
   Pill,
-  QrCode,
   Settings,
   ShieldCheck,
   UserRound,
@@ -106,14 +105,6 @@ export default function HealthNavigation() {
         </button>
       </nav>
 
-      <Link
-        href="/smart-file"
-        aria-label="Share Smart File"
-        className="grid h-10 w-10 shrink-0 place-items-center rounded-2xl bg-[#24C1C4]/10 text-[#0B2D54] transition hover:bg-[#24C1C4]/20 lg:mt-auto"
-      >
-        <QrCode className="h-4.5 w-4.5" aria-hidden="true" />
-      </Link>
-
       {open && (
         <div
           role="menu"
@@ -141,18 +132,6 @@ export default function HealthNavigation() {
                 </Link>
               ))}
             </div>
-          </div>
-          <div className="border-t border-slate-100 px-3 py-3">
-            <Link
-              href="/smart-file"
-              onClick={() => setOpen(false)}
-              className="flex min-h-12 items-center gap-3 rounded-2xl bg-[#24C1C4]/10 px-3 py-3 text-sm font-black text-[#0B2D54]"
-            >
-              <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-white">
-                <QrCode className="h-4 w-4" aria-hidden="true" />
-              </span>
-              Share my Smart File
-            </Link>
           </div>
         </div>
       )}
