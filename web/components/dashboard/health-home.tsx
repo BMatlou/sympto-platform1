@@ -178,7 +178,6 @@ function ActionLink({
 export default function HealthHome() {
   const { data, loading, error, reload } = useDashboard();
   const [symptomFeed, setSymptomFeed] = useState<any[]>([]);
-  const [journalEntries, setJournalEntries] = useState<any[]>([]);
   const [moreOpen, setMoreOpen] = useState(false);
 
   useEffect(() => {
@@ -186,14 +185,10 @@ export default function HealthHome() {
 
     let active = true;
 
-    Promise.all([
-      healthJournalService.getSymptoms({ limit: 100 }),
-      healthJournalService.getAll({ page: 1, limit: 100 }),
-    ])
-      .then(([symptoms, journals]) => {
+    healthJournalService.getSymptoms({ limit: 100 })
+      .then((symptoms) => {
         if (!active) return;
         setSymptomFeed(Array.isArray(symptoms) ? symptoms : []);
-        setJournalEntries(Array.isArray(journals?.data) ? journals.data : []);
       })
       .catch(() => {
         if (!active) return;
@@ -284,23 +279,6 @@ export default function HealthHome() {
     : Array.isArray(data.healthSnapshot?.activeAllergies)
       ? data.healthSnapshot.activeAllergies
       : [];
-
-  const recordedMeasurements = [
-    ...(Array.isArray(data.clinicalVitals) ? data.clinicalVitals : []),
-    ...(Array.isArray(data.healthSnapshot?.latestMeasurements)
-      ? data.healthSnapshot.latestMeasurements
-      : []),
-  ];
-  const uniqueMeasurementCount = new Set(
-    recordedMeasurements
-      .filter((item: any) => item?.measuredAt)
-      .map(
-        (item: any) =>
-          String(item?.type ?? item?.vitalType?.code ?? item?.name ?? "measurement") + "|" +
-          String(item?.value ?? "") + "|" +
-          String(item?.measuredAt),
-      ),
-  ).size;
 
   return (
     <ProtectedRoute>
