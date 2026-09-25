@@ -61,6 +61,15 @@ function itemNames(
     .filter(Boolean) as string[];
 }
 
+function countActiveGoals(data: any) {
+  return (Array.isArray(data?.goals) ? data.goals : []).filter(
+    (goal: any) =>
+      !["ACHIEVED", "ARCHIVED", "CANCELLED", "DELETED"].includes(
+        String(goal?.status ?? "").toUpperCase(),
+      ),
+  ).length;
+}
+
 function ActionLink({
   href,
   children,
@@ -144,6 +153,17 @@ export default function HealthHome() {
     data.profile?.firstName ||
     "Dankie";
 
+  const medications = Array.isArray(data.today?.activeMedications)
+    ? data.today.activeMedications
+    : [];
+  const appointments = Array.isArray(data.today?.upcomingAppointments)
+    ? data.today.upcomingAppointments
+    : [];
+
+  const activeGoalCount = countActiveGoals(data);
+  const todayActionCount =
+    medications.length + appointments.length + activeGoalCount;
+
   return (
     <ProtectedRoute>
       <main className="min-h-screen bg-[#F8FAFC] text-[#16324A]">
@@ -196,29 +216,42 @@ export default function HealthHome() {
                   aria-hidden="true"
                   className="pointer-events-none absolute -bottom-20 left-1/3 h-48 w-48 rounded-full bg-white/[0.08] blur-3xl"
                 />
-                <div
-                  aria-hidden="true"
-                  className="pointer-events-none absolute inset-0 bg-[linear-gradient(90deg,rgba(255,255,255,0.045)_1px,transparent_1px),linear-gradient(rgba(255,255,255,0.045)_1px,transparent_1px)] bg-[size:34px_34px]"
-                />
 
-                <div className="relative flex min-h-[176px] items-center">
-                  <div className="max-w-[34rem]">
-                    <h2 className="text-[34px] font-black tracking-[-0.055em] text-white sm:text-[42px]">
-                      Good day, {firstName}
-                    </h2>
-                    <p className="mt-2 max-w-[28rem] text-[13px] font-medium leading-6 text-white/[0.72]">
-                      Your health, organised around what matters today.
-                    </p>
+                <div className="relative">
+                  <div className="flex items-start justify-between gap-6">
+                    <div className="max-w-[34rem]">
+                      <h2 className="text-[34px] font-black tracking-[-0.055em] text-white sm:text-[42px]">
+                        Good day, {firstName}
+                      </h2>
+                      <p className="mt-2 max-w-[28rem] text-[13px] font-medium leading-6 text-white/[0.72]">
+                        Your health, organised around what matters today.
+                      </p>
+                    </div>
+
+                    <div
+                      aria-hidden="true"
+                      className="pointer-events-none absolute -right-10 top-1/2 hidden h-44 w-44 -translate-y-1/2 rounded-full border border-[#24C1C4]/20 bg-[#24C1C4]/[0.05] shadow-[0_0_80px_rgba(36,193,196,0.10)] sm:block"
+                    />
                   </div>
 
-                  <div
-                    aria-hidden="true"
-                    className="pointer-events-none absolute -right-10 top-1/2 hidden h-44 w-44 -translate-y-1/2 rounded-full border border-[#24C1C4]/20 bg-[#24C1C4]/[0.05] shadow-[0_0_80px_rgba(36,193,196,0.10)] sm:block"
-                  />
-                  <div
-                    aria-hidden="true"
-                    className="pointer-events-none absolute -right-2 top-1/2 hidden h-28 w-28 -translate-y-1/2 rounded-full bg-[#24C1C4]/[0.08] blur-2xl sm:block"
-                  />
+                  <div className="mt-9 flex flex-wrap items-end justify-between gap-6">
+                    <div className="flex items-end gap-3">
+                      <span className="text-[68px] font-black leading-[0.84] tracking-[-0.09em]">
+                        {todayActionCount}
+                      </span>
+                      <p className="pb-1.5 text-[11px] font-black uppercase tracking-[0.13em] text-white/55">
+                        active items
+                      </p>
+                    </div>
+
+                    <ActionLink
+                      href="/today"
+                      className="inline-flex min-h-11 items-center gap-2 rounded-full bg-white px-4 py-2.5 text-[10px] font-black uppercase tracking-[0.08em] text-[#0B2D54] shadow-[0_10px_24px_rgba(0,0,0,0.08)] transition-transform hover:-translate-y-0.5"
+                    >
+                      Open today
+                      <ArrowRight className="h-3.5 w-3.5 text-[#24C1C4]" aria-hidden="true" />
+                    </ActionLink>
+                  </div>
                 </div>
               </section>
 
