@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import type { ReactNode } from "react";
-import { ArrowRight, Bell, CheckCircle2, ChevronRight, FolderOpen, HeartPulse, House, ShieldCheck, Sparkles, UserRound } from "lucide-react";
+import { ArrowRight, Bell, CheckCircle2, FolderOpen, HeartPulse, House, ShieldCheck, UserRound } from "lucide-react";
 import { useDashboard } from "@/hooks/use-dashboard";
 import ProtectedRoute from "@/components/auth/protected-route";
 
@@ -166,7 +166,7 @@ export default function HealthHome() {
 
   return (
     <ProtectedRoute>
-      <main className="min-h-screen bg-[#F8FAFC] text-[#16324A]">
+      <main className="min-h-screen bg-[#F7FBFB] text-[#0B2D54]">
         <div className="mx-auto grid max-w-[1500px] grid-cols-1 gap-4 px-3 pb-8 pt-20 sm:px-5 sm:pt-24 lg:grid-cols-[82px_minmax(0,1fr)] lg:gap-5">
           <aside className="hidden lg:sticky lg:top-24 lg:flex lg:h-[calc(100vh-8rem)] lg:flex-col lg:items-center lg:justify-between lg:rounded-3xl lg:bg-gradient-to-b lg:from-[#0B2D54] lg:to-[#24C1C4] lg:px-2.5 lg:py-4 lg:shadow-[0_10px_40px_rgba(0,0,0,0.02)]">
             <div className="flex w-full flex-col items-center gap-2">
@@ -207,188 +207,146 @@ export default function HealthHome() {
 
           <section className="min-w-0 space-y-5">
             <div className="grid gap-5 xl:grid-cols-[minmax(0,1.65fr)_minmax(320px,0.85fr)]">
-              <section className="group relative overflow-hidden rounded-[32px] bg-[#0B2D54] p-5 text-white shadow-[0_10px_40px_rgba(0,0,0,0.02)] sm:p-7">
+              <section className="group relative overflow-hidden rounded-[32px] bg-[#0B2D54] p-5 text-white shadow-[0_18px_52px_rgba(11,45,84,0.14)] sm:p-7">
                 <div
                   aria-hidden="true"
-                  className="pointer-events-none absolute -right-16 -top-20 h-64 w-64 rounded-full bg-[#24C1C4]/20 blur-3xl"
+                  className="pointer-events-none absolute -right-20 -top-24 h-72 w-72 rounded-full bg-[#24C1C4]/20 blur-3xl"
                 />
                 <div
                   aria-hidden="true"
-                  className="pointer-events-none absolute -bottom-20 left-1/3 h-48 w-48 rounded-full bg-white/[0.08] blur-3xl"
+                  className="pointer-events-none absolute -bottom-24 left-1/3 h-52 w-52 rounded-full bg-white/[0.07] blur-3xl"
                 />
 
-                <div className="relative">
-                  <div className="flex items-start justify-between gap-6">
-                    <div className="max-w-[34rem]">
-                      <h2 className="text-[34px] font-black tracking-[-0.055em] text-white sm:text-[42px]">
-                        Good day, {firstName}
-                      </h2>
-                      <p className="mt-2 max-w-[28rem] text-[13px] font-medium leading-6 text-white/[0.72]">
-                        Your health, organised around what matters today.
-                      </p>
-                    </div>
-
+                <div className="relative flex min-h-[232px] flex-col justify-between gap-10">
+                  <div className="max-w-[40rem]">
+                    <h2 className="text-[34px] font-black tracking-[-0.055em] sm:text-[44px]">
+                      Good day, {firstName}
+                    </h2>
+                    <p className="mt-2 max-w-[30rem] text-[13px] font-medium leading-6 text-white/[0.72]">
+                      Your health, organised around what matters today.
+                    </p>
                   </div>
 
-                  <div className="mt-9 flex flex-wrap items-end justify-between gap-6">
-                    <div className="flex items-end gap-3">
-                      <span className="text-[68px] font-black leading-[0.84] tracking-[-0.09em]">
+                  <div className="flex flex-wrap items-end justify-between gap-6">
+                    <div>
+                      <p className="text-[62px] font-black leading-[0.82] tracking-[-0.08em] sm:text-[72px]">
                         {todayActionCount}
-                      </span>
-                      <p className="pb-1.5 text-[11px] font-black uppercase tracking-[0.13em] text-white/55">
-                        active items
+                      </p>
+                      <p className="mt-2 text-[10px] font-black uppercase tracking-[0.16em] text-white/[0.52]">
+                        things today
                       </p>
                     </div>
 
                     <ActionLink
                       href="/today"
-                      className="inline-flex min-h-11 items-center gap-2 rounded-full bg-white px-4 py-2.5 text-[10px] font-black uppercase tracking-[0.08em] text-[#0B2D54] shadow-[0_10px_24px_rgba(0,0,0,0.08)] transition-transform hover:-translate-y-0.5"
+                      className="inline-flex min-h-11 items-center gap-2 rounded-full bg-[#24C1C4] px-4 py-2.5 text-[10px] font-black uppercase tracking-[0.08em] text-[#0B2D54] shadow-[0_10px_26px_rgba(36,193,196,0.18)] transition-transform hover:-translate-y-0.5"
                     >
                       Open today
-                      <ArrowRight className="h-3.5 w-3.5 text-[#24C1C4]" aria-hidden="true" />
+                      <ArrowRight className="h-3.5 w-3.5" aria-hidden="true" />
                     </ActionLink>
                   </div>
                 </div>
               </section>
 
-              <div className="grid gap-4">
-                <ActionLink
-                  href="/log-symptom"
-                  className="group relative flex min-h-[176px] flex-col justify-between overflow-hidden rounded-[32px] bg-[#24C1C4] p-5 text-white shadow-[0_10px_40px_rgba(0,0,0,0.02)] sm:p-6"
-                >
-                  <div
-                    aria-hidden="true"
-                    className="pointer-events-none absolute -right-12 -top-16 h-44 w-44 rounded-full bg-white/[0.18] blur-3xl transition-transform duration-300 group-hover:scale-110"
-                  />
-                  <div className="relative flex items-start justify-between gap-4">
-                    <span className="grid h-12 w-12 place-items-center rounded-2xl bg-white/[0.14] ring-1 ring-white/25 backdrop-blur-sm">
-                      <HeartPulse className="h-5 w-5 text-white" aria-hidden="true" />
-                    </span>
-                    <span className="rounded-full bg-white/[0.12] px-3 py-1.5 text-[9px] font-black uppercase tracking-[0.11em] text-white/[0.85] ring-1 ring-white/15">
-                      Quick action
-                    </span>
-                  </div>
-                  <div className="relative">
-                    <p className="text-[9px] font-black uppercase tracking-[0.17em] text-[#0B2D54]">
-                      Monitor
-                    </p>
-                    <p className="mt-1 text-[22px] font-black tracking-[-0.045em]">
-                      Log a symptom
-                    </p>
-                    <p className="mt-1 text-[11px] leading-5 text-white/[0.78]">
-                      Capture how you feel in a few taps.
-                    </p>
-                  </div>
-                </ActionLink>
-              </div>
+              <ActionLink
+                href="/log-symptom"
+                className="group relative flex min-h-[232px] flex-col justify-between overflow-hidden rounded-[32px] bg-[#24C1C4] p-5 text-[#0B2D54] shadow-[0_18px_52px_rgba(36,193,196,0.15)] sm:p-6"
+              >
+                <div
+                  aria-hidden="true"
+                  className="pointer-events-none absolute -right-14 -top-20 h-52 w-52 rounded-full bg-white/25 blur-3xl transition-transform duration-300 group-hover:scale-110"
+                />
+                <div className="relative flex items-start justify-between">
+                  <span className="grid h-12 w-12 place-items-center rounded-2xl bg-white/30 ring-1 ring-white/40">
+                    <HeartPulse className="h-5 w-5" aria-hidden="true" />
+                  </span>
+                  <ArrowRight className="mt-1 h-5 w-5 transition-transform group-hover:translate-x-1" aria-hidden="true" />
+                </div>
+
+                <div className="relative">
+                  <p className="text-[10px] font-black uppercase tracking-[0.16em] text-[#0B2D54]/65">
+                    Monitor
+                  </p>
+                  <h2 className="mt-1 text-[26px] font-black tracking-[-0.05em]">
+                    Log a symptom
+                  </h2>
+                </div>
+              </ActionLink>
             </div>
 
-            <section className="relative overflow-hidden rounded-[34px] bg-gradient-to-br from-[#E9F8F7] via-white to-[#F7FAFC] p-[1px] shadow-[0_10px_40px_rgba(0,0,0,0.02)]">
+            <section className="relative overflow-hidden rounded-[34px] bg-gradient-to-br from-[#E8F8F7] via-white to-[#F7FBFB] p-[1px] shadow-[0_12px_40px_rgba(11,45,84,0.05)]">
               <div
                 aria-hidden="true"
                 className="pointer-events-none absolute -left-20 bottom-0 h-40 w-40 rounded-full bg-[#24C1C4]/10 blur-3xl"
               />
-              <div className="relative rounded-[33px] bg-white/90 p-4 backdrop-blur-sm sm:p-5">
-                <div className="flex items-end justify-between gap-4 px-1 pb-4">
-                  <div>
-                    <div className="flex items-center gap-2">
-                      <span className="h-1.5 w-1.5 rounded-full bg-[#24C1C4] shadow-[0_0_10px_rgba(36,193,196,0.65)]" />
-                      <p className="text-[9px] font-black uppercase tracking-[0.17em] text-[#24C1C4]">
-                        Your health, at a glance
-                      </p>
-                    </div>
-                  </div>
-                  <span className="hidden items-center gap-1.5 rounded-full bg-[#F3F8F9] px-3 py-1.5 text-[9px] font-black uppercase tracking-[0.1em] text-[#6F848B] sm:inline-flex">
-                    Sympto
-                    <Sparkles className="h-3 w-3 text-[#24C1C4]" aria-hidden="true" />
-                  </span>
+              <div className="relative rounded-[33px] bg-white/95 p-4 sm:p-5">
+                <div className="mb-4 flex items-center justify-between px-1">
+                  <p className="text-[10px] font-black uppercase tracking-[0.17em] text-[#0B2D54]">
+                    Your health
+                  </p>
                 </div>
 
                 <div className="grid gap-3 md:grid-cols-3">
                   <ActionLink
                     href="/today"
-                    className="group relative min-h-[180px] overflow-hidden rounded-[26px] border border-[#B9E5E2] bg-gradient-to-br from-[#F1FBFA] via-white to-[#E8F8F7] p-5 shadow-[0_10px_30px_rgba(15,90,98,0.045)] transition-all duration-200 hover:-translate-y-0.5 hover:shadow-[0_18px_36px_rgba(15,90,98,0.10)]"
+                    className="group relative flex min-h-[164px] flex-col justify-between overflow-hidden rounded-[26px] border border-[#B9E5E2] bg-gradient-to-br from-[#F7FBFB] via-white to-[#E8F8F7] p-5 shadow-[0_10px_30px_rgba(11,45,84,0.045)] transition-all duration-200 hover:-translate-y-0.5 hover:shadow-[0_18px_36px_rgba(11,45,84,0.09)]"
                   >
                     <div className="pointer-events-none absolute -right-8 -top-8 h-24 w-24 rounded-full bg-[#24C1C4]/15 blur-2xl" />
-                    <div className="relative flex h-full flex-col">
-                      <div className="flex items-start justify-between gap-3">
-                        <span className="grid h-11 w-11 place-items-center rounded-2xl bg-[#DDF7F5] ring-1 ring-[#24C1C4]/25">
-                          <CheckCircle2 className="h-5 w-5 text-[#0B2D54]" aria-hidden="true" />
-                        </span>
-                        <span className="text-[8px] font-black uppercase tracking-[0.12em] text-[#24C1C4]">
-                          Daily care
-                        </span>
-                      </div>
-                      <div className="mt-auto pt-8">
-                        <h2 className="text-[22px] font-black tracking-[-0.045em] text-[#0B2D54]">Today</h2>
-                        <p className="mt-1 text-[11px] leading-5 text-[#71839A]">
-                          What you need to do, monitor and follow up today.
-                        </p>
-                        <div className="mt-4 flex items-center justify-between gap-3">
-                          <span className="text-[9px] font-black uppercase tracking-[0.12em] text-[#0B2D54]">Open today</span>
-                          <span className="grid h-8 w-8 place-items-center rounded-full bg-[#0B2D54] text-white transition-transform group-hover:translate-x-1">
-                            <ArrowRight className="h-3.5 w-3.5" aria-hidden="true" />
-                          </span>
-                        </div>
-                      </div>
+                    <div className="relative flex items-start justify-between">
+                      <span className="grid h-11 w-11 place-items-center rounded-2xl bg-[#E8F8F7] ring-1 ring-[#24C1C4]/25">
+                        <CheckCircle2 className="h-5 w-5 text-[#0B2D54]" aria-hidden="true" />
+                      </span>
+                      <ArrowRight className="h-4 w-4 text-[#0B2D54] transition-transform group-hover:translate-x-1" aria-hidden="true" />
+                    </div>
+                    <div className="relative">
+                      <p className="text-[9px] font-black uppercase tracking-[0.14em] text-[#24C1C4]">
+                        Daily care
+                      </p>
+                      <h2 className="mt-1 text-[24px] font-black tracking-[-0.05em] text-[#0B2D54]">
+                        Today
+                      </h2>
                     </div>
                   </ActionLink>
 
                   <ActionLink
                     href="/health-passport"
-                    className="group relative min-h-[180px] overflow-hidden rounded-[26px] border border-[#EFCACA] bg-gradient-to-br from-[#FFF4F4] via-white to-[#FFF9F9] p-5 shadow-[0_10px_30px_rgba(180,35,24,0.04)] transition-all duration-200 hover:-translate-y-0.5 hover:shadow-[0_18px_36px_rgba(180,35,24,0.09)]"
+                    className="group relative flex min-h-[164px] flex-col justify-between overflow-hidden rounded-[26px] border border-[#EFCACA] bg-gradient-to-br from-[#FFF4F4] via-white to-[#FFF9F9] p-5 shadow-[0_10px_30px_rgba(180,35,24,0.04)] transition-all duration-200 hover:-translate-y-0.5 hover:shadow-[0_18px_36px_rgba(180,35,24,0.09)]"
                   >
                     <div className="pointer-events-none absolute -right-8 -top-8 h-24 w-24 rounded-full bg-[#E53935]/12 blur-2xl" />
-                    <div className="relative flex h-full flex-col">
-                      <div className="flex items-start justify-between gap-3">
-                        <span className="grid h-11 w-11 place-items-center rounded-2xl bg-[#FFE6E6] ring-1 ring-[#E53935]/22">
-                          <ShieldCheck className="h-5 w-5 text-[#C62828]" aria-hidden="true" />
-                        </span>
-                        <span className="text-[8px] font-black uppercase tracking-[0.12em] text-[#C62828]">
-                          My Clinic Card
-                        </span>
-                      </div>
-                      <div className="mt-auto pt-8">
-                        <h2 className="text-[22px] font-black tracking-[-0.045em] text-[#0B2D54]">Essentials</h2>
-                        <p className="mt-1 text-[11px] leading-5 text-[#71839A]">
-                          The essential information to keep ready for care.
-                        </p>
-                        <div className="mt-4 flex items-center justify-between gap-3">
-                          <span className="text-[9px] font-black uppercase tracking-[0.12em] text-[#C62828]">Open clinic card</span>
-                          <span className="grid h-8 w-8 place-items-center rounded-full bg-[#C62828] text-white transition-transform group-hover:translate-x-1">
-                            <ArrowRight className="h-3.5 w-3.5" aria-hidden="true" />
-                          </span>
-                        </div>
-                      </div>
+                    <div className="relative flex items-start justify-between">
+                      <span className="grid h-11 w-11 place-items-center rounded-2xl bg-[#FFE6E6] ring-1 ring-[#E53935]/22">
+                        <ShieldCheck className="h-5 w-5 text-[#C62828]" aria-hidden="true" />
+                      </span>
+                      <ArrowRight className="h-4 w-4 text-[#C62828] transition-transform group-hover:translate-x-1" aria-hidden="true" />
+                    </div>
+                    <div className="relative">
+                      <p className="text-[9px] font-black uppercase tracking-[0.14em] text-[#C62828]">
+                        Clinic Card
+                      </p>
+                      <h2 className="mt-1 text-[24px] font-black tracking-[-0.05em] text-[#0B2D54]">
+                        Essentials
+                      </h2>
                     </div>
                   </ActionLink>
 
                   <ActionLink
                     href="/health-journal"
-                    className="group relative min-h-[180px] overflow-hidden rounded-[26px] border border-[#BFD9DA] bg-gradient-to-br from-[#F1F9F8] via-white to-[#F7FBFB] p-5 shadow-[0_10px_30px_rgba(15,90,98,0.045)] transition-all duration-200 hover:-translate-y-0.5 hover:shadow-[0_18px_36px_rgba(15,90,98,0.10)]"
+                    className="group relative flex min-h-[164px] flex-col justify-between overflow-hidden rounded-[26px] border border-[#B9E5E2] bg-gradient-to-br from-[#F7FBFB] via-white to-[#E8F8F7] p-5 shadow-[0_10px_30px_rgba(11,45,84,0.045)] transition-all duration-200 hover:-translate-y-0.5 hover:shadow-[0_18px_36px_rgba(11,45,84,0.09)]"
                   >
                     <div className="pointer-events-none absolute -right-8 -top-8 h-24 w-24 rounded-full bg-[#24C1C4]/12 blur-2xl" />
-                    <div className="relative flex h-full flex-col">
-                      <div className="flex items-start justify-between gap-3">
-                        <span className="grid h-11 w-11 place-items-center rounded-2xl bg-[#E4F3F3] ring-1 ring-[#0B2D54]/20">
-                          <FolderOpen className="h-5 w-5 text-[#0B2D54]" aria-hidden="true" />
-                        </span>
-                        <span className="text-[8px] font-black uppercase tracking-[0.12em] text-[#0B2D54]">
-                          My history & papers
-                        </span>
-                      </div>
-                      <div className="mt-auto pt-8">
-                        <h2 className="text-[22px] font-black tracking-[-0.045em] text-[#0B2D54]">Records</h2>
-                        <p className="mt-1 text-[11px] leading-5 text-[#71839A]">
-                          Your health story, results and documents in one place.
-                        </p>
-                        <div className="mt-4 flex items-center justify-between gap-3">
-                          <span className="text-[9px] font-black uppercase tracking-[0.12em] text-[#0B2D54]">Open records</span>
-                          <span className="grid h-8 w-8 place-items-center rounded-full bg-[#0B2D54] text-white transition-transform group-hover:translate-x-1">
-                            <ArrowRight className="h-3.5 w-3.5" aria-hidden="true" />
-                          </span>
-                        </div>
-                      </div>
+                    <div className="relative flex items-start justify-between">
+                      <span className="grid h-11 w-11 place-items-center rounded-2xl bg-[#E8F8F7] ring-1 ring-[#24C1C4]/20">
+                        <FolderOpen className="h-5 w-5 text-[#0B2D54]" aria-hidden="true" />
+                      </span>
+                      <ArrowRight className="h-4 w-4 text-[#0B2D54] transition-transform group-hover:translate-x-1" aria-hidden="true" />
+                    </div>
+                    <div className="relative">
+                      <p className="text-[9px] font-black uppercase tracking-[0.14em] text-[#24C1C4]">
+                        Health Journal
+                      </p>
+                      <h2 className="mt-1 text-[24px] font-black tracking-[-0.05em] text-[#0B2D54]">
+                        Records
+                      </h2>
                     </div>
                   </ActionLink>
                 </div>
