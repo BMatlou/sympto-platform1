@@ -238,57 +238,6 @@ function ClinicRow({
     </div>
   );
 }
-function MetricBadge({
-  label,
-  value,
-}: {
-  label: string;
-  value: number;
-}) {
-  return (
-    <div className="rounded-2xl bg-[#f7fbfb] px-3.5 py-3 ring-1 ring-[#e3edef]">
-      <p className="text-[9px] font-black uppercase tracking-[0.12em] text-slate-400">
-        {label}
-      </p>
-      <p className="mt-1 text-lg font-black tracking-[-0.03em] text-[#0b2d54]">
-        {value}
-      </p>
-    </div>
-  );
-}
-
-function ClinicRow({
-  label,
-  value,
-  blood = false,
-}: {
-  label: string;
-  value: string;
-  blood?: boolean;
-}) {
-  return (
-    <div
-      className={
-        "flex min-h-12 items-center justify-between gap-3 rounded-2xl border px-3.5 py-2.5 " +
-        (blood
-          ? "border-red-100 bg-red-50"
-          : "border-slate-100 bg-[#f8fbfb]")
-      }
-    >
-      <span className="text-[9px] font-black uppercase tracking-[0.12em] text-slate-400">
-        {label}
-      </span>
-      <span
-        className={
-          "text-right text-xs font-black " +
-          (blood ? "text-red-700" : "text-[#0b2d54]")
-        }
-      >
-        {value}
-      </span>
-    </div>
-  );
-}
 export default function HealthHome() {
   const { data, loading, error, reload } = useDashboard();
 
