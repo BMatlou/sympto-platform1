@@ -385,7 +385,7 @@ export default function HealthHome() {
                             href="/log-symptom"
                             className="inline-flex min-h-10 items-center gap-2 rounded-full bg-white/15 px-3.5 py-2 text-[10px] font-black uppercase tracking-[0.09em] text-white ring-1 ring-inset ring-white/25 backdrop-blur-sm transition-all hover:bg-white/22"
                           >
-                            <span className="grid h-5 w-5 place-items-center rounded-full bg-white text-[#0B2D54] shadow-sm">
+                            <span className="grid h-5 w-5 place-items-center rounded-full bg-[#0B2D54] text-white shadow-sm">
                               <Plus className="h-3.5 w-3.5 stroke-[2.5]" aria-hidden="true" />
                             </span>
                             New symptom
