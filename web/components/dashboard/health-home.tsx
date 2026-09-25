@@ -395,7 +395,7 @@ export default function HealthHome() {
                   href={href}
                   ariaLabel={label}
                   className={
-                    `grid h-11 w-11 place-items-center rounded-2xl ${index === 0 ? "bg-white text-[#0F5A62] shadow-sm" : "text-white/72 hover:bg-white/10 hover:text-white"}`
+                    `grid h-11 w-11 place-items-center rounded-2xl ${index === 0 ? "bg-white text-[#0F5A62] shadow-sm" : "text-white/[0.72] hover:bg-white/10 hover:text-white"}`
                   }
                 >
                   <Icon className="h-[18px] w-[18px]" aria-hidden="true" />
