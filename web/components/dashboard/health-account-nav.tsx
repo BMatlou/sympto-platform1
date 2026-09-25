@@ -65,7 +65,7 @@ export default function HealthAccountNav() {
   }, [open]);
 
   return (
-    <div ref={menuRef} className="fixed right-4 top-4 z-50 flex items-center gap-2 sm:right-6 sm:top-5">
+    <div ref={menuRef} className="fixed right-4 top-4 z-50 flex items-center gap-2 sm:right-6 sm:top-5 lg:hidden">
       <Link
         href="/smart-file"
         aria-label="Share Smart File"
