@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import type { ReactNode } from "react";
-import { ArrowRight, CheckCircle2, FolderOpen, ShieldCheck } from "lucide-react";
+import { ArrowRight, CheckCircle2, FolderOpen, HeartPulse, ShieldCheck } from "lucide-react";
 import { useDashboard } from "@/hooks/use-dashboard";
 import ProtectedRoute from "@/components/auth/protected-route";
 
@@ -331,11 +331,6 @@ export default function HealthHome() {
     data.healthPassport?.rhesusFactor ??
     data.healthSnapshot?.rhesusFactor;
 
-  const greeting =
-    todayActionCount > 0
-      ? `${todayActionCount} ${todayActionCount === 1 ? "thing" : "things"} to take care of today.`
-      : "Nothing urgent to take care of today.";
-
   const allergiesValue = allergyNames.length
     ? allergyNames.slice(0, 3).join(" · ") +
       (allergyNames.length > 3 ? ` +${allergyNames.length - 3}` : "")
@@ -350,38 +345,76 @@ export default function HealthHome() {
     <ProtectedRoute>
       <main className="min-h-screen bg-[#f7fbfb] text-[#14304d]">
         <div className="mx-auto max-w-[1240px] px-4 pb-12 pt-20 sm:px-6 sm:pt-24 lg:px-8">
-          <section className="relative overflow-hidden rounded-t-3xl rounded-b-[42px] bg-gradient-to-b from-[#0F5A62] to-[#177E89] p-5 text-white shadow-[0_16px_38px_rgba(15,90,98,0.14)] sm:p-7">
+          <section className="relative overflow-hidden rounded-[32px] bg-gradient-to-br from-[#0F5A62] via-[#126C74] to-[#177E89] px-5 pb-5 pt-5 text-white shadow-[0_20px_50px_rgba(15,90,98,0.16)] sm:px-7 sm:pb-7 sm:pt-6">
             <div
               aria-hidden="true"
-              className="pointer-events-none absolute -right-24 -top-24 h-56 w-56 rounded-full border border-white/10"
+              className="pointer-events-none absolute -right-20 -top-24 h-64 w-64 rounded-full border border-white/[0.08]"
             />
             <div
               aria-hidden="true"
-              className="pointer-events-none absolute -bottom-28 left-1/4 h-56 w-56 rounded-full bg-[#24C1C4]/15 blur-3xl"
+              className="pointer-events-none absolute -bottom-20 left-[38%] h-48 w-48 rounded-full bg-[#24C1C4]/20 blur-3xl"
             />
 
             <div className="relative">
-              <p className="text-[11px] font-bold tracking-[-0.01em] text-white/70">
-                Good day, {firstName}
-              </p>
-              <h1 className="mt-3 max-w-md text-3xl font-black tracking-[-0.045em] sm:text-4xl">
-                {greeting}
-              </h1>
-              <p className="mt-2 text-sm leading-6 text-white/72">
-                Start with what matters most.
-              </p>
+              <div className="flex items-center justify-between gap-4">
+                <div>
+                  <p className="text-[13px] font-semibold tracking-[-0.01em] text-white/78">
+                    Good day, {firstName}
+                  </p>
+                  <p className="mt-1 text-[10px] font-medium uppercase tracking-[0.18em] text-white/45">
+                    Your health overview
+                  </p>
+                </div>
 
-              <div className="mt-6 rounded-2xl bg-white/10 p-1 ring-1 ring-white/10 backdrop-blur-sm">
+                <span className="rounded-full border border-white/12 bg-white/10 px-3 py-1.5 text-[9px] font-black uppercase tracking-[0.14em] text-white/72">
+                  Today
+                </span>
+              </div>
+
+              <div className="mt-7 flex items-center gap-4 sm:gap-5">
+                <div className="grid h-[76px] w-[76px] shrink-0 place-items-center rounded-[24px] bg-white/[0.11] ring-1 ring-white/10 sm:h-[86px] sm:w-[86px]">
+                  <div className="text-center">
+                    <p className="text-3xl font-black leading-none tracking-[-0.06em] text-white sm:text-4xl">
+                      {todayActionCount}
+                    </p>
+                    <p className="mt-1 text-[8px] font-black uppercase tracking-[0.12em] text-[#9EF4F0]">
+                      today
+                    </p>
+                  </div>
+                </div>
+
+                <div className="min-w-0">
+                  <h1 className="text-[27px] font-black leading-[1.05] tracking-[-0.045em] sm:text-[36px]">
+                    {todayActionCount === 0
+                      ? "You’re all caught up."
+                      : todayActionCount === 1
+                        ? "One thing needs your attention."
+                        : "Things need your attention."}
+                  </h1>
+                  {todayActionCount > 1 ? (
+                    <p className="mt-2 text-sm leading-5 text-white/65">
+                      {todayActionCount} things to take care of today.
+                    </p>
+                  ) : null}
+                  <p className="mt-2 text-sm leading-5 text-white/60">
+                    Start with what matters most.
+                  </p>
+                </div>
+              </div>
+
+              <div className="mt-7 rounded-[20px] bg-black/[0.10] p-1 ring-1 ring-white/10">
                 <div className="grid grid-cols-2 gap-1">
                   <ActionLink
                     href="/today"
-                    className="flex min-h-11 items-center justify-center rounded-xl bg-white px-3 text-xs font-black text-[#0b2d54]"
+                    className="flex min-h-11 items-center justify-center gap-2 rounded-[16px] bg-white px-3 text-xs font-black text-[#0B2D54] shadow-sm"
                   >
-                    View today
+                    <span>View today</span>
+                    <ArrowRight className="h-3.5 w-3.5 text-[#24C1C4]" aria-hidden="true" />
                   </ActionLink>
+
                   <span
                     aria-current="page"
-                    className="flex min-h-11 items-center justify-center rounded-xl px-3 text-xs font-black text-white/75"
+                    className="flex min-h-11 items-center justify-center rounded-[16px] px-3 text-xs font-bold text-white/72"
                   >
                     Your health, at a glance
                   </span>
@@ -390,13 +423,18 @@ export default function HealthHome() {
 
               <ActionLink
                 href="/log-symptom"
-                className="mt-3 flex min-h-14 w-full items-center justify-center rounded-2xl bg-[#24C1C4] px-5 text-sm font-black text-[#073f46] shadow-[0_10px_24px_rgba(36,193,196,0.20)] hover:bg-[#24C1C4]/90"
+                className="mt-3 flex min-h-12 w-full items-center justify-between rounded-[18px] bg-[#24C1C4] px-4 text-sm font-black text-[#073F46] shadow-[0_12px_26px_rgba(36,193,196,0.22)] hover:bg-[#5ADADC]"
               >
-                ＋ Log a symptom
+                <span className="flex items-center gap-2.5">
+                  <span className="grid h-8 w-8 place-items-center rounded-xl bg-[#073F46]/10">
+                    <HeartPulse className="h-4 w-4" aria-hidden="true" />
+                  </span>
+                  Log a symptom
+                </span>
+                <ArrowRight className="h-4 w-4" aria-hidden="true" />
               </ActionLink>
             </div>
           </section>
-
           <div className="px-1 pb-1 pt-7">
             <p className="text-[9px] font-black uppercase tracking-[0.2em] text-slate-400">
               Choose what you need. Sympto will take you there.
