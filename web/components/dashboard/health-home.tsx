@@ -318,8 +318,7 @@ export default function HealthHome() {
         <div className="mx-auto max-w-[1480px] pb-2">
           <section className="min-w-0">
             <div className="px-4 pb-1 pt-3 sm:px-5 lg:px-7">
-              <div id="dashboard-card-stack">
-                <div className="mt-3 grid gap-3 xl:grid-cols-[minmax(0,1.55fr)_minmax(320px,0.85fr)]">
+              <div id="dashboard-hero-row" className="mt-3 grid gap-3 xl:grid-cols-[minmax(0,1.55fr)_minmax(320px,0.85fr)]">
                 <section className="group relative min-h-[220px] overflow-hidden rounded-[28px] bg-[#0B2D54] p-6 text-white sm:p-7">
                   <div className="relative flex min-h-[166px] items-center justify-between gap-8">
                     <div className="min-w-0">
@@ -423,7 +422,7 @@ export default function HealthHome() {
                   <p className="text-[10px] font-black uppercase tracking-[0.18em] text-[#0B2D54]/55">Your health</p>
                 </div>
 
-                <div className="grid gap-4 md:grid-cols-3">
+                <div id="dashboard-health-cards" className="grid gap-4 md:grid-cols-3">
                   <ActionLink
                     href="/today"
                     className="group relative min-h-[164px] overflow-hidden rounded-[26px] bg-gradient-to-br from-[#10B7B9] via-[#24C1C4] to-[#79E6E1] p-5 text-white shadow-[0_18px_40px_rgba(36,193,196,0.22)] transition-all duration-300 hover:-translate-y-1 hover:shadow-[0_24px_50px_rgba(36,193,196,0.30)]"
@@ -499,7 +498,6 @@ export default function HealthHome() {
                   </ActionLink>
                 </div>
               </section>
-              </div>
             </div>
           </section>
         </div>
