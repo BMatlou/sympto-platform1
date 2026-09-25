@@ -250,7 +250,7 @@ export default function HealthHome() {
     : [];
 
   const activeGoalCount = countActiveGoals(data);
-  const todayActionCount =
+  const {todayActionCount} =
     medications.length + appointments.length + activeGoalCount;
 
   const recentSymptom = recentSymptomFrom(data, symptomFeed);
@@ -315,7 +315,7 @@ export default function HealthHome() {
                     <div>
                       <p className="text-[9px] font-black uppercase tracking-[0.18em] text-white/45">Overview</p>
                       <h2 className="mt-2 text-[30px] font-black tracking-[-0.05em] sm:text-[36px]">
-                        greeting, firstName
+                        {greeting}, {firstName}
                       </h2>
                       <p className="mt-2 max-w-[31rem] text-[11px] font-medium leading-5 text-white/60">
                         Your health, organised around what matters today.
@@ -354,7 +354,7 @@ export default function HealthHome() {
                             </p>
                           </>
                         ) : (
-                          <p className="mt-2 text-[11px] font-semibold text-white/55">No measurement recorded.</p>
+                          <p className="mt-2 text-[11px] font-semibold text-white/55">No measurement recorded</p>
                         );
                       })()}
                     </div>
