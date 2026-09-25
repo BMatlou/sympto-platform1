@@ -358,15 +358,15 @@ export default function HealthHome() {
             <div className="relative">
               <div className="flex items-center justify-between gap-4">
                 <div>
-                  <p className="text-[13px] font-semibold tracking-[-0.01em] text-white/78">
+                  <p className="text-[13px] font-semibold tracking-[-0.01em] text-white/[0.78]">
                     Good day, {firstName}
                   </p>
-                  <p className="mt-1 text-[10px] font-medium uppercase tracking-[0.18em] text-white/45">
+                  <p className="mt-1 text-[10px] font-medium uppercase tracking-[0.18em] text-white/[0.45]">
                     Your health overview
                   </p>
                 </div>
 
-                <span className="rounded-full border border-white/12 bg-white/10 px-3 py-1.5 text-[9px] font-black uppercase tracking-[0.14em] text-white/72">
+                <span className="rounded-full border border-white/12 bg-white/10 px-3 py-1.5 text-[9px] font-black uppercase tracking-[0.14em] text-white/[0.72]">
                   Today
                 </span>
               </div>
@@ -387,16 +387,9 @@ export default function HealthHome() {
                   <h1 className="text-[27px] font-black leading-[1.05] tracking-[-0.045em] sm:text-[36px]">
                     {todayActionCount === 0
                       ? "You’re all caught up."
-                      : todayActionCount === 1
-                        ? "One thing needs your attention."
-                        : "Things need your attention."}
+                      : `You have ${todayActionCount} ${todayActionCount === 1 ? "thing" : "things"} to take care of today.`}
                   </h1>
-                  {todayActionCount > 1 ? (
-                    <p className="mt-2 text-sm leading-5 text-white/65">
-                      {todayActionCount} things to take care of today.
-                    </p>
-                  ) : null}
-                  <p className="mt-2 text-sm leading-5 text-white/60">
+                  <p className="mt-2 text-sm leading-5 text-white/[0.60]">
                     Start with what matters most.
                   </p>
                 </div>
