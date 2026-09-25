@@ -446,7 +446,7 @@ export default function HealthHome() {
                       <p className="text-[10px] font-black uppercase tracking-[0.16em] text-[#B4F9F6]">
                         Daily care pulse
                       </p>
-                      <p className="mt-1 text-sm font-semibold text-white/78">
+                      <p className="mt-1 text-sm font-semibold text-white/[0.78]">
                         What needs your attention today
                       </p>
                     </div>
@@ -465,7 +465,7 @@ export default function HealthHome() {
                           active items
                         </span>
                       </div>
-                      <p className="mt-5 max-w-[520px] text-[12px] leading-5 text-white/74">
+                      <p className="mt-5 max-w-[520px] text-[12px] leading-5 text-white/[0.74]">
                         Medication, visits and goals stay together here so you can see the day before you act.
                       </p>
                     </div>
@@ -521,7 +521,7 @@ export default function HealthHome() {
                     <span className="grid h-11 w-11 place-items-center rounded-2xl bg-white/20 ring-1 ring-white/25">
                       <HeartPulse className="h-5 w-5 text-white" aria-hidden="true" />
                     </span>
-                    <span className="rounded-full bg-white/18 px-2.5 py-1 text-[9px] font-black uppercase tracking-[0.1em] text-white/90 ring-1 ring-white/10">
+                    <span className="rounded-full bg-white/[0.18] px-2.5 py-1 text-[9px] font-black uppercase tracking-[0.1em] text-white/90 ring-1 ring-white/10">
                       Quick action
                     </span>
                   </div>
@@ -532,7 +532,7 @@ export default function HealthHome() {
                     <p className="mt-1 text-[21px] font-black tracking-[-0.04em] text-white">
                       Tell Sympto how you feel.
                     </p>
-                    <span className="mt-3 inline-flex items-center gap-1.5 text-[10px] font-black uppercase tracking-[0.12em] text-white/88">
+                    <span className="mt-3 inline-flex items-center gap-1.5 text-[10px] font-black uppercase tracking-[0.12em] text-white/[0.88]">
                       Open monitor <ChevronRight className="h-3.5 w-3.5" aria-hidden="true" />
                     </span>
                   </div>
