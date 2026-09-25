@@ -18,7 +18,6 @@ import {
   PhoneCall,
   Pill,
   Settings,
-  Stethoscope,
   Target,
   UserRound,
   Users,
@@ -26,6 +25,7 @@ import {
   Watch,
   X,
 } from "lucide-react";
+import type { CSSProperties } from "react";
 import { useEffect, useRef, useState } from "react";
 import { usePathname } from "next/navigation";
 
@@ -57,6 +57,7 @@ const MORE_NAV = [
 export default function HealthNavigation() {
   const pathname = usePathname();
   const [open, setOpen] = useState(false);
+  const [railBounds, setRailBounds] = useState<{ top: number; height: number } | null>(null);
   const menuRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -75,8 +76,45 @@ export default function HealthNavigation() {
     };
   }, [open]);
 
+  useEffect(() => {
+    const measureRail = () => {
+      const target = document.getElementById("dashboard-card-stack");
+      if (!target) return;
+      const rect = target.getBoundingClientRect();
+      setRailBounds({
+        top: Math.max(16, Math.round(rect.top)),
+        height: Math.round(rect.height),
+      });
+    };
+
+    const scheduleMeasure = () => {
+      window.requestAnimationFrame(measureRail);
+    };
+
+    scheduleMeasure();
+    const target = document.getElementById("dashboard-card-stack");
+    const observer = target ? new ResizeObserver(scheduleMeasure) : null;
+    if (target && observer) observer.observe(target);
+    window.addEventListener("resize", scheduleMeasure);
+
+    return () => {
+      observer?.disconnect();
+      window.removeEventListener("resize", scheduleMeasure);
+    };
+  }, []);
+
   return (
-    <div ref={menuRef} className="fixed inset-x-2 top-2 z-50 flex h-14 items-center gap-2 rounded-2xl border border-white/10 bg-[#0B2D54] p-2 shadow-[0_18px_45px_rgba(11,45,84,0.22)] lg:top-10 lg:left-4 lg:right-auto lg:h-[657px] lg:w-[64px] lg:flex-col lg:rounded-[26px] lg:p-2">
+    <div
+      ref={menuRef}
+      style={
+        railBounds
+          ? ({
+              "--nav-top": railBounds.top + "px",
+              "--nav-height": railBounds.height + "px",
+            } as CSSProperties)
+          : undefined
+      }
+      className="fixed inset-x-2 top-2 z-50 flex h-14 items-center gap-2 rounded-2xl border border-white/10 bg-[#0B2D54] p-2 shadow-[0_18px_45px_rgba(11,45,84,0.22)] lg:top-[var(--nav-top)] lg:left-4 lg:right-auto lg:h-[var(--nav-height)] lg:w-[64px] lg:flex-col lg:rounded-[26px] lg:p-2">
       <nav className="flex min-w-0 flex-1 items-center justify-center gap-1 lg:h-full lg:flex-col lg:items-stretch lg:justify-start lg:gap-1" aria-label="Primary health navigation">
         {PRIMARY_NAV.map(({ href, label, icon: Icon }) => {
           const isActive = pathname === href || (href === "/dashboard" && pathname === "/");
