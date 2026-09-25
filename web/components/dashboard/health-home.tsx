@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import type { ReactNode } from "react";
-import { ArrowRight, CheckCircle2, FolderOpen, HeartPulse, ShieldCheck } from "lucide-react";
+import { Activity, ArrowRight, Bell, CalendarDays, CheckCircle2, ChevronRight, ClipboardList, FileText, FolderOpen, HeartPulse, House, MapPin, Pill, ShieldCheck, Sparkles, Target, UserRound } from "lucide-react";
 import { useDashboard } from "@/hooks/use-dashboard";
 import ProtectedRoute from "@/components/auth/protected-route";
 
@@ -70,6 +70,88 @@ function countActiveGoals(data: any) {
   ).length;
 }
 
+function formatDashboardDate(value: unknown, fallback = "Recent"): string {
+  if (!value) return fallback;
+
+  const parsed = new Date(String(value));
+  if (Number.isNaN(parsed.getTime())) return fallback;
+
+  return new Intl.DateTimeFormat("en-ZA", {
+    day: "2-digit",
+    month: "short",
+  }).format(parsed);
+}
+
+function completenessPercent(present: number, total: number): number {
+  if (!total) return 0;
+  return Math.round((present / total) * 100);
+}
+
+function ProgressStrip({
+  value,
+  accent,
+  label,
+}: {
+  value: number;
+  accent: string;
+  label: string;
+}) {
+  return (
+    <div className="mt-5">
+      <div className="flex items-center justify-between gap-3">
+        <span className="text-[9px] font-black uppercase tracking-[0.14em] text-[#8B9AA8]">
+          {label}
+        </span>
+        <span className="text-[10px] font-black text-[#0B2D54]">{value}%</span>
+      </div>
+      <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-[#EEF3F5]">
+        <div
+          className={`h-full rounded-full transition-all duration-500 ${accent}`}
+          style={{ width: `${value}%` }}
+        />
+      </div>
+    </div>
+  );
+}
+
+function FeedRow({
+  icon: Icon,
+  title,
+  meta,
+  time,
+  accent,
+  href,
+}: {
+  icon: typeof CalendarDays;
+  title: string;
+  meta: string;
+  time: string;
+  accent: string;
+  href: string;
+}) {
+  return (
+    <ActionLink
+      href={href}
+      className="group flex items-center gap-3 rounded-2xl px-2 py-3 hover:bg-[#F7FAFB]"
+    >
+      <span className={`grid h-10 w-10 shrink-0 place-items-center rounded-full ${accent}`}>
+        <Icon className="h-4 w-4 text-white" aria-hidden="true" />
+      </span>
+      <span className="min-w-0 flex-1">
+        <span className="block truncate text-[11px] font-black text-[#17344F]">
+          {title}
+        </span>
+        <span className="mt-0.5 block truncate text-[10px] font-medium text-[#8A99A8]">
+          {meta}
+        </span>
+      </span>
+      <span className="shrink-0 text-[9px] font-black uppercase tracking-[0.08em] text-[#A0AFBA]">
+        {time}
+      </span>
+    </ActionLink>
+  );
+}
+
 function ActionLink({
   href,
   children,
@@ -96,158 +178,6 @@ function ActionLink({
   );
 }
 
-function DashboardCard({
-  href,
-  title,
-  tag,
-  description,
-  children,
-  footerLabel,
-  icon: Icon,
-  accent,
-  accentBg,
-  softAccent,
-  iconBg,
-  border,
-  surface,
-}: {
-  href: string;
-  title: string;
-  tag: string;
-  description: string;
-  children?: ReactNode;
-  footerLabel: string;
-  icon: typeof CheckCircle2;
-  accent: string;
-  accentBg: string;
-  softAccent: string;
-  iconBg: string;
-  border: string;
-  surface: string;
-}) {
-  return (
-    <ActionLink
-      href={href}
-      ariaLabel={title}
-      className={
-        "group flex min-h-[340px] h-full flex-col overflow-hidden rounded-[28px] border bg-white " +
-        "shadow-[0_10px_30px_rgba(11,45,84,0.055)] transition-all duration-200 " +
-        "hover:-translate-y-0.5 hover:shadow-[0_16px_38px_rgba(11,45,84,0.09)] " +
-        border
-      }
-    >
-      <div className={`border-b px-5 py-5 sm:px-6 sm:py-6 ${surface}`}>
-        <div className="flex items-start gap-3.5">
-          <span
-            className={
-              "grid h-12 w-12 shrink-0 place-items-center rounded-[17px] ring-1 " +
-              iconBg
-            }
-          >
-            <Icon className={`h-5 w-5 ${accent}`} aria-hidden="true" />
-          </span>
-
-          <div className="min-w-0 pt-0.5">
-            <p className={`text-[9px] font-black uppercase tracking-[0.18em] ${accent}`}>
-              {tag}
-            </p>
-            <h2 className="mt-1 text-[21px] font-black tracking-[-0.045em] text-[#0B2D54]">
-              {title}
-            </h2>
-          </div>
-        </div>
-
-        <p className="mt-4 text-[12px] leading-5.5 text-[#64798D]">
-          {description}
-        </p>
-      </div>
-
-      <div className="flex flex-1 flex-col px-5 py-5 sm:px-6 sm:py-6">
-        {children ? <div>{children}</div> : null}
-
-        <div className="mt-auto pt-6">
-          <div className="flex items-center justify-between gap-3 border-t border-[#EDF2F3] pt-3.5">
-            <span className={`text-[10px] font-black uppercase tracking-[0.15em] ${accent}`}>
-              {footerLabel}
-            </span>
-
-            <span
-              className={
-                "inline-flex h-9 w-9 items-center justify-center rounded-full " +
-                softAccent +
-                " transition-transform duration-200 group-hover:translate-x-1"
-              }
-            >
-              <ArrowRight className={`h-4 w-4 ${accent}`} aria-hidden="true" />
-            </span>
-          </div>
-        </div>
-      </div>
-
-      <div className={`h-1 w-full ${accentBg}`} />
-    </ActionLink>
-  );
-}
-function MetricBadge({
-  label,
-  value,
-  tone = "neutral",
-}: {
-  label: string;
-  value: number;
-  tone?: "neutral" | "teal" | "blue";
-}) {
-  const toneClass =
-    tone === "teal"
-      ? "border-[#D2ECEA] bg-[#F5FBFA]"
-      : tone === "blue"
-        ? "border-[#D9E5F7] bg-[#F7FAFF]"
-        : "border-[#E2EBEE] bg-[#F8FBFB]";
-
-  return (
-    <div className={`rounded-[18px] border px-3.5 py-3.5 ${toneClass}`}>
-      <p className="text-[9px] font-black uppercase tracking-[0.12em] text-[#8A9AA8]">
-        {label}
-      </p>
-      <p className="mt-1 text-[20px] font-black leading-none tracking-[-0.04em] text-[#0B2D54]">
-        {value}
-      </p>
-    </div>
-  );
-}
-
-function ClinicRow({
-  label,
-  value,
-  blood = false,
-}: {
-  label: string;
-  value: string;
-  blood?: boolean;
-}) {
-  return (
-    <div
-      className={
-        "flex min-h-[50px] items-center justify-between gap-3 rounded-[18px] border px-3.5 py-3 " +
-        (blood
-          ? "border-[#F5D7D7] bg-[#FFF6F6]"
-          : "border-[#E3ECEF] bg-[#F9FBFB]")
-      }
-    >
-      <span className="text-[9px] font-black uppercase tracking-[0.12em] text-[#8A9AA8]">
-        {label}
-      </span>
-      <span
-        className={
-          "text-right text-[11px] font-black " +
-          (blood ? "text-[#B42318]" : "text-[#0B2D54]")
-        }
-      >
-        {value}
-      </span>
-    </div>
-  );
-}
 
 export default function HealthHome() {
   const { data, loading, error, reload } = useDashboard();
@@ -354,179 +284,92 @@ export default function HealthHome() {
       (conditionNames.length > 3 ? ` +${conditionNames.length - 3}` : "")
     : "None recorded";
 
-  return (
-    <ProtectedRoute>
-      <main className="min-h-screen bg-[#f7fbfb] text-[#14304d]">
-        <div className="mx-auto max-w-[1240px] px-4 pb-12 pt-20 sm:px-6 sm:pt-24 lg:px-8">
-          <section className="overflow-hidden rounded-[32px] border border-[#D9E9E8] bg-white shadow-[0_18px_52px_rgba(11,45,84,0.07)]" aria-label="Sympto health overview">
-            <div className="relative overflow-hidden rounded-t-[32px] bg-gradient-to-br from-[#08284A] via-[#0C4166] to-[#24B8BB] px-5 py-5 text-white sm:px-7 sm:py-7 lg:px-8">
-            <div
-              aria-hidden="true"
-              className="pointer-events-none absolute -right-16 -top-20 h-56 w-56 rounded-full border border-white/[0.08]"
-            />
-            <div
-              aria-hidden="true"
-              className="pointer-events-none absolute -bottom-28 left-[48%] h-56 w-56 rounded-full bg-[#24C1C4]/20 blur-3xl"
-            />
+  const encounters = Array.isArray(data.encounters) ? data.encounters : [];
+  const laboratoryResults = Array.isArray(data.recentResults?.laboratory)
+    ? data.recentResults.laboratory
+    : [];
+  const imagingResults = Array.isArray(data.recentResults?.imaging)
+    ? data.recentResults.imaging
+    : [];
+  const attachments = Array.isArray(data.attachments) ? data.attachments : [];
 
-            <div className="relative">
-              <div className="flex items-start justify-between gap-5">
-                <div className="min-w-0">
-                  <p className="text-[14px] font-semibold tracking-[-0.01em] text-white/[0.86]">
-                    Good day, {firstName}
-                  </p>
-                  <p className="mt-1.5 text-[9px] font-black uppercase tracking-[0.2em] text-white/[0.48]">
-                    Your health overview
-                  </p>
-                </div>
-
-                <span className="shrink-0 rounded-full border border-white/15 bg-white/10 px-3 py-1.5 text-[9px] font-black uppercase tracking-[0.14em] text-white/[0.72]">
-                  Today
-                </span>
-              </div>
-
-              <div className="mt-7 grid gap-6 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-end">
-                <div className="flex items-center gap-4 sm:gap-5">
-                  <div className="grid h-[76px] w-[76px] shrink-0 place-items-center rounded-[24px] bg-white/10 ring-1 ring-white/10 sm:h-[84px] sm:w-[84px]">
-                    <div className="text-center">
-                      <p className="text-3xl font-black leading-none tracking-[-0.06em]">
-                        {todayActionCount}
-                      </p>
-                      <p className="mt-1 text-[8px] font-black uppercase tracking-[0.14em] text-[#9EF4F0]">
-                        today
-                      </p>
-                    </div>
-                  </div>
-
-                  <div className="min-w-0">
-                    <h1 className="max-w-2xl text-[26px] font-black leading-[1.07] tracking-[-0.05em] sm:text-[34px]">
-                      You have {todayActionCount} {todayActionCount === 1 ? "thing" : "things"} to take care of today.
-                    </h1>
-                    <p className="mt-2 text-[13px] leading-5 text-white/[0.62]">
-                      Start with what matters most.
-                    </p>
-                  </div>
-                </div>
-
-                <div className="flex flex-wrap items-center gap-2 lg:justify-end">
-                  <ActionLink
-                    href="/today"
-                    className="inline-flex min-h-10 items-center gap-2 rounded-full bg-white px-4 py-2 text-[11px] font-black text-[#0B2D54] shadow-sm hover:bg-slate-50"
-                  >
-                    View today
-                    <ArrowRight className="h-3.5 w-3.5 text-[#24C1C4]" aria-hidden="true" />
-                  </ActionLink>
-
-                  <ActionLink
-                    href="/log-symptom"
-                    className="inline-flex min-h-10 items-center gap-2 rounded-full bg-[#24C1C4] px-4 py-2 text-[11px] font-black text-[#08284A] shadow-[0_8px_18px_rgba(36,193,196,0.20)] hover:bg-[#57D7D9]"
-                  >
-                    <HeartPulse className="h-3.5 w-3.5" aria-hidden="true" />
-                    Log a symptom
-                  </ActionLink>
-                </div>
-              </div>
-            </div>
-            </div>
-            <div className="bg-[#FBFEFE] px-5 pb-5 pt-5 sm:px-6 sm:pb-6 sm:pt-6 lg:px-8">
-              <div className="flex items-end justify-between gap-4 px-1 pb-4">
-                <div>
-                  <p className="text-[10px] font-black uppercase tracking-[0.17em] text-[#71839A]">
-                    Your health, at a glance
-                  </p>
-                  <p className="mt-1 text-xs font-medium text-[#8A99A8]">
-                    Choose what you need. Sympto will take you there.
-                  </p>
-                </div>
-              </div>
-
-              <div className="grid items-stretch gap-4 lg:gap-5 md:grid-cols-3" aria-label="Health dashboard">
-
-            <DashboardCard
-              href="/today"
-              title="Today"
-              tag="Daily care"
-              description={`What do I do today? ${todayActionCount} ${todayActionCount === 1 ? "thing needs" : "things need"} your attention.`}
-              icon={CheckCircle2}
-              accent="text-[#0B7B80]"
-              accentBg="bg-[#24C1C4]"
-              softAccent="bg-[#E7F8F7]"
-              iconBg="bg-[#DDF7F5] ring-[#24C1C4]/25"
-              border="border-[#B7E5E2]"
-              surface="bg-[#F0FBFA]"
-              footerLabel="Open today"
-            >
-              <div className="grid grid-cols-3 gap-2">
-                <MetricBadge label="Medication" value={medications.length} tone="teal" />
-                <MetricBadge label="Visit" value={appointments.length} tone="teal" />
-                <MetricBadge label="Goal" value={activeGoalCount} tone="teal" />
-              </div>
-            </DashboardCard>
-
-            <DashboardCard
-              href="/health-passport"
-              title="Essentials"
-              tag="My Clinic Card"
-              description="Your essential health information for quick reference and care."
-              icon={ShieldCheck}
-              accent="text-[#C62828]"
-              accentBg="bg-[#E53935]"
-              softAccent="bg-[#FFF0F0]"
-              iconBg="bg-[#FFE8E8] ring-[#E53935]/25"
-              border="border-[#EFC8C8]"
-              surface="bg-[#FFF6F6]"
-              footerLabel="Open clinic card"
-            >
-              <div className="space-y-2">
-                <ClinicRow label="Allergies" value={allergiesValue} />
-                <ClinicRow label="Conditions" value={conditionsValue} />
-                <div className="grid grid-cols-2 gap-2">
-                  <ClinicRow
-                    label="Blood"
-                    value={display(bloodType).toUpperCase()}
-                    blood
-                  />
-                  <ClinicRow
-                    label="Rhesus"
-                    value={display(rhesusFactor).toUpperCase()}
-                  />
-                </div>
-              </div>
-            </DashboardCard>
-
-            <DashboardCard
-              href="/health-journal"
-              title="Records"
-              tag="My history & papers"
-              description="Your encounters, results and important health documents in one place."
-              icon={FolderOpen}
-              accent="text-[#2F6FDB]"
-              accentBg="bg-[#4A80E8]"
-              softAccent="bg-[#EEF4FF]"
-              iconBg="bg-[#E7EFFF] ring-[#4A80E8]/25"
-              border="border-[#C7D8F4]"
-              surface="bg-[#F4F8FF]"
-              footerLabel="Open records"
-            >
-              <div className="grid grid-cols-2 gap-2">
-                <MetricBadge label="Records" value={historyCount} tone="blue" />
-                <MetricBadge label="Vitals" value={healthVitals.length} tone="blue" />
-              </div>
-
-              <div className="mt-3 rounded-[18px] border border-[#DDE7F7] bg-[#F7FAFF] px-3.5 py-3">
-                <p className="text-[9px] font-black uppercase tracking-[0.13em] text-[#6D8FC7]">
-                  Documents
-                </p>
-                <p className="mt-1 text-xs font-semibold leading-5 text-[#2F5FAF]">
-                  Your history, results and health papers stay together.
-                </p>
-              </div>
-            </DashboardCard>
-              </div>
-            </div>
-          </section>
-        </div>
-      </main>
-    </ProtectedRoute>
+  const todayCoverage = completenessPercent(
+    Number(medications.length > 0) +
+      Number(appointments.length > 0) +
+      Number(activeGoalCount > 0),
+    3,
   );
-}
+
+  const essentialsCoverage = completenessPercent(
+    Number(allergyNames.length > 0) +
+      Number(conditionNames.length > 0) +
+      Number(Boolean(bloodType)) +
+      Number(Boolean(rhesusFactor)),
+    4,
+  );
+
+  const recordsCoverage = completenessPercent(
+    Number(encounters.length > 0) +
+      Number(laboratoryResults.length > 0) +
+      Number(imagingResults.length > 0) +
+      Number(attachments.length > 0),
+    4,
+  );
+
+  const latestVital = healthVitals[0];
+
+  const feedItems = [
+    ...appointments.slice(0, 2).map((item: any) => ({
+      icon: CalendarDays,
+      title: display(item?.title ?? item?.name ?? item?.type, "Upcoming visit"),
+      meta: display(
+        item?.provider?.name ?? item?.providerName ?? item?.location,
+        "Care appointment",
+      ),
+      time: formatDashboardDate(
+        item?.scheduledAt ?? item?.appointmentDate ?? item?.date,
+        "Upcoming",
+      ),
+      accent: "bg-[#177E89]",
+      href: "/today",
+      sort: new Date(
+        String(item?.scheduledAt ?? item?.appointmentDate ?? item?.date ?? 0),
+      ).getTime(),
+    })),
+    ...encounters.slice(0, 2).map((item: any) => ({
+      icon: ClipboardList,
+      title: display(item?.title ?? item?.type ?? item?.reason, "Care encounter"),
+      meta: "Health journal",
+      time: formatDashboardDate(item?.occurredAt ?? item?.encounterDate ?? item?.date),
+      accent: "bg-[#2F6FDB]",
+      href: "/health-journal",
+      sort: new Date(
+        String(item?.occurredAt ?? item?.encounterDate ?? item?.date ?? 0),
+      ).getTime(),
+    })),
+    ...laboratoryResults.slice(0, 1).map((item: any) => ({
+      icon: Activity,
+      title: display(item?.name ?? item?.testName ?? item?.title, "Laboratory result"),
+      meta: "Lab result",
+      time: formatDashboardDate(item?.resultDate ?? item?.createdAt ?? item?.date),
+      accent: "bg-[#0F5A62]",
+      href: "/health-journal",
+      sort: new Date(
+        String(item?.resultDate ?? item?.createdAt ?? item?.date ?? 0),
+      ).getTime(),
+    })),
+    ...attachments.slice(0, 1).map((item: any) => ({
+      icon: FileText,
+      title: display(item?.name ?? item?.fileName ?? item?.title, "Health document"),
+      meta: "Document",
+      time: formatDashboardDate(item?.createdAt ?? item?.uploadedAt ?? item?.date),
+      accent: "bg-[#24C1C4]",
+      href: "/health-journal",
+      sort: new Date(
+        String(item?.createdAt ?? item?.uploadedAt ?? item?.date ?? 0),
+      ).getTime(),
+    })),
+  ]
+    .sort((a, b) => (Number.isFinite(b.sort) ? b.sort : 0) - (Number.isFinite(a.sort) ? a.sort : 0))
+    .slice(0, 5);
+<SHOULD_NOT_EXIST>
