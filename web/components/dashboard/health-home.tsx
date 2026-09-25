@@ -291,13 +291,6 @@ export default function HealthHome() {
                     </ActionLink>
                   </div>
 
-                  <div className="mt-7 max-w-xl rounded-2xl bg-white/[0.07] px-4 py-3.5 ring-1 ring-white/10 backdrop-blur-sm">
-                    <p className="text-[10px] font-black uppercase tracking-[0.12em] text-[#A5F6F3]">
-                      One clear starting point
-                    </p>
-                    <p className="mt-1 text-[11px] leading-5 text-white/[0.72]">
-                      Sympto brings your care destinations together here. Open the place you need instead of scanning duplicate summaries.
-                    </p>
                   </div>
                 </div>
               </section>
@@ -331,8 +324,6 @@ export default function HealthHome() {
                     </p>
                   </div>
                 </ActionLink>
-
-
               </div>
             </div>
 
