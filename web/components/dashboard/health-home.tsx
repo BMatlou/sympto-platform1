@@ -331,11 +331,23 @@ export default function HealthHome() {
                       </p>
                     </div>
 
-                    <div className="shrink-0 min-w-[150px] text-right sm:min-w-[190px]">
-                      <p className="text-[72px] font-black leading-[0.82] tracking-[-0.09em] text-white sm:text-[86px]">
-                        {todayActionCount}
-                      </p>
-                      <p className="mt-2 text-[11px] font-black leading-4 text-white/88 sm:text-xs">
+                    <div className="flex shrink-0 flex-col items-center text-center sm:min-w-[205px]">
+                      <div className="relative grid h-28 w-28 place-items-center sm:h-32 sm:w-32">
+                        <span
+                          aria-hidden="true"
+                          className="absolute inset-1 rounded-full bg-[#24C1C4]/35 blur-2xl"
+                        />
+                        <span
+                          aria-hidden="true"
+                          className="absolute inset-0 rounded-full border border-[#24C1C4]/35 bg-[#24C1C4]/[0.12] shadow-[0_0_36px_rgba(36,193,196,0.38)]"
+                        />
+                        <span className="relative grid h-[88%] w-[88%] place-items-center rounded-full bg-[#24C1C4] text-[#0B2D54] shadow-[0_12px_34px_rgba(36,193,196,0.32)] sm:h-[90%] sm:w-[90%]">
+                          <span className="text-[54px] font-black leading-none tracking-[-0.08em] sm:text-[62px]">
+                            {todayActionCount}
+                          </span>
+                        </span>
+                      </div>
+                      <p className="mt-3 max-w-[13rem] text-[11px] font-black leading-4 text-white/88 sm:text-xs">
                         active items need your attention today
                       </p>
                     </div>
