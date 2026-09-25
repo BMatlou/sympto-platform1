@@ -323,7 +323,7 @@ export default function HealthHome() {
                       </p>
                     </div>
 
-                    <div className="flex items-center gap-3 md:min-w-[270px] md:justify-end">
+                    <div className="flex items-center gap-4 md:min-w-[310px] md:justify-end">
                       <p className="text-[62px] font-black leading-[0.78] tracking-[-0.08em] sm:text-[70px]">
                         {todayActionCount}
                       </p>
@@ -331,13 +331,22 @@ export default function HealthHome() {
                         <p className="text-[10px] font-black leading-4 text-white/74">
                           active items that need your attention today
                         </p>
-                        <ActionLink
-                          href="/today"
-                          className="mt-2 inline-flex min-h-9 items-center gap-2 rounded-full bg-[#24C1C4] px-4 py-2 text-[10px] font-black uppercase tracking-[0.08em] text-[#0B2D54] shadow-[0_12px_28px_rgba(36,193,196,0.22)] transition-all hover:-translate-y-0.5 hover:shadow-[0_16px_34px_rgba(36,193,196,0.32)]"
-                        >
-                          Open today
-                          <ArrowRight className="h-3.5 w-3.5" aria-hidden="true" />
-                        </ActionLink>
+                        {appointments[0] ? (
+                          <div className="mt-3 border-l border-white/30 pl-3">
+                            <p className="text-[8px] font-black uppercase tracking-[0.16em] text-white/50">Next appointment</p>
+                            <p className="mt-1 truncate text-[11px] font-black text-white">
+                              {display(
+                                appointments[0]?.providerName ??
+                                  appointments[0]?.provider?.name ??
+                                  appointments[0]?.title ??
+                                  appointments[0]?.name,
+                                "Upcoming appointment",
+                              )}
+                            </p>
+                          </div>
+                        ) : (
+                          <p className="mt-2 text-[9px] font-semibold text-white/55">No upcoming appointment recorded.</p>
+                        )}
                       </div>
                     </div>
                   </div>
