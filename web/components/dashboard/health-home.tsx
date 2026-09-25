@@ -3,7 +3,7 @@
 import Link from "next/link";
 import type { ReactNode } from "react";
 import { useEffect, useState } from "react";
-import { Activity, ArrowRight, CheckCircle2, FileHeart, FileText, FolderOpen, HeartPulse, Plus, ShieldCheck } from "lucide-react";
+import { Activity, ArrowRight, CheckCircle2, FileHeart, FileText, FolderOpen, ShieldCheck } from "lucide-react";
 import { useDashboard } from "@/hooks/use-dashboard";
 import { healthJournalService } from "@/services/health-journal.service";
 import ProtectedRoute from "@/components/auth/protected-route";
