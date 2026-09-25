@@ -250,8 +250,8 @@ export default function HealthHome() {
     : [];
 
   const activeGoalCount = countActiveGoals(data);
-  const todayActionCount =
-    medications.length + appointments.length + activeGoalCount;
+  const attentionItems = Array.isArray(data?.attention) ? data.attention : [];
+  const priorityItem = attentionItems[0] ?? null;
 
   const recentSymptom = recentSymptomFrom(data, symptomFeed);
   const recentSymptomStatus = String(recentSymptom?.status ?? "").toUpperCase();
@@ -306,66 +306,85 @@ export default function HealthHome() {
                 </ActionLink>
               </div>
 
-              <div className="mt-3 grid gap-3 xl:grid-cols-[minmax(0,1.7fr)_minmax(290px,0.8fr)]">
+              <div className="mt-3 grid gap-3 xl:grid-cols-[minmax(0,1.55fr)_minmax(320px,0.85fr)]">
                 <section className="group relative min-h-[220px] overflow-hidden rounded-[28px] bg-gradient-to-br from-[#0B2D54] via-[#143D67] to-[#0F6173] p-6 text-white shadow-[0_24px_60px_rgba(11,45,84,0.16)] sm:p-7">
                   <div aria-hidden="true" className="pointer-events-none absolute -right-20 -top-24 h-72 w-72 rounded-full bg-[#24C1C4]/20 blur-3xl transition-transform duration-500 group-hover:scale-110" />
                   <div aria-hidden="true" className="pointer-events-none absolute -bottom-24 right-1/4 h-56 w-56 rounded-full bg-white/[0.06] blur-3xl" />
                   <div aria-hidden="true" className="pointer-events-none absolute inset-x-7 top-0 h-px bg-white/20" />
 
                   <div className="relative flex min-h-[166px] flex-col justify-between gap-7">
-                    <div className="flex items-start justify-between gap-6">
-                      <div className="max-w-[38rem]">
-                        <p className="text-[9px] font-black uppercase tracking-[0.18em] text-white/50">Overview</p>
-                        <h2 className="mt-2 text-[30px] font-black leading-tight tracking-[-0.05em] sm:text-[36px]">
-                          {greeting}, {firstName}
-                        </h2>
-                        <p className="mt-2 max-w-[31rem] text-[11px] font-medium leading-5 text-white/66">
-                          Your health, organised around what matters today.
-                        </p>
-                      </div>
-
-                      <div className="hidden shrink-0 sm:block">
-                        <div className="flex h-16 w-16 items-center justify-center rounded-full border border-[#24C1C4]/45 bg-[#24C1C4]/10 shadow-[0_0_32px_rgba(36,193,196,0.18)]">
-                          <span className="text-[8px] font-black uppercase tracking-[0.12em] text-white/65">Today</span>
-                        </div>
-                      </div>
+                    <div>
+                      <p className="text-[9px] font-black uppercase tracking-[0.18em] text-white/50">Overview</p>
+                      <h2 className="mt-2 text-[30px] font-black leading-tight tracking-[-0.05em] sm:text-[38px]">
+                        {greeting}, {firstName}
+                      </h2>
+                      <p className="mt-2 max-w-[34rem] text-[11px] font-medium leading-5 text-white/66 sm:text-xs">
+                        Your health, organised around what matters today.
+                      </p>
                     </div>
 
-                    <div className="grid gap-3 md:grid-cols-[minmax(150px,0.6fr)_minmax(0,1fr)]">
-                      <div className="rounded-[22px] border border-white/10 bg-white/[0.07] px-4 py-3.5">
-                        <div className="flex items-end gap-2">
-                          <p className="text-[56px] font-black leading-[0.82] tracking-[-0.08em]">
-                            {todayActionCount}
-                          </p>
-                          <p className="pb-1 text-[10px] font-bold uppercase tracking-[0.08em] text-white/60">
-                            items today
-                          </p>
-                        </div>
-                        <p className="mt-2 text-[10px] font-medium leading-4 text-white/58">
-                          Active health actions already on your dashboard.
+                    <div className="flex items-end justify-between gap-4 border-t border-white/10 pt-4">
+                      <div>
+                        <p className="text-[9px] font-black uppercase tracking-[0.15em] text-white/45">Your day</p>
+                        <p className="mt-1 text-sm font-semibold text-white/78">
+                          Start with what matters. We’ll keep the details organised below.
                         </p>
                       </div>
-
-                      <div className="grid grid-cols-3 overflow-hidden rounded-[22px] border border-white/10 bg-white/[0.05]">
-                        <Link href="/medications" className="group/item border-r border-white/10 p-3.5 transition-colors hover:bg-white/10">
-                          <p className="text-[9px] font-black uppercase tracking-[0.12em] text-white/48">Meds</p>
-                          <p className="mt-1 text-xl font-black">{medications.length}</p>
-                          <p className="mt-0.5 text-[9px] font-semibold text-white/55">active</p>
-                        </Link>
-                        <Link href="/health-goals" className="group/item border-r border-white/10 p-3.5 transition-colors hover:bg-white/10">
-                          <p className="text-[9px] font-black uppercase tracking-[0.12em] text-white/48">Goals</p>
-                          <p className="mt-1 text-xl font-black">{activeGoalCount}</p>
-                          <p className="mt-0.5 text-[9px] font-semibold text-white/55">active</p>
-                        </Link>
-                        <Link href="/appointments" className="group/item p-3.5 transition-colors hover:bg-white/10">
-                          <p className="text-[9px] font-black uppercase tracking-[0.12em] text-white/48">Visits</p>
-                          <p className="mt-1 text-xl font-black">{appointments.length}</p>
-                          <p className="mt-0.5 text-[9px] font-semibold text-white/55">upcoming</p>
-                        </Link>
-                      </div>
+                      <span className="hidden h-10 w-10 shrink-0 items-center justify-center rounded-full border border-[#24C1C4]/40 bg-[#24C1C4]/10 sm:flex">
+                        <ArrowRight className="h-4 w-4 text-[#24C1C4]" aria-hidden="true" />
+                      </span>
                     </div>
                   </div>
                 </section>
+
+                <section className="group relative min-h-[220px] overflow-hidden rounded-[28px] bg-gradient-to-br from-[#29CFD0] via-[#20BBC0] to-[#0A9DA7] p-6 text-white shadow-[0_24px_60px_rgba(36,193,196,0.20)] ring-1 ring-inset ring-white/25 sm:p-7">
+                  <div aria-hidden="true" className="pointer-events-none absolute -right-20 -top-20 h-64 w-64 rounded-full bg-white/45 blur-3xl transition-transform duration-500 group-hover:scale-110" />
+                  <div aria-hidden="true" className="pointer-events-none absolute -left-20 -bottom-24 h-56 w-56 rounded-full bg-[#C9FFFF]/35 blur-3xl" />
+                  <div aria-hidden="true" className="pointer-events-none absolute inset-x-7 top-0 h-px bg-white/75" />
+
+                  <div className="relative flex min-h-[166px] flex-col justify-between">
+                    <div>
+                      <p className="text-[9px] font-black uppercase tracking-[0.17em] text-white/65">
+                        {priorityItem ? "Priority for today" : "Today"}
+                      </p>
+
+                      {priorityItem ? (
+                        <>
+                          <h2 className="mt-2 max-w-[19rem] text-[23px] font-black leading-tight tracking-[-0.045em]">
+                            {String(priorityItem.title ?? "Something needs your attention")}
+                          </h2>
+                          {priorityItem.description && (
+                            <p className="mt-2 max-w-[20rem] text-[11px] font-medium leading-5 text-white/76">
+                              {String(priorityItem.description)}
+                            </p>
+                          )}
+                          <Link
+                            href={String(priorityItem.actionUrl ?? "/today")}
+                            className="mt-4 inline-flex min-h-10 items-center gap-2 rounded-full bg-[#0B2D54] px-4 py-2 text-[10px] font-black uppercase tracking-[0.08em] text-white shadow-[0_10px_24px_rgba(11,45,84,0.18)] transition-all hover:-translate-y-0.5"
+                          >
+                            {String(priorityItem.actionLabel ?? "View today")}
+                            <ArrowRight className="h-3.5 w-3.5 text-[#24C1C4]" aria-hidden="true" />
+                          </Link>
+                        </>
+                      ) : (
+                        <>
+                          <h2 className="mt-2 max-w-[19rem] text-[23px] font-black leading-tight tracking-[-0.045em]">
+                            Nothing is flagged right now.
+                          </h2>
+                          <p className="mt-2 max-w-[20rem] text-[11px] font-medium leading-5 text-white/76">
+                            Your health actions are organised below when you need them.
+                          </p>
+                        </>
+                      )}
+                    </div>
+
+                    <div className="mt-5 flex items-center gap-2 text-[9px] font-black uppercase tracking-[0.12em] text-white/55">
+                      <span className="h-2 w-2 rounded-full bg-white/80" />
+                      Live health overview
+                    </div>
+                  </div>
+                </section>
+              </div>
 
                 <section className="group relative min-h-[230px] overflow-hidden rounded-[28px] bg-gradient-to-br from-[#29CFD0] via-[#20BBC0] to-[#0A9DA7] p-5 text-white shadow-[0_24px_60px_rgba(36,193,196,0.20)] ring-1 ring-inset ring-white/25 sm:p-6">
                   <div aria-hidden="true" className="pointer-events-none absolute -right-20 -top-20 h-64 w-64 rounded-full bg-white/45 blur-3xl transition-transform duration-500 group-hover:scale-110" />
