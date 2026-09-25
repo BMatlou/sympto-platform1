@@ -672,10 +672,12 @@ export default function HealthHome() {
                 </div>
               </div>
             </section>
-on>
+          </div>
+        </main>
+      </ProtectedRoute>
+    );
+  }
 
-
-        </div>
       </main>
     </ProtectedRoute>
   );
