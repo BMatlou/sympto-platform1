@@ -383,7 +383,7 @@ export default function HealthHome() {
               </header>
 
               <div className="mt-6 grid gap-4 xl:grid-cols-[minmax(0,1.58fr)_minmax(250px,0.72fr)]">
-                <section className="min-h-[340px] rounded-[28px] bg-[#177E89] p-6 text-white shadow-[0_10px_40px_rgba(0,0,0,0.02)] sm:p-7">
+                <section className="min-h-[340px] rounded-[28px] bg-[#0B2D54] p-6 text-white shadow-[0_10px_40px_rgba(0,0,0,0.02)] sm:p-7">
                   <div className="flex h-full flex-col">
                     <div className="flex items-start justify-between">
                       <div>
