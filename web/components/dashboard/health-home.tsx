@@ -278,6 +278,12 @@ export default function HealthHome() {
     4,
   );
 
+  const latestVital = [...healthVitals].sort(
+    (a, b) =>
+      new Date(String(b.measuredAt ?? 0)).getTime() -
+      new Date(String(a.measuredAt ?? 0)).getTime(),
+  )[0];
+
 
 
   return (
