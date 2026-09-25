@@ -494,10 +494,12 @@ export default function HealthHome() {
                   >
                     <div className="pointer-events-none absolute right-4 top-8 h-24 w-24 rounded-full bg-[#24C1C4]/10 blur-3xl transition-transform duration-500 group-hover:scale-125" />
                     <div className="relative flex items-start justify-end">
-                      <span className="pointer-events-none absolute left-1/2 top-[38%] grid h-12 w-12 -translate-x-1/2 -translate-y-1/2 place-items-center rounded-2xl bg-[#E8F8F7] ring-1 ring-[#24C1C4]/30 shadow-[0_0_24px_rgba(36,193,196,0.20)] transition-transform duration-300 group-hover:scale-105">
+                      <ArrowRight className="h-4 w-4 text-[#0B2D54] transition-transform group-hover:translate-x-1" aria-hidden="true" />
+                    </div>
+                    <div className="relative flex flex-1 items-center justify-center py-2">
+                      <span className="grid h-12 w-12 place-items-center rounded-2xl bg-[#E8F8F7] ring-1 ring-[#24C1C4]/30 shadow-[0_0_24px_rgba(36,193,196,0.20)] transition-transform duration-300 group-hover:scale-105">
                         <CheckCircle2 className="h-5 w-5 text-[#0B2D54]" aria-hidden="true" />
                       </span>
-                      <ArrowRight className="h-4 w-4 text-[#0B2D54] transition-transform group-hover:translate-x-1" aria-hidden="true" />
                     </div>
                     <div className="relative mt-auto">
                       <p className="text-[9px] font-black uppercase tracking-[0.14em] text-[#24C1C4]">
@@ -528,11 +530,13 @@ export default function HealthHome() {
                     className="group relative flex min-h-[164px] flex-col justify-between overflow-hidden rounded-[26px] border border-[#F0D0D4] bg-white p-5 shadow-[0_12px_30px_rgba(198,40,40,0.07),0_0_24px_rgba(198,40,40,0.06)] transition-all duration-200 hover:-translate-y-0.5 hover:border-[#E9B2B9] hover:shadow-[0_18px_40px_rgba(198,40,40,0.13),0_0_30px_rgba(198,40,40,0.10)]"
                   >
                     <div className="pointer-events-none absolute right-4 top-8 h-24 w-24 rounded-full bg-[#E53935]/10 blur-3xl transition-transform duration-500 group-hover:scale-125" />
-                    <div className="relative flex items-start justify-between">
-                      <span className="pointer-events-none absolute left-1/2 top-[38%] grid h-12 w-12 -translate-x-1/2 -translate-y-1/2 place-items-center rounded-2xl bg-[#FFE6E6] ring-1 ring-[#E53935]/25 shadow-[0_0_24px_rgba(229,57,53,0.18)] transition-transform duration-300 group-hover:scale-105">
+                    <div className="relative flex items-start justify-end">
+                      <ArrowRight className="h-4 w-4 text-[#C62828] transition-transform group-hover:translate-x-1" aria-hidden="true" />
+                    </div>
+                    <div className="relative flex flex-1 items-center justify-center py-2">
+                      <span className="grid h-12 w-12 place-items-center rounded-2xl bg-[#FFE6E6] ring-1 ring-[#E53935]/25 shadow-[0_0_24px_rgba(229,57,53,0.18)] transition-transform duration-300 group-hover:scale-105">
                         <ShieldCheck className="h-5 w-5 text-[#C62828]" aria-hidden="true" />
                       </span>
-                      <ArrowRight className="h-4 w-4 text-[#C62828] transition-transform group-hover:translate-x-1" aria-hidden="true" />
                     </div>
                     <div className="relative mt-auto">
                       <p className="text-[9px] font-black uppercase tracking-[0.14em] text-[#C62828]">
@@ -563,11 +567,13 @@ export default function HealthHome() {
                     className="group relative flex min-h-[164px] flex-col justify-between overflow-hidden rounded-[26px] border border-[#C9D9F0] bg-white p-5 text-[#0B2D54] shadow-[0_12px_30px_rgba(21,90,193,0.08),0_0_24px_rgba(21,90,193,0.07)] transition-all duration-200 hover:-translate-y-0.5 hover:border-[#A9C2E5] hover:shadow-[0_18px_40px_rgba(21,90,193,0.15),0_0_30px_rgba(21,90,193,0.11)]"
                   >
                     <div className="pointer-events-none absolute right-4 top-8 h-24 w-24 rounded-full bg-[#155AC1]/10 blur-3xl transition-transform duration-500 group-hover:scale-125" />
-                    <div className="relative flex items-start justify-between">
-                      <span className="pointer-events-none absolute left-1/2 top-[38%] grid h-12 w-12 -translate-x-1/2 -translate-y-1/2 place-items-center rounded-2xl bg-[#EAF1FB] ring-1 ring-[#155AC1]/28 shadow-[0_0_24px_rgba(21,90,193,0.20)] transition-transform duration-300 group-hover:scale-105">
+                    <div className="relative flex items-start justify-end">
+                      <ArrowRight className="h-4 w-4 text-[#155AC1] transition-transform group-hover:translate-x-1" aria-hidden="true" />
+                    </div>
+                    <div className="relative flex flex-1 items-center justify-center py-2">
+                      <span className="grid h-12 w-12 place-items-center rounded-2xl bg-[#EAF1FB] ring-1 ring-[#155AC1]/28 shadow-[0_0_24px_rgba(21,90,193,0.20)] transition-transform duration-300 group-hover:scale-105">
                         <FolderOpen className="h-5 w-5 text-[#155AC1]" aria-hidden="true" />
                       </span>
-                      <ArrowRight className="h-4 w-4 text-[#155AC1] transition-transform group-hover:translate-x-1" aria-hidden="true" />
                     </div>
                     <div className="relative mt-auto">
                       <p className="text-[9px] font-black uppercase tracking-[0.14em] text-[#155AC1]">
