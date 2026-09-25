@@ -5,8 +5,6 @@ import { Activity, Bell, CalendarDays, FileHeart, FileText, HeartPulse, Menu, Me
 import { useEffect, useRef, useState } from "react";
 
 type NavItem = readonly [string, string, React.ComponentType<{ className?: string }>];
-type NavGroup = readonly [string, readonly NavItem[]];
-
 const primaryItems: readonly NavItem[] = [
   ["/dashboard", "Home", UserRound],
   ["/today", "Today", ShieldCheck],
@@ -30,7 +28,6 @@ const moreItems: readonly NavItem[] = [
   ["/emergency-contacts", "Emergency contacts", ShieldCheck],
   ["/profile", "Profile", UserRound],
   ["/settings", "Settings", Settings],
-  ["/smart-file", "Smart File", QrCode],
 ];
 
 export default function HealthAccountNav() {
@@ -75,7 +72,7 @@ export default function HealthAccountNav() {
             <p className="mt-1 text-sm font-bold text-[#0b2d54]">Everything you need, organised around your health</p>
           </div>
 
-          {<div className="px-1 py-2">
+          <div className="px-1 py-2">
             <p className="px-3 pb-2 text-[10px] font-black uppercase tracking-[0.16em] text-slate-400">Navigate</p>
             <div className="space-y-0.5">
               {primaryItems.map(([href, label, Icon]) => (
