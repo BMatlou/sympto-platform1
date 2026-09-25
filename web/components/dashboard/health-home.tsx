@@ -312,28 +312,56 @@ export default function HealthHome() {
                   <div aria-hidden="true" className="pointer-events-none absolute -bottom-24 right-1/4 h-56 w-56 rounded-full bg-white/[0.06] blur-3xl" />
                   <div aria-hidden="true" className="pointer-events-none absolute inset-x-7 top-0 h-px bg-white/20" />
 
-                  <div className="relative grid min-h-[166px] items-center gap-8 md:grid-cols-[minmax(0,1fr)_minmax(235px,0.45fr)]">
-                    <div className="max-w-[38rem]">
-                      <p className="text-[9px] font-black uppercase tracking-[0.18em] text-white/50">Overview</p>
-                      <h2 className="mt-2 text-[30px] font-black leading-tight tracking-[-0.05em] sm:text-[36px]">
-                        {greeting}, {firstName}
-                      </h2>
-                      <p className="mt-2 max-w-[31rem] text-[11px] font-medium leading-5 text-white/66">
-                        Your health, organised around what matters today.
-                      </p>
+                  <div className="relative flex min-h-[166px] flex-col justify-between gap-7">
+                    <div className="flex items-start justify-between gap-6">
+                      <div className="max-w-[38rem]">
+                        <p className="text-[9px] font-black uppercase tracking-[0.18em] text-white/50">Overview</p>
+                        <h2 className="mt-2 text-[30px] font-black leading-tight tracking-[-0.05em] sm:text-[36px]">
+                          {greeting}, {firstName}
+                        </h2>
+                        <p className="mt-2 max-w-[31rem] text-[11px] font-medium leading-5 text-white/66">
+                          Your health, organised around what matters today.
+                        </p>
+                      </div>
+
+                      <div className="hidden shrink-0 sm:block">
+                        <div className="flex h-16 w-16 items-center justify-center rounded-full border border-[#24C1C4]/45 bg-[#24C1C4]/10 shadow-[0_0_32px_rgba(36,193,196,0.18)]">
+                          <span className="text-[8px] font-black uppercase tracking-[0.12em] text-white/65">Today</span>
+                        </div>
+                      </div>
                     </div>
 
-                    <div className="border-t border-white/10 pt-5 md:border-l md:border-t-0 md:pl-8 md:pt-0">
-                      <p className="text-[9px] font-black uppercase tracking-[0.16em] text-white/50">
-                        Today
-                      </p>
-                      <div className="mt-2 flex items-end gap-3">
-                        <p className="text-[58px] font-black leading-none tracking-[-0.08em] sm:text-[68px]">
-                          {todayActionCount}
+                    <div className="grid gap-3 md:grid-cols-[minmax(150px,0.6fr)_minmax(0,1fr)]">
+                      <div className="rounded-[22px] border border-white/10 bg-white/[0.07] px-4 py-3.5">
+                        <div className="flex items-end gap-2">
+                          <p className="text-[56px] font-black leading-[0.82] tracking-[-0.08em]">
+                            {todayActionCount}
+                          </p>
+                          <p className="pb-1 text-[10px] font-bold uppercase tracking-[0.08em] text-white/60">
+                            items today
+                          </p>
+                        </div>
+                        <p className="mt-2 text-[10px] font-medium leading-4 text-white/58">
+                          Active health actions already on your dashboard.
                         </p>
-                        <p className="max-w-[10rem] pb-1 text-[10px] font-bold leading-4 text-white/74">
-                          active items that need your attention today
-                        </p>
+                      </div>
+
+                      <div className="grid grid-cols-3 overflow-hidden rounded-[22px] border border-white/10 bg-white/[0.05]">
+                        <Link href="/medications" className="group/item border-r border-white/10 p-3.5 transition-colors hover:bg-white/10">
+                          <p className="text-[9px] font-black uppercase tracking-[0.12em] text-white/48">Meds</p>
+                          <p className="mt-1 text-xl font-black">{medications.length}</p>
+                          <p className="mt-0.5 text-[9px] font-semibold text-white/55">active</p>
+                        </Link>
+                        <Link href="/health-goals" className="group/item border-r border-white/10 p-3.5 transition-colors hover:bg-white/10">
+                          <p className="text-[9px] font-black uppercase tracking-[0.12em] text-white/48">Goals</p>
+                          <p className="mt-1 text-xl font-black">{activeGoalCount}</p>
+                          <p className="mt-0.5 text-[9px] font-semibold text-white/55">active</p>
+                        </Link>
+                        <Link href="/appointments" className="group/item p-3.5 transition-colors hover:bg-white/10">
+                          <p className="text-[9px] font-black uppercase tracking-[0.12em] text-white/48">Visits</p>
+                          <p className="mt-1 text-xl font-black">{appointments.length}</p>
+                          <p className="mt-0.5 text-[9px] font-semibold text-white/55">upcoming</p>
+                        </Link>
                       </div>
                     </div>
                   </div>
@@ -368,7 +396,6 @@ export default function HealthHome() {
                                 {recentSymptomStatus === "ACTIVE" ? " · Active" : ""}
                               </p>
                             </div>
-
                           </div>
 
                           <div className="mt-3 flex flex-wrap gap-2">
@@ -385,7 +412,7 @@ export default function HealthHome() {
                             </Link>
                             <Link
                               href="/log-symptom"
-                              className="inline-flex min-h-10 items-center gap-2 rounded-full bg-white/15 px-3.5 py-2 text-[10px] font-black uppercase tracking-[0.09em] text-white ring-1 ring-inset ring-white/25 backdrop-blur-sm transition-all hover:bg-white/22"
+                              className="inline-flex min-h-10 items-center gap-2 rounded-full bg-white/15 px-3.5 py-2 text-[10px] font-black uppercase tracking-[0.09em] text-white ring-1 ring-inset ring-white/25 backdrop-blur-sm transition-all hover:bg-white/20"
                             >
                               <span className="grid h-5 w-5 place-items-center rounded-full bg-white text-[#0B2D54] shadow-sm">
                                 <Plus className="h-3.5 w-3.5 stroke-[2.5]" aria-hidden="true" />
