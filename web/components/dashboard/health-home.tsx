@@ -99,6 +99,14 @@ function symptomLabel(symptom: any): string {
   return names[0] ? String(names[0]) : "Symptom";
 }
 
+function getTimeGreeting(date = new Date()): string {
+  const hour = date.getHours();
+  if (hour >= 5 && hour < 12) return "Good morning";
+  if (hour >= 12 && hour < 18) return "Good afternoon";
+  if (hour >= 18 || hour < 5) return "Good evening";
+  return "Hello";
+}
+
 function formatSymptomDate(value: unknown): string {
   if (!value) return "";
   const date = new Date(String(value));
@@ -226,6 +234,8 @@ export default function HealthHome() {
     );
   }
 
+  const greeting = getTimeGreeting();
+
   const firstName =
     data.patient?.firstName ||
     data.profile?.preferredName ||
@@ -297,45 +307,38 @@ export default function HealthHome() {
               </div>
 
               <div className="mt-3 grid gap-3 xl:grid-cols-[minmax(0,1.7fr)_minmax(290px,0.8fr)]">
-                <section className="group relative min-h-[230px] overflow-hidden rounded-[28px] bg-gradient-to-br from-[#0B2D54] via-[#143D67] to-[#0F6173] p-5 text-white shadow-[0_24px_60px_rgba(11,45,84,0.16)] sm:p-6">
-                  <div aria-hidden="true" className="pointer-events-none absolute -right-24 -top-24 h-80 w-80 rounded-full bg-[#24C1C4]/20 blur-3xl transition-transform duration-500 group-hover:scale-110" />
-                  <div aria-hidden="true" className="pointer-events-none absolute -bottom-28 left-1/3 h-64 w-64 rounded-full bg-white/[0.06] blur-3xl" />
+                <section className="group relative min-h-[210px] overflow-hidden rounded-[28px] bg-gradient-to-br from-[#0B2D54] via-[#143D67] to-[#0F6173] p-5 text-white shadow-[0_24px_60px_rgba(11,45,84,0.16)] sm:p-6">
+                  <div aria-hidden="true" className="pointer-events-none absolute -right-20 -top-24 h-72 w-72 rounded-full bg-[#24C1C4]/20 blur-3xl transition-transform duration-500 group-hover:scale-110" />
+                  <div aria-hidden="true" className="pointer-events-none absolute -bottom-24 right-1/4 h-56 w-56 rounded-full bg-white/[0.06] blur-3xl" />
                   <div aria-hidden="true" className="pointer-events-none absolute inset-x-7 top-0 h-px bg-white/20" />
 
-                  <div className="relative flex min-h-[202px] flex-col justify-between">
-                    <div className="flex items-start justify-between gap-5">
-                      <div className="max-w-[38rem]">
-                        <p className="text-[9px] font-black uppercase tracking-[0.18em] text-white/48">Overview</p>
-                        <h2 className="mt-1.5 text-[28px] font-black tracking-[-0.05em] sm:text-[34px]">
-                          Good day, {firstName}
-                        </h2>
-                        <p className="mt-1.5 max-w-[31rem] text-[11px] font-medium leading-5 text-white/66">
-                          Your health, organised around what matters today.
-                        </p>
-                      </div>
-
+                  <div className="relative grid min-h-[178px] items-center gap-8 md:grid-cols-[minmax(0,1fr)_auto]">
+                    <div className="max-w-[38rem]">
+                      <p className="text-[9px] font-black uppercase tracking-[0.18em] text-white/50">Overview</p>
+                      <h2 className="mt-1.5 text-[28px] font-black tracking-[-0.05em] sm:text-[34px]">
+                        {greeting}, {firstName}
+                      </h2>
+                      <p className="mt-1.5 max-w-[31rem] text-[11px] font-medium leading-5 text-white/66">
+                        Your health, organised around what matters today.
+                      </p>
                     </div>
 
-                    <div className="flex flex-wrap items-end justify-between gap-5">
-                      <div className="flex items-end gap-3">
-                        <p className="text-[62px] font-black leading-[0.78] tracking-[-0.08em] sm:text-[70px]">
-                          {todayActionCount}
+                    <div className="flex items-center gap-3 md:min-w-[270px] md:justify-end">
+                      <p className="text-[62px] font-black leading-[0.78] tracking-[-0.08em] sm:text-[70px]">
+                        {todayActionCount}
+                      </p>
+                      <div className="max-w-[13rem]">
+                        <p className="text-[10px] font-black leading-4 text-white/74">
+                          active items that need your attention today
                         </p>
-                        <div className="pb-1">
-                          <p className="max-w-[13rem] text-[10px] font-black leading-4 text-white/74">
-                            active items that need your attention today
-                          </p>
-                          <ActionLink
-                            href="/today"
-                            className="mt-2 inline-flex min-h-9 items-center gap-2 rounded-full bg-[#24C1C4] px-4 py-2 text-[10px] font-black uppercase tracking-[0.08em] text-[#0B2D54] shadow-[0_12px_28px_rgba(36,193,196,0.22)] transition-all hover:-translate-y-0.5 hover:shadow-[0_16px_34px_rgba(36,193,196,0.32)]"
-                          >
-                            Open today
-                            <ArrowRight className="h-3.5 w-3.5" aria-hidden="true" />
-                          </ActionLink>
-                        </div>
+                        <ActionLink
+                          href="/today"
+                          className="mt-2 inline-flex min-h-9 items-center gap-2 rounded-full bg-[#24C1C4] px-4 py-2 text-[10px] font-black uppercase tracking-[0.08em] text-[#0B2D54] shadow-[0_12px_28px_rgba(36,193,196,0.22)] transition-all hover:-translate-y-0.5 hover:shadow-[0_16px_34px_rgba(36,193,196,0.32)]"
+                        >
+                          Open today
+                          <ArrowRight className="h-3.5 w-3.5" aria-hidden="true" />
+                        </ActionLink>
                       </div>
-
-
                     </div>
                   </div>
                 </section>
