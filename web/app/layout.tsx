@@ -53,7 +53,7 @@ export default function RootLayout({
       suppressHydrationWarning
       className={cn("h-full", "antialiased", "font-sans")}
     >
-      <body className="min-h-screen bg-background pb-28 text-foreground">
+      <body className="min-h-screen bg-background text-foreground">
         <ThemeProvider>
           <QueryProvider>
             {children}
