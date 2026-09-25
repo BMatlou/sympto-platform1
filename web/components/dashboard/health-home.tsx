@@ -325,7 +325,7 @@ export default function HealthHome() {
   return (
     <ProtectedRoute>
       <main className="min-h-screen bg-[#EAF0F7] px-2 py-2 text-[#0B2D54] sm:px-4 sm:py-4">
-        <div className="mx-auto grid min-h-[calc(100vh-2rem)] max-w-[1560px] overflow-hidden rounded-[30px] border border-white/80 bg-white shadow-[0_28px_80px_rgba(11,45,84,0.12)] lg:grid-cols-[214px_minmax(0,1fr)_250px]">
+        <div className="mx-auto grid min-h-[calc(100vh-2rem)] max-w-[1480px] overflow-hidden rounded-[30px] border border-white/80 bg-white shadow-[0_28px_80px_rgba(11,45,84,0.12)] lg:grid-cols-[214px_minmax(0,1fr)]">
           <aside className="hidden min-h-0 border-r border-slate-200/80 bg-[#F8FAFD] lg:flex lg:flex-col">
             <div className="border-b border-slate-200/80 px-5 py-5">
               <div className="flex items-center gap-3">
@@ -397,184 +397,239 @@ export default function HealthHome() {
                 )}
               </div>
             </div>
-
           </aside>
 
           <section className="min-w-0 bg-white">
-            <div className="px-4 pb-6 pt-5 sm:px-6 lg:px-7 lg:pb-7">
+            <div className="px-4 pb-7 pt-5 sm:px-6 lg:px-8">
               <header className="flex items-end justify-between gap-4">
                 <div>
                   <p className="text-[9px] font-black uppercase tracking-[0.2em] text-slate-400">Primary</p>
-                  <h1 className="mt-0.5 text-[25px] font-black tracking-[-0.05em] text-[#0B2D54] sm:text-[30px]">Dashboard</h1>
+                  <h1 className="mt-0.5 text-[26px] font-black tracking-[-0.05em] text-[#0B2D54] sm:text-[31px]">
+                    Dashboard
+                  </h1>
                 </div>
-                <div className="flex items-center gap-2">
-                  <ActionLink
-                    href="/profile"
-                    ariaLabel="Open profile"
-                    className="grid h-10 w-10 place-items-center rounded-2xl border border-slate-200 bg-white text-[#0B2D54] shadow-[0_8px_20px_rgba(11,45,84,0.06)] transition-all hover:-translate-y-0.5 hover:shadow-[0_12px_26px_rgba(11,45,84,0.10)]"
-                  >
-                    <UserRound className="h-4 w-4" aria-hidden="true" />
-                  </ActionLink>
-                  <ActionLink
-                    href="/smart-file"
-                    className="inline-flex min-h-10 items-center gap-2 rounded-2xl bg-[#0B2D54] px-4 py-2.5 text-[10px] font-black uppercase tracking-[0.08em] text-white shadow-[0_10px_24px_rgba(11,45,84,0.12)] transition-all hover:-translate-y-0.5 hover:bg-[#092544]"
-                  >
-                    <FileHeart className="h-3.5 w-3.5" aria-hidden="true" />
-                    <span className="hidden sm:inline">Share Smart File</span>
-                    <span className="sm:hidden">Share</span>
-                  </ActionLink>
-                </div>
+
+                <ActionLink
+                  href="/smart-file"
+                  className="inline-flex min-h-10 items-center gap-2 rounded-2xl bg-[#0B2D54] px-4 py-2.5 text-[10px] font-black uppercase tracking-[0.08em] text-white shadow-[0_10px_24px_rgba(11,45,84,0.12)] transition-all hover:-translate-y-0.5 hover:bg-[#092544]"
+                >
+                  <FileHeart className="h-3.5 w-3.5" aria-hidden="true" />
+                  <span className="hidden sm:inline">Share Smart File</span>
+                  <span className="sm:hidden">Share</span>
+                </ActionLink>
               </header>
 
-              <div className="mt-5 grid gap-4 xl:grid-cols-[minmax(0,1.55fr)_minmax(270px,0.8fr)]">
-                <section className="group relative min-h-[318px] overflow-hidden rounded-[28px] bg-gradient-to-br from-[#0B2D54] via-[#143D67] to-[#0F6173] p-5 text-white shadow-[0_22px_58px_rgba(11,45,84,0.15)] sm:p-6">
-                  <div aria-hidden="true" className="pointer-events-none absolute -right-24 -top-24 h-80 w-80 rounded-full bg-[#24C1C4]/18 blur-3xl transition-transform duration-500 group-hover:scale-110" />
+              <div className="mt-5 grid gap-4 xl:grid-cols-[minmax(0,1.7fr)_minmax(290px,0.8fr)]">
+                <section className="group relative min-h-[318px] overflow-hidden rounded-[28px] bg-gradient-to-br from-[#0B2D54] via-[#143D67] to-[#0F6173] p-5 text-white shadow-[0_24px_60px_rgba(11,45,84,0.16)] sm:p-6">
+                  <div aria-hidden="true" className="pointer-events-none absolute -right-24 -top-24 h-80 w-80 rounded-full bg-[#24C1C4]/20 blur-3xl transition-transform duration-500 group-hover:scale-110" />
                   <div aria-hidden="true" className="pointer-events-none absolute -bottom-28 left-1/3 h-64 w-64 rounded-full bg-white/[0.06] blur-3xl" />
+                  <div aria-hidden="true" className="pointer-events-none absolute inset-x-7 top-0 h-px bg-white/20" />
+
                   <div className="relative flex min-h-[278px] flex-col justify-between">
                     <div className="flex items-start justify-between gap-5">
-                      <div>
-                        <p className="text-[9px] font-black uppercase tracking-[0.18em] text-white/52">Overview</p>
-                        <h2 className="mt-1 text-[29px] font-black tracking-[-0.05em] sm:text-[35px]">Good day, {firstName}</h2>
-                        <p className="mt-2 max-w-[30rem] text-[12px] font-medium leading-5 text-white/65">Your health, organised around what matters today.</p>
+                      <div className="max-w-[38rem]">
+                        <p className="text-[9px] font-black uppercase tracking-[0.18em] text-white/48">Overview</p>
+                        <h2 className="mt-2 text-[31px] font-black tracking-[-0.055em] sm:text-[40px]">
+                          Good day, {firstName}
+                        </h2>
+                        <p className="mt-2 max-w-[31rem] text-[12px] font-medium leading-5 text-white/66">
+                          Your health, organised around what matters today.
+                        </p>
                       </div>
-                      <span className="grid h-11 w-11 shrink-0 place-items-center rounded-2xl bg-white/10 ring-1 ring-inset ring-white/15 shadow-[0_0_30px_rgba(36,193,196,0.16)]">
+                      <span className="grid h-11 w-11 shrink-0 place-items-center rounded-2xl bg-white/10 ring-1 ring-inset ring-white/15 shadow-[0_0_28px_rgba(36,193,196,0.16)]">
                         <HeartPulse className="h-5 w-5 text-[#8FF7F2]" aria-hidden="true" />
                       </span>
                     </div>
 
-                    <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_270px] lg:items-end">
-                      <div>
-                        <div className="flex items-end gap-3">
-                          <p className="text-[74px] font-black leading-[0.76] tracking-[-0.09em] sm:text-[84px]">{todayActionCount}</p>
-                          <div className="pb-1">
-                            <p className="max-w-[13rem] text-[11px] font-black leading-4 text-white/72">active items that need your attention today</p>
-                            <ActionLink
-                              href="/today"
-                              className="mt-3 inline-flex min-h-10 items-center gap-2 rounded-full bg-[#24C1C4] px-4 py-2 text-[10px] font-black uppercase tracking-[0.08em] text-[#0B2D54] shadow-[0_12px_26px_rgba(36,193,196,0.22)] transition-all hover:-translate-y-0.5"
-                            >
-                              Open today
-                              <ArrowRight className="h-3.5 w-3.5" aria-hidden="true" />
-                            </ActionLink>
-                          </div>
-                        </div>
-                        <div className="mt-6 overflow-hidden rounded-full bg-white/10 p-1 ring-1 ring-inset ring-white/10">
-                          <div className="flex h-2 overflow-hidden rounded-full">
-                            <span className="bg-[#24C1C4]" style={{ width: todayActionCount ? (medications.length / todayActionCount) * 100 + "%" : "0%" }} />
-                            <span className="bg-white/75" style={{ width: todayActionCount ? (activeGoalCount / todayActionCount) * 100 + "%" : "0%" }} />
-                            <span className="bg-[#7DEBED]" style={{ width: todayActionCount ? (appointments.length / todayActionCount) * 100 + "%" : "0%" }} />
-                          </div>
+                    <div className="flex flex-wrap items-end justify-between gap-5">
+                      <div className="flex items-end gap-3">
+                        <p className="text-[76px] font-black leading-[0.76] tracking-[-0.09em] sm:text-[86px]">
+                          {todayActionCount}
+                        </p>
+                        <div className="pb-1">
+                          <p className="max-w-[15rem] text-[11px] font-black leading-4 text-white/74">
+                            active items that need your attention today
+                          </p>
+                          <ActionLink
+                            href="/today"
+                            className="mt-3 inline-flex min-h-10 items-center gap-2 rounded-full bg-[#24C1C4] px-4 py-2 text-[10px] font-black uppercase tracking-[0.08em] text-[#0B2D54] shadow-[0_12px_28px_rgba(36,193,196,0.22)] transition-all hover:-translate-y-0.5 hover:shadow-[0_16px_34px_rgba(36,193,196,0.32)]"
+                          >
+                            Open today
+                            <ArrowRight className="h-3.5 w-3.5" aria-hidden="true" />
+                          </ActionLink>
                         </div>
                       </div>
 
-                      <div className="grid grid-cols-3 gap-2">
-                        <div className="rounded-2xl bg-white/[0.07] px-3 py-3 ring-1 ring-inset ring-white/10">
-                          <p className="text-[8px] font-black uppercase tracking-[0.13em] text-white/42">Meds</p>
-                          <p className="mt-1 text-xl font-black tracking-[-0.04em]">{medications.length}</p>
+                      {todayChips.length > 0 && (
+                        <div className="flex flex-wrap justify-end gap-1.5">
+                          {todayChips.map((chip) => (
+                            <RecordedChip
+                              key={chip}
+                              className="bg-white/10 text-white ring-white/20"
+                            >
+                              {chip}
+                            </RecordedChip>
+                          ))}
                         </div>
-                        <div className="rounded-2xl bg-white/[0.07] px-3 py-3 ring-1 ring-inset ring-white/10">
-                          <p className="text-[8px] font-black uppercase tracking-[0.13em] text-white/42">Goals</p>
-                          <p className="mt-1 text-xl font-black tracking-[-0.04em]">{activeGoalCount}</p>
-                        </div>
-                        <div className="rounded-2xl bg-white/[0.07] px-3 py-3 ring-1 ring-inset ring-white/10">
-                          <p className="text-[8px] font-black uppercase tracking-[0.13em] text-white/42">Appts</p>
-                          <p className="mt-1 text-xl font-black tracking-[-0.04em]">{appointments.length}</p>
-                        </div>
-                      </div>
+                      )}
                     </div>
                   </div>
                 </section>
 
-                <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-1">
-                  <section className="group relative min-h-[150px] overflow-hidden rounded-[26px] bg-gradient-to-br from-[#24C1C4] to-[#0A9DA7] p-5 text-white shadow-[0_18px_42px_rgba(36,193,196,0.22)] ring-1 ring-inset ring-white/25">
-                    <div aria-hidden="true" className="pointer-events-none absolute -right-8 -top-8 h-28 w-28 rounded-full bg-white/30 blur-3xl transition-transform duration-500 group-hover:scale-125" />
-                    <div className="relative flex items-start justify-between">
-                      <span className="grid h-11 w-11 place-items-center rounded-2xl bg-white/18 ring-1 ring-inset ring-white/40 shadow-[0_0_24px_rgba(255,255,255,0.18)]">
-                        <HeartPulse className="h-5 w-5 text-white" aria-hidden="true" />
+                <section className="group relative min-h-[318px] overflow-hidden rounded-[28px] bg-gradient-to-br from-[#29CFD0] via-[#20BBC0] to-[#0A9DA7] p-5 text-white shadow-[0_24px_60px_rgba(36,193,196,0.20)] ring-1 ring-inset ring-white/25 sm:p-6">
+                  <div aria-hidden="true" className="pointer-events-none absolute -right-20 -top-20 h-64 w-64 rounded-full bg-white/45 blur-3xl transition-transform duration-500 group-hover:scale-110" />
+                  <div aria-hidden="true" className="pointer-events-none absolute -left-20 -bottom-24 h-56 w-56 rounded-full bg-[#C9FFFF]/35 blur-3xl" />
+                  <div aria-hidden="true" className="pointer-events-none absolute inset-x-7 top-0 h-px bg-white/75" />
+
+                  <div className="relative flex min-h-[278px] flex-col justify-between">
+                    <div className="flex items-start justify-between gap-4">
+                      <span className="grid h-12 w-12 place-items-center rounded-2xl bg-white/20 ring-1 ring-inset ring-white/45 shadow-[0_0_30px_rgba(255,255,255,0.20)] transition-transform duration-300 group-hover:scale-105">
+                        <HeartPulse className="h-5 w-5 text-white drop-shadow-[0_0_9px_rgba(255,255,255,0.80)]" aria-hidden="true" />
                       </span>
-                      <span className="text-[9px] font-black uppercase tracking-[0.15em] text-white/75">Monitor</span>
+                      <span className="rounded-full bg-white/12 px-2.5 py-1 text-[9px] font-black uppercase tracking-[0.15em] text-white/82 ring-1 ring-inset ring-white/20">
+                        Monitor
+                      </span>
+                    </div>
+
+                    <div>
+                      <p className="text-[9px] font-black uppercase tracking-[0.17em] text-white/68">
+                        Recent symptom
+                      </p>
+
+                      {recentSymptom ? (
+                        <>
+                          <div className="mt-2 flex items-start justify-between gap-3">
+                            <div className="min-w-0">
+                              <h2 className="truncate text-[27px] font-black tracking-[-0.05em]">
+                                {symptomLabel(recentSymptom)}
+                              </h2>
+                              <p className="mt-1 text-[11px] font-semibold text-white/76">
+                                {formatSymptomDate(recentSymptomAt)}
+                                {recentSymptomStatus === "ACTIVE" ? " · Active" : ""}
+                              </p>
+                            </div>
+                            {recentSymptom.overallSeverity && (
+                              <span className="shrink-0 rounded-full bg-white/16 px-2.5 py-1 text-[9px] font-black uppercase tracking-[0.08em] ring-1 ring-inset ring-white/25">
+                                {String(recentSymptom.overallSeverity).toLowerCase()}
+                              </span>
+                            )}
+                          </div>
+
+                          <div className="mt-4 flex flex-wrap gap-2">
+                            <Link
+                              href={
+                                recentSymptomStatus === "ACTIVE"
+                                  ? "/symptom-logs/" + encodeURIComponent(String(recentSymptom.id)) + "/monitor"
+                                  : "/symptom-logs/" + encodeURIComponent(String(recentSymptom.id))
+                              }
+                              className="inline-flex min-h-10 items-center gap-2 rounded-full bg-[#0B2D54] px-4 py-2 text-[10px] font-black uppercase tracking-[0.08em] text-white shadow-[0_10px_24px_rgba(11,45,84,0.18)] transition-all hover:-translate-y-0.5"
+                            >
+                              Update
+                              <ArrowRight className="h-3.5 w-3.5 text-[#24C1C4]" aria-hidden="true" />
+                            </Link>
+                            <Link
+                              href="/log-symptom"
+                              className="inline-flex min-h-10 items-center gap-2 rounded-full bg-white/15 px-3.5 py-2 text-[10px] font-black uppercase tracking-[0.09em] text-white ring-1 ring-inset ring-white/25 backdrop-blur-sm transition-all hover:bg-white/22"
+                            >
+                              <span className="grid h-5 w-5 place-items-center rounded-full bg-white text-[#0B2D54] shadow-sm">
+                                <Plus className="h-3.5 w-3.5 stroke-[2.5]" aria-hidden="true" />
+                              </span>
+                              New symptom
+                            </Link>
+                          </div>
+                        </>
+                      ) : (
+                        <>
+                          <h2 className="mt-2 text-[27px] font-black tracking-[-0.05em]">Log a symptom</h2>
+                          <p className="mt-1 text-[11px] font-semibold text-white/76">Nothing has been logged yet.</p>
+                          <Link
+                            href="/log-symptom"
+                            className="mt-4 inline-flex min-h-10 items-center gap-2 rounded-full bg-[#0B2D54] px-4 py-2 text-[10px] font-black uppercase tracking-[0.08em] text-white"
+                          >
+                            Log symptom
+                            <ArrowRight className="h-3.5 w-3.5 text-[#24C1C4]" aria-hidden="true" />
+                          </Link>
+                        </>
+                      )}
+                    </div>
+                  </div>
+                </section>
+              </div>
+
+              <section className="mt-6">
+                <div className="mb-3 flex items-center justify-between px-1">
+                  <p className="text-[10px] font-black uppercase tracking-[0.18em] text-[#0B2D54]/55">Your health</p>
+                </div>
+
+                <div className="grid gap-4 md:grid-cols-3">
+                  <ActionLink
+                    href="/today"
+                    className="group relative min-h-[164px] overflow-hidden rounded-[26px] border border-slate-200/80 bg-white p-5 shadow-[0_14px_34px_rgba(11,45,84,0.06)] transition-all duration-300 hover:-translate-y-1 hover:border-[#24C1C4]/25 hover:shadow-[0_22px_44px_rgba(11,45,84,0.11)]"
+                  >
+                    <div aria-hidden="true" className="pointer-events-none absolute -right-8 -top-8 h-24 w-24 rounded-full bg-[#24C1C4]/10 blur-2xl transition-transform duration-500 group-hover:scale-125" />
+                    <div className="relative flex items-start justify-between">
+                      <span className="grid h-11 w-11 place-items-center rounded-2xl bg-[#E8F8F7] text-[#24C1C4] ring-1 ring-inset ring-[#24C1C4]/18 shadow-[0_0_20px_rgba(36,193,196,0.10)] transition-all group-hover:scale-105 group-hover:bg-[#D9FFFE] group-hover:shadow-[0_0_28px_rgba(36,193,196,0.32)]">
+                        <CheckCircle2 className="h-5 w-5" aria-hidden="true" />
+                      </span>
+                      <ArrowRight className="h-4 w-4 text-slate-300 transition-all group-hover:translate-x-1 group-hover:text-[#24C1C4]" aria-hidden="true" />
                     </div>
                     <div className="relative mt-7">
-                      <p className="text-[9px] font-black uppercase tracking-[0.16em] text-white/65">Recent symptom</p>
-                      <div className="mt-1.5 flex items-center justify-between gap-3">
-                        <h2 className="truncate text-[22px] font-black tracking-[-0.04em]">{recentSymptom ? symptomLabel(recentSymptom) : "Nothing logged"}</h2>
-                        {recentSymptom?.overallSeverity && <span className="shrink-0 rounded-full bg-white/16 px-2 py-1 text-[8px] font-black uppercase ring-1 ring-inset ring-white/25">{String(recentSymptom.overallSeverity).toLowerCase()}</span>}
+                      <p className="text-[9px] font-black uppercase tracking-[0.16em] text-slate-400">Daily care</p>
+                      <div className="mt-1 flex items-end justify-between gap-3">
+                        <h2 className="text-[24px] font-black tracking-[-0.05em] text-[#0B2D54]">Today</h2>
+                        <div className="flex flex-wrap justify-end gap-1.5">
+                          {todayChips.map((chip) => (
+                            <RecordedChip key={chip} className="bg-[#E8F8F7] text-[#0B2D54] ring-[#24C1C4]/15">{chip}</RecordedChip>
+                          ))}
+                        </div>
                       </div>
-                      {recentSymptom && <p className="mt-1 text-[10px] font-semibold text-white/72">{formatSymptomDate(recentSymptomAt)}{recentSymptomStatus === "ACTIVE" ? " · Active" : ""}</p>}
                     </div>
-                  </section>
+                  </ActionLink>
 
                   <ActionLink
                     href="/health-passport"
-                    className="group relative min-h-[150px] overflow-hidden rounded-[26px] bg-gradient-to-br from-[#C62828] to-[#A91E2A] p-5 text-white shadow-[0_18px_42px_rgba(198,40,40,0.18)] transition-all hover:-translate-y-0.5"
+                    className="group relative min-h-[164px] overflow-hidden rounded-[26px] border border-slate-200/80 bg-white p-5 shadow-[0_14px_34px_rgba(11,45,84,0.06)] transition-all duration-300 hover:-translate-y-1 hover:border-[#C62828]/25 hover:shadow-[0_22px_44px_rgba(11,45,84,0.11)]"
                   >
+                    <div aria-hidden="true" className="pointer-events-none absolute -right-8 -top-8 h-24 w-24 rounded-full bg-[#C62828]/10 blur-2xl transition-transform duration-500 group-hover:scale-125" />
                     <div className="relative flex items-start justify-between">
-                      <span className="grid h-11 w-11 place-items-center rounded-2xl bg-white/16 ring-1 ring-inset ring-white/35 shadow-[0_0_24px_rgba(255,255,255,0.16)]">
-                        <ShieldCheck className="h-5 w-5 text-white" aria-hidden="true" />
-                      </span>
-                      <ArrowRight className="h-4 w-4 text-white/75 transition-transform group-hover:translate-x-1" aria-hidden="true" />
-                    </div>
-                    <div className="relative mt-7">
-                      <p className="text-[9px] font-black uppercase tracking-[0.16em] text-white/68">Clinic Card</p>
-                      <h2 className="mt-1 text-[22px] font-black tracking-[-0.04em]">Essentials</h2>
-                      <p className="mt-1 text-[10px] font-semibold text-white/72">{activeConditions.length} condition{activeConditions.length === 1 ? "" : "s"} · {activeAllergies.length} allerg{activeAllergies.length === 1 ? "y" : "ies"}</p>
-                    </div>
-                  </ActionLink>
-                </div>
-              </div>
-
-              <section className="mt-5">
-                <div className="mb-3 flex items-center justify-between">
-                  <div>
-                    <p className="text-[9px] font-black uppercase tracking-[0.18em] text-slate-400">Your health</p>
-                    <p className="mt-1 text-xs font-semibold text-slate-500">Keep your most-used destinations close.</p>
-                  </div>
-                </div>
-
-                <div className="grid gap-3 md:grid-cols-3">
-                  <ActionLink href="/today" className="group min-h-[154px] rounded-[25px] border border-slate-200 bg-white p-5 shadow-[0_12px_30px_rgba(11,45,84,0.06)] transition-all hover:-translate-y-1 hover:shadow-[0_18px_40px_rgba(11,45,84,0.11)]">
-                    <div className="relative flex items-start justify-between">
-                      <span className="grid h-11 w-11 place-items-center rounded-2xl bg-[#E8F8F7] text-[#24C1C4] ring-1 ring-inset ring-[#24C1C4]/18 shadow-[0_0_20px_rgba(36,193,196,0.10)] transition-all group-hover:bg-[#D9FFFE] group-hover:shadow-[0_0_28px_rgba(36,193,196,0.32)]">
-                        <CheckCircle2 className="h-5 w-5" aria-hidden="true" />
-                      </span>
-                      <ArrowRight className="h-4 w-4 text-slate-300 transition-transform group-hover:translate-x-1 group-hover:text-[#24C1C4]" aria-hidden="true" />
-                    </div>
-                    <div className="mt-7">
-                      <p className="text-[9px] font-black uppercase tracking-[0.16em] text-slate-400">Daily care</p>
-                      <div className="mt-1 flex items-end justify-between gap-2">
-                        <h2 className="text-[23px] font-black tracking-[-0.05em] text-[#0B2D54]">Today</h2>
-                        <div className="flex flex-wrap justify-end gap-1">{todayChips.map((chip) => <RecordedChip key={chip} className="bg-[#E8F8F7] text-[#0B2D54] ring-[#24C1C4]/15">{chip}</RecordedChip>)}</div>
-                      </div>
-                    </div>
-                  </ActionLink>
-
-                  <ActionLink href="/health-passport" className="group min-h-[154px] rounded-[25px] border border-slate-200 bg-white p-5 shadow-[0_12px_30px_rgba(11,45,84,0.06)] transition-all hover:-translate-y-1 hover:shadow-[0_18px_40px_rgba(11,45,84,0.11)]">
-                    <div className="relative flex items-start justify-between">
-                      <span className="grid h-11 w-11 place-items-center rounded-2xl bg-[#FFF0F0] text-[#C62828] ring-1 ring-inset ring-[#C62828]/18 shadow-[0_0_20px_rgba(198,40,40,0.10)] transition-all group-hover:bg-[#FFE4E4] group-hover:shadow-[0_0_28px_rgba(198,40,40,0.30)]">
+                      <span className="grid h-11 w-11 place-items-center rounded-2xl bg-[#FFF0F0] text-[#C62828] ring-1 ring-inset ring-[#C62828]/18 shadow-[0_0_20px_rgba(198,40,40,0.10)] transition-all group-hover:scale-105 group-hover:bg-[#FFE4E4] group-hover:shadow-[0_0_28px_rgba(198,40,40,0.30)]">
                         <ShieldCheck className="h-5 w-5" aria-hidden="true" />
                       </span>
-                      <ArrowRight className="h-4 w-4 text-slate-300 transition-transform group-hover:translate-x-1 group-hover:text-[#C62828]" aria-hidden="true" />
+                      <ArrowRight className="h-4 w-4 text-slate-300 transition-all group-hover:translate-x-1 group-hover:text-[#C62828]" aria-hidden="true" />
                     </div>
-                    <div className="mt-7">
+                    <div className="relative mt-7">
                       <p className="text-[9px] font-black uppercase tracking-[0.16em] text-slate-400">Clinic Card</p>
-                      <div className="mt-1 flex items-end justify-between gap-2">
-                        <h2 className="text-[23px] font-black tracking-[-0.05em] text-[#0B2D54]">Essentials</h2>
-                        <div className="flex flex-wrap justify-end gap-1">{clinicChips.map((chip) => <RecordedChip key={chip} className="bg-[#FFF0F0] text-[#8D1A24] ring-[#C62828]/15">{chip}</RecordedChip>)}</div>
+                      <div className="mt-1 flex items-end justify-between gap-3">
+                        <h2 className="text-[24px] font-black tracking-[-0.05em] text-[#0B2D54]">Essentials</h2>
+                        <div className="flex flex-wrap justify-end gap-1.5">
+                          {clinicChips.map((chip) => (
+                            <RecordedChip key={chip} className="bg-[#FFF0F0] text-[#8D1A24] ring-[#C62828]/15">{chip}</RecordedChip>
+                          ))}
+                        </div>
                       </div>
                     </div>
                   </ActionLink>
 
-                  <ActionLink href="/health-journal" className="group min-h-[154px] rounded-[25px] border border-slate-200 bg-white p-5 shadow-[0_12px_30px_rgba(11,45,84,0.06)] transition-all hover:-translate-y-1 hover:shadow-[0_18px_40px_rgba(11,45,84,0.11)]">
+                  <ActionLink
+                    href="/health-journal"
+                    className="group relative min-h-[164px] overflow-hidden rounded-[26px] border border-slate-200/80 bg-white p-5 shadow-[0_14px_34px_rgba(11,45,84,0.06)] transition-all duration-300 hover:-translate-y-1 hover:border-[#155AC1]/25 hover:shadow-[0_22px_44px_rgba(11,45,84,0.11)]"
+                  >
+                    <div aria-hidden="true" className="pointer-events-none absolute -right-8 -top-8 h-24 w-24 rounded-full bg-[#155AC1]/10 blur-2xl transition-transform duration-500 group-hover:scale-125" />
                     <div className="relative flex items-start justify-between">
-                      <span className="grid h-11 w-11 place-items-center rounded-2xl bg-[#EEF5FF] text-[#155AC1] ring-1 ring-inset ring-[#155AC1]/18 shadow-[0_0_20px_rgba(21,90,193,0.10)] transition-all group-hover:bg-[#E5F0FF] group-hover:shadow-[0_0_28px_rgba(21,90,193,0.30)]">
+                      <span className="grid h-11 w-11 place-items-center rounded-2xl bg-[#EEF5FF] text-[#155AC1] ring-1 ring-inset ring-[#155AC1]/18 shadow-[0_0_20px_rgba(21,90,193,0.10)] transition-all group-hover:scale-105 group-hover:bg-[#E5F0FF] group-hover:shadow-[0_0_28px_rgba(21,90,193,0.30)]">
                         <FolderOpen className="h-5 w-5" aria-hidden="true" />
                       </span>
-                      <ArrowRight className="h-4 w-4 text-slate-300 transition-transform group-hover:translate-x-1 group-hover:text-[#155AC1]" aria-hidden="true" />
+                      <ArrowRight className="h-4 w-4 text-slate-300 transition-all group-hover:translate-x-1 group-hover:text-[#155AC1]" aria-hidden="true" />
                     </div>
-                    <div className="mt-7">
+                    <div className="relative mt-7">
                       <p className="text-[9px] font-black uppercase tracking-[0.16em] text-slate-400">Health Journal</p>
-                      <div className="mt-1 flex items-end justify-between gap-2">
-                        <h2 className="text-[23px] font-black tracking-[-0.05em] text-[#0B2D54]">Records</h2>
-                        <div className="flex flex-wrap justify-end gap-1">{journalChips.map((chip) => <RecordedChip key={chip} className="bg-[#EEF5FF] text-[#0E4B9F] ring-[#155AC1]/15">{chip}</RecordedChip>)}</div>
+                      <div className="mt-1 flex items-end justify-between gap-3">
+                        <h2 className="text-[24px] font-black tracking-[-0.05em] text-[#0B2D54]">Records</h2>
+                        <div className="flex flex-wrap justify-end gap-1.5">
+                          {journalChips.map((chip) => (
+                            <RecordedChip key={chip} className="bg-[#EEF5FF] text-[#0E4B9F] ring-[#155AC1]/15">{chip}</RecordedChip>
+                          ))}
+                        </div>
                       </div>
                     </div>
                   </ActionLink>
@@ -582,59 +637,6 @@ export default function HealthHome() {
               </section>
             </div>
           </section>
-
-          <aside className="hidden min-h-0 border-l border-slate-200/80 bg-[#FBFCFE] xl:flex xl:flex-col">
-            <div className="border-b border-slate-200/80 px-5 py-5">
-              <p className="text-[9px] font-black uppercase tracking-[0.18em] text-slate-400">Care at a glance</p>
-              <h2 className="mt-1 text-lg font-black tracking-[-0.04em] text-[#0B2D54]">Your health</h2>
-            </div>
-
-            <div className="space-y-3 overflow-y-auto p-4 [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:w-0 [&::-webkit-scrollbar]:h-0">
-              <ActionLink href="/medications" className="group block rounded-[22px] bg-white p-4 shadow-[0_10px_26px_rgba(11,45,84,0.05)] ring-1 ring-inset ring-slate-200/70 transition-all hover:-translate-y-0.5 hover:shadow-[0_16px_30px_rgba(11,45,84,0.08)]">
-                <div className="flex items-center justify-between gap-3">
-                  <span className="grid h-9 w-9 place-items-center rounded-xl bg-[#E8F8F7] text-[#24C1C4]"><Pill className="h-4 w-4" aria-hidden="true" /></span>
-                  <ArrowRight className="h-3.5 w-3.5 text-slate-300 transition-transform group-hover:translate-x-1" aria-hidden="true" />
-                </div>
-                <p className="mt-4 text-[9px] font-black uppercase tracking-[0.15em] text-slate-400">Medication</p>
-                <p className="mt-1 text-2xl font-black tracking-[-0.05em] text-[#0B2D54]">{medications.length}</p>
-                <p className="text-[10px] font-semibold text-slate-500">active today</p>
-              </ActionLink>
-
-              <ActionLink href="/health-goals" className="group block rounded-[22px] bg-white p-4 shadow-[0_10px_26px_rgba(11,45,84,0.05)] ring-1 ring-inset ring-slate-200/70 transition-all hover:-translate-y-0.5 hover:shadow-[0_16px_30px_rgba(11,45,84,0.08)]">
-                <div className="flex items-center justify-between gap-3">
-                  <span className="grid h-9 w-9 place-items-center rounded-xl bg-[#EEF5FF] text-[#155AC1]"><HeartPulse className="h-4 w-4" aria-hidden="true" /></span>
-                  <ArrowRight className="h-3.5 w-3.5 text-slate-300 transition-transform group-hover:translate-x-1" aria-hidden="true" />
-                </div>
-                <p className="mt-4 text-[9px] font-black uppercase tracking-[0.15em] text-slate-400">Health goals</p>
-                <p className="mt-1 text-2xl font-black tracking-[-0.05em] text-[#0B2D54]">{activeGoalCount}</p>
-                <p className="text-[10px] font-semibold text-slate-500">active goals</p>
-              </ActionLink>
-
-              <div className="rounded-[22px] bg-white p-4 shadow-[0_10px_26px_rgba(11,45,84,0.05)] ring-1 ring-inset ring-slate-200/70">
-                <div className="flex items-center gap-2">
-                  <span className="grid h-9 w-9 place-items-center rounded-xl bg-[#FFF0F0] text-[#C62828]"><ShieldCheck className="h-4 w-4" aria-hidden="true" /></span>
-                  <div><p className="text-[9px] font-black uppercase tracking-[0.15em] text-slate-400">Essentials</p><p className="text-xs font-black text-[#0B2D54]">Clinic Card</p></div>
-                </div>
-                <div className="mt-4 grid grid-cols-3 gap-2">
-                  <div className="rounded-xl bg-slate-50 px-2 py-2"><p className="text-[8px] font-black uppercase tracking-[0.1em] text-slate-400">Conditions</p><p className="mt-1 text-base font-black text-[#0B2D54]">{activeConditions.length}</p></div>
-                  <div className="rounded-xl bg-slate-50 px-2 py-2"><p className="text-[8px] font-black uppercase tracking-[0.1em] text-slate-400">Allergies</p><p className="mt-1 text-base font-black text-[#0B2D54]">{activeAllergies.length}</p></div>
-                  <div className="rounded-xl bg-slate-50 px-2 py-2"><p className="text-[8px] font-black uppercase tracking-[0.1em] text-slate-400">Records</p><p className="mt-1 text-base font-black text-[#0B2D54]">{journalEntries.length}</p></div>
-                </div>
-              </div>
-
-              <ActionLink
-                href={recentSymptom ? "/symptom-logs/" + encodeURIComponent(String(recentSymptom.id)) + (recentSymptomStatus === "ACTIVE" ? "/monitor" : "") : "/log-symptom"}
-                className="group block rounded-[22px] bg-[#F0FAFA] p-4 ring-1 ring-inset ring-[#24C1C4]/15 transition-all hover:-translate-y-0.5 hover:shadow-[0_14px_28px_rgba(36,193,196,0.10)]"
-              >
-                <div className="flex items-center justify-between gap-3">
-                  <p className="text-[9px] font-black uppercase tracking-[0.15em] text-[#159A9E]">Latest health signal</p>
-                  <ArrowRight className="h-3.5 w-3.5 text-[#24C1C4] transition-transform group-hover:translate-x-1" aria-hidden="true" />
-                </div>
-                <p className="mt-3 truncate text-[18px] font-black tracking-[-0.04em] text-[#0B2D54]">{recentSymptom ? symptomLabel(recentSymptom) : "Log your first symptom"}</p>
-                <p className="mt-1 text-[10px] font-semibold text-slate-500">{recentSymptom ? formatSymptomDate(recentSymptomAt) + (recentSymptomStatus === "ACTIVE" ? " · Active" : "") : "Start your health story"}</p>
-              </ActionLink>
-            </div>
-          </aside>
         </div>
       </main>
     </ProtectedRoute>
