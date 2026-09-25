@@ -228,10 +228,6 @@ export default function HealthHome() {
                       </p>
                     </div>
 
-                    <div
-                      aria-hidden="true"
-                      className="pointer-events-none absolute -right-10 top-1/2 hidden h-44 w-44 -translate-y-1/2 rounded-full border border-[#24C1C4]/20 bg-[#24C1C4]/[0.05] shadow-[0_0_80px_rgba(36,193,196,0.10)] sm:block"
-                    />
                   </div>
 
                   <div className="mt-9 flex flex-wrap items-end justify-between gap-6">
