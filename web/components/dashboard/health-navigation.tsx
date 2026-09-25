@@ -95,8 +95,9 @@ export default function HealthNavigation() {
 
       const heroRect = hero.getBoundingClientRect();
       const cardsRect = healthCards.getBoundingClientRect();
-      const top = Math.round(heroRect.top);
-      const bottom = Math.round(cardsRect.bottom);
+      const inset = 8;
+      const top = Math.round(heroRect.top + inset);
+      const bottom = Math.round(cardsRect.bottom - inset);
 
       if (bottom > top) {
         setRailBounds({ top, height: bottom - top });
