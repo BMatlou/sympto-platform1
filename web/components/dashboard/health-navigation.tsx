@@ -77,40 +77,50 @@ export default function HealthNavigation() {
   }, [open]);
 
   useEffect(() => {
+    let frame = 0;
+    let retries = 0;
+    let observer: ResizeObserver | null = null;
+
     const measureRail = () => {
       const hero = document.getElementById("dashboard-hero-row");
       const healthCards = document.getElementById("dashboard-health-cards");
-      if (!hero || !healthCards) return;
+
+      if (!hero || !healthCards) {
+        if (retries < 60) {
+          retries += 1;
+          frame = window.requestAnimationFrame(measureRail);
+        }
+        return;
+      }
 
       const heroRect = hero.getBoundingClientRect();
       const cardsRect = healthCards.getBoundingClientRect();
       const top = Math.round(heroRect.top);
       const bottom = Math.round(cardsRect.bottom);
 
-      if (bottom <= top) return;
-
-      setRailBounds({
-        top,
-        height: bottom - top,
-      });
+      if (bottom > top) {
+        setRailBounds({ top, height: bottom - top });
+      }
     };
 
-    const scheduleMeasure = () => window.requestAnimationFrame(measureRail);
-
-    scheduleMeasure();
+    measureRail();
 
     const hero = document.getElementById("dashboard-hero-row");
     const healthCards = document.getElementById("dashboard-health-cards");
-    const observer = typeof ResizeObserver !== "undefined" ? new ResizeObserver(scheduleMeasure) : null;
+    observer =
+      typeof ResizeObserver !== "undefined"
+        ? new ResizeObserver(measureRail)
+        : null;
 
-    if (hero) observer?.observe(hero);
-    if (healthCards) observer?.observe(healthCards);
+    if (hero) observer.observe(hero);
+    if (healthCards) observer.observe(healthCards);
 
-    window.addEventListener("resize", scheduleMeasure);
+    window.addEventListener("resize", measureRail);
 
     return () => {
+      window.cancelAnimationFrame(frame);
       observer?.disconnect();
-      window.removeEventListener("resize", scheduleMeasure);
+      window.removeEventListener("resize", measureRail);
     };
   }, []);
 
@@ -125,7 +135,7 @@ export default function HealthNavigation() {
             } as CSSProperties)
           : undefined
       }
-      className="fixed inset-x-2 top-2 z-50 flex h-14 items-center gap-2 rounded-2xl border border-white/10 bg-[#0B2D54] p-2 shadow-[0_18px_45px_rgba(11,45,84,0.22)] lg:top-[var(--nav-top)] lg:left-4 lg:right-auto lg:h-[var(--nav-height)] lg:w-[64px] lg:flex-col lg:rounded-[26px] lg:p-2">
+      className="fixed inset-x-2 top-2 z-50 flex h-14 items-center gap-2 rounded-2xl border border-white/10 bg-[#0B2D54] p-2 shadow-[0_18px_45px_rgba(11,45,84,0.22)] lg:left-4 lg:right-auto lg:w-[64px] lg:flex-col lg:rounded-[26px] lg:p-2 lg:top-[var(--nav-top,1rem)] lg:h-[var(--nav-height,657px)]">
       <nav className="flex min-w-0 flex-1 items-center justify-center gap-1 lg:h-full lg:flex-col lg:items-stretch lg:justify-start lg:gap-1" aria-label="Primary health navigation">
         {PRIMARY_NAV.map(({ href, label, icon: Icon }) => {
           const isActive = pathname === href || (href === "/dashboard" && pathname === "/");
