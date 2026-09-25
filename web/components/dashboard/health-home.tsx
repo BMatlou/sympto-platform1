@@ -340,7 +340,7 @@ export default function HealthHome() {
                           </span>
                         </span>
                       </div>
-                      <p className="mt-3 max-w-[13rem] text-[11px] font-black leading-4 text-white/88 sm:text-xs">
+                      <p className="mt-3 max-w-[15rem] rounded-full bg-[#24C1C4]/10 px-4 py-2 text-center text-[10px] font-black uppercase leading-4 tracking-[0.07em] text-[#D9FFFF] ring-1 ring-inset ring-[#24C1C4]/20 sm:text-[11px]">
                         active items need your attention today
                       </p>
                     </div>
