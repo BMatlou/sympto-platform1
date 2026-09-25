@@ -490,115 +490,115 @@ export default function HealthHome() {
                 <div className="grid gap-3 md:grid-cols-3">
                   <ActionLink
                     href="/today"
-                    className="group relative flex min-h-[164px] flex-col overflow-hidden rounded-[26px] border border-[#CBEFED] bg-white p-4.5 shadow-[0_10px_28px_rgba(11,45,84,0.05)] transition-all duration-300 hover:-translate-y-0.5 hover:border-[#9FE2DE] hover:shadow-[0_18px_40px_rgba(36,193,196,0.14)]"
+                    className="group relative flex min-h-[164px] flex-col justify-between overflow-hidden rounded-[26px] bg-[#24C1C4] p-5 text-[#0B2D54] shadow-[0_14px_34px_rgba(36,193,196,0.22)] transition-all duration-300 hover:-translate-y-0.5 hover:shadow-[0_20px_44px_rgba(36,193,196,0.30)]"
                   >
                     <div
                       aria-hidden="true"
-                      className="pointer-events-none absolute left-1/2 top-[48%] h-24 w-24 -translate-x-1/2 -translate-y-1/2 rounded-full bg-[#24C1C4]/10 blur-3xl transition-transform duration-500 group-hover:scale-125"
+                      className="pointer-events-none absolute -right-10 -top-10 h-28 w-28 rounded-full bg-white/15 blur-3xl transition-transform duration-500 group-hover:scale-125"
                     />
-                    <div className="relative flex items-center justify-between">
-                      <p className="text-[9px] font-black uppercase tracking-[0.16em] text-[#24C1C4]">
+                    <div className="relative flex items-start justify-between gap-4">
+                      <span className="grid h-11 w-11 place-items-center rounded-[15px] bg-white/20 ring-1 ring-inset ring-white/30">
+                        <CheckCircle2 className="h-5 w-5 text-[#0B2D54]" aria-hidden="true" />
+                      </span>
+                      <ArrowRight className="mt-1 h-4 w-4 text-[#0B2D54] transition-transform duration-200 group-hover:translate-x-1" aria-hidden="true" />
+                    </div>
+                    <div className="relative">
+                      <p className="text-[9px] font-black uppercase tracking-[0.16em] text-[#0B2D54]/70">
                         Daily care
                       </p>
-                      <ArrowRight className="h-4 w-4 text-[#0B2D54] transition-transform duration-200 group-hover:translate-x-1" aria-hidden="true" />
-                    </div>
-                    <div className="relative flex flex-1 items-center justify-center">
-                      <span className="grid h-14 w-14 place-items-center rounded-[18px] bg-[#E8F8F7] ring-1 ring-[#24C1C4]/25 shadow-[0_0_28px_rgba(36,193,196,0.18)] transition-transform duration-300 group-hover:scale-105">
-                        <CheckCircle2 className="h-6 w-6 text-[#0B2D54]" aria-hidden="true" />
-                      </span>
-                    </div>
-                    <div className="relative flex items-end justify-between gap-3">
-                      <h2 className="min-w-0 text-[23px] font-black tracking-[-0.05em] text-[#0B2D54]">
-                        Today
-                      </h2>
-                      {todayChips.length > 0 && (
-                        <div className="flex shrink-0 flex-wrap justify-end gap-1">
-                          {todayChips.map((chip) => (
-                            <RecordedChip
-                              key={chip}
-                              className="bg-[#F4FBFB] px-2 py-1 text-[#0B2D54] ring-[#24C1C4]/20"
-                            >
-                              {chip}
-                            </RecordedChip>
-                          ))}
-                        </div>
-                      )}
+                      <div className="mt-1.5 flex min-w-0 items-end justify-between gap-3">
+                        <h2 className="min-w-0 text-[24px] font-black tracking-[-0.05em] text-[#0B2D54]">
+                          Today
+                        </h2>
+                        {todayChips.length > 0 && (
+                          <div className="flex shrink-0 flex-wrap justify-end gap-1.5">
+                            {todayChips.map((chip) => (
+                              <RecordedChip
+                                key={chip}
+                                className="bg-white/18 px-2 py-1 text-[#0B2D54] ring-white/25"
+                              >
+                                {chip}
+                              </RecordedChip>
+                            ))}
+                          </div>
+                        )}
+                      </div>
                     </div>
                   </ActionLink>
 
                   <ActionLink
                     href="/health-passport"
-                    className="group relative flex min-h-[164px] flex-col overflow-hidden rounded-[26px] border border-[#F0D5D8] bg-white p-4.5 shadow-[0_10px_28px_rgba(11,45,84,0.05)] transition-all duration-300 hover:-translate-y-0.5 hover:border-[#E7B5BC] hover:shadow-[0_18px_40px_rgba(198,40,40,0.13)]"
+                    className="group relative flex min-h-[164px] flex-col justify-between overflow-hidden rounded-[26px] bg-[#C62828] p-5 text-white shadow-[0_14px_34px_rgba(198,40,40,0.20)] transition-all duration-300 hover:-translate-y-0.5 hover:shadow-[0_20px_44px_rgba(198,40,40,0.28)]"
                   >
                     <div
                       aria-hidden="true"
-                      className="pointer-events-none absolute left-1/2 top-[48%] h-24 w-24 -translate-x-1/2 -translate-y-1/2 rounded-full bg-[#E53935]/8 blur-3xl transition-transform duration-500 group-hover:scale-125"
+                      className="pointer-events-none absolute -right-10 -top-10 h-28 w-28 rounded-full bg-white/14 blur-3xl transition-transform duration-500 group-hover:scale-125"
                     />
-                    <div className="relative flex items-center justify-between">
-                      <p className="text-[9px] font-black uppercase tracking-[0.16em] text-[#C62828]">
+                    <div className="relative flex items-start justify-between gap-4">
+                      <span className="grid h-11 w-11 place-items-center rounded-[15px] bg-white/16 ring-1 ring-inset ring-white/30">
+                        <ShieldCheck className="h-5 w-5 text-white" aria-hidden="true" />
+                      </span>
+                      <ArrowRight className="mt-1 h-4 w-4 text-white transition-transform duration-200 group-hover:translate-x-1" aria-hidden="true" />
+                    </div>
+                    <div className="relative">
+                      <p className="text-[9px] font-black uppercase tracking-[0.16em] text-white/72">
                         Clinic Card
                       </p>
-                      <ArrowRight className="h-4 w-4 text-[#C62828] transition-transform duration-200 group-hover:translate-x-1" aria-hidden="true" />
-                    </div>
-                    <div className="relative flex flex-1 items-center justify-center">
-                      <span className="grid h-14 w-14 place-items-center rounded-[18px] bg-[#FFF0F1] ring-1 ring-[#E53935]/22 shadow-[0_0_28px_rgba(229,57,53,0.16)] transition-transform duration-300 group-hover:scale-105">
-                        <ShieldCheck className="h-6 w-6 text-[#C62828]" aria-hidden="true" />
-                      </span>
-                    </div>
-                    <div className="relative flex items-end justify-between gap-3">
-                      <h2 className="min-w-0 text-[23px] font-black tracking-[-0.05em] text-[#0B2D54]">
-                        Essentials
-                      </h2>
-                      {clinicChips.length > 0 && (
-                        <div className="flex shrink-0 flex-wrap justify-end gap-1">
-                          {clinicChips.map((chip) => (
-                            <RecordedChip
-                              key={chip}
-                              className="bg-[#FFF8F8] px-2 py-1 text-[#8F2435] ring-[#E53935]/16"
-                            >
-                              {chip}
-                            </RecordedChip>
-                          ))}
-                        </div>
-                      )}
+                      <div className="mt-1.5 flex min-w-0 items-end justify-between gap-3">
+                        <h2 className="min-w-0 text-[24px] font-black tracking-[-0.05em] text-white">
+                          Essentials
+                        </h2>
+                        {clinicChips.length > 0 && (
+                          <div className="flex shrink-0 flex-wrap justify-end gap-1.5">
+                            {clinicChips.map((chip) => (
+                              <RecordedChip
+                                key={chip}
+                                className="bg-white/16 px-2 py-1 text-white ring-white/25"
+                              >
+                                {chip}
+                              </RecordedChip>
+                            ))}
+                          </div>
+                        )}
+                      </div>
                     </div>
                   </ActionLink>
 
                   <ActionLink
                     href="/health-journal"
-                    className="group relative flex min-h-[164px] flex-col overflow-hidden rounded-[26px] border border-[#D2DDF0] bg-white p-4.5 text-[#0B2D54] shadow-[0_10px_28px_rgba(11,45,84,0.05)] transition-all duration-300 hover:-translate-y-0.5 hover:border-[#AFC4E7] hover:shadow-[0_18px_40px_rgba(21,90,193,0.14)]"
+                    className="group relative flex min-h-[164px] flex-col justify-between overflow-hidden rounded-[26px] bg-[#155AC1] p-5 text-white shadow-[0_14px_34px_rgba(21,90,193,0.22)] transition-all duration-300 hover:-translate-y-0.5 hover:shadow-[0_20px_44px_rgba(21,90,193,0.30)]"
                   >
                     <div
                       aria-hidden="true"
-                      className="pointer-events-none absolute left-1/2 top-[48%] h-24 w-24 -translate-x-1/2 -translate-y-1/2 rounded-full bg-[#155AC1]/9 blur-3xl transition-transform duration-500 group-hover:scale-125"
+                      className="pointer-events-none absolute -right-10 -top-10 h-28 w-28 rounded-full bg-white/15 blur-3xl transition-transform duration-500 group-hover:scale-125"
                     />
-                    <div className="relative flex items-center justify-between">
-                      <p className="text-[9px] font-black uppercase tracking-[0.16em] text-[#155AC1]">
+                    <div className="relative flex items-start justify-between gap-4">
+                      <span className="grid h-11 w-11 place-items-center rounded-[15px] bg-white/16 ring-1 ring-inset ring-white/30">
+                        <FolderOpen className="h-5 w-5 text-white" aria-hidden="true" />
+                      </span>
+                      <ArrowRight className="mt-1 h-4 w-4 text-white transition-transform duration-200 group-hover:translate-x-1" aria-hidden="true" />
+                    </div>
+                    <div className="relative">
+                      <p className="text-[9px] font-black uppercase tracking-[0.16em] text-white/72">
                         Health Journal
                       </p>
-                      <ArrowRight className="h-4 w-4 text-[#155AC1] transition-transform duration-200 group-hover:translate-x-1" aria-hidden="true" />
-                    </div>
-                    <div className="relative flex flex-1 items-center justify-center">
-                      <span className="grid h-14 w-14 place-items-center rounded-[18px] bg-[#EEF3FB] ring-1 ring-[#155AC1]/24 shadow-[0_0_28px_rgba(21,90,193,0.17)] transition-transform duration-300 group-hover:scale-105">
-                        <FolderOpen className="h-6 w-6 text-[#155AC1]" aria-hidden="true" />
-                      </span>
-                    </div>
-                    <div className="relative flex items-end justify-between gap-3">
-                      <h2 className="min-w-0 text-[23px] font-black tracking-[-0.05em] text-[#0B2D54]">
-                        Records
-                      </h2>
-                      {journalChips.length > 0 && (
-                        <div className="flex shrink-0 flex-wrap justify-end gap-1">
-                          {journalChips.map((chip) => (
-                            <RecordedChip
-                              key={chip}
-                              className="bg-[#F4F7FC] px-2 py-1 text-[#0B2D54] ring-[#155AC1]/16"
-                            >
-                              {chip}
-                            </RecordedChip>
-                          ))}
-                        </div>
-                      )}
+                      <div className="mt-1.5 flex min-w-0 items-end justify-between gap-3">
+                        <h2 className="min-w-0 text-[24px] font-black tracking-[-0.05em] text-white">
+                          Records
+                        </h2>
+                        {journalChips.length > 0 && (
+                          <div className="flex shrink-0 flex-wrap justify-end gap-1.5">
+                            {journalChips.map((chip) => (
+                              <RecordedChip
+                                key={chip}
+                                className="bg-white/16 px-2 py-1 text-white ring-white/25"
+                              >
+                                {chip}
+                              </RecordedChip>
+                            ))}
+                          </div>
+                        )}
+                      </div>
                     </div>
                   </ActionLink>
                 </div>
