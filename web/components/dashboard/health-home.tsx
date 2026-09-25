@@ -560,21 +560,21 @@ export default function HealthHome() {
 
                   <ActionLink
                     href="/health-journal"
-                    className="group relative flex min-h-[164px] flex-col justify-between overflow-hidden rounded-[26px] border border-[#7DD3FC] bg-gradient-to-br from-[#F8FCFF] via-white to-[#EAF8FF] p-5 shadow-[0_14px_38px_rgba(0,191,255,0.14),0_0_30px_rgba(0,191,255,0.12)] ring-1 ring-inset ring-white/75 transition-all duration-200 hover:-translate-y-0.5 hover:shadow-[0_20px_44px_rgba(0,191,255,0.23),0_0_40px_rgba(0,191,255,0.18)]"
+                    className="group relative flex min-h-[164px] flex-col justify-between overflow-hidden rounded-[26px] border border-white/30 bg-[#00BFFF] p-5 text-white shadow-[0_16px_42px_rgba(0,191,255,0.38),0_0_38px_rgba(0,191,255,0.30)] ring-1 ring-inset ring-white/25 transition-all duration-200 hover:-translate-y-0.5 hover:shadow-[0_22px_50px_rgba(0,191,255,0.48),0_0_48px_rgba(0,191,255,0.38)]"
                   >
-                    <div className="pointer-events-none absolute -right-10 -top-10 h-28 w-28 rounded-full bg-[#00BFFF]/28 blur-2xl transition-transform duration-500 group-hover:scale-125" />
+                    <div className="pointer-events-none absolute -right-12 -top-12 h-32 w-32 rounded-full bg-[#B8F4FF]/55 blur-3xl transition-transform duration-500 group-hover:scale-125" />
                     <div className="relative flex items-start justify-between">
-                      <span className="grid h-11 w-11 place-items-center rounded-2xl bg-white/85 ring-1 ring-[#00BFFF]/30 shadow-[0_0_20px_rgba(0,191,255,0.20)]">
-                        <FolderOpen className="h-5 w-5 text-[#00BFFF]" aria-hidden="true" />
+                      <span className="grid h-11 w-11 place-items-center rounded-2xl bg-white/18 ring-1 ring-white/40 shadow-[0_0_24px_rgba(255,255,255,0.22)] backdrop-blur-sm">
+                        <FolderOpen className="h-5 w-5 text-white" aria-hidden="true" />
                       </span>
-                      <ArrowRight className="h-4 w-4 text-[#00BFFF] transition-transform group-hover:translate-x-1" aria-hidden="true" />
+                      <ArrowRight className="h-4 w-4 text-white transition-transform group-hover:translate-x-1" aria-hidden="true" />
                     </div>
                     <div className="relative">
-                      <p className="text-[9px] font-black uppercase tracking-[0.14em] text-[#00BFFF]">
+                      <p className="text-[9px] font-black uppercase tracking-[0.14em] text-white/78">
                         Health Journal
                       </p>
                       <div className="mt-1 flex min-w-0 items-center justify-between gap-3">
-                        <h2 className="min-w-0 text-[24px] font-black tracking-[-0.05em] text-[#0B2D54]">
+                        <h2 className="min-w-0 text-[24px] font-black tracking-[-0.05em] text-white">
                           Records
                         </h2>
                         {journalChips.length > 0 && (
@@ -582,7 +582,7 @@ export default function HealthHome() {
                             {journalChips.map((chip) => (
                               <RecordedChip
                                 key={chip}
-                                className="bg-[#EAF8FF]/95 px-2 py-1 text-[#0369A1] ring-[#00BFFF]/25"
+                                className="bg-white/18 px-2 py-1 text-white ring-white/30 backdrop-blur-sm"
                               >
                                 {chip}
                               </RecordedChip>
