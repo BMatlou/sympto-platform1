@@ -488,7 +488,6 @@ export default function HealthHome() {
               </div>
             </DashboardCard>
           </section>
-          </section>
         </div>
       </main>
     </ProtectedRoute>
