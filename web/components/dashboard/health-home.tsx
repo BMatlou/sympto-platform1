@@ -341,7 +341,7 @@ export default function HealthHome() {
       title: display(item?.title ?? item?.type ?? item?.reason, "Care encounter"),
       meta: "Health journal",
       time: formatDashboardDate(item?.occurredAt ?? item?.encounterDate ?? item?.date),
-      accent: "bg-[#2F6FDB]",
+      accent: "bg-[#177E89]",
       href: "/health-journal",
       sort: new Date(
         String(item?.occurredAt ?? item?.encounterDate ?? item?.date ?? 0),
@@ -715,7 +715,7 @@ export default function HealthHome() {
                 <div className="absolute inset-0 opacity-60 bg-[linear-gradient(90deg,#E7EEF1_1px,transparent_1px),linear-gradient(#E7EEF1_1px,transparent_1px)] bg-[size:22px_22px]" />
                 <div className="absolute left-[16%] top-[28%] h-2 w-2 rounded-full bg-[#24C1C4] ring-4 ring-[#24C1C4]/15" />
                 <div className="absolute left-[54%] top-[50%] h-2.5 w-2.5 rounded-full bg-[#0F5A62] ring-4 ring-[#0F5A62]/15" />
-                <div className="absolute right-[16%] bottom-[24%] h-2 w-2 rounded-full bg-[#0F5A62] ring-4 ring-[#4A80E8]/15" />
+                <div className="absolute right-[16%] bottom-[24%] h-2 w-2 rounded-full bg-[#0F5A62] ring-4 ring-[#0F5A62]/15" />
                 <div className="absolute left-[17%] top-[30%] h-px w-[39%] rotate-[23deg] bg-[#24C1C4]/60" />
                 <div className="absolute left-[56%] top-[55%] h-px w-[31%] -rotate-[24deg] bg-[#0F5A62]/55" />
 
