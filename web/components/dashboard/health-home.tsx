@@ -224,46 +224,19 @@ export default function HealthHome() {
                 />
 
                 <div className="relative">
-                  <div className="flex items-start justify-between gap-4">
-                    <div>
-                      <div className="inline-flex items-center gap-2 rounded-full bg-white/[0.08] px-3 py-1.5 ring-1 ring-white/10 backdrop-blur-sm">
-                        <span className="h-1.5 w-1.5 rounded-full bg-[#24C1C4] shadow-[0_0_12px_rgba(36,193,196,0.75)]" />
-                        <span className="text-[9px] font-black uppercase tracking-[0.16em] text-white/[0.75]">
-                          Today
-                        </span>
-                      </div>
-                      <h2 className="mt-5 text-[28px] font-black tracking-[-0.045em] text-white sm:text-[32px]">
+                  <div className="flex min-h-[176px] items-end justify-between gap-6">
+                    <div className="max-w-[34rem]">
+                      <h2 className="text-[34px] font-black tracking-[-0.055em] text-white sm:text-[42px]">
                         Good day, {firstName}
                       </h2>
-                      <p className="mt-1 max-w-[28rem] text-[12px] font-medium leading-5 text-white/[0.72]">
+                      <p className="mt-2 max-w-[28rem] text-[13px] font-medium leading-6 text-white/[0.72]">
                         Your health, organised around what matters today.
                       </p>
                     </div>
 
-                    <div className="hidden h-12 w-12 place-items-center rounded-2xl bg-white/[0.08] ring-1 ring-white/10 sm:grid">
+                    <div className="hidden h-14 w-14 place-items-center rounded-2xl bg-white/[0.08] ring-1 ring-white/10 sm:grid">
                       <CheckCircle2 className="h-5 w-5 text-[#9AF6F4]" aria-hidden="true" />
                     </div>
-                  </div>
-
-                  <div className="mt-9 flex flex-wrap items-end justify-between gap-6">
-                    <div className="flex items-end gap-3">
-                      <span className="text-[68px] font-black leading-[0.84] tracking-[-0.09em]">
-                        {todayActionCount}
-                      </span>
-                      <div className="pb-1.5">
-                        <p className="text-[11px] font-black uppercase tracking-[0.13em] text-white/55">
-                          active items
-                        </p>
-                      </div>
-                    </div>
-
-                    <ActionLink
-                      href="/today"
-                      className="inline-flex min-h-11 items-center gap-2 rounded-full bg-white px-4 py-2.5 text-[10px] font-black uppercase tracking-[0.08em] text-[#0F5A62] shadow-[0_10px_24px_rgba(0,0,0,0.08)] transition-transform hover:-translate-y-0.5"
-                    >
-                      Open today
-                      <ArrowRight className="h-3.5 w-3.5 text-[#24C1C4]" aria-hidden="true" />
-                    </ActionLink>
                   </div>
                 </div>
               </section>
