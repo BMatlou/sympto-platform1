@@ -148,7 +148,7 @@ export default function HealthNavigation() {
               className="group relative flex h-10 w-10 shrink-0 items-center justify-center text-white/60 lg:h-auto lg:min-h-0 lg:flex-1 lg:w-full"
             >
               <span
-                className={`grid h-10 w-10 place-items-center rounded-2xl transition-all duration-200 lg:h-12 lg:w-12 ${isActive ? "bg-[#24C1C4] text-[#0B2D54] shadow-[0_10px_24px_rgba(36,193,196,0.24)]" : "text-slate-400 group-hover:bg-white/10 group-hover:text-white group-hover:shadow-[0_8px_20px_rgba(36,193,196,0.16)]"}`}
+                className={`relative z-10 grid h-10 w-10 place-items-center rounded-2xl transition-all duration-200 lg:h-12 lg:w-12 ${isActive ? "bg-[#24C1C4] text-[#0B2D54] shadow-[0_10px_24px_rgba(36,193,196,0.24)]" : "text-white/60 group-hover:translate-x-1.5 group-hover:-translate-y-0.5 group-hover:scale-110 group-hover:bg-white/[0.12] group-hover:text-white group-hover:shadow-[0_12px_28px_rgba(36,193,196,0.30)] group-hover:ring-1 group-hover:ring-inset group-hover:ring-white/15"}`}
               >
                 <Icon className="h-5 w-5" aria-hidden="true" />
               </span>
@@ -167,8 +167,8 @@ export default function HealthNavigation() {
           aria-label={open ? "Close more navigation" : "More navigation"}
           className="group relative flex h-10 w-10 shrink-0 items-center justify-center text-white/60 lg:h-auto lg:min-h-0 lg:flex-1 lg:w-full"
         >
-          <span className="grid h-10 w-10 place-items-center rounded-2xl transition-all duration-200 lg:h-11 lg:w-11 group-hover:bg-[#E8F8F7] group-hover:text-[#0B2D54] group-hover:shadow-[0_8px_20px_rgba(36,193,196,0.16)]">
-            {open ? <X className="h-4.5 w-4.5" /> : <Menu className="h-4.5 w-4.5" />}
+          <span className="relative z-10 grid h-10 w-10 place-items-center rounded-2xl transition-all duration-200 lg:h-12 lg:w-12 group-hover:translate-x-1.5 group-hover:-translate-y-0.5 group-hover:scale-110 group-hover:bg-white/[0.12] group-hover:text-white group-hover:shadow-[0_12px_28px_rgba(36,193,196,0.30)] group-hover:ring-1 group-hover:ring-inset group-hover:ring-white/15">
+            {open ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
           </span>
         </button>
       </nav>
