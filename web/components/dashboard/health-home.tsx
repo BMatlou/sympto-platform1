@@ -105,8 +105,11 @@ function DashboardCard({
   footerLabel,
   icon: Icon,
   accent,
+  accentBg,
   softAccent,
   iconBg,
+  border,
+  surface,
 }: {
   href: string;
   title: string;
@@ -116,71 +119,104 @@ function DashboardCard({
   footerLabel: string;
   icon: typeof CheckCircle2;
   accent: string;
+  accentBg: string;
   softAccent: string;
   iconBg: string;
+  border: string;
+  surface: string;
 }) {
   return (
     <ActionLink
       href={href}
       ariaLabel={title}
       className={
-        "group flex min-h-[318px] h-full flex-col px-5 py-5 sm:px-6 sm:py-6 " +
-        "bg-white transition-colors duration-200 hover:bg-[#FBFEFE] "
+        "group flex min-h-[340px] h-full flex-col overflow-hidden rounded-[28px] border bg-white " +
+        "shadow-[0_10px_30px_rgba(11,45,84,0.055)] transition-all duration-200 " +
+        "hover:-translate-y-0.5 hover:shadow-[0_16px_38px_rgba(11,45,84,0.09)] " +
+        border
       }
     >
-      <div className="flex items-start gap-3.5">
-        <span
-          className={
-            "grid h-11 w-11 shrink-0 place-items-center rounded-[16px] " +
-            iconBg
-          }
-        >
-          <Icon className={`h-5 w-5 ${accent}`} aria-hidden="true" />
-        </span>
-
-        <div className="min-w-0 pt-0.5">
-          <p className={`text-[9px] font-black uppercase tracking-[0.18em] ${accent}`}>
-            {tag}
-          </p>
-          <h2 className="mt-1 text-[20px] font-black tracking-[-0.045em] text-[#0B2D54]">
-            {title}
-          </h2>
-        </div>
-      </div>
-
-      <p className="mt-4 max-w-[34rem] text-[12px] leading-5.5 text-[#6F8192]">
-        {description}
-      </p>
-
-      {children ? <div className="mt-5">{children}</div> : null}
-
-      <div className="mt-auto pt-5">
-        <div className="flex items-center justify-between gap-3 border-t border-[#EDF2F3] pt-3.5">
-          <span className={`text-[10px] font-black uppercase tracking-[0.15em] ${accent}`}>
-            {footerLabel}
-          </span>
-
+      <div className={`border-b px-5 py-5 sm:px-6 sm:py-6 ${surface}`}>
+        <div className="flex items-start gap-3.5">
           <span
             className={
-              "inline-flex h-9 w-9 items-center justify-center rounded-full " +
-              softAccent +
-              " transition-transform duration-200 group-hover:translate-x-1"
+              "grid h-12 w-12 shrink-0 place-items-center rounded-[17px] ring-1 " +
+              iconBg
             }
           >
-            <ArrowRight className={`h-4 w-4 ${accent}`} aria-hidden="true" />
+            <Icon className={`h-5 w-5 ${accent}`} aria-hidden="true" />
           </span>
+
+          <div className="min-w-0 pt-0.5">
+            <p className={`text-[9px] font-black uppercase tracking-[0.18em] ${accent}`}>
+              {tag}
+            </p>
+            <h2 className="mt-1 text-[21px] font-black tracking-[-0.045em] text-[#0B2D54]">
+              {title}
+            </h2>
+          </div>
+        </div>
+
+        <p className="mt-4 text-[12px] leading-5.5 text-[#64798D]">
+          {description}
+        </p>
+      </div>
+
+      <div className="flex flex-1 flex-col px-5 py-5 sm:px-6 sm:py-6">
+        {children ? <div>{children}</div> : null}
+
+        <div className="mt-auto pt-6">
+          <div className="flex items-center justify-between gap-3 border-t border-[#EDF2F3] pt-3.5">
+            <span className={`text-[10px] font-black uppercase tracking-[0.15em] ${accent}`}>
+              {footerLabel}
+            </span>
+
+            <span
+              className={
+                "inline-flex h-9 w-9 items-center justify-center rounded-full " +
+                softAccent +
+                " transition-transform duration-200 group-hover:translate-x-1"
+              }
+            >
+              <ArrowRight className={`h-4 w-4 ${accent}`} aria-hidden="true" />
+            </span>
+          </div>
         </div>
       </div>
+
+      <div className={`h-1 w-full ${accentBg}`} />
     </ActionLink>
   );
 }
 function MetricBadge({
   label,
   value,
+  tone = "neutral",
 }: {
   label: string;
   value: number;
+  tone?: "neutral" | "teal" | "blue";
 }) {
+  const toneClass =
+    tone === "teal"
+      ? "border-[#D2ECEA] bg-[#F5FBFA]"
+      : tone === "blue"
+        ? "border-[#D9E5F7] bg-[#F7FAFF]"
+        : "border-[#E2EBEE] bg-[#F8FBFB]";
+
+  return (
+    <div className={`rounded-[18px] border px-3.5 py-3.5 ${toneClass}`}>
+      <p className="text-[9px] font-black uppercase tracking-[0.12em] text-[#8A9AA8]">
+        {label}
+      </p>
+      <p className="mt-1 text-[20px] font-black leading-none tracking-[-0.04em] text-[#0B2D54]">
+        {value}
+      </p>
+    </div>
+  );
+}
+
+function ClinicRow({
   return (
     <div className="rounded-[18px] border border-[#E2EBEE] bg-[#F8FBFB] px-3.5 py-3.5">
       <p className="text-[9px] font-black uppercase tracking-[0.12em] text-[#8A9AA8]">
@@ -416,8 +452,7 @@ export default function HealthHome() {
                 </div>
               </div>
 
-              <div className="overflow-hidden rounded-[26px] border border-[#DFEBEB] bg-white shadow-[0_8px_24px_rgba(11,45,84,0.04)]" aria-label="Health dashboard">
-                <div className="grid items-stretch divide-y divide-[#E6EEEE] md:grid-cols-3 md:divide-x md:divide-y-0">
+              <div className="grid items-stretch gap-4 lg:gap-5 md:grid-cols-3" aria-label="Health dashboard">
 
             <DashboardCard
               href="/today"
@@ -426,14 +461,17 @@ export default function HealthHome() {
               description={`What do I do today? ${todayActionCount} ${todayActionCount === 1 ? "thing needs" : "things need"} your attention.`}
               icon={CheckCircle2}
               accent="text-[#0B7B80]"
-              softAccent="bg-[#E8F8F7]"
-              iconBg="bg-[#E8F8F7] ring-1 ring-[#24C1C4]/20"
+              accentBg="bg-[#24C1C4]"
+              softAccent="bg-[#E7F8F7]"
+              iconBg="bg-[#DDF7F5] ring-[#24C1C4]/25"
+              border="border-[#B7E5E2]"
+              surface="bg-[#F0FBFA]"
               footerLabel="Open today"
             >
               <div className="grid grid-cols-3 gap-2">
-                <MetricBadge label="Medication" value={medications.length} />
-                <MetricBadge label="Visit" value={appointments.length} />
-                <MetricBadge label="Goal" value={activeGoalCount} />
+                <MetricBadge label="Medication" value={medications.length} tone="teal" />
+                <MetricBadge label="Visit" value={appointments.length} tone="teal" />
+                <MetricBadge label="Goal" value={activeGoalCount} tone="teal" />
               </div>
             </DashboardCard>
 
@@ -444,8 +482,11 @@ export default function HealthHome() {
               description="Your essential health information for quick reference and care."
               icon={ShieldCheck}
               accent="text-[#C62828]"
+              accentBg="bg-[#E53935]"
               softAccent="bg-[#FFF0F0]"
-              iconBg="bg-[#FFF0F0] ring-1 ring-[#E53935]/20"
+              iconBg="bg-[#FFE8E8] ring-[#E53935]/25"
+              border="border-[#EFC8C8]"
+              surface="bg-[#FFF6F6]"
               footerLabel="Open clinic card"
             >
               <div className="space-y-2">
@@ -472,13 +513,16 @@ export default function HealthHome() {
               description="Your encounters, results and important health documents in one place."
               icon={FolderOpen}
               accent="text-[#2F6FDB]"
+              accentBg="bg-[#4A80E8]"
               softAccent="bg-[#EEF4FF]"
-              iconBg="bg-[#EEF4FF] ring-1 ring-[#4A80E8]/20"
+              iconBg="bg-[#E7EFFF] ring-[#4A80E8]/25"
+              border="border-[#C7D8F4]"
+              surface="bg-[#F4F8FF]"
               footerLabel="Open records"
             >
               <div className="grid grid-cols-2 gap-2">
-                <MetricBadge label="Records" value={historyCount} />
-                <MetricBadge label="Vitals" value={healthVitals.length} />
+                <MetricBadge label="Records" value={historyCount} tone="blue" />
+                <MetricBadge label="Vitals" value={healthVitals.length} tone="blue" />
               </div>
 
               <div className="mt-3 rounded-[18px] border border-[#DDE7F7] bg-[#F7FAFF] px-3.5 py-3">
@@ -490,7 +534,6 @@ export default function HealthHome() {
                 </p>
               </div>
             </DashboardCard>
-                </div>
               </div>
             </div>
           </section>
