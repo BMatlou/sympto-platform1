@@ -305,21 +305,19 @@ export default function HealthHome() {
 
   return (
     <ProtectedRoute>
+      <ActionLink
+        href="/smart-file"
+        ariaLabel="Share Smart File"
+        className="fixed right-4 top-4 z-[60] inline-flex min-h-10 items-center gap-2 rounded-2xl bg-[#0B2D54] px-4 py-2.5 text-[9px] font-black uppercase tracking-[0.08em] text-white shadow-[0_12px_28px_rgba(11,45,84,0.18)] transition-all hover:-translate-y-0.5 hover:bg-[#092544] sm:right-6 sm:top-5"
+      >
+        <FileHeart className="h-3.5 w-3.5" aria-hidden="true" />
+        <span className="hidden sm:inline">Share Smart File</span>
+        <span className="sm:hidden">Share</span>
+      </ActionLink>
       <main className="min-h-screen bg-[#EAF0F7] px-2 pb-2 pt-[72px] text-[#0B2D54] sm:px-4 sm:pb-4 sm:pt-[72px] lg:pl-[104px] lg:pt-4">
         <div className="mx-auto min-h-[calc(100vh-2rem)] max-w-[1480px]">
           <section className="min-w-0">
             <div className="px-4 pb-5 pt-3 sm:px-5 lg:px-7">
-              <div className="flex justify-end">
-                <ActionLink
-                  href="/smart-file"
-                  className="inline-flex min-h-9 items-center gap-2 rounded-2xl bg-[#0B2D54] px-3.5 py-2 text-[9px] font-black uppercase tracking-[0.08em] text-white shadow-[0_8px_20px_rgba(11,45,84,0.10)] transition-all hover:-translate-y-0.5 hover:bg-[#092544]"
-                >
-                  <FileHeart className="h-3.5 w-3.5" aria-hidden="true" />
-                  <span className="hidden sm:inline">Share Smart File</span>
-                  <span className="sm:hidden">Share</span>
-                </ActionLink>
-              </div>
-
               <div className="mt-3 grid gap-3 xl:grid-cols-[minmax(0,1.55fr)_minmax(320px,0.85fr)]">
                 <section className="group relative min-h-[220px] overflow-hidden rounded-[28px] bg-gradient-to-br from-[#0B2D54] via-[#143D67] to-[#0F6173] p-6 text-white shadow-[0_24px_60px_rgba(11,45,84,0.16)] sm:p-7">
                   <div aria-hidden="true" className="pointer-events-none absolute -right-20 -top-24 h-72 w-72 rounded-full bg-[#24C1C4]/20 blur-3xl transition-transform duration-500 group-hover:scale-110" />
