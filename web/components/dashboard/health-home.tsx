@@ -302,100 +302,79 @@ export default function HealthHome() {
       ),
   ).size;
 
-  const todayChips = [
-    medications.length ? medications.length + " med" + (medications.length === 1 ? "" : "s") : null,
-    appointments.length ? appointments.length + " appt" : null,
-    activeGoalCount ? activeGoalCount + " goal" + (activeGoalCount === 1 ? "" : "s") : null,
-  ].filter(Boolean) as string[];
-
-  const clinicChips = [
-    activeConditions.length ? activeConditions.length + " condition" + (activeConditions.length === 1 ? "" : "s") : null,
-    activeAllergies.length ? activeAllergies.length + " allerg" + (activeAllergies.length === 1 ? "y" : "ies") : null,
-    data.healthSnapshot?.bloodType
-      ? String(data.healthSnapshot.bloodType).replace(/_POSITIVE$/i, "+").replace(/_NEGATIVE$/i, "−").replace(/_/g, " ")
-      : null,
-  ].filter(Boolean) as string[];
-
-  const journalChips = [
-    symptomFeed.length ? symptomFeed.length + " symptom" + (symptomFeed.length === 1 ? "" : "s") : null,
-    uniqueMeasurementCount ? uniqueMeasurementCount + " measure" + (uniqueMeasurementCount === 1 ? "" : "ments") : null,
-    journalEntries.length ? journalEntries.length + " entr" + (journalEntries.length === 1 ? "y" : "ies") : null,
-  ].filter(Boolean) as string[];
-
   return (
     <ProtectedRoute>
       <main className="min-h-screen bg-[#EAF0F7] px-2 py-2 text-[#0B2D54] sm:px-4 sm:py-4">
-        <div className="mx-auto grid min-h-[calc(100vh-2rem)] max-w-[1480px] overflow-hidden rounded-[30px] border border-white/80 bg-white shadow-[0_28px_80px_rgba(11,45,84,0.12)] lg:grid-cols-[214px_minmax(0,1fr)]">
+        <div className="mx-auto grid min-h-[calc(100vh-2rem)] max-w-[1480px] overflow-hidden rounded-[30px] border border-white/80 bg-white shadow-[0_28px_80px_rgba(11,45,84,0.12)] lg:grid-cols-[76px_minmax(0,1fr)]">
           <aside className="hidden min-h-0 border-r border-slate-200/80 bg-[#F8FAFD] lg:flex lg:flex-col">
-            <div className="border-b border-slate-200/80 px-5 py-5">
-              <div className="flex items-center gap-3">
-                <span className="grid h-10 w-10 place-items-center rounded-2xl bg-[#0B2D54] text-[#8FF7F2] shadow-[0_10px_24px_rgba(11,45,84,0.16)]">
-                  <HeartPulse className="h-5 w-5" aria-hidden="true" />
-                </span>
-                <div>
-                  <p className="text-[9px] font-black uppercase tracking-[0.18em] text-slate-400">Sympto</p>
-                  <p className="text-sm font-black text-[#0B2D54]">My health</p>
-                </div>
-              </div>
+            <div className="flex justify-center border-b border-slate-200/80 px-2 py-4">
+              <Link
+                href="/dashboard"
+                aria-label="Sympto home"
+                className="grid h-11 w-11 place-items-center rounded-2xl bg-[#6C57B8] text-white shadow-[0_10px_24px_rgba(108,87,184,0.20)] transition-all hover:-translate-y-0.5 hover:shadow-[0_14px_30px_rgba(108,87,184,0.28)]"
+              >
+                <HeartPulse className="h-5 w-5" aria-hidden="true" />
+              </Link>
             </div>
 
-            <div className="min-h-0 flex-1 overflow-y-auto px-3 py-4 [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:w-0 [&::-webkit-scrollbar]:h-0">
-              <p className="px-2 pb-2 text-[9px] font-black uppercase tracking-[0.17em] text-slate-400">Navigate</p>
-              <nav className="space-y-1.5" aria-label="Primary health navigation">
+            <div className="min-h-0 flex-1 overflow-y-auto px-2 py-4 [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:w-0 [&::-webkit-scrollbar]:h-0">
+              <nav className="space-y-2" aria-label="Primary health navigation">
                 {PRIMARY_NAV.map(({ href, label, icon: Icon }) => (
-                  <ActionLink
-                    key={href}
-                    href={href}
-                    ariaLabel={label}
-                    className={
-                      "group flex min-h-11 items-center gap-3 rounded-2xl px-3 py-2.5 text-xs font-black transition-all " +
-                      (href === "/dashboard"
-                        ? "bg-[#0B2D54] text-white shadow-[0_10px_24px_rgba(11,45,84,0.15)]"
-                        : "text-slate-500 hover:bg-white hover:text-[#0B2D54] hover:shadow-[0_8px_20px_rgba(11,45,84,0.07)]")
-                    }
-                  >
-                    <span className={"grid h-8 w-8 shrink-0 place-items-center rounded-xl transition-colors " + (href === "/dashboard" ? "bg-white/10" : "bg-white group-hover:bg-[#E8F8F7]")}>
-                      <Icon className="h-4 w-4" aria-hidden="true" />
+                  <div key={href} className="group relative flex justify-center">
+                    <ActionLink
+                      href={href}
+                      ariaLabel={label}
+                      className={
+                        "grid h-11 w-11 place-items-center rounded-2xl transition-all " +
+                        (href === "/dashboard"
+                          ? "bg-[#0B2D54] text-white shadow-[0_10px_24px_rgba(11,45,84,0.15)]"
+                          : "text-slate-400 hover:bg-white hover:text-[#0B2D54] hover:shadow-[0_8px_20px_rgba(11,45,84,0.08)]")
+                      }
+                    >
+                      <Icon className="h-4.5 w-4.5" aria-hidden="true" />
+                    </ActionLink>
+                    <span className="pointer-events-none absolute left-[calc(100%+10px)] top-1/2 z-50 -translate-y-1/2 whitespace-nowrap rounded-xl bg-[#0B2D54] px-3 py-2 text-[10px] font-black text-white opacity-0 shadow-[0_12px_28px_rgba(11,45,84,0.22)] transition-opacity duration-150 group-hover:opacity-100">
+                      {label}
                     </span>
-                    <span>{label}</span>
-                  </ActionLink>
+                  </div>
                 ))}
               </nav>
 
-              <div className="mt-5 border-t border-slate-200/80 pt-4">
-                <button
-                  type="button"
-                  onClick={() => setMoreOpen((value) => !value)}
-                  aria-expanded={moreOpen}
-                  className="flex min-h-11 w-full items-center justify-between rounded-2xl px-3 py-2.5 text-xs font-black text-slate-500 transition-all hover:bg-white hover:text-[#0B2D54] hover:shadow-[0_8px_20px_rgba(11,45,84,0.06)]"
-                >
-                  <span className="flex items-center gap-3">
-                    <span className="grid h-8 w-8 place-items-center rounded-xl bg-white">
-                      <Menu className="h-4 w-4" aria-hidden="true" />
-                    </span>
-                    <span>More</span>
+              <div className="mt-4 flex justify-center border-t border-slate-200/80 pt-4">
+                <div className="group relative">
+                  <button
+                    type="button"
+                    onClick={() => setMoreOpen((value) => !value)}
+                    aria-expanded={moreOpen}
+                    aria-label={moreOpen ? "Collapse more navigation" : "More navigation"}
+                    className="grid h-11 w-11 place-items-center rounded-2xl text-slate-400 transition-all hover:bg-white hover:text-[#0B2D54] hover:shadow-[0_8px_20px_rgba(11,45,84,0.08)]"
+                  >
+                    <Menu className="h-4.5 w-4.5" aria-hidden="true" />
+                  </button>
+                  <span className="pointer-events-none absolute left-[calc(100%+10px)] top-1/2 z-50 -translate-y-1/2 whitespace-nowrap rounded-xl bg-[#0B2D54] px-3 py-2 text-[10px] font-black text-white opacity-0 shadow-[0_12px_28px_rgba(11,45,84,0.22)] transition-opacity duration-150 group-hover:opacity-100">
+                    More
                   </span>
-                  <ChevronDown className={"h-4 w-4 transition-transform " + (moreOpen ? "rotate-180" : "")} aria-hidden="true" />
-                </button>
+                </div>
+              </div>
 
-                {moreOpen && (
-                  <nav className="mt-1 space-y-1 pb-2" aria-label="More health navigation">
-                    {MORE_NAV.map(({ href, label, icon: Icon }) => (
+              {moreOpen && (
+                <nav className="mt-3 space-y-2" aria-label="More health navigation">
+                  {MORE_NAV.map(({ href, label, icon: Icon }) => (
+                    <div key={href} className="group relative flex justify-center">
                       <ActionLink
-                        key={href}
                         href={href}
                         ariaLabel={label}
-                        className="flex min-h-10 items-center gap-3 rounded-xl px-3 py-2 text-[11px] font-semibold text-slate-500 transition-colors hover:bg-white hover:text-[#0B2D54]"
+                        className="grid h-10 w-10 place-items-center rounded-2xl text-slate-400 transition-all hover:bg-white hover:text-[#0B2D54] hover:shadow-[0_8px_20px_rgba(11,45,84,0.08)]"
                       >
-                        <span className="grid h-7 w-7 shrink-0 place-items-center rounded-lg bg-white">
-                          <Icon className="h-3.5 w-3.5" aria-hidden="true" />
-                        </span>
-                        <span>{label}</span>
+                        <Icon className="h-4 w-4" aria-hidden="true" />
                       </ActionLink>
-                    ))}
-                  </nav>
-                )}
-              </div>
+                      <span className="pointer-events-none absolute left-[calc(100%+10px)] top-1/2 z-50 -translate-y-1/2 whitespace-nowrap rounded-xl bg-[#0B2D54] px-3 py-2 text-[10px] font-black text-white opacity-0 shadow-[0_12px_28px_rgba(11,45,84,0.22)] transition-opacity duration-150 group-hover:opacity-100">
+                        {label}
+                      </span>
+                    </div>
+                  ))}
+                </nav>
+              )}
             </div>
           </aside>
 
@@ -429,9 +408,7 @@ export default function HealthHome() {
                           Your health, organised around what matters today.
                         </p>
                       </div>
-                      <span className="grid h-11 w-11 shrink-0 place-items-center rounded-2xl bg-white/10 ring-1 ring-inset ring-white/15 shadow-[0_0_28px_rgba(36,193,196,0.16)]">
-                        <HeartPulse className="h-5 w-5 text-[#8FF7F2]" aria-hidden="true" />
-                      </span>
+
                     </div>
 
                     <div className="flex flex-wrap items-end justify-between gap-5">
@@ -453,18 +430,7 @@ export default function HealthHome() {
                         </div>
                       </div>
 
-                      {todayChips.length > 0 && (
-                        <div className="flex flex-wrap justify-end gap-1.5">
-                          {todayChips.map((chip) => (
-                            <RecordedChip
-                              key={chip}
-                              className="bg-white/10 text-white ring-white/20"
-                            >
-                              {chip}
-                            </RecordedChip>
-                          ))}
-                        </div>
-                      )}
+
                     </div>
                   </div>
                 </section>
