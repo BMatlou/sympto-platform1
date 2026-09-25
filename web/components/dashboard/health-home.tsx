@@ -3,7 +3,7 @@
 import Link from "next/link";
 import type { ReactNode } from "react";
 import { useEffect, useState } from "react";
-import { ArrowRight, Bell, CheckCircle2, FolderOpen, HeartPulse, House, ShieldCheck, UserRound } from "lucide-react";
+import { ArrowRight, Bell, CheckCircle2, FolderOpen, HeartPulse, House, Plus, ShieldCheck, UserRound } from "lucide-react";
 import { useDashboard } from "@/hooks/use-dashboard";
 import { healthJournalService } from "@/services/health-journal.service";
 import ProtectedRoute from "@/components/auth/protected-route";
@@ -450,8 +450,11 @@ export default function HealthHome() {
                         </Link>
                         <Link
                           href="/log-symptom"
-                          className="text-[10px] font-black uppercase tracking-[0.1em] text-white/80 hover:text-white"
+                          className="inline-flex min-h-10 items-center gap-2 rounded-full bg-white/15 px-3.5 py-2 text-[10px] font-black uppercase tracking-[0.09em] text-white ring-1 ring-inset ring-white/25 backdrop-blur-sm transition-all hover:bg-white/22 hover:ring-white/40"
                         >
+                          <span className="grid h-5 w-5 place-items-center rounded-full bg-white text-[#0B2D54] shadow-sm">
+                            <Plus className="h-3.5 w-3.5 stroke-[2.5]" aria-hidden="true" />
+                          </span>
                           New symptom
                         </Link>
                       </div>
