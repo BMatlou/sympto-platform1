@@ -315,9 +315,9 @@ export default function HealthHome() {
         <span className="sm:hidden">Share</span>
       </ActionLink>
       <main className="min-h-screen bg-[#EAF0F7] px-2 pb-2 pt-[72px] text-[#0B2D54] sm:px-4 sm:pb-4 sm:pt-[72px] lg:pl-[104px] lg:pt-4">
-        <div className="mx-auto min-h-[calc(100vh-2rem)] max-w-[1480px]">
+        <div className="mx-auto max-w-[1480px] pb-2">
           <section className="min-w-0">
-            <div className="px-4 pb-5 pt-3 sm:px-5 lg:px-7">
+            <div className="px-4 pb-1 pt-3 sm:px-5 lg:px-7">
               <div className="mt-3 grid gap-3 xl:grid-cols-[minmax(0,1.55fr)_minmax(320px,0.85fr)]">
                 <section className="group relative min-h-[220px] overflow-hidden rounded-[28px] bg-gradient-to-br from-[#0B2D54] via-[#143D67] to-[#0F6173] p-6 text-white shadow-[0_24px_60px_rgba(11,45,84,0.16)] sm:p-7">
                   <div aria-hidden="true" className="pointer-events-none absolute -right-20 -top-24 h-72 w-72 rounded-full bg-[#24C1C4]/20 blur-3xl transition-transform duration-500 group-hover:scale-110" />
