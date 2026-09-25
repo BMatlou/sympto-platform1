@@ -203,10 +203,7 @@ export default function HealthHome() {
 
                 <div className="relative flex min-h-[176px] items-center">
                   <div className="max-w-[34rem]">
-                    <p className="text-[10px] font-black uppercase tracking-[0.18em] text-[#24C1C4]">
-                      Today
-                    </p>
-                    <h2 className="mt-2 text-[34px] font-black tracking-[-0.055em] text-white sm:text-[42px]">
+                    <h2 className="text-[34px] font-black tracking-[-0.055em] text-white sm:text-[42px]">
                       Good day, {firstName}
                     </h2>
                     <p className="mt-2 max-w-[28rem] text-[13px] font-medium leading-6 text-white/[0.72]">
