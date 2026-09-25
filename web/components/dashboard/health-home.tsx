@@ -201,6 +201,10 @@ export default function HealthHome() {
   const activeGoalCount = countActiveGoals(data);
   const todayActionCount = medications.length + appointments.length + activeGoalCount;
 
+  const recentSymptom = recentSymptomFrom(data, symptomFeed);
+  const recentSymptomStatus = String(recentSymptom?.status ?? "").toUpperCase();
+  const recentSymptomAt = recentSymptom?.startedAt ?? recentSymptom?.createdAt ?? null;
+
   // Chips shown on the three navigation cards are derived only from records
   // already loaded for this dashboard; they are not hard-coded health data.
   const todayChips = [
@@ -249,14 +253,43 @@ export default function HealthHome() {
                 </ActionLink>
               </div>
 
-              <section className="mt-3 rounded-[28px] border border-slate-200/80 bg-white px-6 py-7 shadow-[0_16px_40px_rgba(11,45,84,0.06)] sm:px-8">
-                <p className="text-[10px] font-black uppercase tracking-[0.18em] text-[#24C1C4]">My health</p>
-                <h2 className="mt-2 text-[32px] font-black tracking-[-0.05em] text-[#0B2D54] sm:text-[40px]">
+              <section className="relative mt-3 overflow-hidden rounded-[28px] border border-[#24C1C4]/20 bg-gradient-to-br from-[#0B2D54] via-[#103E69] to-[#24C1C4] px-6 py-7 text-white shadow-[0_20px_50px_rgba(11,45,84,0.16)] sm:px-8">
+                <div aria-hidden="true" className="pointer-events-none absolute -right-20 -top-24 h-64 w-64 rounded-full bg-white/10 blur-2xl" />
+                <div aria-hidden="true" className="pointer-events-none absolute -bottom-24 right-20 h-56 w-56 rounded-full bg-[#24C1C4]/25 blur-3xl" />
+                <div className="relative">
+                  <p className="text-[10px] font-black uppercase tracking-[0.18em] text-white/75">My health</p>
+                <h2 className="mt-2 text-[32px] font-black tracking-[-0.05em] text-white sm:text-[40px]">
                   {greeting}, {firstName}
                 </h2>
-                <p className="mt-2 max-w-[42rem] text-sm font-medium leading-6 text-slate-500">
+                <p className="mt-2 max-w-[42rem] text-sm font-medium leading-6 text-white/75">
                   Your health, organised around what matters today.
                 </p>
+                </div>
+              </section>
+
+              <section className="mt-5 overflow-hidden rounded-[24px] border border-[#24C1C4]/20 bg-[#E8F8F7]">
+                <div className="flex flex-col gap-4 px-5 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-6">
+                  <div className="min-w-0">
+                    <p className="text-[9px] font-black uppercase tracking-[0.18em] text-[#0B2D54]/55">Recent symptom</p>
+                    {recentSymptom ? (
+                      <>
+                        <h3 className="mt-1 truncate text-lg font-black tracking-[-0.03em] text-[#0B2D54]">{symptomLabel(recentSymptom)}</h3>
+                        <p className="mt-1 text-xs font-medium text-slate-500">
+                          {formatSymptomDate(recentSymptomAt)}
+                          {recentSymptomStatus ? ` · ${recentSymptomStatus.replace(/_/g, " ").toLowerCase()}` : ""}
+                        </p>
+                      </>
+                    ) : (
+                      <h3 className="mt-1 text-lg font-black tracking-[-0.03em] text-[#0B2D54]">No symptoms logged yet</h3>
+                    )}
+                  </div>
+                  <ActionLink
+                    href="/log-symptom"
+                    className="inline-flex min-h-10 shrink-0 items-center justify-center rounded-xl bg-[#0B2D54] px-4 py-2 text-[10px] font-black uppercase tracking-[0.08em] text-white shadow-[0_8px_18px_rgba(11,45,84,0.12)] hover:bg-[#092544]"
+                  >
+                    Log a symptom
+                  </ActionLink>
+                </div>
               </section>
 
               <section className="mt-6">
