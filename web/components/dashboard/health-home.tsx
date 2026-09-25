@@ -333,20 +333,9 @@ export default function HealthHome() {
 
                     <div className="flex shrink-0 flex-col items-center text-center sm:min-w-[205px]">
                       <div className="relative grid h-28 w-28 place-items-center sm:h-32 sm:w-32">
-                        <span
-                          aria-hidden="true"
-                          className="absolute -inset-3 rounded-full bg-[#24C1C4]/35 blur-2xl animate-pulse"
-                        />
-                        <span
-                          aria-hidden="true"
-                          className="absolute -inset-1 rounded-full border border-[#68F4F0]/70 bg-[#24C1C4]/20 shadow-[0_0_18px_6px_rgba(36,193,196,0.28),0_0_50px_18px_rgba(36,193,196,0.20)]"
-                        />
-                        <span
-                          aria-hidden="true"
-                          className="absolute inset-0 rounded-full border-2 border-[#8BFFFF]/60"
-                        />
-                        <span className="relative grid h-[88%] w-[88%] place-items-center rounded-full bg-[#2BD6D3] text-[#0B2D54] shadow-[0_0_18px_6px_rgba(91,255,250,0.42),0_14px_42px_rgba(36,193,196,0.42)] sm:h-[90%] sm:w-[90%]">
-                          <span className="text-[54px] font-black leading-none tracking-[-0.08em] drop-shadow-[0_2px_8px_rgba(255,255,255,0.28)] sm:text-[62px]">
+                        <span className="absolute inset-0 rounded-full bg-[#24C1C4] shadow-[0_0_42px_rgba(36,193,196,0.58),0_0_80px_rgba(36,193,196,0.28)] animate-pulse" />
+                        <span className="relative grid h-full w-full place-items-center rounded-full bg-[#2BD6D3] text-[#0B2D54] shadow-[inset_0_2px_10px_rgba(255,255,255,0.28)]">
+                          <span className="text-[54px] font-black leading-none tracking-[-0.08em] sm:text-[62px]">
                             {todayActionCount}
                           </span>
                         </span>
