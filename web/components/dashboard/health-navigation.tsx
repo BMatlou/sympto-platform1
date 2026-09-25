@@ -81,9 +81,13 @@ export default function HealthNavigation() {
               href={href}
               aria-label={label}
               aria-current={isActive ? "page" : undefined}
-              className={`group relative grid h-10 w-10 shrink-0 place-items-center rounded-2xl transition-all duration-200 lg:h-auto lg:min-h-0 lg:flex-1 lg:w-full ${isActive ? "bg-[#0B2D54] text-white shadow-[0_10px_24px_rgba(11,45,84,0.20)]" : "text-slate-400 hover:bg-[#E8F8F7] hover:text-[#0B2D54] hover:shadow-[0_8px_20px_rgba(36,193,196,0.16)]"}`}
+              className="group relative flex h-10 w-10 shrink-0 items-center justify-center text-slate-400 lg:h-auto lg:min-h-0 lg:flex-1 lg:w-full"
             >
-              <Icon className="h-4.5 w-4.5" aria-hidden="true" />
+              <span
+                className={`grid h-10 w-10 place-items-center rounded-2xl transition-all duration-200 lg:h-11 lg:w-11 ${isActive ? "bg-[#0B2D54] text-white shadow-[0_10px_24px_rgba(11,45,84,0.20)]" : "text-slate-400 group-hover:bg-[#E8F8F7] group-hover:text-[#0B2D54] group-hover:shadow-[0_8px_20px_rgba(36,193,196,0.16)]"}`}
+              >
+                <Icon className="h-4.5 w-4.5" aria-hidden="true" />
+              </span>
               <span className="pointer-events-none absolute left-[calc(100%+10px)] top-1/2 z-50 hidden -translate-y-1/2 whitespace-nowrap rounded-xl bg-[#0B2D54] px-3 py-2 text-[10px] font-black text-white shadow-[0_12px_28px_rgba(11,45,84,0.22)] lg:block lg:opacity-0 lg:transition-opacity lg:group-hover:opacity-100">
                 {label}
               </span>
@@ -97,9 +101,11 @@ export default function HealthNavigation() {
           aria-expanded={open}
           aria-haspopup="menu"
           aria-label={open ? "Close more navigation" : "More navigation"}
-          className="group relative grid h-10 w-10 shrink-0 place-items-center rounded-2xl text-slate-400 transition-all duration-200 hover:bg-[#E8F8F7] hover:text-[#0B2D54] hover:shadow-[0_8px_20px_rgba(36,193,196,0.16)] lg:h-auto lg:min-h-0 lg:flex-1 lg:w-full"
+          className="group relative flex h-10 w-10 shrink-0 items-center justify-center text-slate-400 lg:h-auto lg:min-h-0 lg:flex-1 lg:w-full"
         >
-          {open ? <X className="h-4.5 w-4.5" /> : <Menu className="h-4.5 w-4.5" />}
+          <span className="grid h-10 w-10 place-items-center rounded-2xl transition-all duration-200 lg:h-11 lg:w-11 group-hover:bg-[#E8F8F7] group-hover:text-[#0B2D54] group-hover:shadow-[0_8px_20px_rgba(36,193,196,0.16)]">
+            {open ? <X className="h-4.5 w-4.5" /> : <Menu className="h-4.5 w-4.5" />}
+          </span>
         </button>
       </nav>
 
