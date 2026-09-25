@@ -3,7 +3,7 @@
 import Link from "next/link";
 import type { ReactNode } from "react";
 import { useEffect, useState } from "react";
-import { Activity, ArrowRight, Bell, CalendarDays, CheckCircle2 , ClipboardList, CreditCard, FileHeart, FileText, FolderOpen, HeartPulse, House,  MessageCircle, Pill, Plus, Settings, ShieldCheck, UserRound, Users, Watch } from "lucide-react";
+import { Activity, ArrowRight, Bell, CalendarDays, CheckCircle2, ClipboardList, CreditCard, FileHeart, FileText, FolderOpen, HeartPulse, House, MessageCircle, Pill, Plus, Settings, ShieldCheck, UserRound, Users, Watch } from "lucide-react";
 import { useDashboard } from "@/hooks/use-dashboard";
 import { healthJournalService } from "@/services/health-journal.service";
 import ProtectedRoute from "@/components/auth/protected-route";
@@ -31,61 +31,6 @@ const MORE_NAV = [
   { href: "/profile", label: "Profile", icon: UserRound },
   { href: "/settings", label: "Settings", icon: Settings },
 ];
-function display(value: unknown, fallback = "Not recorded"): string {
-  return value === null || value === undefined || value === "" ? fallback : String(value);
-}
-
-function normalizeVitals(data: any) {
-  const deviceVitals = Array.isArray(data?.healthSnapshot?.latestMeasurements)
-    ? data.healthSnapshot.latestMeasurements.map((item: any) => ({
-        type: item.type ?? item.measurementType,
-        value: item.value,
-        unit: item.unit,
-        measuredAt: item.measuredAt,
-      }))
-    : [];
-
-  const clinicalVitals = Array.isArray(data?.clinicalVitals)
-    ? data.clinicalVitals.map((item: any) => ({
-        type: item.vitalType?.code ?? item.vitalType?.name,
-        value: item.value,
-        unit: item.vitalType?.unit,
-        measuredAt: item.measuredAt,
-      }))
-    : [];
-
-  const byType = new Map<string, any>();
-
-  for (const vital of [...deviceVitals, ...clinicalVitals]) {
-    const key = String(vital.type ?? "").toUpperCase();
-    if (!key) continue;
-
-    const previous = byType.get(key);
-    if (
-      !previous ||
-      new Date(String(vital.measuredAt ?? 0)).getTime() >
-        new Date(String(previous.measuredAt ?? 0)).getTime()
-    ) {
-      byType.set(key, vital);
-    }
-  }
-
-  return Array.from(byType.values());
-}
-
-function itemNames(
-  items: any[],
-  kind: "allergy" | "condition",
-): string[] {
-  return items
-    .map((item) =>
-      kind === "allergy"
-        ? item?.allergy?.name ?? item?.name
-        : item?.condition?.name ?? item?.name,
-    )
-    .filter(Boolean) as string[];
-}
-
 function countActiveGoals(data: any) {
   return (Array.isArray(data?.goals) ? data.goals : []).filter(
     (goal: any) =>
