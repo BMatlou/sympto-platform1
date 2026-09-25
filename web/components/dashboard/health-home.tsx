@@ -177,7 +177,7 @@ export default function HealthHome() {
   if (loading) {
     return (
       <ProtectedRoute>
-        <main className="min-h-screen bg-[#f7fbfb] p-4 sm:p-8">
+        <main className="min-h-screen bg-[#f7fbfb] p-4 pt-[72px] sm:p-8 sm:pt-[88px] lg:pt-8">
           <div className="mx-auto max-w-[1240px] space-y-4" aria-busy="true">
             <div className="h-[360px] animate-pulse rounded-b-[42px] rounded-t-[30px] bg-white" />
             <div className="h-10 animate-pulse rounded-2xl bg-white" />
@@ -279,20 +279,9 @@ export default function HealthHome() {
   return (
     <ProtectedRoute>
       <main className="min-h-screen bg-[#EAF0F7] px-2 pb-2 pt-[72px] text-[#0B2D54] sm:px-4 sm:pb-4 sm:pt-[72px] lg:pl-[104px] lg:pt-4">
-        <div className="mx-auto grid min-h-[calc(100vh-2rem)] max-w-[1480px] overflow-hidden rounded-[30px] border border-white/80 bg-white shadow-[0_28px_80px_rgba(11,45,84,0.12)] lg:grid-cols-[76px_minmax(0,1fr)]">
+        <div className="mx-auto min-h-[calc(100vh-2rem)] max-w-[1480px] overflow-hidden rounded-[30px] border border-white/80 bg-white shadow-[0_28px_80px_rgba(11,45,84,0.12)]">
           <section className="min-w-0 bg-white">
             <div className="px-4 pb-5 pt-3 sm:px-5 lg:px-7">
-              <div className="flex justify-end">
-                <ActionLink
-                  href="/smart-file"
-                  className="inline-flex min-h-9 items-center gap-2 rounded-2xl bg-[#0B2D54] px-3.5 py-2 text-[9px] font-black uppercase tracking-[0.08em] text-white shadow-[0_8px_20px_rgba(11,45,84,0.10)] transition-all hover:-translate-y-0.5 hover:bg-[#092544]"
-                >
-                  <FileHeart className="h-3.5 w-3.5" aria-hidden="true" />
-                  <span className="hidden sm:inline">Share Smart File</span>
-                  <span className="sm:hidden">Share</span>
-                </ActionLink>
-              </div>
-
               <div className="mt-3 grid gap-3 xl:grid-cols-[minmax(0,1.7fr)_minmax(290px,0.8fr)]">
                 <section className="group relative min-h-[230px] overflow-hidden rounded-[28px] bg-gradient-to-br from-[#0B2D54] via-[#143D67] to-[#0F6173] p-5 text-white shadow-[0_24px_60px_rgba(11,45,84,0.16)] sm:p-6">
                   <div aria-hidden="true" className="pointer-events-none absolute -right-24 -top-24 h-80 w-80 rounded-full bg-[#24C1C4]/20 blur-3xl transition-transform duration-500 group-hover:scale-110" />
