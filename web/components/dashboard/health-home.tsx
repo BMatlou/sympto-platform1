@@ -3,7 +3,7 @@
 import Link from "next/link";
 import type { ReactNode } from "react";
 import { useEffect, useState } from "react";
-import { ArrowRight, CheckCircle2, FileHeart, FolderOpen, HeartPulse, Plus, ShieldCheck } from "lucide-react";
+import { Activity, ArrowRight, CheckCircle2, FileHeart, FolderOpen, Plus, ShieldCheck } from "lucide-react";
 import { useDashboard } from "@/hooks/use-dashboard";
 import { healthJournalService } from "@/services/health-journal.service";
 import ProtectedRoute from "@/components/auth/protected-route";
@@ -346,34 +346,36 @@ export default function HealthHome() {
                   </div>
                 </section>
 
-                <section className="group relative min-h-[230px] overflow-hidden rounded-[28px] bg-gradient-to-br from-[#29CFD0] via-[#20BBC0] to-[#0A9DA7] p-5 text-white shadow-[0_24px_60px_rgba(36,193,196,0.20)] ring-1 ring-inset ring-white/25 sm:p-6">
+                <section className="group relative min-h-[210px] overflow-hidden rounded-[28px] bg-gradient-to-br from-[#29CFD0] via-[#20BBC0] to-[#0A9DA7] p-5 text-white shadow-[0_24px_60px_rgba(36,193,196,0.20)] ring-1 ring-inset ring-white/25 sm:p-6">
                   <div aria-hidden="true" className="pointer-events-none absolute -right-20 -top-20 h-64 w-64 rounded-full bg-white/45 blur-3xl transition-transform duration-500 group-hover:scale-110" />
                   <div aria-hidden="true" className="pointer-events-none absolute -left-20 -bottom-24 h-56 w-56 rounded-full bg-[#C9FFFF]/35 blur-3xl" />
                   <div aria-hidden="true" className="pointer-events-none absolute inset-x-7 top-0 h-px bg-white/75" />
 
-                  <div className="relative flex min-h-[202px] flex-col justify-between">
+                  <div className="relative">
                     <div className="flex items-center gap-2.5">
-                      <HeartPulse
-                        className="h-5 w-5 text-white/82"
-                        strokeWidth={1.8}
-                        aria-hidden="true"
-                      />
-                      <p className="text-[10px] font-black uppercase tracking-[0.17em] text-white/68">
+                      <span className="grid h-9 w-9 place-items-center rounded-xl bg-white/14 ring-1 ring-inset ring-white/20">
+                        <Activity
+                          className="h-5 w-5 text-white/90"
+                          strokeWidth={1.8}
+                          aria-hidden="true"
+                        />
+                      </span>
+                      <p className="text-[10px] font-black uppercase tracking-[0.17em] text-white/70">
                         Recent symptom
                       </p>
                     </div>
 
                     {recentSymptom ? (
-                      <div className="min-w-0">
+                      <div className="mt-5 min-w-0">
                         <h2 className="truncate text-[29px] font-black tracking-[-0.05em] sm:text-[32px]">
                           {symptomLabel(recentSymptom)}
                         </h2>
-                        <p className="mt-1.5 text-[11px] font-semibold text-white/76">
+                        <p className="mt-1 text-[11px] font-semibold text-white/76">
                           {formatSymptomDate(recentSymptomAt)}
                           {recentSymptomStatus === "ACTIVE" ? " · Active" : ""}
                         </p>
 
-                        <div className="mt-4 flex flex-wrap items-center gap-2">
+                        <div className="mt-3.5 flex flex-wrap items-center gap-2">
                           <Link
                             href={
                               recentSymptomStatus === "ACTIVE"
@@ -397,12 +399,12 @@ export default function HealthHome() {
                         </div>
                       </div>
                     ) : (
-                      <div>
-                        <h2 className="mt-2 text-[27px] font-black tracking-[-0.05em]">Log a symptom</h2>
+                      <div className="mt-5">
+                        <h2 className="text-[27px] font-black tracking-[-0.05em]">Log a symptom</h2>
                         <p className="mt-1 text-[11px] font-semibold text-white/76">Nothing has been logged yet.</p>
                         <Link
                           href="/log-symptom"
-                          className="mt-4 inline-flex min-h-10 items-center gap-2 rounded-full bg-[#0B2D54] px-4 py-2 text-[10px] font-black uppercase tracking-[0.08em] text-white"
+                          className="mt-3.5 inline-flex min-h-10 items-center gap-2 rounded-full bg-[#0B2D54] px-4 py-2 text-[10px] font-black uppercase tracking-[0.08em] text-white"
                         >
                           Log symptom
                           <ArrowRight className="h-3.5 w-3.5 text-[#24C1C4]" aria-hidden="true" />
