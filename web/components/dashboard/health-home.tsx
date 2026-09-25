@@ -306,8 +306,8 @@ export default function HealthHome() {
   return (
     <ProtectedRoute>
       <main className="min-h-screen bg-[#EAF0F7] px-2 pb-2 pt-[72px] text-[#0B2D54] sm:px-4 sm:pb-4 sm:pt-[72px] lg:pl-[104px] lg:pt-4">
-        <div className="mx-auto min-h-[calc(100vh-2rem)] max-w-[1480px] overflow-hidden rounded-[30px] border border-white/80 bg-white shadow-[0_28px_80px_rgba(11,45,84,0.12)]">
-          <section className="min-w-0 bg-white">
+        <div className="mx-auto min-h-[calc(100vh-2rem)] max-w-[1480px]">
+          <section className="min-w-0">
             <div className="px-4 pb-5 pt-3 sm:px-5 lg:px-7">
               <div className="flex justify-end">
                 <ActionLink
