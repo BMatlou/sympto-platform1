@@ -345,34 +345,34 @@ export default function HealthHome() {
     <ProtectedRoute>
       <main className="min-h-screen bg-[#f7fbfb] text-[#14304d]">
         <div className="mx-auto max-w-[1240px] px-4 pb-12 pt-20 sm:px-6 sm:pt-24 lg:px-8">
-          <section className="relative overflow-hidden rounded-[32px] bg-gradient-to-br from-[#0F5A62] via-[#126C74] to-[#177E89] px-5 pb-5 pt-5 text-white shadow-[0_20px_50px_rgba(15,90,98,0.16)] sm:px-7 sm:pb-7 sm:pt-6">
+          <section className="relative overflow-hidden rounded-[32px] bg-gradient-to-br from-[#08284A] via-[#0E4773] to-[#24BABE] px-5 pb-5 pt-5 text-white shadow-[0_20px_55px_rgba(11,45,84,0.14)] sm:px-7 sm:pb-7 sm:pt-6 lg:px-8">
             <div
               aria-hidden="true"
-              className="pointer-events-none absolute -right-20 -top-24 h-64 w-64 rounded-full border border-white/[0.08]"
+              className="pointer-events-none absolute -right-24 -top-28 h-64 w-64 rounded-full border border-white/[0.10] shadow-[0_0_0_26px_rgba(255,255,255,0.025),0_0_0_52px_rgba(255,255,255,0.02)]"
             />
             <div
               aria-hidden="true"
-              className="pointer-events-none absolute -bottom-20 left-[38%] h-48 w-48 rounded-full bg-[#24C1C4]/20 blur-3xl"
+              className="pointer-events-none absolute -bottom-28 left-[44%] h-56 w-56 rounded-full bg-[#24C1C4]/25 blur-3xl"
             />
 
             <div className="relative">
               <div className="flex items-center justify-between gap-4">
                 <div>
-                  <p className="text-[13px] font-semibold tracking-[-0.01em] text-white/[0.78]">
+                  <p className="text-[13px] font-medium tracking-[-0.01em] text-white/80">
                     Good day, {firstName}
                   </p>
-                  <p className="mt-1 text-[10px] font-medium uppercase tracking-[0.18em] text-white/[0.45]">
+                  <p className="mt-1 text-[10px] font-black uppercase tracking-[0.18em] text-white/45">
                     Your health overview
                   </p>
                 </div>
 
-                <span className="rounded-full border border-white/12 bg-white/10 px-3 py-1.5 text-[9px] font-black uppercase tracking-[0.14em] text-white/[0.72]">
+                <span className="rounded-full border border-white/15 bg-white/10 px-3 py-1.5 text-[9px] font-black uppercase tracking-[0.14em] text-white/75">
                   Today
                 </span>
               </div>
 
               <div className="mt-7 flex items-center gap-4 sm:gap-5">
-                <div className="grid h-[76px] w-[76px] shrink-0 place-items-center rounded-[24px] bg-white/[0.11] ring-1 ring-white/10 sm:h-[86px] sm:w-[86px]">
+                <div className="grid h-[76px] w-[76px] shrink-0 place-items-center rounded-[24px] border border-white/10 bg-white/10 sm:h-[86px] sm:w-[86px]">
                   <div className="text-center">
                     <p className="text-3xl font-black leading-none tracking-[-0.06em] text-white sm:text-4xl">
                       {todayActionCount}
@@ -384,22 +384,20 @@ export default function HealthHome() {
                 </div>
 
                 <div className="min-w-0">
-                  <h1 className="text-[27px] font-black leading-[1.05] tracking-[-0.045em] sm:text-[36px]">
-                    {todayActionCount === 0
-                      ? "You’re all caught up."
-                      : `You have ${todayActionCount} ${todayActionCount === 1 ? "thing" : "things"} to take care of today.`}
+                  <h1 className="text-[27px] font-black leading-[1.06] tracking-[-0.045em] sm:text-[36px]">
+                    You have {todayActionCount} {todayActionCount === 1 ? "thing" : "things"} to take care of today.
                   </h1>
-                  <p className="mt-2 text-sm leading-5 text-white/[0.60]">
+                  <p className="mt-2 text-sm leading-5 text-white/65">
                     Start with what matters most.
                   </p>
                 </div>
               </div>
 
-              <div className="mt-7 rounded-[20px] bg-black/[0.10] p-1 ring-1 ring-white/10">
+              <div className="mt-7 rounded-[18px] bg-[#062F45]/35 p-1 ring-1 ring-white/10">
                 <div className="grid grid-cols-2 gap-1">
                   <ActionLink
                     href="/today"
-                    className="flex min-h-11 items-center justify-center gap-2 rounded-[16px] bg-white px-3 text-xs font-black text-[#0B2D54] shadow-sm"
+                    className="flex min-h-11 items-center justify-center gap-2 rounded-[14px] bg-white px-3 text-xs font-black text-[#0B2D54] shadow-sm hover:bg-slate-50"
                   >
                     <span>View today</span>
                     <ArrowRight className="h-3.5 w-3.5 text-[#24C1C4]" aria-hidden="true" />
@@ -407,7 +405,7 @@ export default function HealthHome() {
 
                   <span
                     aria-current="page"
-                    className="flex min-h-11 items-center justify-center rounded-[16px] px-3 text-xs font-bold text-white/72"
+                    className="flex min-h-11 items-center justify-center rounded-[14px] px-3 text-xs font-bold text-white/75"
                   >
                     Your health, at a glance
                   </span>
@@ -416,10 +414,10 @@ export default function HealthHome() {
 
               <ActionLink
                 href="/log-symptom"
-                className="mt-3 flex min-h-12 w-full items-center justify-between rounded-[18px] bg-[#24C1C4] px-4 text-sm font-black text-[#073F46] shadow-[0_12px_26px_rgba(36,193,196,0.22)] hover:bg-[#5ADADC]"
+                className="mt-3 flex min-h-12 w-full items-center justify-between rounded-[16px] bg-[#24C1C4] px-4 text-sm font-black text-[#08284A] shadow-[0_12px_28px_rgba(36,193,196,0.24)] hover:bg-[#47D1D3]"
               >
                 <span className="flex items-center gap-2.5">
-                  <span className="grid h-8 w-8 place-items-center rounded-xl bg-[#073F46]/10">
+                  <span className="grid h-8 w-8 place-items-center rounded-xl bg-[#08284A]/10">
                     <HeartPulse className="h-4 w-4" aria-hidden="true" />
                   </span>
                   Log a symptom
@@ -427,9 +425,15 @@ export default function HealthHome() {
                 <ArrowRight className="h-4 w-4" aria-hidden="true" />
               </ActionLink>
             </div>
+
+            <div className="relative mt-5 grid grid-cols-3 gap-1.5" aria-hidden="true">
+              <div className="h-1 rounded-full bg-[#24C1C4]" />
+              <div className="h-1 rounded-full bg-[#E53935]" />
+              <div className="h-1 rounded-full bg-[#4A80E8]" />
+            </div>
           </section>
-          <div className="px-1 pb-1 pt-7">
-            <p className="text-[9px] font-black uppercase tracking-[0.2em] text-slate-400">
+          <div className="px-2 pb-1 pt-6 sm:px-1 sm:pt-7">
+            <p className="text-[10px] font-black uppercase tracking-[0.18em] text-[#71839A]">
               Choose what you need. Sympto will take you there.
             </p>
           </div>
