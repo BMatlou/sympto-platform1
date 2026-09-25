@@ -208,28 +208,6 @@ export default function HealthHome() {
           </aside>
 
           <section className="min-w-0 space-y-5">
-            <div className="flex items-end justify-between gap-4 px-1">
-              <div className="min-w-0">
-                <p className="text-[11px] font-black uppercase tracking-[0.18em] text-[#177E89]">
-                  Sympto workspace
-                </p>
-                <h1 className="mt-1 text-[30px] font-black tracking-[-0.05em] text-[#0B2D54] sm:text-[36px]">
-                  Good day, {firstName}
-                </h1>
-                <p className="mt-1 text-[13px] font-medium text-[#7C8D9B]">
-                  Your health, organised around what matters today.
-                </p>
-              </div>
-
-              <ActionLink
-                href="/today"
-                className="hidden shrink-0 items-center gap-2 rounded-full bg-[#0F5A62] px-4 py-2.5 text-[11px] font-black text-white shadow-[0_8px_22px_rgba(15,90,98,0.12)] hover:bg-[#177E89] sm:inline-flex"
-              >
-                Open today
-                <ArrowRight className="h-3.5 w-3.5" aria-hidden="true" />
-              </ActionLink>
-            </div>
-
             <div className="grid gap-5 xl:grid-cols-[minmax(0,1.65fr)_minmax(320px,0.85fr)]">
               <section className="group relative overflow-hidden rounded-[32px] bg-[#0B2D54] p-5 text-white shadow-[0_10px_40px_rgba(0,0,0,0.02)] sm:p-7">
                 <div
@@ -254,6 +232,12 @@ export default function HealthHome() {
                           Today
                         </span>
                       </div>
+                      <h2 className="mt-5 text-[28px] font-black tracking-[-0.045em] text-white sm:text-[32px]">
+                        Good day, {firstName}
+                      </h2>
+                      <p className="mt-1 max-w-[28rem] text-[12px] font-medium leading-5 text-white/[0.72]">
+                        Your health, organised around what matters today.
+                      </p>
                     </div>
 
                     <div className="hidden h-12 w-12 place-items-center rounded-2xl bg-white/[0.08] ring-1 ring-white/10 sm:grid">
