@@ -332,10 +332,7 @@ export default function HealthHome() {
                     </div>
 
                     <div className="shrink-0 min-w-[150px] text-right sm:min-w-[190px]">
-                      <p className="text-[9px] font-black uppercase tracking-[0.16em] text-white/60">
-                        Needs your attention
-                      </p>
-                      <p className="mt-1 text-[72px] font-black leading-[0.82] tracking-[-0.09em] text-white sm:text-[86px]">
+                      <p className="text-[72px] font-black leading-[0.82] tracking-[-0.09em] text-white sm:text-[86px]">
                         {todayActionCount}
                       </p>
                       <p className="mt-2 text-[11px] font-black leading-4 text-white/88 sm:text-xs">
