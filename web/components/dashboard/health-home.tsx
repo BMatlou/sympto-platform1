@@ -2,8 +2,10 @@
 
 import Link from "next/link";
 import type { ReactNode } from "react";
+import { useEffect, useState } from "react";
 import { ArrowRight, Bell, CheckCircle2, FolderOpen, HeartPulse, House, ShieldCheck, UserRound } from "lucide-react";
 import { useDashboard } from "@/hooks/use-dashboard";
+import { healthJournalService } from "@/services/health-journal.service";
 import ProtectedRoute from "@/components/auth/protected-route";
 
 function display(value: unknown, fallback = "Not recorded"): string {
@@ -70,8 +72,13 @@ function countActiveGoals(data: any) {
   ).length;
 }
 
-function recentSymptomFrom(data: any) {
-  const symptoms = Array.isArray(data?.symptoms) ? data.symptoms : [];
+function recentSymptomFrom(data: any, symptomFeed: any[]) {
+  const symptoms =
+    symptomFeed.length > 0
+      ? symptomFeed
+      : Array.isArray(data?.symptoms)
+        ? data.symptoms
+        : [];
   return [...symptoms]
     .filter((symptom: any) => symptom?.id && (symptom?.startedAt || symptom?.createdAt))
     .sort(
@@ -100,20 +107,6 @@ function formatSymptomDate(value: unknown): string {
     day: "numeric",
     month: "short",
   }).format(date);
-}
-
-function formatTodayDate(value = new Date()): { weekday: string; day: string; month: string } {
-  const parts = new Intl.DateTimeFormat("en-ZA", {
-    weekday: "short",
-    day: "2-digit",
-    month: "short",
-  }).formatToParts(value);
-  const result = Object.fromEntries(parts.map((part) => [part.type, part.value]));
-  return {
-    weekday: String(result.weekday ?? "").toUpperCase(),
-    day: String(result.day ?? ""),
-    month: String(result.month ?? "").toUpperCase(),
-  };
 }
 
 function ActionLink({
@@ -145,6 +138,7 @@ function ActionLink({
 
 export default function HealthHome() {
   const { data, loading, error, reload } = useDashboard();
+  const [symptomFeed, setSymptomFeed] = useState<any[]>([]);
 
   if (loading) {
     return (
@@ -164,6 +158,29 @@ export default function HealthHome() {
       </ProtectedRoute>
     );
   }
+
+  useEffect(() => {
+    if (!data?.patient?.id) return;
+
+    let active = true;
+
+    healthJournalService
+      .getSymptoms({ limit: 20 })
+      .then((records) => {
+        if (active) {
+          setSymptomFeed(Array.isArray(records) ? records : []);
+        }
+      })
+      .catch(() => {
+        if (active) {
+          setSymptomFeed([]);
+        }
+      });
+
+    return () => {
+      active = false;
+    };
+  }, [data?.patient?.id, data?.generatedAt]);
 
   if (error || !data) {
     return (
@@ -210,11 +227,10 @@ export default function HealthHome() {
   const todayActionCount =
     medications.length + appointments.length + activeGoalCount;
 
-  const recentSymptom = recentSymptomFrom(data);
+  const recentSymptom = recentSymptomFrom(data, symptomFeed);
   const recentSymptomStatus = String(recentSymptom?.status ?? "").toUpperCase();
   const recentSymptomAt =
     recentSymptom?.startedAt ?? recentSymptom?.createdAt ?? null;
-  const todayDate = formatTodayDate();
 
   return (
     <ProtectedRoute>
@@ -272,10 +288,7 @@ export default function HealthHome() {
                 <div className="relative flex min-h-[232px] flex-col justify-between gap-8">
                   <div className="flex items-start justify-between gap-6">
                     <div className="max-w-[34rem]">
-                      <p className="text-[10px] font-black uppercase tracking-[0.18em] text-[#24C1C4]">
-                        {todayDate.weekday} · {todayDate.day} {todayDate.month}
-                      </p>
-                      <h2 className="mt-3 text-[34px] font-black tracking-[-0.055em] sm:text-[44px]">
+                      <h2 className="text-[34px] font-black tracking-[-0.055em] sm:text-[44px]">
                         Good day, {firstName}
                       </h2>
                       <p className="mt-2 max-w-[30rem] text-[13px] font-medium leading-6 text-white/[0.72]">
@@ -283,18 +296,6 @@ export default function HealthHome() {
                       </p>
                     </div>
 
-                    <div className="hidden shrink-0 sm:block">
-                      <div className="grid h-[78px] w-[78px] place-items-center rounded-[24px] bg-white/[0.08] ring-1 ring-white/10">
-                        <div className="text-center">
-                          <p className="text-[10px] font-black uppercase tracking-[0.14em] text-white/[0.52]">
-                            {todayDate.month}
-                          </p>
-                          <p className="text-[30px] font-black leading-none tracking-[-0.06em]">
-                            {todayDate.day}
-                          </p>
-                        </div>
-                      </div>
-                    </div>
                   </div>
 
                   <div className="flex flex-wrap items-end justify-between gap-6">
@@ -303,7 +304,7 @@ export default function HealthHome() {
                         {todayActionCount}
                       </p>
                       <p className="pb-1.5 text-[10px] font-black uppercase tracking-[0.16em] text-white/[0.52]">
-                        things today
+                        active items
                       </p>
                     </div>
 
