@@ -82,10 +82,10 @@ export default function HealthNavigation() {
     let observer: ResizeObserver | null = null;
 
     const measureRail = () => {
-      const hero = document.getElementById("dashboard-hero-row");
-      const healthCards = document.getElementById("dashboard-health-cards");
+      const hero = document.getElementById("dashboard-overview-card");
+      const todayCard = document.getElementById("dashboard-today-card");
 
-      if (!hero || !healthCards) {
+      if (!hero || !todayCard) {
         if (retries < 60) {
           retries += 1;
           frame = window.requestAnimationFrame(measureRail);
@@ -94,10 +94,9 @@ export default function HealthNavigation() {
       }
 
       const heroRect = hero.getBoundingClientRect();
-      const cardsRect = healthCards.getBoundingClientRect();
-      const inset = 8;
-      const top = Math.round(heroRect.top + inset);
-      const bottom = Math.round(cardsRect.bottom - inset);
+      const todayRect = todayCard.getBoundingClientRect();
+      const top = Math.round(heroRect.top);
+      const bottom = Math.round(todayRect.bottom);
 
       if (bottom > top) {
         setRailBounds({ top, height: bottom - top });
@@ -106,15 +105,15 @@ export default function HealthNavigation() {
 
     measureRail();
 
-    const hero = document.getElementById("dashboard-hero-row");
-    const healthCards = document.getElementById("dashboard-health-cards");
+    const hero = document.getElementById("dashboard-overview-card");
+    const todayCard = document.getElementById("dashboard-today-card");
     observer =
       typeof ResizeObserver !== "undefined"
         ? new ResizeObserver(measureRail)
         : null;
 
     if (hero) observer.observe(hero);
-    if (healthCards) observer.observe(healthCards);
+    if (todayCard) observer.observe(todayCard);
 
     window.addEventListener("resize", measureRail);
 
