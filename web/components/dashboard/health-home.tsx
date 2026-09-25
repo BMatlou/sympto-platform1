@@ -320,10 +320,6 @@ export default function HealthHome() {
             <div className="px-4 pb-1 pt-3 sm:px-5 lg:px-7">
               <div className="mt-3 grid gap-3 xl:grid-cols-[minmax(0,1.55fr)_minmax(320px,0.85fr)]">
                 <section className="group relative min-h-[220px] overflow-hidden rounded-[28px] bg-[#0B2D54] p-6 text-white sm:p-7">
-                  <div aria-hidden="true" className="pointer-events-none absolute -right-20 -top-24 h-72 w-72 rounded-full bg-[#24C1C4]/20 blur-3xl transition-transform duration-500 group-hover:scale-110" />
-                  <div aria-hidden="true" className="pointer-events-none absolute -bottom-24 right-1/4 h-56 w-56 rounded-full bg-white/[0.06] blur-3xl" />
-                  <div aria-hidden="true" className="pointer-events-none absolute inset-x-7 top-0 h-px bg-white/20" />
-
                   <div className="relative flex min-h-[166px] items-center justify-between gap-8">
                     <div className="min-w-0">
                       <p className="text-[9px] font-black uppercase tracking-[0.18em] text-white/50">Overview</p>
