@@ -31,14 +31,14 @@ const PRIMARY_NAV = [
 ] as const;
 
 const MORE_NAV = [
-  { href: "/appointments", label: "Appointments", icon: CalendarDays },
-  { href: "/notifications", label: "Notifications", icon: Bell },
+  { href: "/health-records", label: "Health Records", icon: FileText },
+  { href: "/health-vitals", label: "Vitals & Measurements", icon: Activity },
   { href: "/medications", label: "Medications", icon: Pill },
-  { href: "/care-plans", label: "Care Plans", icon: ClipboardList },
+  { href: "/appointments", label: "Appointments", icon: CalendarDays },
   { href: "/health-goals", label: "Health Goals", icon: HeartPulse },
   { href: "/log-symptom", label: "Log a symptom", icon: HeartPulse },
-  { href: "/health-vitals", label: "Measurements", icon: Activity },
-  { href: "/health-records", label: "Health Records", icon: FileText },
+  { href: "/care-plans", label: "Care Plans", icon: ClipboardList },
+  { href: "/notifications", label: "Notifications", icon: Bell },
   { href: "/messages", label: "Messages", icon: MessageCircle },
   { href: "/wearables", label: "Connected devices", icon: Watch },
   { href: "/family", label: "Family", icon: Users },
@@ -69,7 +69,7 @@ export default function HealthNavigation() {
   }, [open]);
 
   return (
-    <div ref={menuRef} className="fixed inset-x-2 top-2 z-50 flex h-14 items-center gap-2 rounded-2xl border border-slate-200/80 bg-white/95 p-2 shadow-[0_12px_35px_rgba(11,45,84,0.12)] backdrop-blur lg:inset-y-4 lg:left-4 lg:right-auto lg:h-auto lg:w-[76px] lg:flex-col lg:rounded-[26px] lg:p-2">
+    <div ref={menuRef} className="fixed inset-x-2 top-2 z-50 flex h-14 items-center gap-2 rounded-2xl border border-slate-200/80 bg-white/95 p-2 shadow-[0_12px_35px_rgba(11,45,84,0.12)] backdrop-blur lg:inset-y-4 lg:left-4 lg:right-auto lg:h-auto lg:w-[64px] lg:flex-col lg:rounded-[26px] lg:p-2">
       <Link
         href="/dashboard"
         aria-label="Sympto home"
@@ -109,11 +109,11 @@ export default function HealthNavigation() {
         <div
           role="menu"
           aria-label="More health navigation"
-          className="absolute right-0 top-16 max-h-[calc(100vh-5rem)] w-[min(22rem,calc(100vw-1rem))] overflow-y-auto rounded-[24px] border border-slate-200 bg-white p-2 shadow-[0_24px_60px_rgba(11,45,84,0.18)] lg:left-[88px] lg:right-auto lg:top-0"
+          className="absolute right-0 top-16 max-h-[calc(100vh-5rem)] w-[min(20rem,calc(100vw-1rem))] overflow-y-auto rounded-[24px] border border-slate-200 bg-white p-2 shadow-[0_24px_60px_rgba(11,45,84,0.18)] lg:left-[76px] lg:right-auto lg:top-0"
         >
           <div className="px-3 pb-2 pt-3">
             <p className="text-[10px] font-black uppercase tracking-[0.18em] text-slate-400">Your health</p>
-            <p className="mt-1 text-sm font-bold text-[#0B2D54]">Everything you need, organised around your health</p>
+            <p className="mt-1 text-sm font-bold text-[#0B2D54]">More of your health tools</p>
           </div>
           <div className="border-t border-slate-100 px-1 py-2">
             <div className="space-y-0.5">
