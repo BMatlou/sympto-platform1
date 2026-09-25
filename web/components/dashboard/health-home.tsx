@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import type { ReactNode } from "react";
-import { ArrowRight, CheckCircle2, FileText, FolderOpen, ShieldCheck } from "lucide-react";
+import { ArrowRight, CheckCircle2, FolderOpen, ShieldCheck } from "lucide-react";
 import { useDashboard } from "@/hooks/use-dashboard";
 import ProtectedRoute from "@/components/auth/protected-route";
 
@@ -104,10 +104,11 @@ function DashboardCard({
   children,
   footerLabel = "Open",
   icon: Icon,
-  iconWrapClass,
-  cardClass,
-  badgeClass,
-  footerClass,
+  accent,
+  softAccent,
+  iconBg,
+  border,
+  footerBorder,
 }: {
   href: string;
   title: string;
@@ -116,82 +117,72 @@ function DashboardCard({
   children?: ReactNode;
   footerLabel?: string;
   icon: typeof CheckCircle2;
-  iconWrapClass: string;
-  cardClass: string;
-  badgeClass: string;
-  footerClass: string;
+  accent: string;
+  softAccent: string;
+  iconBg: string;
+  border: string;
+  footerBorder: string;
 }) {
   return (
     <ActionLink
       href={href}
       ariaLabel={title}
       className={
-        "group relative block overflow-hidden rounded-3xl border p-5 shadow-[0_10px_30px_rgba(0,0,0,0.02)] " +
-        "transition-all duration-200 hover:-translate-y-0.5 sm:p-6 " +
-        cardClass
+        "group flex h-full min-h-[318px] flex-col overflow-hidden rounded-3xl border bg-white shadow-[0_10px_30px_rgba(0,0,0,0.04)] " +
+        "hover:-translate-y-0.5 hover:shadow-[0_18px_38px_rgba(0,0,0,0.07)] " +
+        border
       }
     >
-      <div className="absolute inset-y-0 left-0 w-1.5 bg-current opacity-80" />
+      <div className={`h-1.5 w-full ${accent}`} />
 
-      <div className="relative flex items-start justify-between gap-4">
-        <div className="flex min-w-0 items-start gap-3.5">
-          <span
-            className={
-              "grid h-12 w-12 shrink-0 place-items-center rounded-2xl " +
-              iconWrapClass
-            }
-          >
-            <Icon className="h-5 w-5" aria-hidden="true" />
-          </span>
-
-          <div className="min-w-0">
-            <h2 className="text-xl font-black tracking-[-0.04em] text-[#0b2d54]">
-              {title}
-            </h2>
-            <p
-              className={
-                "mt-1 text-[10px] font-black uppercase tracking-[0.16em] " +
-                badgeClass
-              }
+      <div className="flex flex-1 flex-col p-5 sm:p-6">
+        <div className="flex items-start justify-between gap-4">
+          <div className="flex min-w-0 items-center gap-3">
+            <span
+              className={`grid h-11 w-11 shrink-0 place-items-center rounded-2xl ${iconBg}`}
             >
-              {tag}
-            </p>
+              <Icon className={`h-5 w-5 ${accent}`} aria-hidden="true" />
+            </span>
+
+            <div className="min-w-0">
+              <p className={`text-[9px] font-black uppercase tracking-[0.18em] ${accent}`}>
+                {tag}
+              </p>
+              <h2 className="mt-1 text-xl font-black tracking-[-0.04em] text-[#0b2d54]">
+                {title}
+              </h2>
+            </div>
           </div>
+
+          <span
+            className={`rounded-full px-3 py-1.5 text-[9px] font-black uppercase tracking-[0.12em] ${softAccent}`}
+          >
+            {footerLabel}
+          </span>
         </div>
 
-        <span
-          className={
-            "shrink-0 rounded-full px-3 py-1.5 text-[9px] font-black uppercase tracking-[0.12em] " +
-            badgeClass
-          }
+        <p className="mt-4 text-sm leading-6 text-slate-500">
+          {description}
+        </p>
+
+        {children ? <div className="mt-5">{children}</div> : null}
+
+        <div
+          className={`mt-auto flex items-center justify-between gap-3 border-t pt-4 ${footerBorder}`}
         >
-          {footerLabel}
-        </span>
-      </div>
-
-      <p className="relative mt-5 max-w-2xl text-sm leading-6 text-slate-600">
-        {description}
-      </p>
-
-      {children ? <div className="relative mt-5">{children}</div> : null}
-
-      <div
-        className={
-          "relative mt-5 flex items-center justify-between gap-3 border-t pt-4 " +
-          footerClass
-        }
-      >
-        <span className="text-[10px] font-black uppercase tracking-[0.14em]">
-          {footerLabel}
-        </span>
-        <span className="inline-flex h-9 w-9 items-center justify-center rounded-full bg-white/80 ring-1 ring-black/5 transition-transform duration-200 group-hover:translate-x-1">
-          <ArrowRight className="h-4 w-4" aria-hidden="true" />
-        </span>
+          <span className={`text-[10px] font-black uppercase tracking-[0.14em] ${accent}`}>
+            {footerLabel}
+          </span>
+          <span
+            className={`inline-flex h-9 w-9 items-center justify-center rounded-full ${softAccent} transition-transform duration-200 group-hover:translate-x-1`}
+          >
+            <ArrowRight className={`h-4 w-4 ${accent}`} aria-hidden="true" />
+          </span>
+        </div>
       </div>
     </ActionLink>
   );
 }
-
 function MetricBadge({
   label,
   value,
@@ -200,7 +191,7 @@ function MetricBadge({
   value: number;
 }) {
   return (
-    <div className="rounded-2xl bg-white/80 px-3.5 py-3 ring-1 ring-black/[0.04] backdrop-blur-sm">
+    <div className="rounded-2xl bg-[#f7fbfb] px-3.5 py-3 ring-1 ring-[#e3edef]">
       <p className="text-[9px] font-black uppercase tracking-[0.12em] text-slate-400">
         {label}
       </p>
@@ -223,16 +214,18 @@ function ClinicRow({
   return (
     <div
       className={
-        "flex items-center justify-between gap-4 rounded-2xl px-4 py-3.5 " +
-        (blood ? "bg-red-50 ring-1 ring-red-100" : "bg-white/70 ring-1 ring-slate-100")
+        "flex min-h-12 items-center justify-between gap-3 rounded-2xl border px-3.5 py-2.5 " +
+        (blood
+          ? "border-red-100 bg-red-50"
+          : "border-slate-100 bg-[#f8fbfb]")
       }
     >
-      <span className="text-[10px] font-black uppercase tracking-[0.12em] text-slate-400">
+      <span className="text-[9px] font-black uppercase tracking-[0.12em] text-slate-400">
         {label}
       </span>
       <span
         className={
-          "text-right text-sm font-black " +
+          "text-right text-xs font-black " +
           (blood ? "text-red-700" : "text-[#0b2d54]")
         }
       >
@@ -241,7 +234,6 @@ function ClinicRow({
     </div>
   );
 }
-
 export default function HealthHome() {
   const { data, loading, error, reload } = useDashboard();
 
@@ -355,7 +347,7 @@ export default function HealthHome() {
   return (
     <ProtectedRoute>
       <main className="min-h-screen bg-[#f7fbfb] text-[#14304d]">
-        <div className="mx-auto max-w-[1180px] px-4 pb-12 pt-20 sm:px-6 sm:pt-24 lg:px-8">
+        <div className="mx-auto max-w-[1240px] px-4 pb-12 pt-20 sm:px-6 sm:pt-24 lg:px-8">
           <section className="relative overflow-hidden rounded-t-3xl rounded-b-[42px] bg-gradient-to-b from-[#0F5A62] to-[#177E89] p-5 text-white shadow-[0_16px_38px_rgba(15,90,98,0.14)] sm:p-7">
             <div
               aria-hidden="true"
@@ -409,19 +401,24 @@ export default function HealthHome() {
             </p>
           </div>
 
-          <section className="space-y-4" aria-label="Health dashboard">
+          <section
+            className="grid items-stretch gap-4 md:grid-cols-3"
+            aria-label="Health dashboard"
+          >
             <DashboardCard
               href="/today"
               title="Today"
               tag="Today"
               description={`What do I do today? ${todayActionCount} ${todayActionCount === 1 ? "thing needs" : "things need"} your attention.`}
               icon={CheckCircle2}
-              iconWrapClass="bg-[#E5FAF8] text-[#0B7B80] ring-1 ring-[#24C1C4]/25"
-              cardClass="border-[#B9E7E5] bg-gradient-to-br from-white via-white to-[#F0FCFB] text-[#0B7B80] hover:border-[#24C1C4] hover:shadow-[0_16px_38px_rgba(36,193,196,0.14)]"
-              badgeClass="text-[#0B7B80] bg-[#EAF9F8]"
-              footerClass="border-[#D8EFEE] text-[#0B7B80]"
+              accent="text-[#0B7B80]"
+              softAccent="bg-[#E8F8F7]"
+              iconBg="bg-[#E8F8F7] ring-1 ring-[#24C1C4]/20"
+              border="border-[#B9E6E4]"
+              footerBorder="border-[#DDEDEC]"
+              footerLabel="Open items"
             >
-              <div className="grid grid-cols-3 gap-2.5">
+              <div className="grid grid-cols-3 gap-2">
                 <MetricBadge label="Medication" value={medications.length} />
                 <MetricBadge label="Visit" value={appointments.length} />
                 <MetricBadge label="Goal" value={activeGoalCount} />
@@ -434,23 +431,27 @@ export default function HealthHome() {
               tag="My Clinic Card"
               description="Your essential health information for quick reference and care."
               icon={ShieldCheck}
-              iconWrapClass="bg-[#FFF0F0] text-[#C62828] ring-1 ring-[#E53935]/20"
-              cardClass="border-[#F0B7B7] bg-gradient-to-br from-white via-white to-[#FFF5F5] text-[#C62828] hover:border-[#E53935] hover:shadow-[0_16px_38px_rgba(229,57,53,0.14)]"
-              badgeClass="text-[#B42318] bg-[#FFF1F1]"
-              footerClass="border-[#F3D5D5] text-[#B42318]"
+              accent="text-[#C62828]"
+              softAccent="bg-[#FFF0F0]"
+              iconBg="bg-[#FFF0F0] ring-1 ring-[#E53935]/20"
+              border="border-[#F0C2C2]"
+              footerBorder="border-[#F2DDDD]"
+              footerLabel="Open clinic card"
             >
-              <div className="space-y-2.5">
+              <div className="grid grid-cols-1 gap-2">
                 <ClinicRow label="Allergies" value={allergiesValue} />
                 <ClinicRow label="Conditions" value={conditionsValue} />
-                <ClinicRow
-                  label="Blood"
-                  value={display(bloodType).toUpperCase()}
-                  blood
-                />
-                <ClinicRow
-                  label="Rhesus"
-                  value={display(rhesusFactor).toUpperCase()}
-                />
+                <div className="grid grid-cols-2 gap-2">
+                  <ClinicRow
+                    label="Blood"
+                    value={display(bloodType).toUpperCase()}
+                    blood
+                  />
+                  <ClinicRow
+                    label="Rhesus"
+                    value={display(rhesusFactor).toUpperCase()}
+                  />
+                </div>
               </div>
             </DashboardCard>
 
@@ -460,16 +461,28 @@ export default function HealthHome() {
               tag="My History and Papers"
               description="Your encounters, results and important health documents in one place."
               icon={FolderOpen}
-              iconWrapClass="bg-[#EAF2FF] text-[#2F6FDB] ring-1 ring-[#4A80E8]/20"
-              cardClass="border-[#B9D0F5] bg-gradient-to-br from-white via-white to-[#F2F7FF] text-[#2F6FDB] hover:border-[#4A80E8] hover:shadow-[0_16px_38px_rgba(47,111,219,0.14)]"
-              badgeClass="text-[#2F5FAF] bg-[#EEF4FF]"
-              footerClass="border-[#D8E5FA] text-[#2F5FAF]"
+              accent="text-[#2F6FDB]"
+              softAccent="bg-[#EEF4FF]"
+              iconBg="bg-[#EEF4FF] ring-1 ring-[#4A80E8]/20"
+              border="border-[#BED2F4]"
+              footerBorder="border-[#DDE7F7]"
+              footerLabel="Open records"
             >
-              <div className="grid grid-cols-2 gap-2.5">
+              <div className="grid grid-cols-2 gap-2">
                 <MetricBadge label="Records" value={historyCount} />
                 <MetricBadge label="Vitals" value={healthVitals.length} />
               </div>
+
+              <div className="mt-3 rounded-2xl border border-[#DDE7F7] bg-[#F7FAFF] px-3.5 py-3">
+                <p className="text-[9px] font-black uppercase tracking-[0.13em] text-[#6D8FC7]">
+                  Documents
+                </p>
+                <p className="mt-1 text-xs font-semibold leading-5 text-[#2F5FAF]">
+                  Encounters, results and important health papers stay together.
+                </p>
+              </div>
             </DashboardCard>
+          </section>
           </section>
         </div>
       </main>
