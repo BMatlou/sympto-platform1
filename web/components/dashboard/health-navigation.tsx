@@ -22,6 +22,7 @@ import {
   X,
 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
+import { usePathname } from "next/navigation";
 
 const PRIMARY_NAV = [
   { href: "/dashboard", label: "Home", icon: House },
@@ -49,6 +50,7 @@ const MORE_NAV = [
 ] as const;
 
 export default function HealthNavigation() {
+  const pathname = usePathname();
   const [open, setOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
 
@@ -70,28 +72,24 @@ export default function HealthNavigation() {
 
   return (
     <div ref={menuRef} className="fixed inset-x-2 top-2 z-50 flex h-14 items-center gap-2 rounded-2xl border border-slate-200/80 bg-white/95 p-2 shadow-[0_12px_35px_rgba(11,45,84,0.12)] backdrop-blur lg:inset-y-4 lg:left-4 lg:right-auto lg:h-auto lg:w-[64px] lg:flex-col lg:rounded-[26px] lg:p-2">
-      <Link
-        href="/dashboard"
-        aria-label="Sympto home"
-        className="grid h-10 w-10 shrink-0 place-items-center rounded-2xl bg-[#0B2D54] text-white shadow-[0_8px_20px_rgba(11,45,84,0.15)]"
-      >
-        <HeartPulse className="h-4.5 w-4.5" aria-hidden="true" />
-      </Link>
-
       <nav className="flex min-w-0 flex-1 items-center justify-center gap-1 lg:min-h-0 lg:flex-col lg:gap-2" aria-label="Primary health navigation">
-        {PRIMARY_NAV.map(({ href, label, icon: Icon }) => (
-          <Link
-            key={href}
-            href={href}
-            aria-label={label}
-            className="group relative grid h-10 w-10 shrink-0 place-items-center rounded-2xl text-slate-400 transition-all duration-200 hover:-translate-y-0.5 hover:bg-[#E8F8F7] hover:text-[#0B2D54] hover:shadow-[0_8px_20px_rgba(36,193,196,0.16)] lg:h-11 lg:w-11"
-          >
-            <Icon className="h-4.5 w-4.5" aria-hidden="true" />
-            <span className="pointer-events-none absolute left-[calc(100%+10px)] top-1/2 z-50 hidden -translate-y-1/2 whitespace-nowrap rounded-xl bg-[#0B2D54] px-3 py-2 text-[10px] font-black text-white shadow-[0_12px_28px_rgba(11,45,84,0.22)] lg:block lg:opacity-0 lg:transition-opacity lg:group-hover:opacity-100">
-              {label}
-            </span>
-          </Link>
-        ))}
+        {PRIMARY_NAV.map(({ href, label, icon: Icon }) => {
+          const isActive = pathname === href || (href === "/dashboard" && pathname === "/");
+          return (
+            <Link
+              key={href}
+              href={href}
+              aria-label={label}
+              aria-current={isActive ? "page" : undefined}
+              className={`group relative grid h-10 w-10 shrink-0 place-items-center rounded-2xl transition-all duration-200 lg:h-11 lg:w-11 ${isActive ? "bg-[#E8F8F7] text-[#0B2D54] shadow-[0_8px_20px_rgba(36,193,196,0.16)]" : "text-slate-400 hover:-translate-y-0.5 hover:bg-[#E8F8F7] hover:text-[#0B2D54] hover:shadow-[0_8px_20px_rgba(36,193,196,0.16)]"}`}
+            >
+              <Icon className="h-4.5 w-4.5" aria-hidden="true" />
+              <span className="pointer-events-none absolute left-[calc(100%+10px)] top-1/2 z-50 hidden -translate-y-1/2 whitespace-nowrap rounded-xl bg-[#0B2D54] px-3 py-2 text-[10px] font-black text-white shadow-[0_12px_28px_rgba(11,45,84,0.22)] lg:block lg:opacity-0 lg:transition-opacity lg:group-hover:opacity-100">
+                {label}
+              </span>
+            </Link>
+          );
+        })}
 
         <button
           type="button"
