@@ -76,7 +76,7 @@ export default function HealthNavigation() {
   }, [open]);
 
   return (
-    <div ref={menuRef} className="fixed inset-x-2 top-2 z-50 flex h-14 items-center gap-2 rounded-2xl border border-white/10 bg-[#0B2D54] p-2 shadow-[0_18px_45px_rgba(11,45,84,0.22)] lg:inset-y-4 lg:left-4 lg:right-auto lg:h-[calc(100vh-2rem)] lg:w-[64px] lg:flex-col lg:rounded-[26px] lg:p-2">
+    <div ref={menuRef} className="fixed inset-x-2 top-2 z-50 flex h-14 items-center gap-2 rounded-2xl border border-white/10 bg-[#0B2D54] p-2 shadow-[0_18px_45px_rgba(11,45,84,0.22)] lg:top-4 lg:left-4 lg:right-auto lg:h-[448px] lg:w-[64px] lg:flex-col lg:rounded-[26px] lg:p-2">
       <nav className="flex min-w-0 flex-1 items-center justify-center gap-1 lg:h-full lg:flex-col lg:items-stretch lg:justify-start lg:gap-1" aria-label="Primary health navigation">
         {PRIMARY_NAV.map(({ href, label, icon: Icon }) => {
           const isActive = pathname === href || (href === "/dashboard" && pathname === "/");
