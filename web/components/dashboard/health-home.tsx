@@ -400,39 +400,32 @@ export default function HealthHome() {
           </aside>
 
           <section className="min-w-0 bg-white">
-            <div className="px-4 pb-7 pt-5 sm:px-6 lg:px-8">
-              <header className="flex items-end justify-between gap-4">
-                <div>
-                  <p className="text-[9px] font-black uppercase tracking-[0.2em] text-slate-400">Primary</p>
-                  <h1 className="mt-0.5 text-[26px] font-black tracking-[-0.05em] text-[#0B2D54] sm:text-[31px]">
-                    Dashboard
-                  </h1>
-                </div>
-
+            <div className="px-4 pb-5 pt-3 sm:px-5 lg:px-7">
+              <div className="flex justify-end">
                 <ActionLink
                   href="/smart-file"
-                  className="inline-flex min-h-10 items-center gap-2 rounded-2xl bg-[#0B2D54] px-4 py-2.5 text-[10px] font-black uppercase tracking-[0.08em] text-white shadow-[0_10px_24px_rgba(11,45,84,0.12)] transition-all hover:-translate-y-0.5 hover:bg-[#092544]"
+                  className="inline-flex min-h-9 items-center gap-2 rounded-2xl bg-[#0B2D54] px-3.5 py-2 text-[9px] font-black uppercase tracking-[0.08em] text-white shadow-[0_8px_20px_rgba(11,45,84,0.10)] transition-all hover:-translate-y-0.5 hover:bg-[#092544]"
                 >
                   <FileHeart className="h-3.5 w-3.5" aria-hidden="true" />
                   <span className="hidden sm:inline">Share Smart File</span>
                   <span className="sm:hidden">Share</span>
                 </ActionLink>
-              </header>
+              </div>
 
-              <div className="mt-5 grid gap-4 xl:grid-cols-[minmax(0,1.7fr)_minmax(290px,0.8fr)]">
-                <section className="group relative min-h-[318px] overflow-hidden rounded-[28px] bg-gradient-to-br from-[#0B2D54] via-[#143D67] to-[#0F6173] p-5 text-white shadow-[0_24px_60px_rgba(11,45,84,0.16)] sm:p-6">
+              <div className="mt-3 grid gap-3 xl:grid-cols-[minmax(0,1.7fr)_minmax(290px,0.8fr)]">
+                <section className="group relative min-h-[230px] overflow-hidden rounded-[28px] bg-gradient-to-br from-[#0B2D54] via-[#143D67] to-[#0F6173] p-5 text-white shadow-[0_24px_60px_rgba(11,45,84,0.16)] sm:p-6">
                   <div aria-hidden="true" className="pointer-events-none absolute -right-24 -top-24 h-80 w-80 rounded-full bg-[#24C1C4]/20 blur-3xl transition-transform duration-500 group-hover:scale-110" />
                   <div aria-hidden="true" className="pointer-events-none absolute -bottom-28 left-1/3 h-64 w-64 rounded-full bg-white/[0.06] blur-3xl" />
                   <div aria-hidden="true" className="pointer-events-none absolute inset-x-7 top-0 h-px bg-white/20" />
 
-                  <div className="relative flex min-h-[278px] flex-col justify-between">
+                  <div className="relative flex min-h-[202px] flex-col justify-between">
                     <div className="flex items-start justify-between gap-5">
                       <div className="max-w-[38rem]">
                         <p className="text-[9px] font-black uppercase tracking-[0.18em] text-white/48">Overview</p>
-                        <h2 className="mt-2 text-[31px] font-black tracking-[-0.055em] sm:text-[40px]">
+                        <h2 className="mt-1.5 text-[28px] font-black tracking-[-0.05em] sm:text-[34px]">
                           Good day, {firstName}
                         </h2>
-                        <p className="mt-2 max-w-[31rem] text-[12px] font-medium leading-5 text-white/66">
+                        <p className="mt-1.5 max-w-[31rem] text-[11px] font-medium leading-5 text-white/66">
                           Your health, organised around what matters today.
                         </p>
                       </div>
@@ -443,16 +436,16 @@ export default function HealthHome() {
 
                     <div className="flex flex-wrap items-end justify-between gap-5">
                       <div className="flex items-end gap-3">
-                        <p className="text-[76px] font-black leading-[0.76] tracking-[-0.09em] sm:text-[86px]">
+                        <p className="text-[62px] font-black leading-[0.78] tracking-[-0.08em] sm:text-[70px]">
                           {todayActionCount}
                         </p>
                         <div className="pb-1">
-                          <p className="max-w-[15rem] text-[11px] font-black leading-4 text-white/74">
+                          <p className="max-w-[13rem] text-[10px] font-black leading-4 text-white/74">
                             active items that need your attention today
                           </p>
                           <ActionLink
                             href="/today"
-                            className="mt-3 inline-flex min-h-10 items-center gap-2 rounded-full bg-[#24C1C4] px-4 py-2 text-[10px] font-black uppercase tracking-[0.08em] text-[#0B2D54] shadow-[0_12px_28px_rgba(36,193,196,0.22)] transition-all hover:-translate-y-0.5 hover:shadow-[0_16px_34px_rgba(36,193,196,0.32)]"
+                            className="mt-2 inline-flex min-h-9 items-center gap-2 rounded-full bg-[#24C1C4] px-4 py-2 text-[10px] font-black uppercase tracking-[0.08em] text-[#0B2D54] shadow-[0_12px_28px_rgba(36,193,196,0.22)] transition-all hover:-translate-y-0.5 hover:shadow-[0_16px_34px_rgba(36,193,196,0.32)]"
                           >
                             Open today
                             <ArrowRight className="h-3.5 w-3.5" aria-hidden="true" />
@@ -476,12 +469,12 @@ export default function HealthHome() {
                   </div>
                 </section>
 
-                <section className="group relative min-h-[318px] overflow-hidden rounded-[28px] bg-gradient-to-br from-[#29CFD0] via-[#20BBC0] to-[#0A9DA7] p-5 text-white shadow-[0_24px_60px_rgba(36,193,196,0.20)] ring-1 ring-inset ring-white/25 sm:p-6">
+                <section className="group relative min-h-[230px] overflow-hidden rounded-[28px] bg-gradient-to-br from-[#29CFD0] via-[#20BBC0] to-[#0A9DA7] p-5 text-white shadow-[0_24px_60px_rgba(36,193,196,0.20)] ring-1 ring-inset ring-white/25 sm:p-6">
                   <div aria-hidden="true" className="pointer-events-none absolute -right-20 -top-20 h-64 w-64 rounded-full bg-white/45 blur-3xl transition-transform duration-500 group-hover:scale-110" />
                   <div aria-hidden="true" className="pointer-events-none absolute -left-20 -bottom-24 h-56 w-56 rounded-full bg-[#C9FFFF]/35 blur-3xl" />
                   <div aria-hidden="true" className="pointer-events-none absolute inset-x-7 top-0 h-px bg-white/75" />
 
-                  <div className="relative flex min-h-[278px] flex-col justify-between">
+                  <div className="relative flex min-h-[202px] flex-col justify-between">
                     <div className="flex items-start justify-between gap-4">
                       <span className="grid h-12 w-12 place-items-center rounded-2xl bg-white/20 ring-1 ring-inset ring-white/45 shadow-[0_0_30px_rgba(255,255,255,0.20)] transition-transform duration-300 group-hover:scale-105">
                         <HeartPulse className="h-5 w-5 text-white drop-shadow-[0_0_9px_rgba(255,255,255,0.80)]" aria-hidden="true" />
@@ -500,7 +493,7 @@ export default function HealthHome() {
                         <>
                           <div className="mt-2 flex items-start justify-between gap-3">
                             <div className="min-w-0">
-                              <h2 className="truncate text-[27px] font-black tracking-[-0.05em]">
+                              <h2 className="truncate text-[23px] font-black tracking-[-0.045em]">
                                 {symptomLabel(recentSymptom)}
                               </h2>
                               <p className="mt-1 text-[11px] font-semibold text-white/76">
@@ -515,7 +508,7 @@ export default function HealthHome() {
                             )}
                           </div>
 
-                          <div className="mt-4 flex flex-wrap gap-2">
+                          <div className="mt-3 flex flex-wrap gap-2">
                             <Link
                               href={
                                 recentSymptomStatus === "ACTIVE"
