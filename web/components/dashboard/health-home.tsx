@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import type { ReactNode } from "react";
-import { ArrowRight, Bell, CheckCircle2, ChevronRight, FolderOpen, HeartPulse, House, ShieldCheck, Sparkles, UserRound } from "lucide-react";
+import { ArrowRight, Bell, CheckCircle2, FolderOpen, HeartPulse, House, ShieldCheck, Sparkles, UserRound } from "lucide-react";
 import { useDashboard } from "@/hooks/use-dashboard";
 import ProtectedRoute from "@/components/auth/protected-route";
 
@@ -60,16 +60,6 @@ function itemNames(
     )
     .filter(Boolean) as string[];
 }
-
-function countActiveGoals(data: any) {
-  return (Array.isArray(data?.goals) ? data.goals : []).filter(
-    (goal: any) =>
-      !["ACHIEVED", "ARCHIVED", "CANCELLED", "DELETED"].includes(
-        String(goal?.status ?? "").toUpperCase(),
-      ),
-  ).length;
-}
-
 
 function ActionLink({
   href,
@@ -154,23 +144,12 @@ export default function HealthHome() {
     data.profile?.firstName ||
     "Dankie";
 
-  const medications = Array.isArray(data.today?.activeMedications)
-    ? data.today.activeMedications
-    : [];
-  const appointments = Array.isArray(data.today?.upcomingAppointments)
-    ? data.today.upcomingAppointments
-    : [];
-
-  const activeGoalCount = countActiveGoals(data);
-  const todayActionCount = medications.length + appointments.length + activeGoalCount;
-
-
 
   return (
     <ProtectedRoute>
-      <main className="min-h-screen bg-[#F8FAFC] text-[#16324A]">
+      <main className="min-h-screen bg-[#F7FBFB] text-[#0B2D54]">
         <div className="mx-auto grid max-w-[1500px] grid-cols-1 gap-4 px-3 pb-8 pt-20 sm:px-5 sm:pt-24 lg:grid-cols-[82px_minmax(0,1fr)] lg:gap-5">
-          <aside className="hidden lg:sticky lg:top-24 lg:flex lg:h-[calc(100vh-8rem)] lg:flex-col lg:items-center lg:justify-between lg:rounded-3xl lg:bg-gradient-to-b lg:from-[#0F5A62] lg:to-[#177E89] lg:px-2.5 lg:py-4 lg:shadow-[0_10px_40px_rgba(0,0,0,0.02)]">
+          <aside className="hidden lg:sticky lg:top-24 lg:flex lg:h-[calc(100vh-8rem)] lg:flex-col lg:items-center lg:justify-between lg:rounded-3xl lg:bg-gradient-to-b lg:from-[#0B2D54] lg:to-[#24C1C4] lg:px-2.5 lg:py-4 lg:shadow-[0_10px_40px_rgba(0,0,0,0.02)]">
             <div className="flex w-full flex-col items-center gap-2">
               <div className="grid h-11 w-11 place-items-center rounded-2xl bg-white/10 ring-1 ring-white/15">
                 <HeartPulse className="h-5 w-5 text-[#9AF6F4]" aria-hidden="true" />
@@ -188,7 +167,7 @@ export default function HealthHome() {
                   href={href}
                   ariaLabel={label}
                   className={
-                    `grid h-11 w-11 place-items-center rounded-2xl ${index === 0 ? "bg-white text-[#0F5A62] shadow-sm" : "text-white/[0.72] hover:bg-white/10 hover:text-white"}`
+                    `grid h-11 w-11 place-items-center rounded-2xl ${index === 0 ? "bg-white text-[#0B2D54] shadow-sm" : "text-white/[0.72] hover:bg-white/10 hover:text-white"}`
                   }
                 >
                   <Icon className="h-[18px] w-[18px]" aria-hidden="true" />
@@ -210,20 +189,17 @@ export default function HealthHome() {
           <section className="min-w-0 space-y-5">
             <div className="flex items-end justify-between gap-4 px-1">
               <div className="min-w-0">
-                <p className="text-[11px] font-black uppercase tracking-[0.18em] text-[#177E89]">
+                <p className="text-[11px] font-black uppercase tracking-[0.18em] text-[#24C1C4]">
                   Sympto workspace
                 </p>
                 <h1 className="mt-1 text-[30px] font-black tracking-[-0.05em] text-[#0B2D54] sm:text-[36px]">
                   Good day, {firstName}
                 </h1>
-                <p className="mt-1 text-[13px] font-medium text-[#7C8D9B]">
-                  Your health, organised around what matters today.
-                </p>
               </div>
 
               <ActionLink
                 href="/today"
-                className="hidden shrink-0 items-center gap-2 rounded-full bg-[#0F5A62] px-4 py-2.5 text-[11px] font-black text-white shadow-[0_8px_22px_rgba(15,90,98,0.12)] hover:bg-[#177E89] sm:inline-flex"
+                className="hidden shrink-0 items-center gap-2 rounded-full bg-[#0B2D54] px-4 py-2.5 text-[11px] font-black text-white shadow-[0_8px_22px_rgba(15,90,98,0.12)] hover:bg-[#0B2D54] sm:inline-flex"
               >
                 Open today
                 <ArrowRight className="h-3.5 w-3.5" aria-hidden="true" />
@@ -231,119 +207,82 @@ export default function HealthHome() {
             </div>
 
             <div className="grid gap-5 xl:grid-cols-[minmax(0,1.65fr)_minmax(320px,0.85fr)]">
-              <section className="group relative overflow-hidden rounded-[32px] bg-[#177E89] p-5 text-white shadow-[0_10px_40px_rgba(0,0,0,0.02)] sm:p-7">
+              <section className="group relative overflow-hidden rounded-[32px] bg-[#0B2D54] p-5 text-white shadow-[0_14px_44px_rgba(11,45,84,0.14)] sm:p-7">
                 <div
                   aria-hidden="true"
                   className="pointer-events-none absolute -right-16 -top-20 h-64 w-64 rounded-full bg-[#24C1C4]/20 blur-3xl"
                 />
                 <div
                   aria-hidden="true"
-                  className="pointer-events-none absolute -bottom-20 left-1/3 h-48 w-48 rounded-full bg-white/[0.08] blur-3xl"
-                />
-                <div
-                  aria-hidden="true"
-                  className="pointer-events-none absolute inset-0 bg-[linear-gradient(90deg,rgba(255,255,255,0.045)_1px,transparent_1px),linear-gradient(rgba(255,255,255,0.045)_1px,transparent_1px)] bg-[size:34px_34px]"
+                  className="pointer-events-none absolute -bottom-20 left-1/3 h-48 w-48 rounded-full bg-[#24C1C4]/10 blur-3xl"
                 />
 
-                <div className="relative">
+                <div className="relative flex min-h-[176px] flex-col justify-between gap-8">
                   <div className="flex items-start justify-between gap-4">
                     <div>
-                      <div className="inline-flex items-center gap-2 rounded-full bg-white/[0.08] px-3 py-1.5 ring-1 ring-white/10 backdrop-blur-sm">
+                      <span className="inline-flex items-center gap-2 rounded-full bg-white/10 px-3 py-1.5 ring-1 ring-white/10">
                         <span className="h-1.5 w-1.5 rounded-full bg-[#24C1C4] shadow-[0_0_12px_rgba(36,193,196,0.75)]" />
-                        <span className="text-[9px] font-black uppercase tracking-[0.16em] text-white/[0.75]">
+                        <span className="text-[9px] font-black uppercase tracking-[0.16em] text-white/80">
                           Today
                         </span>
-                      </div>
-                      <p className="mt-4 text-[11px] font-black uppercase tracking-[0.15em] text-[#A5F6F3]">
-                        Daily care pulse
-                      </p>
-                      <h2 className="mt-1 text-[16px] font-semibold tracking-[-0.02em] text-white/[0.82]">
-                        Start with what needs you now.
+                      </span>
+                      <h2 className="mt-5 text-[42px] font-black tracking-[-0.06em] sm:text-[52px]">
+                        Today
                       </h2>
                     </div>
 
-                    <div className="hidden h-12 w-12 place-items-center rounded-2xl bg-white/[0.08] ring-1 ring-white/10 sm:grid">
-                      <CheckCircle2 className="h-5 w-5 text-[#9AF6F4]" aria-hidden="true" />
-                    </div>
+                    <span className="hidden h-12 w-12 place-items-center rounded-2xl bg-white/10 ring-1 ring-white/10 sm:grid">
+                      <CheckCircle2 className="h-5 w-5 text-[#24C1C4]" aria-hidden="true" />
+                    </span>
                   </div>
 
-                  <div className="mt-9 flex flex-wrap items-end justify-between gap-6">
-                    <div className="flex items-end gap-3">
-                      <span className="text-[68px] font-black leading-[0.84] tracking-[-0.09em]">
-                        {todayActionCount}
-                      </span>
-                      <div className="pb-1.5">
-                        <p className="text-[11px] font-black uppercase tracking-[0.13em] text-white/55">
-                          active items
-                        </p>
-                        <p className="mt-1 text-[12px] font-semibold text-white/[0.72]">
-                          across your care today
-                        </p>
-                      </div>
-                    </div>
-
-                    <ActionLink
-                      href="/today"
-                      className="inline-flex min-h-11 items-center gap-2 rounded-full bg-white px-4 py-2.5 text-[10px] font-black uppercase tracking-[0.08em] text-[#0F5A62] shadow-[0_10px_24px_rgba(0,0,0,0.08)] transition-transform hover:-translate-y-0.5"
-                    >
-                      Open today
-                      <ArrowRight className="h-3.5 w-3.5 text-[#24C1C4]" aria-hidden="true" />
-                    </ActionLink>
-                  </div>
+                  <ActionLink
+                    href="/today"
+                    className="inline-flex w-fit items-center gap-2 rounded-full bg-[#24C1C4] px-4 py-2.5 text-[10px] font-black uppercase tracking-[0.08em] text-[#0B2D54] shadow-[0_10px_24px_rgba(36,193,196,0.18)] transition-transform hover:-translate-y-0.5"
+                  >
+                    Open today
+                    <ArrowRight className="h-3.5 w-3.5" aria-hidden="true" />
+                  </ActionLink>
                 </div>
               </section>
 
-              <div className="grid gap-4">
-                <ActionLink
-                  href="/log-symptom"
-                  className="group relative flex min-h-[176px] flex-col justify-between overflow-hidden rounded-[32px] bg-[#24C1C4] p-5 text-white shadow-[0_10px_40px_rgba(0,0,0,0.02)] sm:p-6"
-                >
-                  <div
-                    aria-hidden="true"
-                    className="pointer-events-none absolute -right-12 -top-16 h-44 w-44 rounded-full bg-white/[0.18] blur-3xl transition-transform duration-300 group-hover:scale-110"
-                  />
-                  <div className="relative flex items-start justify-between gap-4">
-                    <span className="grid h-12 w-12 place-items-center rounded-2xl bg-white/[0.14] ring-1 ring-white/25 backdrop-blur-sm">
-                      <HeartPulse className="h-5 w-5 text-white" aria-hidden="true" />
-                    </span>
-                    <span className="rounded-full bg-white/[0.12] px-3 py-1.5 text-[9px] font-black uppercase tracking-[0.11em] text-white/[0.85] ring-1 ring-white/15">
-                      Quick action
-                    </span>
-                  </div>
-                  <div className="relative">
-                    <p className="text-[9px] font-black uppercase tracking-[0.17em] text-[#0F5A62]">
-                      Monitor
-                    </p>
-                    <p className="mt-1 text-[22px] font-black tracking-[-0.045em]">
-                      Log a symptom
-                    </p>
-                    <p className="mt-1 text-[11px] leading-5 text-white/[0.78]">
-                      Capture how you feel in a few taps.
-                    </p>
-                  </div>
-                </ActionLink>
-              </div>
+              <ActionLink
+                href="/log-symptom"
+                className="group relative flex min-h-[176px] flex-col justify-between overflow-hidden rounded-[32px] bg-[#24C1C4] p-5 text-[#0B2D54] shadow-[0_14px_44px_rgba(36,193,196,0.12)] sm:p-6"
+              >
+                <div
+                  aria-hidden="true"
+                  className="pointer-events-none absolute -right-12 -top-16 h-44 w-44 rounded-full bg-white/25 blur-3xl transition-transform duration-300 group-hover:scale-110"
+                />
+                <div className="relative flex items-start justify-between gap-4">
+                  <span className="grid h-12 w-12 place-items-center rounded-2xl bg-white/30 ring-1 ring-white/35">
+                    <HeartPulse className="h-5 w-5" aria-hidden="true" />
+                  </span>
+                  <ArrowRight className="mt-1 h-4 w-4 transition-transform group-hover:translate-x-1" aria-hidden="true" />
+                </div>
+
+                <div className="relative">
+                  <p className="text-[9px] font-black uppercase tracking-[0.17em] text-[#0B2D54]/70">
+                    Monitor
+                  </p>
+                  <p className="mt-1 text-[24px] font-black tracking-[-0.05em]">
+                    Log a symptom
+                  </p>
+                </div>
+              </ActionLink>
             </div>
 
-            <section className="relative overflow-hidden rounded-[34px] bg-gradient-to-br from-[#E9F8F7] via-white to-[#F7FAFC] p-[1px] shadow-[0_10px_40px_rgba(0,0,0,0.02)]">
+            <section className="relative overflow-hidden rounded-[34px] bg-gradient-to-br from-[#E8F8F7] via-white to-[#F7FBFB] p-[1px] shadow-[0_10px_40px_rgba(11,45,84,0.04)]">
               <div
                 aria-hidden="true"
                 className="pointer-events-none absolute -left-20 bottom-0 h-40 w-40 rounded-full bg-[#24C1C4]/10 blur-3xl"
               />
-              <div className="relative rounded-[33px] bg-white/90 p-4 backdrop-blur-sm sm:p-5">
-                <div className="flex items-end justify-between gap-4 px-1 pb-4">
-                  <div>
-                    <div className="flex items-center gap-2">
-                      <span className="h-1.5 w-1.5 rounded-full bg-[#24C1C4] shadow-[0_0_10px_rgba(36,193,196,0.65)]" />
-                      <p className="text-[9px] font-black uppercase tracking-[0.17em] text-[#177E89]">
-                        Your health, at a glance
-                      </p>
-                    </div>
-                    <p className="mt-1 text-[12px] font-medium text-[#8A99A8]">
-                      Three destinations. One health workspace.
-                    </p>
-                  </div>
-                  <span className="hidden items-center gap-1.5 rounded-full bg-[#F3F8F9] px-3 py-1.5 text-[9px] font-black uppercase tracking-[0.1em] text-[#6F848B] sm:inline-flex">
+              <div className="relative rounded-[33px] bg-white/95 p-4 backdrop-blur-sm sm:p-5">
+                <div className="flex items-center justify-between gap-4 px-1 pb-4">
+                  <p className="text-[10px] font-black uppercase tracking-[0.17em] text-[#0B2D54]">
+                    Your health
+                  </p>
+                  <span className="hidden items-center gap-1.5 rounded-full bg-[#F7FBFB] px-3 py-1.5 text-[9px] font-black uppercase tracking-[0.1em] text-[#71839A] sm:inline-flex">
                     Sympto
                     <Sparkles className="h-3 w-3 text-[#24C1C4]" aria-hidden="true" />
                   </span>
@@ -352,94 +291,82 @@ export default function HealthHome() {
                 <div className="grid gap-3 md:grid-cols-3">
                   <ActionLink
                     href="/today"
-                    className="group relative min-h-[180px] overflow-hidden rounded-[26px] border border-[#B9E5E2] bg-gradient-to-br from-[#F1FBFA] via-white to-[#E8F8F7] p-5 shadow-[0_10px_30px_rgba(15,90,98,0.045)] transition-all duration-200 hover:-translate-y-0.5 hover:shadow-[0_18px_36px_rgba(15,90,98,0.10)]"
+                    className="group relative min-h-[166px] overflow-hidden rounded-[26px] border border-[#B9E5E2] bg-gradient-to-br from-[#F7FBFB] via-white to-[#E8F8F7] p-5 shadow-[0_10px_30px_rgba(11,45,84,0.045)] transition-all duration-200 hover:-translate-y-0.5 hover:shadow-[0_18px_36px_rgba(11,45,84,0.09)]"
                   >
                     <div className="pointer-events-none absolute -right-8 -top-8 h-24 w-24 rounded-full bg-[#24C1C4]/15 blur-2xl" />
-                    <div className="relative flex h-full flex-col">
-                      <div className="flex items-start justify-between gap-3">
-                        <span className="grid h-11 w-11 place-items-center rounded-2xl bg-[#DDF7F5] ring-1 ring-[#24C1C4]/25">
-                          <CheckCircle2 className="h-5 w-5 text-[#0F5A62]" aria-hidden="true" />
-                        </span>
-                        <span className="text-[8px] font-black uppercase tracking-[0.12em] text-[#177E89]">
-                          Daily care
-                        </span>
-                      </div>
-                      <div className="mt-auto pt-8">
-                        <h2 className="text-[22px] font-black tracking-[-0.045em] text-[#0B2D54]">Today</h2>
-                        <p className="mt-1 text-[11px] leading-5 text-[#71839A]">
-                          What you need to do, monitor and follow up today.
-                        </p>
-                        <div className="mt-4 flex items-center justify-between gap-3">
-                          <span className="text-[9px] font-black uppercase tracking-[0.12em] text-[#0F5A62]">Open today</span>
-                          <span className="grid h-8 w-8 place-items-center rounded-full bg-[#0F5A62] text-white transition-transform group-hover:translate-x-1">
-                            <ArrowRight className="h-3.5 w-3.5" aria-hidden="true" />
-                          </span>
+                    <div className="relative flex h-full flex-col justify-between gap-8">
+                      <span className="grid h-11 w-11 place-items-center rounded-2xl bg-[#E8F8F7] ring-1 ring-[#24C1C4]/25">
+                        <CheckCircle2 className="h-5 w-5 text-[#0B2D54]" aria-hidden="true" />
+                      </span>
+                      <div className="flex items-end justify-between gap-3">
+                        <div>
+                          <p className="text-[8px] font-black uppercase tracking-[0.12em] text-[#0B7B80]">
+                            Daily care
+                          </p>
+                          <h2 className="mt-1 text-[22px] font-black tracking-[-0.045em] text-[#0B2D54]">
+                            Today
+                          </h2>
                         </div>
+                        <span className="grid h-8 w-8 place-items-center rounded-full bg-[#0B2D54] text-white transition-transform group-hover:translate-x-1">
+                          <ArrowRight className="h-3.5 w-3.5" aria-hidden="true" />
+                        </span>
                       </div>
                     </div>
                   </ActionLink>
 
                   <ActionLink
                     href="/health-passport"
-                    className="group relative min-h-[180px] overflow-hidden rounded-[26px] border border-[#EFCACA] bg-gradient-to-br from-[#FFF4F4] via-white to-[#FFF9F9] p-5 shadow-[0_10px_30px_rgba(180,35,24,0.04)] transition-all duration-200 hover:-translate-y-0.5 hover:shadow-[0_18px_36px_rgba(180,35,24,0.09)]"
+                    className="group relative min-h-[166px] overflow-hidden rounded-[26px] border border-[#EFCACA] bg-gradient-to-br from-[#FFF4F4] via-white to-[#FFF9F9] p-5 shadow-[0_10px_30px_rgba(180,35,24,0.04)] transition-all duration-200 hover:-translate-y-0.5 hover:shadow-[0_18px_36px_rgba(180,35,24,0.09)]"
                   >
                     <div className="pointer-events-none absolute -right-8 -top-8 h-24 w-24 rounded-full bg-[#E53935]/12 blur-2xl" />
-                    <div className="relative flex h-full flex-col">
-                      <div className="flex items-start justify-between gap-3">
-                        <span className="grid h-11 w-11 place-items-center rounded-2xl bg-[#FFE6E6] ring-1 ring-[#E53935]/22">
-                          <ShieldCheck className="h-5 w-5 text-[#C62828]" aria-hidden="true" />
-                        </span>
-                        <span className="text-[8px] font-black uppercase tracking-[0.12em] text-[#C62828]">
-                          My Clinic Card
-                        </span>
-                      </div>
-                      <div className="mt-auto pt-8">
-                        <h2 className="text-[22px] font-black tracking-[-0.045em] text-[#0B2D54]">Essentials</h2>
-                        <p className="mt-1 text-[11px] leading-5 text-[#71839A]">
-                          The essential information to keep ready for care.
-                        </p>
-                        <div className="mt-4 flex items-center justify-between gap-3">
-                          <span className="text-[9px] font-black uppercase tracking-[0.12em] text-[#C62828]">Open clinic card</span>
-                          <span className="grid h-8 w-8 place-items-center rounded-full bg-[#C62828] text-white transition-transform group-hover:translate-x-1">
-                            <ArrowRight className="h-3.5 w-3.5" aria-hidden="true" />
-                          </span>
+                    <div className="relative flex h-full flex-col justify-between gap-8">
+                      <span className="grid h-11 w-11 place-items-center rounded-2xl bg-[#FFE6E6] ring-1 ring-[#E53935]/22">
+                        <ShieldCheck className="h-5 w-5 text-[#C62828]" aria-hidden="true" />
+                      </span>
+                      <div className="flex items-end justify-between gap-3">
+                        <div>
+                          <p className="text-[8px] font-black uppercase tracking-[0.12em] text-[#C62828]">
+                            Clinic Card
+                          </p>
+                          <h2 className="mt-1 text-[22px] font-black tracking-[-0.045em] text-[#0B2D54]">
+                            Essentials
+                          </h2>
                         </div>
+                        <span className="grid h-8 w-8 place-items-center rounded-full bg-[#C62828] text-white transition-transform group-hover:translate-x-1">
+                          <ArrowRight className="h-3.5 w-3.5" aria-hidden="true" />
+                        </span>
                       </div>
                     </div>
                   </ActionLink>
 
                   <ActionLink
                     href="/health-journal"
-                    className="group relative min-h-[180px] overflow-hidden rounded-[26px] border border-[#BFD9DA] bg-gradient-to-br from-[#F1F9F8] via-white to-[#F7FBFB] p-5 shadow-[0_10px_30px_rgba(15,90,98,0.045)] transition-all duration-200 hover:-translate-y-0.5 hover:shadow-[0_18px_36px_rgba(15,90,98,0.10)]"
+                    className="group relative min-h-[166px] overflow-hidden rounded-[26px] border border-[#B9E5E2] bg-gradient-to-br from-[#F7FBFB] via-white to-[#E8F8F7] p-5 shadow-[0_10px_30px_rgba(11,45,84,0.045)] transition-all duration-200 hover:-translate-y-0.5 hover:shadow-[0_18px_36px_rgba(11,45,84,0.09)]"
                   >
-                    <div className="pointer-events-none absolute -right-8 -top-8 h-24 w-24 rounded-full bg-[#177E89]/12 blur-2xl" />
-                    <div className="relative flex h-full flex-col">
-                      <div className="flex items-start justify-between gap-3">
-                        <span className="grid h-11 w-11 place-items-center rounded-2xl bg-[#E4F3F3] ring-1 ring-[#0F5A62]/20">
-                          <FolderOpen className="h-5 w-5 text-[#0F5A62]" aria-hidden="true" />
-                        </span>
-                        <span className="text-[8px] font-black uppercase tracking-[0.12em] text-[#0F5A62]">
-                          My history & papers
-                        </span>
-                      </div>
-                      <div className="mt-auto pt-8">
-                        <h2 className="text-[22px] font-black tracking-[-0.045em] text-[#0B2D54]">Records</h2>
-                        <p className="mt-1 text-[11px] leading-5 text-[#71839A]">
-                          Your health story, results and documents in one place.
-                        </p>
-                        <div className="mt-4 flex items-center justify-between gap-3">
-                          <span className="text-[9px] font-black uppercase tracking-[0.12em] text-[#0F5A62]">Open records</span>
-                          <span className="grid h-8 w-8 place-items-center rounded-full bg-[#0F5A62] text-white transition-transform group-hover:translate-x-1">
-                            <ArrowRight className="h-3.5 w-3.5" aria-hidden="true" />
-                          </span>
+                    <div className="pointer-events-none absolute -right-8 -top-8 h-24 w-24 rounded-full bg-[#24C1C4]/12 blur-2xl" />
+                    <div className="relative flex h-full flex-col justify-between gap-8">
+                      <span className="grid h-11 w-11 place-items-center rounded-2xl bg-[#E8F8F7] ring-1 ring-[#24C1C4]/20">
+                        <FolderOpen className="h-5 w-5 text-[#0B2D54]" aria-hidden="true" />
+                      </span>
+                      <div className="flex items-end justify-between gap-3">
+                        <div>
+                          <p className="text-[8px] font-black uppercase tracking-[0.12em] text-[#0B7B80]">
+                            Health Journal
+                          </p>
+                          <h2 className="mt-1 text-[22px] font-black tracking-[-0.045em] text-[#0B2D54]">
+                            Records
+                          </h2>
                         </div>
+                        <span className="grid h-8 w-8 place-items-center rounded-full bg-[#0B2D54] text-white transition-transform group-hover:translate-x-1">
+                          <ArrowRight className="h-3.5 w-3.5" aria-hidden="true" />
+                        </span>
                       </div>
                     </div>
                   </ActionLink>
                 </div>
               </div>
             </section>
-          </section>
+
         </div>
       </main>
       </ProtectedRoute>
