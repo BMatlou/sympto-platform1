@@ -275,7 +275,7 @@ export default function HealthHome() {
 
           <section className="min-w-0 space-y-5">
             <div className="grid gap-5 xl:grid-cols-[minmax(0,1.65fr)_minmax(320px,0.85fr)]">
-              <section className="group relative overflow-hidden rounded-[32px] bg-[#0B2D54] p-5 text-white shadow-[0_18px_52px_rgba(11,45,84,0.14)] sm:p-7">
+              <section className="group relative overflow-hidden rounded-[32px] bg-[#0B2D54] p-5 text-white shadow-[0_18px_52px_rgba(11,45,84,0.14)] sm:p-6">
                 <div
                   aria-hidden="true"
                   className="pointer-events-none absolute -right-24 -top-24 h-80 w-80 rounded-full bg-[#24C1C4]/20 blur-3xl"
@@ -285,7 +285,7 @@ export default function HealthHome() {
                   className="pointer-events-none absolute -bottom-28 left-1/3 h-56 w-56 rounded-full bg-white/[0.07] blur-3xl"
                 />
 
-                <div className="relative flex min-h-[232px] flex-col justify-between gap-8">
+                <div className="relative flex min-h-[196px] flex-col justify-between gap-6">
                   <div className="flex items-start justify-between gap-6">
                     <div className="max-w-[34rem]">
                       <h2 className="text-[34px] font-black tracking-[-0.055em] sm:text-[44px]">
@@ -319,7 +319,7 @@ export default function HealthHome() {
                 </div>
               </section>
 
-              <section className="group relative flex min-h-[232px] flex-col justify-between overflow-hidden rounded-[32px] bg-[#24C1C4] p-5 text-[#0B2D54] shadow-[0_18px_52px_rgba(36,193,196,0.15)] sm:p-6">
+              <section className="group relative flex min-h-[196px] flex-col justify-between overflow-hidden rounded-[32px] bg-[#24C1C4] p-5 text-[#0B2D54] shadow-[0_18px_52px_rgba(36,193,196,0.15)] sm:p-5">
                 <div
                   aria-hidden="true"
                   className="pointer-events-none absolute -right-14 -top-20 h-52 w-52 rounded-full bg-white/25 blur-3xl transition-transform duration-300 group-hover:scale-110"
