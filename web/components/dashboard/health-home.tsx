@@ -105,7 +105,6 @@ function DashboardCard({
   footerLabel,
   icon: Icon,
   accent,
-  accentBg,
   softAccent,
   iconBg,
   border,
@@ -118,7 +117,6 @@ function DashboardCard({
   footerLabel: string;
   icon: typeof CheckCircle2;
   accent: string;
-  accentBg: string;
   softAccent: string;
   iconBg: string;
   border: string;
@@ -130,7 +128,6 @@ function DashboardCard({
       className={
         "group flex min-h-[318px] h-full flex-col px-5 py-5 sm:px-6 sm:py-6 " +
         "bg-white transition-colors duration-200 hover:bg-[#FBFEFE] " +
-        border
       }
     >
       <div className="flex items-start gap-3.5">
@@ -431,10 +428,8 @@ export default function HealthHome() {
               description={`What do I do today? ${todayActionCount} ${todayActionCount === 1 ? "thing needs" : "things need"} your attention.`}
               icon={CheckCircle2}
               accent="text-[#0B7B80]"
-              accentBg="bg-[#24C1C4]"
               softAccent="bg-[#E8F8F7]"
               iconBg="bg-[#E8F8F7] ring-1 ring-[#24C1C4]/20"
-              border="border-[#B9E6E4]"
               footerLabel="Open today"
             >
               <div className="grid grid-cols-3 gap-2">
@@ -451,10 +446,8 @@ export default function HealthHome() {
               description="Your essential health information for quick reference and care."
               icon={ShieldCheck}
               accent="text-[#C62828]"
-              accentBg="bg-[#E53935]"
               softAccent="bg-[#FFF0F0]"
               iconBg="bg-[#FFF0F0] ring-1 ring-[#E53935]/20"
-              border="border-[#F0C2C2]"
               footerLabel="Open clinic card"
             >
               <div className="space-y-2">
@@ -481,10 +474,8 @@ export default function HealthHome() {
               description="Your encounters, results and important health documents in one place."
               icon={FolderOpen}
               accent="text-[#2F6FDB]"
-              accentBg="bg-[#4A80E8]"
               softAccent="bg-[#EEF4FF]"
               iconBg="bg-[#EEF4FF] ring-1 ring-[#4A80E8]/20"
-              border="border-[#BED2F4]"
               footerLabel="Open records"
             >
               <div className="grid grid-cols-2 gap-2">
