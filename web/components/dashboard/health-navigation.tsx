@@ -25,16 +25,16 @@ import { useEffect, useRef, useState } from "react";
 
 const PRIMARY_NAV = [
   { href: "/dashboard", label: "Home", icon: House },
-  { href: "/today", label: "Today", icon: ShieldCheck },
-  { href: "/health-passport", label: "Clinic Card", icon: FileHeart },
-  { href: "/health-journal", label: "Health Journal", icon: FileText },
-] as const;
-
-const MORE_NAV = [
   { href: "/health-records", label: "Health Records", icon: FileText },
   { href: "/health-vitals", label: "Vitals & Measurements", icon: Activity },
   { href: "/medications", label: "Medications", icon: Pill },
   { href: "/appointments", label: "Appointments", icon: CalendarDays },
+] as const;
+
+const MORE_NAV = [
+  { href: "/today", label: "Today", icon: ShieldCheck },
+  { href: "/health-passport", label: "Clinic Card", icon: FileHeart },
+  { href: "/health-journal", label: "Health Journal", icon: FileText },
   { href: "/health-goals", label: "Health Goals", icon: HeartPulse },
   { href: "/log-symptom", label: "Log a symptom", icon: HeartPulse },
   { href: "/care-plans", label: "Care Plans", icon: ClipboardList },
