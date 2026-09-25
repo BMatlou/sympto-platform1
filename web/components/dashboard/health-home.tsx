@@ -384,10 +384,22 @@ export default function HealthHome() {
                 </div>
               </section>
 
-              <section className="group relative flex min-h-[196px] flex-col justify-between overflow-hidden rounded-[32px] bg-[#24C1C4] p-5 text-[#0B2D54] shadow-[0_18px_52px_rgba(36,193,196,0.15)] sm:p-5">
+              <section className="group relative flex min-h-[196px] flex-col justify-between overflow-hidden rounded-[32px] bg-gradient-to-br from-[#24C1C4] via-[#24C1C4] to-[#12A7B0] p-5 text-[#0B2D54] shadow-[0_20px_58px_rgba(36,193,196,0.22),inset_0_1px_0_rgba(255,255,255,0.34)] ring-1 ring-inset ring-white/20 sm:p-5">
                 <div
                   aria-hidden="true"
-                  className="pointer-events-none absolute -right-14 -top-20 h-52 w-52 rounded-full bg-white/25 blur-3xl transition-transform duration-300 group-hover:scale-110"
+                  className="pointer-events-none absolute -right-14 -top-20 h-52 w-52 rounded-full bg-white/30 blur-3xl transition-transform duration-300 group-hover:scale-110"
+                />
+                <div
+                  aria-hidden="true"
+                  className="pointer-events-none absolute -left-20 bottom-[-84px] h-44 w-44 rounded-full bg-[#9AF6F4]/30 blur-3xl transition-transform duration-300 group-hover:translate-x-2"
+                />
+                <div
+                  aria-hidden="true"
+                  className="pointer-events-none absolute inset-x-10 top-0 h-px bg-white/60"
+                />
+                <div
+                  aria-hidden="true"
+                  className="pointer-events-none absolute -right-24 top-8 h-28 w-56 rotate-[-18deg] rounded-full bg-white/12 blur-2xl"
                 />
 
                 <div className="relative flex items-start justify-between gap-4">
