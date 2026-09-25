@@ -332,30 +332,7 @@ export default function HealthHome() {
                   </div>
                 </ActionLink>
 
-                <div className="relative overflow-hidden rounded-[32px] border border-[#DDE9EA] bg-white p-5 shadow-[0_10px_40px_rgba(0,0,0,0.02)] sm:p-6">
-                  <div
-                    aria-hidden="true"
-                    className="pointer-events-none absolute -right-16 -top-16 h-36 w-36 rounded-full bg-[#24C1C4]/15 blur-3xl"
-                  />
-                  <div className="relative">
-                    <div className="flex items-center justify-between gap-4">
-                      <div>
-                        <p className="text-[9px] font-black uppercase tracking-[0.16em] text-[#177E89]">
-                          Next focus
-                        </p>
-                        <p className="mt-1 text-[18px] font-black tracking-[-0.035em] text-[#0B2D54]">
-                          {todayActionCount > 0 ? "Start with today." : "You’re clear for now."}
-                        </p>
-                      </div>
-                      <span className="grid h-10 w-10 place-items-center rounded-full bg-[#E7F8F7]">
-                        <Sparkles className="h-4 w-4 text-[#0F5A62]" aria-hidden="true" />
-                      </span>
-                    </div>
-                    <p className="mt-4 max-w-sm text-[11px] leading-5 text-[#71839A]">
-                      Your health workspace keeps each destination focused, so Today, Essentials and Records do not compete with one another.
-                    </p>
-                  </div>
-                </div>
+
               </div>
             </div>
 
