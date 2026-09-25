@@ -500,7 +500,7 @@ export default function HealthHome() {
                       <ArrowRight className="h-4 w-4 text-[#0B2D54] transition-transform group-hover:translate-x-1" aria-hidden="true" />
                     </div>
                     <div className="relative">
-                      <p className="text-[9px] font-black uppercase tracking-[0.14em] text-[#0288D1]">
+                      <p className="text-[9px] font-black uppercase tracking-[0.14em] text-[#24C1C4]">
                         Daily care
                       </p>
                       <div className="mt-1 flex min-w-0 items-center justify-between gap-3">
@@ -560,17 +560,17 @@ export default function HealthHome() {
 
                   <ActionLink
                     href="/health-journal"
-                    className="group relative flex min-h-[164px] flex-col justify-between overflow-hidden rounded-[26px] border border-[#72C8F2] bg-gradient-to-br from-[#F8FCFF] via-white to-[#E8F5FF] p-5 shadow-[0_14px_38px_rgba(2,136,209,0.13),0_0_30px_rgba(2,136,209,0.11)] ring-1 ring-inset ring-white/75 transition-all duration-200 hover:-translate-y-0.5 hover:shadow-[0_20px_44px_rgba(2,136,209,0.21),0_0_40px_rgba(2,136,209,0.16)]"
+                    className="group relative flex min-h-[164px] flex-col justify-between overflow-hidden rounded-[26px] border border-[#7DD3FC] bg-gradient-to-br from-[#F8FCFF] via-white to-[#EAF8FF] p-5 shadow-[0_14px_38px_rgba(0,191,255,0.14),0_0_30px_rgba(0,191,255,0.12)] ring-1 ring-inset ring-white/75 transition-all duration-200 hover:-translate-y-0.5 hover:shadow-[0_20px_44px_rgba(0,191,255,0.23),0_0_40px_rgba(0,191,255,0.18)]"
                   >
-                    <div className="pointer-events-none absolute -right-10 -top-10 h-28 w-28 rounded-full bg-[#0288D1]/24 blur-2xl transition-transform duration-500 group-hover:scale-125" />
+                    <div className="pointer-events-none absolute -right-10 -top-10 h-28 w-28 rounded-full bg-[#00BFFF]/28 blur-2xl transition-transform duration-500 group-hover:scale-125" />
                     <div className="relative flex items-start justify-between">
-                      <span className="grid h-11 w-11 place-items-center rounded-2xl bg-white/85 ring-1 ring-[#0288D1]/25 shadow-[0_0_20px_rgba(2,136,209,0.16)]">
-                        <FolderOpen className="h-5 w-5 text-[#0288D1]" aria-hidden="true" />
+                      <span className="grid h-11 w-11 place-items-center rounded-2xl bg-white/85 ring-1 ring-[#00BFFF]/30 shadow-[0_0_20px_rgba(0,191,255,0.20)]">
+                        <FolderOpen className="h-5 w-5 text-[#00BFFF]" aria-hidden="true" />
                       </span>
-                      <ArrowRight className="h-4 w-4 text-[#0B2D54] transition-transform group-hover:translate-x-1" aria-hidden="true" />
+                      <ArrowRight className="h-4 w-4 text-[#00BFFF] transition-transform group-hover:translate-x-1" aria-hidden="true" />
                     </div>
                     <div className="relative">
-                      <p className="text-[9px] font-black uppercase tracking-[0.14em] text-[#24C1C4]">
+                      <p className="text-[9px] font-black uppercase tracking-[0.14em] text-[#00BFFF]">
                         Health Journal
                       </p>
                       <div className="mt-1 flex min-w-0 items-center justify-between gap-3">
@@ -582,7 +582,7 @@ export default function HealthHome() {
                             {journalChips.map((chip) => (
                               <RecordedChip
                                 key={chip}
-                                className="bg-[#E8F5FF]/90 px-2 py-1 text-[#075985] ring-[#0288D1]/20"
+                                className="bg-[#EAF8FF]/95 px-2 py-1 text-[#0369A1] ring-[#00BFFF]/25"
                               >
                                 {chip}
                               </RecordedChip>
