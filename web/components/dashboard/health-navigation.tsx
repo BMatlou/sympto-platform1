@@ -78,23 +78,34 @@ export default function HealthNavigation() {
 
   useEffect(() => {
     const measureRail = () => {
-      const target = document.getElementById("dashboard-card-stack");
-      if (!target) return;
-      const rect = target.getBoundingClientRect();
+      const hero = document.getElementById("dashboard-hero-row");
+      const healthCards = document.getElementById("dashboard-health-cards");
+      if (!hero || !healthCards) return;
+
+      const heroRect = hero.getBoundingClientRect();
+      const cardsRect = healthCards.getBoundingClientRect();
+      const top = Math.round(heroRect.top);
+      const bottom = Math.round(cardsRect.bottom);
+
+      if (bottom <= top) return;
+
       setRailBounds({
-        top: Math.max(16, Math.round(rect.top)),
-        height: Math.round(rect.height),
+        top,
+        height: bottom - top,
       });
     };
 
-    const scheduleMeasure = () => {
-      window.requestAnimationFrame(measureRail);
-    };
+    const scheduleMeasure = () => window.requestAnimationFrame(measureRail);
 
     scheduleMeasure();
-    const target = document.getElementById("dashboard-card-stack");
-    const observer = target ? new ResizeObserver(scheduleMeasure) : null;
-    if (target && observer) observer.observe(target);
+
+    const hero = document.getElementById("dashboard-hero-row");
+    const healthCards = document.getElementById("dashboard-health-cards");
+    const observer = typeof ResizeObserver !== "undefined" ? new ResizeObserver(scheduleMeasure) : null;
+
+    if (hero) observer?.observe(hero);
+    if (healthCards) observer?.observe(healthCards);
+
     window.addEventListener("resize", scheduleMeasure);
 
     return () => {
