@@ -560,7 +560,7 @@ export default function HealthHome() {
                     />
                     <div className="relative flex items-start justify-between gap-4">
                       <span className="grid h-11 w-11 place-items-center rounded-[15px] bg-white/18 ring-1 ring-inset ring-white/45 shadow-[0_0_26px_rgba(255,255,255,0.28)] transition-all duration-300 group-hover:bg-white/28 group-hover:ring-white/70 group-hover:shadow-[0_0_34px_rgba(11,45,84,0.46),0_0_14px_rgba(255,255,255,0.50)] group-hover:scale-105">
-                        <CheckCircle2 className="h-5 w-5 text-white fill-transparent transition-all duration-300 group-hover:text-[#0B2D54] group-hover:fill-[#0B2D54] group-hover:drop-shadow-[0_0_12px_rgba(11,45,84,0.85)]" aria-hidden="true" />
+                        <CheckCircle2 className="h-5 w-5 text-white fill-transparent transition-all duration-300 group-hover:text-[#24C1C4] group-hover:fill-[#D9FFFE] group-hover:drop-shadow-[0_0_14px_rgba(36,193,196,0.95)]" aria-hidden="true" />
                       </span>
                       <ArrowRight className="mt-1 h-4 w-4 text-white drop-shadow-[0_0_7px_rgba(255,255,255,0.55)] transition-transform duration-200 group-hover:translate-x-1" aria-hidden="true" />
                     </div>
