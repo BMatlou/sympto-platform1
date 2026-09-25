@@ -206,6 +206,18 @@ export default function HealthHome() {
     )
     .slice(0, 3);
 
+  const activeConditions = Array.isArray(data.conditions)
+    ? data.conditions
+    : Array.isArray(data.healthSnapshot?.activeConditions)
+      ? data.healthSnapshot.activeConditions
+      : [];
+
+  const activeAllergies = Array.isArray(data.allergies)
+    ? data.allergies
+    : Array.isArray(data.healthSnapshot?.activeAllergies)
+      ? data.healthSnapshot.activeAllergies
+      : [];
+
   const clinicSummary =
     [
       activeConditions.length
