@@ -398,17 +398,6 @@ export default function HealthHome() {
               </div>
             </div>
 
-            <div className="border-t border-slate-200/80 p-3">
-              <ActionLink
-                href="/smart-file"
-                className="flex min-h-11 items-center gap-3 rounded-2xl bg-[#0B2D54] px-3 py-2.5 text-[11px] font-black text-white shadow-[0_10px_24px_rgba(11,45,84,0.14)] transition-all hover:-translate-y-0.5 hover:bg-[#092544]"
-              >
-                <span className="grid h-8 w-8 place-items-center rounded-xl bg-white/10">
-                  <FileHeart className="h-4 w-4" aria-hidden="true" />
-                </span>
-                Share Smart File
-              </ActionLink>
-            </div>
           </aside>
 
           <section className="min-w-0 bg-white">
