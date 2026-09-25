@@ -262,6 +262,7 @@ export default function HealthHome() {
     : [];
 
   const activeGoalCount = countActiveGoals(data);
+  const todayActionCount = medications.length + appointments.length + activeGoalCount;
   const attentionItems = Array.isArray(data?.attention) ? data.attention : [];
   const priorityItem = attentionItems[0] ?? null;
   const nextAppointment = (appointments[0] ?? null) as any;
@@ -339,11 +340,11 @@ export default function HealthHome() {
                     <div className="grid gap-3 sm:grid-cols-2">
                       <div className="rounded-[22px] border border-white/10 bg-white/[0.07] px-4 py-3.5">
                         <p className="text-[9px] font-black uppercase tracking-[0.14em] text-white/45">Today</p>
-                        <p className="mt-1 text-sm font-semibold text-white/82">
-                          {attentionItems.length > 0
-                            ? `${attentionItems.length} item${attentionItems.length === 1 ? "" : "s"} need your attention`
-                            : "Nothing is flagged right now."}
-                        </p>
+                        <div className="mt-1 flex items-end gap-2">
+                          <span className="text-[48px] font-black leading-none tracking-[-0.08em]">{todayActionCount}</span>
+                          <span className="pb-1 text-[10px] font-bold uppercase tracking-[0.08em] text-white/60">active items today</span>
+                        </div>
+                        <p className="mt-2 text-[10px] font-medium leading-4 text-white/58">Your active health actions are organised in Today.</p>
                       </div>
 
                       <Link
