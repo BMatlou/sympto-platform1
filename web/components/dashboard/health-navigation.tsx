@@ -135,7 +135,7 @@ export default function HealthNavigation() {
             } as CSSProperties)
           : undefined
       }
-      className="fixed inset-x-2 top-2 z-50 flex h-14 items-center gap-2 rounded-2xl border border-white/10 bg-[#0B2D54] p-2 shadow-[0_18px_45px_rgba(11,45,84,0.22)] lg:left-4 lg:right-auto lg:w-[64px] lg:flex-col lg:rounded-[26px] lg:p-2 lg:top-[var(--nav-top,1rem)] lg:h-[var(--nav-height,657px)]">
+      className="fixed inset-x-2 top-2 z-50 flex h-14 items-center gap-2 rounded-2xl border border-white/10 bg-[#0B2D54] p-2 shadow-[0_18px_45px_rgba(11,45,84,0.22)] lg:left-4 lg:right-auto lg:w-[64px] lg:flex-col lg:rounded-[26px] lg:p-2 lg:top-[var(--nav-top,1rem)] lg:h-[var(--nav-height,calc(100vh-2rem))]">
       <nav className="flex min-w-0 flex-1 items-center justify-center gap-1 lg:h-full lg:flex-col lg:items-stretch lg:justify-start lg:gap-1" aria-label="Primary health navigation">
         {PRIMARY_NAV.map(({ href, label, icon: Icon }) => {
           const isActive = pathname === href || (href === "/dashboard" && pathname === "/");
