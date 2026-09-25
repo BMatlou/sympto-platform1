@@ -306,132 +306,61 @@ export default function HealthHome() {
                 </ActionLink>
               </div>
 
-              <div className="mt-3 grid gap-3 xl:grid-cols-[minmax(0,1.7fr)_minmax(290px,0.8fr)]">
-                <section className="group relative min-h-[210px] overflow-hidden rounded-[28px] bg-gradient-to-br from-[#0B2D54] via-[#143D67] to-[#0F6173] p-5 text-white shadow-[0_24px_60px_rgba(11,45,84,0.16)] sm:p-6">
-                  <div aria-hidden="true" className="pointer-events-none absolute -right-20 -top-24 h-72 w-72 rounded-full bg-[#24C1C4]/20 blur-3xl transition-transform duration-500 group-hover:scale-110" />
-                  <div aria-hidden="true" className="pointer-events-none absolute -bottom-24 right-1/4 h-56 w-56 rounded-full bg-white/[0.06] blur-3xl" />
-                  <div aria-hidden="true" className="pointer-events-none absolute inset-x-7 top-0 h-px bg-white/20" />
+              <div className="mt-3">
+                <section className="relative min-h-[210px] overflow-hidden rounded-[28px] bg-[#0B2D54] px-5 py-6 text-white shadow-[0_24px_60px_rgba(11,45,84,0.16)] sm:px-7 sm:py-7">
+                  <div aria-hidden="true" className="pointer-events-none absolute inset-y-0 right-0 w-1/3 bg-[#24C1C4]/[0.08]" />
+                  <div aria-hidden="true" className="pointer-events-none absolute inset-x-7 top-0 h-px bg-white/10" />
 
-                  <div className="relative grid min-h-[178px] items-center gap-8 md:grid-cols-[minmax(0,1fr)_auto]">
-                    <div className="max-w-[38rem]">
-                      <p className="text-[9px] font-black uppercase tracking-[0.18em] text-white/50">Overview</p>
-                      <h2 className="mt-1.5 text-[28px] font-black tracking-[-0.05em] sm:text-[34px]">
-                        {greeting}, {firstName}
+                  <div className="relative grid min-h-[156px] items-center gap-8 md:grid-cols-[minmax(0,1fr)_minmax(280px,0.8fr)_minmax(180px,0.55fr)]">
+                    <div>
+                      <p className="text-[9px] font-black uppercase tracking-[0.18em] text-white/45">Overview</p>
+                      <h2 className="mt-2 text-[30px] font-black tracking-[-0.05em] sm:text-[36px]">
+                        greeting, firstName
                       </h2>
-                      <p className="mt-1.5 max-w-[31rem] text-[11px] font-medium leading-5 text-white/66">
+                      <p className="mt-2 max-w-[31rem] text-[11px] font-medium leading-5 text-white/60">
                         Your health, organised around what matters today.
                       </p>
                     </div>
 
-                    <div className="flex items-center gap-4 md:min-w-[310px] md:justify-end">
-                      <p className="text-[62px] font-black leading-[0.78] tracking-[-0.08em] sm:text-[70px]">
-                        {todayActionCount}
-                      </p>
-                      <div className="max-w-[13rem]">
-                        <p className="text-[10px] font-black leading-4 text-white/74">
+                    <div className="border-l border-white/15 pl-7">
+                      <p className="text-[9px] font-black uppercase tracking-[0.18em] text-white/45">Today</p>
+                      <div className="mt-2 flex items-end gap-3">
+                        <p className="text-[58px] font-black leading-none tracking-[-0.08em]">
+                          todayActionCount
+                        </p>
+                        <p className="max-w-[11rem] pb-1 text-[10px] font-bold leading-4 text-white/70">
                           active items that need your attention today
                         </p>
-                        {appointments[0] ? (
-                          <div className="mt-3 border-l border-white/30 pl-3">
-                            <p className="text-[8px] font-black uppercase tracking-[0.16em] text-white/50">Next appointment</p>
-                            <p className="mt-1 truncate text-[11px] font-black text-white">
-                              {display(
-                                appointments[0]?.providerName ??
-                                  appointments[0]?.provider?.name ??
-                                  appointments[0]?.title ??
-                                  appointments[0]?.name,
-                                "Upcoming appointment",
-                              )}
-                            </p>
-                          </div>
-                        ) : (
-                          <p className="mt-2 text-[9px] font-semibold text-white/55">No upcoming appointment recorded.</p>
-                        )}
                       </div>
                     </div>
-                  </div>
-                </section>
 
-                <section className="group relative min-h-[230px] overflow-hidden rounded-[28px] bg-gradient-to-br from-[#29CFD0] via-[#20BBC0] to-[#0A9DA7] p-5 text-white shadow-[0_24px_60px_rgba(36,193,196,0.20)] ring-1 ring-inset ring-white/25 sm:p-6">
-                  <div aria-hidden="true" className="pointer-events-none absolute -right-20 -top-20 h-64 w-64 rounded-full bg-white/45 blur-3xl transition-transform duration-500 group-hover:scale-110" />
-                  <div aria-hidden="true" className="pointer-events-none absolute -left-20 -bottom-24 h-56 w-56 rounded-full bg-[#C9FFFF]/35 blur-3xl" />
-                  <div aria-hidden="true" className="pointer-events-none absolute inset-x-7 top-0 h-px bg-white/75" />
-
-                  <div className="relative flex min-h-[202px] flex-col justify-between">
-                    <div className="flex items-start justify-between gap-4">
-                      <span className="grid h-12 w-12 place-items-center rounded-2xl bg-white/20 ring-1 ring-inset ring-white/45 shadow-[0_0_30px_rgba(255,255,255,0.20)] transition-transform duration-300 group-hover:scale-105">
-                        <HeartPulse className="h-5 w-5 text-white drop-shadow-[0_0_9px_rgba(255,255,255,0.80)]" aria-hidden="true" />
-                      </span>
-                      <span className="rounded-full bg-white/12 px-2.5 py-1 text-[9px] font-black uppercase tracking-[0.15em] text-white/82 ring-1 ring-inset ring-white/20">
-                        Monitor
-                      </span>
-                    </div>
-
-                    <div>
-                      <p className="text-[9px] font-black uppercase tracking-[0.17em] text-white/68">
-                        Recent symptom
-                      </p>
-
-                      {recentSymptom ? (
-                        <>
-                          <div className="mt-2 flex items-start justify-between gap-3">
-                            <div className="min-w-0">
-                              <h2 className="truncate text-[23px] font-black tracking-[-0.045em]">
-                                {symptomLabel(recentSymptom)}
-                              </h2>
-                              <p className="mt-1 text-[11px] font-semibold text-white/76">
-                                {formatSymptomDate(recentSymptomAt)}
-                                {recentSymptomStatus === "ACTIVE" ? " · Active" : ""}
-                              </p>
-                            </div>
-                            {recentSymptom.overallSeverity && (
-                              <span className="shrink-0 rounded-full bg-white/16 px-2.5 py-1 text-[9px] font-black uppercase tracking-[0.08em] ring-1 ring-inset ring-white/25">
-                                {String(recentSymptom.overallSeverity).toLowerCase()}
-                              </span>
-                            )}
-                          </div>
-
-                          <div className="mt-3 flex flex-wrap gap-2">
-                            <Link
-                              href={
-                                recentSymptomStatus === "ACTIVE"
-                                  ? "/symptom-logs/" + encodeURIComponent(String(recentSymptom.id)) + "/monitor"
-                                  : "/symptom-logs/" + encodeURIComponent(String(recentSymptom.id))
-                              }
-                              className="inline-flex min-h-10 items-center gap-2 rounded-full bg-[#0B2D54] px-4 py-2 text-[10px] font-black uppercase tracking-[0.08em] text-white shadow-[0_10px_24px_rgba(11,45,84,0.18)] transition-all hover:-translate-y-0.5"
-                            >
-                              Update
-                              <ArrowRight className="h-3.5 w-3.5 text-[#24C1C4]" aria-hidden="true" />
-                            </Link>
-                            <Link
-                              href="/log-symptom"
-                              className="inline-flex min-h-10 items-center gap-2 rounded-full bg-white/15 px-3.5 py-2 text-[10px] font-black uppercase tracking-[0.09em] text-white ring-1 ring-inset ring-white/25 backdrop-blur-sm transition-all hover:bg-white/22"
-                            >
-                              <span className="grid h-5 w-5 place-items-center rounded-full bg-white text-[#0B2D54] shadow-sm">
-                                <Plus className="h-3.5 w-3.5 stroke-[2.5]" aria-hidden="true" />
-                              </span>
-                              New symptom
-                            </Link>
-                          </div>
-                        </>
-                      ) : (
-                        <>
-                          <h2 className="mt-2 text-[27px] font-black tracking-[-0.05em]">Log a symptom</h2>
-                          <p className="mt-1 text-[11px] font-semibold text-white/76">Nothing has been logged yet.</p>
-                          <Link
-                            href="/log-symptom"
-                            className="mt-4 inline-flex min-h-10 items-center gap-2 rounded-full bg-[#0B2D54] px-4 py-2 text-[10px] font-black uppercase tracking-[0.08em] text-white"
-                          >
-                            Log symptom
-                            <ArrowRight className="h-3.5 w-3.5 text-[#24C1C4]" aria-hidden="true" />
-                          </Link>
-                        </>
-                      )}
+                    <div className="border-l border-white/15 pl-7">
+                      <p className="text-[9px] font-black uppercase tracking-[0.18em] text-white/45">Latest measurement</p>
+                      {(() => {
+                        const latest = normalizeVitals(data)
+                          .filter((item: any) => item?.value !== null && item?.value !== undefined)
+                          .sort((a: any, b: any) =>
+                            new Date(String(b.measuredAt ?? 0)).getTime() -
+                            new Date(String(a.measuredAt ?? 0)).getTime(),
+                          )[0];
+                        return latest ? (
+                          <>
+                            <p className="mt-2 truncate text-[19px] font-black tracking-[-0.03em]">
+                              {display(latest.type, "Measurement")}
+                            </p>
+                            <p className="mt-1 text-[11px] font-semibold text-white/65">
+                              {display(latest.value)}
+                              {latest.unit ? ` ${latest.unit}` : ""}
+                            </p>
+                          </>
+                        ) : (
+                          <p className="mt-2 text-[11px] font-semibold text-white/55">No measurement recorded.</p>
+                        );
+                      })()}
                     </div>
                   </div>
                 </section>
               </div>
-
               <section className="mt-6">
                 <div className="mb-3 flex items-center justify-between px-1">
                   <p className="text-[10px] font-black uppercase tracking-[0.18em] text-[#0B2D54]/55">Your health</p>
