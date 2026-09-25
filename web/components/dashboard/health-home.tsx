@@ -128,65 +128,57 @@ function DashboardCard({
       href={href}
       ariaLabel={title}
       className={
-        "group flex min-h-[340px] h-full flex-col overflow-hidden rounded-[28px] border bg-white " +
-        "shadow-[0_8px_28px_rgba(11,45,84,0.045)] " +
-        "transition-all duration-200 hover:-translate-y-0.5 hover:shadow-[0_16px_38px_rgba(11,45,84,0.08)] " +
+        "group flex min-h-[318px] h-full flex-col px-5 py-5 sm:px-6 sm:py-6 " +
+        "bg-white transition-colors duration-200 hover:bg-[#FBFEFE] " +
         border
       }
     >
-      <div className={`h-1.5 w-full ${accentBg}`} />
+      <div className="flex items-start gap-3.5">
+        <span
+          className={
+            "grid h-11 w-11 shrink-0 place-items-center rounded-[16px] " +
+            iconBg
+          }
+        >
+          <Icon className={`h-5 w-5 ${accent}`} aria-hidden="true" />
+        </span>
 
-      <div className="flex flex-1 flex-col p-5 sm:p-6">
-        <div className="flex items-start justify-between gap-4">
-          <div className="flex min-w-0 items-center gap-3.5">
-            <span
-              className={
-                "grid h-12 w-12 shrink-0 place-items-center rounded-[18px] " +
-                iconBg
-              }
-            >
-              <Icon className={`h-5 w-5 ${accent}`} aria-hidden="true" />
-            </span>
-
-            <div className="min-w-0">
-              <p className={`text-[9px] font-black uppercase tracking-[0.18em] ${accent}`}>
-                {tag}
-              </p>
-              <h2 className="mt-1 text-[21px] font-black tracking-[-0.045em] text-[#0B2D54]">
-                {title}
-              </h2>
-            </div>
-          </div>
+        <div className="min-w-0 pt-0.5">
+          <p className={`text-[9px] font-black uppercase tracking-[0.18em] ${accent}`}>
+            {tag}
+          </p>
+          <h2 className="mt-1 text-[20px] font-black tracking-[-0.045em] text-[#0B2D54]">
+            {title}
+          </h2>
         </div>
+      </div>
 
-        <p className="mt-5 max-w-[34rem] text-[13px] leading-6 text-[#6F8192]">
-          {description}
-        </p>
+      <p className="mt-4 max-w-[34rem] text-[12px] leading-5.5 text-[#6F8192]">
+        {description}
+      </p>
 
-        {children ? <div className="mt-5">{children}</div> : null}
+      {children ? <div className="mt-5">{children}</div> : null}
 
-        <div className="mt-auto pt-6">
-          <div className="flex items-center justify-between gap-3 border-t border-slate-100 pt-4">
-            <span className={`text-[10px] font-black uppercase tracking-[0.16em] ${accent}`}>
-              {footerLabel}
-            </span>
+      <div className="mt-auto pt-5">
+        <div className="flex items-center justify-between gap-3 border-t border-[#EDF2F3] pt-3.5">
+          <span className={`text-[10px] font-black uppercase tracking-[0.15em] ${accent}`}>
+            {footerLabel}
+          </span>
 
-            <span
-              className={
-                "inline-flex h-9 min-w-9 items-center justify-center rounded-full px-2 " +
-                softAccent +
-                " transition-transform duration-200 group-hover:translate-x-1"
-              }
-            >
-              <ArrowRight className={`h-4 w-4 ${accent}`} aria-hidden="true" />
-            </span>
-          </div>
+          <span
+            className={
+              "inline-flex h-9 w-9 items-center justify-center rounded-full " +
+              softAccent +
+              " transition-transform duration-200 group-hover:translate-x-1"
+            }
+          >
+            <ArrowRight className={`h-4 w-4 ${accent}`} aria-hidden="true" />
+          </span>
         </div>
       </div>
     </ActionLink>
   );
 }
-
 function MetricBadge({
   label,
   value,
@@ -347,7 +339,8 @@ export default function HealthHome() {
     <ProtectedRoute>
       <main className="min-h-screen bg-[#f7fbfb] text-[#14304d]">
         <div className="mx-auto max-w-[1240px] px-4 pb-12 pt-20 sm:px-6 sm:pt-24 lg:px-8">
-          <section className="relative overflow-hidden rounded-[32px] bg-gradient-to-br from-[#08284A] via-[#0C4166] to-[#24B8BB] px-5 py-5 text-white shadow-[0_18px_48px_rgba(11,45,84,0.13)] sm:px-7 sm:py-7 lg:px-8">
+          <section className="overflow-hidden rounded-[32px] border border-[#D9E9E8] bg-white shadow-[0_18px_52px_rgba(11,45,84,0.07)]" aria-label="Sympto health overview">
+            <div className="relative overflow-hidden rounded-t-[32px] bg-gradient-to-br from-[#08284A] via-[#0C4166] to-[#24B8BB] px-5 py-5 text-white sm:px-7 sm:py-7 lg:px-8">
             <div
               aria-hidden="true"
               className="pointer-events-none absolute -right-16 -top-20 h-56 w-56 rounded-full border border-white/[0.08]"
@@ -415,23 +408,22 @@ export default function HealthHome() {
                 </div>
               </div>
             </div>
-          </section>
-
-          <div className="flex items-center justify-between gap-4 px-1 pb-1 pt-7">
-            <div>
-              <p className="text-[10px] font-black uppercase tracking-[0.17em] text-[#71839A]">
-                Your health, at a glance
-              </p>
-              <p className="mt-1 text-xs font-medium text-[#8A99A8]">
-                Choose what you need. Sympto will take you there.
-              </p>
             </div>
-          </div>
+            <div className="bg-[#FBFEFE] px-5 pb-5 pt-5 sm:px-6 sm:pb-6 sm:pt-6 lg:px-8">
+              <div className="flex items-end justify-between gap-4 px-1 pb-4">
+                <div>
+                  <p className="text-[10px] font-black uppercase tracking-[0.17em] text-[#71839A]">
+                    Your health, at a glance
+                  </p>
+                  <p className="mt-1 text-xs font-medium text-[#8A99A8]">
+                    Choose what you need. Sympto will take you there.
+                  </p>
+                </div>
+              </div>
 
-          <section
-            className="grid items-stretch gap-4 md:grid-cols-3"
-            aria-label="Health dashboard"
-          >
+              <div className="overflow-hidden rounded-[26px] border border-[#DFEBEB] bg-white shadow-[0_8px_24px_rgba(11,45,84,0.04)]" aria-label="Health dashboard">
+                <div className="grid items-stretch divide-y divide-[#E6EEEE] md:grid-cols-3 md:divide-x md:divide-y-0">
+
             <DashboardCard
               href="/today"
               title="Today"
@@ -509,6 +501,9 @@ export default function HealthHome() {
                 </p>
               </div>
             </DashboardCard>
+                </div>
+              </div>
+            </div>
           </section>
         </div>
       </main>
