@@ -560,9 +560,9 @@ export default function HealthHome() {
 
                   <ActionLink
                     href="/health-journal"
-                    className="group relative flex min-h-[164px] flex-col justify-between overflow-hidden rounded-[26px] border border-white/30 bg-[#00BFFF] p-5 text-white shadow-[0_16px_42px_rgba(0,191,255,0.38),0_0_38px_rgba(0,191,255,0.30)] ring-1 ring-inset ring-white/25 transition-all duration-200 hover:-translate-y-0.5 hover:shadow-[0_22px_50px_rgba(0,191,255,0.48),0_0_48px_rgba(0,191,255,0.38)]"
+                    className="group relative flex min-h-[164px] flex-col justify-between overflow-hidden rounded-[26px] border border-white/25 bg-[#155AC1] p-5 text-white shadow-[0_16px_42px_rgba(21,90,193,0.38),0_0_38px_rgba(21,90,193,0.30)] ring-1 ring-inset ring-white/25 transition-all duration-200 hover:-translate-y-0.5 hover:shadow-[0_22px_50px_rgba(21,90,193,0.48),0_0_48px_rgba(21,90,193,0.38)]"
                   >
-                    <div className="pointer-events-none absolute -right-12 -top-12 h-32 w-32 rounded-full bg-[#B8F4FF]/55 blur-3xl transition-transform duration-500 group-hover:scale-125" />
+                    <div className="pointer-events-none absolute -right-12 -top-12 h-32 w-32 rounded-full bg-[#8DB7FF]/55 blur-3xl transition-transform duration-500 group-hover:scale-125" />
                     <div className="relative flex items-start justify-between">
                       <span className="grid h-11 w-11 place-items-center rounded-2xl bg-white/18 ring-1 ring-white/40 shadow-[0_0_24px_rgba(255,255,255,0.22)] backdrop-blur-sm">
                         <FolderOpen className="h-5 w-5 text-white" aria-hidden="true" />
