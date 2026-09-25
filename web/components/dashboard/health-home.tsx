@@ -327,7 +327,7 @@ export default function HealthHome() {
       <main className="min-h-screen bg-[#F7FBFB] text-[#0B2D54]">
         <div className="mx-auto grid max-w-[1500px] grid-cols-1 gap-4 px-3 pb-8 pt-20 sm:px-5 sm:pt-24 lg:grid-cols-[248px_minmax(0,1fr)] lg:gap-5">
           <aside className="hidden lg:sticky lg:top-24 lg:flex lg:h-[calc(100vh-8rem)] lg:min-h-0 lg:flex-col lg:rounded-[28px] lg:bg-gradient-to-b lg:from-[#0B2D54] lg:to-[#0F5F72] lg:p-3 lg:shadow-[0_16px_48px_rgba(11,45,84,0.16)]">
-            <div className="min-h-0 flex-1 overflow-y-auto pr-1">
+            <div className="min-h-0 flex-1 overflow-y-auto pr-1 [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden">
               <div className="flex items-center gap-3 px-2.5 py-2">
                 <div className="grid h-11 w-11 shrink-0 place-items-center rounded-2xl bg-white/12 ring-1 ring-white/15">
                   <HeartPulse className="h-5 w-5 text-[#9AF6F4]" aria-hidden="true" />
