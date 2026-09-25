@@ -461,13 +461,8 @@ export default function HealthHome() {
               </section>
             </div>
 
-            <section className="relative overflow-hidden rounded-[34px] bg-gradient-to-br from-[#E8F8F7] via-white to-[#F7FBFB] p-[1px] shadow-[0_12px_40px_rgba(11,45,84,0.05)]">
-              <div
-                aria-hidden="true"
-                className="pointer-events-none absolute -left-20 bottom-0 h-40 w-40 rounded-full bg-[#24C1C4]/10 blur-3xl"
-              />
-              <div className="relative rounded-[33px] bg-white/95 p-4 sm:p-5">
-                <div className="mb-4 flex items-center justify-between px-1">
+            <section className="relative">
+              <div className="mb-4 flex items-center justify-between px-1">
                   <p className="text-[10px] font-black uppercase tracking-[0.17em] text-[#0B2D54]">
                     Your health
                   </p>
@@ -579,7 +574,6 @@ export default function HealthHome() {
                     </div>
                   </ActionLink>
                 </div>
-              </div>
             </section>
           </section>
         </div>
