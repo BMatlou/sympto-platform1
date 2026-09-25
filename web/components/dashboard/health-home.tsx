@@ -598,7 +598,7 @@ export default function HealthHome() {
                     />
                     <div className="relative flex items-start justify-between gap-4">
                       <span className="grid h-11 w-11 place-items-center rounded-[15px] bg-white/16 ring-1 ring-inset ring-white/45 shadow-[0_0_26px_rgba(255,255,255,0.28)]">
-                        <ShieldCheck className="h-5 w-5 text-white fill-transparent transition-all duration-300 group-hover:text-[#FFE4E4] group-hover:fill-[#FFE4E4] group-hover:drop-shadow-[0_0_12px_rgba(255,228,228,0.90)]" aria-hidden="true" />
+                        <ShieldCheck className="h-5 w-5 text-white fill-transparent transition-all duration-300 group-hover:text-[#C62828] group-hover:fill-[#FFE8E8] group-hover:drop-shadow-[0_0_14px_rgba(255,232,232,0.95)]" aria-hidden="true" />
                       </span>
                       <ArrowRight className="mt-1 h-4 w-4 text-white drop-shadow-[0_0_7px_rgba(255,255,255,0.55)] transition-transform duration-200 group-hover:translate-x-1" aria-hidden="true" />
                     </div>
@@ -636,7 +636,7 @@ export default function HealthHome() {
                     />
                     <div className="relative flex items-start justify-between gap-4">
                       <span className="grid h-11 w-11 place-items-center rounded-[15px] bg-white/16 ring-1 ring-inset ring-white/30">
-                        <FolderOpen className="h-5 w-5 text-white fill-transparent transition-all duration-300 group-hover:text-[#DCEBFF] group-hover:fill-[#DCEBFF] group-hover:drop-shadow-[0_0_12px_rgba(220,235,255,0.92)]" aria-hidden="true" />
+                        <FolderOpen className="h-5 w-5 text-white fill-transparent transition-all duration-300 group-hover:text-[#155AC1] group-hover:fill-[#E5F0FF] group-hover:drop-shadow-[0_0_14px_rgba(229,240,255,0.95)]" aria-hidden="true" />
                       </span>
                       <ArrowRight className="mt-1 h-4 w-4 text-white transition-transform duration-200 group-hover:translate-x-1" aria-hidden="true" />
                     </div>
