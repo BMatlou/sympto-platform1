@@ -3,13 +3,64 @@
 import Link from "next/link";
 import type { ReactNode } from "react";
 import { useEffect, useState } from "react";
-import { ArrowRight, CheckCircle2, FileHeart, FolderOpen, ShieldCheck } from "lucide-react";
+import { ArrowRight, CheckCircle2, FileHeart, FolderOpen, Plus, ShieldCheck } from "lucide-react";
 import { useDashboard } from "@/hooks/use-dashboard";
 import { healthJournalService } from "@/services/health-journal.service";
 import ProtectedRoute from "@/components/auth/protected-route";
 
 function display(value: unknown, fallback = "Not recorded"): string {
   return value === null || value === undefined || value === "" ? fallback : String(value);
+}
+
+function normalizeVitals(data: any) {
+  const deviceVitals = Array.isArray(data?.healthSnapshot?.latestMeasurements)
+    ? data.healthSnapshot.latestMeasurements.map((item: any) => ({
+        type: item.type ?? item.measurementType,
+        value: item.value,
+        unit: item.unit,
+        measuredAt: item.measuredAt,
+      }))
+    : [];
+
+  const clinicalVitals = Array.isArray(data?.clinicalVitals)
+    ? data.clinicalVitals.map((item: any) => ({
+        type: item.vitalType?.code ?? item.vitalType?.name,
+        value: item.value,
+        unit: item.vitalType?.unit,
+        measuredAt: item.measuredAt,
+      }))
+    : [];
+
+  const byType = new Map<string, any>();
+
+  for (const vital of [...deviceVitals, ...clinicalVitals]) {
+    const key = String(vital.type ?? "").toUpperCase();
+    if (!key) continue;
+
+    const previous = byType.get(key);
+    if (
+      !previous ||
+      new Date(String(vital.measuredAt ?? 0)).getTime() >
+        new Date(String(previous.measuredAt ?? 0)).getTime()
+    ) {
+      byType.set(key, vital);
+    }
+  }
+
+  return Array.from(byType.values());
+}
+
+function itemNames(
+  items: any[],
+  kind: "allergy" | "condition",
+): string[] {
+  return items
+    .map((item) =>
+      kind === "allergy"
+        ? item?.allergy?.name ?? item?.name
+        : item?.condition?.name ?? item?.name,
+    )
+    .filter(Boolean) as string[];
 }
 
 function countActiveGoals(data: any) {
@@ -199,11 +250,13 @@ export default function HealthHome() {
     : [];
 
   const activeGoalCount = countActiveGoals(data);
-  const todayActionCount = medications.length + appointments.length + activeGoalCount;
+  const todayActionCount =
+    medications.length + appointments.length + activeGoalCount;
 
   const recentSymptom = recentSymptomFrom(data, symptomFeed);
   const recentSymptomStatus = String(recentSymptom?.status ?? "").toUpperCase();
-  const recentSymptomAt = recentSymptom?.startedAt ?? recentSymptom?.createdAt ?? null;
+  const recentSymptomAt =
+    recentSymptom?.startedAt ?? recentSymptom?.createdAt ?? null;
 
   // Chips shown on the three navigation cards are derived only from records
   // already loaded for this dashboard; they are not hard-coded health data.
@@ -253,44 +306,109 @@ export default function HealthHome() {
                 </ActionLink>
               </div>
 
-              <section className="relative mt-3 overflow-hidden rounded-[28px] border border-[#24C1C4]/20 bg-gradient-to-br from-[#0B2D54] via-[#103E69] to-[#24C1C4] px-6 py-7 text-white shadow-[0_20px_50px_rgba(11,45,84,0.16)] sm:px-8">
-                <div aria-hidden="true" className="pointer-events-none absolute -right-20 -top-24 h-64 w-64 rounded-full bg-white/10 blur-2xl" />
-                <div aria-hidden="true" className="pointer-events-none absolute -bottom-24 right-20 h-56 w-56 rounded-full bg-[#24C1C4]/25 blur-3xl" />
-                <div className="relative">
-                  <p className="text-[10px] font-black uppercase tracking-[0.18em] text-white/75">My health</p>
-                <h2 className="mt-2 text-[32px] font-black tracking-[-0.05em] text-white sm:text-[40px]">
-                  {greeting}, {firstName}
-                </h2>
-                <p className="mt-2 max-w-[42rem] text-sm font-medium leading-6 text-white/75">
-                  Your health, organised around what matters today.
-                </p>
-                </div>
-              </section>
+              <div className="mt-3 grid gap-3 xl:grid-cols-[minmax(0,1.7fr)_minmax(290px,0.8fr)]">
+                <section className="group relative min-h-[210px] overflow-hidden rounded-[28px] bg-gradient-to-br from-[#0B2D54] via-[#143D67] to-[#0F6173] p-5 text-white shadow-[0_24px_60px_rgba(11,45,84,0.16)] sm:p-6">
+                  <div aria-hidden="true" className="pointer-events-none absolute -right-20 -top-24 h-72 w-72 rounded-full bg-[#24C1C4]/20 blur-3xl transition-transform duration-500 group-hover:scale-110" />
+                  <div aria-hidden="true" className="pointer-events-none absolute -bottom-24 right-1/4 h-56 w-56 rounded-full bg-white/[0.06] blur-3xl" />
+                  <div aria-hidden="true" className="pointer-events-none absolute inset-x-7 top-0 h-px bg-white/20" />
 
-              <section className="mt-5 overflow-hidden rounded-[24px] border border-[#24C1C4]/20 bg-[#E8F8F7]">
-                <div className="flex flex-col gap-4 px-5 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-6">
-                  <div className="min-w-0">
-                    <p className="text-[9px] font-black uppercase tracking-[0.18em] text-[#0B2D54]/55">Recent symptom</p>
-                    {recentSymptom ? (
-                      <>
-                        <h3 className="mt-1 truncate text-lg font-black tracking-[-0.03em] text-[#0B2D54]">{symptomLabel(recentSymptom)}</h3>
-                        <p className="mt-1 text-xs font-medium text-slate-500">
-                          {formatSymptomDate(recentSymptomAt)}
-                          {recentSymptomStatus ? ` · ${recentSymptomStatus.replace(/_/g, " ").toLowerCase()}` : ""}
+                  <div className="relative grid min-h-[178px] items-center gap-8 md:grid-cols-[minmax(0,1fr)_auto]">
+                    <div className="max-w-[38rem]">
+                      <p className="text-[9px] font-black uppercase tracking-[0.18em] text-white/50">Overview</p>
+                      <h2 className="mt-1.5 text-[28px] font-black tracking-[-0.05em] sm:text-[34px]">
+                        {greeting}, {firstName}
+                      </h2>
+                      <p className="mt-1.5 max-w-[31rem] text-[11px] font-medium leading-5 text-white/66">
+                        Your health, organised around what matters today.
+                      </p>
+                    </div>
+
+                    <div className="flex items-center gap-3 md:min-w-[270px] md:justify-end">
+                      <p className="text-[62px] font-black leading-[0.78] tracking-[-0.08em] sm:text-[70px]">
+                        {todayActionCount}
+                      </p>
+                      <div className="max-w-[13rem]">
+                        <p className="text-[10px] font-black leading-4 text-white/74">
+                          active items that need your attention today
                         </p>
-                      </>
-                    ) : (
-                      <h3 className="mt-1 text-lg font-black tracking-[-0.03em] text-[#0B2D54]">No symptoms logged yet</h3>
-                    )}
+
+                      </div>
+                    </div>
                   </div>
-                  <ActionLink
-                    href="/log-symptom"
-                    className="inline-flex min-h-10 shrink-0 items-center justify-center rounded-xl bg-[#0B2D54] px-4 py-2 text-[10px] font-black uppercase tracking-[0.08em] text-white shadow-[0_8px_18px_rgba(11,45,84,0.12)] hover:bg-[#092544]"
-                  >
-                    Log a symptom
-                  </ActionLink>
-                </div>
-              </section>
+                </section>
+
+                <section className="group relative min-h-[230px] overflow-hidden rounded-[28px] bg-gradient-to-br from-[#29CFD0] via-[#20BBC0] to-[#0A9DA7] p-5 text-white shadow-[0_24px_60px_rgba(36,193,196,0.20)] ring-1 ring-inset ring-white/25 sm:p-6">
+                  <div aria-hidden="true" className="pointer-events-none absolute -right-20 -top-20 h-64 w-64 rounded-full bg-white/45 blur-3xl transition-transform duration-500 group-hover:scale-110" />
+                  <div aria-hidden="true" className="pointer-events-none absolute -left-20 -bottom-24 h-56 w-56 rounded-full bg-[#C9FFFF]/35 blur-3xl" />
+                  <div aria-hidden="true" className="pointer-events-none absolute inset-x-7 top-0 h-px bg-white/75" />
+
+                  <div className="relative flex min-h-[202px] flex-col justify-between">
+                    <div className="flex items-start justify-between gap-4">
+                      <span className="text-[9px] font-black uppercase tracking-[0.15em] text-white/55">
+                        Symptom record
+                      </span>
+                    </div>
+
+                    <div>
+                      <p className="text-[9px] font-black uppercase tracking-[0.17em] text-white/68">
+                        Recent symptom
+                      </p>
+
+                      {recentSymptom ? (
+                        <>
+                          <div className="mt-2 flex items-start justify-between gap-3">
+                            <div className="min-w-0">
+                              <h2 className="truncate text-[23px] font-black tracking-[-0.045em]">
+                                {symptomLabel(recentSymptom)}
+                              </h2>
+                              <p className="mt-1 text-[11px] font-semibold text-white/76">
+                                {formatSymptomDate(recentSymptomAt)}
+                                {recentSymptomStatus === "ACTIVE" ? " · Active" : ""}
+                              </p>
+                            </div>
+
+                          </div>
+
+                          <div className="mt-3 flex flex-wrap gap-2">
+                            <Link
+                              href={
+                                recentSymptomStatus === "ACTIVE"
+                                  ? "/symptom-logs/" + encodeURIComponent(String(recentSymptom.id)) + "/monitor"
+                                  : "/symptom-logs/" + encodeURIComponent(String(recentSymptom.id))
+                              }
+                              className="inline-flex min-h-10 items-center gap-2 rounded-full bg-[#0B2D54] px-4 py-2 text-[10px] font-black uppercase tracking-[0.08em] text-white shadow-[0_10px_24px_rgba(11,45,84,0.18)] transition-all hover:-translate-y-0.5"
+                            >
+                              Update
+                              <ArrowRight className="h-3.5 w-3.5 text-[#24C1C4]" aria-hidden="true" />
+                            </Link>
+                            <Link
+                              href="/log-symptom"
+                              className="inline-flex min-h-10 items-center gap-2 rounded-full bg-white/15 px-3.5 py-2 text-[10px] font-black uppercase tracking-[0.09em] text-white ring-1 ring-inset ring-white/25 backdrop-blur-sm transition-all hover:bg-white/22"
+                            >
+                              <span className="grid h-5 w-5 place-items-center rounded-full bg-white text-[#0B2D54] shadow-sm">
+                                <Plus className="h-3.5 w-3.5 stroke-[2.5]" aria-hidden="true" />
+                              </span>
+                              New symptom
+                            </Link>
+                          </div>
+                        </>
+                      ) : (
+                        <>
+                          <h2 className="mt-2 text-[27px] font-black tracking-[-0.05em]">Log a symptom</h2>
+                          <p className="mt-1 text-[11px] font-semibold text-white/76">Nothing has been logged yet.</p>
+                          <Link
+                            href="/log-symptom"
+                            className="mt-4 inline-flex min-h-10 items-center gap-2 rounded-full bg-[#0B2D54] px-4 py-2 text-[10px] font-black uppercase tracking-[0.08em] text-white"
+                          >
+                            Log symptom
+                            <ArrowRight className="h-3.5 w-3.5 text-[#24C1C4]" aria-hidden="true" />
+                          </Link>
+                        </>
+                      )}
+                    </div>
+                  </div>
+                </section>
+              </div>
 
               <section className="mt-6">
                 <div className="mb-3 flex items-center justify-between px-1">
