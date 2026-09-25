@@ -3,35 +3,11 @@
 import Link from "next/link";
 import type { ReactNode } from "react";
 import { useEffect, useState } from "react";
-import { Activity, ArrowRight, Bell, CalendarDays, CheckCircle2, ChevronDown, ClipboardList, CreditCard, FileHeart, FileText, FolderOpen, HeartPulse, House, Menu, MessageCircle, Pill, Plus, Settings, ShieldCheck, UserRound, Users, Watch } from "lucide-react";
+import { Activity, ArrowRight, CheckCircle2, FileHeart, FileText, FolderOpen, HeartPulse, Plus, ShieldCheck } from "lucide-react";
 import { useDashboard } from "@/hooks/use-dashboard";
 import { healthJournalService } from "@/services/health-journal.service";
 import ProtectedRoute from "@/components/auth/protected-route";
 
-const PRIMARY_NAV = [
-  { href: "/dashboard", label: "Home", icon: House },
-  { href: "/today", label: "Today", icon: CheckCircle2 },
-  { href: "/health-passport", label: "Clinic Card", icon: FileHeart },
-  { href: "/health-journal", label: "Health Journal", icon: FileText },
-];
-
-const MORE_NAV = [
-  { href: "/appointments", label: "Appointments", icon: CalendarDays },
-  { href: "/notifications", label: "Notifications", icon: Bell },
-  { href: "/medications", label: "Medications", icon: Pill },
-  { href: "/care-plans", label: "Care Plans", icon: ClipboardList },
-  { href: "/health-goals", label: "Health Goals", icon: HeartPulse },
-  { href: "/log-symptom", label: "Log a symptom", icon: HeartPulse },
-  { href: "/health-vitals", label: "Measurements", icon: Activity },
-  { href: "/health-records", label: "Health Records", icon: FileText },
-  { href: "/messages", label: "Messages", icon: MessageCircle },
-  { href: "/wearables", label: "Connected devices", icon: Watch },
-  { href: "/family", label: "Family", icon: Users },
-  { href: "/health-finance", label: "Medical aid & payments", icon: CreditCard },
-  { href: "/emergency-contacts", label: "Emergency contacts", icon: ShieldCheck },
-  { href: "/profile", label: "Profile", icon: UserRound },
-  { href: "/settings", label: "Settings", icon: Settings },
-];
 function display(value: unknown, fallback = "Not recorded"): string {
   return value === null || value === undefined || value === "" ? fallback : String(value);
 }
@@ -178,7 +154,6 @@ function ActionLink({
 export default function HealthHome() {
   const { data, loading, error, reload } = useDashboard();
   const [symptomFeed, setSymptomFeed] = useState<any[]>([]);
-  const [moreOpen, setMoreOpen] = useState(false);
 
   useEffect(() => {
     if (!data?.patient?.id) return;
@@ -303,80 +278,8 @@ export default function HealthHome() {
 
   return (
     <ProtectedRoute>
-      <main className="min-h-screen bg-[#EAF0F7] px-2 py-2 text-[#0B2D54] sm:px-4 sm:py-4">
+      <main className="min-h-screen bg-[#EAF0F7] px-2 pb-2 pt-[72px] text-[#0B2D54] sm:px-4 sm:pb-4 sm:pt-[72px] lg:pl-[104px] lg:pt-4">
         <div className="mx-auto grid min-h-[calc(100vh-2rem)] max-w-[1480px] overflow-hidden rounded-[30px] border border-white/80 bg-white shadow-[0_28px_80px_rgba(11,45,84,0.12)] lg:grid-cols-[76px_minmax(0,1fr)]">
-          <aside className="hidden min-h-0 border-r border-slate-200/80 bg-[#F8FAFD] lg:flex lg:flex-col">
-            <div className="flex justify-center border-b border-slate-200/80 px-2 py-4">
-              <Link
-                href="/dashboard"
-                aria-label="Sympto home"
-                className="grid h-11 w-11 place-items-center rounded-2xl bg-[#6C57B8] text-white shadow-[0_10px_24px_rgba(108,87,184,0.20)] transition-all hover:-translate-y-0.5 hover:shadow-[0_14px_30px_rgba(108,87,184,0.28)]"
-              >
-                <HeartPulse className="h-5 w-5" aria-hidden="true" />
-              </Link>
-            </div>
-
-            <div className="min-h-0 flex-1 overflow-y-auto px-2 py-4 [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:w-0 [&::-webkit-scrollbar]:h-0">
-              <nav className="space-y-2" aria-label="Primary health navigation">
-                {PRIMARY_NAV.map(({ href, label, icon: Icon }) => (
-                  <div key={href} className="group relative flex justify-center">
-                    <ActionLink
-                      href={href}
-                      ariaLabel={label}
-                      className={
-                        "grid h-11 w-11 place-items-center rounded-2xl transition-all " +
-                        (href === "/dashboard"
-                          ? "bg-[#0B2D54] text-white shadow-[0_10px_24px_rgba(11,45,84,0.15)]"
-                          : "text-slate-400 hover:bg-white hover:text-[#0B2D54] hover:shadow-[0_8px_20px_rgba(11,45,84,0.08)]")
-                      }
-                    >
-                      <Icon className="h-4.5 w-4.5" aria-hidden="true" />
-                    </ActionLink>
-                    <span className="pointer-events-none absolute left-[calc(100%+10px)] top-1/2 z-50 -translate-y-1/2 whitespace-nowrap rounded-xl bg-[#0B2D54] px-3 py-2 text-[10px] font-black text-white opacity-0 shadow-[0_12px_28px_rgba(11,45,84,0.22)] transition-opacity duration-150 group-hover:opacity-100">
-                      {label}
-                    </span>
-                  </div>
-                ))}
-              </nav>
-
-              <div className="mt-4 flex justify-center border-t border-slate-200/80 pt-4">
-                <div className="group relative">
-                  <button
-                    type="button"
-                    onClick={() => setMoreOpen((value) => !value)}
-                    aria-expanded={moreOpen}
-                    aria-label={moreOpen ? "Collapse more navigation" : "More navigation"}
-                    className="grid h-11 w-11 place-items-center rounded-2xl text-slate-400 transition-all hover:bg-white hover:text-[#0B2D54] hover:shadow-[0_8px_20px_rgba(11,45,84,0.08)]"
-                  >
-                    <Menu className="h-4.5 w-4.5" aria-hidden="true" />
-                  </button>
-                  <span className="pointer-events-none absolute left-[calc(100%+10px)] top-1/2 z-50 -translate-y-1/2 whitespace-nowrap rounded-xl bg-[#0B2D54] px-3 py-2 text-[10px] font-black text-white opacity-0 shadow-[0_12px_28px_rgba(11,45,84,0.22)] transition-opacity duration-150 group-hover:opacity-100">
-                    More
-                  </span>
-                </div>
-              </div>
-
-              {moreOpen && (
-                <nav className="mt-3 space-y-2" aria-label="More health navigation">
-                  {MORE_NAV.map(({ href, label, icon: Icon }) => (
-                    <div key={href} className="group relative flex justify-center">
-                      <ActionLink
-                        href={href}
-                        ariaLabel={label}
-                        className="grid h-10 w-10 place-items-center rounded-2xl text-slate-400 transition-all hover:bg-white hover:text-[#0B2D54] hover:shadow-[0_8px_20px_rgba(11,45,84,0.08)]"
-                      >
-                        <Icon className="h-4 w-4" aria-hidden="true" />
-                      </ActionLink>
-                      <span className="pointer-events-none absolute left-[calc(100%+10px)] top-1/2 z-50 -translate-y-1/2 whitespace-nowrap rounded-xl bg-[#0B2D54] px-3 py-2 text-[10px] font-black text-white opacity-0 shadow-[0_12px_28px_rgba(11,45,84,0.22)] transition-opacity duration-150 group-hover:opacity-100">
-                        {label}
-                      </span>
-                    </div>
-                  ))}
-                </nav>
-              )}
-            </div>
-          </aside>
-
           <section className="min-w-0 bg-white">
             <div className="px-4 pb-5 pt-3 sm:px-5 lg:px-7">
               <div className="flex justify-end">
