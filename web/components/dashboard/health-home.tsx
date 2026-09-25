@@ -217,19 +217,6 @@ function MetricBadge({
 }
 
 function ClinicRow({
-  return (
-    <div className="rounded-[18px] border border-[#E2EBEE] bg-[#F8FBFB] px-3.5 py-3.5">
-      <p className="text-[9px] font-black uppercase tracking-[0.12em] text-[#8A9AA8]">
-        {label}
-      </p>
-      <p className="mt-1 text-[20px] font-black leading-none tracking-[-0.04em] text-[#0B2D54]">
-        {value}
-      </p>
-    </div>
-  );
-}
-
-function ClinicRow({
   label,
   value,
   blood = false,
@@ -261,6 +248,7 @@ function ClinicRow({
     </div>
   );
 }
+
 export default function HealthHome() {
   const { data, loading, error, reload } = useDashboard();
 
