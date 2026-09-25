@@ -107,7 +107,6 @@ function DashboardCard({
   accent,
   softAccent,
   iconBg,
-  border,
 }: {
   href: string;
   title: string;
@@ -119,7 +118,6 @@ function DashboardCard({
   accent: string;
   softAccent: string;
   iconBg: string;
-  border: string;
 }) {
   return (
     <ActionLink
@@ -127,7 +125,7 @@ function DashboardCard({
       ariaLabel={title}
       className={
         "group flex min-h-[318px] h-full flex-col px-5 py-5 sm:px-6 sm:py-6 " +
-        "bg-white transition-colors duration-200 hover:bg-[#FBFEFE] " +
+        "bg-white transition-colors duration-200 hover:bg-[#FBFEFE] "
       }
     >
       <div className="flex items-start gap-3.5">
