@@ -271,10 +271,9 @@ export default function HealthHome() {
       : null,
   ].filter((chip): chip is string => Boolean(chip));
 
-  const journalChips = [
-    recentSymptom ? "Symptom logged" : null,
-    recentSymptom ? "Recent" : null,
-  ].filter((chip): chip is string => Boolean(chip));
+  const journalChip = recentSymptom
+    ? `Last entry · ${formatSymptomDate(recentSymptomAt)}`
+    : "No recent entries";
 
   return (
     <ProtectedRoute>
@@ -487,9 +486,7 @@ export default function HealthHome() {
                       <div className="mt-1 flex items-end justify-between gap-3">
                         <h2 className="text-[24px] font-black tracking-[-0.05em] text-[#0B2D54]">Records</h2>
                         <div className="flex flex-wrap justify-end gap-1.5">
-                          {journalChips.map((chip) => (
-                            <RecordedChip key={chip} className="bg-[#EEF5FF] text-[#0E4B9F] ring-[#155AC1]/15">{chip}</RecordedChip>
-                          ))}
+                          <RecordedChip className="bg-[#EEF5FF] text-[#0E4B9F] ring-[#155AC1]/15">{journalChip}</RecordedChip>
                         </div>
                       </div>
                     </div>
