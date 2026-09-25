@@ -445,12 +445,12 @@ export default function HealthHome() {
 
                   <ActionLink
                     href="/health-passport"
-                    className="group relative min-h-[164px] overflow-hidden rounded-[26px] bg-gradient-to-br from-[#0B2D54] via-[#155AC1] to-[#4E8CFF] p-5 text-white shadow-[0_18px_40px_rgba(21,90,193,0.22)] transition-all duration-300 hover:-translate-y-1 hover:shadow-[0_24px_50px_rgba(21,90,193,0.30)]"
+                    className="group relative min-h-[164px] overflow-hidden rounded-[26px] bg-gradient-to-br from-[#8E1B1B] via-[#C62828] to-[#F05A5A] p-5 text-white shadow-[0_18px_40px_rgba(198,40,40,0.22)] transition-all duration-300 hover:-translate-y-1 hover:shadow-[0_24px_50px_rgba(198,40,40,0.30)]"
                   >
                     <div aria-hidden="true" className="pointer-events-none absolute -right-10 -top-12 h-32 w-32 rounded-full bg-white/22 blur-2xl transition-transform duration-500 group-hover:scale-125" />
                     <div aria-hidden="true" className="pointer-events-none absolute inset-x-5 top-0 h-px bg-white/35" />
                     <div className="relative flex items-start justify-between">
-                      <span className="grid h-11 w-11 place-items-center rounded-2xl bg-white/14 text-white ring-1 ring-inset ring-white/22 shadow-[0_8px_22px_rgba(0,20,60,0.16)] transition-all group-hover:scale-105 group-hover:bg-white/22">
+                      <span className="grid h-11 w-11 place-items-center rounded-2xl bg-white/14 text-white ring-1 ring-inset ring-white/22 shadow-[0_8px_22px_rgba(80,20,20,0.16)] transition-all group-hover:scale-105 group-hover:bg-white/22">
                         <ShieldCheck className="h-5 w-5" aria-hidden="true" />
                       </span>
                       <ArrowRight className="h-4 w-4 text-white/65 transition-all group-hover:translate-x-1 group-hover:text-white" aria-hidden="true" />
@@ -470,12 +470,12 @@ export default function HealthHome() {
 
                   <ActionLink
                     href="/health-journal"
-                    className="group relative min-h-[164px] overflow-hidden rounded-[26px] bg-gradient-to-br from-[#4B2E83] via-[#6B4CC5] to-[#9B82E8] p-5 text-white shadow-[0_18px_40px_rgba(75,46,131,0.22)] transition-all duration-300 hover:-translate-y-1 hover:shadow-[0_24px_50px_rgba(75,46,131,0.30)]"
+                    className="group relative min-h-[164px] overflow-hidden rounded-[26px] bg-gradient-to-br from-[#0B2D54] via-[#155AC1] to-[#2F6FED] p-5 text-white shadow-[0_18px_40px_rgba(11,45,84,0.24)] transition-all duration-300 hover:-translate-y-1 hover:shadow-[0_24px_50px_rgba(11,45,84,0.32)]"
                   >
                     <div aria-hidden="true" className="pointer-events-none absolute -right-10 -top-12 h-32 w-32 rounded-full bg-white/22 blur-2xl transition-transform duration-500 group-hover:scale-125" />
                     <div aria-hidden="true" className="pointer-events-none absolute inset-x-5 top-0 h-px bg-white/35" />
                     <div className="relative flex items-start justify-between">
-                      <span className="grid h-11 w-11 place-items-center rounded-2xl bg-white/14 text-white ring-1 ring-inset ring-white/22 shadow-[0_8px_22px_rgba(40,20,80,0.16)] transition-all group-hover:scale-105 group-hover:bg-white/22">
+                      <span className="grid h-11 w-11 place-items-center rounded-2xl bg-white/14 text-white ring-1 ring-inset ring-white/22 shadow-[0_8px_22px_rgba(0,20,60,0.16)] transition-all group-hover:scale-105 group-hover:bg-white/22">
                         <FolderOpen className="h-5 w-5" aria-hidden="true" />
                       </span>
                       <ArrowRight className="h-4 w-4 text-white/65 transition-all group-hover:translate-x-1 group-hover:text-white" aria-hidden="true" />
