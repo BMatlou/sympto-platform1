@@ -70,6 +70,52 @@ function countActiveGoals(data: any) {
   ).length;
 }
 
+function recentSymptomFrom(data: any) {
+  const symptoms = Array.isArray(data?.symptoms) ? data.symptoms : [];
+  return [...symptoms]
+    .filter((symptom: any) => symptom?.id && (symptom?.startedAt || symptom?.createdAt))
+    .sort(
+      (a: any, b: any) =>
+        new Date(String(b.startedAt ?? b.createdAt)).getTime() -
+        new Date(String(a.startedAt ?? a.createdAt)).getTime(),
+    )[0] ?? null;
+}
+
+function symptomLabel(symptom: any): string {
+  if (!symptom) return "";
+  if (symptom.title) return String(symptom.title);
+  const names = Array.isArray(symptom.symptoms)
+    ? symptom.symptoms
+        .map((item: any) => item?.symptom?.name ?? item?.name)
+        .filter(Boolean)
+    : [];
+  return names[0] ? String(names[0]) : "Symptom";
+}
+
+function formatSymptomDate(value: unknown): string {
+  if (!value) return "";
+  const date = new Date(String(value));
+  if (Number.isNaN(date.getTime())) return "";
+  return new Intl.DateTimeFormat("en-ZA", {
+    day: "numeric",
+    month: "short",
+  }).format(date);
+}
+
+function formatTodayDate(value = new Date()): { weekday: string; day: string; month: string } {
+  const parts = new Intl.DateTimeFormat("en-ZA", {
+    weekday: "short",
+    day: "2-digit",
+    month: "short",
+  }).formatToParts(value);
+  const result = Object.fromEntries(parts.map((part) => [part.type, part.value]));
+  return {
+    weekday: String(result.weekday ?? "").toUpperCase(),
+    day: String(result.day ?? ""),
+    month: String(result.month ?? "").toUpperCase(),
+  };
+}
+
 function ActionLink({
   href,
   children,
@@ -164,6 +210,12 @@ export default function HealthHome() {
   const todayActionCount =
     medications.length + appointments.length + activeGoalCount;
 
+  const recentSymptom = recentSymptomFrom(data);
+  const recentSymptomStatus = String(recentSymptom?.status ?? "").toUpperCase();
+  const recentSymptomAt =
+    recentSymptom?.startedAt ?? recentSymptom?.createdAt ?? null;
+  const todayDate = formatTodayDate();
+
   return (
     <ProtectedRoute>
       <main className="min-h-screen bg-[#F7FBFB] text-[#0B2D54]">
@@ -210,29 +262,47 @@ export default function HealthHome() {
               <section className="group relative overflow-hidden rounded-[32px] bg-[#0B2D54] p-5 text-white shadow-[0_18px_52px_rgba(11,45,84,0.14)] sm:p-7">
                 <div
                   aria-hidden="true"
-                  className="pointer-events-none absolute -right-20 -top-24 h-72 w-72 rounded-full bg-[#24C1C4]/20 blur-3xl"
+                  className="pointer-events-none absolute -right-24 -top-24 h-80 w-80 rounded-full bg-[#24C1C4]/20 blur-3xl"
                 />
                 <div
                   aria-hidden="true"
-                  className="pointer-events-none absolute -bottom-24 left-1/3 h-52 w-52 rounded-full bg-white/[0.07] blur-3xl"
+                  className="pointer-events-none absolute -bottom-28 left-1/3 h-56 w-56 rounded-full bg-white/[0.07] blur-3xl"
                 />
 
-                <div className="relative flex min-h-[232px] flex-col justify-between gap-10">
-                  <div className="max-w-[40rem]">
-                    <h2 className="text-[34px] font-black tracking-[-0.055em] sm:text-[44px]">
-                      Good day, {firstName}
-                    </h2>
-                    <p className="mt-2 max-w-[30rem] text-[13px] font-medium leading-6 text-white/[0.72]">
-                      Your health, organised around what matters today.
-                    </p>
+                <div className="relative flex min-h-[232px] flex-col justify-between gap-8">
+                  <div className="flex items-start justify-between gap-6">
+                    <div className="max-w-[34rem]">
+                      <p className="text-[10px] font-black uppercase tracking-[0.18em] text-[#24C1C4]">
+                        {todayDate.weekday} · {todayDate.day} {todayDate.month}
+                      </p>
+                      <h2 className="mt-3 text-[34px] font-black tracking-[-0.055em] sm:text-[44px]">
+                        Good day, {firstName}
+                      </h2>
+                      <p className="mt-2 max-w-[30rem] text-[13px] font-medium leading-6 text-white/[0.72]">
+                        Your health, organised around what matters today.
+                      </p>
+                    </div>
+
+                    <div className="hidden shrink-0 sm:block">
+                      <div className="grid h-[78px] w-[78px] place-items-center rounded-[24px] bg-white/[0.08] ring-1 ring-white/10">
+                        <div className="text-center">
+                          <p className="text-[10px] font-black uppercase tracking-[0.14em] text-white/[0.52]">
+                            {todayDate.month}
+                          </p>
+                          <p className="text-[30px] font-black leading-none tracking-[-0.06em]">
+                            {todayDate.day}
+                          </p>
+                        </div>
+                      </div>
+                    </div>
                   </div>
 
                   <div className="flex flex-wrap items-end justify-between gap-6">
-                    <div>
+                    <div className="flex items-end gap-3">
                       <p className="text-[62px] font-black leading-[0.82] tracking-[-0.08em] sm:text-[72px]">
                         {todayActionCount}
                       </p>
-                      <p className="mt-2 text-[10px] font-black uppercase tracking-[0.16em] text-white/[0.52]">
+                      <p className="pb-1.5 text-[10px] font-black uppercase tracking-[0.16em] text-white/[0.52]">
                         things today
                       </p>
                     </div>
@@ -248,30 +318,81 @@ export default function HealthHome() {
                 </div>
               </section>
 
-              <ActionLink
-                href="/log-symptom"
-                className="group relative flex min-h-[232px] flex-col justify-between overflow-hidden rounded-[32px] bg-[#24C1C4] p-5 text-[#0B2D54] shadow-[0_18px_52px_rgba(36,193,196,0.15)] sm:p-6"
-              >
+              <section className="group relative flex min-h-[232px] flex-col justify-between overflow-hidden rounded-[32px] bg-[#24C1C4] p-5 text-[#0B2D54] shadow-[0_18px_52px_rgba(36,193,196,0.15)] sm:p-6">
                 <div
                   aria-hidden="true"
                   className="pointer-events-none absolute -right-14 -top-20 h-52 w-52 rounded-full bg-white/25 blur-3xl transition-transform duration-300 group-hover:scale-110"
                 />
-                <div className="relative flex items-start justify-between">
+
+                <div className="relative flex items-start justify-between gap-4">
                   <span className="grid h-12 w-12 place-items-center rounded-2xl bg-white/30 ring-1 ring-white/40">
                     <HeartPulse className="h-5 w-5" aria-hidden="true" />
                   </span>
-                  <ArrowRight className="mt-1 h-5 w-5 transition-transform group-hover:translate-x-1" aria-hidden="true" />
+                  <span className="text-[10px] font-black uppercase tracking-[0.15em] text-[#0B2D54]/65">
+                    Monitor
+                  </span>
                 </div>
 
                 <div className="relative">
-                  <p className="text-[10px] font-black uppercase tracking-[0.16em] text-[#0B2D54]/65">
-                    Monitor
+                  <p className="text-[10px] font-black uppercase tracking-[0.15em] text-[#0B2D54]/60">
+                    Recent symptom
                   </p>
-                  <h2 className="mt-1 text-[26px] font-black tracking-[-0.05em]">
-                    Log a symptom
-                  </h2>
+
+                  {recentSymptom ? (
+                    <>
+                      <div className="mt-1 flex items-end justify-between gap-3">
+                        <h2 className="min-w-0 truncate text-[22px] font-black tracking-[-0.045em]">
+                          {symptomLabel(recentSymptom)}
+                        </h2>
+                        {recentSymptom.overallSeverity && (
+                          <span className="shrink-0 rounded-full bg-white/35 px-2.5 py-1 text-[9px] font-black uppercase tracking-[0.08em]">
+                            {String(recentSymptom.overallSeverity).toLowerCase()}
+                          </span>
+                        )}
+                      </div>
+                      <p className="mt-1 text-[11px] font-semibold text-[#0B2D54]/65">
+                        {formatSymptomDate(recentSymptomAt)}
+                        {recentSymptomStatus === "ACTIVE" ? " · Active" : ""}
+                      </p>
+                      <div className="mt-4 flex items-center justify-between gap-3">
+                        <Link
+                          href={
+                            recentSymptomStatus === "ACTIVE"
+                              ? "/symptom-logs/" + encodeURIComponent(String(recentSymptom.id)) + "/monitor"
+                              : "/symptom-logs/" + encodeURIComponent(String(recentSymptom.id))
+                          }
+                          className="inline-flex min-h-10 items-center gap-2 rounded-full bg-[#0B2D54] px-4 py-2 text-[10px] font-black uppercase tracking-[0.08em] text-white transition-transform hover:-translate-y-0.5"
+                        >
+                          Update
+                          <ArrowRight className="h-3.5 w-3.5 text-[#24C1C4]" aria-hidden="true" />
+                        </Link>
+                        <Link
+                          href="/log-symptom"
+                          className="text-[10px] font-black uppercase tracking-[0.1em] text-[#0B2D54]/70 hover:text-[#0B2D54]"
+                        >
+                          New symptom
+                        </Link>
+                      </div>
+                    </>
+                  ) : (
+                    <>
+                      <h2 className="mt-1 text-[22px] font-black tracking-[-0.045em]">
+                        Log a symptom
+                      </h2>
+                      <p className="mt-1 text-[11px] font-semibold text-[#0B2D54]/65">
+                        Nothing has been logged yet.
+                      </p>
+                      <Link
+                        href="/log-symptom"
+                        className="mt-4 inline-flex min-h-10 items-center gap-2 rounded-full bg-[#0B2D54] px-4 py-2 text-[10px] font-black uppercase tracking-[0.08em] text-white"
+                      >
+                        Log symptom
+                        <ArrowRight className="h-3.5 w-3.5 text-[#24C1C4]" aria-hidden="true" />
+                      </Link>
+                    </>
+                  )}
                 </div>
-              </ActionLink>
+              </section>
             </div>
 
             <section className="relative overflow-hidden rounded-[34px] bg-gradient-to-br from-[#E8F8F7] via-white to-[#F7FBFB] p-[1px] shadow-[0_12px_40px_rgba(11,45,84,0.05)]">
