@@ -154,16 +154,21 @@ function ActionLink({
 export default function HealthHome() {
   const { data, loading, error, reload } = useDashboard();
   const [symptomFeed, setSymptomFeed] = useState<any[]>([]);
+  const [journalRecordCount, setJournalRecordCount] = useState(0);
 
   useEffect(() => {
     if (!data?.patient?.id) return;
 
     let active = true;
 
-    healthJournalService.getSymptoms({ limit: 100 })
-      .then((symptoms) => {
+    Promise.all([
+      healthJournalService.getSymptoms({ limit: 100 }),
+      healthJournalService.getAll({ page: 1, limit: 1 }),
+    ])
+      .then(([symptoms, journals]) => {
         if (!active) return;
         setSymptomFeed(Array.isArray(symptoms) ? symptoms : []);
+        setJournalRecordCount(Number(journals?.pagination?.total ?? journals?.data?.length ?? 0));
       })
       .catch(() => {
         if (!active) return;
@@ -271,9 +276,8 @@ export default function HealthHome() {
       : null,
   ].filter((chip): chip is string => Boolean(chip));
 
-  const journalChip = recentSymptom
-    ? `Last entry · ${formatSymptomDate(recentSymptomAt)}`
-    : "No recent entries";
+  const journalRecordLabel = `${journalRecordCount} record${journalRecordCount === 1 ? "" : "s"}`;
+  const symptomRecordLabel = `${symptomFeed.length} symptom${symptomFeed.length === 1 ? "" : "s"}`;
 
   return (
     <ProtectedRoute>
@@ -486,7 +490,8 @@ export default function HealthHome() {
                       <div className="mt-1 flex items-end justify-between gap-3">
                         <h2 className="text-[24px] font-black tracking-[-0.05em] text-[#0B2D54]">Records</h2>
                         <div className="flex flex-wrap justify-end gap-1.5">
-                          <RecordedChip className="bg-[#EEF5FF] text-[#0E4B9F] ring-[#155AC1]/15">{journalChip}</RecordedChip>
+                          <RecordedChip className="bg-[#EEF5FF] text-[#0E4B9F] ring-[#155AC1]/15">{journalRecordLabel}</RecordedChip>
+                          <RecordedChip className="bg-[#EEF5FF] text-[#0E4B9F] ring-[#155AC1]/15">{symptomRecordLabel}</RecordedChip>
                         </div>
                       </div>
                     </div>
