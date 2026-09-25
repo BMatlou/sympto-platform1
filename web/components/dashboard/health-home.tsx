@@ -193,7 +193,6 @@ export default function HealthHome() {
       .catch(() => {
         if (!active) return;
         setSymptomFeed([]);
-        setJournalEntries([]);
       });
 
     return () => {
@@ -269,6 +268,14 @@ export default function HealthHome() {
   const recentSymptomAt =
     recentSymptom?.startedAt ?? recentSymptom?.createdAt ?? null;
 
+  // Chips shown on the three navigation cards are derived only from records
+  // already loaded for this dashboard; they are not hard-coded health data.
+  const todayChips = [
+    medications.length > 0 ? `${medications.length} med${medications.length === 1 ? "" : "s"}` : null,
+    activeGoalCount > 0 ? `${activeGoalCount} goal${activeGoalCount === 1 ? "" : "s"}` : null,
+    appointments.length > 0 ? `${appointments.length} visit${appointments.length === 1 ? "" : "s"}` : null,
+  ].filter((chip): chip is string => Boolean(chip));
+
   const activeConditions = Array.isArray(data.conditions)
     ? data.conditions
     : Array.isArray(data.healthSnapshot?.activeConditions)
@@ -279,6 +286,20 @@ export default function HealthHome() {
     : Array.isArray(data.healthSnapshot?.activeAllergies)
       ? data.healthSnapshot.activeAllergies
       : [];
+
+  const clinicChips = [
+    activeConditions.length > 0
+      ? `${activeConditions.length} condition${activeConditions.length === 1 ? "" : "s"}`
+      : null,
+    activeAllergies.length > 0
+      ? `${activeAllergies.length} allerg${activeAllergies.length === 1 ? "y" : "ies"}`
+      : null,
+  ].filter((chip): chip is string => Boolean(chip));
+
+  const journalChips = [
+    recentSymptom ? "Symptom logged" : null,
+    recentSymptom ? "Recent" : null,
+  ].filter((chip): chip is string => Boolean(chip));
 
   return (
     <ProtectedRoute>
