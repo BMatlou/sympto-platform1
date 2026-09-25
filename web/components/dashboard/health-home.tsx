@@ -3,7 +3,7 @@
 import Link from "next/link";
 import type { ReactNode } from "react";
 import { useEffect, useState } from "react";
-import { ArrowRight, CheckCircle2, FileHeart, FolderOpen, Plus, ShieldCheck } from "lucide-react";
+import { ArrowRight, CheckCircle2, FileHeart, FolderOpen, HeartPulse, Plus, ShieldCheck } from "lucide-react";
 import { useDashboard } from "@/hooks/use-dashboard";
 import { healthJournalService } from "@/services/health-journal.service";
 import ProtectedRoute from "@/components/auth/protected-route";
@@ -352,16 +352,15 @@ export default function HealthHome() {
                   <div aria-hidden="true" className="pointer-events-none absolute inset-x-7 top-0 h-px bg-white/75" />
 
                   <div className="relative flex min-h-[202px] flex-col justify-between">
-                    <div className="flex items-center justify-between gap-4">
+                    <div className="flex items-center gap-2.5">
+                      <HeartPulse
+                        className="h-5 w-5 text-white/82"
+                        strokeWidth={1.8}
+                        aria-hidden="true"
+                      />
                       <p className="text-[10px] font-black uppercase tracking-[0.17em] text-white/68">
                         Recent symptom
                       </p>
-                      <Link
-                        href="/log-symptom"
-                        className="inline-flex min-h-8 items-center rounded-xl bg-white/10 px-3 py-1.5 text-[9px] font-black uppercase tracking-[0.12em] text-white/80 ring-1 ring-inset ring-white/20 transition-all hover:bg-white/18 hover:text-white"
-                      >
-                        Log
-                      </Link>
                     </div>
 
                     {recentSymptom ? (
