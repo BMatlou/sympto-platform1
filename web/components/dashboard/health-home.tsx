@@ -142,7 +142,7 @@ function RecordedChip({
 }) {
   return (
     <span
-      className={"inline-flex items-center rounded-full px-2.5 py-1 text-[9px] font-black tracking-[-0.01em] ring-1 ring-inset " + className}
+      className={"inline-flex min-h-6 items-center whitespace-nowrap rounded-full px-2.5 py-1 text-[9px] font-black tracking-[-0.01em] shadow-[0_3px_12px_rgba(11,45,84,0.08)] backdrop-blur-md ring-1 ring-inset " + className}
     >
       {children}
     </span>
@@ -544,7 +544,7 @@ export default function HealthHome() {
 
             <section className="relative">
               <div className="mb-4 flex items-center justify-between px-1">
-                  <p className="text-[10px] font-black uppercase tracking-[0.17em] text-[#0B2D54]">
+                  <p className="text-[11px] font-black uppercase tracking-[0.18em] text-[#0B2D54]">
                     Your health
                   </p>
                 </div>
@@ -577,7 +577,7 @@ export default function HealthHome() {
                             {todayChips.map((chip) => (
                               <RecordedChip
                                 key={chip}
-                                className="bg-white/16 px-2 py-1 text-white ring-white/30"
+                                className="bg-white/14 px-2.5 py-1 text-white ring-white/30"
                               >
                                 {chip}
                               </RecordedChip>
@@ -615,7 +615,7 @@ export default function HealthHome() {
                             {clinicChips.map((chip) => (
                               <RecordedChip
                                 key={chip}
-                                className="bg-white/16 px-2 py-1 text-white ring-white/25"
+                                className="bg-white/14 px-2.5 py-1 text-white ring-white/25"
                               >
                                 {chip}
                               </RecordedChip>
