@@ -199,7 +199,7 @@ export default function HealthHome() {
 
               <ActionLink
                 href="/today"
-                className="hidden shrink-0 items-center gap-2 rounded-full bg-[#0B2D54] px-4 py-2.5 text-[11px] font-black text-white shadow-[0_8px_22px_rgba(15,90,98,0.12)] hover:bg-[#0B2D54] sm:inline-flex"
+                className="hidden shrink-0 items-center gap-2 rounded-full bg-[#0B2D54] px-4 py-2.5 text-[11px] font-black text-white shadow-[0_8px_22px_rgba(11,45,84,0.12)] hover:bg-[#0B2D54] sm:inline-flex"
               >
                 Open today
                 <ArrowRight className="h-3.5 w-3.5" aria-hidden="true" />
@@ -220,13 +220,7 @@ export default function HealthHome() {
                 <div className="relative flex min-h-[176px] flex-col justify-between gap-8">
                   <div className="flex items-start justify-between gap-4">
                     <div>
-                      <span className="inline-flex items-center gap-2 rounded-full bg-white/10 px-3 py-1.5 ring-1 ring-white/10">
-                        <span className="h-1.5 w-1.5 rounded-full bg-[#24C1C4] shadow-[0_0_12px_rgba(36,193,196,0.75)]" />
-                        <span className="text-[9px] font-black uppercase tracking-[0.16em] text-white/80">
-                          Today
-                        </span>
-                      </span>
-                      <h2 className="mt-5 text-[42px] font-black tracking-[-0.06em] sm:text-[52px]">
+                      <h2 className="text-[42px] font-black tracking-[-0.06em] sm:text-[52px]">
                         Today
                       </h2>
                     </div>
