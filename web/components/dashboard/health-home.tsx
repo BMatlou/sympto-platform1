@@ -3,7 +3,7 @@
 import Link from "next/link";
 import type { ReactNode } from "react";
 import { useEffect, useState } from "react";
-import { Activity, ArrowRight, Bell, CalendarDays, CheckCircle2, ChevronDown, ClipboardList, CreditCard, FileHeart, FileText, FolderOpen, HeartPulse, House, Menu, MessageCircle, Pill, Plus, Settings, ShieldCheck, UserRound, Users, Watch } from "lucide-react";
+import { Activity, ArrowRight, Bell, CalendarDays, CheckCircle2 , ClipboardList, CreditCard, FileHeart, FileText, FolderOpen, HeartPulse, House,  MessageCircle, Pill, Plus, Settings, ShieldCheck, UserRound, Users, Watch } from "lucide-react";
 import { useDashboard } from "@/hooks/use-dashboard";
 import { healthJournalService } from "@/services/health-journal.service";
 import ProtectedRoute from "@/components/auth/protected-route";
@@ -162,7 +162,6 @@ function ActionLink({
 export default function HealthHome() {
   const { data, loading, error, reload } = useDashboard();
   const [symptomFeed, setSymptomFeed] = useState<any[]>([]);
-  const [moreOpen, setMoreOpen] = useState(false);
 
   useEffect(() => {
     if (!data?.patient?.id) return;
@@ -246,11 +245,6 @@ export default function HealthHome() {
   const activeGoalCount = countActiveGoals(data);
   const todayActionCount =
     medications.length + appointments.length + activeGoalCount;
-
-  const recentSymptom = recentSymptomFrom(data, symptomFeed);
-  const recentSymptomStatus = String(recentSymptom?.status ?? "").toUpperCase();
-  const recentSymptomAt =
-    recentSymptom?.startedAt ?? recentSymptom?.createdAt ?? null;
 
   const recentSymptoms = [...(
     symptomFeed.length > 0
@@ -448,7 +442,7 @@ export default function HealthHome() {
                       </div>
                       <div className="mt-auto">
                         <p className="text-[9px] font-bold uppercase tracking-[0.12em] text-slate-400">Clinic Card</p>
-                        <h3 className="mt-1 text-[27px] font-black tracking-[-0.06em] text-[#0B2D54]">2 conditions · 2 allergies</h3>
+                        <h3 className="mt-1 text-[27px] font-black tracking-[-0.06em] text-[#0B2D54]">{clinicSummary}</h3>
                         <div className="mt-5 h-1 rounded-full bg-[#0B2D54]/10">
                           <div className="h-1 w-3/4 rounded-full bg-[#0B2D54]/45" />
                         </div>
