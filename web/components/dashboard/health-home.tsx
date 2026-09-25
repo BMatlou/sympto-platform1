@@ -201,18 +201,27 @@ export default function HealthHome() {
                   className="pointer-events-none absolute inset-0 bg-[linear-gradient(90deg,rgba(255,255,255,0.045)_1px,transparent_1px),linear-gradient(rgba(255,255,255,0.045)_1px,transparent_1px)] bg-[size:34px_34px]"
                 />
 
-                <div className="relative">
-                  <div className="flex min-h-[176px] items-end justify-between gap-6">
-                    <div className="max-w-[34rem]">
-                      <h2 className="text-[34px] font-black tracking-[-0.055em] text-white sm:text-[42px]">
-                        Good day, {firstName}
-                      </h2>
-                      <p className="mt-2 max-w-[28rem] text-[13px] font-medium leading-6 text-white/[0.72]">
-                        Your health, organised around what matters today.
-                      </p>
-                    </div>
-
+                <div className="relative flex min-h-[176px] items-center">
+                  <div className="max-w-[34rem]">
+                    <p className="text-[10px] font-black uppercase tracking-[0.18em] text-[#24C1C4]">
+                      Today
+                    </p>
+                    <h2 className="mt-2 text-[34px] font-black tracking-[-0.055em] text-white sm:text-[42px]">
+                      Good day, {firstName}
+                    </h2>
+                    <p className="mt-2 max-w-[28rem] text-[13px] font-medium leading-6 text-white/[0.72]">
+                      Your health, organised around what matters today.
+                    </p>
                   </div>
+
+                  <div
+                    aria-hidden="true"
+                    className="pointer-events-none absolute -right-10 top-1/2 hidden h-44 w-44 -translate-y-1/2 rounded-full border border-[#24C1C4]/20 bg-[#24C1C4]/[0.05] shadow-[0_0_80px_rgba(36,193,196,0.10)] sm:block"
+                  />
+                  <div
+                    aria-hidden="true"
+                    className="pointer-events-none absolute -right-2 top-1/2 hidden h-28 w-28 -translate-y-1/2 rounded-full bg-[#24C1C4]/[0.08] blur-2xl sm:block"
+                  />
                 </div>
               </section>
 
