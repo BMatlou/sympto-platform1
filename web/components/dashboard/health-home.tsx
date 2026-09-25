@@ -3,64 +3,13 @@
 import Link from "next/link";
 import type { ReactNode } from "react";
 import { useEffect, useState } from "react";
-import { Activity, ArrowRight, CheckCircle2, FileHeart, FileText, FolderOpen, ShieldCheck } from "lucide-react";
+import { ArrowRight, CheckCircle2, FileHeart, FolderOpen, ShieldCheck } from "lucide-react";
 import { useDashboard } from "@/hooks/use-dashboard";
 import { healthJournalService } from "@/services/health-journal.service";
 import ProtectedRoute from "@/components/auth/protected-route";
 
 function display(value: unknown, fallback = "Not recorded"): string {
   return value === null || value === undefined || value === "" ? fallback : String(value);
-}
-
-function normalizeVitals(data: any) {
-  const deviceVitals = Array.isArray(data?.healthSnapshot?.latestMeasurements)
-    ? data.healthSnapshot.latestMeasurements.map((item: any) => ({
-        type: item.type ?? item.measurementType,
-        value: item.value,
-        unit: item.unit,
-        measuredAt: item.measuredAt,
-      }))
-    : [];
-
-  const clinicalVitals = Array.isArray(data?.clinicalVitals)
-    ? data.clinicalVitals.map((item: any) => ({
-        type: item.vitalType?.code ?? item.vitalType?.name,
-        value: item.value,
-        unit: item.vitalType?.unit,
-        measuredAt: item.measuredAt,
-      }))
-    : [];
-
-  const byType = new Map<string, any>();
-
-  for (const vital of [...deviceVitals, ...clinicalVitals]) {
-    const key = String(vital.type ?? "").toUpperCase();
-    if (!key) continue;
-
-    const previous = byType.get(key);
-    if (
-      !previous ||
-      new Date(String(vital.measuredAt ?? 0)).getTime() >
-        new Date(String(previous.measuredAt ?? 0)).getTime()
-    ) {
-      byType.set(key, vital);
-    }
-  }
-
-  return Array.from(byType.values());
-}
-
-function itemNames(
-  items: any[],
-  kind: "allergy" | "condition",
-): string[] {
-  return items
-    .map((item) =>
-      kind === "allergy"
-        ? item?.allergy?.name ?? item?.name
-        : item?.condition?.name ?? item?.name,
-    )
-    .filter(Boolean) as string[];
 }
 
 function countActiveGoals(data: any) {
@@ -250,13 +199,7 @@ export default function HealthHome() {
     : [];
 
   const activeGoalCount = countActiveGoals(data);
-  const {todayActionCount} =
-    medications.length + appointments.length + activeGoalCount;
-
-  const recentSymptom = recentSymptomFrom(data, symptomFeed);
-  const recentSymptomStatus = String(recentSymptom?.status ?? "").toUpperCase();
-  const recentSymptomAt =
-    recentSymptom?.startedAt ?? recentSymptom?.createdAt ?? null;
+  const todayActionCount = medications.length + appointments.length + activeGoalCount;
 
   // Chips shown on the three navigation cards are derived only from records
   // already loaded for this dashboard; they are not hard-coded health data.
@@ -306,61 +249,16 @@ export default function HealthHome() {
                 </ActionLink>
               </div>
 
-              <div className="mt-3">
-                <section className="relative min-h-[210px] overflow-hidden rounded-[28px] bg-[#0B2D54] px-5 py-6 text-white shadow-[0_24px_60px_rgba(11,45,84,0.16)] sm:px-7 sm:py-7">
-                  <div aria-hidden="true" className="pointer-events-none absolute inset-y-0 right-0 w-1/3 bg-[#24C1C4]/[0.08]" />
-                  <div aria-hidden="true" className="pointer-events-none absolute inset-x-7 top-0 h-px bg-white/10" />
+              <section className="mt-3 rounded-[28px] border border-slate-200/80 bg-white px-6 py-7 shadow-[0_16px_40px_rgba(11,45,84,0.06)] sm:px-8">
+                <p className="text-[10px] font-black uppercase tracking-[0.18em] text-[#24C1C4]">My health</p>
+                <h2 className="mt-2 text-[32px] font-black tracking-[-0.05em] text-[#0B2D54] sm:text-[40px]">
+                  {greeting}, {firstName}
+                </h2>
+                <p className="mt-2 max-w-[42rem] text-sm font-medium leading-6 text-slate-500">
+                  Your health, organised around what matters today.
+                </p>
+              </section>
 
-                  <div className="relative grid min-h-[156px] items-center gap-8 md:grid-cols-[minmax(0,1fr)_minmax(280px,0.8fr)_minmax(180px,0.55fr)]">
-                    <div>
-                      <p className="text-[9px] font-black uppercase tracking-[0.18em] text-white/45">Overview</p>
-                      <h2 className="mt-2 text-[30px] font-black tracking-[-0.05em] sm:text-[36px]">
-                        {greeting}, {firstName}
-                      </h2>
-                      <p className="mt-2 max-w-[31rem] text-[11px] font-medium leading-5 text-white/60">
-                        Your health, organised around what matters today.
-                      </p>
-                    </div>
-
-                    <div className="border-l border-white/15 pl-7">
-                      <p className="text-[9px] font-black uppercase tracking-[0.18em] text-white/45">Today</p>
-                      <div className="mt-2 flex items-end gap-3">
-                        <p className="text-[58px] font-black leading-none tracking-[-0.08em]">
-                          todayActionCount
-                        </p>
-                        <p className="max-w-[11rem] pb-1 text-[10px] font-bold leading-4 text-white/70">
-                          active items that need your attention today
-                        </p>
-                      </div>
-                    </div>
-
-                    <div className="border-l border-white/15 pl-7">
-                      <p className="text-[9px] font-black uppercase tracking-[0.18em] text-white/45">Latest measurement</p>
-                      {(() => {
-                        const latest = normalizeVitals(data)
-                          .filter((item: any) => item?.value !== null && item?.value !== undefined)
-                          .sort((a: any, b: any) =>
-                            new Date(String(b.measuredAt ?? 0)).getTime() -
-                            new Date(String(a.measuredAt ?? 0)).getTime(),
-                          )[0];
-                        return latest ? (
-                          <>
-                            <p className="mt-2 truncate text-[19px] font-black tracking-[-0.03em]">
-                              {display(latest.type, "Measurement")}
-                            </p>
-                            <p className="mt-1 text-[11px] font-semibold text-white/65">
-                              {display(latest.value)}
-                              {latest.unit ? ` ${latest.unit}` : ""}
-                            </p>
-                          </>
-                        ) : (
-                          <p className="mt-2 text-[11px] font-semibold text-white/55">No measurement recorded</p>
-                        );
-                      })()}
-                    </div>
-                  </div>
-                </section>
-              </div>
               <section className="mt-6">
                 <div className="mb-3 flex items-center justify-between px-1">
                   <p className="text-[10px] font-black uppercase tracking-[0.18em] text-[#0B2D54]/55">Your health</p>
