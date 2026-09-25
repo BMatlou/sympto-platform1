@@ -148,7 +148,7 @@ export default function HealthNavigation() {
               className="group relative flex h-10 w-10 shrink-0 items-center justify-center text-white/60 lg:h-auto lg:min-h-0 lg:flex-1 lg:w-full"
             >
               <span
-                className={`relative z-10 grid h-10 w-10 place-items-center rounded-2xl transition-all duration-200 lg:h-12 lg:w-12 ${isActive ? "bg-[#24C1C4] text-[#0B2D54] shadow-[0_10px_24px_rgba(36,193,196,0.24)]" : "text-white/60 group-hover:translate-x-1.5 group-hover:-translate-y-0.5 group-hover:scale-110 group-hover:bg-white/[0.12] group-hover:text-white group-hover:shadow-[0_12px_28px_rgba(36,193,196,0.30)] group-hover:ring-1 group-hover:ring-inset group-hover:ring-white/15"}`}
+                className={`relative z-10 grid h-10 w-10 place-items-center rounded-2xl transition-all duration-200 lg:h-12 lg:w-12 ${isActive ? "bg-[#24C1C4] text-[#0B2D54] shadow-[0_10px_24px_rgba(36,193,196,0.24)]" : "text-white/60 group-hover:translate-x-1.5 group-hover:-translate-y-0.5 group-hover:scale-110 group-hover:bg-white/[0.12] group-hover:text-[#24C1C4] group-hover:shadow-[0_12px_28px_rgba(36,193,196,0.30)] group-hover:ring-1 group-hover:ring-inset group-hover:ring-white/15"}`}
               >
                 <Icon className="h-5 w-5" aria-hidden="true" />
               </span>
