@@ -140,25 +140,6 @@ export default function HealthHome() {
   const { data, loading, error, reload } = useDashboard();
   const [symptomFeed, setSymptomFeed] = useState<any[]>([]);
 
-  if (loading) {
-    return (
-      <ProtectedRoute>
-        <main className="min-h-screen bg-[#f7fbfb] p-4 sm:p-8">
-          <div className="mx-auto max-w-[1240px] space-y-4" aria-busy="true">
-            <div className="h-[360px] animate-pulse rounded-b-[42px] rounded-t-[30px] bg-white" />
-            <div className="h-10 animate-pulse rounded-2xl bg-white" />
-            {Array.from({ length: 3 }).map((_, index) => (
-              <div
-                key={index}
-                className="h-64 animate-pulse rounded-3xl bg-white"
-              />
-            ))}
-          </div>
-        </main>
-      </ProtectedRoute>
-    );
-  }
-
   useEffect(() => {
     if (!data?.patient?.id) return;
 
@@ -181,6 +162,25 @@ export default function HealthHome() {
       active = false;
     };
   }, [data?.patient?.id, data?.generatedAt]);
+
+  if (loading) {
+    return (
+      <ProtectedRoute>
+        <main className="min-h-screen bg-[#f7fbfb] p-4 sm:p-8">
+          <div className="mx-auto max-w-[1240px] space-y-4" aria-busy="true">
+            <div className="h-[360px] animate-pulse rounded-b-[42px] rounded-t-[30px] bg-white" />
+            <div className="h-10 animate-pulse rounded-2xl bg-white" />
+            {Array.from({ length: 3 }).map((_, index) => (
+              <div
+                key={index}
+                className="h-64 animate-pulse rounded-3xl bg-white"
+              />
+            ))}
+          </div>
+        </main>
+      </ProtectedRoute>
+    );
+  }
 
   if (error || !data) {
     return (
