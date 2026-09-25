@@ -109,6 +109,21 @@ function formatSymptomDate(value: unknown): string {
   }).format(date);
 }
 
+function RecordedChip({
+  children,
+  className = "",
+}: {
+  children: ReactNode;
+  className?: string;
+}) {
+  return (
+    <span
+      className={"inline-flex items-center rounded-full px-2.5 py-1 text-[9px] font-black tracking-[-0.01em] ring-1 ring-inset " + className}
+    >
+      {children}
+    </span>
+  );
+}
 function ActionLink({
   href,
   children,
@@ -139,30 +154,32 @@ function ActionLink({
 export default function HealthHome() {
   const { data, loading, error, reload } = useDashboard();
   const [symptomFeed, setSymptomFeed] = useState<any[]>([]);
+  const [journalEntries, setJournalEntries] = useState<any[]>([]);
 
   useEffect(() => {
     if (!data?.patient?.id) return;
 
     let active = true;
 
-    healthJournalService
-      .getSymptoms({ limit: 20 })
-      .then((records) => {
-        if (active) {
-          setSymptomFeed(Array.isArray(records) ? records : []);
-        }
+    Promise.all([
+      healthJournalService.getSymptoms({ limit: 100 }),
+      healthJournalService.getAll({ page: 1, limit: 100 }),
+    ])
+      .then(([symptoms, journals]) => {
+        if (!active) return;
+        setSymptomFeed(Array.isArray(symptoms) ? symptoms : []);
+        setJournalEntries(Array.isArray(journals?.data) ? journals.data : []);
       })
       .catch(() => {
-        if (active) {
-          setSymptomFeed([]);
-        }
+        if (!active) return;
+        setSymptomFeed([]);
+        setJournalEntries([]);
       });
 
     return () => {
       active = false;
     };
   }, [data?.patient?.id, data?.generatedAt]);
-
   if (loading) {
     return (
       <ProtectedRoute>
@@ -231,6 +248,54 @@ export default function HealthHome() {
   const recentSymptomStatus = String(recentSymptom?.status ?? "").toUpperCase();
   const recentSymptomAt =
     recentSymptom?.startedAt ?? recentSymptom?.createdAt ?? null;
+
+  const activeConditions = Array.isArray(data.conditions)
+    ? data.conditions
+    : Array.isArray(data.healthSnapshot?.activeConditions)
+      ? data.healthSnapshot.activeConditions
+      : [];
+  const activeAllergies = Array.isArray(data.allergies)
+    ? data.allergies
+    : Array.isArray(data.healthSnapshot?.activeAllergies)
+      ? data.healthSnapshot.activeAllergies
+      : [];
+
+  const recordedMeasurements = [
+    ...(Array.isArray(data.clinicalVitals) ? data.clinicalVitals : []),
+    ...(Array.isArray(data.healthSnapshot?.latestMeasurements)
+      ? data.healthSnapshot.latestMeasurements
+      : []),
+  ];
+  const uniqueMeasurementCount = new Set(
+    recordedMeasurements
+      .filter((item: any) => item?.measuredAt)
+      .map(
+        (item: any) =>
+          String(item?.type ?? item?.vitalType?.code ?? item?.name ?? "measurement") + "|" +
+          String(item?.value ?? "") + "|" +
+          String(item?.measuredAt),
+      ),
+  ).size;
+
+  const todayChips = [
+    medications.length ? medications.length + " medication" + (medications.length === 1 ? "" : "s") : null,
+    appointments.length ? appointments.length + " appointment" + (appointments.length === 1 ? "" : "s") : null,
+    activeGoalCount ? activeGoalCount + " active goal" + (activeGoalCount === 1 ? "" : "s") : null,
+  ].filter(Boolean) as string[];
+
+  const clinicChips = [
+    activeConditions.length ? activeConditions.length + " condition" + (activeConditions.length === 1 ? "" : "s") : null,
+    activeAllergies.length ? activeAllergies.length + " allerg" + (activeAllergies.length === 1 ? "y" : "ies") : null,
+    data.healthSnapshot?.bloodType
+      ? String(data.healthSnapshot.bloodType).replace(/_POSITIVE$/i, "+").replace(/_NEGATIVE$/i, "-").replace(/_/g, " ")
+      : null,
+  ].filter(Boolean) as string[];
+
+  const journalChips = [
+    symptomFeed.length ? symptomFeed.length + " symptom" + (symptomFeed.length === 1 ? "" : "s") : null,
+    uniqueMeasurementCount ? uniqueMeasurementCount + " measurement" + (uniqueMeasurementCount === 1 ? "" : "s") : null,
+    journalEntries.length ? journalEntries.length + " entr" + (journalEntries.length === 1 ? "y" : "ies") : null,
+  ].filter(Boolean) as string[];
 
   return (
     <ProtectedRoute>
@@ -421,6 +486,18 @@ export default function HealthHome() {
                       <ArrowRight className="h-4 w-4 text-[#0B2D54] transition-transform group-hover:translate-x-1" aria-hidden="true" />
                     </div>
                     <div className="relative">
+                      {todayChips.length > 0 && (
+                        <div className="mb-3 flex flex-wrap gap-1.5">
+                          {todayChips.map((chip) => (
+                            <RecordedChip
+                              key={chip}
+                              className="bg-white/80 text-[#0B2D54] ring-[#24C1C4]/25"
+                            >
+                              {chip}
+                            </RecordedChip>
+                          ))}
+                        </div>
+                      )}
                       <p className="text-[9px] font-black uppercase tracking-[0.14em] text-[#24C1C4]">
                         Daily care
                       </p>
@@ -442,6 +519,18 @@ export default function HealthHome() {
                       <ArrowRight className="h-4 w-4 text-[#C62828] transition-transform group-hover:translate-x-1" aria-hidden="true" />
                     </div>
                     <div className="relative">
+                      {clinicChips.length > 0 && (
+                        <div className="mb-3 flex flex-wrap gap-1.5">
+                          {clinicChips.map((chip) => (
+                            <RecordedChip
+                              key={chip}
+                              className="bg-white/90 text-[#8F2435] ring-[#E53935]/15"
+                            >
+                              {chip}
+                            </RecordedChip>
+                          ))}
+                        </div>
+                      )}
                       <p className="text-[9px] font-black uppercase tracking-[0.14em] text-[#C62828]">
                         Clinic Card
                       </p>
@@ -463,6 +552,18 @@ export default function HealthHome() {
                       <ArrowRight className="h-4 w-4 text-[#0B2D54] transition-transform group-hover:translate-x-1" aria-hidden="true" />
                     </div>
                     <div className="relative">
+                      {journalChips.length > 0 && (
+                        <div className="mb-3 flex flex-wrap gap-1.5">
+                          {journalChips.map((chip) => (
+                            <RecordedChip
+                              key={chip}
+                              className="bg-[#E8F8F7] text-[#0B2D54] ring-[#24C1C4]/20"
+                            >
+                              {chip}
+                            </RecordedChip>
+                          ))}
+                        </div>
+                      )}
                       <p className="text-[9px] font-black uppercase tracking-[0.14em] text-[#24C1C4]">
                         Health Journal
                       </p>
