@@ -118,13 +118,13 @@ export default function HealthNavigation() {
         <div
           role="menu"
           aria-label="More health navigation"
-          className="absolute right-0 top-16 max-h-[calc(100vh-5rem)] w-[min(22rem,calc(100vw-1rem))] overflow-y-auto rounded-[28px] border border-slate-200/80 bg-white/98 p-2 shadow-[0_28px_70px_rgba(11,45,84,0.20)] backdrop-blur-xl animate-in fade-in zoom-in-95 duration-200 lg:left-[76px] lg:right-auto lg:top-0"
+          className="absolute right-0 top-16 max-h-[calc(100vh-5rem)] w-[min(22rem,calc(100vw-1rem))] overflow-y-auto rounded-[28px] border border-white/10 bg-[#0B2D54] p-2 shadow-[0_28px_70px_rgba(11,45,84,0.28)] animate-in fade-in zoom-in-95 duration-200 lg:left-[76px] lg:right-auto lg:top-0"
         >
           <div className="px-4 pb-3 pt-4">
-            <p className="text-[10px] font-black uppercase tracking-[0.18em] text-slate-400">Your health</p>
-            <p className="mt-1 text-base font-black tracking-[-0.02em] text-[#0B2D54]">More of your health tools</p>
+            <p className="text-[10px] font-black uppercase tracking-[0.18em] text-white/55">Your health</p>
+            <p className="mt-1 text-base font-black tracking-[-0.02em] text-white">More of your health tools</p>
           </div>
-          <div className="border-t border-slate-100 px-1 py-2">
+          <div className="border-t border-white/10 px-1 py-2">
             <div className="space-y-0.5">
               {MORE_NAV.map(({ href, label, icon: Icon }) => (
                 <Link
@@ -132,9 +132,9 @@ export default function HealthNavigation() {
                   href={href}
                   role="menuitem"
                   onClick={() => setOpen(false)}
-                  className="group flex min-h-12 items-center gap-3 rounded-2xl px-3 py-2.5 text-sm font-bold text-[#0B2D54] transition-all duration-200 hover:translate-x-0.5 hover:bg-[#E8F8F7] hover:text-[#0B2D54]"
+                  className="group flex min-h-12 items-center gap-3 rounded-2xl px-3 py-2.5 text-sm font-bold text-white transition-all duration-200 hover:translate-x-0.5 hover:bg-white/10 hover:text-white"
                 >
-                  <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-[#0B2D54]/[0.06] text-[#0B2D54] transition-colors group-hover:bg-white group-hover:text-[#24C1C4] group-hover:shadow-sm">
+                  <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-white/10 text-white transition-colors group-hover:bg-white/16 group-hover:text-[#24C1C4] group-hover:shadow-sm">
                     <Icon className="h-4 w-4" aria-hidden="true" />
                   </span>
                   <span>{label}</span>
