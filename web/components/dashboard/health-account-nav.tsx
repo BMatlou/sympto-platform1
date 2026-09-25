@@ -65,7 +65,7 @@ export default function HealthAccountNav() {
   }, [open]);
 
   return (
-    <div ref={menuRef} className="fixed right-4 top-4 z-50 flex items-center gap-2 sm:right-6 sm:top-5 lg:hidden">
+    <div ref={menuRef} className="fixed right-4 top-4 z-50 flex items-center gap-2 sm:right-6 sm:top-5">
       <Link
         href="/smart-file"
         aria-label="Share Smart File"
@@ -82,7 +82,7 @@ export default function HealthAccountNav() {
         aria-expanded={open}
         aria-haspopup="menu"
         aria-label={open ? "Close patient menu" : "Open patient menu"}
-        className="flex h-12 w-12 items-center justify-center rounded-2xl border border-slate-200/80 bg-white/95 text-[#0b2d54] shadow-[0_12px_35px_rgba(11,45,84,0.12)] backdrop-blur transition hover:-translate-y-0.5 hover:shadow-lg focus:outline-none focus-visible:ring-2 focus-visible:ring-[#24c1c4]/60"
+        className="flex h-12 w-12 items-center justify-center rounded-2xl border border-slate-200/80 bg-white/95 lg:hidden text-[#0b2d54] shadow-[0_12px_35px_rgba(11,45,84,0.12)] backdrop-blur transition hover:-translate-y-0.5 hover:shadow-lg focus:outline-none focus-visible:ring-2 focus-visible:ring-[#24c1c4]/60"
       >
         {open ? <X className="h-5 w-5" aria-hidden="true" /> : <Menu className="h-5 w-5" aria-hidden="true" />}
       </button>
