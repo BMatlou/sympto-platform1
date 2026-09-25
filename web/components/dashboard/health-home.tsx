@@ -431,7 +431,7 @@ export default function HealthHome() {
                     <div aria-hidden="true" className="pointer-events-none absolute -right-10 -top-12 h-32 w-32 rounded-full bg-white/25 blur-2xl transition-transform duration-500 group-hover:scale-125" />
                     <div aria-hidden="true" className="pointer-events-none absolute inset-x-5 top-0 h-px bg-white/45" />
                     <div className="relative flex items-start justify-between">
-                      <span className="grid h-11 w-11 place-items-center rounded-2xl bg-white/18 text-white ring-1 ring-inset ring-white/25 shadow-[0_8px_22px_rgba(0,70,80,0.12)] transition-all group-hover:scale-105 group-hover:bg-white/25">
+                      <span className="grid h-11 w-11 place-items-center rounded-2xl bg-white/18 text-white ring-1 ring-inset ring-white/25 shadow-[0_8px_22px_rgba(0,70,80,0.12)] transition-all duration-200 group-hover:-translate-y-1 group-hover:scale-110 group-hover:bg-[#24C1C4] group-hover:text-[#0B2D54] group-hover:shadow-[0_12px_28px_rgba(36,193,196,0.34)]">
                         <CheckCircle2 className="h-5 w-5" aria-hidden="true" />
                       </span>
                       <ArrowRight className="h-4 w-4 text-white/65 transition-all group-hover:translate-x-1 group-hover:text-white" aria-hidden="true" />
@@ -456,7 +456,7 @@ export default function HealthHome() {
                     <div aria-hidden="true" className="pointer-events-none absolute -right-10 -top-12 h-32 w-32 rounded-full bg-white/22 blur-2xl transition-transform duration-500 group-hover:scale-125" />
                     <div aria-hidden="true" className="pointer-events-none absolute inset-x-5 top-0 h-px bg-white/35" />
                     <div className="relative flex items-start justify-between">
-                      <span className="grid h-11 w-11 place-items-center rounded-2xl bg-white/14 text-white ring-1 ring-inset ring-white/22 shadow-[0_8px_22px_rgba(80,20,20,0.16)] transition-all group-hover:scale-105 group-hover:bg-white/22">
+                      <span className="grid h-11 w-11 place-items-center rounded-2xl bg-white/14 text-white ring-1 ring-inset ring-white/22 shadow-[0_8px_22px_rgba(80,20,20,0.16)] transition-all duration-200 group-hover:-translate-y-1 group-hover:scale-110 group-hover:bg-[#24C1C4] group-hover:text-[#0B2D54] group-hover:shadow-[0_12px_28px_rgba(36,193,196,0.34)]">
                         <ShieldCheck className="h-5 w-5" aria-hidden="true" />
                       </span>
                       <ArrowRight className="h-4 w-4 text-white/65 transition-all group-hover:translate-x-1 group-hover:text-white" aria-hidden="true" />
@@ -481,7 +481,7 @@ export default function HealthHome() {
                     <div aria-hidden="true" className="pointer-events-none absolute -right-10 -top-12 h-32 w-32 rounded-full bg-white/22 blur-2xl transition-transform duration-500 group-hover:scale-125" />
                     <div aria-hidden="true" className="pointer-events-none absolute inset-x-5 top-0 h-px bg-white/35" />
                     <div className="relative flex items-start justify-between">
-                      <span className="grid h-11 w-11 place-items-center rounded-2xl bg-white/14 text-white ring-1 ring-inset ring-white/22 shadow-[0_8px_22px_rgba(0,20,60,0.16)] transition-all group-hover:scale-105 group-hover:bg-white/22">
+                      <span className="grid h-11 w-11 place-items-center rounded-2xl bg-white/14 text-white ring-1 ring-inset ring-white/22 shadow-[0_8px_22px_rgba(0,20,60,0.16)] transition-all duration-200 group-hover:-translate-y-1 group-hover:scale-110 group-hover:bg-[#24C1C4] group-hover:text-[#0B2D54] group-hover:shadow-[0_12px_28px_rgba(36,193,196,0.34)]">
                         <FolderOpen className="h-5 w-5" aria-hidden="true" />
                       </span>
                       <ArrowRight className="h-4 w-4 text-white/65 transition-all group-hover:translate-x-1 group-hover:text-white" aria-hidden="true" />
