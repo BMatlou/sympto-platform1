@@ -87,7 +87,7 @@ function ActionLink({
       prefetch
       aria-label={ariaLabel}
       className={
-        "transition-all duration-200 hover:bg-slate-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#24c1c4] focus-visible:ring-offset-2 " +
+        "transition-all duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#24c1c4] focus-visible:ring-offset-2 " +
         className
       }
     >
@@ -141,7 +141,7 @@ function DashboardCard({
               iconWrapClass
             }
           >
-            <Icon className="h-5.5 w-5.5" aria-hidden="true" />
+            <Icon className="h-5 w-5" aria-hidden="true" />
           </span>
 
           <div className="min-w-0">
