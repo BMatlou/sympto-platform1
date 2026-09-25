@@ -278,22 +278,22 @@ export default function HealthHome() {
   ).size;
 
   const todayChips = [
-    medications.length ? medications.length + " medication" + (medications.length === 1 ? "" : "s") : null,
-    appointments.length ? appointments.length + " appointment" + (appointments.length === 1 ? "" : "s") : null,
-    activeGoalCount ? activeGoalCount + " active goal" + (activeGoalCount === 1 ? "" : "s") : null,
+    medications.length ? medications.length + " med" + (medications.length === 1 ? "" : "s") : null,
+    appointments.length ? appointments.length + " appt" : null,
+    activeGoalCount ? activeGoalCount + " goal" + (activeGoalCount === 1 ? "" : "s") : null,
   ].filter(Boolean) as string[];
 
   const clinicChips = [
     activeConditions.length ? activeConditions.length + " condition" + (activeConditions.length === 1 ? "" : "s") : null,
     activeAllergies.length ? activeAllergies.length + " allerg" + (activeAllergies.length === 1 ? "y" : "ies") : null,
     data.healthSnapshot?.bloodType
-      ? String(data.healthSnapshot.bloodType).replace(/_POSITIVE$/i, "+").replace(/_NEGATIVE$/i, "-").replace(/_/g, " ")
+      ? String(data.healthSnapshot.bloodType).replace(/_POSITIVE$/i, "+").replace(/_NEGATIVE$/i, "−").replace(/_/g, " ")
       : null,
   ].filter(Boolean) as string[];
 
   const journalChips = [
     symptomFeed.length ? symptomFeed.length + " symptom" + (symptomFeed.length === 1 ? "" : "s") : null,
-    uniqueMeasurementCount ? uniqueMeasurementCount + " measurement" + (uniqueMeasurementCount === 1 ? "" : "s") : null,
+    uniqueMeasurementCount ? uniqueMeasurementCount + " measure" + (uniqueMeasurementCount === 1 ? "" : "ments") : null,
     journalEntries.length ? journalEntries.length + " entr" + (journalEntries.length === 1 ? "y" : "ies") : null,
   ].filter(Boolean) as string[];
 
@@ -485,19 +485,19 @@ export default function HealthHome() {
                       </span>
                       <ArrowRight className="h-4 w-4 text-[#0B2D54] transition-transform group-hover:translate-x-1" aria-hidden="true" />
                     </div>
+                    {todayChips.length > 0 ? (
+                      <div className="relative flex min-h-[20px] items-center gap-1.5 overflow-hidden">
+                        {todayChips.map((chip) => (
+                          <RecordedChip
+                            key={chip}
+                            className="bg-white/70 px-2 py-1 text-[#0B2D54] ring-[#24C1C4]/20"
+                          >
+                            {chip}
+                          </RecordedChip>
+                        ))}
+                      </div>
+                    ) : <span className="relative min-h-[20px]" aria-hidden="true" />}
                     <div className="relative">
-                      {todayChips.length > 0 && (
-                        <div className="mb-3 flex flex-wrap gap-1.5">
-                          {todayChips.map((chip) => (
-                            <RecordedChip
-                              key={chip}
-                              className="bg-white/80 text-[#0B2D54] ring-[#24C1C4]/25"
-                            >
-                              {chip}
-                            </RecordedChip>
-                          ))}
-                        </div>
-                      )}
                       <p className="text-[9px] font-black uppercase tracking-[0.14em] text-[#24C1C4]">
                         Daily care
                       </p>
@@ -518,19 +518,19 @@ export default function HealthHome() {
                       </span>
                       <ArrowRight className="h-4 w-4 text-[#C62828] transition-transform group-hover:translate-x-1" aria-hidden="true" />
                     </div>
+                    {clinicChips.length > 0 ? (
+                      <div className="relative flex min-h-[20px] items-center gap-1.5 overflow-hidden">
+                        {clinicChips.map((chip) => (
+                          <RecordedChip
+                            key={chip}
+                            className="bg-white/80 px-2 py-1 text-[#8F2435] ring-[#E53935]/15"
+                          >
+                            {chip}
+                          </RecordedChip>
+                        ))}
+                      </div>
+                    ) : <span className="relative min-h-[20px]" aria-hidden="true" />}
                     <div className="relative">
-                      {clinicChips.length > 0 && (
-                        <div className="mb-3 flex flex-wrap gap-1.5">
-                          {clinicChips.map((chip) => (
-                            <RecordedChip
-                              key={chip}
-                              className="bg-white/90 text-[#8F2435] ring-[#E53935]/15"
-                            >
-                              {chip}
-                            </RecordedChip>
-                          ))}
-                        </div>
-                      )}
                       <p className="text-[9px] font-black uppercase tracking-[0.14em] text-[#C62828]">
                         Clinic Card
                       </p>
@@ -551,19 +551,19 @@ export default function HealthHome() {
                       </span>
                       <ArrowRight className="h-4 w-4 text-[#0B2D54] transition-transform group-hover:translate-x-1" aria-hidden="true" />
                     </div>
+                    {journalChips.length > 0 ? (
+                      <div className="relative flex min-h-[20px] items-center gap-1.5 overflow-hidden">
+                        {journalChips.map((chip) => (
+                          <RecordedChip
+                            key={chip}
+                            className="bg-[#E8F8F7]/80 px-2 py-1 text-[#0B2D54] ring-[#24C1C4]/20"
+                          >
+                            {chip}
+                          </RecordedChip>
+                        ))}
+                      </div>
+                    ) : <span className="relative min-h-[20px]" aria-hidden="true" />}
                     <div className="relative">
-                      {journalChips.length > 0 && (
-                        <div className="mb-3 flex flex-wrap gap-1.5">
-                          {journalChips.map((chip) => (
-                            <RecordedChip
-                              key={chip}
-                              className="bg-[#E8F8F7] text-[#0B2D54] ring-[#24C1C4]/20"
-                            >
-                              {chip}
-                            </RecordedChip>
-                          ))}
-                        </div>
-                      )}
                       <p className="text-[9px] font-black uppercase tracking-[0.14em] text-[#24C1C4]">
                         Health Journal
                       </p>
