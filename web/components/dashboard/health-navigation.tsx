@@ -97,7 +97,7 @@ export default function HealthNavigation() {
           aria-expanded={open}
           aria-haspopup="menu"
           aria-label={open ? "Close more navigation" : "More navigation"}
-          className="group relative grid h-10 w-10 shrink-0 place-items-center rounded-2xl text-slate-400 transition-all duration-200 hover:bg-[#E8F8F7] hover:text-[#0B2D54] hover:shadow-[0_8px_20px_rgba(36,193,196,0.16)] lg:h-11 lg:w-11 lg:flex-none"
+          className="group relative grid h-10 w-10 shrink-0 place-items-center rounded-2xl text-slate-400 transition-all duration-200 hover:bg-[#E8F8F7] hover:text-[#0B2D54] hover:shadow-[0_8px_20px_rgba(36,193,196,0.16)] lg:h-auto lg:min-h-0 lg:flex-1 lg:w-full"
         >
           {open ? <X className="h-4.5 w-4.5" /> : <Menu className="h-4.5 w-4.5" />}
         </button>
