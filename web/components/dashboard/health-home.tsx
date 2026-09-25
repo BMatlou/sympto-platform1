@@ -560,7 +560,7 @@ export default function HealthHome() {
                 </p>
               </div>
             </DashboardCard>
-          </section>>
+          </section>
         </div>
       </main>
     </ProtectedRoute>
