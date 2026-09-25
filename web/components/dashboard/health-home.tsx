@@ -430,8 +430,8 @@ export default function HealthHome() {
                       <p className="text-[62px] font-black leading-[0.82] tracking-[-0.08em] sm:text-[72px]">
                         {todayActionCount}
                       </p>
-                      <p className="pb-1.5 text-[10px] font-black uppercase tracking-[0.16em] text-white/[0.52]">
-                        active items
+                      <p className="max-w-[14rem] pb-0.5 text-[11px] font-black leading-4 text-white/[0.72] sm:max-w-[18rem]">
+                        active items that need your attention today
                       </p>
                     </div>
 
