@@ -3,7 +3,7 @@
 import Link from "next/link";
 import type { ReactNode } from "react";
 import { useEffect, useState } from "react";
-import { Activity, ArrowRight, Bell, CalendarDays, CheckCircle2, ChevronDown, ClipboardList, CreditCard, FileHeart, FileText, FolderOpen, HeartPulse, House, Menu, MessageCircle, Pill, Plus, QrCode, Settings, ShieldCheck, UserRound, Users, Watch } from "lucide-react";
+import { Activity, ArrowRight, Bell, CalendarDays, CheckCircle2, ChevronDown, ClipboardList, CreditCard, FileHeart, FileText, FolderOpen, HeartPulse, House, Menu, MessageCircle, Pill, Plus, Settings, ShieldCheck, UserRound, Users, Watch } from "lucide-react";
 import { useDashboard } from "@/hooks/use-dashboard";
 import { healthJournalService } from "@/services/health-journal.service";
 import ProtectedRoute from "@/components/auth/protected-route";
@@ -398,17 +398,6 @@ export default function HealthHome() {
               </div>
             </div>
 
-            <div className="mt-3 shrink-0 border-t border-white/10 pt-3">
-              <ActionLink
-                href="/smart-file"
-                className="flex min-h-12 items-center gap-3 rounded-2xl bg-white/10 px-3 py-2.5 text-xs font-black text-white ring-1 ring-inset ring-white/12 transition hover:bg-white/15"
-              >
-                <span className="grid h-8 w-8 place-items-center rounded-xl bg-white/12">
-                  <QrCode className="h-4 w-4" aria-hidden="true" />
-                </span>
-                <span>Share Smart File</span>
-              </ActionLink>
-            </div>
           </aside>
 
           <section className="min-w-0 space-y-5">
