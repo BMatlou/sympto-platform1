@@ -1,10 +1,10 @@
+import HealthNavigation from "@/components/dashboard/health-navigation";
 import HealthHome from "@/components/dashboard/health-home";
-import HealthAccountNav from "@/components/dashboard/health-account-nav";
 
 export default function DashboardRoute() {
   return (
     <>
-      <HealthAccountNav />
+      <HealthNavigation />
       <HealthHome />
     </>
   );
