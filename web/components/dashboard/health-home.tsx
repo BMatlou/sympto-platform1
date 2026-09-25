@@ -485,25 +485,27 @@ export default function HealthHome() {
                       </span>
                       <ArrowRight className="h-4 w-4 text-[#0B2D54] transition-transform group-hover:translate-x-1" aria-hidden="true" />
                     </div>
-                    {todayChips.length > 0 ? (
-                      <div className="relative flex min-h-[20px] items-center gap-1.5 overflow-hidden">
-                        {todayChips.map((chip) => (
-                          <RecordedChip
-                            key={chip}
-                            className="bg-white/70 px-2 py-1 text-[#0B2D54] ring-[#24C1C4]/20"
-                          >
-                            {chip}
-                          </RecordedChip>
-                        ))}
+                    <div className="relative flex items-end justify-between gap-4">
+                      <div className="min-w-0">
+                        <p className="text-[9px] font-black uppercase tracking-[0.14em] text-[#24C1C4]">
+                          Daily care
+                        </p>
+                        <h2 className="mt-1 text-[24px] font-black tracking-[-0.05em] text-[#0B2D54]">
+                          Today
+                        </h2>
                       </div>
-                    ) : <span className="relative min-h-[20px]" aria-hidden="true" />}
-                    <div className="relative">
-                      <p className="text-[9px] font-black uppercase tracking-[0.14em] text-[#24C1C4]">
-                        Daily care
-                      </p>
-                      <h2 className="mt-1 text-[24px] font-black tracking-[-0.05em] text-[#0B2D54]">
-                        Today
-                      </h2>
+                      {todayChips.length > 0 && (
+                        <div className="flex max-w-[58%] flex-wrap items-center justify-end gap-1.5">
+                          {todayChips.map((chip) => (
+                            <RecordedChip
+                              key={chip}
+                              className="bg-white/70 px-2 py-1 text-[#0B2D54] ring-[#24C1C4]/20"
+                            >
+                              {chip}
+                            </RecordedChip>
+                          ))}
+                        </div>
+                      )}
                     </div>
                   </ActionLink>
 
@@ -518,25 +520,27 @@ export default function HealthHome() {
                       </span>
                       <ArrowRight className="h-4 w-4 text-[#C62828] transition-transform group-hover:translate-x-1" aria-hidden="true" />
                     </div>
-                    {clinicChips.length > 0 ? (
-                      <div className="relative flex min-h-[20px] items-center gap-1.5 overflow-hidden">
-                        {clinicChips.map((chip) => (
-                          <RecordedChip
-                            key={chip}
-                            className="bg-white/80 px-2 py-1 text-[#8F2435] ring-[#E53935]/15"
-                          >
-                            {chip}
-                          </RecordedChip>
-                        ))}
+                    <div className="relative flex items-end justify-between gap-4">
+                      <div className="min-w-0">
+                        <p className="text-[9px] font-black uppercase tracking-[0.14em] text-[#C62828]">
+                          Clinic Card
+                        </p>
+                        <h2 className="mt-1 text-[24px] font-black tracking-[-0.05em] text-[#0B2D54]">
+                          Essentials
+                        </h2>
                       </div>
-                    ) : <span className="relative min-h-[20px]" aria-hidden="true" />}
-                    <div className="relative">
-                      <p className="text-[9px] font-black uppercase tracking-[0.14em] text-[#C62828]">
-                        Clinic Card
-                      </p>
-                      <h2 className="mt-1 text-[24px] font-black tracking-[-0.05em] text-[#0B2D54]">
-                        Essentials
-                      </h2>
+                      {clinicChips.length > 0 && (
+                        <div className="flex max-w-[58%] flex-wrap items-center justify-end gap-1.5">
+                          {clinicChips.map((chip) => (
+                            <RecordedChip
+                              key={chip}
+                              className="bg-white/80 px-2 py-1 text-[#8F2435] ring-[#E53935]/15"
+                            >
+                              {chip}
+                            </RecordedChip>
+                          ))}
+                        </div>
+                      )}
                     </div>
                   </ActionLink>
 
@@ -551,25 +555,27 @@ export default function HealthHome() {
                       </span>
                       <ArrowRight className="h-4 w-4 text-[#0B2D54] transition-transform group-hover:translate-x-1" aria-hidden="true" />
                     </div>
-                    {journalChips.length > 0 ? (
-                      <div className="relative flex min-h-[20px] items-center gap-1.5 overflow-hidden">
-                        {journalChips.map((chip) => (
-                          <RecordedChip
-                            key={chip}
-                            className="bg-[#E8F8F7]/80 px-2 py-1 text-[#0B2D54] ring-[#24C1C4]/20"
-                          >
-                            {chip}
-                          </RecordedChip>
-                        ))}
+                    <div className="relative flex items-end justify-between gap-4">
+                      <div className="min-w-0">
+                        <p className="text-[9px] font-black uppercase tracking-[0.14em] text-[#24C1C4]">
+                          Health Journal
+                        </p>
+                        <h2 className="mt-1 text-[24px] font-black tracking-[-0.05em] text-[#0B2D54]">
+                          Records
+                        </h2>
                       </div>
-                    ) : <span className="relative min-h-[20px]" aria-hidden="true" />}
-                    <div className="relative">
-                      <p className="text-[9px] font-black uppercase tracking-[0.14em] text-[#24C1C4]">
-                        Health Journal
-                      </p>
-                      <h2 className="mt-1 text-[24px] font-black tracking-[-0.05em] text-[#0B2D54]">
-                        Records
-                      </h2>
+                      {journalChips.length > 0 && (
+                        <div className="flex max-w-[58%] flex-wrap items-center justify-end gap-1.5">
+                          {journalChips.map((chip) => (
+                            <RecordedChip
+                              key={chip}
+                              className="bg-[#E8F8F7]/80 px-2 py-1 text-[#0B2D54] ring-[#24C1C4]/20"
+                            >
+                              {chip}
+                            </RecordedChip>
+                          ))}
+                        </div>
+                      )}
                     </div>
                   </ActionLink>
                 </div>
