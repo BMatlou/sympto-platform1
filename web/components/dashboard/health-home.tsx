@@ -326,8 +326,8 @@ export default function HealthHome() {
                   <div aria-hidden="true" className="pointer-events-none absolute -bottom-24 right-1/4 h-56 w-56 rounded-full bg-white/[0.06] blur-3xl" />
                   <div aria-hidden="true" className="pointer-events-none absolute inset-x-7 top-0 h-px bg-white/20" />
 
-                  <div className="relative flex min-h-[166px] flex-col justify-between gap-7">
-                    <div>
+                  <div className="relative flex min-h-[166px] items-center justify-between gap-8">
+                    <div className="min-w-0">
                       <p className="text-[9px] font-black uppercase tracking-[0.18em] text-white/50">Overview</p>
                       <h2 className="mt-2 text-[30px] font-black leading-tight tracking-[-0.05em] sm:text-[38px]">
                         {greeting}, {firstName}
@@ -337,34 +337,11 @@ export default function HealthHome() {
                       </p>
                     </div>
 
-                    <div className="grid gap-3 sm:grid-cols-2">
-                      <div className="rounded-[22px] border border-white/10 bg-white/[0.07] px-4 py-3.5">
-                        <p className="text-[9px] font-black uppercase tracking-[0.14em] text-white/45">Today</p>
-                        <div className="mt-1 flex items-end gap-2">
-                          <span className="text-[48px] font-black leading-none tracking-[-0.08em]">{todayActionCount}</span>
-                          <span className="pb-1 text-[10px] font-bold uppercase tracking-[0.08em] text-white/60">active items today</span>
-                        </div>
-                        <p className="mt-2 text-[10px] font-medium leading-4 text-white/58">Your active health actions are organised in Today.</p>
-                      </div>
-
-                      <Link
-                        href="/appointments"
-                        className="rounded-[22px] border border-white/10 bg-white/[0.07] px-4 py-3.5 transition-colors hover:bg-white/10"
-                      >
-                        <p className="text-[9px] font-black uppercase tracking-[0.14em] text-white/45">Upcoming appointment</p>
-                        {nextAppointment ? (
-                          <>
-                            <p className="mt-1 truncate text-sm font-black text-white">
-                              {String(nextAppointment.title ?? nextAppointment.type ?? "Appointment")}
-                            </p>
-                            <p className="mt-0.5 text-[10px] font-semibold text-white/60">
-                              {formatAppointmentDate(nextAppointment.scheduledStart ?? nextAppointment.startTime ?? nextAppointment.date)}
-                            </p>
-                          </>
-                        ) : (
-                          <p className="mt-1 text-sm font-semibold text-white/70">View appointments</p>
-                        )}
-                      </Link>
+                    <div className="shrink-0 text-right">
+                      <p className="text-[52px] font-black leading-none tracking-[-0.08em] sm:text-[64px]">{todayActionCount}</p>
+                      <p className="mt-2 max-w-[11rem] text-[9px] font-black uppercase leading-4 tracking-[0.08em] text-white/55">
+                        active items today
+                      </p>
                     </div>
                   </div>
                 </section>
@@ -415,7 +392,6 @@ export default function HealthHome() {
                   </div>
                 </section>
               </div>
-
               <section className="mt-6">
                 <div className="mb-3 flex items-center justify-between px-1">
                   <p className="text-[10px] font-black uppercase tracking-[0.18em] text-[#0B2D54]/55">Your health</p>
