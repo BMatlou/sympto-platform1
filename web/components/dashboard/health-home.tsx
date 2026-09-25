@@ -70,23 +70,6 @@ function countActiveGoals(data: any) {
   ).length;
 }
 
-function formatDashboardDate(value: unknown, fallback = "Recent"): string {
-  if (!value) return fallback;
-
-  const parsed = new Date(String(value));
-  if (Number.isNaN(parsed.getTime())) return fallback;
-
-  return new Intl.DateTimeFormat("en-ZA", {
-    day: "2-digit",
-    month: "short",
-  }).format(parsed);
-}
-
-function completenessPercent(present: number, total: number): number {
-  if (!total) return 0;
-  return Math.round((present / total) * 100);
-}
-
 
 function ActionLink({
   href,
