@@ -84,7 +84,7 @@ export default function HealthNavigation() {
             key={href}
             href={href}
             aria-label={label}
-            className="group relative grid h-10 w-10 shrink-0 place-items-center rounded-2xl text-slate-400 transition hover:bg-slate-50 hover:text-[#0B2D54] lg:h-11 lg:w-11"
+            className="group relative grid h-10 w-10 shrink-0 place-items-center rounded-2xl text-slate-400 transition-all duration-200 hover:-translate-y-0.5 hover:bg-[#E8F8F7] hover:text-[#0B2D54] hover:shadow-[0_8px_20px_rgba(36,193,196,0.16)] lg:h-11 lg:w-11"
           >
             <Icon className="h-4.5 w-4.5" aria-hidden="true" />
             <span className="pointer-events-none absolute left-[calc(100%+10px)] top-1/2 z-50 hidden -translate-y-1/2 whitespace-nowrap rounded-xl bg-[#0B2D54] px-3 py-2 text-[10px] font-black text-white shadow-[0_12px_28px_rgba(11,45,84,0.22)] lg:block lg:opacity-0 lg:transition-opacity lg:group-hover:opacity-100">
@@ -99,7 +99,7 @@ export default function HealthNavigation() {
           aria-expanded={open}
           aria-haspopup="menu"
           aria-label={open ? "Close more navigation" : "More navigation"}
-          className="grid h-10 w-10 shrink-0 place-items-center rounded-2xl text-slate-400 transition hover:bg-slate-50 hover:text-[#0B2D54] lg:h-11 lg:w-11"
+          className="group relative grid h-10 w-10 shrink-0 place-items-center rounded-2xl text-slate-400 transition-all duration-200 hover:-translate-y-0.5 hover:bg-[#E8F8F7] hover:text-[#0B2D54] hover:shadow-[0_8px_20px_rgba(36,193,196,0.16)] lg:h-11 lg:w-11"
         >
           {open ? <X className="h-4.5 w-4.5" /> : <Menu className="h-4.5 w-4.5" />}
         </button>
@@ -109,11 +109,11 @@ export default function HealthNavigation() {
         <div
           role="menu"
           aria-label="More health navigation"
-          className="absolute right-0 top-16 max-h-[calc(100vh-5rem)] w-[min(20rem,calc(100vw-1rem))] overflow-y-auto rounded-[24px] border border-slate-200 bg-white p-2 shadow-[0_24px_60px_rgba(11,45,84,0.18)] lg:left-[76px] lg:right-auto lg:top-0"
+          className="absolute right-0 top-16 max-h-[calc(100vh-5rem)] w-[min(22rem,calc(100vw-1rem))] overflow-y-auto rounded-[28px] border border-slate-200/80 bg-white/98 p-2 shadow-[0_28px_70px_rgba(11,45,84,0.20)] backdrop-blur-xl animate-in fade-in zoom-in-95 duration-200 lg:left-[76px] lg:right-auto lg:top-0"
         >
-          <div className="px-3 pb-2 pt-3">
+          <div className="px-4 pb-3 pt-4">
             <p className="text-[10px] font-black uppercase tracking-[0.18em] text-slate-400">Your health</p>
-            <p className="mt-1 text-sm font-bold text-[#0B2D54]">More of your health tools</p>
+            <p className="mt-1 text-base font-black tracking-[-0.02em] text-[#0B2D54]">More of your health tools</p>
           </div>
           <div className="border-t border-slate-100 px-1 py-2">
             <div className="space-y-0.5">
@@ -123,9 +123,9 @@ export default function HealthNavigation() {
                   href={href}
                   role="menuitem"
                   onClick={() => setOpen(false)}
-                  className="flex min-h-12 items-center gap-3 rounded-2xl px-3 py-3 text-sm font-bold text-[#0B2D54] transition hover:bg-[#24C1C4]/10"
+                  className="group flex min-h-12 items-center gap-3 rounded-2xl px-3 py-2.5 text-sm font-bold text-[#0B2D54] transition-all duration-200 hover:translate-x-0.5 hover:bg-[#E8F8F7] hover:text-[#0B2D54]"
                 >
-                  <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-[#0B2D54]/[0.06]">
+                  <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-[#0B2D54]/[0.06] text-[#0B2D54] transition-colors group-hover:bg-white group-hover:text-[#24C1C4] group-hover:shadow-sm">
                     <Icon className="h-4 w-4" aria-hidden="true" />
                   </span>
                   <span>{label}</span>
