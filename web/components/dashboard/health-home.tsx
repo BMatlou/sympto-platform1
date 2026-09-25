@@ -1,99 +1,428 @@
 "use client";
 
 import Link from "next/link";
-import { ArrowRight, CheckCircle2, FolderOpen, HeartPulse, ShieldCheck, TriangleAlert } from "lucide-react";
-import ProtectedRoute from "@/components/auth/protected-route";
 import { useDashboard } from "@/hooks/use-dashboard";
-import HealthVitalsSummary, { type DashboardVital } from "@/components/dashboard/health-vitals-summary";
+import ProtectedRoute from "@/components/auth/protected-route";
 
-function display(value: unknown): string {
-  return value === null || value === undefined || value === "" ? "—" : String(value);
+function display(value: unknown, fallback = "Not recorded"): string {
+  return value === null || value === undefined || value === "" ? fallback : String(value);
 }
 
-function normalizeVitals(data: any): DashboardVital[] {
+function normalizeVitals(data: any) {
   const deviceVitals = Array.isArray(data?.healthSnapshot?.latestMeasurements)
-    ? data.healthSnapshot.latestMeasurements.map((item: any) => ({ type: item.type ?? item.measurementType, name: item.name, value: item.value, unit: item.unit, measuredAt: item.measuredAt, source: item.source }))
+    ? data.healthSnapshot.latestMeasurements.map((item: any) => ({
+        type: item.type ?? item.measurementType,
+        value: item.value,
+        unit: item.unit,
+        measuredAt: item.measuredAt,
+      }))
     : [];
+
   const clinicalVitals = Array.isArray(data?.clinicalVitals)
-    ? data.clinicalVitals.map((item: any) => ({ type: item.vitalType?.code ?? item.vitalType?.name, name: item.vitalType?.name, value: item.value, unit: item.vitalType?.unit, measuredAt: item.measuredAt, source: "CLINICAL_RECORD" }))
+    ? data.clinicalVitals.map((item: any) => ({
+        type: item.vitalType?.code ?? item.vitalType?.name,
+        value: item.value,
+        unit: item.vitalType?.unit,
+        measuredAt: item.measuredAt,
+      }))
     : [];
-  const byType = new Map<string, DashboardVital>();
+
+  const byType = new Map<string, any>();
+
   for (const vital of [...deviceVitals, ...clinicalVitals]) {
-    const key = String(vital.type ?? vital.name ?? "").toUpperCase();
+    const key = String(vital.type ?? "").toUpperCase();
     if (!key) continue;
+
     const previous = byType.get(key);
-    if (!previous || new Date(String(vital.measuredAt ?? 0)).getTime() > new Date(String(previous.measuredAt ?? 0)).getTime()) byType.set(key, vital);
+    if (
+      !previous ||
+      new Date(String(vital.measuredAt ?? 0)).getTime() >
+        new Date(String(previous.measuredAt ?? 0)).getTime()
+    ) {
+      byType.set(key, vital);
+    }
   }
+
   return Array.from(byType.values());
 }
 
-function itemNames(items: any[], kind: "allergy" | "condition" | "medication") {
-  return items.map((item) => kind === "allergy" ? item?.allergy?.name ?? item?.name : kind === "condition" ? item?.condition?.name ?? item?.name : item?.medication?.name ?? item?.name).filter(Boolean) as string[];
+function itemNames(
+  items: any[],
+  kind: "allergy" | "condition",
+): string[] {
+  return items
+    .map((item) =>
+      kind === "allergy"
+        ? item?.allergy?.name ?? item?.name
+        : item?.condition?.name ?? item?.name,
+    )
+    .filter(Boolean) as string[];
 }
 
-function detailLabel(value: unknown, fallback = "Not recorded") {
-  return value === null || value === undefined || value === "" ? fallback : String(value).replaceAll("_", " ");
+function countActiveGoals(data: any) {
+  return (Array.isArray(data?.goals) ? data.goals : []).filter(
+    (goal: any) =>
+      !["ACHIEVED", "ARCHIVED", "CANCELLED", "DELETED"].includes(
+        String(goal?.status ?? "").toUpperCase(),
+      ),
+  ).length;
+}
+
+function ActionLink({
+  href,
+  children,
+  className = "",
+  ariaLabel,
+}: {
+  href: string;
+  children: React.ReactNode;
+  className?: string;
+  ariaLabel?: string;
+}) {
+  return (
+    <Link
+      href={href}
+      prefetch
+      aria-label={ariaLabel}
+      className={
+        "transition-all duration-200 hover:bg-slate-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#24c1c4] focus-visible:ring-offset-2 " +
+        className
+      }
+    >
+      {children}
+    </Link>
+  );
+}
+
+function DashboardCard({
+  href,
+  title,
+  tag,
+  description,
+  children,
+  footerLabel = "Open",
+  accentClass,
+}: {
+  href: string;
+  title: string;
+  tag: string;
+  description: string;
+  children?: React.ReactNode;
+  footerLabel?: string;
+  accentClass?: string;
+}) {
+  return (
+    <ActionLink
+      href={href}
+      ariaLabel={title}
+      className={
+        "group block rounded-3xl border border-slate-200 bg-white p-5 shadow-[0_10px_30px_rgba(0,0,0,0.02)] " +
+        "hover:border-slate-300 hover:shadow-[0_16px_38px_rgba(0,0,0,0.05)] sm:p-6 " +
+        (accentClass ?? "")
+      }
+    >
+      <div className="flex items-start justify-between gap-4">
+        <div>
+          <h2 className="text-xl font-black tracking-[-0.04em] text-[#0b2d54]">
+            {title}
+          </h2>
+          <p className="mt-1 text-[10px] font-black uppercase tracking-[0.16em] text-slate-400">
+            {tag}
+          </p>
+        </div>
+
+        <span className="rounded-full bg-slate-50 px-3 py-1.5 text-[9px] font-black uppercase tracking-[0.12em] text-slate-500">
+          {footerLabel}
+        </span>
+      </div>
+
+      <p className="mt-4 max-w-2xl text-sm leading-6 text-slate-500">
+        {description}
+      </p>
+
+      {children ? <div className="mt-5">{children}</div> : null}
+
+      <div className="mt-5 flex items-center justify-between gap-3 border-t border-slate-100 pt-4">
+        <span className="text-[10px] font-black uppercase tracking-[0.14em] text-slate-400">
+          {footerLabel}
+        </span>
+        <span className="text-sm font-black text-[#0b2d54] transition-transform duration-200 group-hover:translate-x-1">
+          →
+        </span>
+      </div>
+    </ActionLink>
+  );
+}
+
+function MetricBadge({
+  label,
+  value,
+}: {
+  label: string;
+  value: number;
+}) {
+  return (
+    <div className="rounded-2xl bg-slate-50 px-3.5 py-3 ring-1 ring-slate-100">
+      <p className="text-[9px] font-black uppercase tracking-[0.12em] text-slate-400">
+        {label}
+      </p>
+      <p className="mt-1 text-lg font-black tracking-[-0.03em] text-[#0b2d54]">
+        {value}
+      </p>
+    </div>
+  );
+}
+
+function ClinicRow({
+  label,
+  value,
+  blood = false,
+}: {
+  label: string;
+  value: string;
+  blood?: boolean;
+}) {
+  return (
+    <div
+      className={
+        "flex items-center justify-between gap-4 rounded-2xl px-4 py-3.5 " +
+        (blood ? "bg-red-50" : "bg-slate-50")
+      }
+    >
+      <span className="text-[10px] font-black uppercase tracking-[0.12em] text-slate-400">
+        {label}
+      </span>
+      <span
+        className={
+          "text-right text-sm font-black " +
+          (blood ? "text-red-700" : "text-[#0b2d54]")
+        }
+      >
+        {value}
+      </span>
+    </div>
+  );
 }
 
 export default function HealthHome() {
   const { data, loading, error, reload } = useDashboard();
 
   if (loading) {
-    return <ProtectedRoute><main className="min-h-screen bg-[#f4f9fb] p-4 sm:p-8"><div className="mx-auto max-w-[1300px] space-y-4" aria-busy="true"><div className="h-80 animate-pulse rounded-[34px] bg-white" /><div className="grid gap-4 lg:grid-cols-3">{Array.from({ length: 3 }).map((_, i) => <div key={i} className="h-60 animate-pulse rounded-[27px] bg-white" />)}</div></div></main></ProtectedRoute>;
+    return (
+      <ProtectedRoute>
+        <main className="min-h-screen bg-[#f7fbfb] p-4 sm:p-8">
+          <div className="mx-auto max-w-2xl space-y-4" aria-busy="true">
+            <div className="h-[360px] animate-pulse rounded-b-[42px] rounded-t-[30px] bg-white" />
+            <div className="h-10 animate-pulse rounded-2xl bg-white" />
+            {Array.from({ length: 3 }).map((_, index) => (
+              <div
+                key={index}
+                className="h-64 animate-pulse rounded-3xl bg-white"
+              />
+            ))}
+          </div>
+        </main>
+      </ProtectedRoute>
+    );
   }
 
   if (error || !data) {
-    return <ProtectedRoute><main className="min-h-screen bg-[#f4f9fb] p-4 sm:p-8"><div className="mx-auto max-w-xl rounded-[28px] border border-red-200 bg-white p-6"><TriangleAlert className="h-6 w-6 text-red-600" /><h1 className="mt-4 text-xl font-extrabold text-[#0b2d54]">Your health screen could not load</h1><p className="mt-2 text-sm text-slate-500">Your health information has not been changed. Please try again.</p><button type="button" onClick={reload} className="mt-5 min-h-11 rounded-xl bg-[#0b2d54] px-5 py-2 text-sm font-extrabold text-white">Try again</button></div></main></ProtectedRoute>;
+    return (
+      <ProtectedRoute>
+        <main className="min-h-screen bg-[#f7fbfb] p-4 sm:p-8">
+          <div className="mx-auto max-w-xl rounded-3xl border border-red-200 bg-white p-7 shadow-[0_10px_30px_rgba(0,0,0,0.02)]">
+            <p className="text-[10px] font-black uppercase tracking-[0.16em] text-red-600">
+              Sympto
+            </p>
+            <h1 className="mt-2 text-xl font-black text-[#0b2d54]">
+              Your health screen could not load
+            </h1>
+            <p className="mt-2 text-sm leading-6 text-slate-500">
+              Your saved health information has not been changed. Please try
+              again.
+            </p>
+            <button
+              type="button"
+              onClick={reload}
+              className="mt-5 min-h-11 rounded-2xl bg-[#0b2d54] px-5 py-2.5 text-sm font-black text-white transition-all duration-200 hover:bg-slate-100 hover:text-[#0b2d54]"
+            >
+              Try again
+            </button>
+          </div>
+        </main>
+      </ProtectedRoute>
+    );
   }
 
-  const firstName = data.patient?.firstName || data.profile?.preferredName || data.profile?.firstName || "there";
-  const hour = new Date().getHours();
-  const greeting = hour < 12 ? "Good morning" : hour < 14 ? "Good day" : hour < 18 ? "Good afternoon" : "Good evening";
-  const medications = data.today?.activeMedications ?? [];
-  const appointments = data.today?.upcomingAppointments ?? [];
-  const activeGoals = (data.goals ?? []).filter((goal) => String(goal.status).toUpperCase() !== "ACHIEVED").length;
-  const todayActionCount = medications.length + appointments.length + activeGoals;
-  const historyCount = (data.encounters?.length ?? 0) + (data.recentResults?.laboratory?.length ?? 0) + (data.recentResults?.imaging?.length ?? 0) + (data.attachments?.length ?? 0);
+  const firstName =
+    data.patient?.firstName ||
+    data.profile?.preferredName ||
+    data.profile?.firstName ||
+    "Dankie";
+
+  const medications = Array.isArray(data.today?.activeMedications)
+    ? data.today.activeMedications
+    : [];
+  const appointments = Array.isArray(data.today?.upcomingAppointments)
+    ? data.today.upcomingAppointments
+    : [];
+
+  const activeGoalCount = countActiveGoals(data);
+  const todayActionCount = medications.length + appointments.length + activeGoalCount;
+
+  const historyCount =
+    (data.encounters?.length ?? 0) +
+    (data.recentResults?.laboratory?.length ?? 0) +
+    (data.recentResults?.imaging?.length ?? 0) +
+    (data.attachments?.length ?? 0);
+
   const healthVitals = normalizeVitals(data);
-  const allergies = data.healthSnapshot?.activeAllergies ?? data.healthSnapshot?.allergies ?? data.allergies ?? [];
-  const conditions = data.healthSnapshot?.activeConditions ?? data.conditions ?? [];
+  const allergies =
+    data.healthSnapshot?.activeAllergies ??
+    data.healthSnapshot?.allergies ??
+    data.allergies ??
+    [];
+  const conditions =
+    data.healthSnapshot?.activeConditions ??
+    data.conditions ??
+    [];
+
   const allergyNames = itemNames(allergies, "allergy");
   const conditionNames = itemNames(conditions, "condition");
-  const bloodType = data.healthPassport?.bloodType ?? data.healthSnapshot?.bloodType ?? data.medicalRecord?.bloodType;
-  const rhesusFactor = data.healthPassport?.rhesusFactor ?? data.healthSnapshot?.rhesusFactor;
 
-  return <ProtectedRoute>
-    <main className="min-h-screen bg-[#f4f9fb] text-[#14304d]">
-      <div className="mx-auto max-w-[1300px] px-4 py-5 sm:px-6 sm:py-7 lg:px-8">
-        <section className="relative overflow-hidden rounded-[34px] bg-gradient-to-br from-[#08284a] via-[#0e4773] to-[#24babe] p-7 text-white shadow-[0_18px_52px_rgba(11,45,84,0.10)] sm:p-9 lg:p-10">
-          <div className="pointer-events-none absolute -right-[205px] -top-[255px] h-[500px] w-[500px] rounded-full border border-white/15 shadow-[0_0_0_34px_rgba(255,255,255,0.035),0_0_0_68px_rgba(255,255,255,0.02)]" />
-          <div className="pointer-events-none absolute bottom-[-180px] left-[42%] h-[230px] w-[230px] rounded-full bg-[#24c1c4]/30 blur-3xl" />
-          <div className="relative">
-            <p className="text-sm font-medium tracking-[-0.01em] text-white/80">{greeting}, {firstName}</p>
-            <div className="mt-3 flex flex-col gap-5 sm:flex-row sm:items-end sm:justify-between">
-              <div>
-                <p className="text-lg font-medium tracking-[-0.02em] text-white/95 sm:text-xl">{todayActionCount > 0 ? `${todayActionCount} ${todayActionCount === 1 ? "thing" : "things"} to take care of today.` : "Nothing urgent to take care of today."}</p>
-                <p className="mt-1 text-sm leading-6 text-white/60">{todayActionCount > 0 ? "Start with what matters most." : "You’re all caught up."}</p>
+  const bloodType =
+    data.healthPassport?.bloodType ??
+    data.healthSnapshot?.bloodType ??
+    data.medicalRecord?.bloodType;
+
+  const rhesusFactor =
+    data.healthPassport?.rhesusFactor ??
+    data.healthSnapshot?.rhesusFactor;
+
+  const greeting =
+    todayActionCount > 0
+      ? `${todayActionCount} ${todayActionCount === 1 ? "thing" : "things"} to take care of today.`
+      : "Nothing urgent to take care of today.";
+
+  const allergiesValue = allergyNames.length
+    ? allergyNames.slice(0, 3).join(" · ") +
+      (allergyNames.length > 3 ? ` +${allergyNames.length - 3}` : "")
+    : "None recorded";
+
+  const conditionsValue = conditionNames.length
+    ? conditionNames.slice(0, 3).join(" · ") +
+      (conditionNames.length > 3 ? ` +${conditionNames.length - 3}` : "")
+    : "None recorded";
+
+  return (
+    <ProtectedRoute>
+      <main className="min-h-screen bg-[#f7fbfb] text-[#14304d]">
+        <div className="mx-auto max-w-2xl px-4 pb-12 pt-4 sm:px-6 sm:pt-6">
+          <section className="relative overflow-hidden rounded-t-3xl rounded-b-[42px] bg-gradient-to-b from-[#0F5A62] to-[#177E89] p-5 text-white shadow-[0_16px_38px_rgba(15,90,98,0.14)] sm:p-7">
+            <div
+              aria-hidden="true"
+              className="pointer-events-none absolute -right-24 -top-24 h-56 w-56 rounded-full border border-white/10"
+            />
+            <div
+              aria-hidden="true"
+              className="pointer-events-none absolute -bottom-28 left-1/4 h-56 w-56 rounded-full bg-[#24C1C4]/15 blur-3xl"
+            />
+
+            <div className="relative">
+              <p className="text-[11px] font-bold tracking-[-0.01em] text-white/72">
+                Good day, {firstName}
+              </p>
+              <h1 className="mt-3 max-w-md text-3xl font-black tracking-[-0.045em] sm:text-4xl">
+                {greeting}
+              </h1>
+              <p className="mt-2 text-sm leading-6 text-white/72">
+                Start with what matters most.
+              </p>
+
+              <div className="mt-6 rounded-2xl bg-white/10 p-1 ring-1 ring-white/10 backdrop-blur-sm">
+                <div className="grid grid-cols-2 gap-1">
+                  <ActionLink
+                    href="/today"
+                    className="flex min-h-11 items-center justify-center rounded-xl bg-white px-3 text-xs font-black text-[#0b2d54]"
+                  >
+                    View today
+                  </ActionLink>
+                  <span
+                    aria-current="page"
+                    className="flex min-h-11 items-center justify-center rounded-xl px-3 text-xs font-black text-white/75"
+                  >
+                    Your health, at a glance
+                  </span>
+                </div>
               </div>
-              <div className="flex flex-wrap gap-2.5">
-                <Link href="/today" prefetch className="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl bg-white px-4 py-2 text-xs font-semibold text-[#0b2d54] shadow-sm transition hover:-translate-y-0.5"><span>View today</span><ArrowRight className="h-3.5 w-3.5" /></Link>
-                <Link href="/log-symptom" className="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl border border-white/20 bg-white/10 px-4 py-2 text-xs font-medium text-white backdrop-blur-sm transition hover:bg-white/15"><HeartPulse className="h-4 w-4" /><span>Log a symptom</span></Link>
-              </div>
+
+              <ActionLink
+                href="/log-symptom"
+                className="mt-3 flex min-h-14 w-full items-center justify-center rounded-2xl bg-[#24C1C4] px-5 text-sm font-black text-[#073f46] shadow-[0_10px_24px_rgba(36,193,196,0.20)] hover:bg-[#24C1C4]/90"
+              >
+                ＋ Log a symptom
+              </ActionLink>
             </div>
+          </section>
+
+          <div className="px-1 pb-1 pt-7">
+            <p className="text-[9px] font-black uppercase tracking-[0.2em] text-slate-400">
+              Choose what you need. Sympto will take you there.
+            </p>
           </div>
-        </section>
 
-        <div className="my-7 px-1"><p className="text-[11px] font-black uppercase tracking-[0.21em] text-[#71839a]">Your health, at a glance</p><p className="mt-1 text-sm font-semibold text-[#71839a]">Choose what you need. Sympto will take you there.</p></div>
+          <section className="space-y-4" aria-label="Health dashboard">
+            <DashboardCard
+              href="/today"
+              title="Today"
+              tag="Today"
+              description={`What do I do today? ${todayActionCount} ${todayActionCount === 1 ? "thing needs" : "things need"} your attention.`}
+            >
+              <div className="grid grid-cols-3 gap-2.5">
+                <MetricBadge label="Medication" value={medications.length} />
+                <MetricBadge label="Visit" value={appointments.length} />
+                <MetricBadge label="Goal" value={activeGoalCount} />
+              </div>
+            </DashboardCard>
 
-        <section className="grid gap-[15px] lg:grid-cols-3">
-          <Link href="/today" prefetch aria-label="Open Today" className="group relative min-h-[220px] overflow-hidden rounded-[27px] border border-[#e0ebef] bg-gradient-to-br from-white via-white to-[#f2fcf8] p-6 shadow-[0_5px_18px_rgba(11,45,84,0.035)] transition duration-200 hover:-translate-y-1 hover:border-[#b9ddd1] hover:shadow-[0_16px_36px_rgba(11,45,84,0.10)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#24c1c4] focus-visible:ring-offset-2"><div className="relative z-10"><div className="flex items-start justify-between gap-3"><div className="grid h-11 w-11 place-items-center rounded-[15px] bg-[#e8f8f1] text-[#168660] transition-transform duration-200 group-hover:scale-105"><CheckCircle2 className="h-5 w-5" /></div><span className="text-[10px] font-black uppercase tracking-[0.14em] text-[#71839a]">Today</span></div><h3 className="mt-5 text-[19px] font-black tracking-[-0.04em] text-[#0b2d54]">What do I do today?</h3><p className="mt-2 max-w-[280px] text-xs leading-5 text-[#71839a]">{todayActionCount > 0 ? `${todayActionCount} ${todayActionCount === 1 ? "thing needs" : "things need"} your attention.` : "Nothing urgent is waiting for you today."}</p><div className="mt-4 flex flex-wrap gap-2 text-[11px] font-semibold text-[#0b2d54]"><span className="rounded-full bg-[#f4f8fa] px-2.5 py-1.5">Medication {medications.length}</span><span className="rounded-full bg-[#f4f8fa] px-2.5 py-1.5">Visit {appointments.length}</span><span className="rounded-full bg-[#f4f8fa] px-2.5 py-1.5">Goal {activeGoals}</span></div><div className="mt-5 flex items-center gap-2 text-[10px] font-black uppercase tracking-[0.14em] text-[#71839a] opacity-70 transition-all duration-200 group-hover:translate-x-1 group-hover:opacity-100"><span>Open</span><ArrowRight className="h-3.5 w-3.5" /></div></div></Link>
+            <DashboardCard
+              href="/health-passport"
+              title="Essentials"
+              tag="My Clinic Card"
+              description="Your essential health information for quick reference and care."
+              accentClass="border-red-100/80"
+              footerLabel="Open"
+            >
+              <div className="space-y-2.5">
+                <ClinicRow label="Allergies" value={allergiesValue} />
+                <ClinicRow label="Conditions" value={conditionsValue} />
+                <ClinicRow
+                  label="Blood"
+                  value={display(bloodType).toUpperCase()}
+                  blood
+                />
+                <ClinicRow
+                  label="Rhesus"
+                  value={display(rhesusFactor).toUpperCase()}
+                />
+              </div>
+            </DashboardCard>
 
-          <Link href="/health-passport" aria-label="Open My Clinic Card" className="group relative min-h-[220px] overflow-hidden rounded-[27px] border border-[#eadede] bg-gradient-to-br from-white via-white to-[#fff6f6] p-6 shadow-[0_5px_18px_rgba(11,45,84,0.035)] transition duration-200 hover:-translate-y-1 hover:border-[#e5b8b8] hover:shadow-[0_16px_36px_rgba(11,45,84,0.10)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#24c1c4] focus-visible:ring-offset-2"><div className="relative z-10"><div className="flex items-start justify-between gap-3"><div className="grid h-11 w-11 place-items-center rounded-[15px] bg-[#fff0f0] text-[#c62828] transition-transform duration-200 group-hover:scale-105"><ShieldCheck className="h-5 w-5" /></div><span className="text-[10px] font-black uppercase tracking-[0.14em] text-[#71839a]">Essentials</span></div><h3 className="mt-5 text-[19px] font-black tracking-[-0.04em] text-[#0b2d54]">My Clinic Card</h3><p className="mt-2 text-xs leading-5 text-[#71839a]">Your essential health information for quick reference and care.</p><div className="mt-4 space-y-2.5"><div className="rounded-2xl bg-white px-3.5 py-3 ring-1 ring-[#e0ebef]"><p className="text-[9px] font-black uppercase tracking-wide text-[#71839a]">Allergies</p><p className="mt-1 truncate text-[11px] font-bold text-[#0b2d54]">{allergyNames.length ? allergyNames.slice(0, 2).join(" · ") : "No active allergies recorded"}{allergyNames.length > 2 ? ` +${allergyNames.length - 2}` : ""}</p></div><div className="rounded-2xl bg-white px-3.5 py-3 ring-1 ring-[#e0ebef]"><p className="text-[9px] font-black uppercase tracking-wide text-[#71839a]">Conditions</p><p className="mt-1 truncate text-[11px] font-bold text-[#0b2d54]">{conditionNames.length ? conditionNames.slice(0, 2).join(" · ") : "No active conditions recorded"}{conditionNames.length > 2 ? ` +${conditionNames.length - 2}` : ""}</p></div><div className="grid grid-cols-2 gap-2"><div className="rounded-2xl bg-white px-3 py-2.5 ring-1 ring-[#e0ebef]"><p className="text-[8px] font-black uppercase tracking-wide text-[#9aa8b7]">Blood</p><p className="mt-1 text-[11px] font-black text-[#0b2d54]">{detailLabel(bloodType)}</p></div><div className="rounded-2xl bg-white px-3 py-2.5 ring-1 ring-[#e0ebef]">
-<p className="text-[8px] font-black uppercase tracking-wide text-[#9aa8b7]">Rhesus</p><p className="mt-1 text-[11px] font-black text-[#0b2d54]">{detailLabel(rhesusFactor)}</p></div></div></div><div className="mt-4 flex items-center gap-2 text-[10px] font-black uppercase tracking-[0.14em] text-[#71839a] opacity-70 transition-all duration-200 group-hover:translate-x-1 group-hover:opacity-100"><span>Open</span><ArrowRight className="h-3.5 w-3.5" /></div></div></Link>
-
-          <Link href="/health-journal" aria-label="Open My History and Papers" className="group relative min-h-[220px] overflow-hidden rounded-[27px] border border-[#e0ebef] bg-gradient-to-br from-white via-white to-[#f2f7ff] p-6 shadow-[0_5px_18px_rgba(11,45,84,0.035)] transition duration-200 hover:-translate-y-1 hover:border-[#cddbf0] hover:shadow-[0_16px_36px_rgba(11,45,84,0.10)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#24c1c4] focus-visible:ring-offset-2"><div className="relative z-10"><div className="flex items-start justify-between gap-3"><div className="grid h-11 w-11 place-items-center rounded-[15px] bg-[#edf4ff] text-[#3f75bd]"><FolderOpen className="h-5 w-5" /></div><span className="text-[10px] font-black uppercase tracking-[0.14em] text-[#71839a]">Records</span></div><h3 className="mt-5 text-[19px] font-black tracking-[-0.04em] text-[#0b2d54]">My History and Papers</h3><p className="mt-2 text-xs leading-5 text-[#71839a]">Your encounters, results and important health documents in one place.</p><div className="mt-4 grid grid-cols-2 gap-2"><div className="rounded-2xl bg-white px-3 py-2.5 ring-1 ring-[#e0ebef]"><p className="text-[8px] font-black uppercase tracking-wide text-[#9aa8b7]">Records</p><p className="mt-1 text-[11px] font-black text-[#0b2d54]">{historyCount}</p></div><div className="rounded-2xl bg-white px-3 py-2.5 ring-1 ring-[#e0ebef]"><p className="text-[8px] font-black uppercase tracking-wide text-[#9aa8b7]">Vitals</p><p className="mt-1 text-[11px] font-black text-[#0b2d54]">{healthVitals.length}</p></div></div><div className="mt-4 flex items-center gap-2 text-[10px] font-black uppercase tracking-[0.14em] text-[#71839a] opacity-70 transition-all duration-200 group-hover:translate-x-1 group-hover:opacity-100"><span>Open</span><ArrowRight className="h-3.5 w-3.5" /></div></div></Link>
-        </section>
-      </div>
-    </main>
-  </ProtectedRoute>;
+            <DashboardCard
+              href="/health-journal"
+              title="Records"
+              tag="My History and Papers"
+              description="Your encounters, results and important health documents in one place."
+              accentClass="border-slate-200"
+            >
+              <div className="grid grid-cols-2 gap-2.5">
+                <MetricBadge label="Records" value={historyCount} />
+                <MetricBadge label="Vitals" value={healthVitals.length} />
+              </div>
+            </DashboardCard>
+          </section>
+        </div>
+      </main>
+    </ProtectedRoute>
+  );
 }
