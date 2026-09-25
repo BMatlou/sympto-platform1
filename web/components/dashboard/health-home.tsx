@@ -290,8 +290,6 @@ export default function HealthHome() {
                       <ArrowRight className="h-3.5 w-3.5 text-[#24C1C4]" aria-hidden="true" />
                     </ActionLink>
                   </div>
-
-                  </div>
                 </div>
               </section>
 
