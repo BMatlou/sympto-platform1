@@ -50,6 +50,17 @@ class PatientNotificationsService {
     return response.data?.data ?? response.data;
   }
 
+  async getPushPublicKey(): Promise<string> {
+    const response = await api.get("/patient-notifications/push/public-key");
+    return String(response.data?.data?.publicKey ?? response.data?.publicKey ?? "");
+  }
+
+  async registerPushSubscription(subscription: PushSubscription): Promise<void> {
+    await api.post("/patient-notifications/push-subscription", {
+      subscription: JSON.stringify(subscription.toJSON()),
+    });
+  }
+
   async getPreferences(): Promise<NotificationPreference[]> {
     const response = await api.get("/patient-notifications/preferences");
     const payload = response.data?.data ?? response.data;
