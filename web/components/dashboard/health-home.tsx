@@ -6,6 +6,7 @@ import { useEffect, useState } from "react";
 import { Activity, ArrowRight, Bell, CheckCircle2, FileHeart, FolderOpen, Plus, ShieldCheck } from "lucide-react";
 import { useDashboard } from "@/hooks/use-dashboard";
 import { healthJournalService } from "@/services/health-journal.service";
+import { patientNotificationsService } from "@/services/patient-notifications.service";
 import ProtectedRoute from "@/components/auth/protected-route";
 
 function display(value: unknown, fallback = "Not recorded"): string {
@@ -298,6 +299,57 @@ export default function HealthHome() {
       active = false;
     };
   }, [data?.patient?.id, data?.generatedAt]);
+
+  const [unreadNotificationCount, setUnreadNotificationCount] = useState(0);
+
+  useEffect(() => {
+    if (!data?.patient?.id) return;
+
+    let active = true;
+
+    const snapshotNotifications = Array.isArray(data?.today?.notifications)
+      ? data.today.notifications
+      : [];
+
+    const snapshotUnread = snapshotNotifications.filter((notification: any) => {
+      if (notification?.readAt) return false;
+      if (!notification?.scheduledFor) return true;
+
+      const scheduledAt = new Date(String(notification.scheduledFor)).getTime();
+      return Number.isFinite(scheduledAt) && scheduledAt <= Date.now();
+    }).length;
+
+    setUnreadNotificationCount(snapshotUnread);
+
+    const refresh = async () => {
+      try {
+        const count = await patientNotificationsService.getUnreadCount();
+        if (active) setUnreadNotificationCount(count);
+      } catch {
+        // Keep the dashboard snapshot count when the live count cannot be loaded.
+      }
+    };
+
+    void refresh();
+
+    const timer = window.setInterval(() => void refresh(), 15_000);
+
+    const refreshOnFocus = () => void refresh();
+    const refreshOnVisibility = () => {
+      if (document.visibilityState === "visible") void refresh();
+    };
+
+    window.addEventListener("focus", refreshOnFocus);
+    document.addEventListener("visibilitychange", refreshOnVisibility);
+
+    return () => {
+      active = false;
+      window.clearInterval(timer);
+      window.removeEventListener("focus", refreshOnFocus);
+      document.removeEventListener("visibilitychange", refreshOnVisibility);
+    };
+  }, [data?.patient?.id, data?.generatedAt]);
+
   if (loading) {
     return (
       <ProtectedRoute>
@@ -365,13 +417,6 @@ export default function HealthHome() {
   const dashboardNotifications = Array.isArray(data?.today?.notifications)
     ? data.today.notifications
     : [];
-  const currentTime = Date.now();
-  const unreadNotificationCount = dashboardNotifications.filter((notification: any) => {
-    if (notification?.readAt) return false;
-    if (!notification?.scheduledFor) return true;
-    const scheduledAt = new Date(String(notification.scheduledFor)).getTime();
-    return Number.isFinite(scheduledAt) && scheduledAt <= currentTime;
-  }).length;
   const attentionItems = Array.isArray(data?.attention) ? data.attention : [];
   const priorityItem = attentionItems[0] ?? null;
   const nextAppointment = (appointments[0] ?? null) as any;
