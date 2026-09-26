@@ -446,12 +446,7 @@ export class PushNotificationService {
       dsaEncoding: 'der',
     });
 
-    return Buffer.concat([
-      Buffer.from(input),
-      Buffer.from('.'),
-      derSignatureToJose(derSignature),
-    ])
-      .toString('base64url');
+    return input + '.' + derSignatureToJose(derSignature).toString('base64url');
   }
 
   private getSubject(): string {
