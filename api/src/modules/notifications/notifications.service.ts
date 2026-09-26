@@ -212,6 +212,20 @@ export class NotificationsService {
     };
   }
 
+  async getUnreadCountForUser(userId: string): Promise<number> {
+    return this.prisma.notification.count({
+      where: {
+        userId,
+        readAt: null,
+        status: { in: ['SENT', 'DELIVERED'] },
+        OR: [
+          { scheduledFor: null },
+          { scheduledFor: { lte: new Date() } },
+        ],
+      },
+    });
+  }
+
   async markReadForUser(userId: string, notificationId: string) {
     const notification = await this.prisma.notification.findFirst({
       where: { id: notificationId, userId },
