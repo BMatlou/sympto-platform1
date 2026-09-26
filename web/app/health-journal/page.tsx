@@ -56,6 +56,14 @@ export default function HealthJournalPage() {
   const [filter, setFilter] = useState<"all" | "journal" | "symptom" | "measurement">("all");
 
   useEffect(() => {
+    if (typeof window === "undefined") return;
+    const requested = new URLSearchParams(window.location.search).get("filter");
+    if (requested === "all" || requested === "journal" || requested === "symptom" || requested === "measurement") {
+      setFilter(requested);
+    }
+  }, []);
+
+  useEffect(() => {
     let active = true;
     setJournalError(false);
     healthJournalService.getAll({ page: 1, limit: 100 }).then(r => { if (active) setLogs(r.data ?? []); }).catch(() => { if (active) setJournalError(true); });
