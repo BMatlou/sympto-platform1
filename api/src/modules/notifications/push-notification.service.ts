@@ -294,9 +294,11 @@ export class PushNotificationService {
       throw error;
     }
 
+    const pushCopy = this.getPrivacySafeCopy(notification);
+
     const payload = JSON.stringify({
-      title: notification.title,
-      body: notification.body,
+      title: pushCopy.title,
+      body: pushCopy.body,
       notificationId: notification.id,
       type: notification.type,
       actionUrl: notification.actionUrl ?? '/notifications',
@@ -417,6 +419,69 @@ export class PushNotificationService {
       applicationServerPublicKey,
       ciphertext,
     ]);
+  }
+
+  private getPrivacySafeCopy(notification: {
+    type: string;
+    title: string;
+  }): { title: string; body: string } {
+    switch (String(notification.type).toUpperCase()) {
+      case 'REMINDER':
+        return {
+          title: 'Sympto reminder',
+          body: 'You have a health reminder waiting. Open Sympto to view the details.',
+        };
+      case 'APPOINTMENT':
+        return {
+          title: 'Sympto appointment update',
+          body: 'You have an appointment update waiting. Open Sympto to view the details.',
+        };
+      case 'LAB_RESULT':
+        return {
+          title: 'Sympto result available',
+          body: 'A new laboratory result is available in Sympto.',
+        };
+      case 'IMAGING_RESULT':
+        return {
+          title: 'Sympto imaging update',
+          body: 'A new imaging update is available in Sympto.',
+        };
+      case 'MESSAGE':
+        return {
+          title: 'Sympto care team message',
+          body: 'You have a new message from your care team.',
+        };
+      case 'TELEMEDICINE':
+        return {
+          title: 'Sympto telemedicine update',
+          body: 'You have a telemedicine update waiting in Sympto.',
+        };
+      case 'PAYMENT':
+        return {
+          title: 'Sympto payment update',
+          body: 'You have a healthcare payment update waiting in Sympto.',
+        };
+      case 'CLAIM':
+        return {
+          title: 'Sympto medical aid update',
+          body: 'You have a medical aid update waiting in Sympto.',
+        };
+      case 'SECURITY':
+        return {
+          title: 'Sympto security alert',
+          body: 'There is an important security update in Sympto.',
+        };
+      case 'SYSTEM':
+        return {
+          title: 'Sympto system update',
+          body: 'There is an important update from Sympto.',
+        };
+      default:
+        return {
+          title: 'Sympto notification',
+          body: 'You have a new health notification. Open Sympto to view the details.',
+        };
+    }
   }
 
   private createVapidToken(audience: string): string {
