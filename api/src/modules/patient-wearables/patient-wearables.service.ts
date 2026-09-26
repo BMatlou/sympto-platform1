@@ -30,20 +30,64 @@ export class PatientWearablesService {
         status: true,
         lastSyncAt: true,
         registeredAt: true,
+        measurements: {
+          orderBy: { measuredAt: 'desc' },
+          take: 1,
+          select: {
+            measurementType: true,
+            value: true,
+            unit: true,
+            measuredAt: true,
+            source: true,
+          },
+        },
       },
     });
   }
 
   async connect(userId: string, input: { manufacturer: string; model: string; deviceType?: DeviceType }) {
     const patient = await this.patientForUser(userId);
+    const manufacturer = input.manufacturer.trim() || 'Bluetooth LE';
+    const model = input.model.trim() || 'Smart Watch';
+    const deviceType = input.deviceType ?? DeviceType.SMARTWATCH;
+
+    const existing = await this.prisma.wearableDevice.findFirst({
+      where: {
+        patientId: patient.id,
+        manufacturer,
+        model,
+        status: { not: DeviceStatus.RETIRED },
+      },
+      orderBy: { registeredAt: 'desc' },
+      select: { id: true },
+    });
+
+    if (existing) {
+      return this.prisma.wearableDevice.update({
+        where: { id: existing.id },
+        data: {
+          deviceType,
+          status: DeviceStatus.ACTIVE,
+        },
+        select: {
+          id: true,
+          manufacturer: true,
+          model: true,
+          deviceType: true,
+          status: true,
+          lastSyncAt: true,
+          registeredAt: true,
+        },
+      });
+    }
+
     return this.prisma.wearableDevice.create({
       data: {
         patientId: patient.id,
-        manufacturer: input.manufacturer.trim() || 'Bluetooth LE',
-        model: input.model.trim() || 'Smart Watch',
-        deviceType: input.deviceType ?? DeviceType.SMARTWATCH,
+        manufacturer,
+        model,
+        deviceType,
         status: DeviceStatus.ACTIVE,
-        lastSyncAt: new Date(),
       },
       select: {
         id: true,
@@ -87,7 +131,11 @@ export class PatientWearablesService {
       },
     });
 
-    await this.prisma.wearableDevice.update({ where: { id: deviceId }, data: { lastSyncAt: new Date() } });
+    await this.prisma.wearableDevice.update({
+      where: { id: deviceId },
+      data: { lastSyncAt: new Date() },
+    });
+
     return measurement;
   }
 }
