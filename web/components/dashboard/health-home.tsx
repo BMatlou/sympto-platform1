@@ -426,21 +426,23 @@ export default function HealthHome() {
             <div className="px-4 pb-1 pt-3 sm:px-5 lg:px-7">
               <div className="mt-3 grid gap-3 xl:grid-cols-[minmax(0,1.55fr)_minmax(320px,0.85fr)]">
                 <section id="dashboard-overview-card" className="group relative min-h-[220px] overflow-hidden rounded-[28px] bg-[#0B2D54] p-6 text-white sm:p-7">
-                  <ActionLink
-                    href="/notifications"
-                    ariaLabel="Notifications"
-                    className="absolute right-5 top-5 z-10 grid h-10 w-10 place-items-center rounded-2xl bg-white/10 text-white ring-1 ring-inset ring-white/20 transition-all hover:-translate-y-0.5 hover:bg-[#24C1C4] hover:text-[#0B2D54]"
-                  >
-                    <Bell className="h-4 w-4" aria-hidden="true" />
-                    {unreadNotificationCount > 0 && (
-                      <span className="absolute -right-1 -top-1 grid min-h-5 min-w-5 place-items-center rounded-full bg-[#24C1C4] px-1 text-[8px] font-black leading-none text-[#0B2D54] ring-2 ring-[#0B2D54]">
-                        {unreadNotificationCount > 9 ? "9+" : unreadNotificationCount}
-                      </span>
-                    )}
-                  </ActionLink>
                   <div className="relative flex min-h-[166px] items-center justify-between gap-8">
                     <div className="min-w-0 pr-1 sm:pr-10">
-                      <p className="text-[9px] font-black uppercase tracking-[0.18em] text-white/50">Overview</p>
+                      <div className="flex items-center justify-between gap-4">
+                        <p className="text-[9px] font-black uppercase tracking-[0.18em] text-white/50">Overview</p>
+                        <ActionLink
+                          href="/notifications"
+                          ariaLabel="Notifications"
+                          className="relative grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-white/10 text-white ring-1 ring-inset ring-white/20 transition-all hover:-translate-y-0.5 hover:bg-[#24C1C4] hover:text-[#0B2D54]"
+                        >
+                          <Bell className="h-4 w-4" aria-hidden="true" />
+                          {unreadNotificationCount > 0 && (
+                            <span className="absolute -right-1 -top-1 grid min-h-5 min-w-5 place-items-center rounded-full bg-[#24C1C4] px-1 text-[8px] font-black leading-none text-[#0B2D54] ring-2 ring-[#0B2D54]">
+                              {unreadNotificationCount > 9 ? "9+" : unreadNotificationCount}
+                            </span>
+                          )}
+                        </ActionLink>
+                      </div>
                       <h2 className="mt-2 text-[30px] font-black leading-tight tracking-[-0.05em] sm:text-[38px]">
                         {greeting}, {firstName}
                       </h2>
