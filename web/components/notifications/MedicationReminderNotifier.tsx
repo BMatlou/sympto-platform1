@@ -69,9 +69,14 @@ export default function MedicationReminderNotifier() {
             toast(raw.title, {
               description: raw.body,
               duration: 10_000,
-              className:
-                "border-[#24c1c4] bg-[#24c1c4] text-white shadow-lg shadow-[#24c1c4]/20",
+              style: {
+                background: "#24C1C4",
+                border: "1px solid #24C1C4",
+                color: "#FFFFFF",
+                boxShadow: "0 10px 30px rgba(36, 193, 196, 0.24)",
+              },
               classNames: {
+                toast: "text-white",
                 title: "font-bold text-white",
                 description: "text-white/90",
                 icon: "text-white",
