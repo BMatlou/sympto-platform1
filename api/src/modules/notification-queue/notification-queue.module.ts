@@ -1,19 +1,18 @@
 import { Module } from '@nestjs/common';
 
 import { DatabaseModule } from '../../database/database.module';
+import { NotificationProcessorModule } from '../notification-processor/notification-processor.module';
 
 import { NotificationQueueController } from './notification-queue.controller';
 import { NotificationQueueService } from './notification-queue.service';
-import { NotificationProcessorService } from '../notification-processor/notification-processor.service';
 
 @Module({
-  imports: [DatabaseModule],
+  imports: [DatabaseModule, NotificationProcessorModule],
   controllers: [
     NotificationQueueController,
   ],
   providers: [
     NotificationQueueService,
-    NotificationProcessorService,
   ],
   exports: [
     NotificationQueueService,
