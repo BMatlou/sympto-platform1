@@ -132,14 +132,30 @@ export default function TodaySupportedGoalCard({ goal, onUpdated }: SupportedGoa
 
     setSaving(true);
     try {
+      const occurredAt = new Date().toISOString();
       await healthGoalsService.syncMetricEvent({
         metricType,
         metricKey,
         loggedValue: numeric,
-        occurredAt: new Date().toISOString(),
+        occurredAt,
         source: "goal-manual",
         sourceId: "goal-" + goalId + "-" + Date.now(),
       });
+
+      if (["NUTRITION", "BLOOD_GLUCOSE", "CHOLESTEROL"].includes(category)) {
+        try {
+          await healthJournalService.create({
+            title: "Goal measurement · " + meta.label,
+            journal: meta.label + ": " + numeric + (meta.unit ? " " + meta.unit : "") + ".",
+            notes: "Recorded from Today.",
+          });
+        } catch {
+          toast.warning(meta.label + " saved", {
+            description: "The goal record was saved, but the Health Journal entry could not be added.",
+          });
+        }
+      }
+
       setValue("");
       toast.success(meta.label + " value recorded.");
       await onUpdated?.();
