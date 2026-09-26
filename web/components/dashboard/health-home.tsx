@@ -3,7 +3,7 @@
 import Link from "next/link";
 import type { ReactNode } from "react";
 import { useEffect, useState } from "react";
-import { Activity, ArrowRight, CheckCircle2, FileHeart, FolderOpen, Plus, ShieldCheck } from "lucide-react";
+import { Activity, ArrowRight, Bell, CheckCircle2, FileHeart, FolderOpen, Plus, ShieldCheck } from "lucide-react";
 import { useDashboard } from "@/hooks/use-dashboard";
 import { healthJournalService } from "@/services/health-journal.service";
 import ProtectedRoute from "@/components/auth/protected-route";
@@ -263,6 +263,16 @@ export default function HealthHome() {
 
   const activeGoalCount = countActiveGoals(data);
   const todayActionCount = medications.length + appointments.length + activeGoalCount;
+  const dashboardNotifications = Array.isArray(data?.today?.notifications)
+    ? data.today.notifications
+    : [];
+  const currentTime = Date.now();
+  const unreadNotificationCount = dashboardNotifications.filter((notification: any) => {
+    if (notification?.readAt) return false;
+    if (!notification?.scheduledFor) return true;
+    const scheduledAt = new Date(String(notification.scheduledFor)).getTime();
+    return Number.isFinite(scheduledAt) && scheduledAt <= currentTime;
+  }).length;
   const attentionItems = Array.isArray(data?.attention) ? data.attention : [];
   const priorityItem = attentionItems[0] ?? null;
   const nextAppointment = (appointments[0] ?? null) as any;
@@ -305,6 +315,18 @@ export default function HealthHome() {
 
   return (
     <ProtectedRoute>
+      <ActionLink
+        href="/notifications"
+        ariaLabel="Notifications"
+        className="fixed right-[84px] top-4 z-[60] grid h-10 w-10 place-items-center rounded-2xl bg-white text-[#0B2D54] shadow-[0_10px_26px_rgba(11,45,84,0.12)] ring-1 ring-[#dce7ec] transition-all hover:-translate-y-0.5 hover:ring-[#24C1C4]/50 sm:right-[166px] sm:top-5"
+      >
+        <Bell className="h-4 w-4" aria-hidden="true" />
+        {unreadNotificationCount > 0 && (
+          <span className="absolute -right-1 -top-1 grid min-h-5 min-w-5 place-items-center rounded-full bg-[#24C1C4] px-1 text-[8px] font-black leading-none text-[#0B2D54] ring-2 ring-[#EAF0F7]">
+            {unreadNotificationCount > 9 ? "9+" : unreadNotificationCount}
+          </span>
+        )}
+      </ActionLink>
       <ActionLink
         href="/smart-file"
         ariaLabel="Share Smart File"
