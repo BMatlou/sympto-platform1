@@ -216,11 +216,48 @@ export class GoalsEngineService {
   }
 
   private async aggregateMetric(patientId: string, metricType: string, metricKey: string, start: Date, end: Date, aggregation: GoalConfig['aggregation']) {
-    const rows = await this.prisma.$queryRaw<Array<{ loggedValue: Prisma.Decimal }>>`SELECT "loggedValue" FROM "HealthGoalMetricEvent" WHERE "patientId" = ${patientId} AND "metricType" = ${metricType} AND "metricKey" = ${metricKey} AND "source" <> 'goal-baseline' AND "occurredAt" >= ${start} AND "occurredAt" <= ${end} ORDER BY "occurredAt" ASC`;
+    const rows = await this.prisma.$queryRaw<Array<{ loggedValue: Prisma.Decimal; occurredAt: Date; source: string | null }>>`SELECT "loggedValue", "occurredAt", "source" FROM "HealthGoalMetricEvent" WHERE "patientId" = ${patientId} AND "metricType" = ${metricType} AND "metricKey" = ${metricKey} AND "source" <> 'goal-baseline' AND "occurredAt" >= ${start} AND "occurredAt" <= ${end} ORDER BY "occurredAt" ASC`;
     if (!rows.length) return null;
+
+    if (metricType === 'EXERCISE' && metricKey === 'exercise.minutes' && aggregation === 'SUM') {
+      const byDay = new Map<string, { wearableTotal: number; manualLatest: number; manualLatestAt: number }>();
+
+      for (const row of rows) {
+        const value = Number(row.loggedValue);
+        if (!Number.isFinite(value)) continue;
+
+        const parts = new Intl.DateTimeFormat('en-CA', {
+          timeZone: 'Africa/Johannesburg',
+          year: 'numeric',
+          month: '2-digit',
+          day: '2-digit',
+        }).formatToParts(row.occurredAt);
+        const dateKey = `${parts.find((part) => part.type === 'year')?.value}-${parts.find((part) => part.type === 'month')?.value}-${parts.find((part) => part.type === 'day')?.value}`;
+        if (!dateKey) continue;
+
+        const day = byDay.get(dateKey) ?? { wearableTotal: 0, manualLatest: 0, manualLatestAt: -Infinity };
+        if (String(row.source ?? '').toLowerCase().startsWith('wearable')) {
+          day.wearableTotal += value;
+        } else if (row.occurredAt.getTime() >= day.manualLatestAt) {
+          day.manualLatest = value;
+          day.manualLatestAt = row.occurredAt.getTime();
+        }
+        byDay.set(dateKey, day);
+      }
+
+      return [...byDay.values()].reduce((sum, day) => sum + Math.max(day.wearableTotal, day.manualLatest), 0);
+    }
+
     const values = rows.map((row) => Number(row.loggedValue)).filter(Number.isFinite);
     if (!values.length) return null;
-    switch (aggregation) { case 'SUM': return values.reduce((sum, value) => sum + value, 0); case 'AVERAGE': return values.reduce((sum, value) => sum + value, 0) / values.length; case 'MIN': return Math.min(...values); case 'MAX': return Math.max(...values); case 'LATEST': default: return values[values.length - 1]; }
+    switch (aggregation) {
+      case 'SUM': return values.reduce((sum, value) => sum + value, 0);
+      case 'AVERAGE': return values.reduce((sum, value) => sum + value, 0) / values.length;
+      case 'MIN': return Math.min(...values);
+      case 'MAX': return Math.max(...values);
+      case 'LATEST':
+      default: return values[values.length - 1];
+    }
   }
 
   private async evaluateWeightStrategy(patientId: string, title: string, config: GoalConfig, goalCreatedAt: Date, now: Date, target: number): Promise<StrategyEvaluation> {
