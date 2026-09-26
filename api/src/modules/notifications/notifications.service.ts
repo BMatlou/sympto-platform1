@@ -168,6 +168,11 @@ export class NotificationsService {
   ) {
     const where: Prisma.NotificationWhereInput = {
       userId,
+      status: { in: ['SENT', 'DELIVERED', 'READ'] },
+      OR: [
+        { scheduledFor: null },
+        { scheduledFor: { lte: new Date() } },
+      ],
       ...(unreadOnly ? { readAt: null } : {}),
     };
 
