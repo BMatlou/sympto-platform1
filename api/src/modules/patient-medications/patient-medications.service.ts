@@ -301,29 +301,152 @@ export class PatientMedicationsService {
   async scheduleReminder(id: string, dto: CreateMedicationReminderDto, authenticatedUserId: string) {
     const medication = await this.findOne(id);
     const ownerUserId = medication.healthPassport.patient.userId;
-    if (!authenticatedUserId || ownerUserId !== authenticatedUserId) throw new NotFoundException('Patient medication not found.');
-    const medicationName = medication.medication.name || medication.medication.genericName || 'Medication';
-    const scheduledFor = new Date(dto.scheduledFor);
-    if (Number.isNaN(scheduledFor.getTime())) throw new ConflictException('The reminder time is invalid.');
-    if (scheduledFor.getTime() <= Date.now()) throw new ConflictException('The reminder must be scheduled in the future.');
-    const notification = await this.notificationsService.create({ userId: ownerUserId, type: NotificationType.REMINDER, title: `Medication reminder: ${medicationName}`, body: `It is time to take ${medicationName}${medication.dosage ? ` (${medication.dosage})` : ''}. Follow the instructions provided by your healthcare professional.`, channel: dto.channel ?? NotificationChannel.IN_APP, status: NotificationStatus.PENDING, priority: NotificationPriority.NORMAL, actionUrl: '/medications', actionLabel: 'View medication', scheduledFor: scheduledFor.toISOString() });
 
-    // NotificationsService can intentionally skip creation when the user has disabled
-    // this notification type/channel in their preferences. Do not enqueue a reminder
-    // unless an actual Notification record was created.
-    if ('skipped' in notification) {
+    if (!authenticatedUserId || ownerUserId !== authenticatedUserId) {
+      throw new NotFoundException('Patient medication not found.');
+    }
+
+    const medicationName =
+      medication.medication.name ||
+      medication.medication.genericName ||
+      'Medication';
+
+    const scheduledFor = new Date(dto.scheduledFor);
+
+    if (Number.isNaN(scheduledFor.getTime())) {
+      throw new ConflictException('The reminder time is invalid.');
+    }
+
+    if (scheduledFor.getTime() <= Date.now()) {
+      throw new ConflictException('The reminder must be scheduled in the future.');
+    }
+
+    const requestedChannel = dto.channel ?? NotificationChannel.IN_APP;
+    const payload = {
+      userId: ownerUserId,
+      type: NotificationType.REMINDER,
+      title: `Medication reminder: ${medicationName}`,
+      body: `It is time to take ${medicationName}${medication.dosage ? ` (${medication.dosage})` : ''}. Follow the instructions provided by your healthcare professional.`,
+      status: NotificationStatus.PENDING,
+      priority: NotificationPriority.NORMAL,
+      actionUrl: '/medications',
+      actionLabel: 'View medication',
+      scheduledFor: scheduledFor.toISOString(),
+    };
+
+    const enqueue = async (notification: any) => {
+      if (!notification || 'skipped' in notification) {
+        return null;
+      }
+
+      await this.notificationQueueService.create({
+        notificationId: notification.id,
+        scheduledFor: scheduledFor.toISOString(),
+      });
+
+      return notification;
+    };
+
+    let inAppReminder: any = null;
+    let pushReminder: any = null;
+
+    if (requestedChannel === NotificationChannel.PUSH) {
+      const pushPreference =
+        await this.prisma.notificationPreference.findUnique({
+          where: {
+            userId_notificationType_channel: {
+              userId: ownerUserId,
+              notificationType: NotificationType.REMINDER,
+              channel: NotificationChannel.PUSH,
+            },
+          },
+          select: { enabled: true },
+        });
+
+      const pushConfigured =
+        Boolean(pushPreference?.enabled) &&
+        (await this.prisma.deviceToken.findFirst({
+          where: {
+            userId: ownerUserId,
+            platform: 'WEB_PUSH',
+            active: true,
+          },
+          select: { id: true },
+        }));
+
+      if (pushConfigured) {
+        pushReminder = await enqueue(
+          await this.notificationsService.create({
+            ...payload,
+            channel: NotificationChannel.PUSH,
+          }),
+        );
+      }
+    } else {
+      inAppReminder = await enqueue(
+        await this.notificationsService.create({
+          ...payload,
+          channel: NotificationChannel.IN_APP,
+        }),
+      );
+
+      const pushPreference =
+        await this.prisma.notificationPreference.findUnique({
+          where: {
+            userId_notificationType_channel: {
+              userId: ownerUserId,
+              notificationType: NotificationType.REMINDER,
+              channel: NotificationChannel.PUSH,
+            },
+          },
+          select: { enabled: true },
+        });
+
+      const pushConfigured =
+        Boolean(pushPreference?.enabled) &&
+        (await this.prisma.deviceToken.findFirst({
+          where: {
+            userId: ownerUserId,
+            platform: 'WEB_PUSH',
+            active: true,
+          },
+          select: { id: true },
+        }));
+
+      if (pushConfigured) {
+        pushReminder = await enqueue(
+          await this.notificationsService.create({
+            ...payload,
+            channel: NotificationChannel.PUSH,
+          }),
+        );
+      }
+    }
+
+    if (!inAppReminder && !pushReminder) {
       return {
         reminder: null,
+        pushReminder: null,
         skipped: true,
-        reason: notification.reason,
+        reason:
+          requestedChannel === NotificationChannel.PUSH
+            ? 'PUSH_NOT_CONFIGURED'
+            : 'NOTIFICATION_PREFERENCES_DISABLED',
         scheduledFor: scheduledFor.toISOString(),
       };
     }
 
-    await this.notificationQueueService.create({ notificationId: notification.id, scheduledFor: scheduledFor.toISOString() });
-    return { reminder: notification, scheduledFor: scheduledFor.toISOString() };
+    return {
+      reminder: inAppReminder,
+      pushReminder,
+      skipped: false,
+      scheduledFor: scheduledFor.toISOString(),
+      channels: {
+        inApp: Boolean(inAppReminder),
+        push: Boolean(pushReminder),
+      },
+    };
   }
-
   async remove(id: string, authenticatedUserId: string) {
     const medication = await this.findOne(id);
     const ownerUserId = medication.healthPassport.patient.userId;
