@@ -173,8 +173,6 @@ export default function WearablesPage() {
   const otherProviders = providers.filter((provider) => provider.provider !== "SYMPTO_WEARABLE");
   const usingOtherSources = showSources;
 
-  const otherProviders = providers.filter((provider) => provider.provider !== "SYMPTO_WEARABLE");
-
   return (
     <main className="min-h-screen bg-[#F4FBFB] px-4 py-7 text-[#0b2d54] sm:px-6 lg:px-8">
       <div className="mx-auto max-w-5xl">
