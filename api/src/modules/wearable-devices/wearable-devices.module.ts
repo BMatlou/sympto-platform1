@@ -1,6 +1,8 @@
 import { Module } from '@nestjs/common';
 
 import { DatabaseModule } from '../../database/database.module';
+import { DeviceMeasurementsModule } from '../device-measurements/device-measurements.module';
+import { HealthGoalsModule } from '../health-goals/health-goals.module';
 
 import { WearableDevicesController } from './wearable-devices.controller';
 import { WearableDevicesService } from './wearable-devices.service';
@@ -10,6 +12,8 @@ import { PatientWearablesService } from '../patient-wearables/patient-wearables.
 @Module({
   imports: [
     DatabaseModule,
+    DeviceMeasurementsModule,
+    HealthGoalsModule,
   ],
 
   controllers: [
