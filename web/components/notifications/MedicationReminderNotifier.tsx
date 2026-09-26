@@ -70,10 +70,10 @@ export default function MedicationReminderNotifier() {
               description: raw.body,
               duration: 10_000,
               style: {
-                background: "#24C1C4",
-                border: "1px solid #24C1C4",
+                background: "#16A34A",
+                border: "1px solid #16A34A",
                 color: "#FFFFFF",
-                boxShadow: "0 10px 30px rgba(36, 193, 196, 0.24)",
+                boxShadow: "0 10px 30px rgba(22, 163, 74, 0.24)",
               },
               classNames: {
                 toast: "text-white",
