@@ -597,38 +597,57 @@ export class HealthGoalsService {
         orderBy: { createdAt: 'desc' },
       });
 
-      // HealthGoalMetricConfig is intentionally hydrated here because the
-      // frontend must never guess a weight-goal direction. In particular,
-      // CLOSEST must remain MAINTAIN and must not silently become LOSE.
+      // Optional enrichments must never take down the core goals list.
       const data = await Promise.all(
         healthGoalsList.map(async (goal: any) => {
-          const configRows = await this.prisma.$queryRaw<any[]>`
-            SELECT
-              "id",
-              "healthGoalId",
-              "metricType",
-              "metricKey",
-              "frequency",
-              "frequencyTarget",
-              "aggregation",
-              "comparison",
-              "guidanceText"
-            FROM "HealthGoalMetricConfig"
-            WHERE "healthGoalId" = ${goal.id}
-            LIMIT 1
-          `;
+          let metricConfig: any = null;
+
+          try {
+            const configRows = await this.prisma.$queryRaw<any[]>`
+              SELECT
+                "id",
+                "healthGoalId",
+                "metricType",
+                "metricKey",
+                "frequency",
+                "frequencyTarget",
+                "aggregation",
+                "comparison",
+                "guidanceText"
+              FROM "HealthGoalMetricConfig"
+              WHERE "healthGoalId" = ${goal.id}
+              LIMIT 1
+            `;
+            metricConfig = configRows[0] ?? null;
+          } catch (error: unknown) {
+            console.warn(
+              "HealthGoalMetricConfig enrichment unavailable; returning core goal data.",
+              error instanceof Error ? error.message : String(error),
+            );
+          }
 
           return {
             ...goal,
-            metricConfig: configRows[0] ?? null,
+            metricConfig,
           };
         }),
       );
 
-      const enrichedData = await this.healthGoalIntelligence.attachRelationships(
-        data as any[],
-      );
-
+      let enrichedData = data as any[];
+      try {
+        enrichedData = await this.healthGoalIntelligence.attachRelationships(
+          data as any[],
+        );
+      } catch (error: unknown) {
+        console.warn(
+          "Health goal relationship enrichment unavailable; returning goals without relationships.",
+          error instanceof Error ? error.message : String(error),
+        );
+        enrichedData = data.map((goal: any) => ({
+          ...goal,
+          connectedGoals: [],
+        }));
+      }
       return {
         success: true,
         statusCode: 200,
