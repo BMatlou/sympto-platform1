@@ -4,6 +4,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { Check, Minus, Plus, Save, Dumbbell, Moon, Sparkles, Droplets, Target } from "lucide-react";
 import { healthJournalService } from "@/services/health-journal.service";
 import { healthGoalsService } from "@/services/health-goals.service";
+import { canonicalExerciseDayTotals, canonicalExerciseWeekTotal, type ExerciseMetricEvent } from "@/lib/exercise-metric";
 import type { HealthJournal, HealthJournalMood, SleepQuality } from "@/types/health-journal";
 
 const moodOptions: Array<{ value: HealthJournalMood; label: string; tone: string }> = [
@@ -40,7 +41,7 @@ type Goal = {
   metricConfig?: { frequencyTarget?: number | string | null } | null;
 };
 
-type ExerciseEvent = { loggedValue: number; occurredAt: string };
+type ExerciseEvent = ExerciseMetricEvent;
 
 function startOfLocalWeek(date = new Date()) {
   const start = new Date(date);
@@ -188,16 +189,15 @@ export default function DailyHealthCheckIn({ embedded = false, goals = [], medic
   const sleepGoalHours = sleepTarget(sleepGoal);
   const waterPercent = Math.min(100, Math.round((waterIntakeMl / waterGoalMl) * 100));
   const waterRemaining = Math.max(0, waterGoalMl - waterIntakeMl);
-  const persistedWeekMinutes = weeklyExerciseEvents.reduce((total, event) => total + (Number.isFinite(event.loggedValue) ? event.loggedValue : 0), 0);
-  const persistedTodayMinutes = weeklyExerciseEvents.filter((event) => {
-    const date = new Date(event.occurredAt);
-    return !Number.isNaN(date.getTime()) && localDayKey(date) === localDayKey();
-  }).reduce((total, event) => total + (Number.isFinite(event.loggedValue) ? event.loggedValue : 0), 0);
-  const projectedWeekMinutes = Math.max(0, persistedWeekMinutes - persistedTodayMinutes + exerciseMinutes);
+  const persistedDayTotals = canonicalExerciseDayTotals(weeklyExerciseEvents);
+  const persistedWeekMinutes = canonicalExerciseWeekTotal(weeklyExerciseEvents);
+  const persistedTodayMinutes = persistedDayTotals.get(localDayKey()) ?? 0;
+  const projectedTodayMinutes = Math.max(persistedTodayMinutes, exerciseMinutes);
+  const projectedWeekMinutes = Math.max(0, persistedWeekMinutes - persistedTodayMinutes + projectedTodayMinutes);
   const movementProgress = exerciseGoalMinutes > 0 ? Math.min(100, Math.round((projectedWeekMinutes / exerciseGoalMinutes) * 100)) : 0;
   const sleepProgress = Math.min(100, Math.round((sleepHours / sleepGoalHours) * 100));
   const derivedSleepQuality = sleepHours > 0 ? sleepQualityForHours(sleepHours) : null;
-  const effectiveSleepQuality = derivedSleepQuality ?? sleepQuality;
+  const effectiveSleepQuality = sleepQuality ?? derivedSleepQuality;
   const movementRemaining = Math.max(0, exerciseGoalMinutes - projectedWeekMinutes);
 
   const hasInput = useMemo(
@@ -245,9 +245,9 @@ export default function DailyHealthCheckIn({ embedded = false, goals = [], medic
     const weekStart = startOfLocalWeek();
     async function loadWeekExercise() {
       try {
-        const response = await healthGoalsService.getMetricEvents("EXERCISE", "exercise.minutes", weekStart, new Date(), "health-journal");
+        const response = await healthGoalsService.getMetricEvents("EXERCISE", "exercise.minutes", weekStart, new Date());
         if (!active) return;
-        setWeeklyExerciseEvents((response.events ?? []).map((event) => ({ loggedValue: Number(event.loggedValue), occurredAt: String(event.occurredAt) })));
+        setWeeklyExerciseEvents((response.events ?? []).map((event) => ({ loggedValue: Number(event.loggedValue), occurredAt: String(event.occurredAt), source: event.source ?? null })));
       } catch {
         if (active) setWeeklyExerciseEvents([]);
       }
