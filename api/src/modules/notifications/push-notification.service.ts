@@ -526,13 +526,35 @@ export class PushNotificationService {
 
   private getPrivateKey(): KeyObject {
     const configured = process.env.PUSH_VAPID_PRIVATE_KEY_BASE64?.trim();
+
     if (!configured) {
       throw new Error(
         'PUSH_VAPID_PRIVATE_KEY_BASE64 is not configured.',
       );
     }
 
-    const pem = Buffer.from(configured, 'base64').toString('utf8');
-    return createPrivateKey(pem);
+    // Accept either the generated base64-encoded PKCS#8 PEM value
+    // or a PEM value directly, so local .env formatting cannot break key loading.
+    const pem = configured.includes('-----BEGIN')
+      ? configured.replace(/\\n/g, '\\n')
+      : Buffer.from(configured, 'base64').toString('utf8');
+
+    if (!pem.includes('-----BEGIN PRIVATE KEY-----')) {
+      throw new Error(
+        'PUSH_VAPID_PRIVATE_KEY_BASE64 is invalid. Generate a fresh key with: npm run push:vapid',
+      );
+    }
+
+    try {
+      return createPrivateKey({
+        key: pem,
+        format: 'pem',
+        type: 'pkcs8',
+      });
+    } catch {
+      throw new Error(
+        'PUSH_VAPID_PRIVATE_KEY_BASE64 could not be decoded. Generate a fresh VAPID key with: npm run push:vapid',
+      );
+    }
   }
 }
