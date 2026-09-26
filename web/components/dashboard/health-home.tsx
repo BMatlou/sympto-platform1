@@ -118,7 +118,10 @@ function countTodayNeeds(data: any) {
       const scheduledAt = new Date(String(notification.scheduledFor)).getTime();
       if (!Number.isFinite(scheduledAt) || scheduledAt > Date.now()) return false;
     }
-    return String(notification?.type ?? "").toUpperCase() !== "REMINDER";
+    return (
+      String(notification?.type ?? "").toUpperCase() !== "REMINDER" &&
+      !["HIGH", "URGENT"].includes(String(notification?.priority ?? "").toUpperCase())
+    );
   });
 
   const deviceAlerts = Array.isArray(data?.wearables?.deviceAlerts)
