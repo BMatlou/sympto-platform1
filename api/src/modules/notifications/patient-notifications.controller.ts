@@ -1,15 +1,19 @@
 import {
+  BadRequestException,
   Body,
   Controller,
   Get,
   Param,
   Patch,
+  Post,
   Query,
   Req,
   UseGuards,
 } from '@nestjs/common';
 import { IsBoolean, IsEnum, IsOptional, IsString } from 'class-validator';
 import { NotificationChannel, NotificationType } from '@prisma/client';
+import { RegisterPushSubscriptionDto } from './dto/register-push-subscription.dto';
+import { PushNotificationService } from './push-notification.service';
 
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { NotificationPreferencesService } from '../notification-preferences/notification-preferences.service';
@@ -40,7 +44,24 @@ export class PatientNotificationsController {
   constructor(
     private readonly notificationsService: NotificationsService,
     private readonly notificationPreferencesService: NotificationPreferencesService,
+    private readonly pushNotificationService: PushNotificationService,
   ) {}
+
+  @Get('push/public-key')
+  pushPublicKey() {
+    return { publicKey: this.pushNotificationService.getPublicKey() };
+  }
+
+  @Post('push-subscription')
+  registerPushSubscription(
+    @Req() req: any,
+    @Body() dto: RegisterPushSubscriptionDto,
+  ) {
+    return this.pushNotificationService.registerSubscription(
+      req.user.sub,
+      JSON.parse(dto.subscription),
+    );
+  }
 
   @Get('preferences')
   preferences(@Req() req: any) {
@@ -52,6 +73,17 @@ export class PatientNotificationsController {
     @Req() req: any,
     @Body() dto: UpdatePatientNotificationPreferenceDto,
   ) {
+    const supportedChannels = new Set([
+      NotificationChannel.IN_APP,
+      NotificationChannel.PUSH,
+    ]);
+
+    if (!supportedChannels.has(dto.channel)) {
+      throw new BadRequestException(
+        'This notification channel is not available yet.',
+      );
+    }
+
     return this.notificationPreferencesService.upsertForUser(
       req.user.sub,
       dto,
