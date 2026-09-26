@@ -150,7 +150,7 @@ export class DeviceMeasurementsService {
         unit: dto.unit,
         secondaryValue: dto.secondaryValue,
         secondaryUnit: dto.secondaryUnit,
-        measuredAt: dto.measuredAt,
+        measuredAt: new Date(dto.measuredAt),
         source: dto.source,
         externalRecordId: dto.externalRecordId,
         notes: dto.notes,
