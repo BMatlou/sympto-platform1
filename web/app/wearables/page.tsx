@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
-import { Activity, Bluetooth, CheckCircle2, ChevronLeft, HeartPulse, Link2Off, Watch } from "lucide-react";
+import { Activity, Bluetooth, ChevronLeft, HeartPulse, Link2Off, Watch } from "lucide-react";
 import { api } from "@/lib/api";
 
 const HEART_RATE_SERVICE = "heart_rate";
@@ -72,6 +72,7 @@ export default function WearablesPage() {
   const [status, setStatus] = useState("Not connected");
   const [error, setError] = useState("");
   const [connecting, setConnecting] = useState(false);
+  const [showSources, setShowSources] = useState(false);
   const deviceRef = useRef<BluetoothDeviceLike | null>(null);
   const backendDeviceIdRef = useRef<string | null>(null);
 
@@ -269,7 +270,7 @@ export default function WearablesPage() {
                     <div className="mt-7 flex flex-col gap-3 sm:flex-row sm:items-center">
                       <div className="flex items-center gap-3 rounded-2xl border border-[#d7eeee] bg-white px-4 py-3">
                         <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-[#24c1c4]/12 text-[#0b2d54]">
-                          <Watch className="h-4.5 w-4.5" />
+                          <Watch className="h-4 w-4" />
                         </span>
                         <div>
                           <p className="text-xs font-black text-[#0b2d54]">Sympto device</p>
