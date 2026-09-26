@@ -174,6 +174,8 @@ export default function WearablesPage() {
   const usingOtherSources = showSources;
 
 
+  const otherProviders = providers.filter((provider) => provider.provider !== "SYMPTO_WEARABLE");
+
   return (
     <main className="min-h-screen bg-[#F4FBFB] px-4 py-7 text-[#0b2d54] sm:px-6 lg:px-8">
       <div className="mx-auto max-w-5xl">
@@ -185,202 +187,187 @@ export default function WearablesPage() {
           Health Home
         </Link>
 
-        <section className="mt-4 overflow-hidden rounded-[2rem] border border-[#dce9ec] bg-white shadow-[0_24px_70px_rgba(11,45,84,0.08)]">
-          <header className="flex flex-col gap-5 px-6 pb-6 pt-7 sm:flex-row sm:items-end sm:justify-between sm:px-8">
+        <section className="mt-4 overflow-hidden rounded-[2rem] border border-[#dbe7ea] bg-white shadow-[0_24px_70px_rgba(11,45,84,0.08)]">
+          <header className="flex flex-col gap-5 border-b border-slate-100 px-6 py-6 sm:flex-row sm:items-center sm:justify-between sm:px-8">
             <div>
-              <p className="text-[11px] font-black uppercase tracking-[0.2em] text-[#24c1c4]">Connected Health</p>
-              <h1 className="mt-2 text-3xl font-black tracking-tight sm:text-[2.35rem]">Wearables</h1>
+              <p className="text-[10px] font-black uppercase tracking-[0.22em] text-[#24c1c4]">Connected Health</p>
+              <h1 className="mt-2 text-2xl font-black tracking-tight sm:text-3xl">Wearables</h1>
             </div>
 
-            <div className="flex items-center gap-3 self-start sm:self-auto">
-              <span className={`text-xs font-black transition ${showSources ? "text-slate-400" : "text-[#0b2d54]"}`}>
-                Sympto
-              </span>
+            <div className="flex items-center gap-3 self-start">
+              <span className={`text-xs font-black ${showSources ? "text-slate-400" : "text-[#0b2d54]"}`}>Sympto</span>
               <button
                 type="button"
                 role="switch"
                 aria-checked={showSources}
                 aria-label={showSources ? "Show Sympto wearable" : "Show other wearables"}
                 onClick={() => setShowSources((value) => !value)}
-                className={`relative h-8 w-14 shrink-0 rounded-full p-1 transition-colors duration-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#24c1c4] focus-visible:ring-offset-2 ${
-                  showSources ? "bg-[#0b2d54]" : "bg-[#24c1c4]"
-                }`}
+                className={`relative h-8 w-14 rounded-full p-1 transition-colors duration-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#24c1c4] focus-visible:ring-offset-2 ${showSources ? "bg-slate-300" : "bg-[#24c1c4]"}`}
               >
-                <span
-                  className={`block h-6 w-6 rounded-full bg-white shadow-[0_2px_8px_rgba(11,45,84,0.22)] transition-transform duration-200 ${
-                    showSources ? "translate-x-6" : "translate-x-0"
-                  }`}
-                />
+                <span className={`block h-6 w-6 rounded-full bg-white shadow-[0_2px_8px_rgba(11,45,84,0.22)] transition-transform duration-200 ${showSources ? "translate-x-6" : "translate-x-0"}`} />
               </button>
-              <span className={`text-xs font-black transition ${showSources ? "text-[#0b2d54]" : "text-slate-400"}`}>
-                Other
-              </span>
+              <span className={`text-xs font-black ${showSources ? "text-[#0b2d54]" : "text-slate-400"}`}>Other</span>
             </div>
           </header>
 
-          <div className="border-t border-slate-100 px-5 pb-6 pt-5 sm:px-8 sm:pb-8">
-            {!showSources ? (
-              <>
-                <div className="relative overflow-hidden rounded-[2rem] bg-[#0b2d54]">
-                  <div className="absolute -right-20 -top-20 h-56 w-56 rounded-full bg-[#24c1c4]/10" />
-                  <div className="grid min-h-[430px] lg:grid-cols-[0.9fr_1.1fr]">
-                    <div className="relative z-10 flex flex-col justify-center p-7 sm:p-10">
-                      <p className="text-[10px] font-black uppercase tracking-[0.2em] text-[#24c1c4]">Sympto</p>
-                      <h2 className="mt-3 text-4xl font-black tracking-tight text-white sm:text-5xl">
-                        Sympto Wearable
-                      </h2>
-                      <p className="mt-2 text-base font-medium text-white/55">Watch + wristband</p>
-                      <p className="mt-6 max-w-sm text-sm leading-6 text-white/65">
-                        Vitals, activity, sleep and recovery — designed around Sympto.
-                      </p>
+          {!showSources ? (
+            <div className="p-5 sm:p-7">
+              <div className="overflow-hidden rounded-[2rem] bg-[#0b2d54]">
+                <div className="grid min-h-[520px] lg:grid-cols-[1fr_1fr]">
+                  <div className="relative flex items-center justify-center overflow-hidden bg-[#F1FBFB] p-8 sm:p-12">
+                    <div className="absolute left-1/2 top-1/2 h-72 w-72 -translate-x-1/2 -translate-y-1/2 rounded-full border border-[#24c1c4]/15" />
+                    <div className="absolute left-1/2 top-1/2 h-60 w-60 -translate-x-1/2 -translate-y-1/2 rounded-full border border-[#24c1c4]/10" />
 
-                      <p className="mt-9 text-xs font-bold text-white/35">Coming soon</p>
-                    </div>
-
-                    <div className="relative flex min-h-[300px] items-center justify-center overflow-hidden border-t border-white/10 bg-white/[0.035] lg:border-l lg:border-t-0">
-                      <div className="absolute inset-x-0 bottom-8 mx-auto h-px max-w-xs bg-white/10" />
-
-                      <div className="relative h-[280px] w-[180px]">
-                        <div className="absolute left-1/2 top-0 h-24 w-24 -translate-x-1/2 rounded-[2rem] bg-[#071f3a] shadow-[0_20px_45px_rgba(0,0,0,0.25)]" />
-                        <div className="absolute bottom-0 left-1/2 h-24 w-24 -translate-x-1/2 rounded-[2rem] bg-[#071f3a] shadow-[0_20px_45px_rgba(0,0,0,0.25)]" />
-                        <div className="absolute left-1/2 top-1/2 h-[190px] w-[150px] -translate-x-1/2 -translate-y-1/2 rounded-[3rem] bg-[#24c1c4] p-2 shadow-[0_30px_70px_rgba(0,0,0,0.28)]">
-                          <div className="flex h-full w-full items-center justify-center rounded-[2.55rem] bg-[#0b2d54]">
-                            <div className="text-center">
-                              <div className="mx-auto h-11 w-11 rounded-full border-[3px] border-[#24c1c4]/60" />
-                              <p className="mt-3 text-[9px] font-black uppercase tracking-[0.18em] text-white/55">Sympto</p>
+                    <div className="relative h-[380px] w-[245px]">
+                      <div className="absolute left-1/2 top-0 h-32 w-32 -translate-x-1/2 rounded-[2.5rem] bg-[#08213e] shadow-[0_26px_55px_rgba(11,45,84,0.24)]" />
+                      <div className="absolute bottom-0 left-1/2 h-32 w-32 -translate-x-1/2 rounded-[2.5rem] bg-[#08213e] shadow-[0_26px_55px_rgba(11,45,84,0.24)]" />
+                      <div className="absolute left-1/2 top-1/2 h-[270px] w-[205px] -translate-x-1/2 -translate-y-1/2 rounded-[4.2rem] bg-[#24c1c4] p-[10px] shadow-[0_30px_75px_rgba(11,45,84,0.24)]">
+                        <div className="flex h-full w-full items-center justify-center rounded-[3.55rem] bg-[#071f3a]">
+                          <div className="text-center">
+                            <p className="text-2xl font-black tracking-tight text-white">Sympto</p>
+                            <div className="mx-auto mt-4 flex h-14 w-14 items-center justify-center rounded-full border-[3px] border-[#24c1c4]/55">
+                              <div className="h-3 w-3 rounded-full bg-[#24c1c4]" />
                             </div>
                           </div>
                         </div>
                       </div>
                     </div>
                   </div>
-                </div>
-              </>
-            ) : (
-              <div>
-                <div className="rounded-[1.75rem] border border-slate-200 bg-white p-5 sm:p-6">
-                  <div className="flex flex-col gap-5 sm:flex-row sm:items-center sm:justify-between">
-                    <div className="flex items-center gap-3">
-                      <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-[#0b2d54] text-[#24c1c4]">
-                        <Bluetooth className="h-5 w-5" />
+
+                  <div className="flex flex-col justify-between p-7 text-white sm:p-10">
+                    <div>
+                      <div className="inline-flex items-center rounded-full bg-[#24c1c4]/12 px-3 py-1.5 text-[10px] font-black uppercase tracking-[0.18em] text-[#24c1c4]">
+                        Sympto
                       </div>
-                      <div>
-                        <p className="text-sm font-black text-[#0b2d54]">Bluetooth</p>
-                        <p className="mt-1 text-xs text-slate-500">
-                          {connectedName || (status === "Disconnected" ? "Disconnected" : "Not connected")}
-                        </p>
-                      </div>
+                      <h2 className="mt-5 text-4xl font-black tracking-tight sm:text-5xl">Sympto Wearable</h2>
+                      <p className="mt-2 text-sm font-medium text-white/50">Watch + Wristband</p>
                     </div>
 
-                    <div className="flex items-center gap-3 sm:justify-end">
-                      <div className="text-right">
-                        <p className="text-[10px] font-black uppercase tracking-wide text-slate-400">Heart rate</p>
-                        <p className="text-2xl font-black text-[#0b2d54]">
-                          {heartRate ?? "—"} <span className="text-xs text-slate-400">bpm</span>
-                        </p>
+                    <div>
+                      <div className="flex flex-wrap gap-2">
+                        {["Vitals", "Activity", "Sleep", "Recovery"].map((item) => (
+                          <span key={item} className="rounded-full border border-white/10 bg-white/[0.06] px-3 py-1.5 text-xs font-bold text-white/70">
+                            {item}
+                          </span>
+                        ))}
                       </div>
 
-                      <button
-                        type="button"
-                        onClick={connect}
-                        disabled={connecting || status.startsWith("Connected")}
-                        className="inline-flex min-h-10 items-center justify-center gap-2 rounded-full bg-[#0b2d54] px-4 text-xs font-black text-white transition hover:bg-[#071f3a] disabled:cursor-not-allowed disabled:opacity-45"
-                      >
-                        <Bluetooth className="h-4 w-4" />
-                        {connecting ? "Connecting…" : "Connect"}
-                      </button>
-
-                      <button
-                        type="button"
-                        onClick={disconnect}
-                        disabled={!backendDeviceIdRef.current}
-                        className="flex h-10 w-10 items-center justify-center rounded-full border border-slate-200 bg-white text-[#0b2d54] transition hover:border-slate-300 disabled:cursor-not-allowed disabled:opacity-35"
-                        aria-label="Disconnect"
-                      >
-                        <Link2Off className="h-4 w-4" />
-                      </button>
+                      <div className="mt-6 flex items-center justify-between rounded-2xl border border-white/10 bg-white/[0.045] px-4 py-4">
+                        <div>
+                          <p className="text-[10px] font-black uppercase tracking-[0.18em] text-white/35">Status</p>
+                          <p className="mt-1 text-sm font-black text-white">Coming soon</p>
+                        </div>
+                        <span className="h-2.5 w-2.5 rounded-full bg-[#24c1c4] shadow-[0_0_0_5px_rgba(36,193,196,0.10)]" />
+                      </div>
                     </div>
                   </div>
-
-                  {error && (
-                    <p className="mt-4 rounded-2xl bg-red-50 px-4 py-3 text-xs font-semibold leading-5 text-red-700" role="alert">
-                      {error}
-                    </p>
-                  )}
-                </div>
-
-                <div className="mt-5 grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
-                  {otherProviders.map((provider) => {
-                    const availableNow = provider.status === "AVAILABLE_NOW";
-
-                    return (
-                      <div
-                        key={provider.provider}
-                        className="flex items-center justify-between rounded-2xl border border-slate-200 bg-white px-4 py-3.5"
-                      >
-                        <div className="flex items-center gap-3">
-                          <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-slate-100 text-[#0b2d54]">
-                            <Watch className="h-4 w-4" />
-                          </div>
-                          <p className="text-sm font-black text-[#0b2d54]">{provider.name}</p>
-                        </div>
-                        <span
-                          className={`rounded-full px-2.5 py-1 text-[9px] font-black ${
-                            availableNow ? "bg-[#24c1c4]/12 text-[#0b2d54]" : "bg-slate-100 text-slate-500"
-                          }`}
-                        >
-                          {availableNow ? "Available" : "Coming soon"}
-                        </span>
-                      </div>
-                    );
-                  })}
                 </div>
               </div>
-            )}
 
-            {devices.length > 0 && (
-              <div className="mt-7 border-t border-slate-100 pt-6">
-                <p className="text-[10px] font-black uppercase tracking-[0.18em] text-slate-400">Connected devices</p>
-                <div className="mt-3 space-y-2">
-                  {devices.map((device) => {
-                    const latest = device.measurements?.[0];
-                    const lastSync = device.lastSyncAt
-                      ? new Intl.DateTimeFormat("en-ZA", {
-                          day: "numeric",
-                          month: "short",
-                          hour: "2-digit",
-                          minute: "2-digit",
-                        }).format(new Date(device.lastSyncAt))
-                      : null;
+              {devices.length > 0 && (
+                <div className="mt-6">
+                  <p className="text-[10px] font-black uppercase tracking-[0.18em] text-slate-400">Connected devices</p>
+                  <div className="mt-3 space-y-2">
+                    {devices.map((device) => {
+                      const latest = device.measurements?.[0];
+                      const lastSync = device.lastSyncAt
+                        ? new Intl.DateTimeFormat("en-ZA", {
+                            day: "numeric",
+                            month: "short",
+                            hour: "2-digit",
+                            minute: "2-digit",
+                          }).format(new Date(device.lastSyncAt))
+                        : null;
 
-                    return (
-                      <div
-                        key={device.id}
-                        className="flex flex-col gap-3 rounded-2xl border border-slate-200 bg-white px-4 py-4 sm:flex-row sm:items-center sm:justify-between"
-                      >
-                        <div className="flex items-center gap-3">
-                          <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-[#0b2d54] text-[#24c1c4]">
-                            <Watch className="h-4 w-4" />
+                      return (
+                        <div key={device.id} className="flex items-center justify-between rounded-2xl border border-slate-200 bg-white px-4 py-4">
+                          <div className="flex items-center gap-3">
+                            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-[#0b2d54] text-[#24c1c4]">
+                              <Watch className="h-4 w-4" />
+                            </div>
+                            <div>
+                              <p className="text-sm font-black text-[#0b2d54]">{device.model}</p>
+                              <p className="text-xs text-slate-500">{device.manufacturer}</p>
+                            </div>
                           </div>
-                          <div>
-                            <p className="text-sm font-black text-[#0b2d54]">{device.model}</p>
-                            <p className="text-xs text-slate-500">{device.manufacturer}</p>
+                          <div className="text-right">
+                            <p className="text-xs font-black text-[#0b2d54]">{device.status}</p>
                             <p className="mt-1 text-[11px] text-slate-400">
-                              {lastSync ? `Last sync ${lastSync}` : "Waiting for first reading"}
+                              {lastSync ? `Sync ${lastSync}` : "Waiting"}
                               {latest ? ` · ${latest.value} ${latest.unit}` : ""}
                             </p>
                           </div>
                         </div>
-                        <span className="self-start rounded-full bg-[#24c1c4]/10 px-3 py-1 text-xs font-black text-[#0b2d54] sm:self-auto">
-                          {device.status}
-                        </span>
-                      </div>
-                    );
-                  })}
+                      );
+                    })}
+                  </div>
                 </div>
+              )}
+            </div>
+          ) : (
+            <div className="p-5 sm:p-7">
+              <div className="rounded-[1.75rem] border border-slate-200 bg-slate-50/70 p-5 sm:p-6">
+                <div className="flex flex-col gap-5 sm:flex-row sm:items-center sm:justify-between">
+                  <div>
+                    <p className="text-xl font-black tracking-tight text-[#0b2d54]">Other wearables</p>
+                    <p className="mt-1 text-xs text-slate-500">Connect a device you already use.</p>
+                  </div>
+
+                  <div className="flex items-center gap-3">
+                    <div className="text-right">
+                      <p className="text-[10px] font-black uppercase tracking-[0.16em] text-slate-400">Bluetooth</p>
+                      <p className="mt-1 text-lg font-black text-[#0b2d54]">{heartRate ?? "—"} <span className="text-xs text-slate-400">bpm</span></p>
+                    </div>
+
+                    <button
+                      type="button"
+                      onClick={connect}
+                      disabled={connecting || status.startsWith("Connected")}
+                      className="inline-flex min-h-10 items-center justify-center gap-2 rounded-full bg-[#0b2d54] px-4 text-xs font-black text-white transition hover:bg-[#071f3a] disabled:cursor-not-allowed disabled:opacity-45"
+                    >
+                      <Bluetooth className="h-4 w-4" />
+                      {connecting ? "Connecting…" : "Connect"}
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={disconnect}
+                      disabled={!backendDeviceIdRef.current}
+                      className="flex h-10 w-10 items-center justify-center rounded-full border border-slate-200 bg-white text-[#0b2d54] disabled:cursor-not-allowed disabled:opacity-35"
+                      aria-label="Disconnect"
+                    >
+                      <Link2Off className="h-4 w-4" />
+                    </button>
+                  </div>
+                </div>
+
+                {error && (
+                  <p className="mt-4 rounded-2xl bg-red-50 px-4 py-3 text-xs font-semibold leading-5 text-red-700" role="alert">
+                    {error}
+                  </p>
+                )}
               </div>
-            )}
-          </div>
+
+              <div className="mt-6 divide-y divide-slate-100 overflow-hidden rounded-[1.75rem] border border-slate-200 bg-white">
+                {otherProviders.map((provider) => {
+                  const availableNow = provider.status === "AVAILABLE_NOW";
+                  return (
+                    <div key={provider.provider} className="flex items-center justify-between px-5 py-4">
+                      <div className="flex items-center gap-3">
+                        <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-slate-100 text-[#0b2d54]">
+                          <Watch className="h-4 w-4" />
+                        </div>
+                        <p className="text-sm font-black text-[#0b2d54]">{provider.name}</p>
+                      </div>
+                      <span className={`text-xs font-black ${availableNow ? "text-[#0b2d54]" : "text-slate-400"}`}>
+                        {availableNow ? "Available" : "Coming soon"}
+                      </span>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
         </section>
       </div>
     </main>
