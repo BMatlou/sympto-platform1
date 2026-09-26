@@ -17,6 +17,14 @@ const dayKey = (value: string) => { const d = new Date(value); return `${d.getFu
 const dayLabel = (value: string) => { const d = new Date(value); const t = new Date(); const y = new Date(); y.setDate(t.getDate() - 1); const same = (a: Date, b: Date) => a.toDateString() === b.toDateString(); if (same(d, t)) return "Today"; if (same(d, y)) return "Yesterday"; return new Intl.DateTimeFormat("en-ZA", { day: "numeric", month: "long", year: "numeric" }).format(d); };
 const timeLabel = (value: string) => new Intl.DateTimeFormat("en-ZA", { hour: "2-digit", minute: "2-digit" }).format(new Date(value));
 const human = (value: unknown) => String(value ?? "").replace(/_/g, " ").replace(/\b\w/g, c => c.toUpperCase());
+const durationLabel = (minutes: number | null | undefined) => {
+  const value = Number(minutes);
+  if (!Number.isFinite(value) || value <= 0) return null;
+  const rounded = Math.round(value);
+  const hours = Math.floor(rounded / 60);
+  const mins = rounded % 60;
+  return hours > 0 ? `${hours}h ${mins}m`.trim() : `${mins} min`;
+};
 
 const moodLabel: Record<string, string> = { VERY_BAD: "Very low", BAD: "Low", NEUTRAL: "Neutral", GOOD: "Good", VERY_GOOD: "Very good" };
 const sleepLabel: Record<string, string> = { VERY_POOR: "Very poor", POOR: "Poor", FAIR: "Fair", GOOD: "Good", EXCELLENT: "Excellent" };
@@ -79,6 +87,70 @@ export default function HealthJournalPage() {
       if (!v.measuredAt) return;
       all.push({ id: `v-${v.id}`, type: "measurement", title: v.vitalType?.name || v.vitalType?.code || "Measurement", detail: `${v.value ?? "—"}${v.unit || v.vitalType?.unit ? ` ${v.unit ?? v.vitalType.unit}` : ""}`, at: String(v.measuredAt), href: "/health-vitals", source: "Vitals" });
     });
+    (data.wearables?.sleepSessions ?? []).forEach((session: any) => {
+      const at = session.endedAt || session.startedAt;
+      if (!at) return;
+      const duration = durationLabel(session.durationMinutes ?? ((new Date(String(session.endedAt)).getTime() - new Date(String(session.startedAt)).getTime()) / 60000));
+      const stageSummary = Array.isArray(session.stages)
+        ? session.stages.reduce((acc: Record<string, number>, stage: any) => {
+            const key = human(stage.stage);
+            const minutes = Number(stage.durationMinutes);
+            if (key && Number.isFinite(minutes)) acc[key] = (acc[key] ?? 0) + minutes;
+            return acc;
+          }, {})
+        : {};
+      const meta = [
+        duration ? `Sleep · ${duration}` : null,
+        session.sleepScore != null ? `Score · ${session.sleepScore}` : null,
+        ...Object.entries(stageSummary).slice(0, 4).map(([key, value]) => `${key} · ${Math.round(Number(value))} min`),
+      ].filter(Boolean) as string[];
+      all.push({
+        id: `sleep-${session.id}`,
+        type: "measurement",
+        title: "Sleep",
+        detail: duration ? `Slept ${duration}.` : "Sleep session recorded.",
+        at: String(at),
+        href: "/health-vitals",
+        meta,
+        source: session.device ? [session.device.manufacturer, session.device.model].filter(Boolean).join(" · ") || "Wearable" : "Wearable",
+      });
+    });
+    (data.wearables?.workoutSessions ?? []).forEach((workout: any) => {
+      const at = workout.endedAt || workout.startedAt;
+      if (!at) return;
+      const duration = durationLabel(workout.durationSeconds != null ? Number(workout.durationSeconds) / 60 : undefined);
+      const meta = [
+        duration ? `Workout · ${duration}` : null,
+        workout.distance != null && workout.distanceUnit ? `Distance · ${workout.distance} ${workout.distanceUnit}` : null,
+        workout.calories != null ? `Calories · ${workout.calories}` : null,
+        workout.averageHeartRate != null ? `Avg HR · ${workout.averageHeartRate} bpm` : null,
+      ].filter(Boolean) as string[];
+      all.push({
+        id: `workout-${workout.id}`,
+        type: "measurement",
+        title: human(workout.activityType || "Workout"),
+        detail: duration ? `Exercise session · ${duration}.` : "Exercise session recorded.",
+        at: String(at),
+        href: "/today#today-goals",
+        meta,
+        source: workout.device ? [workout.device.manufacturer, workout.device.model].filter(Boolean).join(" · ") || "Wearable" : "Wearable",
+      });
+    });
+    (data.wearables?.wellnessMetrics ?? []).forEach((metric: any) => {
+      if (!metric.measuredAt) return;
+      const value = metric.value == null ? "—" : String(metric.value);
+      const unit = metric.unit ? ` ${metric.unit}` : "";
+      all.push({
+        id: `wellness-${metric.id}`,
+        type: "measurement",
+        title: human(metric.metricKey || "Wellness"),
+        detail: `${value}${unit}`,
+        at: String(metric.measuredAt),
+        href: "/health-vitals",
+        source: metric.device ? [metric.device.manufacturer, metric.device.model].filter(Boolean).join(" · ") || "Wearable" : "Wearable",
+      });
+    });
+
     (data.healthSnapshot?.latestMeasurements ?? []).forEach((v: any, i: number) => {
       if (!v.measuredAt) return;
       all.push({ id: `d-${v.id ?? i}`, type: "measurement", title: v.name || v.type || "Measurement", detail: `${v.value ?? "—"}${v.unit ? ` ${v.unit}` : ""}`, at: String(v.measuredAt), href: "/health-vitals", source: v.source ? human(v.source) : "Connected device" });
