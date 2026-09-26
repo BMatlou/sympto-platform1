@@ -1,9 +1,10 @@
 import { Body, Controller, Delete, Get, Param, Post, Req, UseGuards } from '@nestjs/common';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 import { IsDateString, IsEnum, IsNumber, IsOptional, IsString } from 'class-validator';
-import { DeviceType } from '@prisma/client';
+import { DeviceType, WearableProvider } from '@prisma/client';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { PatientWearablesService } from './patient-wearables.service';
+import { SyncWearableDataDto } from './dto/sync-wearable-data.dto';
 
 class ConnectWearableDto {
   @IsString()
@@ -15,6 +16,10 @@ class ConnectWearableDto {
   @IsOptional()
   @IsEnum(DeviceType)
   deviceType?: DeviceType;
+
+  @IsOptional()
+  @IsEnum(WearableProvider)
+  provider?: WearableProvider;
 }
 
 class HeartRateDto {
@@ -36,6 +41,11 @@ class HeartRateDto {
 export class PatientWearablesController {
   constructor(private readonly service: PatientWearablesService) {}
 
+  @Get('providers')
+  providers() {
+    return this.service.getSupportedProviders();
+  }
+
   @Get()
   list(@Req() req: any) {
     return this.service.list(req.user.sub);
@@ -52,7 +62,26 @@ export class PatientWearablesController {
   }
 
   @Post(':deviceId/heart-rate')
-  recordHeartRate(@Req() req: any, @Param('deviceId') deviceId: string, @Body() dto: HeartRateDto) {
-    return this.service.recordHeartRate(req.user.sub, deviceId, dto.value, dto.measuredAt, dto.source);
+  recordHeartRate(
+    @Req() req: any,
+    @Param('deviceId') deviceId: string,
+    @Body() dto: HeartRateDto,
+  ) {
+    return this.service.recordHeartRate(
+      req.user.sub,
+      deviceId,
+      dto.value,
+      dto.measuredAt,
+      dto.source,
+    );
+  }
+
+  @Post(':deviceId/sync')
+  sync(
+    @Req() req: any,
+    @Param('deviceId') deviceId: string,
+    @Body() dto: SyncWearableDataDto,
+  ) {
+    return this.service.sync(req.user.sub, deviceId, dto);
   }
 }
