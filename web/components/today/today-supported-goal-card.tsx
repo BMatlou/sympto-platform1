@@ -5,6 +5,7 @@ import { Activity, ArrowRight, Check, Droplets, HeartPulse, Moon, PencilLine, Ta
 import { useState } from "react";
 import { toast } from "sonner";
 import { healthGoalsService } from "@/services/health-goals.service";
+import { healthJournalService } from "@/services/health-journal.service";
 
 type SupportedGoalCardProps = {
   goal: any;
