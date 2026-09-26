@@ -52,7 +52,7 @@ export interface HealthHomeResponse {
   conditions?: Array<Record<string, any>>;
   immunizations?: Array<Record<string, any>>;
   emergencyContacts?: Array<Record<string, any>>;
-  wearables: { devices: Array<Record<string, any>>; latestMeasurements: Array<{ id?: string; type: string; value: number | string; unit: string; measuredAt: string; source?: string | null }> };
+  wearables: { devices: Array<Record<string, any>>; latestMeasurements: Array<{ id?: string; type: string; value: number | string; unit: string; measuredAt: string; source?: string | null }>; deviceAlerts?: Array<Record<string, any>> };
   notifications?: Array<Record<string, any>>;
   medicationNotifications?: Array<Record<string, any>>;
   attention: Array<{ type: string; severity: string; title: string; description: string; actionUrl?: string | null; actionLabel?: string | null }>;
