@@ -239,7 +239,7 @@ export class HealthHomeService {
     const now = new Date();
     const immunizations = patient.healthPassport?.immunizations ?? [];
     const medicalRecord = patient.medicalRecord;
-    const [allergies, conditions, medications, goals, family, appointments, notifications, devices, measurements, deviceAlerts, symptomLogs, aiObservations, labOrders, imagingStudies, carePlans, encounters, prescriptions, patientInsurances, todayMeasurementJournal] = await Promise.all([
+    const [allergies, conditions, medications, goals, family, appointments, notifications, devices, measurements, deviceAlerts, sleepSessions, workoutSessions, wellnessMetrics, symptomLogs, aiObservations, labOrders, imagingStudies, carePlans, encounters, prescriptions, patientInsurances, todayMeasurementJournal] = await Promise.all([
       this.prisma.patientAllergy.findMany({ where: { healthPassportId: healthPassportId ?? '' }, include: { allergy: true }, orderBy: { createdAt: 'desc' } }),
       this.prisma.patientCondition.findMany({ where: { healthPassportId: healthPassportId ?? '' }, include: { condition: true }, orderBy: { createdAt: 'desc' } }),
       this.prisma.patientMedication.findMany({ where: { healthPassportId: healthPassportId ?? '', status: { in: [...ACTIVE_MEDICATION_STATUSES] } }, include: { medication: true }, orderBy: { createdAt: 'desc' } }),
@@ -250,6 +250,24 @@ export class HealthHomeService {
       this.prisma.wearableDevice.findMany({ where: { patientId }, orderBy: { lastSyncAt: 'desc' }, include: { _count: { select: { measurements: true } } } }),
       this.prisma.deviceMeasurement.findMany({ where: { device: { patientId } }, orderBy: { measuredAt: 'desc' }, take: 100 }),
       this.prisma.deviceAlert.findMany({ where: { device: { patientId }, acknowledged: false }, include: { device: true, measurement: true }, orderBy: { createdAt: 'desc' }, take: 20 }),
+      this.prisma.sleepSession.findMany({
+        where: { patientId },
+        orderBy: { endedAt: 'desc' },
+        take: 20,
+        include: { device: { select: { manufacturer: true, model: true } } },
+      }),
+      this.prisma.workoutSession.findMany({
+        where: { patientId },
+        orderBy: { startedAt: 'desc' },
+        take: 20,
+        include: { device: { select: { manufacturer: true, model: true } } },
+      }),
+      this.prisma.wearableWellnessMetric.findMany({
+        where: { patientId },
+        orderBy: { measuredAt: 'desc' },
+        take: 20,
+        include: { device: { select: { manufacturer: true, model: true } } },
+      }),
       this.prisma.symptomLog.findMany({ where: { clinicalEpisode: { patientId }, status: { in: ['ACTIVE', 'COMPLETED'] } }, include: { clinicalEpisode: true, symptoms: { include: { symptom: true } }, triggers: true }, orderBy: { startedAt: 'desc' }, take: 20 }),
       this.prisma.aIObservation.findMany({ where: { symptomLog: { clinicalEpisode: { patientId } } }, orderBy: { createdAt: 'desc' }, take: 10 }),
       this.prisma.labOrder.findMany({ where: { patientId }, include: { laboratory: true, items: { include: { test: true, labResults: { orderBy: { createdAt: 'desc' }, take: 1, include: { items: { include: { test: true } } } } } } }, orderBy: { orderedAt: 'desc' }, take: 20 }),
@@ -446,7 +464,14 @@ export class HealthHomeService {
         return !['CANCELLED', 'DELETED', 'ARCHIVED', 'ACHIEVED', 'EXPIRED', 'ON_HOLD'].includes(status);
       }),
       medications: medicationsWithGoalLinks, appointments, goals: mappedGoals, healthGoals: mappedGoals, family, allergies, conditions, immunizations, emergencyContacts: patient.emergencyContacts,
-      wearables: { devices: devices.map((device) => ({ id: device.id, manufacturer: device.manufacturer, model: device.model, deviceType: device.deviceType, status: device.status, lastSyncAt: device.lastSyncAt, measurementCount: device._count.measurements })), latestMeasurements: journalSignals.signals, deviceAlerts },
+      wearables: {
+        devices: devices.map((device) => ({ id: device.id, manufacturer: device.manufacturer, model: device.model, deviceType: device.deviceType, status: device.status, lastSyncAt: device.lastSyncAt, measurementCount: device._count.measurements })),
+        latestMeasurements: journalSignals.signals,
+        deviceAlerts,
+        sleepSessions,
+        workoutSessions,
+        wellnessMetrics,
+      },
       symptoms: symptomLogs, recentResults: { laboratory: labOrders, imaging: imagingStudies }, carePlans, encounters, prescriptions, attachments, clinicalVitals, patientInsurances, medicalRecord, journal: journalSignals, ai: { recentObservations: aiObservations }, settings: patient.healthJournalSettings, healthJournalSettings: patient.healthJournalSettings,
     };
   }
