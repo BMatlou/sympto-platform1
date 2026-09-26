@@ -40,6 +40,12 @@ class PatientNotificationsService {
     return response.data?.data ?? response.data;
   }
 
+  async getUnreadCount(): Promise<number> {
+    const response = await api.get("/patient-notifications/unread-count");
+    const payload = response.data?.data ?? response.data;
+    return Number(payload?.count ?? 0);
+  }
+
   async markRead(id: string) {
     const response = await api.patch(`/patient-notifications/${encodeURIComponent(id)}/read`);
     return response.data?.data ?? response.data;
