@@ -29,6 +29,18 @@ function formatDate(value: unknown, includeTime = false) {
   return new Intl.DateTimeFormat("en-ZA", includeTime ? { dateStyle: "medium", timeStyle: "short" } : { dateStyle: "medium" }).format(date);
 }
 
+function dayKey(value: unknown) {
+  if (!value) return "";
+  const date = new Date(String(value));
+  if (Number.isNaN(date.getTime())) return "";
+  return new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Africa/Johannesburg",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).format(date);
+}
+
 function normalizeVitals(data: any): DashboardVital[] {
   const deviceVitals = Array.isArray(data?.healthSnapshot?.latestMeasurements)
     ? data.healthSnapshot.latestMeasurements.map((item: any) => ({ type: item.type ?? item.measurementType, name: item.name, value: item.value, unit: item.unit, measuredAt: item.measuredAt, source: item.source }))
@@ -275,17 +287,38 @@ export default function TodayPage() {
 
   const attention = data.attention ?? [];
   const carePlans = data.carePlans ?? [];
-  const careTasks = carePlans.flatMap((plan: any) => (Array.isArray(plan.tasks) ? plan.tasks : []).filter((task: any) => !["COMPLETED", "CANCELLED"].includes(String(task.status ?? "").toUpperCase())).map((task: any) => ({ ...task, carePlanTitle: plan.title })));
-  const nextAppointment = Array.isArray(appointments)
-    ? appointments
-        .filter((appointment: any) => appointment?.scheduledStart && !Number.isNaN(new Date(String(appointment.scheduledStart)).getTime()))
-        .sort((a: any, b: any) => new Date(String(a.scheduledStart)).getTime() - new Date(String(b.scheduledStart)).getTime())[0] ?? null
-    : null;
-  const appointmentIsToday = Boolean(
-    nextAppointment?.scheduledStart &&
-      new Date(String(nextAppointment.scheduledStart)).toDateString() === new Date().toDateString(),
+  const currentDayKey = dayKey(new Date());
+  const careTasks = carePlans.flatMap((plan: any) =>
+    (Array.isArray(plan.tasks) ? plan.tasks : [])
+      .filter((task: any) => {
+        const status = String(task.status ?? "").toUpperCase();
+        if (["COMPLETED", "CANCELLED"].includes(status) || !task?.dueDate) return false;
+        return dayKey(task.dueDate) <= currentDayKey;
+      })
+      .map((task: any) => ({ ...task, carePlanTitle: plan.title, isOverdue: dayKey(task.dueDate) < currentDayKey })),
   );
+  const allUpcomingAppointments = Array.isArray(data.appointments) && data.appointments.length > 0
+    ? data.appointments
+    : appointments;
+  const sortedAppointments = Array.isArray(allUpcomingAppointments)
+    ? allUpcomingAppointments
+        .filter((appointment: any) => appointment?.scheduledStart && !Number.isNaN(new Date(String(appointment.scheduledStart)).getTime()))
+        .sort((a: any, b: any) => new Date(String(a.scheduledStart)).getTime() - new Date(String(b.scheduledStart)).getTime())
+    : [];
+  const nextAppointment = sortedAppointments[0] ?? null;
+  const appointmentsForToday = sortedAppointments.filter((appointment: any) => dayKey(appointment.scheduledStart) === currentDayKey);
+  const appointmentIsToday = appointmentsForToday.length > 0 && Boolean(nextAppointment?.scheduledStart && dayKey(nextAppointment.scheduledStart) === currentDayKey);
   const notifications = (data.today?.notifications ?? data.notifications ?? []).filter((item: any) => !item.scheduledFor || new Date(String(item.scheduledFor)) <= new Date());
+  const regularNotifications = notifications.filter((item: any) => !["HIGH", "URGENT"].includes(String(item?.priority ?? "").toUpperCase()));
+  const deviceAlerts = Array.isArray(data.wearables?.deviceAlerts) ? data.wearables.deviceAlerts : [];
+  const immunizations = Array.isArray(data.healthSnapshot?.immunizations)
+    ? data.healthSnapshot.immunizations
+    : (Array.isArray(data.immunizations) ? data.immunizations : []);
+  const dueImmunizations = immunizations.filter((item: any) => {
+    const status = String(item?.status ?? "").toUpperCase();
+    if (status === "MISSED") return true;
+    return status === "SCHEDULED" && item?.nextDueDate && dayKey(item.nextDueDate) <= currentDayKey;
+  });
   const healthVitals = normalizeVitals(data);
   const bmi = data.healthSnapshot?.bmi ?? data.patient?.bmi ?? null;
   const bmiCategory = data.healthSnapshot?.bmiCategory ?? data.patient?.bmiCategory ?? null;
@@ -391,6 +424,22 @@ export default function TodayPage() {
               </section>
             </div>
           </div>
+          {appointmentsForToday.length > 1 && (
+            <div className="mt-3 rounded-[23px] border border-[#e0ebef] bg-white p-4 shadow-[0_5px_18px_rgba(11,45,84,0.025)]">
+              <div className="flex items-center justify-between gap-3">
+                <p className="text-[9px] font-black uppercase tracking-[0.16em] text-[#71839a]">Also today</p>
+                <Link href="/appointments" className="text-[9px] font-black text-[#0b2d54]">View all <ArrowRight className="ml-1 inline h-3 w-3" /></Link>
+              </div>
+              <div className="mt-2 space-y-1.5">
+                {appointmentsForToday.slice(1, 5).map((appointment: any) => (
+                  <Link key={String(appointment.id)} href={appointment.id ? `/appointments/${encodeURIComponent(String(appointment.id))}` : "/appointments"} className="flex items-center justify-between gap-3 rounded-xl bg-[#f8fbfb] px-3 py-2.5 ring-1 ring-[#e4edef]">
+                    <span className="min-w-0 truncate text-[10px] font-bold text-[#0b2d54]">{text(appointment.title || appointment.type || "Healthcare appointment")}</span>
+                    <span className="shrink-0 text-[10px] font-semibold text-slate-500">{formatDate(appointment.scheduledStart, true)}</span>
+                  </Link>
+                ))}
+              </div>
+            </div>
+          )}
         </section>
 
         <section className="mt-8">
@@ -407,6 +456,12 @@ export default function TodayPage() {
         </section>
 
         {attention.length > 0 && <section className="mt-8 rounded-[27px] border border-amber-200 bg-gradient-to-br from-amber-50/80 to-white p-5 shadow-[0_8px_24px_rgba(161,98,4,0.05)] sm:p-6"><div className="flex items-start gap-3"><span className="mt-0.5 grid h-9 w-9 shrink-0 place-items-center rounded-[13px] bg-amber-100 text-amber-700"><Bell className="h-4 w-4" /></span><div className="min-w-0"><p className="text-[9px] font-black uppercase tracking-[0.16em] text-amber-700/80">Check this next</p><h2 className="mt-1 text-sm font-black text-[#0b2d54]">Needs your attention</h2></div></div><div className="mt-3 space-y-2">{attention.map((item: any, index: number) => <div key={String(item.id ?? index)} className="rounded-xl bg-white p-3.5 text-xs leading-5 text-slate-600 ring-1 ring-amber-100">{text(item.title || item.message || item.description)}</div>)}</div></section>}
+
+        {regularNotifications.length > 0 && <section className="mt-8 rounded-[27px] border border-[#e0ebef] bg-white p-5 shadow-[0_5px_18px_rgba(11,45,84,0.03)] sm:p-6"><div className="flex items-center justify-between gap-3"><div className="flex items-center gap-2.5"><span className="grid h-9 w-9 place-items-center rounded-[13px] bg-[#e8f8f7] text-[#0b7b80]"><Bell className="h-4 w-4" /></span><h2 className="text-sm font-black text-[#0b2d54]">Notifications & reminders</h2></div><Link href="/notifications" className="text-[9px] font-black text-[#0b2d54]">Open notifications <ArrowRight className="ml-1 inline h-3 w-3" /></Link></div><div className="mt-3 space-y-2">{regularNotifications.slice(0, 5).map((item: any, index: number) => <Link key={String(item.id ?? index)} href={item.actionUrl || "/notifications"} className="block rounded-xl bg-[#f8fbfb] p-3 ring-1 ring-[#e1edef]"><p className="text-xs font-bold text-[#0b2d54]">{text(item.title || "Notification")}</p>{item.body && <p className="mt-1 text-[11px] leading-5 text-slate-500">{String(item.body)}</p>}</Link>)}</div></section>}
+
+        {deviceAlerts.length > 0 && <section className="mt-8 rounded-[27px] border border-amber-200 bg-amber-50/50 p-5 sm:p-6"><div className="flex items-center justify-between gap-3"><div><p className="text-[9px] font-black uppercase tracking-[0.16em] text-amber-700/80">Connected devices</p><h2 className="mt-1 text-sm font-black text-[#0b2d54]">Device alerts</h2></div><Link href="/health-vitals" className="text-[9px] font-black text-[#0b2d54]">View vitals <ArrowRight className="ml-1 inline h-3 w-3" /></Link></div><div className="mt-3 space-y-2">{deviceAlerts.slice(0, 5).map((item: any, index: number) => <div key={String(item.id ?? index)} className="rounded-xl bg-white p-3 ring-1 ring-amber-100"><div className="flex items-center justify-between gap-3"><p className="text-xs font-bold text-[#0b2d54]">{text(item.title || "Device alert")}</p><span className="text-[8px] font-black uppercase tracking-[.12em] text-amber-700">{text(item.severity, "Alert")}</span></div>{item.description && <p className="mt-1 text-[11px] leading-5 text-slate-600">{String(item.description)}</p>}</div>)}</div></section>}
+
+        {dueImmunizations.length > 0 && <section className="mt-8 rounded-[27px] border border-[#e0ebef] bg-white p-5 shadow-[0_5px_18px_rgba(11,45,84,0.03)] sm:p-6"><div className="flex items-center justify-between gap-3"><div><p className="text-[9px] font-black uppercase tracking-[0.16em] text-[#71839a]">Preventive care</p><h2 className="mt-1 text-sm font-black text-[#0b2d54]">Immunisations due</h2></div></div><div className="mt-3 space-y-2">{dueImmunizations.slice(0, 5).map((item: any, index: number) => <div key={String(item.id ?? index)} className="rounded-xl bg-slate-50 p-3"><div className="flex items-center justify-between gap-3"><p className="text-xs font-bold text-[#0b2d54]">{text(item.immunization?.name || item.name || "Immunisation")}</p><span className="text-[8px] font-black uppercase tracking-[.12em] text-amber-700">{String(item.status ?? "SCHEDULED").replaceAll("_", " ")}</span></div>{item.nextDueDate && <p className="mt-1 text-[11px] text-slate-500">Due {formatDate(item.nextDueDate)}</p>}</div>)}</div></section>}
 
         <section id="current-health" className="mt-8 rounded-[27px] border border-[#e0ebef] bg-white p-5 shadow-[0_5px_18px_rgba(11,45,84,0.03)] sm:p-6">
           <div className="flex flex-wrap items-end justify-between gap-4">
@@ -448,7 +503,7 @@ export default function TodayPage() {
             <div className="mt-3.5 grid items-stretch gap-4 lg:grid-cols-2">{otherTodayGoals.map((goal: any, index: number) => <TodaySupportedGoalCard key={String(goal?.id ?? "goal-" + index)} goal={goal} onUpdated={reload} />)}</div>
           </section>}
         </section>
-        {careTasks.length > 0 && <section className="mt-7 rounded-[27px] border border-[#e0ebef] bg-white p-5"><div className="flex items-center justify-between gap-3"><div className="flex items-center gap-2"><ClipboardCheck className="h-4 w-4 text-[#24c1c4]" /><h2 className="text-sm font-black text-[#0b2d54]">Care plan tasks</h2></div><Link href="/care-plans" className="inline-flex min-h-9 items-center gap-1 rounded-xl border border-[#d7e4e8] bg-white px-3 py-2 text-[9px] font-black text-[#0b2d54]">Open care plans <ArrowRight className="h-3 w-3" /></Link></div><div className="mt-3 space-y-2">{careTasks.map((task: any, index: number) => <div key={String(task.id ?? index)} className="rounded-xl bg-slate-50 p-3"><p className="text-xs font-semibold text-[#0b2d54]">{text(task.title || task.name || "Care task")}</p><p className="mt-1 text-[11px] text-slate-500">{text(task.carePlanTitle)}</p></div>)}</div></section>}
+        {careTasks.length > 0 && <section className="mt-7 rounded-[27px] border border-[#e0ebef] bg-white p-5"><div className="flex items-center justify-between gap-3"><div className="flex items-center gap-2"><ClipboardCheck className="h-4 w-4 text-[#24c1c4]" /><h2 className="text-sm font-black text-[#0b2d54]">Care plan tasks</h2></div><Link href="/care-plans" className="inline-flex min-h-9 items-center gap-1 rounded-xl border border-[#d7e4e8] bg-white px-3 py-2 text-[9px] font-black text-[#0b2d54]">Open care plans <ArrowRight className="h-3 w-3" /></Link></div><div className="mt-3 space-y-2">{careTasks.map((task: any, index: number) => <div key={String(task.id ?? index)} className="rounded-xl bg-slate-50 p-3"><div className="flex items-center justify-between gap-3"><p className="text-xs font-semibold text-[#0b2d54]">{text(task.title || task.name || "Care task")}</p><span className={task.isOverdue ? "text-[8px] font-black uppercase tracking-[.12em] text-amber-700" : "text-[8px] font-black uppercase tracking-[.12em] text-[#0b7b80]"}>{task.isOverdue ? "Overdue" : "Due today"}</span></div><p className="mt-1 text-[11px] text-slate-500">{text(task.carePlanTitle)}{task.dueDate ? ` · Due ${formatDate(task.dueDate)}` : ""}</p></div>)}</div></section>}
       </div></main>
     </ProtectedRoute>
   );
