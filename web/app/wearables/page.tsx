@@ -11,7 +11,10 @@ const HEART_RATE_CHARACTERISTIC = "heart_rate_measurement";
 type BluetoothDeviceLike = {
   id: string;
   name?: string;
-  gatt?: { connect: () => Promise<BluetoothRemoteGATTServerLike> };
+  gatt?: {
+    connect: () => Promise<BluetoothRemoteGATTServerLike>;
+    disconnect?: () => void;
+  };
 };
 
 type BluetoothRemoteGATTServerLike = {
@@ -39,7 +42,22 @@ function parseHeartRate(data: DataView): number {
 }
 
 export default function WearablesPage() {
-  const [devices, setDevices] = useState<Array<{ id: string; manufacturer: string; model: string; status: string; lastSyncAt?: string | null }>>([]);
+  const [devices, setDevices] = useState<
+    Array<{
+      id: string;
+      manufacturer: string;
+      model: string;
+      status: string;
+      lastSyncAt?: string | null;
+      measurements?: Array<{
+        measurementType: string;
+        value: number | string;
+        unit: string;
+        measuredAt: string;
+        source?: string | null;
+      }>;
+    }>
+  >([]);
   const [connectedName, setConnectedName] = useState("");
   const [heartRate, setHeartRate] = useState<number | null>(null);
   const [status, setStatus] = useState("Not connected");
@@ -85,13 +103,14 @@ export default function WearablesPage() {
       backendDeviceIdRef.current = backendDevice.id;
       deviceRef.current = device;
       setConnectedName(device.name || "Heart-rate wearable");
-      setStatus("Connected · receiving heart rate");
+      setStatus("Connected · waiting for heart rate");
 
       characteristic.addEventListener("characteristicvaluechanged", async (event) => {
         const data = event.target?.value;
         if (!data || !backendDeviceIdRef.current) return;
         const bpm = parseHeartRate(data);
         setHeartRate(bpm);
+        setStatus("Connected · receiving heart rate");
         try {
           await api.post(`/patient-wearables/${backendDeviceIdRef.current}/heart-rate`, {
             value: bpm,
@@ -117,6 +136,7 @@ export default function WearablesPage() {
       if (backendDeviceIdRef.current) {
         await api.delete(`/patient-wearables/${backendDeviceIdRef.current}`);
       }
+      deviceRef.current?.gatt?.disconnect?.();
       setStatus("Disconnected");
       setConnectedName("");
       setHeartRate(null);
@@ -164,7 +184,44 @@ export default function WearablesPage() {
 
             <div className="mt-8 border-t border-slate-100 pt-6">
               <div className="flex items-center gap-2"><Activity className="h-5 w-5 text-[#24c1c4]" /><h2 className="font-black">Your connected devices</h2></div>
-              {devices.length === 0 ? <p className="mt-3 text-sm leading-6 text-slate-500">No wearable has been connected yet.</p> : <div className="mt-4 space-y-2">{devices.map((device) => <div key={device.id} className="flex items-center justify-between rounded-2xl border border-slate-200 px-4 py-3"><div><p className="font-bold">{device.model}</p><p className="text-xs text-slate-500">{device.manufacturer}</p></div><span className="rounded-full bg-[#24c1c4]/10 px-3 py-1 text-xs font-black text-[#0b2d54]">{device.status}</span></div>)}</div>}
+              {devices.length === 0 ? (
+                <p className="mt-3 text-sm leading-6 text-slate-500">
+                  No wearable has been connected yet.
+                </p>
+              ) : (
+                <div className="mt-4 space-y-2">
+                  {devices.map((device) => {
+                    const latest = device.measurements?.[0];
+                    const lastSync = device.lastSyncAt
+                      ? new Intl.DateTimeFormat("en-ZA", {
+                          day: "numeric",
+                          month: "short",
+                          hour: "2-digit",
+                          minute: "2-digit",
+                        }).format(new Date(device.lastSyncAt))
+                      : null;
+
+                    return (
+                      <div
+                        key={device.id}
+                        className="flex flex-col gap-3 rounded-2xl border border-slate-200 px-4 py-3 sm:flex-row sm:items-center sm:justify-between"
+                      >
+                        <div>
+                          <p className="font-bold">{device.model}</p>
+                          <p className="text-xs text-slate-500">{device.manufacturer}</p>
+                          <p className="mt-1 text-[11px] text-slate-400">
+                            {lastSync ? `Last sync ${lastSync}` : "Waiting for the first reading"}
+                            {latest ? ` · Latest ${latest.value} ${latest.unit}` : ""}
+                          </p>
+                        </div>
+                        <span className="self-start rounded-full bg-[#24c1c4]/10 px-3 py-1 text-xs font-black text-[#0b2d54]">
+                          {device.status}
+                        </span>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
             </div>
 
             <div className="mt-6 rounded-2xl bg-[#24c1c4]/8 p-4 text-xs leading-5 text-slate-600"><strong className="text-[#0b2d54]">Compatibility:</strong> this browser connector uses the standard Bluetooth Heart Rate Service. Apple Health/HealthKit and Android Health Connect require the native Sympto mobile connector and are not falsely represented as browser Bluetooth devices.</div>
