@@ -133,6 +133,7 @@ import { NotificationDeliveriesModule } from './modules/notification-deliveries/
 import { NotificationPreferencesModule } from './modules/notification-preferences/notification-preferences.module';
 import { NotificationTemplatesModule } from './modules/notification-templates/notification-templates.module';
 import { NotificationQueueModule } from './modules/notification-queue/notification-queue.module';
+import { NotificationProcessorModule } from './modules/notification-processor/notification-processor.module';
 import { DeviceTokensModule } from './modules/device-tokens/device-tokens.module';
 import { OrganizationsModule } from './modules/organizations/organizations.module';
 import { BranchesModule } from './modules/branches/branches.module';
@@ -320,6 +321,7 @@ import { OnboardingModule } from './modules/onboarding/onboarding.module';
     NotificationPreferencesModule,
     NotificationTemplatesModule,
     NotificationQueueModule,
+    NotificationProcessorModule,
     DeviceTokensModule,
     OrganizationsModule,
     BranchesModule,
