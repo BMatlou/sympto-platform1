@@ -254,7 +254,7 @@ export class HealthHomeService {
         where: { patientId },
         orderBy: { endedAt: 'desc' },
         take: 20,
-        include: { device: { select: { manufacturer: true, model: true } } },
+        include: { device: { select: { manufacturer: true, model: true } }, stages: true },
       }),
       this.prisma.workoutSession.findMany({
         where: { patientId },
