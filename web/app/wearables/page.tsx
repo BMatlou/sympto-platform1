@@ -370,15 +370,6 @@ export default function WearablesPage() {
                     Bring supported health data into the same Sympto experience.
                   </p>
 
-                  <div className="mt-6 rounded-2xl border border-[#d9eeee] bg-white px-4 py-4">
-                    <div className="flex items-center justify-between gap-3">
-                      <div>
-                        <p className="text-xs font-black text-[#0b2d54]">Apple Health</p>
-                        <p className="mt-1 text-[11px] text-slate-400">iPhone + Apple Watch</p>
-                      </div>
-                      <span className="rounded-full bg-slate-100 px-2.5 py-1 text-[9px] font-black text-slate-500">Coming soon</span>
-                    </div>
-                  </div>
                 </div>
               </div>
 
