@@ -42,6 +42,15 @@ function parseHeartRate(data: DataView): number {
 }
 
 export default function WearablesPage() {
+  const [providers, setProviders] = useState<
+    Array<{
+      provider: string;
+      name: string;
+      connectionMode: string;
+      status: string;
+      note: string;
+    }>
+  >([]);
   const [devices, setDevices] = useState<
     Array<{
       id: string;
@@ -75,7 +84,19 @@ export default function WearablesPage() {
     }
   };
 
-  useEffect(() => { loadDevices(); }, []);
+  const loadProviders = async () => {
+    try {
+      const response = await api.get("/patient-wearables/providers");
+      setProviders(response.data?.data ?? response.data ?? []);
+    } catch {
+      setProviders([]);
+    }
+  };
+
+  useEffect(() => {
+    void loadDevices();
+    void loadProviders();
+  }, []);
 
   const connect = async () => {
     setError("");
@@ -183,7 +204,51 @@ export default function WearablesPage() {
             </div>
 
             <div className="mt-8 border-t border-slate-100 pt-6">
-              <div className="flex items-center gap-2"><Activity className="h-5 w-5 text-[#24c1c4]" /><h2 className="font-black">Your connected devices</h2></div>
+              <div className="flex items-center gap-2">
+                <Activity className="h-5 w-5 text-[#24c1c4]" />
+                <h2 className="font-black">Health sources Sympto supports</h2>
+              </div>
+              <p className="mt-1 text-xs leading-5 text-slate-500">
+                Wearable data is normalized into the same Sympto health records used by manual and clinical entries.
+              </p>
+
+              {providers.length > 0 && (
+                <div className="mt-4 grid gap-2 sm:grid-cols-2">
+                  {providers.map((provider) => {
+                    const availableNow = provider.status === "AVAILABLE_NOW";
+                    const ready = provider.status === "PROTOCOL_READY";
+
+                    return (
+                      <div
+                        key={provider.provider}
+                        className="rounded-2xl border border-slate-200 bg-white px-4 py-3"
+                      >
+                        <div className="flex items-center justify-between gap-3">
+                          <p className="text-sm font-black text-[#0b2d54]">{provider.name}</p>
+                          <span
+                            className={
+                              "rounded-full px-2.5 py-1 text-[9px] font-black " +
+                              (availableNow
+                                ? "bg-[#24c1c4]/10 text-[#0b2d54]"
+                                : ready
+                                  ? "bg-slate-100 text-slate-600"
+                                  : "bg-slate-100 text-slate-500")
+                            }
+                          >
+                            {availableNow ? "Available now" : ready ? "Protocol ready" : "Connector required"}
+                          </span>
+                        </div>
+                        <p className="mt-1 text-[11px] leading-5 text-slate-500">{provider.note}</p>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+
+              <div className="mt-7 flex items-center gap-2">
+                <Activity className="h-5 w-5 text-[#24c1c4]" />
+                <h2 className="font-black">Your connected devices</h2>
+              </div>
               {devices.length === 0 ? (
                 <p className="mt-3 text-sm leading-6 text-slate-500">
                   No wearable has been connected yet.
@@ -224,7 +289,9 @@ export default function WearablesPage() {
               )}
             </div>
 
-            <div className="mt-6 rounded-2xl bg-[#24c1c4]/8 p-4 text-xs leading-5 text-slate-600"><strong className="text-[#0b2d54]">Compatibility:</strong> this browser connector uses the standard Bluetooth Heart Rate Service. Apple Health/HealthKit and Android Health Connect require the native Sympto mobile connector and are not falsely represented as browser Bluetooth devices.</div>
+            <div className="mt-6 rounded-2xl bg-[#24c1c4]/8 p-4 text-xs leading-5 text-slate-600">
+              <strong className="text-[#0b2d54]">How Sympto uses wearable data:</strong> connected sources can feed vitals, sleep, exercise and wellness data into the same patient-owned health timeline as manual and clinical records. The browser connection currently supports standard Bluetooth health devices; Apple Health, Health Connect, Samsung Health and provider cloud APIs require their native/provider connectors.
+            </div>
           </div>
         </section>
       </div>
