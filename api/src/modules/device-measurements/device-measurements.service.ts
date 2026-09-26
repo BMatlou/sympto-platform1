@@ -48,6 +48,59 @@ export class DeviceMeasurementsService {
     });
   }
 
+  private async syncWearableGoalMetric(
+    patientId: string,
+    measurementId: string,
+    measurementType: MeasurementType,
+    value: number,
+    secondaryValue: number | undefined,
+    measuredAt: Date,
+    source: string | undefined,
+  ) {
+    if (!source?.startsWith('wearable')) return;
+
+    const mappings: Array<[string, string, number | undefined]> = [];
+
+    switch (measurementType) {
+      case MeasurementType.HEART_RATE:
+        mappings.push(['HEART_RATE', 'heart_rate.bpm', value]);
+        break;
+      case MeasurementType.BLOOD_PRESSURE:
+        mappings.push(['BLOOD_PRESSURE', 'blood_pressure.systolic', value]);
+        if (secondaryValue != null) {
+          mappings.push(['BLOOD_PRESSURE', 'blood_pressure.diastolic', secondaryValue]);
+        }
+        break;
+      case MeasurementType.BLOOD_GLUCOSE:
+        mappings.push(['BLOOD_GLUCOSE', 'blood_glucose.value', value]);
+        break;
+      case MeasurementType.OXYGEN_SATURATION:
+        mappings.push(['OXYGEN', 'oxygen_saturation.percent', value]);
+        break;
+      case MeasurementType.RESPIRATORY_RATE:
+        mappings.push(['RESPIRATION', 'respiratory_rate.bpm', value]);
+        break;
+      case MeasurementType.BODY_TEMPERATURE:
+        mappings.push(['TEMPERATURE', 'temperature.c', value]);
+        break;
+      default:
+        break;
+    }
+
+    for (const [metricType, metricKey, loggedValue] of mappings) {
+      if (!Number.isFinite(loggedValue)) continue;
+      await this.goalsEngine.recordMetricEvent({
+        patientId,
+        metricType,
+        metricKey,
+        loggedValue: loggedValue as number,
+        occurredAt: measuredAt,
+        source: 'wearable',
+        sourceId: measurementId,
+      });
+    }
+  }
+
   async create(dto: CreateDeviceMeasurementDto) {
     const device = await this.prisma.wearableDevice.findUnique({
       where: { id: dto.deviceId },
@@ -57,8 +110,51 @@ export class DeviceMeasurementsService {
       throw new NotFoundException('Wearable device not found.');
     }
 
+    if (dto.connectionId) {
+      const connection = await this.prisma.wearableConnection.findFirst({
+        where: {
+          id: dto.connectionId,
+          patientId: device.patientId,
+        },
+        select: { id: true },
+      });
+
+      if (!connection) {
+        throw new NotFoundException('Wearable connection not found.');
+      }
+    }
+
+    if (dto.externalRecordId && dto.source) {
+      const existing = await this.prisma.deviceMeasurement.findFirst({
+        where: {
+          deviceId: dto.deviceId,
+          source: dto.source,
+          externalRecordId: dto.externalRecordId,
+        },
+        include: {
+          device: true,
+          deviceAlerts: true,
+        },
+      });
+
+      if (existing) return existing;
+    }
+
     const measurement = await this.prisma.deviceMeasurement.create({
-      data: { ...dto },
+      data: {
+        deviceId: dto.deviceId,
+        connectionId: dto.connectionId,
+        measurementType: dto.measurementType,
+        metricKey: dto.metricKey,
+        value: dto.value,
+        unit: dto.unit,
+        secondaryValue: dto.secondaryValue,
+        secondaryUnit: dto.secondaryUnit,
+        measuredAt: dto.measuredAt,
+        source: dto.source,
+        externalRecordId: dto.externalRecordId,
+        notes: dto.notes,
+      },
       include: {
         device: true,
         deviceAlerts: true,
@@ -71,6 +167,16 @@ export class DeviceMeasurementsService {
       measurement.measurementType,
       measurement.value,
       measurement.measuredAt,
+    );
+
+    await this.syncWearableGoalMetric(
+      device.patientId,
+      measurement.id,
+      measurement.measurementType,
+      Number(measurement.value),
+      measurement.secondaryValue == null ? undefined : Number(measurement.secondaryValue),
+      measurement.measuredAt,
+      measurement.source ?? undefined,
     );
 
     return measurement;
