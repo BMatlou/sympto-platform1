@@ -64,6 +64,8 @@ ALTER TABLE "WearableDevice"
 
 CREATE INDEX "WearableDevice_connectionId_idx"
   ON "WearableDevice"("connectionId");
+CREATE INDEX "WearableDevice_patientId_idx"
+  ON "WearableDevice"("patientId");
 
 ALTER TABLE "WearableDevice"
   ADD CONSTRAINT "WearableDevice_connectionId_fkey"
