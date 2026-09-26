@@ -125,8 +125,12 @@ export class PatientNotificationsController {
   }
 
   @Get('unread-count')
-  unreadCount(@Req() req: any) {
-    return this.notificationsService.getUnreadCountForUser(req.user.sub);
+  async unreadCount(@Req() req: any) {
+    const count = await this.notificationsService.getUnreadCountForUser(
+      req.user.sub,
+    );
+
+    return { count };
   }
 
   @Patch('read-all')
