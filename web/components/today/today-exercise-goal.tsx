@@ -4,9 +4,10 @@ import Link from "next/link";
 import { ArrowRight, Dumbbell } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { healthGoalsService } from "@/services/health-goals.service";
+import { canonicalExerciseDayTotals, canonicalExerciseWeekTotal, type ExerciseMetricEvent } from "@/lib/exercise-metric";
 
 type Props = { goal: any };
-type ExerciseEvent = { loggedValue: number; occurredAt: string; sourceId?: string | null };
+type ExerciseEvent = ExerciseMetricEvent & { sourceId?: string | null };
 
 function startOfLocalWeek(date = new Date()) {
   const start = new Date(date);
@@ -47,8 +48,8 @@ export default function TodayExerciseGoal({ goal }: Props) {
 
   async function loadWeekEvents() {
     try {
-      const response = await healthGoalsService.getMetricEvents("EXERCISE", "exercise.minutes", weekStart, new Date(), "health-journal");
-      setEvents((response.events ?? []).map((event) => ({ loggedValue: Number(event.loggedValue), occurredAt: String(event.occurredAt), sourceId: event.sourceId ?? null })));
+      const response = await healthGoalsService.getMetricEvents("EXERCISE", "exercise.minutes", weekStart, new Date());
+      setEvents((response.events ?? []).map((event) => ({ loggedValue: Number(event.loggedValue), occurredAt: String(event.occurredAt), source: event.source ?? null, sourceId: event.sourceId ?? null })));
     } catch {
       setEvents([]);
     } finally {
@@ -67,13 +68,11 @@ export default function TodayExerciseGoal({ goal }: Props) {
     };
   }, [goal?.id, weekStart.getTime()]);
 
-  const weekTotal = events.reduce((total, event) => total + (Number.isFinite(event.loggedValue) ? event.loggedValue : 0), 0);
+  const dayTotals = canonicalExerciseDayTotals(events);
+  const weekTotal = canonicalExerciseWeekTotal(events);
   const progressPercent = targetMinutes > 0 ? Math.min(100, Math.round((weekTotal / targetMinutes) * 100)) : 0;
   const todayKey = localDayKey();
-  const todayMinutes = events.filter((event) => {
-    const date = new Date(event.occurredAt);
-    return !Number.isNaN(date.getTime()) && localDayKey(date) === todayKey;
-  }).reduce((total, event) => total + (Number.isFinite(event.loggedValue) ? event.loggedValue : 0), 0);
+  const todayMinutes = dayTotals.get(todayKey) ?? 0;
   const targetReached = targetMinutes > 0 && weekTotal >= targetMinutes;
   const overTarget = targetMinutes > 0 && weekTotal > targetMinutes;
   const remainingMinutes = Math.max(0, targetMinutes - weekTotal);
