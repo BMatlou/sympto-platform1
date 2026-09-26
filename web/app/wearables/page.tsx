@@ -176,7 +176,7 @@ export default function WearablesPage() {
     <main className="min-h-screen bg-[#F4FBFB] px-4 py-7 text-[#0b2d54] sm:px-6 lg:px-8">
       <div className="mx-auto max-w-5xl">
         <Link
-          href="/"
+          href="/dashboard"
           className="inline-flex min-h-10 items-center gap-2 rounded-xl px-2 text-sm font-bold text-slate-500 transition hover:bg-white hover:text-[#0b2d54]"
         >
           <ChevronLeft className="h-5 w-5" />
