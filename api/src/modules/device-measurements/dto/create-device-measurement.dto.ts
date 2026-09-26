@@ -33,6 +33,26 @@ export class CreateDeviceMeasurementDto {
   source?: string;
 
   @IsOptional()
+  @IsUUID()
+  connectionId?: string;
+
+  @IsOptional()
+  @IsString()
+  metricKey?: string;
+
+  @IsOptional()
+  @IsNumber()
+  secondaryValue?: number;
+
+  @IsOptional()
+  @IsString()
+  secondaryUnit?: string;
+
+  @IsOptional()
+  @IsString()
+  externalRecordId?: string;
+
+  @IsOptional()
   @IsString()
   notes?: string;
 }
