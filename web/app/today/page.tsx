@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { ArrowLeft, ArrowRight, Bell, CalendarDays, ClipboardCheck, Sparkles } from "lucide-react";
+import { ArrowLeft, ArrowRight, CalendarDays, ClipboardCheck, Sparkles } from "lucide-react";
 import { useEffect, useState } from "react";
 import ProtectedRoute from "@/components/auth/protected-route";
 import { useDashboard } from "@/hooks/use-dashboard";
@@ -285,7 +285,6 @@ export default function TodayPage() {
   const otherTodayGoals = activeGoalsArray.filter((goal: any) => !dedicatedTodayCategories.has(String(goal?.category ?? "").toUpperCase()));
   const primaryMedicationId = medicationGoalCardsForToday[0]?.medication ? patientMedicationId(medicationGoalCardsForToday[0].medication) : null;
 
-  const attention = data.attention ?? [];
   const carePlans = data.carePlans ?? [];
   const currentDayKey = dayKey(new Date());
   const careTasks = carePlans.flatMap((plan: any) =>
@@ -308,8 +307,6 @@ export default function TodayPage() {
   const nextAppointment = sortedAppointments[0] ?? null;
   const appointmentsForToday = sortedAppointments.filter((appointment: any) => dayKey(appointment.scheduledStart) === currentDayKey);
   const appointmentIsToday = appointmentsForToday.length > 0 && Boolean(nextAppointment?.scheduledStart && dayKey(nextAppointment.scheduledStart) === currentDayKey);
-  const notifications = (data.today?.notifications ?? data.notifications ?? []).filter((item: any) => !item.scheduledFor || new Date(String(item.scheduledFor)) <= new Date());
-  const regularNotifications = notifications.filter((item: any) => !["HIGH", "URGENT"].includes(String(item?.priority ?? "").toUpperCase()));
   const deviceAlerts = Array.isArray(data.wearables?.deviceAlerts) ? data.wearables.deviceAlerts : [];
   const immunizations = Array.isArray(data.healthSnapshot?.immunizations)
     ? data.healthSnapshot.immunizations
@@ -454,10 +451,6 @@ export default function TodayPage() {
             <DailyHealthCheckIn embedded goals={goals} medicationGoalHref={medicationGoal && primaryMedicationId ? `#medication-adherence-card-${String(primaryMedicationId)}` : null} />
           </div>
         </section>
-
-        {attention.length > 0 && <section className="mt-8 rounded-[27px] border border-amber-200 bg-gradient-to-br from-amber-50/80 to-white p-5 shadow-[0_8px_24px_rgba(161,98,4,0.05)] sm:p-6"><div className="flex items-start gap-3"><span className="mt-0.5 grid h-9 w-9 shrink-0 place-items-center rounded-[13px] bg-amber-100 text-amber-700"><Bell className="h-4 w-4" /></span><div className="min-w-0"><p className="text-[9px] font-black uppercase tracking-[0.16em] text-amber-700/80">Check this next</p><h2 className="mt-1 text-sm font-black text-[#0b2d54]">Needs your attention</h2></div></div><div className="mt-3 space-y-2">{attention.map((item: any, index: number) => <div key={String(item.id ?? index)} className="rounded-xl bg-white p-3.5 text-xs leading-5 text-slate-600 ring-1 ring-amber-100">{text(item.title || item.message || item.description)}</div>)}</div></section>}
-
-        {regularNotifications.length > 0 && <section className="mt-8 rounded-[27px] border border-[#e0ebef] bg-white p-5 shadow-[0_5px_18px_rgba(11,45,84,0.03)] sm:p-6"><div className="flex items-center justify-between gap-3"><div className="flex items-center gap-2.5"><span className="grid h-9 w-9 place-items-center rounded-[13px] bg-[#e8f8f7] text-[#0b7b80]"><Bell className="h-4 w-4" /></span><h2 className="text-sm font-black text-[#0b2d54]">Notifications & reminders</h2></div><Link href="/notifications" className="text-[9px] font-black text-[#0b2d54]">Open notifications <ArrowRight className="ml-1 inline h-3 w-3" /></Link></div><div className="mt-3 space-y-2">{regularNotifications.slice(0, 5).map((item: any, index: number) => <Link key={String(item.id ?? index)} href={item.actionUrl || "/notifications"} className="block rounded-xl bg-[#f8fbfb] p-3 ring-1 ring-[#e1edef]"><p className="text-xs font-bold text-[#0b2d54]">{text(item.title || "Notification")}</p>{item.body && <p className="mt-1 text-[11px] leading-5 text-slate-500">{String(item.body)}</p>}</Link>)}</div></section>}
 
         {deviceAlerts.length > 0 && <section className="mt-8 rounded-[27px] border border-amber-200 bg-amber-50/50 p-5 sm:p-6"><div className="flex items-center justify-between gap-3"><div><p className="text-[9px] font-black uppercase tracking-[0.16em] text-amber-700/80">Connected devices</p><h2 className="mt-1 text-sm font-black text-[#0b2d54]">Device alerts</h2></div><Link href="/health-vitals" className="text-[9px] font-black text-[#0b2d54]">View vitals <ArrowRight className="ml-1 inline h-3 w-3" /></Link></div><div className="mt-3 space-y-2">{deviceAlerts.slice(0, 5).map((item: any, index: number) => <div key={String(item.id ?? index)} className="rounded-xl bg-white p-3 ring-1 ring-amber-100"><div className="flex items-center justify-between gap-3"><p className="text-xs font-bold text-[#0b2d54]">{text(item.title || "Device alert")}</p><span className="text-[8px] font-black uppercase tracking-[.12em] text-amber-700">{text(item.severity, "Alert")}</span></div>{item.description && <p className="mt-1 text-[11px] leading-5 text-slate-600">{String(item.description)}</p>}</div>)}</div></section>}
 
