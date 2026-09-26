@@ -26,7 +26,7 @@ export class CreateDeviceMeasurementDto {
   unit!: string;
 
   @IsDateString()
-  measuredAt!: Date;
+  measuredAt!: string;
 
   @IsOptional()
   @IsString()
