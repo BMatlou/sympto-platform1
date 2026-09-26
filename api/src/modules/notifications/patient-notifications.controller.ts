@@ -85,12 +85,12 @@ export class PatientNotificationsController {
     @Req() req: any,
     @Body() dto: UpdatePatientNotificationPreferenceDto,
   ) {
-    const supportedChannels = new Set([
+    const supportedChannels: readonly NotificationChannel[] = [
       NotificationChannel.IN_APP,
       NotificationChannel.PUSH,
-    ]);
+    ];
 
-    if (!supportedChannels.has(dto.channel)) {
+    if (!supportedChannels.includes(dto.channel)) {
       throw new BadRequestException(
         'This notification channel is not available yet.',
       );
