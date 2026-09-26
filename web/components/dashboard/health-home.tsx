@@ -63,10 +63,106 @@ function itemNames(
     .filter(Boolean) as string[];
 }
 
+function countTodayNeeds(data: any) {
+  const dayKey = (value: unknown) => {
+    if (!value) return "";
+    const date = new Date(String(value));
+    if (Number.isNaN(date.getTime())) return "";
+    return new Intl.DateTimeFormat("en-CA", {
+      timeZone: "Africa/Johannesburg",
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+    }).format(date);
+  };
+
+  const today = dayKey(new Date());
+
+  const medications = Array.isArray(data?.today?.activeMedications)
+    ? data.today.activeMedications
+    : [];
+
+  const appointments = (
+    Array.isArray(data?.appointments) && data.appointments.length > 0
+      ? data.appointments
+      : Array.isArray(data?.today?.upcomingAppointments)
+        ? data.today.upcomingAppointments
+        : []
+  ).filter(
+    (appointment: any) =>
+      appointment?.scheduledStart && dayKey(appointment.scheduledStart) === today,
+  );
+
+  const goals = Array.isArray(data?.activeGoalsArray)
+    ? data.activeGoalsArray
+    : (Array.isArray(data?.goals) ? data.goals : []).filter((goal: any) =>
+        !["ACHIEVED", "ARCHIVED", "CANCELLED", "DELETED", "EXPIRED", "ON_HOLD"].includes(
+          String(goal?.status ?? "").toUpperCase(),
+        ),
+      );
+
+  const nonMedicationGoals = goals.filter(
+    (goal: any) => String(goal?.category ?? "").toUpperCase() !== "MEDICATION",
+  );
+
+  const activeSymptoms = (Array.isArray(data?.symptoms) ? data.symptoms : []).filter(
+    (symptom: any) => String(symptom?.status ?? "").toUpperCase() === "ACTIVE",
+  );
+
+  const attentionItems = Array.isArray(data?.attention) ? data.attention : [];
+
+  const regularDueNotifications = (
+    Array.isArray(data?.today?.notifications) ? data.today.notifications : []
+  ).filter((notification: any) => {
+    if (notification?.scheduledFor) {
+      const scheduledAt = new Date(String(notification.scheduledFor)).getTime();
+      if (!Number.isFinite(scheduledAt) || scheduledAt > Date.now()) return false;
+    }
+    return String(notification?.type ?? "").toUpperCase() !== "REMINDER";
+  });
+
+  const deviceAlerts = Array.isArray(data?.wearables?.deviceAlerts)
+    ? data.wearables.deviceAlerts
+    : [];
+
+  const immunizations = Array.isArray(data?.healthSnapshot?.immunizations)
+    ? data.healthSnapshot.immunizations
+    : Array.isArray(data?.immunizations)
+      ? data.immunizations
+      : [];
+
+  const dueImmunizations = immunizations.filter((item: any) => {
+    const status = String(item?.status ?? "").toUpperCase();
+    if (status === "MISSED") return true;
+    return status === "SCHEDULED" && item?.nextDueDate && dayKey(item.nextDueDate) <= today;
+  });
+
+  const careTasks = (Array.isArray(data?.carePlans) ? data.carePlans : []).flatMap(
+    (plan: any) =>
+      (Array.isArray(plan?.tasks) ? plan.tasks : []).filter((task: any) => {
+        const status = String(task?.status ?? "").toUpperCase();
+        if (["COMPLETED", "CANCELLED"].includes(status) || !task?.dueDate) return false;
+        return dayKey(task.dueDate) <= today;
+      }),
+  );
+
+  return (
+    medications.length +
+    appointments.length +
+    nonMedicationGoals.length +
+    activeSymptoms.length +
+    attentionItems.length +
+    regularDueNotifications.length +
+    deviceAlerts.length +
+    dueImmunizations.length +
+    careTasks.length
+  );
+}
+
 function countActiveGoals(data: any) {
   return (Array.isArray(data?.goals) ? data.goals : []).filter(
     (goal: any) =>
-      !["ACHIEVED", "ARCHIVED", "CANCELLED", "DELETED"].includes(
+      !["ACHIEVED", "ARCHIVED", "CANCELLED", "DELETED", "ON_HOLD", "EXPIRED"].includes(
         String(goal?.status ?? "").toUpperCase(),
       ),
   ).length;
@@ -262,7 +358,7 @@ export default function HealthHome() {
     : [];
 
   const activeGoalCount = countActiveGoals(data);
-  const todayActionCount = medications.length + appointments.length + activeGoalCount;
+  const todayActionCount = countTodayNeeds(data);
   const dashboardNotifications = Array.isArray(data?.today?.notifications)
     ? data.today.notifications
     : [];
@@ -316,18 +412,6 @@ export default function HealthHome() {
   return (
     <ProtectedRoute>
       <ActionLink
-        href="/notifications"
-        ariaLabel="Notifications"
-        className="fixed right-[84px] top-4 z-[60] grid h-10 w-10 place-items-center rounded-2xl bg-white text-[#0B2D54] shadow-[0_10px_26px_rgba(11,45,84,0.12)] ring-1 ring-[#dce7ec] transition-all hover:-translate-y-0.5 hover:ring-[#24C1C4]/50 sm:right-[166px] sm:top-5"
-      >
-        <Bell className="h-4 w-4" aria-hidden="true" />
-        {unreadNotificationCount > 0 && (
-          <span className="absolute -right-1 -top-1 grid min-h-5 min-w-5 place-items-center rounded-full bg-[#24C1C4] px-1 text-[8px] font-black leading-none text-[#0B2D54] ring-2 ring-[#EAF0F7]">
-            {unreadNotificationCount > 9 ? "9+" : unreadNotificationCount}
-          </span>
-        )}
-      </ActionLink>
-      <ActionLink
         href="/smart-file"
         ariaLabel="Share Smart File"
         className="fixed right-4 top-4 z-[60] inline-flex min-h-10 items-center gap-2 rounded-2xl bg-[#0B2D54] px-4 py-2.5 text-[9px] font-black uppercase tracking-[0.08em] text-white shadow-[0_12px_28px_rgba(11,45,84,0.18)] transition-all hover:-translate-y-0.5 hover:bg-[#092544] sm:right-6 sm:top-5"
@@ -342,8 +426,20 @@ export default function HealthHome() {
             <div className="px-4 pb-1 pt-3 sm:px-5 lg:px-7">
               <div className="mt-3 grid gap-3 xl:grid-cols-[minmax(0,1.55fr)_minmax(320px,0.85fr)]">
                 <section id="dashboard-overview-card" className="group relative min-h-[220px] overflow-hidden rounded-[28px] bg-[#0B2D54] p-6 text-white sm:p-7">
+                  <ActionLink
+                    href="/notifications"
+                    ariaLabel="Notifications"
+                    className="absolute right-5 top-5 z-10 grid h-10 w-10 place-items-center rounded-2xl bg-white/10 text-white ring-1 ring-inset ring-white/20 transition-all hover:-translate-y-0.5 hover:bg-[#24C1C4] hover:text-[#0B2D54]"
+                  >
+                    <Bell className="h-4 w-4" aria-hidden="true" />
+                    {unreadNotificationCount > 0 && (
+                      <span className="absolute -right-1 -top-1 grid min-h-5 min-w-5 place-items-center rounded-full bg-[#24C1C4] px-1 text-[8px] font-black leading-none text-[#0B2D54] ring-2 ring-[#0B2D54]">
+                        {unreadNotificationCount > 9 ? "9+" : unreadNotificationCount}
+                      </span>
+                    )}
+                  </ActionLink>
                   <div className="relative flex min-h-[166px] items-center justify-between gap-8">
-                    <div className="min-w-0">
+                    <div className="min-w-0 pr-1 sm:pr-10">
                       <p className="text-[9px] font-black uppercase tracking-[0.18em] text-white/50">Overview</p>
                       <h2 className="mt-2 text-[30px] font-black leading-tight tracking-[-0.05em] sm:text-[38px]">
                         {greeting}, {firstName}
