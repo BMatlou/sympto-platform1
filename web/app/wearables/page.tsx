@@ -170,7 +170,7 @@ export default function WearablesPage() {
     }
   };
 
-  const otherProviders = providers.filter((provider) => provider.provider !== "SYMPTO_WEARABLE");
+  const otherProviders = providers.filter((provider) => !["SYMPTO_WEARABLE", "BLUETOOTH_LE"].includes(provider.provider));
 
   return (
     <main className="min-h-screen bg-[#F4FBFB] px-4 py-7 text-[#0b2d54] sm:px-6 lg:px-8">
@@ -302,62 +302,131 @@ export default function WearablesPage() {
             </div>
           ) : (
             <div className="p-5 sm:p-7">
-              <div className="rounded-[1.75rem] border border-slate-200 bg-slate-50/70 p-5 sm:p-6">
-                <div className="flex flex-col gap-5 sm:flex-row sm:items-center sm:justify-between">
-                  <div>
-                    <p className="text-xl font-black tracking-tight text-[#0b2d54]">Other wearables</p>
-                    <p className="mt-1 text-xs text-slate-500">Connect a device you already use.</p>
-                  </div>
-
-                  <div className="flex items-center gap-3">
-                    <div className="text-right">
-                      <p className="text-[10px] font-black uppercase tracking-[0.16em] text-slate-400">Bluetooth</p>
-                      <p className="mt-1 text-lg font-black text-[#0b2d54]">{heartRate ?? "—"} <span className="text-xs text-slate-400">bpm</span></p>
+              <div className="grid gap-4 lg:grid-cols-[1.15fr_0.85fr]">
+                <div className="overflow-hidden rounded-[1.75rem] bg-[#0b2d54] text-white">
+                  <div className="flex h-full flex-col justify-between p-6 sm:p-7">
+                    <div className="flex items-start justify-between gap-4">
+                      <div>
+                        <p className="text-[10px] font-black uppercase tracking-[0.2em] text-[#24c1c4]">Bluetooth</p>
+                        <h2 className="mt-2 text-2xl font-black tracking-tight">Connect a device</h2>
+                        <p className="mt-2 max-w-sm text-sm leading-6 text-white/55">
+                          Pair a compatible wearable and bring its live heart-rate data into Sympto.
+                        </p>
+                      </div>
+                      <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-white/10 text-[#24c1c4]">
+                        <Bluetooth className="h-6 w-6" />
+                      </div>
                     </div>
 
-                    <button
-                      type="button"
-                      onClick={connect}
-                      disabled={connecting || status.startsWith("Connected")}
-                      className="inline-flex min-h-10 items-center justify-center gap-2 rounded-full bg-[#0b2d54] px-4 text-xs font-black text-white transition hover:bg-[#071f3a] disabled:cursor-not-allowed disabled:opacity-45"
-                    >
-                      <Bluetooth className="h-4 w-4" />
-                      {connecting ? "Connecting…" : "Connect"}
-                    </button>
+                    <div className="mt-8 flex items-end justify-between gap-4">
+                      <div>
+                        <p className="text-[10px] font-black uppercase tracking-[0.18em] text-white/35">Live heart rate</p>
+                        <p className="mt-1 text-5xl font-black tracking-tight">
+                          {heartRate ?? "—"}<span className="ml-2 text-sm font-bold text-white/40">bpm</span>
+                        </p>
+                        <div className="mt-3 flex items-center gap-2">
+                          <span className={`h-2.5 w-2.5 rounded-full ${status.startsWith("Connected") ? "bg-[#24c1c4] shadow-[0_0_0_5px_rgba(36,193,196,0.10)]" : "bg-white/25"}`} />
+                          <span className="text-xs font-bold text-white/45">
+                            {connectedName || (status === "Disconnected" ? "Disconnected" : "Not connected")}
+                          </span>
+                        </div>
+                      </div>
 
-                    <button
-                      type="button"
-                      onClick={disconnect}
-                      disabled={!backendDeviceIdRef.current}
-                      className="flex h-10 w-10 items-center justify-center rounded-full border border-slate-200 bg-white text-[#0b2d54] disabled:cursor-not-allowed disabled:opacity-35"
-                      aria-label="Disconnect"
-                    >
-                      <Link2Off className="h-4 w-4" />
-                    </button>
+                      <div className="flex items-center gap-2">
+                        <button
+                          type="button"
+                          onClick={connect}
+                          disabled={connecting || status.startsWith("Connected")}
+                          className="inline-flex min-h-11 items-center justify-center gap-2 rounded-full bg-[#24c1c4] px-5 text-xs font-black text-[#0b2d54] transition hover:bg-[#38d1d3] disabled:cursor-not-allowed disabled:opacity-45"
+                        >
+                          <Bluetooth className="h-4 w-4" />
+                          {connecting ? "Connecting…" : "Connect"}
+                        </button>
+
+                        <button
+                          type="button"
+                          onClick={disconnect}
+                          disabled={!backendDeviceIdRef.current}
+                          className="flex h-11 w-11 items-center justify-center rounded-full border border-white/10 bg-white/5 text-white/75 transition hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-30"
+                          aria-label="Disconnect"
+                        >
+                          <Link2Off className="h-4 w-4" />
+                        </button>
+                      </div>
+                    </div>
+
+                    {error && (
+                      <p className="mt-5 rounded-2xl bg-red-400/10 px-4 py-3 text-xs font-semibold leading-5 text-red-200" role="alert">
+                        {error}
+                      </p>
+                    )}
                   </div>
                 </div>
 
-                {error && (
-                  <p className="mt-4 rounded-2xl bg-red-50 px-4 py-3 text-xs font-semibold leading-5 text-red-700" role="alert">
-                    {error}
+                <div className="rounded-[1.75rem] border border-slate-200 bg-[#F7FBFC] p-6 sm:p-7">
+                  <p className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400">Connected health</p>
+                  <h2 className="mt-2 text-xl font-black tracking-tight text-[#0b2d54]">Use your existing devices</h2>
+                  <p className="mt-2 text-sm leading-6 text-slate-500">
+                    Bring supported health data into the same Sympto experience.
                   </p>
-                )}
+
+                  <div className="mt-6 rounded-2xl border border-[#d9eeee] bg-white px-4 py-4">
+                    <div className="flex items-center justify-between gap-3">
+                      <div>
+                        <p className="text-xs font-black text-[#0b2d54]">Apple Health</p>
+                        <p className="mt-1 text-[11px] text-slate-400">iPhone + Apple Watch</p>
+                      </div>
+                      <span className="rounded-full bg-slate-100 px-2.5 py-1 text-[9px] font-black text-slate-500">Coming soon</span>
+                    </div>
+                  </div>
+                </div>
               </div>
 
-              <div className="mt-6 divide-y divide-slate-100 overflow-hidden rounded-[1.75rem] border border-slate-200 bg-white">
+              <div className="mt-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
                 {otherProviders.map((provider) => {
                   const availableNow = provider.status === "AVAILABLE_NOW";
+                  const initials = provider.name
+                    .split(/\s+/)
+                    .map((part) => part[0])
+                    .join("")
+                    .slice(0, 2)
+                    .toUpperCase();
+
                   return (
-                    <div key={provider.provider} className="flex items-center justify-between px-5 py-4">
-                      <div className="flex items-center gap-3">
-                        <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-slate-100 text-[#0b2d54]">
-                          <Watch className="h-4 w-4" />
+                    <div
+                      key={provider.provider}
+                      className="group rounded-[1.5rem] border border-slate-200 bg-white p-4 transition hover:-translate-y-0.5 hover:border-[#b9e7e8] hover:shadow-[0_14px_32px_rgba(11,45,84,0.07)]"
+                    >
+                      <div className="flex items-center justify-between gap-3">
+                        <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-[#F1F7F8] text-sm font-black text-[#0b2d54]">
+                          {initials}
                         </div>
-                        <p className="text-sm font-black text-[#0b2d54]">{provider.name}</p>
+                        <span className={`rounded-full px-2.5 py-1 text-[9px] font-black ${availableNow ? "bg-[#24c1c4]/12 text-[#0b2d54]" : "bg-slate-100 text-slate-500"}`}>
+                          {availableNow ? "Available" : "Coming soon"}
+                        </span>
                       </div>
-                      <span className={`text-xs font-black ${availableNow ? "text-[#0b2d54]" : "text-slate-400"}`}>
-                        {availableNow ? "Available" : "Coming soon"}
-                      </span>
+
+                      <div className="mt-5 flex items-end justify-between gap-3">
+                        <div>
+                          <p className="text-sm font-black text-[#0b2d54]">{provider.name}</p>
+                          <p className="mt-1 text-[11px] text-slate-400">
+                            {provider.provider === "FITBIT"
+                              ? "Fitbit devices"
+                              : provider.provider === "GARMIN"
+                                ? "Garmin devices"
+                                : provider.provider === "OURA"
+                                  ? "Oura Ring"
+                                  : provider.provider === "POLAR"
+                                    ? "Polar devices"
+                                    : provider.provider === "HEALTH_CONNECT"
+                                      ? "Android devices"
+                                      : provider.provider === "SAMSUNG_HEALTH"
+                                        ? "Galaxy devices"
+                                        : "Health data"}
+                          </p>
+                        </div>
+                        <span className="text-slate-300 transition group-hover:text-[#24c1c4]">→</span>
+                      </div>
                     </div>
                   );
                 })}
