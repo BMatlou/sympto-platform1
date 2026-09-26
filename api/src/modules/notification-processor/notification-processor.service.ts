@@ -6,7 +6,6 @@ import {
 } from '@nestjs/common';
 
 import { PrismaService } from '../../database/prisma.service';
-import { NotificationsModule } from '../notifications/notifications.module';
 import { PushNotificationService } from '../notifications/push-notification.service';
 
 /**
