@@ -124,6 +124,11 @@ export class PatientNotificationsController {
     );
   }
 
+  @Get('unread-count')
+  unreadCount(@Req() req: any) {
+    return this.notificationsService.getUnreadCountForUser(req.user.sub);
+  }
+
   @Patch('read-all')
   markAllRead(@Req() req: any) {
     return this.notificationsService.markAllReadForUser(req.user.sub);
