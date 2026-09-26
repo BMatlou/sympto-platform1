@@ -173,6 +173,8 @@ export default function WearablesPage() {
   const otherProviders = providers.filter((provider) => provider.provider !== "SYMPTO_WEARABLE");
   const usingOtherSources = showSources;
 
+  const otherProviders = providers.filter((provider) => provider.provider !== "SYMPTO_WEARABLE");
+
   return (
     <main className="min-h-screen bg-[#F4FBFB] px-4 py-7 text-[#0b2d54] sm:px-6 lg:px-8">
       <div className="mx-auto max-w-5xl">
@@ -184,92 +186,101 @@ export default function WearablesPage() {
           Health Home
         </Link>
 
-        <section className="mt-4 overflow-hidden rounded-[2rem] border border-[#dbe8eb] bg-white shadow-[0_24px_70px_rgba(11,45,84,0.08)]">
-          <div className="px-6 pb-6 pt-7 sm:px-8 sm:pb-7 sm:pt-8">
-            <p className="text-[11px] font-black uppercase tracking-[0.2em] text-[#24c1c4]">Connected Health</p>
-            <h1 className="mt-2 text-3xl font-black tracking-tight sm:text-[2.25rem]">Connect your wearable</h1>
+        <section className="mt-4 overflow-hidden rounded-[2rem] border border-[#dce9ec] bg-white shadow-[0_24px_70px_rgba(11,45,84,0.08)]">
+          <header className="flex flex-col gap-5 px-6 pb-6 pt-7 sm:flex-row sm:items-end sm:justify-between sm:px-8">
+            <div>
+              <p className="text-[11px] font-black uppercase tracking-[0.2em] text-[#24c1c4]">Connected Health</p>
+              <h1 className="mt-2 text-3xl font-black tracking-tight sm:text-[2.35rem]">Wearables</h1>
+            </div>
 
-            <div className="mt-6 flex justify-start">
-              <div className="relative inline-grid min-h-11 grid-cols-2 rounded-full bg-slate-100 p-1 shadow-inner">
+            <div className="flex items-center gap-3 self-start sm:self-auto">
+              <span className={`text-xs font-black transition ${showSources ? "text-slate-400" : "text-[#0b2d54]"}`}>
+                Sympto
+              </span>
+              <button
+                type="button"
+                role="switch"
+                aria-checked={showSources}
+                aria-label={showSources ? "Show Sympto wearable" : "Show other wearables"}
+                onClick={() => setShowSources((value) => !value)}
+                className={`relative h-8 w-14 shrink-0 rounded-full p-1 transition-colors duration-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#24c1c4] focus-visible:ring-offset-2 ${
+                  showSources ? "bg-[#0b2d54]" : "bg-[#24c1c4]"
+                }`}
+              >
                 <span
-                  aria-hidden="true"
-                  className={`absolute bottom-1 top-1 w-[calc(50%-0.25rem)] rounded-full bg-white shadow-[0_4px_12px_rgba(11,45,84,0.12)] transition-transform duration-300 ease-out ${
-                    showSources ? "translate-x-full" : "translate-x-0"
+                  className={`block h-6 w-6 rounded-full bg-white shadow-[0_2px_8px_rgba(11,45,84,0.22)] transition-transform duration-200 ${
+                    showSources ? "translate-x-6" : "translate-x-0"
                   }`}
                 />
-                <button
-                  type="button"
-                  onClick={() => setShowSources(false)}
-                  aria-pressed={!showSources}
-                  className="relative z-10 min-w-[148px] rounded-full px-5 text-sm font-black text-[#0b2d54]"
-                >
-                  Sympto Wearable
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setShowSources(true)}
-                  aria-pressed={showSources}
-                  className="relative z-10 min-w-[148px] rounded-full px-5 text-sm font-black text-slate-500"
-                >
-                  Other wearables
-                </button>
-              </div>
+              </button>
+              <span className={`text-xs font-black transition ${showSources ? "text-[#0b2d54]" : "text-slate-400"}`}>
+                Other
+              </span>
             </div>
-          </div>
+          </header>
 
           <div className="border-t border-slate-100 px-5 pb-6 pt-5 sm:px-8 sm:pb-8">
             {!showSources ? (
-              <div className="overflow-hidden rounded-[1.75rem] bg-[#0b2d54] text-white">
-                <div className="grid min-h-[360px] lg:grid-cols-[1.2fr_0.8fr]">
-                  <div className="flex flex-col justify-between p-7 sm:p-9">
-                    <div>
-                      <span className="inline-flex rounded-full bg-[#24c1c4]/12 px-3 py-1.5 text-[10px] font-black uppercase tracking-[0.18em] text-[#24c1c4]">
-                        Sympto
-                      </span>
-                      <h2 className="mt-5 text-3xl font-black tracking-tight sm:text-4xl">Sympto Wearable</h2>
-                      <p className="mt-2 text-sm font-medium text-white/55">Watch + wristband</p>
+              <>
+                <div className="relative overflow-hidden rounded-[2rem] bg-[#0b2d54]">
+                  <div className="absolute -right-20 -top-20 h-56 w-56 rounded-full bg-[#24c1c4]/10" />
+                  <div className="grid min-h-[430px] lg:grid-cols-[0.9fr_1.1fr]">
+                    <div className="relative z-10 flex flex-col justify-center p-7 sm:p-10">
+                      <p className="text-[10px] font-black uppercase tracking-[0.2em] text-[#24c1c4]">Sympto</p>
+                      <h2 className="mt-3 text-4xl font-black tracking-tight text-white sm:text-5xl">
+                        Sympto Wearable
+                      </h2>
+                      <p className="mt-2 text-base font-medium text-white/55">Watch + wristband</p>
+                      <p className="mt-6 max-w-sm text-sm leading-6 text-white/65">
+                        Vitals, activity, sleep and recovery — designed around Sympto.
+                      </p>
+
+                      <div className="mt-7 flex flex-wrap gap-x-5 gap-y-2 text-xs font-black text-white/70">
+                        <span>Vitals</span>
+                        <span>Activity</span>
+                        <span>Sleep</span>
+                        <span>Recovery</span>
+                      </div>
+
+                      <p className="mt-9 text-xs font-bold text-white/35">Coming soon</p>
                     </div>
 
-                    <div className="grid grid-cols-2 gap-2 pt-8 sm:grid-cols-4">
-                      {["Vitals", "Activity", "Sleep", "Recovery"].map((item) => (
-                        <div key={item} className="rounded-2xl border border-white/10 bg-white/[0.06] px-3 py-3 text-center text-xs font-black text-white/90">
-                          {item}
+                    <div className="relative flex min-h-[300px] items-center justify-center overflow-hidden border-t border-white/10 bg-white/[0.035] lg:border-l lg:border-t-0">
+                      <div className="absolute inset-x-0 bottom-8 mx-auto h-px max-w-xs bg-white/10" />
+
+                      <div className="relative h-[280px] w-[180px]">
+                        <div className="absolute left-1/2 top-0 h-24 w-24 -translate-x-1/2 rounded-[2rem] bg-[#071f3a] shadow-[0_20px_45px_rgba(0,0,0,0.25)]" />
+                        <div className="absolute bottom-0 left-1/2 h-24 w-24 -translate-x-1/2 rounded-[2rem] bg-[#071f3a] shadow-[0_20px_45px_rgba(0,0,0,0.25)]" />
+                        <div className="absolute left-1/2 top-1/2 h-[190px] w-[150px] -translate-x-1/2 -translate-y-1/2 rounded-[3rem] bg-[#24c1c4] p-2 shadow-[0_30px_70px_rgba(0,0,0,0.28)]">
+                          <div className="flex h-full w-full items-center justify-center rounded-[2.55rem] bg-[#0b2d54]">
+                            <div className="text-center">
+                              <div className="mx-auto h-11 w-11 rounded-full border-[3px] border-[#24c1c4]/60" />
+                              <p className="mt-3 text-[9px] font-black uppercase tracking-[0.18em] text-white/55">Sympto</p>
+                            </div>
+                          </div>
                         </div>
-                      ))}
+                      </div>
                     </div>
-                  </div>
-
-                  <div className="flex min-h-[280px] flex-col items-center justify-center border-t border-white/10 bg-white/[0.04] p-8 lg:border-l lg:border-t-0">
-                    <div className="flex h-32 w-32 items-center justify-center rounded-[2rem] border border-white/10 bg-white/[0.05] text-[#24c1c4] shadow-[0_18px_50px_rgba(0,0,0,0.12)]">
-                      <Watch className="h-16 w-16" strokeWidth={1.5} />
-                    </div>
-                    <span className="mt-5 rounded-full bg-[#24c1c4]/15 px-3 py-1.5 text-[10px] font-black uppercase tracking-[0.16em] text-[#24c1c4]">
-                      Coming soon
-                    </span>
                   </div>
                 </div>
-              </div>
+              </>
             ) : (
               <div>
-                <div className="mb-4">
-                  <h2 className="text-xl font-black tracking-tight">Other wearables</h2>
-                </div>
-
-                <div className="overflow-hidden rounded-[1.5rem] border border-slate-200 bg-white">
-                  <div className="flex flex-col gap-4 bg-slate-50/70 p-5 sm:flex-row sm:items-center sm:justify-between">
+                <div className="rounded-[1.75rem] border border-slate-200 bg-white p-5 sm:p-6">
+                  <div className="flex flex-col gap-5 sm:flex-row sm:items-center sm:justify-between">
                     <div className="flex items-center gap-3">
-                      <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-[#0b2d54] text-[#24c1c4]">
+                      <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-[#0b2d54] text-[#24c1c4]">
                         <Bluetooth className="h-5 w-5" />
                       </div>
                       <div>
                         <p className="text-sm font-black text-[#0b2d54]">Bluetooth</p>
-                        <p className="text-xs text-slate-500">
+                        <p className="mt-1 text-xs text-slate-500">
                           {connectedName || (status === "Disconnected" ? "Disconnected" : "Not connected")}
                         </p>
                       </div>
                     </div>
 
-                    <div className="flex items-center gap-3">
+                    <div className="flex items-center gap-3 sm:justify-end">
                       <div className="text-right">
                         <p className="text-[10px] font-black uppercase tracking-wide text-slate-400">Heart rate</p>
                         <p className="text-2xl font-black text-[#0b2d54]">
@@ -300,7 +311,7 @@ export default function WearablesPage() {
                   </div>
 
                   {error && (
-                    <p className="border-t border-red-100 bg-red-50 px-5 py-3 text-xs font-semibold leading-5 text-red-700" role="alert">
+                    <p className="mt-4 rounded-2xl bg-red-50 px-4 py-3 text-xs font-semibold leading-5 text-red-700" role="alert">
                       {error}
                     </p>
                   )}
@@ -321,9 +332,11 @@ export default function WearablesPage() {
                           </div>
                           <p className="text-sm font-black text-[#0b2d54]">{provider.name}</p>
                         </div>
-                        <span className={`rounded-full px-2.5 py-1 text-[9px] font-black ${
-                          availableNow ? "bg-[#24c1c4]/12 text-[#0b2d54]" : "bg-slate-100 text-slate-500"
-                        }`}>
+                        <span
+                          className={`rounded-full px-2.5 py-1 text-[9px] font-black ${
+                            availableNow ? "bg-[#24c1c4]/12 text-[#0b2d54]" : "bg-slate-100 text-slate-500"
+                          }`}
+                        >
                           {availableNow ? "Available" : "Coming soon"}
                         </span>
                       </div>
