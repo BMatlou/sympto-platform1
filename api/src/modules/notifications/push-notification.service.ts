@@ -536,7 +536,7 @@ export class PushNotificationService {
     // Accept either the generated base64-encoded PKCS#8 PEM value
     // or a PEM value directly, so local .env formatting cannot break key loading.
     const pem = configured.includes('-----BEGIN')
-      ? configured.replace(/\\n/g, '\\n')
+      ? configured.replace(/\\n/g, '\n')
       : Buffer.from(configured, 'base64').toString('utf8');
 
     if (!pem.includes('-----BEGIN PRIVATE KEY-----')) {
