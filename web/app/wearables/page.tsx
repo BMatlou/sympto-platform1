@@ -170,7 +170,6 @@ export default function WearablesPage() {
     }
   };
 
-  const symptoProvider = providers.find((provider) => provider.provider === "SYMPTO_WEARABLE");
   const otherProviders = providers.filter((provider) => provider.provider !== "SYMPTO_WEARABLE");
 
   const symptoProvider = providers.find((provider) => provider.provider === "SYMPTO_WEARABLE");
