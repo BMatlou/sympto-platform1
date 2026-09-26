@@ -230,6 +230,7 @@ export class PatientWearablesService {
     return this.prisma.wearableDevice.create({
       data: {
         patientId: patient.id,
+        connectionId: connection.id,
         manufacturer,
         model,
         deviceType,
@@ -243,6 +244,14 @@ export class PatientWearablesService {
         status: true,
         lastSyncAt: true,
         registeredAt: true,
+        connection: {
+          select: {
+            id: true,
+            provider: true,
+            status: true,
+            connectedAt: true,
+          },
+        },
       },
     });
   }
