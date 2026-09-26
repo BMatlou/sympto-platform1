@@ -8,6 +8,7 @@ import {
   DeviceStatus,
   DeviceType,
   MeasurementType,
+  Prisma,
   SleepStageType,
   WearableConnectionStatus,
   WearableProvider,
@@ -602,7 +603,7 @@ export class PatientWearablesService {
         averageHeartRate: record.averageHeartRate,
         maximumHeartRate: record.maximumHeartRate,
         source: record.source?.trim() || sourcePrefix,
-        metadata: record.metadata,
+        metadata: record.metadata as Prisma.InputJsonValue,
       },
     });
 
