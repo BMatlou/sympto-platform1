@@ -71,7 +71,7 @@ export class PatientNotificationsController {
 
     return this.pushNotificationService.registerSubscription(
       req.user.sub,
-      subscription,
+      subscription as any,
     );
   }
 
