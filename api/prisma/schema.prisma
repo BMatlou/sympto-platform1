@@ -341,6 +341,10 @@ model Patient {
   referrals               Referral[]
   telemedicineConsents    TelemedicineConsent[]
   wearableDevices         WearableDevice[]
+  wearableConnections     WearableConnection[]
+  sleepSessions           SleepSession[]
+  workoutSessions         WorkoutSession[]
+  wearableWellnessMetrics WearableWellnessMetric[]
   healthJournals          HealthJournal[]
   clinicalEpisodes        ClinicalEpisode[]
   riskAssessments         RiskAssessment[]
@@ -2066,6 +2070,7 @@ model DataAccessConsent {
 model WearableDevice {
   id              String              @id @default(uuid())
   patientId       String
+  connectionId    String?
   manufacturer    String
   model           String
   serialNumber    String?             @unique
@@ -2077,24 +2082,41 @@ model WearableDevice {
   alerts          DeviceAlert[]
   measurements    DeviceMeasurement[]
   syncLogs        DeviceSyncLog[]
+  sleepSessions   SleepSession[]
+  workoutSessions WorkoutSession[]
+  wellnessMetrics WearableWellnessMetric[]
+  connection      WearableConnection? @relation(fields: [connectionId], references: [id], onDelete: SetNull)
   patient         Patient             @relation(fields: [patientId], references: [id], onDelete: Cascade)
+
+  @@index([connectionId])
+  @@index([patientId])
 }
 
 model DeviceMeasurement {
-  id              String          @id @default(uuid())
-  deviceId        String
-  measurementType MeasurementType
-  value           Decimal         @db.Decimal(12, 4)
-  unit            String
-  measuredAt      DateTime
-  receivedAt      DateTime        @default(now())
-  source          String?
-  notes           String?
-  deviceAlerts    DeviceAlert[]
-  device          WearableDevice  @relation(fields: [deviceId], references: [id], onDelete: Cascade)
+  id               String              @id @default(uuid())
+  deviceId         String
+  connectionId     String?
+  measurementType  MeasurementType
+  metricKey        String?
+  value            Decimal             @db.Decimal(12, 4)
+  unit             String
+  secondaryValue   Decimal?            @db.Decimal(12, 4)
+  secondaryUnit    String?
+  measuredAt       DateTime
+  receivedAt       DateTime            @default(now())
+  source           String?
+  externalRecordId String?
+  notes            String?
+  deviceAlerts     DeviceAlert[]
+  device           WearableDevice      @relation(fields: [deviceId], references: [id], onDelete: Cascade)
+  connection       WearableConnection? @relation(fields: [connectionId], references: [id], onDelete: SetNull)
 
   @@index([measurementType])
+  @@index([metricKey])
   @@index([measuredAt])
+  @@index([connectionId])
+  @@index([externalRecordId])
+  @@index([deviceId, source, externalRecordId])
 }
 
 model DeviceAlert {
@@ -2112,14 +2134,141 @@ model DeviceAlert {
 }
 
 model DeviceSyncLog {
-  id              String         @id @default(uuid())
+  id              String              @id @default(uuid())
   deviceId        String
+  connectionId    String?
   syncStartedAt   DateTime
   syncCompletedAt DateTime?
-  success         Boolean
-  recordsImported Int            @default(0)
+  success         Boolean             @default(false)
+  recordsImported Int                 @default(0)
   errorMessage    String?
-  device          WearableDevice @relation(fields: [deviceId], references: [id], onDelete: Cascade)
+  device          WearableDevice      @relation(fields: [deviceId], references: [id], onDelete: Cascade)
+  connection      WearableConnection? @relation(fields: [connectionId], references: [id], onDelete: SetNull)
+
+  @@index([connectionId])
+  @@index([deviceId, syncStartedAt])
+}
+
+model WearableConnection {
+  id                   String                   @id @default(uuid())
+  patientId            String
+  provider             WearableProvider
+  status               WearableConnectionStatus @default(DISCONNECTED)
+  externalAccountId    String?
+  permissions          Json?
+  metadata             Json?
+  connectedAt          DateTime?
+  lastSyncAt           DateTime?
+  lastSuccessfulSyncAt DateTime?
+  lastError            String?
+  createdAt            DateTime                 @default(now())
+  updatedAt            DateTime                 @updatedAt
+
+  patient              Patient                  @relation(fields: [patientId], references: [id], onDelete: Cascade)
+  devices              WearableDevice[]
+  syncLogs             DeviceSyncLog[]
+  measurements         DeviceMeasurement[]
+  sleepSessions        SleepSession[]
+  workoutSessions      WorkoutSession[]
+  wellnessMetrics      WearableWellnessMetric[]
+
+  @@unique([patientId, provider])
+  @@index([patientId])
+  @@index([provider])
+  @@index([status])
+}
+
+model SleepSession {
+  id                String              @id @default(uuid())
+  patientId         String
+  deviceId          String?
+  connectionId      String?
+  externalRecordId  String?
+  startedAt         DateTime
+  endedAt           DateTime
+  durationMinutes   Int
+  sleepScore        Decimal?            @db.Decimal(6, 2)
+  source            String?
+  timezone          String?
+  createdAt         DateTime            @default(now())
+  updatedAt         DateTime            @updatedAt
+
+  patient            Patient              @relation(fields: [patientId], references: [id], onDelete: Cascade)
+  device             WearableDevice?      @relation(fields: [deviceId], references: [id], onDelete: SetNull)
+  connection         WearableConnection?  @relation(fields: [connectionId], references: [id], onDelete: SetNull)
+  stages             SleepStage[]
+
+  @@index([patientId, startedAt])
+  @@index([deviceId])
+  @@index([connectionId])
+  @@index([externalRecordId])
+}
+
+model SleepStage {
+  id              String         @id @default(uuid())
+  sleepSessionId  String
+  stage           SleepStageType
+  startedAt       DateTime
+  endedAt         DateTime
+  durationMinutes Int
+
+  sleepSession    SleepSession  @relation(fields: [sleepSessionId], references: [id], onDelete: Cascade)
+
+  @@index([sleepSessionId, startedAt])
+}
+
+model WorkoutSession {
+  id                String              @id @default(uuid())
+  patientId         String
+  deviceId          String?
+  connectionId      String?
+  externalRecordId  String?
+  activityType      String
+  startedAt         DateTime
+  endedAt           DateTime
+  durationSeconds   Int
+  distance          Decimal?            @db.Decimal(12, 3)
+  distanceUnit      String?
+  calories          Decimal?            @db.Decimal(12, 2)
+  averageHeartRate  Int?
+  maximumHeartRate  Int?
+  source            String?
+  metadata          Json?
+  createdAt         DateTime              @default(now())
+  updatedAt         DateTime              @updatedAt
+
+  patient           Patient              @relation(fields: [patientId], references: [id], onDelete: Cascade)
+  device            WearableDevice?      @relation(fields: [deviceId], references: [id], onDelete: SetNull)
+  connection        WearableConnection?  @relation(fields: [connectionId], references: [id], onDelete: SetNull)
+
+  @@index([patientId, startedAt])
+  @@index([deviceId])
+  @@index([connectionId])
+  @@index([externalRecordId])
+}
+
+model WearableWellnessMetric {
+  id                String              @id @default(uuid())
+  patientId         String
+  deviceId          String?
+  connectionId      String?
+  externalRecordId  String?
+  metricKey         String
+  value             Decimal             @db.Decimal(12, 4)
+  unit              String?
+  measuredAt        DateTime
+  source             String?
+  metadata          Json?
+  createdAt         DateTime            @default(now())
+
+  patient           Patient              @relation(fields: [patientId], references: [id], onDelete: Cascade)
+  device            WearableDevice?      @relation(fields: [deviceId], references: [id], onDelete: SetNull)
+  connection        WearableConnection?  @relation(fields: [connectionId], references: [id], onDelete: SetNull)
+
+  @@index([patientId, metricKey, measuredAt])
+  @@index([deviceId])
+  @@index([connectionId])
+  @@index([externalRecordId])
 }
 
 model LabDiscipline {
@@ -4210,6 +4359,34 @@ enum ConsentType {
   TREATMENT
   RESEARCH
   MARKETING
+}
+
+enum WearableProvider {
+  BLUETOOTH_LE
+  APPLE_HEALTHKIT
+  HEALTH_CONNECT
+  SAMSUNG_HEALTH
+  GARMIN
+  FITBIT
+  OURA
+  POLAR
+  SYMPTO_WEARABLE
+  OTHER
+}
+
+enum WearableConnectionStatus {
+  CONNECTED
+  PAUSED
+  DISCONNECTED
+  ERROR
+}
+
+enum SleepStageType {
+  AWAKE
+  LIGHT
+  DEEP
+  REM
+  UNKNOWN
 }
 
 enum DeviceType {
