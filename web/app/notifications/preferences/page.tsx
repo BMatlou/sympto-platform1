@@ -18,15 +18,16 @@ import {
 } from "lucide-react";
 import ProtectedRoute from "@/components/auth/protected-route";
 import { patientNotificationsService } from "@/services/patient-notifications.service";
+import { enablePushNotifications } from "@/services/push-notifications.service";
 
 const types = [
   { key: "APPOINTMENT", label: "Appointments", description: "Upcoming visits, changes and care scheduling.", icon: CalendarDays },
-  { key: "PRESCRIPTION", label: "Prescriptions & medicines", description: "Prescription activity and medication-related reminders.", icon: Pill },
+  { key: "PRESCRIPTION", label: "Prescriptions & medicines", description: "Prescription activity and medication updates.", icon: Pill },
   { key: "LAB_RESULT", label: "Laboratory results", description: "New laboratory results and result updates.", icon: FileText },
   { key: "IMAGING_RESULT", label: "Imaging results", description: "New imaging reports and updates.", icon: FileText },
   { key: "MESSAGE", label: "Care team messages", description: "Messages from practitioners and your care team.", icon: MessageCircle },
   { key: "TELEMEDICINE", label: "Telemedicine", description: "Telemedicine session updates and related reminders.", icon: Smartphone },
-  { key: "REMINDER", label: "Health reminders", description: "General reminders linked to your health activity.", icon: Bell },
+  { key: "REMINDER", label: "Health reminders", description: "Medication reminders and other scheduled health reminders.", icon: Bell },
   { key: "PAYMENT", label: "Payments", description: "Healthcare payment and invoice activity.", icon: FileText },
   { key: "CLAIM", label: "Medical aid claims", description: "Claim status and related updates.", icon: FileText },
   { key: "SECURITY", label: "Security", description: "Important account and health-data security notices.", icon: ShieldCheck },
@@ -34,11 +35,11 @@ const types = [
 ] as const;
 
 const channels = [
-  { key: "IN_APP", label: "In-app", icon: Bell },
-  { key: "EMAIL", label: "Email", icon: Mail },
-  { key: "SMS", label: "SMS", icon: MessageSquareText },
-  { key: "PUSH", label: "Push", icon: Smartphone },
-  { key: "WHATSAPP", label: "WhatsApp", icon: MessageCircle },
+  { key: "IN_APP", label: "In-app", icon: Bell, supported: true },
+  { key: "EMAIL", label: "Email", icon: Mail, supported: false },
+  { key: "SMS", label: "SMS", icon: MessageSquareText, supported: false },
+  { key: "PUSH", label: "Push", icon: Smartphone, supported: true },
+  { key: "WHATSAPP", label: "WhatsApp", icon: MessageCircle, supported: false },
 ] as const;
 
 type PreferenceState = Record<string, boolean>;
@@ -77,28 +78,42 @@ export default function NotificationPreferencesPage() {
     void load();
   }, [load]);
 
-  async function toggle(type: string, channel: string) {
+  async function toggle(type: string, channel: string, supported: boolean) {
+    if (!supported) return;
+
     const key = preferenceKey(type, channel);
     const existingPreference = Object.prototype.hasOwnProperty.call(preferences, key);
-    const previous = preferences[key] ?? true;
+    const previous = preferences[key] ?? (channel === "IN_APP");
     const next = !previous;
 
-    setPreferences((current) => ({ ...current, [key]: next }));
     setSavingKey(key);
     setNotice("");
     setError("");
 
     try {
+      if (channel === "PUSH" && next) {
+        await enablePushNotifications();
+      }
+
       await patientNotificationsService.updatePreference({
         notificationType: type,
         channel,
         enabled: next,
       });
+
+      setPreferences((current) => ({ ...current, [key]: next }));
+
       if (!existingPreference) setSavedCount((count) => count + 1);
-      setNotice(`${channel === "IN_APP" ? "In-app" : channel} notifications for this category are now ${next ? "on" : "off"}.`);
-    } catch {
-      setPreferences((current) => ({ ...current, [key]: previous }));
-      setError("That preference could not be saved. Your previous setting has been restored.");
+
+      setNotice(
+        `${channel === "IN_APP" ? "In-app" : "Push"} notifications for this category are now ${next ? "on" : "off"}.`,
+      );
+    } catch (error) {
+      setError(
+        error instanceof Error
+          ? error.message
+          : "That preference could not be saved. Your previous setting has been restored.",
+      );
     } finally {
       setSavingKey(null);
     }
@@ -134,7 +149,16 @@ export default function NotificationPreferencesPage() {
           <section className="mt-6 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
             <div className="grid grid-cols-[1fr_repeat(5,56px)] gap-2 border-b border-slate-100 pb-3">
               <div><span className="text-[10px] font-black uppercase tracking-[0.15em] text-slate-400">Update type</span></div>
-              {channels.map(({ key, label, icon: Icon }) => <div key={key} className="flex flex-col items-center gap-1 text-center"><Icon className="h-4 w-4 text-[#24c1c4]" /><span className="text-[9px] font-black text-slate-500">{label}</span></div>)}
+              {channels.map(({ key, label, icon: Icon, supported }) => (
+                <div
+                  key={key}
+                  className={`flex flex-col items-center gap-1 text-center ${supported ? "text-[#24c1c4]" : "text-slate-300"}`}
+                  title={supported ? label : `${label} notifications are coming soon`}
+                >
+                  <Icon className="h-4 w-4" />
+                  <span className={`text-[9px] font-black ${supported ? "text-slate-500" : "text-slate-300"}`}>{label}</span>
+                </div>
+              ))}
             </div>
 
             {loading ? (
@@ -152,21 +176,40 @@ export default function NotificationPreferencesPage() {
                         </div>
                       </div>
                     </div>
-                    {channels.map(({ key: channel }) => {
+                    {channels.map(({ key: channel, supported }) => {
                       const settingKey = preferenceKey(type, channel);
-                      const enabled = preferences[settingKey] ?? true;
+                      const enabled = preferences[settingKey] ?? (channel === "IN_APP");
                       const saving = savingKey === settingKey;
                       return (
                         <button
                           key={channel}
                           type="button"
-                          onClick={() => void toggle(type, channel)}
-                          disabled={saving}
-                          aria-pressed={enabled}
-                          aria-label={`${label}: ${channel} notifications ${enabled ? "on" : "off"}`}
-                          className={`mx-auto flex h-10 w-10 items-center justify-center rounded-xl border text-xs font-black transition ${enabled ? "border-[#24c1c4]/35 bg-[#24c1c4]/10 text-[#0b2d54]" : "border-slate-200 bg-slate-50 text-slate-400"} disabled:opacity-60`}
+                          onClick={() => void toggle(type, channel, supported)}
+                          disabled={saving || !supported}
+                          aria-pressed={supported ? enabled : false}
+                          aria-label={
+                            supported
+                              ? `${label}: ${channel} notifications ${enabled ? "on" : "off"}`
+                              : `${label}: ${channel} notifications coming soon`
+                          }
+                          title={!supported ? `${channel} notifications are coming soon` : undefined}
+                          className={`mx-auto flex h-10 w-10 items-center justify-center rounded-xl border text-xs font-black transition ${
+                            !supported
+                              ? "cursor-not-allowed border-slate-100 bg-slate-50 text-slate-300 opacity-60"
+                              : enabled
+                                ? "border-[#24c1c4]/35 bg-[#24c1c4]/10 text-[#0b2d54]"
+                                : "border-slate-200 bg-slate-50 text-slate-400"
+                          } disabled:opacity-60`}
                         >
-                          {saving ? <span className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-current border-t-transparent" aria-hidden="true" /> : enabled ? <Check className="h-4 w-4" /> : <span className="text-[10px]">Off</span>}
+                          {saving ? (
+                            <span className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-current border-t-transparent" aria-hidden="true" />
+                          ) : !supported ? (
+                            <span className="text-[8px] font-black uppercase tracking-tight">Soon</span>
+                          ) : enabled ? (
+                            <Check className="h-4 w-4" />
+                          ) : (
+                            <span className="text-[10px]">Off</span>
+                          )}
                         </button>
                       );
                     })}
@@ -181,7 +224,7 @@ export default function NotificationPreferencesPage() {
               <ShieldCheck className="mt-0.5 h-5 w-5 shrink-0 text-[#0b2d54]" />
               <div>
                 <h2 className="font-semibold text-[#0b2d54]">A note about channels</h2>
-                <p className="mt-1 text-sm leading-6 text-slate-500">A preference records your choice for that notification type and channel. Actual delivery also depends on whether the channel is configured for your account or device.</p>
+                <p className="mt-1 text-sm leading-6 text-slate-500">In-app and Push notifications are available now. Email, SMS and WhatsApp are muted until their delivery services are connected. Turning a channel off never deletes your clinical records.</p>
               </div>
             </div>
           </section>
