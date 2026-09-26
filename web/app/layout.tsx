@@ -10,6 +10,7 @@ import { Toaster } from "sonner";
 import { cn } from "@/lib/utils";
 import AIHealthHelperFab from "@/components/ai-health-helper-fab";
 import MedicationReminderNotifier from "@/components/notifications/MedicationReminderNotifier";
+import PushNotificationBridge from "@/components/notifications/PushNotificationBridge";
 import QueryProvider from "@/providers/query-provider";
 import ThemeProvider from "@/providers/theme-provider";
 
@@ -59,6 +60,7 @@ export default function RootLayout({
           <QueryProvider>
             {children}
             <MedicationReminderNotifier />
+            <PushNotificationBridge />
             <AIHealthHelperFab />
           </QueryProvider>
 
