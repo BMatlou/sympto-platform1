@@ -652,7 +652,7 @@ export class PatientWearablesService {
         unit: record.unit,
         measuredAt: record.measuredAt,
         source: record.source?.trim() || sourcePrefix,
-        metadata: record.metadata,
+        metadata: record.metadata as Prisma.InputJsonValue,
       },
     });
   }
