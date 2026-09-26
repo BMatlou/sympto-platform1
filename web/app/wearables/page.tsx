@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
-import { Activity, Bluetooth, ChevronLeft, HeartPulse, Link2Off, Watch } from "lucide-react";
+import { Bluetooth, ChevronLeft, Link2Off, Watch } from "lucide-react";
 import { api } from "@/lib/api";
 
 const HEART_RATE_SERVICE = "heart_rate";
