@@ -57,9 +57,21 @@ export class PatientNotificationsController {
     @Req() req: any,
     @Body() dto: RegisterPushSubscriptionDto,
   ) {
+    let subscription: unknown;
+
+    try {
+      subscription = JSON.parse(dto.subscription);
+    } catch {
+      throw new BadRequestException('Invalid push subscription payload.');
+    }
+
+    if (!subscription || typeof subscription !== 'object') {
+      throw new BadRequestException('Invalid push subscription payload.');
+    }
+
     return this.pushNotificationService.registerSubscription(
       req.user.sub,
-      JSON.parse(dto.subscription),
+      subscription,
     );
   }
 
