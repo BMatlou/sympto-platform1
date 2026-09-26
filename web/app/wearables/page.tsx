@@ -234,13 +234,6 @@ export default function WearablesPage() {
                         Vitals, activity, sleep and recovery — designed around Sympto.
                       </p>
 
-                      <div className="mt-7 flex flex-wrap gap-x-5 gap-y-2 text-xs font-black text-white/70">
-                        <span>Vitals</span>
-                        <span>Activity</span>
-                        <span>Sleep</span>
-                        <span>Recovery</span>
-                      </div>
-
                       <p className="mt-9 text-xs font-bold text-white/35">Coming soon</p>
                     </div>
 
