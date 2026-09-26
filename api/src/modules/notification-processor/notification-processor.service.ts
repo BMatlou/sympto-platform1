@@ -86,6 +86,8 @@ export class NotificationProcessorService
         data: {
           status: 'SENT' as any,
           scheduledFor: null,
+          sentAt: new Date(),
+          deliveredAt: new Date(),
         },
       }),
       this.prisma.notificationDelivery.create({
