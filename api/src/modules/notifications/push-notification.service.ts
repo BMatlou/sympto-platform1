@@ -31,8 +31,8 @@ function hmacSha256(key: Buffer, data: Buffer): Buffer {
 }
 
 function hkdfExpand(prk: Buffer, info: Buffer, length: number): Buffer {
-  const blocks: Buffer[] = [];
-  let previous = Buffer.alloc(0);
+  const blocks: Buffer<ArrayBufferLike>[] = [];
+  let previous: Buffer<ArrayBufferLike> = Buffer.alloc(0);
 
   for (let counter = 1; Buffer.concat(blocks).length < length; counter += 1) {
     previous = hmacSha256(
@@ -326,7 +326,7 @@ export class PushNotificationService {
             ? 'high'
             : 'normal',
       },
-      body: encrypted,
+      body: encrypted as unknown as BodyInit,
     });
 
     if (!response.ok) {
