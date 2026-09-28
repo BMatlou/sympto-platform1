@@ -8,6 +8,7 @@ import { useDashboard } from "@/hooks/use-dashboard";
 import { healthJournalService } from "@/services/health-journal.service";
 import { healthGoalsService } from "@/services/health-goals.service";
 import { patientNotificationsService } from "@/services/patient-notifications.service";
+import { canonicalExerciseWeekTotal } from "@/lib/exercise-metric";
 import ProtectedRoute from "@/components/auth/protected-route";
 
 function display(value: unknown, fallback = "Not recorded"): string {
@@ -226,7 +227,17 @@ async function countTodayNeeds(
 
   const dayFormatter = new Intl.DateTimeFormat("en-CA", {
     timeZone: "Africa/Johannesburg",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
   });
+
+  const localDayKey = (value: unknown) => {
+    if (!value) return "";
+    const date = new Date(String(value));
+    if (Number.isNaN(date.getTime())) return "";
+    return dayFormatter.format(date);
+  };
 
   const appointments = (
     Array.isArray(data?.appointments) && data.appointments.length > 0
@@ -234,15 +245,11 @@ async function countTodayNeeds(
       : Array.isArray(data?.today?.upcomingAppointments)
         ? data.today.upcomingAppointments
         : []
-  ).filter((appointment: any) => {
-    if (!appointment?.scheduledStart) return false;
-    const date = new Date(String(appointment.scheduledStart));
-    if (Number.isNaN(date.getTime())) return false;
-    return dayFormatter.format(date) === todayKey;
-  });
+  ).filter((appointment: any) => localDayKey(appointment?.scheduledStart) === todayKey);
 
   const allGoals = [
     ...(Array.isArray(data?.goals) ? data.goals : []),
+    ...(Array.isArray(data?.healthGoals) ? data.healthGoals : []),
     ...(Array.isArray(data?.activeGoalsArray) ? data.activeGoalsArray : []),
   ].filter(Boolean);
 
@@ -253,12 +260,7 @@ async function countTodayNeeds(
     seenGoals.add(id);
 
     const status = String(goal?.status ?? "").toUpperCase();
-    const category = String(goal?.category ?? "").toUpperCase();
-
-    return (
-      ACTIVE_TODAY_GOAL_STATUSES.has(status) ||
-      (category === "MEDICATION" && status === "NOT_STARTED")
-    );
+    return ACTIVE_TODAY_GOAL_STATUSES.has(status) || status === "NOT_STARTED";
   });
 
   const activeSymptoms = (Array.isArray(data?.symptoms) ? data.symptoms : []).filter(
@@ -279,15 +281,10 @@ async function countTodayNeeds(
     const status = String(item?.status ?? "").toUpperCase();
     if (status === "MISSED") return true;
 
-    const dueDate = item?.nextDueDate
-      ? new Date(String(item.nextDueDate))
-      : null;
-
-    return Boolean(
-      dueDate &&
-      !Number.isNaN(dueDate.getTime()) &&
+    return (
       status === "SCHEDULED" &&
-      dayFormatter.format(dueDate) <= todayKey,
+      Boolean(item?.nextDueDate) &&
+      localDayKey(item.nextDueDate) <= todayKey
     );
   });
 
@@ -298,12 +295,7 @@ async function countTodayNeeds(
         if (["COMPLETED", "CANCELLED"].includes(status) || !task?.dueDate) {
           return false;
         }
-
-        const dueDate = new Date(String(task.dueDate));
-        return (
-          !Number.isNaN(dueDate.getTime()) &&
-          dayFormatter.format(dueDate) <= todayKey
-        );
+        return localDayKey(task.dueDate) <= todayKey;
       }),
   );
 
@@ -312,43 +304,220 @@ async function countTodayNeeds(
     activeSymptoms.length +
     deviceAlerts.length +
     dueImmunizations.length +
-    careTasks.length +
-    (hasTodayCheckIn === false ? 1 : 0);
+    careTasks.length;
 
-  const goalsByCategory = new Map<string, any[]>();
-  for (const goal of goals) {
-    const { category } = goalMetric(goal);
-    const bucket = goalsByCategory.get(category) ?? [];
-    bucket.push(goal);
-    goalsByCategory.set(category, bucket);
-  }
+  // Today always exposes one Daily Health Check-in action. It is one shared
+  // action even when several goals depend on it.
+  const checkInGoalCategories = CHECK_IN_GOAL_CATEGORIES;
+  const checkInGoals = goals.filter((goal: any) =>
+    checkInGoalCategories.has(goalMetric(goal).category),
+  );
 
   const metricQueries = new Map<
     string,
-    { metricType: string; metricKey: string }
+    { metricType: string; metricKey: string; from: Date; to: Date }
   >();
 
-  const addMetricQuery = (goal: any) => {
+  const addMetricQuery = (
+    goal: any,
+    from = todayStart,
+    to = todayEnd,
+  ) => {
     const { metricType, metricKey } = goalMetric(goal);
-    metricQueries.set(metricType + "|" + metricKey, { metricType, metricKey });
+    const key = metricType + "|" + metricKey + "|" + from.toISOString();
+    metricQueries.set(key, { metricType, metricKey, from, to });
   };
+
+  const startOfSouthAfricaWeek = () => {
+    const start = new Date(todayStart);
+    const weekday = start.getUTCDay();
+    const daysFromMonday = weekday === 0 ? 6 : weekday - 1;
+    start.setUTCDate(start.getUTCDate() - daysFromMonday);
+    return start;
+  };
+
+  const weekStart = startOfSouthAfricaWeek();
 
   for (const goal of goals) {
     const { category, frequency } = goalMetric(goal);
 
-    if (
-      CHECK_IN_GOAL_CATEGORIES.has(category) ||
-      category === "MEDICATION" ||
-      category === "SMOKING" ||
-      category === "ALCOHOL" ||
-      category === "WEIGHT"
-    ) {
+    if (checkInGoalCategories.has(category)) {
+      if (category === "EXERCISE") {
+        addMetricQuery(goal, weekStart, new Date());
+      } else {
+        addMetricQuery(goal, todayStart, todayEnd);
+      }
+      continue;
+    }
+
+    if (category === "SMOKING") {
+      addMetricQuery(goal);
+      continue;
+    }
+
+    if (category === "ALCOHOL") {
+      addMetricQuery(goal, weekStart, new Date());
+      continue;
+    }
+
+    if (category === "MEDICATION") {
+      addMetricQuery(goal);
+      continue;
+    }
+
+    if (category === "WEIGHT") {
       continue;
     }
 
     if (VITAL_GOAL_CATEGORIES.has(category) || frequency === "DAILY") {
       addMetricQuery(goal);
     }
+  }
+
+  const metricEventsByKey = new Map<string, any[]>();
+  const metricQueryFailed = new Set<string>();
+
+  const settled = await Promise.all(
+    [...metricQueries.entries()].map(async ([key, definition]) => {
+      try {
+        const response = await healthGoalsService.getMetricEvents(
+          definition.metricType,
+          definition.metricKey,
+          definition.from,
+          definition.to,
+        );
+
+        return {
+          key,
+          events: Array.isArray(response?.events) ? response.events : [],
+        };
+      } catch {
+        return { key, events: null };
+      }
+    }),
+  );
+
+  for (const result of settled) {
+    if (result.events === null) {
+      metricQueryFailed.add(result.key);
+      continue;
+    }
+    metricEventsByKey.set(result.key, result.events);
+  }
+
+  const metricEventsFor = (
+    goal: any,
+    from = todayStart,
+  ) => {
+    const { metricType, metricKey } = goalMetric(goal);
+    const key = metricType + "|" + metricKey + "|" + from.toISOString();
+    return {
+      key,
+      events: metricEventsByKey.get(key) ?? [],
+      failed: metricQueryFailed.has(key),
+    };
+  };
+
+  const goalTarget = (goal: any): number | null => {
+    const raw =
+      goal?.metricConfig?.frequencyTarget ??
+      goal?.frequencyTarget ??
+      goal?.targetValue;
+
+    if (raw === null || raw === undefined || raw === "") return null;
+
+    const parsed = Number(raw);
+    return Number.isFinite(parsed) ? parsed : null;
+  };
+
+  const goalComparison = (goal: any) =>
+    String(
+      goal?.metricConfig?.comparison ??
+      goal?.comparison ??
+      "AT_MOST",
+    ).toUpperCase();
+
+  const valueNeedsAttention = (goal: any, value: number | null) => {
+    if (value === null || !Number.isFinite(value)) return true;
+
+    const target = goalTarget(goal);
+    if (target === null) return false;
+
+    const comparison = goalComparison(goal);
+
+    if (comparison === "AT_LEAST") return value < target;
+    if (comparison === "AT_MOST") return value > target;
+    if (comparison === "CLOSEST") {
+      return Math.abs(value - target) >
+        Math.max(0.5, Math.abs(target) * 0.05);
+    }
+    if (comparison === "INCREASE_TO") return value < target;
+    if (comparison === "DECREASE_TO") return value > target;
+
+    return false;
+  };
+
+  // The Daily Health Check-in is a single Today action. It is pending when
+  // today's check-in is missing, or when a connected check-in goal is still
+  // outside its own current-period target after the check-in has been saved.
+  if (hasTodayCheckIn === false) {
+    count += 1;
+  } else {
+    let checkInNeedsAttention = false;
+
+    for (const goal of checkInGoals) {
+      const { category } = goalMetric(goal);
+
+      if (category === "EXERCISE") {
+        const { key, events, failed } = metricEventsFor(goal, weekStart);
+        if (failed) {
+          checkInNeedsAttention = true;
+          break;
+        }
+
+        const exerciseEvents = events.map((event: any) => ({
+          loggedValue: Number(event?.loggedValue),
+          occurredAt: String(event?.occurredAt ?? ""),
+          source: event?.source ?? null,
+        }));
+
+        const weekTotal = canonicalExerciseWeekTotal(exerciseEvents);
+        const target = goalTarget(goal);
+        if (target === null || weekTotal < target) {
+          checkInNeedsAttention = true;
+          break;
+        }
+
+        continue;
+      }
+
+      const { events, failed } = metricEventsFor(goal);
+      if (failed) {
+        checkInNeedsAttention = true;
+        break;
+      }
+
+      const latest =
+        [...events]
+          .filter((event: any) => Number.isFinite(Number(event?.loggedValue)))
+          .sort(
+            (a: any, b: any) =>
+              new Date(String(b?.occurredAt ?? 0)).getTime() -
+              new Date(String(a?.occurredAt ?? 0)).getTime(),
+          )[0] ?? null;
+
+      const value =
+        latest && Number.isFinite(Number(latest.loggedValue))
+          ? Number(latest.loggedValue)
+          : null;
+
+      if (valueNeedsAttention(goal, value)) {
+        checkInNeedsAttention = true;
+        break;
+      }
+    }
+
+    if (checkInNeedsAttention) count += 1;
   }
 
   const medications = (
@@ -361,63 +530,156 @@ async function countTodayNeeds(
   );
 
   const medicationGoals = goals.filter(
-    (goal: any) => String(goal?.category ?? "").toUpperCase() === "MEDICATION",
+    (goal: any) =>
+      String(goal?.category ?? "").toUpperCase() === "MEDICATION" ||
+      String(goal?.metricType ?? "").toUpperCase() === "MEDICATION" ||
+      String(goal?.metricConfig?.metricKey ?? goal?.metricKey ?? "").toLowerCase() ===
+        "medication.adherence",
   );
 
-  if (medicationGoals.length > 0) {
-    metricQueries.set("MEDICATION|medication.adherence", {
-      metricType: "MEDICATION",
-      metricKey: "medication.adherence",
-    });
-  }
+  const medicationName = (medication: any) =>
+    String(
+      medication?.medication?.name ??
+      medication?.name ??
+      medication?.medication?.genericName ??
+      medication?.medication?.brandName ??
+      "",
+    )
+      .trim()
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, " ")
+      .trim();
 
-  if (goalsByCategory.has("SMOKING")) {
-    metricQueries.set("SMOKING|smoking.cigarettes", {
-      metricType: "SMOKING",
-      metricKey: "smoking.cigarettes",
-    });
-  }
+  const medicationMatchesTodayGoal = (
+    medication: any,
+    goal: any,
+    medicationCount: number,
+  ) => {
+    const medicationGoalId =
+      medication?.healthGoalId ??
+      medication?.medicationGoalId ??
+      null;
 
-  const metricEventsByKey = new Map<string, any[]>();
+    if (medicationGoalId && String(goal?.id ?? "") === String(medicationGoalId)) {
+      return true;
+    }
 
-  try {
-    await Promise.all(
-      [...metricQueries.entries()].map(async ([key, definition]) => {
-        const response = await healthGoalsService.getMetricEvents(
-          definition.metricType,
-          definition.metricKey,
-          todayStart,
-          todayEnd,
-        );
-
-        metricEventsByKey.set(
-          key,
-          Array.isArray(response?.events) ? response.events : [],
-        );
-      }),
-    );
-  } catch {
-    return null;
-  }
-
-  if (medicationGoals.length > 0) {
-    const medicationEvents =
-      metricEventsByKey.get("MEDICATION|medication.adherence") ?? [];
-
-    for (const medication of medications) {
-      const patientMedicationIdValue = medicationPatientId(medication);
-      if (!patientMedicationIdValue) continue;
-
-      const matchingGoal = medicationGoals.find((goal: any) =>
-        medicationMatchesGoal(medication, goal, medications.length),
+    const targetPatientMedicationId =
+      medication?.patientMedication?.id ??
+      medication?.patientMedicationId ??
+      (
+        String(medication?.source ?? "").trim().toUpperCase() !== "PRESCRIPTION" &&
+        !String(medication?.id ?? "").startsWith("prescription-item-")
+          ? medication?.id
+          : null
       );
+
+    const goalPatientMedicationId =
+      goal?.patientMedicationId ??
+      goal?.patientMedication?.id ??
+      goal?.associatedPatientMedicationId ??
+      goal?.associatedPatientMedication?.id ??
+      null;
+
+    if (
+      targetPatientMedicationId &&
+      goalPatientMedicationId &&
+      String(targetPatientMedicationId) === String(goalPatientMedicationId)
+    ) {
+      return true;
+    }
+
+    const medicationCatalogId =
+      medication?.medicationId ??
+      medication?.medication?.id ??
+      medication?.medication?.medicationId ??
+      null;
+    const goalMedicationId =
+      goal?.associatedMedicationId ??
+      goal?.medicationId ??
+      goal?.associatedMedication?.id ??
+      goal?.medication?.id ??
+      null;
+
+    if (
+      medicationCatalogId &&
+      goalMedicationId &&
+      String(medicationCatalogId) === String(goalMedicationId)
+    ) {
+      return true;
+    }
+
+    const name = medicationName(medication);
+    const goalNames = [
+      goal?.medication?.name,
+      goal?.medication?.genericName,
+      goal?.medication?.brandName,
+      goal?.title,
+      goal?.description,
+    ]
+      .map((value: unknown) =>
+        String(value ?? "")
+          .trim()
+          .toLowerCase()
+          .replace(/[^a-z0-9]+/g, " ")
+          .trim(),
+      )
+      .filter(Boolean);
+
+    if (name) {
+      if (
+        goalNames.some(
+          (candidate: string) =>
+            candidate === name ||
+            candidate.includes(name) ||
+            name.includes(candidate),
+        )
+      ) {
+        return true;
+      }
+    }
+
+    return (
+      medicationCount === 1 &&
+      String(goal?.title ?? "").trim().toLowerCase() === "manage medication"
+    );
+  };
+
+  if (medicationGoals.length > 0) {
+    for (const medication of medications) {
+      const matchingGoal = medicationGoals.find((goal: any) =>
+        medicationMatchesTodayGoal(medication, goal, medications.length),
+      );
+
       if (!matchingGoal) continue;
 
       const required = requiredMedicationDoses(
         medication?.frequency ?? medication?.schedule,
       );
 
-      const actionsLoggedToday = medicationEvents.filter(
+      const { events, failed } = metricEventsFor(matchingGoal);
+
+      const patientMedicationIdValue =
+        medication?.patientMedication?.id ??
+        medication?.patientMedicationId ??
+        (
+          String(medication?.source ?? "").trim().toUpperCase() !== "PRESCRIPTION" &&
+          !String(medication?.id ?? "").startsWith("prescription-item-")
+            ? medication?.id
+            : null
+        );
+
+      if (!patientMedicationIdValue) {
+        count += 1;
+        continue;
+      }
+
+      if (failed) {
+        count += 1;
+        continue;
+      }
+
+      const actionsLoggedToday = events.filter(
         (event: any) =>
           String(event?.sourceId ?? "").startsWith(
             String(patientMedicationIdValue) + ":",
@@ -428,47 +690,192 @@ async function countTodayNeeds(
     }
   }
 
-  const smokingGoal = goalsByCategory.get("SMOKING")?.[0] ?? null;
+  const smokingGoal = goals.find(
+    (goal: any) => goalMetric(goal).category === "SMOKING",
+  );
+
   if (smokingGoal) {
-    const smokingEvents =
-      metricEventsByKey.get("SMOKING|smoking.cigarettes") ?? [];
+    const { events, failed } = metricEventsFor(smokingGoal);
 
-    const loggedToday = smokingEvents.some((event: any) =>
-      String(event?.sourceId ?? "").startsWith(String(smokingGoal.id) + ":"),
-    );
+    if (failed) {
+      count += 1;
+    } else {
+      const todayKeyValue = todayKey;
+      const loggedEvent =
+        events.find(
+          (event: any) =>
+            String(event?.sourceId ?? "") ===
+            String(smokingGoal.id) + ":" + todayKeyValue,
+        ) ?? null;
 
-    if (!loggedToday) count += 1;
+      if (!loggedEvent) {
+        count += 1;
+      } else {
+        const loggedValue = Number(loggedEvent?.loggedValue);
+        const target = goalTarget(smokingGoal);
+        if (target !== null && Number.isFinite(loggedValue) && loggedValue > target) {
+          count += 1;
+        }
+      }
+    }
   }
 
-  let hasVitalsAction = false;
+  const alcoholGoal = goals.find(
+    (goal: any) => goalMetric(goal).category === "ALCOHOL",
+  );
 
-  for (const goal of goals) {
-    const { category, metricType, metricKey, frequency } = goalMetric(goal);
+  if (alcoholGoal) {
+    const { events, failed } = metricEventsFor(alcoholGoal, weekStart);
 
-    if (CHECK_IN_GOAL_CATEGORIES.has(category)) continue;
-    if (["MEDICATION", "SMOKING", "ALCOHOL", "WEIGHT"].includes(category)) {
+    if (failed) {
+      count += 1;
+    } else {
+      const weeklyTotal = events.reduce((sum: number, event: any) => {
+        const value = Number(event?.loggedValue);
+        return sum + (Number.isFinite(value) ? value : 0);
+      }, 0);
+
+      const target = goalTarget(alcoholGoal);
+      if (target === null || weeklyTotal > target) {
+        count += 1;
+      }
+    }
+  }
+
+  const exerciseGoal = goals.find(
+    (goal: any) => goalMetric(goal).category === "EXERCISE",
+  );
+
+  // Exercise is represented inside the shared Daily Health Check-in, so it
+  // does not create a second counter item here.
+  void exerciseGoal;
+
+  const vitalGoals = goals.filter((goal: any) =>
+    VITAL_GOAL_CATEGORIES.has(goalMetric(goal).category),
+  );
+
+  if (vitalGoals.length > 0) {
+    let vitalsNeedAttention = false;
+
+    for (const goal of vitalGoals) {
+      const { events, failed } = metricEventsFor(goal);
+
+      if (failed || events.length === 0) {
+        vitalsNeedAttention = true;
+        break;
+      }
+
+      const latest =
+        [...events]
+          .filter((event: any) => Number.isFinite(Number(event?.loggedValue)))
+          .sort(
+            (a: any, b: any) =>
+              new Date(String(b?.occurredAt ?? 0)).getTime() -
+              new Date(String(a?.occurredAt ?? 0)).getTime(),
+          )[0] ?? null;
+
+      const value =
+        latest && Number.isFinite(Number(latest.loggedValue))
+          ? Number(latest.loggedValue)
+          : null;
+
+      if (valueNeedsAttention(goal, value)) {
+        vitalsNeedAttention = true;
+        break;
+      }
+    }
+
+    if (vitalsNeedAttention) count += 1;
+  }
+
+  const genericDailyGoals = goals.filter((goal: any) => {
+    const { category, frequency } = goalMetric(goal);
+    if ([
+      "MEDICATION",
+      "SMOKING",
+      "ALCOHOL",
+      "WEIGHT",
+      "EXERCISE",
+      "SLEEP",
+      "MENTAL_HEALTH",
+      "HYDRATION",
+      "BLOOD_PRESSURE",
+      "HEART_RATE",
+    ].includes(category)) {
+      return false;
+    }
+    return frequency === "DAILY";
+  });
+
+  for (const goal of genericDailyGoals) {
+    const { events, failed } = metricEventsFor(goal);
+
+    if (failed || events.length === 0) {
+      count += 1;
       continue;
     }
 
-    if (VITAL_GOAL_CATEGORIES.has(category)) {
-      const events =
-        metricEventsByKey.get(metricType + "|" + metricKey) ?? [];
+    const latest =
+      [...events]
+        .filter((event: any) => Number.isFinite(Number(event?.loggedValue)))
+        .sort(
+          (a: any, b: any) =>
+            new Date(String(b?.occurredAt ?? 0)).getTime() -
+            new Date(String(a?.occurredAt ?? 0)).getTime(),
+        )[0] ?? null;
 
-      if (events.length === 0) hasVitalsAction = true;
-      continue;
-    }
+    const value =
+      latest && Number.isFinite(Number(latest.loggedValue))
+        ? Number(latest.loggedValue)
+        : null;
 
-    if (frequency !== "DAILY") continue;
-
-    const events = metricEventsByKey.get(metricType + "|" + metricKey) ?? [];
-    if (events.length === 0) count += 1;
+    if (valueNeedsAttention(goal, value)) count += 1;
   }
 
-  if (hasVitalsAction) count += 1;
+  const weightGoal = goals.find(
+    (goal: any) => goalMetric(goal).category === "WEIGHT",
+  );
+
+  if (weightGoal) {
+    const status = String(
+      weightGoal?.latestProgress?.status ??
+      weightGoal?.progress?.[0]?.status ??
+      "",
+    ).toUpperCase();
+
+    if (!["ACHIEVED", "COMPLETED"].includes(status)) {
+      const comparison = String(
+        weightGoal?.metricConfig?.comparison ??
+        weightGoal?.comparison ??
+        "CLOSEST",
+      ).toUpperCase();
+
+      const current = Number(
+        weightGoal?.latestProgress?.currentValue ??
+        weightGoal?.progress?.[0]?.currentValue ??
+        weightGoal?.currentValue,
+      );
+
+      const target = goalTarget(weightGoal);
+
+      if (!Number.isFinite(current) || target === null) {
+        // No current weight/target information means the goal needs the user
+        // to open Health Vitals and/or complete its configuration.
+        count += 1;
+      } else if (
+        (comparison === "DECREASE_TO" && current > target) ||
+        (comparison === "INCREASE_TO" && current < target)
+      ) {
+        count += 1;
+      } else if (comparison === "CLOSEST") {
+        const stableBand = Math.max(1.5, Math.abs(target) * 0.02);
+        if (Math.abs(current - target) > stableBand) count += 1;
+      }
+    }
+  }
 
   return count;
 }
-
 function countActiveGoals(data: any) {
   return (Array.isArray(data?.goals) ? data.goals : []).filter(
     (goal: any) =>
