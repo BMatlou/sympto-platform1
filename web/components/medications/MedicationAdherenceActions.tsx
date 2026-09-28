@@ -142,7 +142,7 @@ export function MedicationAdherenceActions({ medicationId, medicationName, adher
 
     void loadClinicalReference();
     return () => { cancelled = true; };
-  }, [clinicalOpen, clinical, clinicalLoading, medicationId, clinicalMedicationId]);
+  }, [clinicalOpen, clinical, medicationId, clinicalMedicationId]);
 
   async function record(action: "TAKEN" | "SKIPPED") {
     if (saving) return;
