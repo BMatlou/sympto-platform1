@@ -124,7 +124,7 @@ export default function MonitorSymptomPage({ params }: { params: Promise<{ id: s
       const response = await healthJournalService.monitorSymptom(id, {
         severity: stillPresent ? severity : "NONE",
         progression: stillPresent ? effectiveProgression as "IMPROVING" | "STABLE" | "WORSENING" | "FLUCTUATING" : "RESOLVED",
-        frequency: frequency || undefined,
+        frequency: frequency ? (frequency as "CONSTANT" | "INTERMITTENT" | "OCCASIONAL" | "RARE" | "UNKNOWN") : undefined,
         durationMinutes: Number.isFinite(duration) && duration > 0 ? duration : undefined,
         painScore: Number.isFinite(pain) ? pain : undefined,
         stillPresent,
