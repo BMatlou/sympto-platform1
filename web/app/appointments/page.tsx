@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { Suspense } from "react";
 import { ArrowLeft, CalendarDays, Clock3, MapPin, Stethoscope } from "lucide-react";
 import ProtectedRoute from "@/components/auth/protected-route";
 import { useDashboard } from "@/hooks/use-dashboard";
@@ -8,7 +9,7 @@ import { useDashboard } from "@/hooks/use-dashboard";
 function formatDate(value: unknown) { if (!value) return "Date not recorded"; const date = new Date(String(value)); if (Number.isNaN(date.getTime())) return String(value); return new Intl.DateTimeFormat("en-ZA", { dateStyle: "full", timeStyle: "short" }).format(date); }
 function value(obj: Record<string, any>, ...keys: string[]): string | null { for (const key of keys) if (obj?.[key] != null && obj[key] !== "") return String(obj[key]); return null; }
 
-export default function AppointmentsPage() {
+function AppointmentsPageContent() {
   const { data, loading, error, reload } = useDashboard();
   const appointments = data?.appointments ?? data?.today?.upcomingAppointments ?? [];
   return <ProtectedRoute><main className="min-h-screen bg-slate-50"><div className="mx-auto max-w-6xl px-4 py-8 sm:px-6 lg:px-8">
@@ -19,4 +20,13 @@ export default function AppointmentsPage() {
     {!loading && !error && appointments.length === 0 && <div className="rounded-2xl border border-slate-200 bg-white p-10 text-center"><div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-[#24c1c4]/10 text-[#0b2d54]"><Stethoscope className="h-7 w-7" /></div><h2 className="mt-5 text-xl font-semibold text-[#0b2d54]">No upcoming appointments</h2><p className="mx-auto mt-2 max-w-md text-sm leading-6 text-slate-500">When appointments are recorded for you, they will appear here automatically.</p></div>}
     {!loading && !error && appointments.length > 0 && <div className="space-y-4">{appointments.map((appointment: any) => { const practitioner = appointment?.practitioner?.person; const practitionerName = practitioner ? [practitioner.firstName, practitioner.lastName].filter(Boolean).join(" ") : null; const practice = appointment?.practice?.name ? String(appointment.practice.name) : null; return <Link href={`/appointments/${appointment.id}`} key={String(appointment.id)} className="block rounded-2xl border border-slate-200 bg-white p-6 shadow-sm transition hover:-translate-y-0.5 hover:border-[#24c1c4]/50 hover:shadow-md focus:outline-none focus-visible:ring-2 focus-visible:ring-[#24c1c4]"><article><div className="flex flex-col gap-5 sm:flex-row sm:items-start"><div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-[#24c1c4]/10 text-[#0b2d54]"><CalendarDays className="h-6 w-6" /></div><div className="min-w-0 flex-1"><div className="flex flex-wrap items-center gap-2"><h2 className="text-lg font-semibold text-[#0b2d54]">{value(appointment, "title", "type") || "Healthcare appointment"}</h2>{appointment.status && <span className="rounded-full bg-[#24c1c4]/10 px-2.5 py-1 text-[11px] font-semibold text-[#0b2d54]">{String(appointment.status).replace(/_/g, " ")}</span>}</div><div className="mt-4 grid gap-3 sm:grid-cols-2"><div className="rounded-xl bg-slate-50 p-4"><div className="flex items-center gap-2 text-xs font-medium text-slate-400"><Clock3 className="h-4 w-4" /> Date & time</div><p className="mt-1 text-sm font-semibold text-[#0b2d54]">{formatDate(appointment.scheduledStart)}</p></div>{(practitionerName || practice) && <div className="rounded-xl bg-slate-50 p-4"><div className="flex items-center gap-2 text-xs font-medium text-slate-400"><MapPin className="h-4 w-4" /> Care</div><p className="mt-1 text-sm font-semibold text-[#0b2d54]">{practitionerName || practice}</p>{practitionerName && practice && <p className="mt-1 text-xs text-slate-500">{practice}</p>}</div>}</div></div></div><p className="mt-4 text-xs font-bold text-[#24c1c4]">View appointment details →</p></article></Link>; })}</div>}
   </div></main></ProtectedRoute>;
+}
+
+
+export default function AppointmentsPage() {
+  return (
+    <Suspense fallback={<div className="min-h-screen bg-[#f5fafb]" aria-hidden="true" />}>
+      <AppointmentsPageContent />
+    </Suspense>
+  );
 }
