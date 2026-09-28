@@ -17,7 +17,6 @@ import {
   NotebookPen,
   PhoneCall,
   Pill,
-  Receipt,
   Settings,
   ShieldCheck,
   Target,
