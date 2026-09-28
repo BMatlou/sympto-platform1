@@ -157,7 +157,7 @@ export class PatientMedicationsService {
     if (dto.medicationId && !(await this.prisma.medication.findUnique({ where: { id: dto.medicationId } }))) throw new NotFoundException('Medication not found.');
     const duplicate = await this.prisma.patientMedication.findFirst({ where: { id: { not: id }, healthPassportId, medicationId } });
     if (duplicate) throw new ConflictException('This medication has already been added to the health passport.');
-    return this.prisma.patientMedication.update({
+    const updatedMedication = await this.prisma.patientMedication.update({
       where: { id },
       data: {
         healthPassportId,
@@ -179,7 +179,7 @@ export class PatientMedicationsService {
       include: { medication: true, healthPassport: { include: { patient: { include: { person: true } } } } },
     });
     await this.reminderScheduler.syncMedication(id);
-    return medication;
+    return updatedMedication;
   }
 
   async recordAdherence(id: string, dto: RecordMedicationAdherenceDto, authenticatedUserId: string) {
