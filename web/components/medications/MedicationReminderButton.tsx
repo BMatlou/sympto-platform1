@@ -255,8 +255,19 @@ export function MedicationReminderButton({
                     })}
                   </div>
                   <p className="mt-2 text-[10px] text-slate-400">
-                    {isWeekly ? "Choose the day you take this medicine." : "Choose the days you want the medication reminders active."}
+                    {isWeekly
+                      ? "Choose the day you take this medicine."
+                      : "Tap a day to turn reminders on or off. Navy with ✓ means reminders are active."}
                   </p>
+                  {!isWeekly && (
+                    <p className="mt-1 text-[10px] font-semibold text-[#0b2d54]">
+                      {state.daysOfWeek.length === 7
+                        ? "Active every day"
+                        : state.daysOfWeek.length === 0
+                          ? "No days selected"
+                          : `Active: ${DAYS.filter(([, day]) => state.daysOfWeek.includes(day)).map(([label]) => label).join(", ")}`}
+                    </p>
+                  )}
                 </div>
 
                 <div>
