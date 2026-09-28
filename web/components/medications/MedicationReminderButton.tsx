@@ -241,9 +241,15 @@ export function MedicationReminderButton({
                           type="button"
                           onClick={() => toggleDay(day)}
                           aria-pressed={selected}
-                          className={"rounded-xl px-1 py-2.5 text-[10px] font-black transition " + (selected ? "bg-[#0b2d54] text-white" : "bg-slate-100 text-slate-500 hover:bg-slate-200")}
+                          title={selected ? `${label}: reminders on` : `${label}: reminders off`}
+                          className={"rounded-xl border px-1 py-2.5 text-[10px] font-black transition " + (selected
+                            ? "border-[#0b2d54] bg-[#0b2d54] text-white shadow-[0_5px_12px_rgba(11,45,84,.12)]"
+                            : "border-slate-200 bg-white text-slate-500 hover:border-slate-300 hover:bg-slate-50")}
                         >
-                          {label}
+                          <span className="flex items-center justify-center gap-1">
+                            {selected ? <span aria-hidden="true" className="text-[9px] text-[#24c1c4]">✓</span> : null}
+                            {label}
+                          </span>
                         </button>
                       );
                     })}
