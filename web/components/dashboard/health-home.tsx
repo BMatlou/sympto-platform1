@@ -249,14 +249,17 @@ function ActionLink({
   children,
   className = "",
   ariaLabel,
+  id,
 }: {
   href: string;
   children: ReactNode;
   className?: string;
   ariaLabel?: string;
+  id?: string;
 }) {
   return (
     <Link
+      id={id}
       href={href}
       prefetch
       aria-label={ariaLabel}
