@@ -274,8 +274,8 @@ function ActionLink({
 }
 
 
-export default function HealthHome() {
-  const { data, loading, error, reload } = useDashboard();
+export default function HealthHome({ patientId }: { patientId?: string }) {
+  const { data, loading, error, reload } = useDashboard(patientId);
   const [symptomFeed, setSymptomFeed] = useState<any[]>([]);
   const [journalRecordCount, setJournalRecordCount] = useState(0);
 
