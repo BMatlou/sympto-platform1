@@ -43,6 +43,13 @@ export class DataAccessConsentsController {
   }
 
   @Permissions('data-access-consent.read')
+  @Get('mine')
+  findMine(@Req() req: Request) {
+    const user = req.user as JwtUser;
+    return this.dataAccessConsentsService.findForPatientUser(user.sub);
+  }
+
+  @Permissions('data-access-consent.read')
   @Get(':id')
   findOne(@Param('id') id: string) {
     return this.dataAccessConsentsService.findOne(id);
