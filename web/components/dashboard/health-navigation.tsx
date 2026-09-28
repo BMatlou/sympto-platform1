@@ -216,9 +216,10 @@ export default function HealthNavigation() {
                   </p>
                   <div className="space-y-0.5">
                     {items.map(({ href, label, icon: Icon }) => {
+                      const baseHref = href.split("#")[0];
                       const isActive =
-                        pathname === href ||
-                        (href !== "/dashboard" && pathname.startsWith(`${href}/`));
+                        pathname === baseHref ||
+                        (baseHref !== "/dashboard" && pathname.startsWith(`${baseHref}/`));
                       return (
                         <Link
                           key={href}
