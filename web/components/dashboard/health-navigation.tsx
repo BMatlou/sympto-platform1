@@ -18,6 +18,8 @@ import {
   PhoneCall,
   Pill,
   Settings,
+  ShieldCheck,
+  ChevronRight,
   Target,
   UserRound,
   Users,
@@ -46,17 +48,24 @@ const MORE_NAV = [
   { href: "/care-plans", label: "Care Plans", icon: ClipboardList },
   { href: "/notifications", label: "Notifications", icon: Bell },
   { href: "/messages", label: "Messages", icon: MessageCircle },
-  { href: "/wearables", label: "Connected devices", icon: Watch },
-  { href: "/family", label: "Family", icon: Users },
   { href: "/health-finance", label: "Medical aid & payments", icon: WalletCards },
   { href: "/emergency-contacts", label: "Emergency contacts", icon: PhoneCall },
+] as const;
+
+const SETTINGS_NAV = [
+  { href: "/settings", label: "Settings overview", icon: Settings },
   { href: "/profile", label: "Profile", icon: UserRound },
-  { href: "/settings", label: "Settings", icon: Settings },
+  { href: "/family", label: "Family accounts", icon: Users },
+  { href: "/notifications/preferences", label: "Notification preferences", icon: Bell },
+  { href: "/health-journal/settings", label: "Smart Journal settings", icon: NotebookPen },
+  { href: "/wearables", label: "Connected devices", icon: Watch },
+  { href: "/privacy", label: "Privacy & consent", icon: ShieldCheck },
 ] as const;
 
 export default function HealthNavigation() {
   const pathname = usePathname();
   const [open, setOpen] = useState(false);
+  const [settingsOpen, setSettingsOpen] = useState(false);
   const [railBounds, setRailBounds] = useState<{ top: number; height: number } | null>(null);
   const menuRef = useRef<HTMLDivElement>(null);
 
@@ -185,7 +194,7 @@ export default function HealthNavigation() {
           </div>
           <div className="border-t border-white/10 px-1 py-2">
             <div className="space-y-0.5">
-              {MORE_NAV.map(({ href, label, icon: Icon }) => (
+{MORE_NAV.map(({ href, label, icon: Icon }) => (
                 <Link
                   key={href}
                   href={href}
@@ -199,6 +208,54 @@ export default function HealthNavigation() {
                   <span>{label}</span>
                 </Link>
               ))}
+
+              <div className="mt-1 border-t border-white/10 pt-1">
+                <button
+                  type="button"
+                  role="menuitem"
+                  aria-expanded={settingsOpen}
+                  onClick={() => setSettingsOpen((value) => !value)}
+                  className="group flex min-h-12 w-full items-center gap-3 rounded-2xl px-3 py-2.5 text-left text-sm font-bold text-white transition-all duration-200 hover:translate-x-0.5 hover:bg-white/10 hover:text-white"
+                >
+                  <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-white/10 text-white transition-colors group-hover:bg-white/16 group-hover:text-[#24C1C4] group-hover:shadow-sm">
+                    <Settings className="h-4 w-4" aria-hidden="true" />
+                  </span>
+                  <span className="min-w-0 flex-1">Settings</span>
+                  <ChevronRight
+                    className={`h-4 w-4 shrink-0 transition-transform duration-200 ${settingsOpen ? "rotate-90" : ""}`}
+                    aria-hidden="true"
+                  />
+                </button>
+
+                {settingsOpen && (
+                  <div className="ml-4 space-y-0.5 border-l border-white/10 pl-2 pt-1">
+                    {SETTINGS_NAV.map(({ href, label, icon: Icon }) => {
+                      const isActive =
+                        pathname === href ||
+                        (href === "/settings" && pathname.startsWith("/settings/"));
+                      return (
+                        <Link
+                          key={href}
+                          href={href}
+                          role="menuitem"
+                          onClick={() => {
+                            setOpen(false);
+                            setSettingsOpen(false);
+                          }}
+                          className={`group flex min-h-11 items-center gap-3 rounded-xl px-3 py-2 text-xs font-bold transition-all duration-200 hover:bg-white/10 ${
+                            isActive ? "bg-white/10 text-[#24C1C4]" : "text-white/75 hover:text-white"
+                          }`}
+                        >
+                          <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-white/[0.07] text-white transition-colors group-hover:text-[#24C1C4]">
+                            <Icon className="h-3.5 w-3.5" aria-hidden="true" />
+                          </span>
+                          <span>{label}</span>
+                        </Link>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
             </div>
           </div>
         </div>
