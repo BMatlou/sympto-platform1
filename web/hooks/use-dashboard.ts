@@ -1,7 +1,6 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { useSearchParams } from "next/navigation";
 import { healthHomeService, type HealthHomeResponse } from "@/services/health-home.service";
 import { healthGoalsService } from "@/services/health-goals.service";
 import { api } from "@/lib/api";
@@ -186,8 +185,8 @@ function normalizeGoals(result: HealthHomeResponse, fullGoals: any[]) {
   });
 }
 
-export function useDashboard() {
-  const searchParams = useSearchParams(); const patientId = searchParams.get("patientId") || undefined; const [data, setData] = useState<HealthHomeResponse | null>(null); const [loading, setLoading] = useState(true); const [error, setError] = useState<string | null>(null); const firstLoad = useRef(true); const loadSequence = useRef(0);
+export function useDashboard(patientIdOverride?: string) {
+  const patientId = patientIdOverride || undefined; const [data, setData] = useState<HealthHomeResponse | null>(null); const [loading, setLoading] = useState(true); const [error, setError] = useState<string | null>(null); const firstLoad = useRef(true); const loadSequence = useRef(0);
   const loadDashboard = useCallback(async () => { const requestId = ++loadSequence.current; try { if (firstLoad.current) setLoading(true); setError(null); const result = await healthHomeService.getHealthHome(patientId); const normalizedMedications = normalizeMedicationDetails(Array.isArray(result.medications) ? result.medications : []); const hydratedMedications = await hydrateSavedMedicationDetails(normalizedMedications); const fullGoalsResponse = await healthGoalsService.list(result.patient.id); const backendActiveGoals = Array.isArray((result as any).activeGoalsArray) ? (result as any).activeGoalsArray : []; const fullGoalsResponseData = Array.isArray(fullGoalsResponse?.data)
     ? fullGoalsResponse.data
     : Array.isArray(fullGoalsResponse)
