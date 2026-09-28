@@ -46,6 +46,7 @@ const MORE_GROUPS = [
       { href: "/risk-assessments", label: "Risk assessments", icon: ShieldCheck },
       { href: "/ai-reports", label: "AI health reports", icon: HeartPulse },
       { href: "/referrals", label: "Referrals", icon: FileHeart },
+      { href: "/emergency-contacts", label: "Emergency contacts", icon: PhoneCall },
     ],
   },
   {
@@ -55,7 +56,6 @@ const MORE_GROUPS = [
       { href: "/health-journal", label: "Health Journal", icon: NotebookPen },
       { href: "/health-goals", label: "Health Goals", icon: Target },
       { href: "/log-symptom", label: "Log a symptom", icon: Activity },
-      { href: "/wearables", label: "Connected devices", icon: Watch },
     ],
   },
   {
@@ -76,8 +76,6 @@ const MORE_GROUPS = [
       { href: "/health-finance#insurance", label: "Insurance & medical aid", icon: WalletCards },
       { href: "/health-finance#claims", label: "Claims", icon: FileText },
       { href: "/health-finance#billing", label: "Invoices & payments", icon: Receipt },
-      { href: "/emergency-contacts", label: "Emergency contacts", icon: PhoneCall },
-      { href: "/privacy", label: "Privacy & consent", icon: ShieldCheck },
     ],
   },
   {
