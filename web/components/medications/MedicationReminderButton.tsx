@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Bell, Check, Clock3, X } from "lucide-react";
 import { toast } from "sonner";
 import { api } from "@/lib/api";
@@ -80,6 +80,10 @@ export function MedicationReminderButton({
     times: ["08:00"],
     timezone: localTimezone(),
   });
+
+  useEffect(() => {
+    void loadSchedule();
+  }, [medicationId]);
 
   const isWeekly = cadence === "WEEKLY";
   const cadenceLabel = useMemo(() => frequencyCopy(doseCount, cadence), [doseCount, cadence]);
