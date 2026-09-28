@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { ArrowLeft, ArrowRight, CheckCircle2, Edit3, Plus, Target, Trash2, X, LockKeyhole } from "lucide-react";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { Suspense, useEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { toast } from "sonner";
 import ProtectedRoute from "@/components/auth/protected-route";
@@ -160,7 +160,7 @@ function weightAdvice(weight: number | null, height: number | null, requestedCha
   return { bmi, requestedChangeKg, targetWeight, targetBmi, targetBmiClass, lowerHealthyWeight, upperHealthyWeight, weekly, underweightNow, targetBelowHealthy, targetAboveHealthy, targetInObesityRange };
 }
 
-export default function HealthGoalsPage() {
+function HealthGoalsPageContent() {
   const { data: dashboard, loading, error, reload } = useDashboard();
   const searchParams = useSearchParams();
   const medicationPrefillHandled = useRef(false);
@@ -482,5 +482,13 @@ export default function HealthGoalsPage() {
         </div></div>}
       </main>
     </ProtectedRoute>
+  );
+}
+
+export default function HealthGoalsPage() {
+  return (
+    <Suspense fallback={null}>
+      <HealthGoalsPageContent />
+    </Suspense>
   );
 }
