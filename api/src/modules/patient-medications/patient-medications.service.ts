@@ -389,7 +389,7 @@ export class PatientMedicationsService {
         `This medication is scheduled for ${frequency.doseCount} dose${frequency.doseCount === 1 ? '' : 's'} ${frequency.cadence === 'WEEKLY' ? 'per week' : 'per day'}. Set exactly ${frequency.doseCount} reminder time${frequency.doseCount === 1 ? '' : 's'}.`,
       );
     }
-    const timePattern = /^([01]\\d|2[0-3]):[0-5]\\d$/;
+    const timePattern = /^([01]\d|2[0-3]):[0-5]\d$/;
     if (times.some((time) => !timePattern.test(time))) {
       throw new BadRequestException('Reminder times must use 24-hour HH:mm format.');
     }
