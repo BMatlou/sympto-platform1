@@ -57,6 +57,7 @@ const MORE_GROUPS = [
     items: [
       { href: "/care-plans", label: "Care Plans", icon: ClipboardList },
       { href: "/messages", label: "Messages", icon: MessageCircle },
+      { href: "/smart-file", label: "Smart File & sharing", icon: FileHeart },
       { href: "/notifications", label: "Notifications", icon: Bell },
       { href: "/referrals", label: "Referrals", icon: FileHeart },
       { href: "/family", label: "Family & Care Circle", icon: Users },
@@ -201,7 +202,7 @@ export default function HealthNavigation() {
         >
           <div className="px-4 pb-3 pt-4">
             <p className="text-[10px] font-black uppercase tracking-[0.18em] text-white/55">Your health</p>
-            <p className="mt-1 text-base font-black tracking-[-0.02em] text-white">More of your health tools</p>
+            <p className="mt-1 text-base font-black tracking-[-0.02em] text-white">Your health, care & account</p>
           </div>
           <div className="border-t border-white/10 px-1 py-2">
             <div className="space-y-1">
