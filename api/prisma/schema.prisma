@@ -806,6 +806,7 @@ model PatientMedication {
   @@index([status])
   @@index([ongoing])
   healthGoals HealthGoal[]
+  reminderSchedule MedicationReminderSchedule?
 
 }
 
@@ -1589,6 +1590,35 @@ model Notification {
   deliveryLogs      NotificationDelivery[]
   preferences       NotificationPreference[]
   notificationQueue NotificationQueue?
+  medicationReminderSlotId String?
+  medicationReminderSlot MedicationReminderSlot? @relation(fields: [medicationReminderSlotId], references: [id], onDelete: SetNull)
+  @@index([medicationReminderSlotId])
+}
+
+model MedicationReminderSchedule {
+  id                String          @id @default(uuid())
+  patientMedicationId String        @unique
+  enabled           Boolean         @default(true)
+  daysOfWeek        Int[]
+  timezone          String          @default("UTC")
+  createdAt         DateTime        @default(now())
+  updatedAt         DateTime        @updatedAt
+  patientMedication PatientMedication @relation(fields: [patientMedicationId], references: [id], onDelete: Cascade)
+  slots             MedicationReminderSlot[]
+  @@index([enabled])
+}
+
+model MedicationReminderSlot {
+  id             String                       @id @default(uuid())
+  scheduleId     String
+  doseIndex      Int
+  time           String
+  createdAt      DateTime                     @default(now())
+  updatedAt      DateTime                     @updatedAt
+  schedule       MedicationReminderSchedule   @relation(fields: [scheduleId], references: [id], onDelete: Cascade)
+  notifications  Notification[]
+  @@unique([scheduleId, doseIndex])
+  @@index([scheduleId])
 }
 
 model NotificationDelivery {
