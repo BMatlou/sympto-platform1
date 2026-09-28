@@ -112,8 +112,8 @@ export default function HealthNavigation() {
         ? new ResizeObserver(measureRail)
         : null;
 
-    if (hero) observer.observe(hero);
-    if (todayCard) observer.observe(todayCard);
+    if (hero && observer) observer.observe(hero);
+    if (todayCard && observer) observer.observe(todayCard);
 
     window.addEventListener("resize", measureRail);
 
