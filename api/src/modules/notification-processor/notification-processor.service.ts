@@ -7,6 +7,7 @@ import {
 
 import { PrismaService } from '../../database/prisma.service';
 import { PushNotificationService } from '../notifications/push-notification.service';
+import { MedicationReminderSchedulerService } from './medication-reminder-scheduler.service';
 
 /**
  * Processes due notifications created by the notification queue.
@@ -25,6 +26,7 @@ export class NotificationProcessorService
   constructor(
     private readonly prisma: PrismaService,
     private readonly pushNotificationService: PushNotificationService,
+    private readonly medicationReminderScheduler: MedicationReminderSchedulerService,
   ) {}
 
   onModuleInit() {
@@ -46,6 +48,8 @@ export class NotificationProcessorService
 
     try {
       const now = new Date();
+
+      await this.medicationReminderScheduler.syncAll(now);
 
       const dueItems = await this.prisma.notificationQueue.findMany({
         where: {
