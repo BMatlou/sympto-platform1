@@ -1,13 +1,14 @@
 "use client";
 
 import Link from "next/link";
-import { ArrowLeft, Bell, BookHeart, Brain, ChevronRight, ClipboardCheck, CreditCard, LockKeyhole, ShieldCheck, UserRound, Users } from "lucide-react";
+import { ArrowLeft, Bell, BookHeart, Brain, ChevronRight, ClipboardCheck, CreditCard, LockKeyhole, ShieldCheck, UserRound, Users, Watch } from "lucide-react";
 import ProtectedRoute from "@/components/auth/protected-route";
 
 const sections = [
   { title: "Your profile", description: "The personal information Sympto uses to identify you and personalise your experience.", items: [{ href: "/profile", icon: UserRound, title: "Personal profile", description: "Name, date of birth, gender and lifestyle context." }] },
   { title: "People you manage", description: "Family accounts are separate patient accounts. Select a family member to switch the health record you are viewing.", items: [{ href: "/family", icon: Users, title: "Family accounts", description: "Add and manage authorised family members and switch between their records." }] },
   { title: "How Sympto works for you", description: "Preferences that control communication and the Smart Health Journal. These do not duplicate clinical records.", items: [{ href: "/notifications", icon: Bell, title: "Notifications & preferences", description: "Review your notification history and choose which channels can be used for health updates." }, { href: "/health-journal/settings", icon: BookHeart, title: "Smart Journal settings", description: "Choose which app activity and health data the journal uses for its dynamic timeline and insights." }] },
+  { title: "Connections", description: "Manage devices and health connections that contribute data to your Sympto experience.", items: [{ href: "/wearables", icon: Watch, title: "Connected devices", description: "View connected wearables, monitor connection status and manage your device connection." }] },
   { title: "Privacy & access", description: "Control who has access to your clinical information and keep financial information in its separate layer.", items: [{ href: "/privacy", icon: LockKeyhole, title: "Privacy & consent", description: "Review active clinical access and revoke a sharing permission." }] },
 ];
 
