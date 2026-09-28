@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { ArrowLeft, Mail, Phone, Plus, RefreshCw, ShieldAlert, UserRound } from "lucide-react";
+import { Suspense } from "react";
 import { useSearchParams } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
 import { useDashboard } from "@/hooks/use-dashboard";
@@ -9,7 +10,7 @@ import { emergencyContactsService, type EmergencyContact } from "@/services/emer
 
 function formatRelationship(value: unknown) { if (!value) return "Relationship not specified"; return String(value).toLowerCase().replace(/_/g, " ").replace(/\b\w/g, (letter) => letter.toUpperCase()); }
 
-export default function EmergencyContactsPage() {
+function EmergencyContactsPageContent() {
   const searchParams = useSearchParams();
   const requestedPatientId = searchParams.get("patientId") || undefined;
   const { data: dashboard, loading: dashboardLoading, error: dashboardError, reload: reloadDashboard } = useDashboard();
@@ -46,5 +47,14 @@ export default function EmergencyContactsPage() {
         <section className="mt-8 rounded-2xl border border-[#24c1c4]/20 bg-[#24c1c4]/5 p-6"><div className="flex items-start gap-3"><ShieldAlert className="mt-0.5 h-5 w-5 shrink-0 text-[#0B2D54]" /><div><h2 className="font-semibold text-[#0B2D54]">One contact record across Sympto</h2><p className="mt-1 text-sm leading-6 text-slate-600">Emergency contacts are stored against the patient and reused by Health Home and Health Passport.</p></div></div></section>
       </div>
     </main>
+  );
+}
+
+
+export default function EmergencyContactsPage() {
+  return (
+    <Suspense fallback={<div className="min-h-screen bg-[#F7F9FC]" aria-hidden="true" />}>
+      <EmergencyContactsPageContent />
+    </Suspense>
   );
 }
