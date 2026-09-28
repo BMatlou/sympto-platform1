@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { Activity, ArrowLeft, Bluetooth, Check, HeartPulse, Plus, Scale, Thermometer, Watch, Wind, X } from "lucide-react";
-import { FormEvent, useMemo, useState } from "react";
+import { FormEvent, useMemo, useState, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
 import ProtectedRoute from "@/components/auth/protected-route";
 import { useDashboard } from "@/hooks/use-dashboard";
@@ -41,7 +41,7 @@ function Field({ label, name, value, onChange, placeholder, step = "1", min, max
   return <label className="block"><span className="text-[10px] font-black uppercase tracking-[0.13em] text-[#71839a]">{label}</span><input name={name} type="number" inputMode="decimal" step={step} min={min} max={max} value={value} onChange={(event) => onChange(event.target.value)} placeholder={placeholder} className="mt-1.5 w-full rounded-xl border border-slate-200 bg-white px-3 py-3 text-sm font-semibold text-[#0b2d54] outline-none ring-0 placeholder:text-slate-300 focus:border-[#24c1c4]" /></label>;
 }
 
-export default function HealthVitalsPage() {
+function HealthVitalsPageContent() {
   const { data, loading, error, reload } = useDashboard();
   const searchParams = useSearchParams();
   const viewingFamilyMember = Boolean(searchParams.get("patientId"));
@@ -128,4 +128,13 @@ export default function HealthVitalsPage() {
 
     <section className="mt-5 rounded-[28px] border border-[#24c1c4]/20 bg-[#24c1c4]/5 p-5"><div className="flex gap-3"><HeartPulse className="h-5 w-5 shrink-0 text-[#0b2d54]"/><div><p className="font-semibold text-[#0b2d54]">Keep your measurements current</p><p className="mt-1 text-sm leading-6 text-slate-600">Use BMI when your weight or height changes, connect a watch for supported live readings, and enter home measurements when you check your vital signs manually.</p></div></div></section>
   </div></main></ProtectedRoute>;
+}
+
+
+export default function HealthVitalsPage() {
+  return (
+    <Suspense fallback={<div className="min-h-screen bg-[#f5f8fb]" aria-hidden="true" />}>
+      <HealthVitalsPageContent />
+    </Suspense>
+  );
 }
