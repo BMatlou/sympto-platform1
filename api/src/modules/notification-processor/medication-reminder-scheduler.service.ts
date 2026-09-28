@@ -66,7 +66,7 @@ export class MedicationReminderSchedulerService {
     }
 
     const frequency = getMedicationReminderFrequency(schedule.patientMedication.frequency);
-    if (!frequency.doseCount || schedule.slots.length !== frequency.doseCount) { await this.cancelSchedule(scheduleId); return; }
+    if (!frequency.doseCount || schedule.slots.length !== frequency.doseCount || (frequency.cadence === 'WEEKLY' && schedule.daysOfWeek.length !== 1) || schedule.daysOfWeek.length < 1 || schedule.daysOfWeek.some((day) => day < 1 || day > 7)) { await this.cancelSchedule(scheduleId); return; }
 
     const slotIds = schedule.slots.map((slot) => slot.id);
     const pending = await this.prisma.notification.findMany({
