@@ -40,6 +40,25 @@ export class DataAccessConsentsService {
     return consent;
   }
 
+  async findForPatientUser(userId: string) {
+    return this.prisma.dataAccessConsent.findMany({
+      where: {
+        patient: {
+          userId,
+        },
+      },
+      include: {
+        patient: true,
+        grantedTo: {
+          include: {
+            person: true,
+          },
+        },
+      },
+      orderBy: { grantedAt: 'desc' },
+    });
+  }
+
   async update(id: string, dto: UpdateDataAccessConsentDto, requesterUserId: string) {
     const consent = await this.prisma.dataAccessConsent.findUnique({ where: { id }, include: { patient: true } });
     if (!consent) throw new NotFoundException('Data access consent not found.');
