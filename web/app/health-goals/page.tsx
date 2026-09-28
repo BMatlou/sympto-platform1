@@ -485,14 +485,6 @@ function HealthGoalsPageContent() {
   );
 }
 
-function HealthGoalsPageContent() {
-  return (
-    <Suspense fallback={null}>
-      <HealthGoalsPageContent />
-    </Suspense>
-  );
-}
-
 export default function HealthGoalsPage() {
   return (
     <Suspense fallback={<div className="min-h-screen bg-[#f5fafb]" aria-hidden="true" />}>
