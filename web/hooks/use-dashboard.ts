@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import { useSearchParams } from "next/navigation";
 import { healthHomeService, type HealthHomeResponse } from "@/services/health-home.service";
 import { healthGoalsService } from "@/services/health-goals.service";
 import { api } from "@/lib/api";
@@ -186,11 +187,7 @@ function normalizeGoals(result: HealthHomeResponse, fullGoals: any[]) {
 }
 
 export function useDashboard() {
-  const [patientId, setPatientId] = useState<string | undefined>(() => {
-    if (typeof window === "undefined") return undefined;
-    return new URLSearchParams(window.location.search).get("patientId") || undefined;
-  });
-  const [data, setData] = useState<HealthHomeResponse | null>(null); const [loading, setLoading] = useState(true); const [error, setError] = useState<string | null>(null); const firstLoad = useRef(true); const loadSequence = useRef(0);
+  const searchParams = useSearchParams(); const patientId = searchParams.get("patientId") || undefined; const [data, setData] = useState<HealthHomeResponse | null>(null); const [loading, setLoading] = useState(true); const [error, setError] = useState<string | null>(null); const firstLoad = useRef(true); const loadSequence = useRef(0);
   const loadDashboard = useCallback(async () => { const requestId = ++loadSequence.current; try { if (firstLoad.current) setLoading(true); setError(null); const result = await healthHomeService.getHealthHome(patientId); const normalizedMedications = normalizeMedicationDetails(Array.isArray(result.medications) ? result.medications : []); const hydratedMedications = await hydrateSavedMedicationDetails(normalizedMedications); const fullGoalsResponse = await healthGoalsService.list(result.patient.id); const backendActiveGoals = Array.isArray((result as any).activeGoalsArray) ? (result as any).activeGoalsArray : []; const fullGoalsResponseData = Array.isArray(fullGoalsResponse?.data)
     ? fullGoalsResponse.data
     : Array.isArray(fullGoalsResponse)
@@ -201,32 +198,6 @@ export function useDashboard() {
       return !["CANCELLED", "DELETED", "ARCHIVED"].includes(status) && !goal?.deletedAt;
     });
     const linkedMedications = mergeMedicationGoalLinksWithGoals(hydratedMedications, fullGoals); const normalizedGoals = normalizeGoals({ ...result, medications: linkedMedications }, fullGoals); if (requestId !== loadSequence.current) return; setData({ ...result, medications: linkedMedications, goals: normalizedGoals, healthGoals: normalizedGoals, activeGoalsArray: normalizedGoals.filter((goal: any) => ["ACTIVE", "IN_PROGRESS", "ON_TRACK", "IMPROVING", "STAGNANT", "DECLINING"].includes(String(goal?.status ?? "").toUpperCase())), today: { ...result.today, activeMedications: linkedMedications, activeGoalCount: normalizedGoals.filter((goal: any) => ["ACTIVE", "IN_PROGRESS"].includes(String(goal?.status ?? "").toUpperCase())).length } }); firstLoad.current = false; } catch (requestError) { if (requestId !== loadSequence.current) return; console.error("Failed to load Health Home:", requestError); const message = requestError instanceof Error ? requestError.message : typeof requestError === "string" ? requestError : "We could not load your Health Home."; setError(message); } finally { if (requestId === loadSequence.current) setLoading(false); } }, [patientId]);
-  useEffect(() => {
-    firstLoad.current = true;
-    const syncPatientIdFromLocation = () => {
-      const nextPatientId = new URLSearchParams(window.location.search).get("patientId") || undefined;
-      setPatientId((current) => current === nextPatientId ? current : nextPatientId);
-    };
-    syncPatientIdFromLocation();
-    const handleNavigation = () => {
-      syncPatientIdFromLocation();
-      void loadDashboard();
-    };
-    const handleGoalChange = () => void loadDashboard();
-    const handleFocus = () => void loadDashboard();
-    const handleVisibility = () => { if (document.visibilityState === "visible") void loadDashboard(); };
-    window.addEventListener("popstate", handleNavigation);
-    window.addEventListener("sympto:health-goal-updated", handleGoalChange);
-    window.addEventListener("focus", handleFocus);
-    document.addEventListener("visibilitychange", handleVisibility);
-    const refresh = window.setInterval(() => { if (document.visibilityState === "visible") void loadDashboard(); }, REFRESH_INTERVAL_MS);
-    return () => {
-      window.removeEventListener("popstate", handleNavigation);
-      window.removeEventListener("sympto:health-goal-updated", handleGoalChange);
-      window.removeEventListener("focus", handleFocus);
-      document.removeEventListener("visibilitychange", handleVisibility);
-      window.clearInterval(refresh);
-    };
-  }, [loadDashboard]);
+  useEffect(() => { firstLoad.current = true; void loadDashboard(); const handleNavigation = () => void loadDashboard(); const handleGoalChange = () => void loadDashboard(); const handleFocus = () => void loadDashboard(); const handleVisibility = () => { if (document.visibilityState === "visible") void loadDashboard(); }; window.addEventListener("popstate", handleNavigation); window.addEventListener("sympto:health-goal-updated", handleGoalChange); window.addEventListener("focus", handleFocus); document.addEventListener("visibilitychange", handleVisibility); const refresh = window.setInterval(() => { if (document.visibilityState === "visible") void loadDashboard(); }, REFRESH_INTERVAL_MS); return () => { window.removeEventListener("popstate", handleNavigation); window.removeEventListener("sympto:health-goal-updated", handleGoalChange); window.removeEventListener("focus", handleFocus); document.removeEventListener("visibilitychange", handleVisibility); window.clearInterval(refresh); }; }, [loadDashboard]);
   return { data, loading, error, reload: loadDashboard };
 }
