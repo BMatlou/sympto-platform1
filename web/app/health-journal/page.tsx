@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useMemo, useState } from "react";
+import { Suspense, useEffect, useMemo, useState } from "react";
 import { Activity, ArrowLeft, ArrowRight, ChevronDown, ClipboardList, FileText, HeartPulse, ShieldCheck, Sparkles } from "lucide-react";
 import ProtectedRoute from "@/components/auth/protected-route";
 import { useDashboard } from "@/hooks/use-dashboard";
@@ -45,7 +45,7 @@ function clean(events: Event[]) {
   return out;
 }
 
-export default function HealthJournalPage() {
+function HealthJournalPageContent() {
   const { data, loading, error, reload } = useDashboard();
   const [logs, setLogs] = useState<any[]>([]);
   const [symptoms, setSymptoms] = useState<any[]>([]);
@@ -220,4 +220,13 @@ export default function HealthJournalPage() {
 
     <section className="mt-5 rounded-3xl border border-[#24c1c4]/20 bg-[#24c1c4]/5 p-5"><div className="flex gap-3"><ShieldCheck className="h-5 w-5 shrink-0 text-[#0b2d54]"/><div><p className="font-bold text-[#0b2d54]">Your history is designed to tell the story, not expose database noise.</p><p className="mt-1 text-sm leading-6 text-slate-600">Repeated entries are filtered where possible, while the original record remains available through the related-record action.</p></div></div></section>
   </div></main></ProtectedRoute>;
+}
+
+
+export default function HealthJournalPage() {
+  return (
+    <Suspense fallback={<div className="min-h-screen bg-[#f5fafb]" aria-hidden="true" />}>
+      <HealthJournalPageContent />
+    </Suspense>
+  );
 }
