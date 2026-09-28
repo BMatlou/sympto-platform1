@@ -1,5 +1,6 @@
 "use client";
 
+import { Suspense } from "react";
 import Link from "next/link";
 import { useState } from "react";
 import { ArrowLeft, CheckCircle2, LockKeyhole, ShieldCheck, UserRound, XCircle } from "lucide-react";
