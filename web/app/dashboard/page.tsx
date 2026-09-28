@@ -1,11 +1,25 @@
+"use client";
+
 import HealthNavigation from "@/components/dashboard/health-navigation";
 import HealthHome from "@/components/dashboard/health-home";
+import { Suspense, useSearchParams } from "next/navigation";
 
-export default function DashboardRoute() {
+function DashboardContent() {
+  const searchParams = useSearchParams();
+  const patientId = searchParams.get("patientId") || undefined;
+
   return (
     <>
       <HealthNavigation />
-      <HealthHome />
+      <HealthHome patientId={patientId} />
     </>
+  );
+}
+
+export default function DashboardRoute() {
+  return (
+    <Suspense fallback={<div className="min-h-screen bg-[#f5fafb]" aria-hidden="true" />}>
+      <DashboardContent />
+    </Suspense>
   );
 }
