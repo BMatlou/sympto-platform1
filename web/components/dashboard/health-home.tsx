@@ -219,6 +219,7 @@ function medicationMatchesGoal(medication: any, goal: any, medicationCount: numb
 async function countTodayNeeds(
   data: any,
   hasTodayCheckIn: boolean | null = null,
+  symptomFeed: any[] = [],
 ): Promise<number | null> {
   if (hasTodayCheckIn === null) return null;
 
@@ -272,7 +273,14 @@ async function countTodayNeeds(
     );
   });
 
-  const activeSymptoms = (Array.isArray(data?.symptoms) ? data.symptoms : []).filter(
+  const symptomSource =
+    symptomFeed.length > 0
+      ? symptomFeed
+      : Array.isArray(data?.symptoms)
+        ? data.symptoms
+        : [];
+
+  const activeSymptoms = symptomSource.filter(
     (symptom: any) => String(symptom?.status ?? "").toUpperCase() === "ACTIVE",
   );
 
@@ -668,19 +676,32 @@ export default function HealthHome({ patientId }: { patientId?: string }) {
           day: "2-digit",
         }).format(new Date());
 
-        const hasCheckIn = (Array.isArray(journals?.data) ? journals.data : []).some((journal: any) => {
+        const hasCompletedCheckIn = (Array.isArray(journals?.data) ? journals.data : []).some((journal: any) => {
           if (journal?.title !== "Daily Health Check-in" || !journal?.createdAt) return false;
           const journalDate = new Date(String(journal.createdAt));
           if (Number.isNaN(journalDate.getTime())) return false;
-          return new Intl.DateTimeFormat("en-CA", {
-            timeZone: "Africa/Johannesburg",
-            year: "numeric",
-            month: "2-digit",
-            day: "2-digit",
-          }).format(journalDate) === todayKey;
+          if (
+            new Intl.DateTimeFormat("en-CA", {
+              timeZone: "Africa/Johannesburg",
+              year: "numeric",
+              month: "2-digit",
+              day: "2-digit",
+            }).format(journalDate) !== todayKey
+          ) {
+            return false;
+          }
+
+          return [
+            journal?.mood,
+            journal?.sleepQuality,
+            journal?.sleepHours,
+            journal?.stressLevel,
+            journal?.exerciseMinutes,
+            journal?.waterIntakeMl,
+          ].some((value) => value !== null && value !== undefined && value !== "");
         });
 
-        setHasTodayCheckIn(hasCheckIn);
+        setHasTodayCheckIn(hasCompletedCheckIn);
       })
       .catch(() => {
         if (!active) return;
@@ -701,7 +722,7 @@ export default function HealthHome({ patientId }: { patientId?: string }) {
 
     let active = true;
 
-    void countTodayNeeds(data, hasTodayCheckIn)
+    void countTodayNeeds(data, hasTodayCheckIn, symptomFeed)
       .then((count) => {
         if (active) setTodayActionCount(count);
       })
@@ -712,7 +733,7 @@ export default function HealthHome({ patientId }: { patientId?: string }) {
     return () => {
       active = false;
     };
-  }, [data?.patient?.id, data?.generatedAt, hasTodayCheckIn]);
+  }, [data?.patient?.id, data?.generatedAt, hasTodayCheckIn, symptomFeed]);
 
   useEffect(() => {
     const refreshDashboard = () => void reload();
