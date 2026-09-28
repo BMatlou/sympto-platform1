@@ -6,6 +6,7 @@ import { useEffect, useState } from "react";
 import { Activity, ArrowRight, Bell, CheckCircle2, FileHeart, FolderOpen, Plus, ShieldCheck } from "lucide-react";
 import { useDashboard } from "@/hooks/use-dashboard";
 import { healthJournalService } from "@/services/health-journal.service";
+import { healthGoalsService } from "@/services/health-goals.service";
 import { patientNotificationsService } from "@/services/patient-notifications.service";
 import ProtectedRoute from "@/components/auth/protected-route";
 
@@ -64,25 +65,168 @@ function itemNames(
     .filter(Boolean) as string[];
 }
 
-function countTodayNeeds(data: any, hasTodayCheckIn: boolean | null = null) {
-  const dayKey = (value: unknown) => {
-    if (!value) return "";
-    const date = new Date(String(value));
-    if (Number.isNaN(date.getTime())) return "";
-    return new Intl.DateTimeFormat("en-CA", {
-      timeZone: "Africa/Johannesburg",
-      year: "numeric",
-      month: "2-digit",
-      day: "2-digit",
-    }).format(date);
+const ACTIVE_TODAY_GOAL_STATUSES = new Set([
+  "ACTIVE",
+  "IN_PROGRESS",
+  "ON_TRACK",
+  "IMPROVING",
+  "STAGNANT",
+  "DECLINING",
+]);
+
+const DEFAULT_GOAL_FREQUENCIES: Record<string, string> = {
+  WEIGHT: "TOTAL",
+  EXERCISE: "WEEKLY",
+  NUTRITION: "DAILY",
+  BLOOD_PRESSURE: "DAILY",
+  BLOOD_GLUCOSE: "DAILY",
+  CHOLESTEROL: "TOTAL",
+  MEDICATION: "WEEKLY",
+  SLEEP: "DAILY",
+  MENTAL_HEALTH: "DAILY",
+  HYDRATION: "DAILY",
+  SMOKING: "DAILY",
+  ALCOHOL: "WEEKLY",
+  HEART_RATE: "DAILY",
+  OTHER: "TOTAL",
+};
+
+const DEFAULT_GOAL_METRICS: Record<string, { metricType: string; metricKey: string }> = {
+  WEIGHT: { metricType: "WEIGHT", metricKey: "weight.kg" },
+  EXERCISE: { metricType: "EXERCISE", metricKey: "exercise.minutes" },
+  NUTRITION: { metricType: "NUTRITION", metricKey: "nutrition.calories" },
+  BLOOD_PRESSURE: { metricType: "BLOOD_PRESSURE", metricKey: "blood_pressure.systolic" },
+  BLOOD_GLUCOSE: { metricType: "BLOOD_GLUCOSE", metricKey: "blood_glucose.value" },
+  CHOLESTEROL: { metricType: "CHOLESTEROL", metricKey: "cholesterol.total" },
+  MEDICATION: { metricType: "MEDICATION", metricKey: "medication.adherence" },
+  SLEEP: { metricType: "SLEEP", metricKey: "sleep.hours" },
+  MENTAL_HEALTH: { metricType: "MENTAL_HEALTH", metricKey: "mental.stress" },
+  HYDRATION: { metricType: "HYDRATION", metricKey: "hydration.ml" },
+  SMOKING: { metricType: "SMOKING", metricKey: "smoking.cigarettes" },
+  ALCOHOL: { metricType: "ALCOHOL", metricKey: "alcohol.drinks" },
+  HEART_RATE: { metricType: "HEART_RATE", metricKey: "heart_rate.bpm" },
+  OTHER: { metricType: "OTHER", metricKey: "other.value" },
+};
+
+const CHECK_IN_GOAL_CATEGORIES = new Set([
+  "EXERCISE",
+  "SLEEP",
+  "MENTAL_HEALTH",
+  "HYDRATION",
+]);
+
+const VITAL_GOAL_CATEGORIES = new Set([
+  "BLOOD_PRESSURE",
+  "HEART_RATE",
+]);
+
+function requiredMedicationDoses(frequency: unknown): number {
+  const normalized = String(frequency ?? "").trim().toUpperCase();
+  if (normalized === "TWICE_DAILY") return 2;
+  if (normalized === "THREE_TIMES_DAILY") return 3;
+  if (normalized === "FOUR_TIMES_DAILY") return 4;
+  return 1;
+}
+
+function todayBoundsInSouthAfrica() {
+  const todayKey = new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Africa/Johannesburg",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).format(new Date());
+
+  const start = new Date(todayKey + "T00:00:00+02:00");
+  const end = new Date(start.getTime() + 24 * 60 * 60 * 1000);
+  return { start, end, todayKey };
+}
+
+function goalMetric(goal: any) {
+  const category = String(goal?.category ?? "OTHER").toUpperCase();
+  const fallback = DEFAULT_GOAL_METRICS[category] ?? DEFAULT_GOAL_METRICS.OTHER;
+  return {
+    category,
+    metricType: String(goal?.metricConfig?.metricType ?? goal?.metricType ?? fallback.metricType).toUpperCase(),
+    metricKey: String(goal?.metricConfig?.metricKey ?? goal?.metricKey ?? fallback.metricKey),
+    frequency: String(
+      goal?.metricConfig?.frequency ??
+      goal?.frequency ??
+      DEFAULT_GOAL_FREQUENCIES[category] ??
+      "TOTAL",
+    ).toUpperCase(),
   };
+}
 
-  const today = dayKey(new Date());
+function medicationPatientId(medication: any) {
+  const source = String(medication?.source ?? "").trim().toUpperCase();
+  const syntheticPrescriptionId = String(medication?.id ?? "").startsWith("prescription-item-");
+  return (
+    medication?.patientMedication?.id ??
+    medication?.patientMedicationId ??
+    (source !== "PRESCRIPTION" && !syntheticPrescriptionId ? medication?.id : null)
+  );
+}
 
-  const medications = (Array.isArray(data?.today?.activeMedications)
-    ? data.today.activeMedications
-    : []
-  ).filter((medication: any) => String(medication?.status ?? "ACTIVE").toUpperCase() === "ACTIVE");
+function medicationMatchesGoal(medication: any, goal: any, medicationCount: number) {
+  if (!goal || String(goal?.category ?? "").toUpperCase() !== "MEDICATION") return false;
+
+  const linkedGoalId = medication?.healthGoalId ?? medication?.medicationGoalId ?? null;
+  if (linkedGoalId && String(goal?.id ?? "") === String(linkedGoalId)) return true;
+
+  const medicationPatientMedicationId =
+    medicationPatientId(medication);
+  const goalPatientMedicationId =
+    goal?.patientMedicationId ??
+    goal?.patientMedication?.id ??
+    goal?.associatedPatientMedicationId ??
+    goal?.associatedPatientMedication?.id ??
+    null;
+
+  if (
+    medicationPatientMedicationId &&
+    goalPatientMedicationId &&
+    String(medicationPatientMedicationId) === String(goalPatientMedicationId)
+  ) {
+    return true;
+  }
+
+  const medicationCatalogId =
+    medication?.medicationId ??
+    medication?.medication?.id ??
+    null;
+  const goalMedicationId =
+    goal?.medicationId ??
+    goal?.associatedMedicationId ??
+    goal?.associatedMedication?.id ??
+    goal?.medication?.id ??
+    null;
+
+  if (
+    medicationCatalogId &&
+    goalMedicationId &&
+    String(medicationCatalogId) === String(goalMedicationId)
+  ) {
+    return true;
+  }
+
+  return (
+    medicationCount === 1 &&
+    String(goal?.title ?? "").trim().toLowerCase() === "manage medication"
+  );
+}
+
+async function countTodayNeeds(
+  data: any,
+  hasTodayCheckIn: boolean | null = null,
+): Promise<number | null> {
+  if (hasTodayCheckIn === null) return null;
+
+  const { start: todayStart, end: todayEnd, todayKey } =
+    todayBoundsInSouthAfrica();
+
+  const dayFormatter = new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Africa/Johannesburg",
+  });
 
   const appointments = (
     Array.isArray(data?.appointments) && data.appointments.length > 0
@@ -90,87 +234,36 @@ function countTodayNeeds(data: any, hasTodayCheckIn: boolean | null = null) {
       : Array.isArray(data?.today?.upcomingAppointments)
         ? data.today.upcomingAppointments
         : []
-  ).filter(
-    (appointment: any) =>
-      appointment?.scheduledStart && dayKey(appointment.scheduledStart) === today,
-  );
+  ).filter((appointment: any) => {
+    if (!appointment?.scheduledStart) return false;
+    const date = new Date(String(appointment.scheduledStart));
+    if (Number.isNaN(date.getTime())) return false;
+    return dayFormatter.format(date) === todayKey;
+  });
 
-  const goals = Array.isArray(data?.activeGoalsArray)
-    ? data.activeGoalsArray
-    : (Array.isArray(data?.goals) ? data.goals : []).filter((goal: any) =>
-        !["ACHIEVED", "ARCHIVED", "CANCELLED", "DELETED", "EXPIRED", "ON_HOLD"].includes(
-          String(goal?.status ?? "").toUpperCase(),
-        ),
-      );
+  const allGoals = [
+    ...(Array.isArray(data?.goals) ? data.goals : []),
+    ...(Array.isArray(data?.activeGoalsArray) ? data.activeGoalsArray : []),
+  ].filter(Boolean);
+
+  const seenGoals = new Set<string>();
+  const goals = allGoals.filter((goal: any) => {
+    const id = String(goal?.id ?? "");
+    if (!id || seenGoals.has(id)) return false;
+    seenGoals.add(id);
+
+    const status = String(goal?.status ?? "").toUpperCase();
+    const category = String(goal?.category ?? "").toUpperCase();
+
+    return (
+      ACTIVE_TODAY_GOAL_STATUSES.has(status) ||
+      (category === "MEDICATION" && status === "NOT_STARTED")
+    );
+  });
 
   const activeSymptoms = (Array.isArray(data?.symptoms) ? data.symptoms : []).filter(
     (symptom: any) => String(symptom?.status ?? "").toUpperCase() === "ACTIVE",
   );
-
-  // Keep each active goal counted once. A prescribed medication that already
-  // has a live medication goal is represented by that goal on Today, so it
-  // must not be counted again as a separate active medication item.
-  const liveMedicationGoals = goals.filter((goal: any) => {
-    const status = String(goal?.status ?? "").toUpperCase();
-    return (
-      String(goal?.category ?? "").toUpperCase() === "MEDICATION" &&
-      !["ACHIEVED", "ARCHIVED", "CANCELLED", "DELETED", "EXPIRED", "ON_HOLD"].includes(status)
-    );
-  });
-
-  const medicationNeedsAttention = medications.filter((medication: any) => {
-    const medicationPatientId =
-      medication?.patientMedication?.id ??
-      medication?.patientMedicationId ??
-      (String(medication?.source ?? "").toUpperCase() !== "PRESCRIPTION" &&
-      !String(medication?.id ?? "").startsWith("prescription-item-")
-        ? medication?.id
-        : null);
-
-    const medicationCatalogId =
-      medication?.medicationId ??
-      medication?.medication?.id ??
-      null;
-
-    const linkedGoalId =
-      medication?.healthGoalId ??
-      medication?.medicationGoalId ??
-      null;
-
-    const hasLiveMedicationGoal = liveMedicationGoals.some((goal: any) => {
-      if (linkedGoalId && String(goal?.id ?? "") === String(linkedGoalId)) return true;
-
-      const goalPatientMedicationId =
-        goal?.patientMedicationId ??
-        goal?.patientMedication?.id ??
-        goal?.associatedPatientMedicationId ??
-        goal?.associatedPatientMedication?.id ??
-        null;
-
-      if (
-        medicationPatientId &&
-        goalPatientMedicationId &&
-        String(medicationPatientId) === String(goalPatientMedicationId)
-      ) {
-        return true;
-      }
-
-      const goalMedicationId =
-        goal?.medicationId ??
-        goal?.associatedMedicationId ??
-        goal?.associatedMedication?.id ??
-        goal?.medication?.id ??
-        null;
-
-      return Boolean(
-        medicationCatalogId &&
-        goalMedicationId &&
-        String(medicationCatalogId) === String(goalMedicationId),
-      );
-    });
-
-    return !hasLiveMedicationGoal;
-  });
 
   const deviceAlerts = Array.isArray(data?.wearables?.deviceAlerts)
     ? data.wearables.deviceAlerts
@@ -185,28 +278,195 @@ function countTodayNeeds(data: any, hasTodayCheckIn: boolean | null = null) {
   const dueImmunizations = immunizations.filter((item: any) => {
     const status = String(item?.status ?? "").toUpperCase();
     if (status === "MISSED") return true;
-    return status === "SCHEDULED" && item?.nextDueDate && dayKey(item.nextDueDate) <= today;
+
+    const dueDate = item?.nextDueDate
+      ? new Date(String(item.nextDueDate))
+      : null;
+
+    return Boolean(
+      dueDate &&
+      !Number.isNaN(dueDate.getTime()) &&
+      status === "SCHEDULED" &&
+      dayFormatter.format(dueDate) <= todayKey,
+    );
   });
 
   const careTasks = (Array.isArray(data?.carePlans) ? data.carePlans : []).flatMap(
     (plan: any) =>
       (Array.isArray(plan?.tasks) ? plan.tasks : []).filter((task: any) => {
         const status = String(task?.status ?? "").toUpperCase();
-        if (["COMPLETED", "CANCELLED"].includes(status) || !task?.dueDate) return false;
-        return dayKey(task.dueDate) <= today;
+        if (["COMPLETED", "CANCELLED"].includes(status) || !task?.dueDate) {
+          return false;
+        }
+
+        const dueDate = new Date(String(task.dueDate));
+        return (
+          !Number.isNaN(dueDate.getTime()) &&
+          dayFormatter.format(dueDate) <= todayKey
+        );
       }),
   );
 
-  return (
-    medicationNeedsAttention.length +
+  let count =
     appointments.length +
-    goals.length +
     activeSymptoms.length +
     deviceAlerts.length +
     dueImmunizations.length +
     careTasks.length +
-    (hasTodayCheckIn === false ? 1 : 0)
+    (hasTodayCheckIn === false ? 1 : 0);
+
+  const goalsByCategory = new Map<string, any[]>();
+  for (const goal of goals) {
+    const { category } = goalMetric(goal);
+    const bucket = goalsByCategory.get(category) ?? [];
+    bucket.push(goal);
+    goalsByCategory.set(category, bucket);
+  }
+
+  const metricQueries = new Map<
+    string,
+    { metricType: string; metricKey: string }
+  >();
+
+  const addMetricQuery = (goal: any) => {
+    const { metricType, metricKey } = goalMetric(goal);
+    metricQueries.set(metricType + "|" + metricKey, { metricType, metricKey });
+  };
+
+  for (const goal of goals) {
+    const { category, frequency } = goalMetric(goal);
+
+    if (
+      CHECK_IN_GOAL_CATEGORIES.has(category) ||
+      category === "MEDICATION" ||
+      category === "SMOKING" ||
+      category === "ALCOHOL" ||
+      category === "WEIGHT"
+    ) {
+      continue;
+    }
+
+    if (VITAL_GOAL_CATEGORIES.has(category) || frequency === "DAILY") {
+      addMetricQuery(goal);
+    }
+  }
+
+  const medications = (
+    Array.isArray(data?.today?.activeMedications)
+      ? data.today.activeMedications
+      : []
+  ).filter(
+    (medication: any) =>
+      String(medication?.status ?? "ACTIVE").toUpperCase() === "ACTIVE",
   );
+
+  const medicationGoals = goals.filter(
+    (goal: any) => String(goal?.category ?? "").toUpperCase() === "MEDICATION",
+  );
+
+  if (medicationGoals.length > 0) {
+    metricQueries.set("MEDICATION|medication.adherence", {
+      metricType: "MEDICATION",
+      metricKey: "medication.adherence",
+    });
+  }
+
+  if (goalsByCategory.has("SMOKING")) {
+    metricQueries.set("SMOKING|smoking.cigarettes", {
+      metricType: "SMOKING",
+      metricKey: "smoking.cigarettes",
+    });
+  }
+
+  const metricEventsByKey = new Map<string, any[]>();
+
+  try {
+    await Promise.all(
+      [...metricQueries.entries()].map(async ([key, definition]) => {
+        const response = await healthGoalsService.getMetricEvents(
+          definition.metricType,
+          definition.metricKey,
+          todayStart,
+          todayEnd,
+        );
+
+        metricEventsByKey.set(
+          key,
+          Array.isArray(response?.events) ? response.events : [],
+        );
+      }),
+    );
+  } catch {
+    return null;
+  }
+
+  if (medicationGoals.length > 0) {
+    const medicationEvents =
+      metricEventsByKey.get("MEDICATION|medication.adherence") ?? [];
+
+    for (const medication of medications) {
+      const patientMedicationIdValue = medicationPatientId(medication);
+      if (!patientMedicationIdValue) continue;
+
+      const matchingGoal = medicationGoals.find((goal: any) =>
+        medicationMatchesGoal(medication, goal, medications.length),
+      );
+      if (!matchingGoal) continue;
+
+      const required = requiredMedicationDoses(
+        medication?.frequency ?? medication?.schedule,
+      );
+
+      const actionsLoggedToday = medicationEvents.filter(
+        (event: any) =>
+          String(event?.sourceId ?? "").startsWith(
+            String(patientMedicationIdValue) + ":",
+          ),
+      ).length;
+
+      if (actionsLoggedToday < required) count += 1;
+    }
+  }
+
+  const smokingGoal = goalsByCategory.get("SMOKING")?.[0] ?? null;
+  if (smokingGoal) {
+    const smokingEvents =
+      metricEventsByKey.get("SMOKING|smoking.cigarettes") ?? [];
+
+    const loggedToday = smokingEvents.some((event: any) =>
+      String(event?.sourceId ?? "").startsWith(String(smokingGoal.id) + ":"),
+    );
+
+    if (!loggedToday) count += 1;
+  }
+
+  let hasVitalsAction = false;
+
+  for (const goal of goals) {
+    const { category, metricType, metricKey, frequency } = goalMetric(goal);
+
+    if (CHECK_IN_GOAL_CATEGORIES.has(category)) continue;
+    if (["MEDICATION", "SMOKING", "ALCOHOL", "WEIGHT"].includes(category)) {
+      continue;
+    }
+
+    if (VITAL_GOAL_CATEGORIES.has(category)) {
+      const events =
+        metricEventsByKey.get(metricType + "|" + metricKey) ?? [];
+
+      if (events.length === 0) hasVitalsAction = true;
+      continue;
+    }
+
+    if (frequency !== "DAILY") continue;
+
+    const events = metricEventsByKey.get(metricType + "|" + metricKey) ?? [];
+    if (events.length === 0) count += 1;
+  }
+
+  if (hasVitalsAction) count += 1;
+
+  return count;
 }
 
 function countActiveGoals(data: any) {
@@ -325,6 +585,7 @@ export default function HealthHome({ patientId }: { patientId?: string }) {
   const [symptomFeed, setSymptomFeed] = useState<any[]>([]);
   const [journalRecordCount, setJournalRecordCount] = useState(0);
   const [hasTodayCheckIn, setHasTodayCheckIn] = useState<boolean | null>(null);
+  const [todayActionCount, setTodayActionCount] = useState<number | null>(null);
 
   useEffect(() => {
     if (!data?.patient?.id) return;
@@ -371,6 +632,37 @@ export default function HealthHome({ patientId }: { patientId?: string }) {
       active = false;
     };
   }, [data?.patient?.id, data?.generatedAt]);
+
+  useEffect(() => {
+    if (!data?.patient?.id || hasTodayCheckIn === null) {
+      setTodayActionCount(null);
+      return;
+    }
+
+    let active = true;
+
+    void countTodayNeeds(data, hasTodayCheckIn)
+      .then((count) => {
+        if (active) setTodayActionCount(count);
+      })
+      .catch(() => {
+        if (active) setTodayActionCount(null);
+      });
+
+    return () => {
+      active = false;
+    };
+  }, [data?.patient?.id, data?.generatedAt, hasTodayCheckIn]);
+
+  useEffect(() => {
+    const refreshDashboard = () => void reload();
+
+    window.addEventListener("sympto:health-checkin-updated", refreshDashboard);
+
+    return () => {
+      window.removeEventListener("sympto:health-checkin-updated", refreshDashboard);
+    };
+  }, [reload]);
 
   const [unreadNotificationCount, setUnreadNotificationCount] = useState(0);
 
@@ -485,7 +777,6 @@ export default function HealthHome({ patientId }: { patientId?: string }) {
     : [];
 
   const activeGoalCount = countActiveGoals(data);
-  const todayActionCount = countTodayNeeds(data, hasTodayCheckIn);
   const dashboardNotifications = Array.isArray(data?.today?.notifications)
     ? data.today.notifications
     : [];
@@ -582,7 +873,7 @@ export default function HealthHome({ patientId }: { patientId?: string }) {
                         <span className="absolute inset-0 rounded-full bg-[#24C1C4] shadow-[0_0_42px_rgba(36,193,196,0.58),0_0_80px_rgba(36,193,196,0.28)] animate-pulse" />
                         <span className="relative grid h-full w-full place-items-center rounded-full bg-[#2BD6D3] text-[#0B2D54] shadow-[inset_0_2px_10px_rgba(255,255,255,0.28)]">
                           <span className="text-[54px] font-black leading-none tracking-[-0.08em] sm:text-[62px]">
-                            {todayActionCount}
+                            {todayActionCount ?? "—"}
                           </span>
                         </span>
                       </div>
