@@ -107,19 +107,69 @@ function countTodayNeeds(data: any, hasTodayCheckIn: boolean | null = null) {
     (symptom: any) => String(symptom?.status ?? "").toUpperCase() === "ACTIVE",
   );
 
-  const attentionItems = Array.isArray(data?.attention) ? data.attention : [];
-
-  const regularDueNotifications = (
-    Array.isArray(data?.today?.notifications) ? data.today.notifications : []
-  ).filter((notification: any) => {
-    if (notification?.scheduledFor) {
-      const scheduledAt = new Date(String(notification.scheduledFor)).getTime();
-      if (!Number.isFinite(scheduledAt) || scheduledAt > Date.now()) return false;
-    }
+  // Keep each active goal counted once. A prescribed medication that already
+  // has a live medication goal is represented by that goal on Today, so it
+  // must not be counted again as a separate active medication item.
+  const liveMedicationGoals = goals.filter((goal: any) => {
+    const status = String(goal?.status ?? "").toUpperCase();
     return (
-      String(notification?.type ?? "").toUpperCase() !== "REMINDER" &&
-      !["HIGH", "URGENT"].includes(String(notification?.priority ?? "").toUpperCase())
+      String(goal?.category ?? "").toUpperCase() === "MEDICATION" &&
+      !["ACHIEVED", "ARCHIVED", "CANCELLED", "DELETED", "EXPIRED", "ON_HOLD"].includes(status)
     );
+  });
+
+  const medicationNeedsAttention = medications.filter((medication: any) => {
+    const medicationPatientId =
+      medication?.patientMedication?.id ??
+      medication?.patientMedicationId ??
+      (String(medication?.source ?? "").toUpperCase() !== "PRESCRIPTION" &&
+      !String(medication?.id ?? "").startsWith("prescription-item-")
+        ? medication?.id
+        : null);
+
+    const medicationCatalogId =
+      medication?.medicationId ??
+      medication?.medication?.id ??
+      null;
+
+    const linkedGoalId =
+      medication?.healthGoalId ??
+      medication?.medicationGoalId ??
+      null;
+
+    const hasLiveMedicationGoal = liveMedicationGoals.some((goal: any) => {
+      if (linkedGoalId && String(goal?.id ?? "") === String(linkedGoalId)) return true;
+
+      const goalPatientMedicationId =
+        goal?.patientMedicationId ??
+        goal?.patientMedication?.id ??
+        goal?.associatedPatientMedicationId ??
+        goal?.associatedPatientMedication?.id ??
+        null;
+
+      if (
+        medicationPatientId &&
+        goalPatientMedicationId &&
+        String(medicationPatientId) === String(goalPatientMedicationId)
+      ) {
+        return true;
+      }
+
+      const goalMedicationId =
+        goal?.medicationId ??
+        goal?.associatedMedicationId ??
+        goal?.associatedMedication?.id ??
+        goal?.medication?.id ??
+        null;
+
+      return Boolean(
+        medicationCatalogId &&
+        goalMedicationId &&
+        String(medicationCatalogId) === String(goalMedicationId),
+      );
+    });
+
+    return !hasLiveMedicationGoal;
   });
 
   const deviceAlerts = Array.isArray(data?.wearables?.deviceAlerts)
@@ -148,12 +198,10 @@ function countTodayNeeds(data: any, hasTodayCheckIn: boolean | null = null) {
   );
 
   return (
-    medications.length +
+    medicationNeedsAttention.length +
     appointments.length +
     goals.length +
     activeSymptoms.length +
-    attentionItems.length +
-    regularDueNotifications.length +
     deviceAlerts.length +
     dueImmunizations.length +
     careTasks.length +
