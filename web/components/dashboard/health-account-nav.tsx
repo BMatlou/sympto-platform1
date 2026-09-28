@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { Activity, Bell, CalendarDays, FileHeart, FileText, HeartPulse, Menu, MessageCircle, Pill, QrCode, Settings, ShieldCheck, UserRound, Users, Watch, X, CreditCard, ClipboardList } from "lucide-react";
+import { Activity, Bell, CalendarDays, FileHeart, FileText, HeartPulse, IdCard, Menu, MessageCircle, Pill, QrCode, Receipt, Settings, ShieldCheck, Target, UserRound, Users, Watch, X, WalletCards, PhoneCall } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 
 type NavItem = readonly [string, string, React.ComponentType<{ className?: string }>];
@@ -9,35 +9,48 @@ type NavGroup = readonly [string, readonly NavItem[]];
 
 const groups: readonly NavGroup[] = [
   [
-    "Today & care",
+    "Clinical",
     [
-      ["/today", "Today", ShieldCheck],
-      ["/appointments", "Appointments", CalendarDays],
-      ["/notifications", "Notifications", Bell],
-      ["/medications", "Medications", Pill],
-      ["/care-plans", "Care Plans", ClipboardList],
-      ["/health-goals", "Health Goals", HeartPulse],
-      ["/log-symptom", "Log a symptom", HeartPulse],
-    ],
-  ],
-  [
-    "My health",
-    [
-      ["/health-passport", "Clinic Card", FileHeart],
-      ["/health-vitals", "Measurements", Activity],
-      ["/health-journal", "Health Journal", FileText],
       ["/health-records", "Health Records", FileText],
-      ["/messages", "Messages", MessageCircle],
-      ["/wearables", "Connected devices", Watch],
-      ["/family", "Family", Users],
+      ["/health-vitals", "Vitals & Measurements", Activity],
+      ["/medications", "Medications", Pill],
+      ["/health-passport", "Clinic Card", IdCard],
+      ["/risk-assessments", "Risk assessments", ShieldCheck],
+      ["/ai-reports", "AI health reports", HeartPulse],
+      ["/referrals", "Referrals", FileHeart],
+      ["/emergency-contacts", "Emergency contacts", PhoneCall],
     ],
   ],
   [
-    "My cover & account",
+    "My Health",
     [
-      ["/health-finance", "Medical aid & payments", CreditCard],
-      ["/emergency-contacts", "Emergency contacts", ShieldCheck],
+      ["/today", "Today", CalendarDays],
+      ["/health-journal", "Health Journal", FileText],
+      ["/health-goals", "Health Goals", Target],
+      ["/log-symptom", "Log a symptom", Activity],
+    ],
+  ],
+  [
+    "My Care",
+    [
+      ["/appointments", "Appointments", CalendarDays],
+      ["/care-plans", "Care Plans", ClipboardList],
+      ["/messages", "Messages", MessageCircle],
+      ["/smart-file", "Smart File & sharing", FileHeart],
+      ["/notifications", "Notifications", Bell],
+      ["/family", "Family & Care Circle", Users],
+    ],
+  ],
+  [
+    "My Account",
+    [
       ["/profile", "Profile", UserRound],
+      ["/health-finance", "Insurance, claims & billing", WalletCards],
+    ],
+  ],
+  [
+    "Settings",
+    [
       ["/settings", "Settings", Settings],
     ],
   ],
