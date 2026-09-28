@@ -241,7 +241,7 @@ export default function HealthNavigation() {
                 </section>
               ))}
             </div>
-          </div>          </div>
+          </div>
         </div>
       )}
     </div>
