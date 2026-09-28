@@ -35,6 +35,7 @@ const PRIMARY_NAV = [
   { href: "/health-records", label: "Health Records", icon: FileText },
   { href: "/health-vitals", label: "Vitals & Measurements", icon: Activity },
   { href: "/medications", label: "Medications", icon: Pill },
+  { href: "/appointments", label: "Appointments", icon: CalendarDays },
 ] as const;
 
 const MORE_GROUPS = [
@@ -44,8 +45,6 @@ const MORE_GROUPS = [
       { href: "/health-passport", label: "Clinic Card", icon: IdCard },
       { href: "/risk-assessments", label: "Risk assessments", icon: ShieldCheck },
       { href: "/ai-reports", label: "AI health reports", icon: HeartPulse },
-      { href: "/referrals", label: "Referrals", icon: FileHeart },
-      { href: "/emergency-contacts", label: "Emergency contacts", icon: PhoneCall },
     ],
   },
   {
@@ -65,6 +64,7 @@ const MORE_GROUPS = [
       { href: "/messages", label: "Messages", icon: MessageCircle },
       { href: "/smart-file", label: "Smart File & sharing", icon: FileHeart },
       { href: "/notifications", label: "Notifications", icon: Bell },
+      { href: "/referrals", label: "Referrals", icon: FileHeart },
       { href: "/family", label: "Family & Care Circle", icon: Users },
     ],
   },
@@ -72,9 +72,8 @@ const MORE_GROUPS = [
     title: "My Account",
     items: [
       { href: "/profile", label: "Profile", icon: UserRound },
-      { href: "/health-finance#insurance", label: "Insurance & medical aid", icon: WalletCards },
-      { href: "/health-finance#claims", label: "Claims", icon: FileText },
-      { href: "/health-finance#billing", label: "Invoices & payments", icon: Receipt },
+      { href: "/health-finance", label: "Insurance, claims & billing", icon: WalletCards },
+      { href: "/emergency-contacts", label: "Emergency contacts", icon: PhoneCall },
     ],
   },
   {
