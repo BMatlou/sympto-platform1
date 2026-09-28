@@ -11,6 +11,7 @@ interface MedicationAdherenceActionsProps {
   medicationId: string;
   medicationName: string;
   adherencePercentage?: number | null;
+  clinicalMedicationId?: string | null;
 }
 
 interface ClinicalSymptom {
@@ -75,7 +76,7 @@ function goalMatchesMedication(goal: any, patientMedicationId: string, medicatio
   return targetName === "metformin" && normalise(goal?.title) === "manage medication";
 }
 
-export function MedicationAdherenceActions({ medicationId, medicationName, adherencePercentage }: MedicationAdherenceActionsProps) {
+export function MedicationAdherenceActions({ medicationId, medicationName, adherencePercentage, clinicalMedicationId }: MedicationAdherenceActionsProps) {
   const { data: dashboard } = useDashboard();
   const [saving, setSaving] = useState<"TAKEN" | "SKIPPED" | null>(null);
   const [adherence, setAdherence] = useState(adherencePercentage ?? null);
@@ -126,7 +127,11 @@ export function MedicationAdherenceActions({ medicationId, medicationName, adher
       try {
         setClinicalLoading(true);
         setClinicalError(false);
-        const response = await api.get(`/patient-medications/${medicationId}/clinical-reference`);
+        const referenceMedicationId = String(clinicalMedicationId ?? "").trim();
+        const endpoint = referenceMedicationId
+          ? `/medications/${encodeURIComponent(referenceMedicationId)}/clinical-reference`
+          : `/patient-medications/${encodeURIComponent(medicationId)}/clinical-reference`;
+        const response = await api.get(endpoint);
         if (!cancelled) setClinical(response.data?.data ?? response.data ?? null);
       } catch {
         if (!cancelled) setClinicalError(true);
@@ -137,7 +142,7 @@ export function MedicationAdherenceActions({ medicationId, medicationName, adher
 
     void loadClinicalReference();
     return () => { cancelled = true; };
-  }, [clinicalOpen, clinical, clinicalLoading, medicationId]);
+  }, [clinicalOpen, clinical, clinicalLoading, medicationId, clinicalMedicationId]);
 
   async function record(action: "TAKEN" | "SKIPPED") {
     if (saving) return;
