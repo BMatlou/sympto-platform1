@@ -49,7 +49,7 @@ export class MedicationReminderSchedulerService {
     const schedule = await this.prisma.medicationReminderSchedule.findUnique({
       where: { id: scheduleId },
       include: {
-        patientMedication: { select: { id: true, status: true, ongoing: true, startedAt: true, endedAt: true, dosage: true, frequency: true, medication: { select: { name: true, genericName: true } } } },
+        patientMedication: { select: { id: true, status: true, ongoing: true, startedAt: true, endedAt: true, dosage: true, frequency: true, healthPassport: { select: { patient: { select: { userId: true } } } }, medication: { select: { name: true, genericName: true } } } },
         slots: { orderBy: { doseIndex: 'asc' } },
       },
     });
@@ -62,6 +62,14 @@ export class MedicationReminderSchedulerService {
 
     if (!schedule.enabled || !activeMedication) {
       await this.cancelSchedule(scheduleId);
+      const medicationName = schedule.patientMedication.medication.name || schedule.patientMedication.medication.genericName || 'Medication';
+      await this.prisma.notification.deleteMany({
+        where: {
+          userId: schedule.patientMedication.healthPassport.patient.userId,
+          title: 'Medication reminder: ' + medicationName,
+          status: { in: [NotificationStatus.PENDING, NotificationStatus.QUEUED] },
+        },
+      });
       return;
     }
 
