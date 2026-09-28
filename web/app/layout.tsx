@@ -1,4 +1,5 @@
 import type { Metadata, Viewport } from "next";
+import { Suspense } from "react";
 import "./globals.css";
 import "./hydration-card.css";
 import "./hydration-wave-fix.css";
@@ -58,7 +59,9 @@ export default function RootLayout({
       <body className="min-h-screen bg-background text-foreground">
         <ThemeProvider>
           <QueryProvider>
-            {children}
+            <Suspense fallback={null}>
+              {children}
+            </Suspense>
             <MedicationReminderNotifier />
             <PushNotificationBridge />
             <AIHealthHelperFab />
