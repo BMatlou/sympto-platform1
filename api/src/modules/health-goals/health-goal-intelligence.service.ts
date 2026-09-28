@@ -245,17 +245,50 @@ export class HealthGoalIntelligenceService {
     relationshipType: 'SUPPORTS' | 'RELATED_TO' | 'MONITORS',
     rationale: string | null,
   ) {
-    await this.prisma.$executeRawUnsafe(
-      'INSERT INTO "HealthGoalRelation" ("id","patientId","sourceGoalId","targetGoalId","relationshipType","rationale","createdBy") VALUES (gen_random_uuid(),$1,$2,$3,$4,$5,$6) ON CONFLICT ("sourceGoalId","targetGoalId","relationshipType") DO UPDATE SET "patientId"=EXCLUDED."patientId","rationale"=EXCLUDED."rationale","updatedAt"=CURRENT_TIMESTAMP',
-      patientId,
-      sourceGoalId,
-      targetGoalId,
-      relationshipType,
-      rationale,
-      'SYSTEM',
-    );
-  }
+    // Do not depend on the historical unique constraint being present.
+    // Some existing databases were created before HealthGoalRelation was
+    // hardened. Preserve the same upsert semantics with an update-first
+    // approach, then fall back to insert when the relation does not exist.
+    const updated = await this.prisma.$executeRaw`
+      UPDATE "HealthGoalRelation"
+      SET
+        "patientId" = ${patientId},
+        "rationale" = ${rationale},
+        "createdBy" = 'SYSTEM',
+        "updatedAt" = CURRENT_TIMESTAMP
+      WHERE "sourceGoalId" = ${sourceGoalId}
+        AND "targetGoalId" = ${targetGoalId}
+        AND "relationshipType" = ${relationshipType}
+    `;
 
+    if (updated > 0) return;
+
+    try {
+      await this.prisma.$executeRaw`
+        INSERT INTO "HealthGoalRelation"
+          ("id","patientId","sourceGoalId","targetGoalId","relationshipType","rationale","createdBy")
+        VALUES
+          (gen_random_uuid(), ${patientId}, ${sourceGoalId}, ${targetGoalId}, ${relationshipType}, ${rationale}, 'SYSTEM')
+      `;
+    } catch (error: any) {
+      // A concurrent request may have inserted the same relation after the
+      // update check. When the database still has the unique constraint,
+      // reconcile that race exactly as the old ON CONFLICT upsert did.
+      if (String(error?.code ?? '') !== 'P2002') throw error;
+
+      await this.prisma.$executeRaw`
+        UPDATE "HealthGoalRelation"
+        SET
+          "patientId" = ${patientId},
+          "rationale" = ${rationale},
+          "createdBy" = 'SYSTEM',
+          "updatedAt" = CURRENT_TIMESTAMP
+        WHERE "sourceGoalId" = ${sourceGoalId}
+          AND "targetGoalId" = ${targetGoalId}
+          AND "relationshipType" = ${relationshipType}
+      `;
+    }
+  }
   async getGoalRelationships(goalId: string) {
     const goal = await this.prisma.healthGoal.findUnique({
       where: { id: goalId },
