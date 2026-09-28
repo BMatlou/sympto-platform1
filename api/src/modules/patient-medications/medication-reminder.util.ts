@@ -37,10 +37,10 @@ export function getMedicationReminderFrequency(frequency: string | null | undefi
     }
   }
 
-  if (/once\s+(a|per)\s+day|once\s+daily|daily/.test(value)) return { doseCount: 1, cadence: "DAILY" };
   if (/twice\s+(a|per)\s+day|twice\s+daily/.test(value)) return { doseCount: 2, cadence: "DAILY" };
   if (/three\s+times?\s+(a|per)?\s*day|three\s+times?\s+daily/.test(value)) return { doseCount: 3, cadence: "DAILY" };
   if (/four\s+times?\s+(a|per)?\s*day|four\s+times?\s+daily/.test(value)) return { doseCount: 4, cadence: "DAILY" };
+  if (/once\s+(a|per)\s+day|once\s+daily|daily/.test(value)) return { doseCount: 1, cadence: "DAILY" };
 
   if (/times?\s*(a|per)?\s*day|daily/.test(value)) {
     const count = parseCount(value);
