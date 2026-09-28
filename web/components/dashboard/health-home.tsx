@@ -486,9 +486,15 @@ export default function HealthHome({ patientId }: { patientId?: string }) {
       <ActionLink
         href="/smart-file"
         ariaLabel="Share Smart File"
-        className="fixed right-4 top-4 z-[60] inline-flex min-h-10 items-center gap-2 rounded-2xl bg-[#0B2D54] px-4 py-2.5 text-[9px] font-black uppercase tracking-[0.08em] text-white shadow-[0_12px_28px_rgba(11,45,84,0.18)] transition-all hover:-translate-y-0.5 hover:bg-[#092544] sm:right-6 sm:top-5"
+        className="group fixed right-4 top-4 z-[60] inline-flex min-h-10 items-center gap-2 overflow-visible rounded-2xl bg-[#0B2D54] px-4 py-2.5 text-[9px] font-black uppercase tracking-[0.08em] text-white shadow-[0_12px_28px_rgba(11,45,84,0.18)] transition-all duration-300 hover:-translate-y-1 hover:bg-[#092544] hover:shadow-[0_18px_38px_rgba(11,45,84,0.28),0_0_28px_rgba(36,193,196,0.22)] sm:right-6 sm:top-5"
       >
-        <FileHeart className="h-3.5 w-3.5" aria-hidden="true" />
+        <span
+          aria-hidden="true"
+          className="pointer-events-none absolute -inset-2 rounded-[18px] bg-[#24C1C4]/20 opacity-0 blur-xl scale-90 transition-all duration-300 group-hover:scale-110 group-hover:opacity-100"
+        />
+        <span className="relative grid h-6 w-6 place-items-center rounded-xl bg-white/8 ring-1 ring-inset ring-white/10 transition-all duration-300 group-hover:scale-125 group-hover:bg-[#24C1C4]/18 group-hover:ring-[#24C1C4]/45 group-hover:shadow-[0_0_18px_rgba(36,193,196,0.58)]">
+          <FileHeart className="h-3.5 w-3.5 text-white transition-all duration-300 group-hover:scale-110 group-hover:text-[#24C1C4]" aria-hidden="true" />
+        </span>
         <span className="hidden sm:inline">Share Smart File</span>
         <span className="sm:hidden">Share</span>
       </ActionLink>
