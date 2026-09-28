@@ -280,9 +280,18 @@ async function countTodayNeeds(
         ? data.symptoms
         : [];
 
-  const activeSymptoms = symptomSource.filter(
-    (symptom: any) => String(symptom?.status ?? "").toUpperCase() === "ACTIVE",
-  );
+  const activeSymptoms = symptomSource.filter((symptom: any) => {
+    if (String(symptom?.status ?? "").toUpperCase() !== "ACTIVE") return false;
+
+    // An active symptom is a Today action only until the user records
+    // today's monitoring update. It may remain clinically active after
+    // today's update, but the user has completed today's action for it.
+    const latestMonitoring = Array.isArray(symptom?.monitorings)
+      ? symptom.monitorings[0]
+      : null;
+
+    return localDayKey(latestMonitoring?.observedAt) !== todayKey;
+  });
 
   const deviceAlerts = Array.isArray(data?.wearables?.deviceAlerts)
     ? data.wearables.deviceAlerts
@@ -318,6 +327,21 @@ async function countTodayNeeds(
     : []).filter(
       (medication: any) => String(medication?.status ?? "ACTIVE").toUpperCase() === "ACTIVE",
     );
+
+  const todayHealthMeasurements = [
+    ...(Array.isArray(data?.healthSnapshot?.latestMeasurements)
+      ? data.healthSnapshot.latestMeasurements
+      : []),
+    ...(Array.isArray(data?.healthSnapshot?.normalizedVitals)
+      ? data.healthSnapshot.normalizedVitals
+      : []),
+    ...(Array.isArray(data?.clinicalVitals) ? data.clinicalVitals : []),
+  ];
+
+  const hasCurrentHealthMeasurementToday = todayHealthMeasurements.some((measurement: any) => {
+    const measuredAt = measurement?.measuredAt ?? measurement?.recordedAt ?? null;
+    return localDayKey(measuredAt) === todayKey;
+  });
 
   let count =
     appointmentsToday.length +
@@ -511,6 +535,13 @@ async function countTodayNeeds(
     }, 0);
     const target = goalTarget(goal);
     if (target !== null && weeklyTotal > target) count += 1;
+  }
+
+  // Current Health is a shared Today action even when no BP/heart-rate
+  // goal exists. If there are explicit vital goals, their existing logic
+  // below supplies the one shared vitals action instead.
+  if (vitalGoals.length === 0 && !hasCurrentHealthMeasurementToday) {
+    count += 1;
   }
 
   if (vitalGoals.length > 0) {
