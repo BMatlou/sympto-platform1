@@ -64,7 +64,7 @@ function itemNames(
     .filter(Boolean) as string[];
 }
 
-function countTodayNeeds(data: any) {
+function countTodayNeeds(data: any, hasTodayCheckIn = false) {
   const dayKey = (value: unknown) => {
     if (!value) return "";
     const date = new Date(String(value));
@@ -79,9 +79,10 @@ function countTodayNeeds(data: any) {
 
   const today = dayKey(new Date());
 
-  const medications = Array.isArray(data?.today?.activeMedications)
+  const medications = (Array.isArray(data?.today?.activeMedications)
     ? data.today.activeMedications
-    : [];
+    : []
+  ).filter((medication: any) => String(medication?.status ?? "ACTIVE").toUpperCase() === "ACTIVE");
 
   const appointments = (
     Array.isArray(data?.appointments) && data.appointments.length > 0
@@ -101,10 +102,6 @@ function countTodayNeeds(data: any) {
           String(goal?.status ?? "").toUpperCase(),
         ),
       );
-
-  const nonMedicationGoals = goals.filter(
-    (goal: any) => String(goal?.category ?? "").toUpperCase() !== "MEDICATION",
-  );
 
   const activeSymptoms = (Array.isArray(data?.symptoms) ? data.symptoms : []).filter(
     (symptom: any) => String(symptom?.status ?? "").toUpperCase() === "ACTIVE",
@@ -153,14 +150,14 @@ function countTodayNeeds(data: any) {
   return (
     medications.length +
     appointments.length +
-    nonMedicationGoals.length +
+    goals.length +
     activeSymptoms.length +
     attentionItems.length +
     regularDueNotifications.length +
     deviceAlerts.length +
     dueImmunizations.length +
-    careTasks.length
-  );
+    careTasks.length +
+    (hasTodayCheckIn ? 0 : 1)  );
 }
 
 function countActiveGoals(data: any) {
@@ -278,6 +275,7 @@ export default function HealthHome({ patientId }: { patientId?: string }) {
   const { data, loading, error, reload } = useDashboard(patientId);
   const [symptomFeed, setSymptomFeed] = useState<any[]>([]);
   const [journalRecordCount, setJournalRecordCount] = useState(0);
+  const [hasTodayCheckIn, setHasTodayCheckIn] = useState(false);
 
   useEffect(() => {
     if (!data?.patient?.id) return;
@@ -286,12 +284,33 @@ export default function HealthHome({ patientId }: { patientId?: string }) {
 
     Promise.all([
       healthJournalService.getSymptoms({ limit: 100 }),
-      healthJournalService.getAll({ page: 1, limit: 1 }),
+      healthJournalService.getAll({ page: 1, limit: 100 }),
     ])
       .then(([symptoms, journals]) => {
         if (!active) return;
         setSymptomFeed(Array.isArray(symptoms) ? symptoms : []);
         setJournalRecordCount(Number(journals?.pagination?.total ?? journals?.data?.length ?? 0));
+
+        const todayKey = new Intl.DateTimeFormat("en-CA", {
+          timeZone: "Africa/Johannesburg",
+          year: "numeric",
+          month: "2-digit",
+          day: "2-digit",
+        }).format(new Date());
+
+        const hasCheckIn = (Array.isArray(journals?.data) ? journals.data : []).some((journal: any) => {
+          if (journal?.title !== "Daily Health Check-in" || !journal?.createdAt) return false;
+          const journalDate = new Date(String(journal.createdAt));
+          if (Number.isNaN(journalDate.getTime())) return false;
+          return new Intl.DateTimeFormat("en-CA", {
+            timeZone: "Africa/Johannesburg",
+            year: "numeric",
+            month: "2-digit",
+            day: "2-digit",
+          }).format(journalDate) === todayKey;
+        });
+
+        setHasTodayCheckIn(hasCheckIn);
       })
       .catch(() => {
         if (!active) return;
@@ -416,7 +435,7 @@ export default function HealthHome({ patientId }: { patientId?: string }) {
     : [];
 
   const activeGoalCount = countActiveGoals(data);
-  const todayActionCount = countTodayNeeds(data);
+  const todayActionCount = countTodayNeeds(data, hasTodayCheckIn);
   const dashboardNotifications = Array.isArray(data?.today?.notifications)
     ? data.today.notifications
     : [];
