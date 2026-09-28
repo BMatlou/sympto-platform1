@@ -17,6 +17,7 @@ import {
   NotebookPen,
   PhoneCall,
   Pill,
+  Receipt,
   Settings,
   ShieldCheck,
   Target,
@@ -67,7 +68,9 @@ const MORE_GROUPS = [
     title: "My Account",
     items: [
       { href: "/profile", label: "Profile", icon: UserRound },
-      { href: "/health-finance", label: "Medical aid & payments", icon: WalletCards },
+      { href: "/health-finance#insurance", label: "Insurance & medical aid", icon: WalletCards },
+      { href: "/health-finance#claims", label: "Claims", icon: FileText },
+      { href: "/health-finance#billing", label: "Invoices & payments", icon: Receipt },
       { href: "/emergency-contacts", label: "Emergency contacts", icon: PhoneCall },
       { href: "/privacy", label: "Privacy & consent", icon: ShieldCheck },
       { href: "/settings", label: "Settings", icon: Settings },
