@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { Suspense } from "react";
 import { useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import {
@@ -188,7 +189,7 @@ function documentBodyOverflow() {
   return document.body.style.overflow;
 }
 
-export default function HealthRecordsPage() {
+function HealthRecordsContent() {
   const searchParams = useSearchParams();
   const patientId = searchParams.get("patientId") || undefined;
   const { data, loading, error, reload } = useDashboard();
@@ -340,5 +341,13 @@ export default function HealthRecordsPage() {
       </main>
       {selected && <ReportModal record={selected} onClose={closePreview} />}
     </ProtectedRoute>
+  );
+}
+
+export default function HealthRecordsPage() {
+  return (
+    <Suspense fallback={<div className="min-h-screen bg-[#f5f8fb]" aria-label="Loading health records" />}>
+      <HealthRecordsContent />
+    </Suspense>
   );
 }
