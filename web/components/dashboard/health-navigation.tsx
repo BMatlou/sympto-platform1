@@ -36,31 +36,36 @@ const PRIMARY_NAV = [
   { href: "/health-records", label: "Health Records", icon: FileText },
   { href: "/health-vitals", label: "Vitals & Measurements", icon: Activity },
   { href: "/medications", label: "Medications", icon: Pill },
-  { href: "/appointments", label: "Appointments", icon: CalendarDays },
 ] as const;
 
 const MORE_GROUPS = [
   {
+    title: "Clinical",
+    items: [
+      { href: "/health-passport", label: "Clinic Card", icon: IdCard },
+      { href: "/risk-assessments", label: "Risk assessments", icon: ShieldCheck },
+      { href: "/ai-reports", label: "AI health reports", icon: HeartPulse },
+      { href: "/referrals", label: "Referrals", icon: FileHeart },
+    ],
+  },
+  {
     title: "My Health",
     items: [
       { href: "/today", label: "Today", icon: CalendarCheck2 },
-      { href: "/health-passport", label: "Clinic Card", icon: IdCard },
       { href: "/health-journal", label: "Health Journal", icon: NotebookPen },
       { href: "/health-goals", label: "Health Goals", icon: Target },
       { href: "/log-symptom", label: "Log a symptom", icon: Activity },
       { href: "/wearables", label: "Connected devices", icon: Watch },
-      { href: "/risk-assessments", label: "Risk assessments", icon: ShieldCheck },
-      { href: "/ai-reports", label: "AI health reports", icon: HeartPulse },
     ],
   },
   {
     title: "My Care",
     items: [
+      { href: "/appointments", label: "Appointments", icon: CalendarDays },
       { href: "/care-plans", label: "Care Plans", icon: ClipboardList },
       { href: "/messages", label: "Messages", icon: MessageCircle },
       { href: "/smart-file", label: "Smart File & sharing", icon: FileHeart },
       { href: "/notifications", label: "Notifications", icon: Bell },
-      { href: "/referrals", label: "Referrals", icon: FileHeart },
       { href: "/family", label: "Family & Care Circle", icon: Users },
     ],
   },
@@ -73,6 +78,11 @@ const MORE_GROUPS = [
       { href: "/health-finance#billing", label: "Invoices & payments", icon: Receipt },
       { href: "/emergency-contacts", label: "Emergency contacts", icon: PhoneCall },
       { href: "/privacy", label: "Privacy & consent", icon: ShieldCheck },
+    ],
+  },
+  {
+    title: "Settings",
+    items: [
       { href: "/settings", label: "Settings", icon: Settings },
     ],
   },
@@ -160,7 +170,7 @@ export default function HealthNavigation() {
           : undefined
       }
       className="fixed inset-x-2 top-2 z-50 flex h-14 items-center gap-2 rounded-2xl border border-white/10 bg-[#0B2D54] p-2 shadow-[0_18px_45px_rgba(11,45,84,0.22)] lg:left-4 lg:right-auto lg:w-[72px] lg:flex-col lg:rounded-[26px] lg:p-2 lg:top-[var(--nav-top,1rem)] lg:h-[var(--nav-height,calc(100vh-2rem))]">
-      <nav className="flex min-w-0 flex-1 items-center justify-center gap-1 lg:h-full lg:flex-col lg:items-stretch lg:justify-start lg:gap-1" aria-label="Primary health navigation">
+      <nav className="flex min-w-0 flex-1 items-center justify-center gap-1 lg:h-full lg:flex-col lg:items-stretch lg:justify-start lg:gap-1" aria-label="Primary Sympto navigation">
         {PRIMARY_NAV.map(({ href, label, icon: Icon }) => {
           const isActive = pathname === href || (href === "/dashboard" && pathname === "/");
           return (
@@ -205,7 +215,7 @@ export default function HealthNavigation() {
         >
           <div className="px-4 pb-3 pt-4">
             <p className="text-[10px] font-black uppercase tracking-[0.18em] text-white/55">Your health</p>
-            <p className="mt-1 text-base font-black tracking-[-0.02em] text-white">Your health, care & account</p>
+            <p className="mt-1 text-base font-black tracking-[-0.02em] text-white">Your health, care, account & settings</p>
           </div>
           <div className="border-t border-white/10 px-1 py-2">
             <div className="space-y-1">
