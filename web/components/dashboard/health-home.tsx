@@ -64,7 +64,7 @@ function itemNames(
     .filter(Boolean) as string[];
 }
 
-function countTodayNeeds(data: any, hasTodayCheckIn = false) {
+function countTodayNeeds(data: any, hasTodayCheckIn: boolean | null = null) {
   const dayKey = (value: unknown) => {
     if (!value) return "";
     const date = new Date(String(value));
@@ -157,7 +157,8 @@ function countTodayNeeds(data: any, hasTodayCheckIn = false) {
     deviceAlerts.length +
     dueImmunizations.length +
     careTasks.length +
-    (hasTodayCheckIn ? 0 : 1)  );
+    (hasTodayCheckIn === false ? 1 : 0)
+  );
 }
 
 function countActiveGoals(data: any) {
@@ -275,7 +276,7 @@ export default function HealthHome({ patientId }: { patientId?: string }) {
   const { data, loading, error, reload } = useDashboard(patientId);
   const [symptomFeed, setSymptomFeed] = useState<any[]>([]);
   const [journalRecordCount, setJournalRecordCount] = useState(0);
-  const [hasTodayCheckIn, setHasTodayCheckIn] = useState(false);
+  const [hasTodayCheckIn, setHasTodayCheckIn] = useState<boolean | null>(null);
 
   useEffect(() => {
     if (!data?.patient?.id) return;
@@ -315,6 +316,7 @@ export default function HealthHome({ patientId }: { patientId?: string }) {
       .catch(() => {
         if (!active) return;
         setSymptomFeed([]);
+        setHasTodayCheckIn(null);
       });
 
     return () => {
