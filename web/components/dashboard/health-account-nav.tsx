@@ -17,8 +17,6 @@ const groups: readonly NavGroup[] = [
       ["/health-passport", "Clinic Card", IdCard],
       ["/risk-assessments", "Risk assessments", ShieldCheck],
       ["/ai-reports", "AI health reports", HeartPulse],
-      ["/referrals", "Referrals", FileHeart],
-      ["/emergency-contacts", "Emergency contacts", PhoneCall],
     ],
   ],
   [
@@ -38,6 +36,7 @@ const groups: readonly NavGroup[] = [
       ["/messages", "Messages", MessageCircle],
       ["/smart-file", "Smart File & sharing", FileHeart],
       ["/notifications", "Notifications", Bell],
+      ["/referrals", "Referrals", FileHeart],
       ["/family", "Family & Care Circle", Users],
     ],
   ],
@@ -46,6 +45,7 @@ const groups: readonly NavGroup[] = [
     [
       ["/profile", "Profile", UserRound],
       ["/health-finance", "Insurance, claims & billing", WalletCards],
+      ["/emergency-contacts", "Emergency contacts", PhoneCall],
     ],
   ],
   [
