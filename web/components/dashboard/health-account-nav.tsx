@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { Activity, Bell, CalendarDays, FileHeart, FileText, HeartPulse, IdCard, Menu, MessageCircle, Pill, QrCode, Receipt, Settings, ShieldCheck, Target, UserRound, Users, Watch, X, WalletCards, PhoneCall } from "lucide-react";
+import { Activity, Bell, CalendarDays, ClipboardList, FileHeart, FileText, HeartPulse, IdCard, Menu, MessageCircle, Pill, QrCode, Settings, ShieldCheck, Target, UserRound, Users, X, WalletCards, PhoneCall } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 
 type NavItem = readonly [string, string, React.ComponentType<{ className?: string }>];
