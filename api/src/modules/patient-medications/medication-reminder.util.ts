@@ -61,11 +61,11 @@ export function assertReminderTimezone(timezone: string) {
 function offsetMinutesAt(date: Date, timezone: string) {
   const parts = new Intl.DateTimeFormat("en-US", { timeZone: timezone, timeZoneName: "shortOffset" }).formatToParts(date);
   const raw = parts.find((part) => part.type === "timeZoneName")?.value ?? "GMT";
-  const match = raw.match(/^GMT(?:(\+|-)()(\d{1,2})(?::(\d{2}))?)?$/);
+  const match = raw.match(/^GMT(?:(\+|-)(\d{1,2})(?::(\d{2}))?)?$/);
   if (!match) return 0;
   const sign = match[1] === "-" ? -1 : 1;
-  const hours = Number(match[3] ?? 0);
-  const minutes = Number(match[4] ?? 0);
+  const hours = Number(match[2] ?? 0);
+  const minutes = Number(match[3] ?? 0);
   return sign * (hours * 60 + minutes);
 }
 
