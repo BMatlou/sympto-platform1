@@ -2,7 +2,8 @@
 
 import HealthNavigation from "@/components/dashboard/health-navigation";
 import HealthHome from "@/components/dashboard/health-home";
-import { Suspense, useSearchParams } from "next/navigation";
+import { Suspense } from "react";
+import { useSearchParams } from "next/navigation";
 
 function DashboardContent() {
   const searchParams = useSearchParams();
