@@ -24,7 +24,6 @@ import {
   UserRound,
   Users,
   WalletCards,
-  Watch,
   X,
 } from "lucide-react";
 import type { CSSProperties } from "react";
