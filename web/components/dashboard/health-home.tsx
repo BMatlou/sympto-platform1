@@ -239,13 +239,17 @@ async function countTodayNeeds(
     return dayFormatter.format(date);
   };
 
-  const appointments = (
+  const appointmentsSource =
     Array.isArray(data?.appointments) && data.appointments.length > 0
       ? data.appointments
       : Array.isArray(data?.today?.upcomingAppointments)
         ? data.today.upcomingAppointments
-        : []
-  ).filter((appointment: any) => localDayKey(appointment?.scheduledStart) === todayKey);
+        : [];
+
+  const appointmentsToday = appointmentsSource.filter(
+    (appointment: any) =>
+      localDayKey(appointment?.scheduledStart) === todayKey,
+  );
 
   const allGoals = [
     ...(Array.isArray(data?.goals) ? data.goals : []),
@@ -260,8 +264,12 @@ async function countTodayNeeds(
     seenGoals.add(id);
 
     const status = String(goal?.status ?? "").toUpperCase();
-    return ACTIVE_TODAY_GOAL_STATUSES.has(status) ||
-      (String(goal?.category ?? "").toUpperCase() === "MEDICATION" && status === "NOT_STARTED");
+    const category = String(goal?.category ?? "").toUpperCase();
+
+    return (
+      ACTIVE_TODAY_GOAL_STATUSES.has(status) ||
+      (category === "MEDICATION" && status === "NOT_STARTED")
+    );
   });
 
   const activeSymptoms = (Array.isArray(data?.symptoms) ? data.symptoms : []).filter(
@@ -281,7 +289,6 @@ async function countTodayNeeds(
   const dueImmunizations = immunizations.filter((item: any) => {
     const status = String(item?.status ?? "").toUpperCase();
     if (status === "MISSED") return true;
-
     return (
       status === "SCHEDULED" &&
       Boolean(item?.nextDueDate) &&
@@ -293,271 +300,231 @@ async function countTodayNeeds(
     (plan: any) =>
       (Array.isArray(plan?.tasks) ? plan.tasks : []).filter((task: any) => {
         const status = String(task?.status ?? "").toUpperCase();
-        if (["COMPLETED", "CANCELLED"].includes(status) || !task?.dueDate) {
-          return false;
-        }
+        if (["COMPLETED", "CANCELLED"].includes(status) || !task?.dueDate) return false;
         return localDayKey(task.dueDate) <= todayKey;
       }),
   );
 
+  const medications = (Array.isArray(data?.today?.activeMedications)
+    ? data.today.activeMedications
+    : []).filter(
+      (medication: any) => String(medication?.status ?? "ACTIVE").toUpperCase() === "ACTIVE",
+    );
+
   let count =
-    appointments.length +
+    appointmentsToday.length +
     activeSymptoms.length +
     deviceAlerts.length +
     dueImmunizations.length +
     careTasks.length;
 
-  // Today always exposes one Daily Health Check-in action. It is one shared
-  // action even when several goals depend on it.
-  const checkInGoalCategories = CHECK_IN_GOAL_CATEGORIES;
   const checkInGoals = goals.filter((goal: any) =>
-    checkInGoalCategories.has(goalMetric(goal).category),
+    CHECK_IN_GOAL_CATEGORIES.has(goalMetric(goal).category),
   );
+  const vitalGoals = goals.filter((goal: any) =>
+    VITAL_GOAL_CATEGORIES.has(goalMetric(goal).category),
+  );
+  const smokingGoals = goals.filter(
+    (goal: any) => goalMetric(goal).category === "SMOKING",
+  );
+  const alcoholGoals = goals.filter(
+    (goal: any) => goalMetric(goal).category === "ALCOHOL",
+  );
+  const manualDailyGoals = goals.filter((goal: any) => {
+    const { category, frequency } = goalMetric(goal);
+    if ([
+      "MEDICATION", "SMOKING", "ALCOHOL", "WEIGHT", "EXERCISE",
+      "SLEEP", "MENTAL_HEALTH", "HYDRATION", "BLOOD_PRESSURE", "HEART_RATE",
+    ].includes(category)) return false;
+    return frequency === "DAILY";
+  });
 
-  const metricQueries = new Map<
-    string,
-    { metricType: string; metricKey: string; from: Date; to: Date }
-  >();
+  const startOfSouthAfricaWeek = () => {
+    const parts = new Intl.DateTimeFormat("en-CA", {
+      timeZone: "Africa/Johannesburg",
+      year: "numeric", month: "2-digit", day: "2-digit",
+    }).formatToParts(new Date());
+    const year = Number(parts.find((part) => part.type === "year")?.value);
+    const month = Number(parts.find((part) => part.type === "month")?.value);
+    const day = Number(parts.find((part) => part.type === "day")?.value);
+    const monday = new Date(Date.UTC(year, month - 1, day));
+    const weekday = monday.getUTCDay();
+    const daysFromMonday = weekday === 0 ? 6 : weekday - 1;
+    monday.setUTCDate(monday.getUTCDate() - daysFromMonday);
+    return new Date(monday.toISOString().slice(0, 10) + "T00:00:00+02:00");
+  };
 
-  const addMetricQuery = (
-    goal: any,
-    from = todayStart,
-    to = todayEnd,
-  ) => {
-    const { metricType, metricKey } = goalMetric(goal);
+  const weekStart = startOfSouthAfricaWeek();
+  const now = new Date();
+
+  type MetricQuery = { metricType: string; metricKey: string; from: Date; to: Date };
+  const metricQueries = new Map<string, MetricQuery>();
+  const addMetricQuery = (metricType: string, metricKey: string, from: Date = todayStart, to: Date = todayEnd) => {
     const key = metricType + "|" + metricKey + "|" + from.toISOString();
     metricQueries.set(key, { metricType, metricKey, from, to });
   };
 
-  const startOfSouthAfricaWeek = () => {
-    const start = new Date(todayStart);
-    const weekday = start.getUTCDay();
-    const daysFromMonday = weekday === 0 ? 6 : weekday - 1;
-    start.setUTCDate(start.getUTCDate() - daysFromMonday);
-    return start;
+  if (medications.length > 0) addMetricQuery("MEDICATION", "medication.adherence");
+  for (const goal of checkInGoals) {
+    const { category, metricType, metricKey } = goalMetric(goal);
+    addMetricQuery(metricType, metricKey, category === "EXERCISE" ? weekStart : todayStart, category === "EXERCISE" ? now : todayEnd);
+  }
+  for (const goal of vitalGoals) {
+    const { metricType, metricKey } = goalMetric(goal);
+    addMetricQuery(metricType, metricKey);
+  }
+  for (const goal of smokingGoals) {
+    const { metricType, metricKey } = goalMetric(goal);
+    addMetricQuery(metricType, metricKey);
+  }
+  for (const goal of alcoholGoals) {
+    const { metricType, metricKey } = goalMetric(goal);
+    addMetricQuery(metricType, metricKey, weekStart, now);
+  }
+  for (const goal of manualDailyGoals) {
+    const { metricType, metricKey } = goalMetric(goal);
+    addMetricQuery(metricType, metricKey);
+  }
+
+  const metricEventsByKey = new Map<string, any[]>();
+  const metricQueryFailed = new Set<string>();
+
+  await Promise.all([...metricQueries.entries()].map(async ([key, definition]) => {
+    try {
+      const response = await healthGoalsService.getMetricEvents(
+        definition.metricType,
+        definition.metricKey,
+        definition.from,
+        definition.to,
+      );
+      metricEventsByKey.set(key, Array.isArray(response?.events) ? response.events : []);
+    } catch {
+      metricQueryFailed.add(key);
+    }
+  }));
+
+  const eventsFor = (metricType: string, metricKey: string, from: Date = todayStart) => {
+    const key = metricType + "|" + metricKey + "|" + from.toISOString();
+    return {
+      events: metricEventsByKey.get(key) ?? [],
+      failed: metricQueryFailed.has(key),
+    };
   };
 
-  const weekStart = startOfSouthAfricaWeek();
+  const latestNumericEvent = (events: any[]) =>
+    [...events]
+      .filter((event: any) => Number.isFinite(Number(event?.loggedValue)))
+      .sort((a: any, b: any) => new Date(String(b?.occurredAt ?? 0)).getTime() - new Date(String(a?.occurredAt ?? 0)).getTime())[0] ?? null;
 
-  const medicationMetricKey =
-    "MEDICATION|medication.adherence|" + todayStart.toISOString();
-  const medicationEvents = metricEventsByKey.get(medicationMetricKey) ?? [];
-  const medicationMetricFailed = metricQueryFailed.has(medicationMetricKey);
+  const goalTarget = (goal: any): number | null => {
+    const raw = goal?.metricConfig?.frequencyTarget ?? goal?.frequencyTarget ?? goal?.targetValue;
+    if (raw === null || raw === undefined || raw === "") return null;
+    const parsed = Number(raw);
+    return Number.isFinite(parsed) ? parsed : null;
+  };
 
-  // Medication itself is a Today action. A linked MEDICATION goal enriches
-  // the journey, but it must never be required before the scheduled medicine
-  // appears in the dashboard attention count.
-  for (const medication of medications) {
-    const required = requiredMedicationDoses(
-      medication?.frequency ?? medication?.schedule,
-    );
+  const goalComparison = (goal: any) => String(goal?.metricConfig?.comparison ?? goal?.comparison ?? "AT_MOST").toUpperCase();
+  const valueNeedsAttention = (goal: any, value: number | null) => {
+    if (value === null || !Number.isFinite(value)) return true;
+    const target = goalTarget(goal);
+    if (target === null) return true;
+    const comparison = goalComparison(goal);
+    if (comparison === "AT_LEAST") return value < target;
+    if (comparison === "AT_MOST") return value > target;
+    if (comparison === "CLOSEST") return Math.abs(value - target) > Math.max(0.5, Math.abs(target) * 0.05);
+    if (comparison === "INCREASE_TO") return value < target;
+    if (comparison === "DECREASE_TO") return value > target;
+    return false;
+  };
 
-    const patientMedicationIdValue =
-      medication?.patientMedication?.id ??
-      medication?.patientMedicationId ??
-      (
-        String(medication?.source ?? "").trim().toUpperCase() !== "PRESCRIPTION" &&
-        !String(medication?.id ?? "").startsWith("prescription-item-")
-          ? medication?.id
-          : null
-      );
-
-    if (!patientMedicationIdValue || medicationMetricFailed) {
-      count += 1;
-      continue;
-    }
-
-    const actionsLoggedToday = medicationEvents.filter(
-      (event: any) =>
-        String(event?.sourceId ?? "").startsWith(
-          String(patientMedicationIdValue) + ":",
-        ),
-    ).length;
-
-    if (actionsLoggedToday < required) count += 1;
-  }
-  const smokingGoal = goals.find(
-    (goal: any) => goalMetric(goal).category === "SMOKING",
-  );
-
-  if (smokingGoal) {
-    const { events, failed } = metricEventsFor(smokingGoal);
-
-    if (failed) {
-      count += 1;
-    } else {
-      const todayKeyValue = todayKey;
-      const loggedEvent =
-        events.find(
-          (event: any) =>
-            String(event?.sourceId ?? "") ===
-            String(smokingGoal.id) + ":" + todayKeyValue,
-        ) ?? null;
-
-      if (!loggedEvent) {
-        count += 1;
+  if (hasTodayCheckIn === false) {
+    count += 1;
+  } else {
+    let checkInNeedsAttention = false;
+    for (const goal of checkInGoals) {
+      const { category, metricType, metricKey } = goalMetric(goal);
+      const { events, failed } = eventsFor(metricType, metricKey, category === "EXERCISE" ? weekStart : todayStart);
+      if (failed) { checkInNeedsAttention = true; break; }
+      if (category === "EXERCISE") {
+        const exerciseEvents = events.map((event: any) => ({
+          loggedValue: Number(event?.loggedValue),
+          occurredAt: String(event?.occurredAt ?? ""),
+          source: event?.source ?? null,
+        }));
+        const total = canonicalExerciseWeekTotal(exerciseEvents);
+        const target = goalTarget(goal);
+        if (target === null || total < target) { checkInNeedsAttention = true; break; }
       } else {
-        const loggedValue = Number(loggedEvent?.loggedValue);
-        const target = goalTarget(smokingGoal);
-        if (target !== null && Number.isFinite(loggedValue) && loggedValue > target) {
-          count += 1;
-        }
+        const latest = latestNumericEvent(events);
+        const value = latest ? Number(latest.loggedValue) : null;
+        if (valueNeedsAttention(goal, value)) { checkInNeedsAttention = true; break; }
       }
     }
+    if (checkInNeedsAttention) count += 1;
   }
 
-  const alcoholGoal = goals.find(
-    (goal: any) => goalMetric(goal).category === "ALCOHOL",
-  );
-
-  if (alcoholGoal) {
-    const { events, failed } = metricEventsFor(alcoholGoal, weekStart);
-
-    if (failed) {
-      count += 1;
-    } else {
-      const weeklyTotal = events.reduce((sum: number, event: any) => {
-        const value = Number(event?.loggedValue);
-        return sum + (Number.isFinite(value) ? value : 0);
-      }, 0);
-
-      const target = goalTarget(alcoholGoal);
-      if (target === null || weeklyTotal > target) {
+  if (medications.length > 0) {
+    const medicationMetric = eventsFor("MEDICATION", "medication.adherence");
+    for (const medication of medications) {
+      const required = requiredMedicationDoses(medication?.frequency ?? medication?.schedule);
+      const patientMedicationId = medicationPatientId(medication);
+      if (!patientMedicationId || medicationMetric.failed) {
         count += 1;
+        continue;
       }
+      const actionsLoggedToday = medicationMetric.events.filter((event: any) =>
+        String(event?.sourceId ?? "").startsWith(String(patientMedicationId) + ":"),
+      ).length;
+      if (actionsLoggedToday < required) count += 1;
     }
   }
 
-  const exerciseGoal = goals.find(
-    (goal: any) => goalMetric(goal).category === "EXERCISE",
-  );
+  for (const goal of smokingGoals) {
+    const { metricType, metricKey } = goalMetric(goal);
+    const { events, failed } = eventsFor(metricType, metricKey);
+    if (failed) { count += 1; continue; }
+    const loggedToday = events.some((event: any) =>
+      String(event?.sourceId ?? "").startsWith(String(goal?.id ?? "") + ":") || localDayKey(event?.occurredAt) === todayKey,
+    );
+    if (!loggedToday) { count += 1; continue; }
+    const latest = latestNumericEvent(events);
+    const current = latest ? Number(latest.loggedValue) : null;
+    const target = goalTarget(goal);
+    if (target !== null && current !== null && Number.isFinite(current) && current > target) count += 1;
+  }
 
-  // Exercise is represented inside the shared Daily Health Check-in, so it
-  // does not create a second counter item here.
-  void exerciseGoal;
-
-  const vitalGoals = goals.filter((goal: any) =>
-    VITAL_GOAL_CATEGORIES.has(goalMetric(goal).category),
-  );
+  for (const goal of alcoholGoals) {
+    const { metricType, metricKey } = goalMetric(goal);
+    const { events, failed } = eventsFor(metricType, metricKey, weekStart);
+    if (failed) { count += 1; continue; }
+    const weeklyTotal = events.reduce((sum: number, event: any) => {
+      const value = Number(event?.loggedValue);
+      return sum + (Number.isFinite(value) ? value : 0);
+    }, 0);
+    const target = goalTarget(goal);
+    if (target !== null && weeklyTotal > target) count += 1;
+  }
 
   if (vitalGoals.length > 0) {
     let vitalsNeedAttention = false;
-
     for (const goal of vitalGoals) {
-      const { events, failed } = metricEventsFor(goal);
-
-      if (failed || events.length === 0) {
-        vitalsNeedAttention = true;
-        break;
-      }
-
-      const latest =
-        [...events]
-          .filter((event: any) => Number.isFinite(Number(event?.loggedValue)))
-          .sort(
-            (a: any, b: any) =>
-              new Date(String(b?.occurredAt ?? 0)).getTime() -
-              new Date(String(a?.occurredAt ?? 0)).getTime(),
-          )[0] ?? null;
-
-      const value =
-        latest && Number.isFinite(Number(latest.loggedValue))
-          ? Number(latest.loggedValue)
-          : null;
-
-      if (valueNeedsAttention(goal, value)) {
-        vitalsNeedAttention = true;
-        break;
-      }
+      const { metricType, metricKey } = goalMetric(goal);
+      const { events, failed } = eventsFor(metricType, metricKey);
+      if (failed || events.length === 0) { vitalsNeedAttention = true; break; }
+      const latest = latestNumericEvent(events);
+      const value = latest ? Number(latest.loggedValue) : null;
+      if (valueNeedsAttention(goal, value)) { vitalsNeedAttention = true; break; }
     }
-
     if (vitalsNeedAttention) count += 1;
   }
 
-  const genericDailyGoals = goals.filter((goal: any) => {
-    const { category, frequency } = goalMetric(goal);
-    if ([
-      "MEDICATION",
-      "SMOKING",
-      "ALCOHOL",
-      "WEIGHT",
-      "EXERCISE",
-      "SLEEP",
-      "MENTAL_HEALTH",
-      "HYDRATION",
-      "BLOOD_PRESSURE",
-      "HEART_RATE",
-    ].includes(category)) {
-      return false;
-    }
-    return frequency === "DAILY";
-  });
-
-  for (const goal of genericDailyGoals) {
-    const { events, failed } = metricEventsFor(goal);
-
-    if (failed || events.length === 0) {
-      count += 1;
-      continue;
-    }
-
-    const latest =
-      [...events]
-        .filter((event: any) => Number.isFinite(Number(event?.loggedValue)))
-        .sort(
-          (a: any, b: any) =>
-            new Date(String(b?.occurredAt ?? 0)).getTime() -
-            new Date(String(a?.occurredAt ?? 0)).getTime(),
-        )[0] ?? null;
-
-    const value =
-      latest && Number.isFinite(Number(latest.loggedValue))
-        ? Number(latest.loggedValue)
-        : null;
-
+  for (const goal of manualDailyGoals) {
+    const { metricType, metricKey } = goalMetric(goal);
+    const { events, failed } = eventsFor(metricType, metricKey);
+    if (failed || events.length === 0) { count += 1; continue; }
+    const latest = latestNumericEvent(events);
+    const value = latest ? Number(latest.loggedValue) : null;
     if (valueNeedsAttention(goal, value)) count += 1;
-  }
-
-  const weightGoal = goals.find(
-    (goal: any) => goalMetric(goal).category === "WEIGHT",
-  );
-
-  if (weightGoal) {
-    const status = String(
-      weightGoal?.latestProgress?.status ??
-      weightGoal?.progress?.[0]?.status ??
-      "",
-    ).toUpperCase();
-
-    if (!["ACHIEVED", "COMPLETED"].includes(status)) {
-      const comparison = String(
-        weightGoal?.metricConfig?.comparison ??
-        weightGoal?.comparison ??
-        "CLOSEST",
-      ).toUpperCase();
-
-      const current = Number(
-        weightGoal?.latestProgress?.currentValue ??
-        weightGoal?.progress?.[0]?.currentValue ??
-        weightGoal?.currentValue,
-      );
-
-      const target = goalTarget(weightGoal);
-
-      if (!Number.isFinite(current) || target === null) {
-        // No current weight/target information means the goal needs the user
-        // to open Health Vitals and/or complete its configuration.
-        count += 1;
-      } else if (
-        (comparison === "DECREASE_TO" && current > target) ||
-        (comparison === "INCREASE_TO" && current < target)
-      ) {
-        count += 1;
-      } else if (comparison === "CLOSEST") {
-        const stableBand = Math.max(1.5, Math.abs(target) * 0.02);
-        if (Math.abs(current - target) > stableBand) count += 1;
-      }
-    }
   }
 
   return count;
