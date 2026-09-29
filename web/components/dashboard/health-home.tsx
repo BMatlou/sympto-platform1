@@ -263,6 +263,10 @@ async function countTodayNeeds(
     }
   }
 
+  // Goals shown in Today are part of today's active work and each active
+  // goal contributes one item to the dashboard's Today attention count.
+  count += countActiveGoals(data);
+
   // Current Health / Vitals is one shared Today action.
   if (!hasCurrentHealthMeasurementToday) {
     count += 1;
@@ -272,7 +276,15 @@ async function countTodayNeeds(
 }
 
 function countActiveGoals(data: any) {
-  return (Array.isArray(data?.goals) ? data.goals : []).filter(
+  const goals = Array.isArray(data?.activeGoalsArray)
+    ? data.activeGoalsArray
+    : Array.isArray(data?.goals)
+      ? data.goals
+      : Array.isArray(data?.healthGoals)
+        ? data.healthGoals
+        : [];
+
+  return goals.filter(
     (goal: any) =>
       !["ACHIEVED", "ARCHIVED", "CANCELLED", "DELETED", "ON_HOLD", "EXPIRED"].includes(
         String(goal?.status ?? "").toUpperCase(),
