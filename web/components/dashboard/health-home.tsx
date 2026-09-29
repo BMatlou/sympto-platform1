@@ -263,9 +263,10 @@ async function countTodayNeeds(
     }
   }
 
-  // Goals shown in Today are part of today's active work and each active
-  // goal contributes one item to the dashboard's Today attention count.
-  count += countActiveGoals(data);
+  // Only goals with a distinct unfinished Today action contribute here.
+  // Goal cards that are already satisfied or backed by shared check-in/vitals
+  // actions do not create duplicate hero items.
+  count += await countTodayGoalNeeds(data, hasTodayCheckIn);
 
   // Current Health / Vitals is one shared Today action.
   if (!hasCurrentHealthMeasurementToday) {
@@ -290,6 +291,99 @@ function countActiveGoals(data: any) {
         String(goal?.status ?? "").toUpperCase(),
       ),
   ).length;
+}
+
+async function countTodayGoalNeeds(
+  data: any,
+  hasTodayCheckIn: boolean,
+): Promise<number> {
+  const goals = (
+    Array.isArray(data?.activeGoalsArray)
+      ? data.activeGoalsArray
+      : Array.isArray(data?.goals)
+        ? data.goals
+        : Array.isArray(data?.healthGoals)
+          ? data.healthGoals
+          : []
+  ).filter(
+    (goal: any) =>
+      !["ACHIEVED", "ARCHIVED", "CANCELLED", "DELETED", "ON_HOLD", "EXPIRED"].includes(
+        String(goal?.status ?? "").toUpperCase(),
+      ),
+  );
+
+  let count = 0;
+
+  for (const goal of goals) {
+    const category = String(goal?.category ?? goal?.metricConfig?.metricType ?? "")
+      .trim()
+      .toUpperCase();
+
+    if (category === "MEDICATION") continue;
+
+    if (["EXERCISE", "SLEEP", "HYDRATION", "MENTAL_HEALTH"].includes(category)) {
+      continue;
+    }
+
+    if (["WEIGHT", "BLOOD_PRESSURE", "HEART_RATE"].includes(category)) {
+      continue;
+    }
+
+    if (category === "SMOKING") {
+      const goalId = String(goal?.id ?? "");
+      if (!goalId) continue;
+
+      const { start, end, todayKey } = todayBoundsInSouthAfrica();
+      try {
+        const response = await healthGoalsService.getMetricEvents(
+          "SMOKING",
+          "smoking.cigarettes",
+          start,
+          end,
+          "patient-smoking-log",
+        );
+        const loggedToday = (response?.events ?? []).some(
+          (event: any) =>
+            String(event?.sourceId ?? "") === goalId + ":" + todayKey,
+        );
+        if (!loggedToday) count += 1;
+      } catch {
+      }
+      continue;
+    }
+
+    const metricType = String(
+      goal?.metricConfig?.metricType ?? category,
+    ).toUpperCase();
+    const metricKey = String(
+      goal?.metricConfig?.metricKey ?? "",
+    ).trim();
+
+    if (["NUTRITION", "BLOOD_GLUCOSE", "CHOLESTEROL", "OTHER"].includes(category)) {
+      if (!metricKey) {
+        if (hasTodayCheckIn && category === "OTHER") continue;
+        count += 1;
+        continue;
+      }
+
+      const { start, end } = todayBoundsInSouthAfrica();
+      try {
+        const response = await healthGoalsService.getMetricEvents(
+          metricType,
+          metricKey,
+          start,
+          end,
+          "goal-manual",
+        );
+        if (!Array.isArray(response?.events) || response.events.length === 0) {
+          count += 1;
+        }
+      } catch {
+      }
+    }
+  }
+
+  return count;
 }
 
 function recentSymptomFrom(data: any, symptomFeed: any[]) {
