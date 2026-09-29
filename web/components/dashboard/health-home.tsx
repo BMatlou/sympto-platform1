@@ -297,35 +297,6 @@ async function countTodayNeeds(
     return localDayKey(latestMonitoring?.observedAt) !== todayKey;
   });
 
-  const deviceAlerts = Array.isArray(data?.wearables?.deviceAlerts)
-    ? data.wearables.deviceAlerts
-    : [];
-
-  const immunizations = Array.isArray(data?.healthSnapshot?.immunizations)
-    ? data.healthSnapshot.immunizations
-    : Array.isArray(data?.immunizations)
-      ? data.immunizations
-      : [];
-
-  const dueImmunizations = immunizations.filter((item: any) => {
-    const status = String(item?.status ?? "").toUpperCase();
-    if (status === "MISSED") return true;
-    return (
-      status === "SCHEDULED" &&
-      Boolean(item?.nextDueDate) &&
-      localDayKey(item.nextDueDate) <= todayKey
-    );
-  });
-
-  const careTasks = (Array.isArray(data?.carePlans) ? data.carePlans : []).flatMap(
-    (plan: any) =>
-      (Array.isArray(plan?.tasks) ? plan.tasks : []).filter((task: any) => {
-        const status = String(task?.status ?? "").toUpperCase();
-        if (["COMPLETED", "CANCELLED"].includes(status) || !task?.dueDate) return false;
-        return localDayKey(task.dueDate) <= todayKey;
-      }),
-  );
-
   const medications = (Array.isArray(data?.today?.activeMedications)
     ? data.today.activeMedications
     : []).filter(
@@ -349,10 +320,7 @@ async function countTodayNeeds(
 
   let count =
     appointmentsToday.length +
-    activeSymptoms.length +
-    deviceAlerts.length +
-    dueImmunizations.length +
-    careTasks.length;
+    activeSymptoms.length;
 
   const smokingGoals = goals.filter(
     (goal: any) => goalMetric(goal).category === "SMOKING",
