@@ -290,11 +290,19 @@ async function countTodayNeeds(
     // An active symptom is a Today action only until the user records
     // today's monitoring update. It may remain clinically active after
     // today's update, but the user has completed today's action for it.
-    const latestMonitoring = Array.isArray(symptom?.monitorings)
-      ? symptom.monitorings[0]
+    const latestMonitoringAt = Array.isArray(symptom?.monitorings)
+      ? symptom.monitorings[0]?.observedAt
       : null;
 
-    return localDayKey(latestMonitoring?.observedAt) !== todayKey;
+    // Monitoring writes also update the symptom log itself. Use that
+    // timestamp as a fallback when the dashboard feed does not carry the
+    // latest monitoring relation in its payload.
+    const latestActivityAt =
+      latestMonitoringAt ??
+      symptom?.updatedAt ??
+      null;
+
+    return localDayKey(latestActivityAt) !== todayKey;
   });
 
   const medications = (Array.isArray(data?.today?.activeMedications)
