@@ -247,10 +247,14 @@ async function countTodayNeeds(
         ? data.today.upcomingAppointments
         : [];
 
-  const appointmentsToday = appointmentsSource.filter(
-    (appointment: any) =>
-      localDayKey(appointment?.scheduledStart) === todayKey,
-  );
+  const appointmentsToday = appointmentsSource.filter((appointment: any) => {
+    if (localDayKey(appointment?.scheduledStart) !== todayKey) return false;
+
+    const status = String(appointment?.status ?? appointment?.appointmentStatus ?? "").toUpperCase();
+    if (!status) return true;
+
+    return ["PENDING", "CONFIRMED", "SCHEDULED"].includes(status);
+  });
 
   const allGoals = [
     ...(Array.isArray(data?.goals) ? data.goals : []),
@@ -350,12 +354,6 @@ async function countTodayNeeds(
     dueImmunizations.length +
     careTasks.length;
 
-  const checkInGoals = goals.filter((goal: any) =>
-    CHECK_IN_GOAL_CATEGORIES.has(goalMetric(goal).category),
-  );
-  const vitalGoals = goals.filter((goal: any) =>
-    VITAL_GOAL_CATEGORIES.has(goalMetric(goal).category),
-  );
   const smokingGoals = goals.filter(
     (goal: any) => goalMetric(goal).category === "SMOKING",
   );
@@ -371,24 +369,6 @@ async function countTodayNeeds(
     return frequency === "DAILY";
   });
 
-  const startOfSouthAfricaWeek = () => {
-    const parts = new Intl.DateTimeFormat("en-CA", {
-      timeZone: "Africa/Johannesburg",
-      year: "numeric", month: "2-digit", day: "2-digit",
-    }).formatToParts(new Date());
-    const year = Number(parts.find((part) => part.type === "year")?.value);
-    const month = Number(parts.find((part) => part.type === "month")?.value);
-    const day = Number(parts.find((part) => part.type === "day")?.value);
-    const monday = new Date(Date.UTC(year, month - 1, day));
-    const weekday = monday.getUTCDay();
-    const daysFromMonday = weekday === 0 ? 6 : weekday - 1;
-    monday.setUTCDate(monday.getUTCDate() - daysFromMonday);
-    return new Date(monday.toISOString().slice(0, 10) + "T00:00:00+02:00");
-  };
-
-  const weekStart = startOfSouthAfricaWeek();
-  const now = new Date();
-
   type MetricQuery = { metricType: string; metricKey: string; from: Date; to: Date };
   const metricQueries = new Map<string, MetricQuery>();
   const addMetricQuery = (metricType: string, metricKey: string, from: Date = todayStart, to: Date = todayEnd) => {
@@ -397,14 +377,8 @@ async function countTodayNeeds(
   };
 
   if (medications.length > 0) addMetricQuery("MEDICATION", "medication.adherence");
-  for (const goal of checkInGoals) {
-    const { category, metricType, metricKey } = goalMetric(goal);
-    addMetricQuery(metricType, metricKey, category === "EXERCISE" ? weekStart : todayStart, category === "EXERCISE" ? now : todayEnd);
-  }
-  for (const goal of vitalGoals) {
-    const { metricType, metricKey } = goalMetric(goal);
-    addMetricQuery(metricType, metricKey);
-  }
+  // Check-in completion and Current Health use the shared Today data
+  // above, so they do not need separate goal-metric queries here.
   for (const goal of smokingGoals) {
     const { metricType, metricKey } = goalMetric(goal);
     addMetricQuery(metricType, metricKey);
@@ -471,43 +445,29 @@ async function countTodayNeeds(
 
   if (hasTodayCheckIn === false) {
     count += 1;
-  } else {
-    let checkInNeedsAttention = false;
-    for (const goal of checkInGoals) {
-      const { category, metricType, metricKey } = goalMetric(goal);
-      const { events, failed } = eventsFor(metricType, metricKey, category === "EXERCISE" ? weekStart : todayStart);
-      if (failed) { checkInNeedsAttention = true; break; }
-      if (category === "EXERCISE") {
-        const exerciseEvents = events.map((event: any) => ({
-          loggedValue: Number(event?.loggedValue),
-          occurredAt: String(event?.occurredAt ?? ""),
-          source: event?.source ?? null,
-        }));
-        const total = canonicalExerciseWeekTotal(exerciseEvents);
-        const target = goalTarget(goal);
-        if (target === null || total < target) { checkInNeedsAttention = true; break; }
-      } else {
-        const latest = latestNumericEvent(events);
-        const value = latest ? Number(latest.loggedValue) : null;
-        if (valueNeedsAttention(goal, value)) { checkInNeedsAttention = true; break; }
-      }
-    }
-    if (checkInNeedsAttention) count += 1;
   }
+
+
 
   if (medications.length > 0) {
     const medicationMetric = eventsFor("MEDICATION", "medication.adherence");
+
     for (const medication of medications) {
       const required = requiredMedicationDoses(medication?.frequency ?? medication?.schedule);
       const patientMedicationId = medicationPatientId(medication);
+
+      // Medication attention is dose-based: every unlogged dose is one
+      // outstanding Today action, matching the medication cards.
       if (!patientMedicationId || medicationMetric.failed) {
-        count += 1;
+        count += required;
         continue;
       }
+
       const actionsLoggedToday = medicationMetric.events.filter((event: any) =>
         String(event?.sourceId ?? "").startsWith(String(patientMedicationId) + ":"),
       ).length;
-      if (actionsLoggedToday < required) count += 1;
+
+      count += Math.max(0, required - Math.min(actionsLoggedToday, required));
     }
   }
 
@@ -537,24 +497,11 @@ async function countTodayNeeds(
     if (target !== null && weeklyTotal > target) count += 1;
   }
 
-  // Current Health is a shared Today action even when no BP/heart-rate
-  // goal exists. If there are explicit vital goals, their existing logic
-  // below supplies the one shared vitals action instead.
-  if (vitalGoals.length === 0 && !hasCurrentHealthMeasurementToday) {
+  // Current Health / Vitals is one shared Today action. A measurement
+  // recorded today completes this action; goal thresholds do not create
+  // another counter item here.
+  if (!hasCurrentHealthMeasurementToday) {
     count += 1;
-  }
-
-  if (vitalGoals.length > 0) {
-    let vitalsNeedAttention = false;
-    for (const goal of vitalGoals) {
-      const { metricType, metricKey } = goalMetric(goal);
-      const { events, failed } = eventsFor(metricType, metricKey);
-      if (failed || events.length === 0) { vitalsNeedAttention = true; break; }
-      const latest = latestNumericEvent(events);
-      const value = latest ? Number(latest.loggedValue) : null;
-      if (valueNeedsAttention(goal, value)) { vitalsNeedAttention = true; break; }
-    }
-    if (vitalsNeedAttention) count += 1;
   }
 
   for (const goal of manualDailyGoals) {
@@ -691,11 +638,12 @@ export default function HealthHome({ patientId }: { patientId?: string }) {
 
     let active = true;
 
-    Promise.all([
-      healthJournalService.getSymptoms({ limit: 100 }),
-      healthJournalService.getAll({ page: 1, limit: 100 }),
-    ])
-      .then(([symptoms, journals]) => {
+    const refreshTodayRecords = () => {
+      void Promise.all([
+        healthJournalService.getSymptoms({ limit: 100 }),
+        healthJournalService.getAll({ page: 1, limit: 100 }),
+      ])
+        .then(([symptoms, journals]) => {
         if (!active) return;
         setSymptomFeed(Array.isArray(symptoms) ? symptoms : []);
         setJournalRecordCount(Number(journals?.pagination?.total ?? journals?.data?.length ?? 0));
@@ -733,15 +681,20 @@ export default function HealthHome({ patientId }: { patientId?: string }) {
         });
 
         setHasTodayCheckIn(hasCompletedCheckIn);
-      })
-      .catch(() => {
-        if (!active) return;
-        setSymptomFeed([]);
-        setHasTodayCheckIn(null);
-      });
+          })
+        .catch(() => {
+          if (!active) return;
+          setSymptomFeed([]);
+          setHasTodayCheckIn(null);
+        });
+    };
 
+    refreshTodayRecords();
+
+    window.addEventListener("sympto:today-action-updated", refreshTodayRecords);
     return () => {
       active = false;
+      window.removeEventListener("sympto:today-action-updated", refreshTodayRecords);
     };
   }, [data?.patient?.id, data?.generatedAt]);
 
@@ -770,9 +723,11 @@ export default function HealthHome({ patientId }: { patientId?: string }) {
     const refreshDashboard = () => void reload();
 
     window.addEventListener("sympto:health-checkin-updated", refreshDashboard);
+    window.addEventListener("sympto:today-action-updated", refreshDashboard);
 
     return () => {
       window.removeEventListener("sympto:health-checkin-updated", refreshDashboard);
+      window.removeEventListener("sympto:today-action-updated", refreshDashboard);
     };
   }, [reload]);
 
