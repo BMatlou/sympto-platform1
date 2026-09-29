@@ -140,6 +140,7 @@ export default function MonitorSymptomPage({ params }: { params: Promise<{ id: s
       });
 
       setResult(response);
+      window.dispatchEvent(new Event("sympto:today-action-updated"));
     } catch (requestError: any) {
       setError(requestError?.response?.data?.message || "We could not save this update.");
     } finally {
