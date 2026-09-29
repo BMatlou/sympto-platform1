@@ -389,7 +389,7 @@ async function countTodayNeeds(
   const weekStart = startOfSouthAfricaWeek();
   const now = new Date();
 
-  type MetricQuery = { metricType: string; metricKey: string; from: Date; to: Date };
+  type MetricQuery =  type MetricQuery = { metricType: string; metricKey: string; from: Date; to: Date };
   const metricQueries = new Map<string, MetricQuery>();
   const addMetricQuery = (metricType: string, metricKey: string, from: Date = todayStart, to: Date = todayEnd) => {
     const key = metricType + "|" + metricKey + "|" + from.toISOString();
