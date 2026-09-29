@@ -6,6 +6,7 @@ import { useEffect, useState } from "react";
 import { Activity, ArrowRight, Bell, CheckCircle2, FileHeart, FolderOpen, Plus, ShieldCheck } from "lucide-react";
 import { useDashboard } from "@/hooks/use-dashboard";
 import { healthJournalService } from "@/services/health-journal.service";
+import { healthGoalsService } from "@/services/health-goals.service";
 import { patientNotificationsService } from "@/services/patient-notifications.service";
 import ProtectedRoute from "@/components/auth/protected-route";
 
@@ -221,27 +222,25 @@ async function countTodayNeeds(
 
   // Each remaining scheduled dose is one outstanding Today action.
   if (medications.length > 0) {
-    const response = await data?.__unused;
-    void response;
+    let medicationEventsResult: { failed: boolean; events: any[] };
 
-    const medicationEventsResult = await (async () => {
-      try {
-        const { healthGoalsService } = await import(
-          "@/services/health-goals.service"
-        );
-        return {
-          failed: false,
-          events: await healthGoalsService.getMetricEvents(
-            "MEDICATION",
-            "medication.adherence",
-            todayStart,
-            todayEnd,
-          ),
-        };
-      } catch {
-        return { failed: true, events: [] as any[] };
-      }
-    })();
+    try {
+      const response = await healthGoalsService.getMetricEvents(
+        "MEDICATION",
+        "medication.adherence",
+        todayStart,
+        todayEnd,
+      );
+      medicationEventsResult = {
+        failed: false,
+        events: Array.isArray(response?.events) ? response.events : [],
+      };
+    } catch {
+      medicationEventsResult = {
+        failed: true,
+        events: [],
+      };
+    }
 
     for (const medication of medications) {
       const required = requiredMedicationDoses(
