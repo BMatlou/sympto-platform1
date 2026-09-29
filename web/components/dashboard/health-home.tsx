@@ -369,6 +369,26 @@ async function countTodayNeeds(
     return frequency === "DAILY";
   });
 
+  const startOfSouthAfricaWeek = () => {
+    const parts = new Intl.DateTimeFormat("en-CA", {
+      timeZone: "Africa/Johannesburg",
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+    }).formatToParts(new Date());
+    const year = Number(parts.find((part) => part.type === "year")?.value);
+    const month = Number(parts.find((part) => part.type === "month")?.value);
+    const day = Number(parts.find((part) => part.type === "day")?.value);
+    const monday = new Date(Date.UTC(year, month - 1, day));
+    const weekday = monday.getUTCDay();
+    const daysFromMonday = weekday === 0 ? 6 : weekday - 1;
+    monday.setUTCDate(monday.getUTCDate() - daysFromMonday);
+    return new Date(monday.toISOString().slice(0, 10) + "T00:00:00+02:00");
+  };
+
+  const weekStart = startOfSouthAfricaWeek();
+  const now = new Date();
+
   type MetricQuery = { metricType: string; metricKey: string; from: Date; to: Date };
   const metricQueries = new Map<string, MetricQuery>();
   const addMetricQuery = (metricType: string, metricKey: string, from: Date = todayStart, to: Date = todayEnd) => {
