@@ -60,7 +60,7 @@ function HealthVitalsPageContent() {
     const weight = Number(bmiWeight); const height = Number(bmiHeight);
     if (!weight || !height) { setMessage("Enter both your weight and height to calculate BMI."); return; }
     setBusy(true);
-    try { const result = await healthHomeService.updateWeight(weight, height); setMessage(`BMI saved: ${result.bmi != null ? result.bmi.toFixed(1) : "not available"}.`); setPanel(null); await reload(); }
+    try { const result = await healthHomeService.updateWeight(weight, height); setMessage(`BMI saved: ${result.bmi != null ? result.bmi.toFixed(1) : "not available"}.`); setPanel(null); await reload(); window.dispatchEvent(new Event("sympto:today-action-updated")); }
     catch (err: any) { setMessage(err?.response?.data?.message || "We couldn't save your BMI measurement."); }
     finally { setBusy(false); }
   }
