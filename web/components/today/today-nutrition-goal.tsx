@@ -271,6 +271,56 @@ function buildNutritionInsights(
     }))
     .filter((item) => item.calories != null);
 
+  const priorDays = recentNutritionDays.filter(
+    (item) => item.day !== todayDay && item.calories >= 0,
+  );
+
+  if (target != null && target > 0 && priorDays.length >= 3) {
+    const recentAverage =
+      priorDays.reduce((sum, item) => sum + Number(item.calories), 0) /
+      priorDays.length;
+    const difference = recentAverage - target;
+
+    if (Math.abs(difference) >= 75) {
+      insights.push({
+        title: "Recent intake compared with your target",
+        text:
+          "Across " +
+          priorDays.length +
+          " recent recorded days, your average logged intake was about " +
+          formatNumber(Math.abs(difference)) +
+          " kcal " +
+          (difference > 0 ? "above" : "below") +
+          " the " +
+          formatNumber(target) +
+          " kcal daily target. This describes logged intake and does not recommend changing the target.",
+      });
+    }
+  }
+
+  const comparisonEligibleDays = new Set(
+    recentCheckIns
+      .filter(
+        (item) =>
+          item.sleepHours != null ||
+          item.waterIntakeMl != null ||
+          item.exerciseMinutes != null,
+      )
+      .map((item) => item.day),
+  );
+
+  const matchedContextDays = Array.from(comparisonEligibleDays).filter((day) =>
+    nutritionByDay.has(day),
+  );
+
+  if (matchedContextDays.length < 3) {
+    insights.push({
+      title: "Building your personal nutrition baseline",
+      text:
+        "Sympto is collecting matched nutrition and Daily Health Check-in data. Comparison insights such as sleep-versus-intake and hydration-versus-activity are only shown after enough days are recorded to make the comparison meaningful.",
+    });
+  }
+
   // Pattern 1: sleep < 6h vs >= 6h, using full-day logged calories.
   const sleepMatched = matched.filter(
     (item) => item.sleepHours != null && Number.isFinite(Number(item.sleepHours)),
