@@ -1,7 +1,17 @@
 import { api } from "@/lib/api";
 
 export type HealthGoalProgressUpdate = { id: string; title: string; category?: string; targetValue?: number | string | null; currentValue?: number | string | null; unit?: string | null; progress?: Array<{ currentValue?: number | string | null; progressPercent?: number | string | null; status?: string | null; measuredAt?: string; }>; };
-export type HealthGoalMetricEventsResponse = { count: number; events: Array<{ id: string; loggedValue: number; occurredAt: string; source: string; sourceId?: string | null; }>; };
+export type HealthGoalMetricEventsResponse = { count: number; events: Array<{ id: string; loggedValue: number; occurredAt: string; source: string; sourceId?: string | null; metadata?: Record<string, unknown> | null; }>; };
+export type NutritionFood = {
+  fdcId: string;
+  description: string;
+  dataType: string;
+  caloriesPer100g: number | null;
+  proteinPer100g: number | null;
+  fibrePer100g: number | null;
+  portions: Array<{ amount: number; modifier?: string | null; gramWeight: number; unit?: string | null; }>;
+  source: string;
+};
 export type HealthGoalInput = { patientId: string; practitionerId?: string; carePlanId?: string; patientMedicationId?: string; title: string; description?: string; category: string; priority?: string; status?: string; targetValue?: string; currentValue?: string; unit?: string; targetDate?: string; metricType?: string; metricKey?: string; frequency?: "DAILY" | "WEEKLY" | "TOTAL"; frequencyTarget?: string; aggregation?: "SUM" | "LATEST" | "AVERAGE" | "MIN" | "MAX"; comparison?: "AT_LEAST" | "AT_MOST" | "CLOSEST" | "INCREASE_TO" | "DECREASE_TO"; guidanceText?: string; };
 export type HealthGoalListResponse = { data: any[]; pagination?: { page: number; limit: number; total: number; totalPages: number } };
 export type WeightGoalIntelligence = {
@@ -32,7 +42,15 @@ class HealthGoalsService {
   async create(input: HealthGoalInput) { const normalized = normalizeGoalInput(input); const category = String(normalized.category ?? "").toUpperCase(); const patientMedicationId = category === "MEDICATION" ? String(normalized.patientMedicationId ?? "").trim() : ""; if (patientMedicationId) { const existingGoals = await this.list(input.patientId); const existing = existingGoals.data.find((goal: any) => sameMedicationGoal(goal, patientMedicationId)); if (existing) return existing; } const response = await api.post("/patient-health-goals", normalized); const goal = response.data?.data ?? response.data; if (goal?.id) deletedGoalIds.delete(String(goal.id)); notifyGoalChange(); return goal; }
   async update(id: string, input: Partial<HealthGoalInput>) { const response = await api.patch(`/patient-health-goals/${id}`, normalizeGoalInput(input)); const goal = response.data?.data ?? response.data; deletedGoalIds.delete(String(id)); notifyGoalChange(); return goal; }
   async configureMetric(id: string, config: Pick<HealthGoalInput, "metricType" | "metricKey" | "frequency" | "frequencyTarget" | "aggregation" | "comparison" | "guidanceText">) { const metricType = String((config as any).metricType ?? "").toUpperCase(); const normalized = metricType === "SMOKING" ? { ...config, metricType: "SMOKING", metricKey: "smoking.cigarettes", frequency: "DAILY" as const, aggregation: "LATEST" as const, comparison: "AT_MOST" as const } : metricType === "ALCOHOL" ? { ...config, metricType: "ALCOHOL", metricKey: "alcohol.drinks", frequency: "WEEKLY" as const, aggregation: "SUM" as const, comparison: "AT_MOST" as const } : metricType === "EXERCISE" ? { ...config, metricType: "EXERCISE", metricKey: "exercise.minutes", frequency: "WEEKLY" as const, aggregation: "SUM" as const, comparison: "AT_LEAST" as const } : config; const response = await api.patch(`/patient-health-goals/${id}/metric-config`, normalized); const result = response.data?.data ?? response.data; deletedGoalIds.delete(String(id)); notifyGoalChange(); return result; }
-  async syncMetricEvent(input: { metricType: string; metricKey: string; loggedValue: number; occurredAt?: string; source?: string; sourceId?: string }) { const response = await api.post("/health-goals/metric-event", input); return response.data?.data ?? response.data; }
+  async syncMetricEvent(input: { metricType: string; metricKey: string; loggedValue: number; occurredAt?: string; source?: string; sourceId?: string; metadata?: Record<string, unknown> }) { const response = await api.post("/health-goals/metric-event", input); return response.data?.data ?? response.data; }
+  async searchNutritionFoods(query: string, limit = 8): Promise<{ foods: NutritionFood[] }> {
+    const response = await api.get("/health-goals/nutrition/foods", { params: { query, limit } });
+    return response.data?.data ?? response.data;
+  }
+  async getNutritionFood(fdcId: string): Promise<NutritionFood> {
+    const response = await api.get("/health-goals/nutrition/foods/" + encodeURIComponent(fdcId));
+    return response.data?.data?.food ?? response.data?.food ?? response.data;
+  }
   async logSmoking(id: string, cigarettes: number, dayKey: string) { const response = await api.post(`/patient-health-goals/${id}/smoking-log`, { cigarettes, dayKey }); return response.data?.data ?? response.data; }
   async logAlcohol(id: string, drinks: number) { const response = await api.post(`/patient-health-goals/${id}/alcohol-log`, { drinks }); return response.data?.data ?? response.data; }
   async remove(id: string) { const response = await api.delete(`/patient-health-goals/${id}`); deletedGoalIds.add(String(id)); const result = response.data?.data ?? response.data; notifyGoalChange(String(id)); return result; }
