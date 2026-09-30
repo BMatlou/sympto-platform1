@@ -902,6 +902,31 @@ export default function TodayNutritionGoal({ goal, onUpdated }: Props) {
           </Link>
         </section>
 
+        {nutritionInsights.length > 0 && (
+          <section className="mt-4 rounded-[22px] border border-[#d8e9eb] bg-[#f5fbfb] p-4 sm:p-5">
+            <div className="flex items-start gap-3">
+              <span className="grid h-9 w-9 shrink-0 place-items-center rounded-[13px] bg-[#e8f8f7] text-[#0b7b80]">
+                <Sparkles className="h-4 w-4" />
+              </span>
+              <div className="min-w-0">
+                <p className="text-[9px] font-black uppercase tracking-[.15em] text-[#0b7b80]">Sympto insight</p>
+                <h3 className="mt-1 text-base font-black tracking-[-.025em] text-[#0b2d54]">Nutrition in context</h3>
+              </div>
+            </div>
+            <div className="mt-3 space-y-2">
+              {nutritionInsights.map((insight, index) => (
+                <div key={insight.title + "-" + index} className="rounded-[17px] bg-white px-3.5 py-3 ring-1 ring-[#e2edef]">
+                  <p className="text-[10px] font-black text-[#0b2d54]">{insight.title}</p>
+                  <p className="mt-1 text-[10px] leading-5 text-[#748694]">{insight.text}</p>
+                </div>
+              ))}
+            </div>
+            <p className="mt-3 text-[8px] leading-4 text-[#9aa8b1]">
+              Context only: these observations describe patterns in your recorded health data and do not diagnose conditions or automatically change your nutrition target.
+            </p>
+          </section>
+        )}
+
         {showThreeDayReminder && (
           <div className="mt-4 rounded-[18px] border border-amber-200 bg-amber-50 px-3.5 py-3">
             <p className="text-[9px] font-black uppercase tracking-[.13em] text-amber-900">Three-day review</p>
