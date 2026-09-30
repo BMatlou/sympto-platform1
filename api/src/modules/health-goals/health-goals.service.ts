@@ -65,13 +65,6 @@ export class HealthGoalsService {
 
     if (Number.isFinite(amount)) return amount;
 
-    // Some branded-food responses expose nutrition through labelNutrients.
-    // Convert per-serving label values to a per-100-g basis only when
-    // USDA gives us a gram-based serving size.
-    const servingSize = Number(food?.servingSize);
-    const servingUnit = String(food?.servingSizeUnit ?? '').trim().toLowerCase();
-    const canConvertServing = Number.isFinite(servingSize) && servingSize > 0 && servingUnit === 'g';
-
     return null;
   }
 
@@ -81,23 +74,40 @@ export class HealthGoalsService {
     const canConvertServing = Number.isFinite(servingSize) && servingSize > 0 && servingUnit === 'g';
 
     const fromLabelNutrients = (key: 'calories' | 'protein' | 'fiber') => {
+      if (!canConvertServing) return null;
       const value = Number(food?.labelNutrients?.[key]?.value);
-      if (!Number.isFinite(value)) return null;
-      if (canConvertServing) return (value * 100) / servingSize;
-      return value;
+      return Number.isFinite(value) ? (value * 100) / servingSize : null;
     };
 
+    const nutrientOrNull = (value: number | null) =>
+      value != null && Number.isFinite(value) ? value : null;
+
+    const caloriesFromFoodNutrients = nutrientOrNull(
+      this.nutritionNutrient(food, [1008, 2047, 2048], ['208']),
+    );
+    const proteinFromFoodNutrients = nutrientOrNull(
+      this.nutritionNutrient(food, [1003], ['203']),
+    );
+    const fibreFromFoodNutrients = nutrientOrNull(
+      this.nutritionNutrient(food, [1079], ['291']),
+    );
+
+    const labelCalories = fromLabelNutrients('calories');
+    const labelProtein = fromLabelNutrients('protein');
+    const labelFibre = fromLabelNutrients('fiber');
+
     const caloriesPer100g =
-      this.nutritionNutrient(food, [1008, 2047, 2048], ['208']) ??
-      fromLabelNutrients('calories');
-
+      caloriesFromFoodNutrients != null && caloriesFromFoodNutrients > 0
+        ? caloriesFromFoodNutrients
+        : labelCalories;
     const proteinPer100g =
-      this.nutritionNutrient(food, [1003], ['203']) ??
-      fromLabelNutrients('protein');
-
+      proteinFromFoodNutrients != null
+        ? proteinFromFoodNutrients
+        : labelProtein;
     const fibrePer100g =
-      this.nutritionNutrient(food, [1079], ['291']) ??
-      fromLabelNutrients('fiber');
+      fibreFromFoodNutrients != null
+        ? fibreFromFoodNutrients
+        : labelFibre;
 
     return {
       fdcId: String(food?.fdcId ?? ''),
