@@ -229,6 +229,11 @@ function buildNutritionInsights(
   }
 
   const nutritionByDay = new Map(recentNutritionDays.map((item) => [item.day, item.calories]));
+  const todayDay = journalDayKey(new Date());
+  if (todayDay && todayTotal > 0) {
+    nutritionByDay.set(todayDay, todayTotal);
+  }
+
   const matched = recentCheckIns
     .map((checkIn) => ({ ...checkIn, calories: nutritionByDay.get(checkIn.day) }))
     .filter((item) => item.calories != null && item.sleepHours != null);
