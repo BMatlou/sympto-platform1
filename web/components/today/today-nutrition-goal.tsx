@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { ArrowRight, Check, Plus, Utensils } from "lucide-react";
+import { ArrowRight, Check, Plus, Sparkles, Utensils } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 import { healthGoalsService, type NutritionFood } from "@/services/health-goals.service";
@@ -50,6 +50,10 @@ type TodayCheckIn = {
   waterIntakeMl: number | null;
 };
 
+type NutritionInsight = {
+  title: string;
+  text: string;
+};
 
 function todayBounds() {
   const start = new Date();
@@ -169,9 +173,271 @@ function isTodayJournal(entry: any) {
   );
 }
 
+function journalDayKey(value: unknown) {
+  const date = new Date(String(value ?? ""));
+  if (Number.isNaN(date.getTime())) return "";
+  return new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Africa/Johannesburg",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).format(date);
+}
+
+function buildNutritionInsights(
+  today: TodayCheckIn | null,
+  todayTotal: number,
+  target: number | null,
+  todayProtein: number,
+  todayFibre: number,
+  nutritionEvents: NutritionEvent[],
+  recentNutritionDays: Array<{ day: string; calories: number }>,
+  recentCheckIns: Array<{
+    day: string;
+    sleepHours: number | null;
+    waterIntakeMl: number | null;
+    exerciseMinutes: number | null;
+  }>,
+): NutritionInsight[] {
+  const insights: NutritionInsight[] = [];
+
+  const nutritionByDay = new Map(
+    recentNutritionDays.map((item) => [item.day, item.calories]),
+  );
+  const todayDay = journalDayKey(new Date());
+
+  if (todayDay && todayTotal > 0) {
+    nutritionByDay.set(todayDay, todayTotal);
+  }
+
+  const matched = recentCheckIns
+    .map((checkIn) => ({
+      ...checkIn,
+      calories: nutritionByDay.get(checkIn.day),
+    }))
+    .filter((item) => item.calories != null);
+
+  const priorDays = recentNutritionDays.filter(
+    (item) => item.day !== todayDay && item.calories >= 0,
+  );
+
+  if (target != null && target > 0 && priorDays.length >= 3) {
+    const recentAverage =
+      priorDays.reduce((sum, item) => sum + Number(item.calories), 0) /
+      priorDays.length;
+    const difference = recentAverage - target;
+
+    if (Math.abs(difference) >= 75) {
+      insights.push({
+        title: "Recent intake compared with your target",
+        text:
+          "Across " +
+          priorDays.length +
+          " recent recorded days, your average logged intake was about " +
+          formatNumber(Math.abs(difference)) +
+          " kcal " +
+          (difference > 0 ? "above" : "below") +
+          " the " +
+          formatNumber(target) +
+          " kcal daily target. This describes logged intake and does not recommend changing the target.",
+      });
+    }
+  }
+
+  // Pattern 1: sleep < 6h vs >= 6h, using full-day logged calories.
+  const sleepMatched = matched.filter(
+    (item) => item.sleepHours != null && Number.isFinite(Number(item.sleepHours)),
+  );
+
+  if (sleepMatched.length >= 6) {
+    const lowerSleep = sleepMatched.filter((item) => Number(item.sleepHours) < 6);
+    const usualSleep = sleepMatched.filter((item) => Number(item.sleepHours) >= 6);
+
+    if (lowerSleep.length >= 3 && usualSleep.length >= 3) {
+      const lowAverage =
+        lowerSleep.reduce((sum, item) => sum + Number(item.calories), 0) /
+        lowerSleep.length;
+      const usualAverage =
+        usualSleep.reduce((sum, item) => sum + Number(item.calories), 0) /
+        usualSleep.length;
+      const difference = lowAverage - usualAverage;
+
+      if (Math.abs(difference) >= 100) {
+        insights.push({
+          title: "Sleep and logged intake show a pattern",
+          text:
+            "On " +
+            lowerSleep.length +
+            " days with less than 6 hours of recorded sleep, your logged daily intake averaged about " +
+            formatNumber(Math.abs(difference)) +
+            " kcal " +
+            (difference > 0 ? "higher" : "lower") +
+            " than on " +
+            usualSleep.length +
+            " days with 6 or more hours. This is an association in your records, not evidence that sleep caused the difference.",
+        });
+      }
+    }
+  }
+
+  // Pattern 2: sleep < 6h vs >= 6h, specifically evening meal calories.
+  const eveningByDay = new Map<string, number>();
+
+  for (const event of nutritionEvents) {
+    const meal = metadataMeal(event);
+    if (!meal) continue;
+
+    const mealType = meal.mealType.trim().toLowerCase();
+    const mealTime = new Date(event.occurredAt);
+    const hour = mealTime.getHours();
+
+    const isEveningMeal =
+      mealType === "dinner" ||
+      mealType === "snack" ||
+      hour >= 18;
+
+    if (!isEveningMeal) continue;
+
+    const day = journalDayKey(event.occurredAt);
+    if (!day) continue;
+
+    eveningByDay.set(
+      day,
+      (eveningByDay.get(day) ?? 0) + Number(meal.calories || event.loggedValue || 0),
+    );
+  }
+
+  const eveningSleepMatched = recentCheckIns
+    .map((checkIn) => ({
+      ...checkIn,
+      eveningCalories: eveningByDay.get(checkIn.day),
+    }))
+    .filter(
+      (item) =>
+        item.eveningCalories != null &&
+        item.sleepHours != null &&
+        Number.isFinite(Number(item.sleepHours)),
+    );
+
+  if (eveningSleepMatched.length >= 6) {
+    const lowerSleep = eveningSleepMatched.filter(
+      (item) => Number(item.sleepHours) < 6,
+    );
+    const usualSleep = eveningSleepMatched.filter(
+      (item) => Number(item.sleepHours) >= 6,
+    );
+
+    if (lowerSleep.length >= 3 && usualSleep.length >= 3) {
+      const lowAverage =
+        lowerSleep.reduce((sum, item) => sum + Number(item.eveningCalories), 0) /
+        lowerSleep.length;
+      const usualAverage =
+        usualSleep.reduce((sum, item) => sum + Number(item.eveningCalories), 0) /
+        usualSleep.length;
+      const difference = lowAverage - usualAverage;
+
+      if (Math.abs(difference) >= 75) {
+        insights.push({
+          title: "Sleep and evening meals show a pattern",
+          text:
+            "On " +
+            lowerSleep.length +
+            " days with less than 6 hours of recorded sleep, your logged evening meals averaged about " +
+            formatNumber(Math.abs(difference)) +
+            " kcal " +
+            (difference > 0 ? "higher" : "lower") +
+            " than on " +
+            usualSleep.length +
+            " days with 6 or more hours. This is an association in your records, not evidence that sleep caused the difference.",
+        });
+      }
+    }
+  }
+
+  // Pattern 3: hydration vs activity.
+  const hydrationMatched = recentCheckIns.filter(
+    (item) =>
+      item.waterIntakeMl != null &&
+      item.exerciseMinutes != null &&
+      Number.isFinite(Number(item.waterIntakeMl)) &&
+      Number.isFinite(Number(item.exerciseMinutes)),
+  );
+
+  if (hydrationMatched.length >= 6) {
+    const lowerActivity = hydrationMatched.filter(
+      (item) => Number(item.exerciseMinutes) < 30,
+    );
+    const higherActivity = hydrationMatched.filter(
+      (item) => Number(item.exerciseMinutes) >= 30,
+    );
+
+    if (lowerActivity.length >= 3 && higherActivity.length >= 3) {
+      const lowAverage =
+        lowerActivity.reduce((sum, item) => sum + Number(item.waterIntakeMl), 0) /
+        lowerActivity.length;
+      const highAverage =
+        higherActivity.reduce((sum, item) => sum + Number(item.waterIntakeMl), 0) /
+        higherActivity.length;
+      const difference = lowAverage - highAverage;
+
+      if (Math.abs(difference) >= 250) {
+        insights.push({
+          title: "Hydration and activity show a pattern",
+          text:
+            "On " +
+            lowerActivity.length +
+            " days with less than 30 minutes of recorded activity, your water intake averaged about " +
+            formatNumber(Math.abs(difference)) +
+            " ml " +
+            (difference > 0 ? "higher" : "lower") +
+            " than on " +
+            higherActivity.length +
+            " days with 30 minutes or more. This is an association in your records, not evidence that activity caused the difference.",
+        });
+      }
+    }
+  }
+
+  // Pattern 4: nutrition completeness and meal regularity.
+  const mealsByDay = new Map<string, Set<string>>();
+  for (const event of nutritionEvents) {
+    const meal = metadataMeal(event);
+    if (!meal) continue;
+
+    const day = journalDayKey(event.occurredAt);
+    if (!day) continue;
+
+    if (!mealsByDay.has(day)) mealsByDay.set(day, new Set());
+    mealsByDay.get(day)?.add(meal.mealType.trim().toLowerCase());
+  }
+
+  const trackedMealDays = Array.from(mealsByDay.values()).filter(
+    (mealTypes) => mealTypes.size > 0,
+  );
+  const completeMealDays = trackedMealDays.filter((mealTypes) =>
+    ["breakfast", "lunch", "dinner"].every((meal) => mealTypes.has(meal)),
+  );
+
+  if (trackedMealDays.length >= 5 && completeMealDays.length >= 3) {
+    insights.push({
+      title: "Meal logging consistency",
+      text:
+        "You have recorded at least one meal on " +
+        trackedMealDays.length +
+        " recent days, with breakfast, lunch and dinner all represented on " +
+        completeMealDays.length +
+        " of those days. More consistent logging gives Sympto better data for identifying personal nutrition patterns.",
+    });
+  }
+
+  return insights.slice(0, 4);
+}
 export default function TodayNutritionGoal({ goal, onUpdated }: Props) {
   const [events, setEvents] = useState<NutritionEvent[]>([]);
   const [todayCheckIn, setTodayCheckIn] = useState<TodayCheckIn | null>(null);
+  const [recentNutritionDays, setRecentNutritionDays] = useState<Array<{ day: string; calories: number }>>([]);
+  const [recentNutritionEvents, setRecentNutritionEvents] = useState<NutritionEvent[]>([]);
+  const [recentCheckIns, setRecentCheckIns] = useState<Array<{ day: string; sleepHours: number | null; waterIntakeMl: number | null; exerciseMinutes: number | null }>>([]);
   const [foods, setFoods] = useState<NutritionFood[]>([]);
   const [query, setQuery] = useState("");
   const [mealType, setMealType] = useState("Meal");
@@ -218,6 +484,30 @@ export default function TodayNutritionGoal({ goal, onUpdated }: Props) {
   const draftProtein = draftItems.reduce((sum, item) => sum + Number(item.protein ?? 0), 0);
   const draftFibre = draftItems.reduce((sum, item) => sum + Number(item.fibre ?? 0), 0);
 
+  const nutritionInsights = useMemo(
+    () =>
+      buildNutritionInsights(
+        todayCheckIn,
+        todayTotal,
+        target,
+        todayProtein,
+        todayFibre,
+        recentNutritionEvents,
+        recentNutritionDays,
+        recentCheckIns,
+      ),
+    [
+      todayCheckIn,
+      todayTotal,
+      target,
+      todayProtein,
+      todayFibre,
+      recentNutritionEvents,
+      recentNutritionDays,
+      recentCheckIns,
+    ],
+  );
+
   async function loadToday() {
     if (!goalId) return;
 
@@ -244,6 +534,13 @@ export default function TodayNutritionGoal({ goal, onUpdated }: Props) {
 
       setEvents(loadedEvents);
 
+      // Keep the longitudinal insight dataset current with today's newly
+      // logged meals without waiting for the 14-day refresh effect.
+      const currentDay = journalDayKey(new Date());
+      setRecentNutritionEvents((current) => [
+        ...current.filter((event) => journalDayKey(event.occurredAt) !== currentDay),
+        ...loadedEvents,
+      ]);
     } catch {
       setEvents([]);
     } finally {
@@ -280,6 +577,19 @@ export default function TodayNutritionGoal({ goal, onUpdated }: Props) {
           : null,
       );
 
+      setRecentCheckIns(
+        journals
+          .filter((journal: any) => journal?.title === "Daily Health Check-in" && journal?.createdAt)
+          .map((journal: any) => ({
+            day: journalDayKey(journal.createdAt),
+            sleepHours: journal.sleepHours == null ? null : Number(journal.sleepHours),
+            waterIntakeMl: journal.waterIntakeMl == null ? null : Number(journal.waterIntakeMl),
+            exerciseMinutes: journal.exerciseMinutes == null ? null : Number(journal.exerciseMinutes),
+          }))
+          .filter((item) => Boolean(item.day))
+          .sort((a, b) => b.day.localeCompare(a.day))
+          .slice(0, 14),
+      );
     } catch {
       setTodayCheckIn(null);
       setRecentCheckIns([]);
@@ -296,6 +606,61 @@ export default function TodayNutritionGoal({ goal, onUpdated }: Props) {
       window.removeEventListener("sympto:health-checkin-updated", handleCheckInUpdated);
     };
   }, []);
+
+  useEffect(() => {
+    let active = true;
+
+    async function loadRecentNutrition() {
+      try {
+        const end = new Date();
+        const start = new Date(end);
+        start.setDate(start.getDate() - 13);
+        start.setHours(0, 0, 0, 0);
+
+        const response = await healthGoalsService.getMetricEvents(
+          "NUTRITION",
+          "nutrition.calories",
+          start,
+          end,
+          "goal-manual",
+        );
+
+        const loadedEvents = (response.events ?? []).map((event) => ({
+          id: String(event.id),
+          loggedValue: Number(event.loggedValue),
+          occurredAt: String(event.occurredAt),
+          source: String(event.source ?? ""),
+          sourceId: event.sourceId ?? null,
+          metadata: event.metadata ?? null,
+        })).filter((event) => Number.isFinite(event.loggedValue) && event.loggedValue >= 0);
+
+        const byDay = new Map<string, number>();
+        for (const event of loadedEvents) {
+          const day = journalDayKey(event.occurredAt);
+          if (!day) continue;
+          byDay.set(day, (byDay.get(day) ?? 0) + Number(event.loggedValue ?? 0));
+        }
+
+        if (active) {
+          setRecentNutritionEvents(loadedEvents);
+          setRecentNutritionDays(
+            Array.from(byDay.entries()).map(([day, calories]) => ({
+              day,
+              calories,
+            })),
+          );
+        }
+      } catch {
+        if (active) setRecentNutritionDays([]);
+      }
+    }
+
+    void loadRecentNutrition();
+
+    return () => {
+      active = false;
+    };
+  }, [goalId]);
 
   async function searchFood() {
     const parsed = extractFoodSearchTerm(query);
@@ -742,6 +1107,29 @@ export default function TodayNutritionGoal({ goal, onUpdated }: Props) {
             <p className="mt-1 text-[9px] leading-4 text-[#8a99a4]">{todayCheckIn?.exerciseMinutes == null ? "Record physical activity in the Daily Health Check-in." : "Movement recorded in today's Daily Health Check-in."}</p>
           </Link>
         </section>
+
+        {nutritionInsights.length > 0 && (
+          <section className="mt-4 rounded-[22px] border border-[#d8e9eb] bg-[#f5fbfb] p-4 sm:p-5">
+            <div className="flex items-start gap-3">
+              <span className="grid h-9 w-9 shrink-0 place-items-center rounded-[13px] bg-[#e8f8f7] text-[#0b7b80]">
+                <Sparkles className="h-4 w-4" />
+              </span>
+              <div className="min-w-0">
+                <p className="text-[9px] font-black uppercase tracking-[.15em] text-[#0b7b80]">Sympto insight</p>
+                <h3 className="mt-1 text-base font-black tracking-[-.025em] text-[#0b2d54]">Nutrition in context</h3>
+              </div>
+            </div>
+            <div className="mt-3 space-y-2">
+              {nutritionInsights.map((insight, index) => (
+                <div key={insight.title + "-" + index} className="rounded-[17px] bg-white px-3.5 py-3 ring-1 ring-[#e2edef]">
+                  <p className="text-[10px] font-black text-[#0b2d54]">{insight.title}</p>
+                  <p className="mt-1 text-[10px] leading-5 text-[#748694]">{insight.text}</p>
+                </div>
+              ))}
+            </div>
+
+          </section>
+        )}
 
         {showThreeDayReminder && (
           <div className="mt-4 rounded-[18px] border border-amber-200 bg-amber-50 px-3.5 py-3">
