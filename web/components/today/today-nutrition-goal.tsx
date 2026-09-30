@@ -1083,48 +1083,48 @@ export default function TodayNutritionGoal({ goal, onUpdated }: Props) {
             href="#daily-health-check-in"
             className={`rounded-[18px] border p-3.5 transition ${
               todayCheckIn?.waterIntakeMl != null
-                ? "border-[#24c1c4]/75 bg-[#dff7f7] shadow-[0_0_28px_rgba(36,193,196,.34)] hover:shadow-[0_0_36px_rgba(36,193,196,.44)]"
+                ? "border-[#24c1c4] bg-[#24c1c4] text-white shadow-[0_0_30px_rgba(36,193,196,.55)] hover:shadow-[0_0_42px_rgba(36,193,196,.7)]"
                 : "border-[#dfeaec] bg-[#f7fbfb] hover:border-[#24c1c4]"
             }`}
           >
-            <p className="text-[8px] font-black uppercase tracking-[.13em] text-[#0b7b80]">Hydration</p>
+            <p className={`text-[8px] font-black uppercase tracking-[.13em] ${todayCheckIn?.waterIntakeMl != null ? "text-white/75" : "text-[#0b7b80]"}`}>Hydration</p>
             <div className="mt-1 flex items-end justify-between gap-2">
-              <p className="text-xs font-black text-[#0b2d54]">{todayCheckIn?.waterIntakeMl == null ? "Not logged" : todayCheckIn.waterIntakeMl.toLocaleString("en-ZA") + " ml"}</p>
-              <span className="text-[8px] font-black uppercase tracking-[.1em] text-[#0b7b80]">{todayCheckIn?.waterIntakeMl == null ? "Action needed" : "Logged today"}</span>
+              <p className={`text-xs font-black ${todayCheckIn?.waterIntakeMl != null ? "text-white" : "text-[#0b2d54]"}`}>{todayCheckIn?.waterIntakeMl == null ? "Not logged" : todayCheckIn.waterIntakeMl.toLocaleString("en-ZA") + " ml"}</p>
+              <span className={`text-[8px] font-black uppercase tracking-[.1em] ${todayCheckIn?.waterIntakeMl != null ? "text-white/80" : "text-[#0b7b80]"}`}>{todayCheckIn?.waterIntakeMl == null ? "Action needed" : "Logged today"}</span>
             </div>
-            <p className="mt-1 text-[9px] leading-4 text-[#8a99a4]">{todayCheckIn?.waterIntakeMl == null ? "Log your water intake in the Daily Health Check-in." : "Water recorded in today's Daily Health Check-in."}</p>
+            <p className={`mt-1 text-[9px] leading-4 ${todayCheckIn?.waterIntakeMl != null ? "text-white/70" : "text-[#8a99a4]"}`}>{todayCheckIn?.waterIntakeMl == null ? "Log your water intake in the Daily Health Check-in." : "Water recorded in today's Daily Health Check-in."}</p>
           </Link>
 
           <Link
             href="#daily-health-check-in"
             className={`rounded-[18px] border p-3.5 transition ${
               todayCheckIn?.sleepHours != null
-                ? "border-[#5265a9]/75 bg-[#e8ebfa] shadow-[0_0_28px_rgba(82,101,169,.3)] hover:shadow-[0_0_36px_rgba(82,101,169,.4)]"
+                ? "border-[#5265a9] bg-[#5265a9] text-white shadow-[0_0_30px_rgba(82,101,169,.5)] hover:shadow-[0_0_42px_rgba(82,101,169,.65)]"
                 : "border-[#dfeaec] bg-[#f7fbfb] hover:border-[#5265a9]"
             }`}
           >
-            <p className="text-[8px] font-black uppercase tracking-[.13em] text-[#5265a9]">Sleep</p>
+            <p className={`text-[8px] font-black uppercase tracking-[.13em] ${todayCheckIn?.sleepHours != null ? "text-white/75" : "text-[#5265a9]"}`}>Sleep</p>
             <div className="mt-1 flex items-end justify-between gap-2">
-              <p className="text-xs font-black text-[#0b2d54]">{todayCheckIn?.sleepHours == null ? "Not logged" : todayCheckIn.sleepHours + " h"}</p>
-              <span className="text-[8px] font-black uppercase tracking-[.1em] text-[#5265a9]">{todayCheckIn?.sleepHours == null ? "Action needed" : "Logged today"}</span>
+              <p className={`text-xs font-black ${todayCheckIn?.sleepHours != null ? "text-white" : "text-[#0b2d54]"}`}>{todayCheckIn?.sleepHours == null ? "Not logged" : todayCheckIn.sleepHours + " h"}</p>
+              <span className={`text-[8px] font-black uppercase tracking-[.1em] ${todayCheckIn?.sleepHours != null ? "text-white/80" : "text-[#5265a9]"}`}>{todayCheckIn?.sleepHours == null ? "Action needed" : "Logged today"}</span>
             </div>
-            <p className="mt-1 text-[9px] leading-4 text-[#8a99a4]">{todayCheckIn?.sleepHours == null ? "Record last night's sleep in the Daily Health Check-in." : "Sleep recorded in today's Daily Health Check-in."}</p>
+            <p className={`mt-1 text-[9px] leading-4 ${todayCheckIn?.sleepHours != null ? "text-white/70" : "text-[#8a99a4]"}`}>{todayCheckIn?.sleepHours == null ? "Record last night's sleep in the Daily Health Check-in." : "Sleep recorded in today's Daily Health Check-in."}</p>
           </Link>
 
           <Link
             href="#daily-health-check-in"
             className={`rounded-[18px] border p-3.5 transition ${
               todayCheckIn?.exerciseMinutes != null
-                ? "border-[#3f75bd]/75 bg-[#e5f1fc] shadow-[0_0_28px_rgba(63,117,189,.3)] hover:shadow-[0_0_36px_rgba(63,117,189,.4)]"
+                ? "border-[#3f75bd] bg-[#3f75bd] text-white shadow-[0_0_30px_rgba(63,117,189,.5)] hover:shadow-[0_0_42px_rgba(63,117,189,.65)]"
                 : "border-[#dfeaec] bg-[#f7fbfb] hover:border-[#3f75bd]"
             }`}
           >
-            <p className="text-[8px] font-black uppercase tracking-[.13em] text-[#3f75bd]">Activity</p>
+            <p className={`text-[8px] font-black uppercase tracking-[.13em] ${todayCheckIn?.exerciseMinutes != null ? "text-white/75" : "text-[#3f75bd]"}`}>Activity</p>
             <div className="mt-1 flex items-end justify-between gap-2">
-              <p className="text-xs font-black text-[#0b2d54]">{todayCheckIn?.exerciseMinutes == null ? "Not logged" : todayCheckIn.exerciseMinutes + " min"}</p>
-              <span className="text-[8px] font-black uppercase tracking-[.1em] text-[#3f75bd]">{todayCheckIn?.exerciseMinutes == null ? "Action needed" : "Logged today"}</span>
+              <p className={`text-xs font-black ${todayCheckIn?.exerciseMinutes != null ? "text-white" : "text-[#0b2d54]"}`}>{todayCheckIn?.exerciseMinutes == null ? "Not logged" : todayCheckIn.exerciseMinutes + " min"}</p>
+              <span className={`text-[8px] font-black uppercase tracking-[.1em] ${todayCheckIn?.exerciseMinutes != null ? "text-white/80" : "text-[#3f75bd]"}`}>{todayCheckIn?.exerciseMinutes == null ? "Action needed" : "Logged today"}</span>
             </div>
-            <p className="mt-1 text-[9px] leading-4 text-[#8a99a4]">{todayCheckIn?.exerciseMinutes == null ? "Record physical activity in the Daily Health Check-in." : "Movement recorded in today's Daily Health Check-in."}</p>
+            <p className={`mt-1 text-[9px] leading-4 ${todayCheckIn?.exerciseMinutes != null ? "text-white/70" : "text-[#8a99a4]"}`}>{todayCheckIn?.exerciseMinutes == null ? "Record physical activity in the Daily Health Check-in." : "Movement recorded in today's Daily Health Check-in."}</p>
           </Link>
         </section>
 
