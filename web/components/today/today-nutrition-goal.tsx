@@ -305,8 +305,8 @@ export default function TodayNutritionGoal({ goal, onUpdated }: Props) {
     const proteinPer100 = selectedFood.proteinPer100g == null ? null : Number(selectedFood.proteinPer100g);
     const fibrePer100 = selectedFood.fibrePer100g == null ? null : Number(selectedFood.fibrePer100g);
 
-    if (!Number.isFinite(caloriesPer100)) {
-      toast.error("This food does not have a reliable calorie value available.");
+    if (!Number.isFinite(caloriesPer100) || caloriesPer100 <= 0) {
+      toast.error("This food does not have a reliable calorie value available, so it cannot be logged yet.");
       return;
     }
 
@@ -540,7 +540,7 @@ export default function TodayNutritionGoal({ goal, onUpdated }: Props) {
                     <ArrowRight className="h-3.5 w-3.5 shrink-0 text-[#24c1c4]" />
                   </div>
                   <p className="mt-1 text-[9px] font-semibold text-[#7c8d98]">
-                    {food.caloriesPer100g == null ? "Calories unavailable" : `${Math.round(food.caloriesPer100g)} kcal / 100 g`}
+                    {food.caloriesPer100g == null || food.caloriesPer100g <= 0 ? "Calories unavailable" : `${Math.round(food.caloriesPer100g)} kcal / 100 g`}
                     {" · "}
                     {food.proteinPer100g == null ? "Protein —" : `${food.proteinPer100g.toFixed(1)} g protein / 100 g`}
                     {" · "}
@@ -558,7 +558,7 @@ export default function TodayNutritionGoal({ goal, onUpdated }: Props) {
                 <div className="min-w-0">
                   <p className="text-xs font-black text-[#0b2d54]">{selectedFood.description}</p>
                   <p className="mt-1 text-[9px] font-semibold text-[#7c8d98]">
-                    {selectedFood.caloriesPer100g == null ? "Calories unavailable" : `${Math.round(selectedFood.caloriesPer100g)} kcal / 100 g`}
+                    {selectedFood.caloriesPer100g == null || selectedFood.caloriesPer100g <= 0 ? "Calories unavailable" : `${Math.round(selectedFood.caloriesPer100g)} kcal / 100 g`}
                     {" · "}
                     {selectedFood.proteinPer100g == null ? "Protein —" : `${selectedFood.proteinPer100g.toFixed(1)} g protein / 100 g`}
                     {" · "}
@@ -597,7 +597,7 @@ export default function TodayNutritionGoal({ goal, onUpdated }: Props) {
                   <p className="text-[8px] font-black uppercase tracking-[.13em] text-[#74859a]">{mealType} draft</p>
                   <p className="mt-1 text-sm font-black text-[#0b2d54]">{formatNumber(draftCalories)} kcal</p>
                 </div>
-                <button type="button" disabled={saving} onClick={() => void saveMeal()} className="inline-flex min-h-10 items-center gap-1.5 rounded-xl bg-[#0b2d54] px-3.5 py-2 text-[9px] font-black text-white disabled:opacity-50">
+                <button type="button" disabled={saving || draftCalories <= 0} onClick={() => void saveMeal()} className="inline-flex min-h-10 items-center gap-1.5 rounded-xl bg-[#0b2d54] px-3.5 py-2 text-[9px] font-black text-white disabled:opacity-50">
                   <Check className="h-3.5 w-3.5 text-[#24c1c4]" />
                   {saving ? "Saving…" : "Log meal"}
                 </button>
