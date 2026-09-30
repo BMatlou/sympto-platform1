@@ -427,6 +427,14 @@ function buildNutritionInsights(
     });
   }
 
+  if (insights.length === 0) {
+    insights.push({
+      title: "Not enough data yet",
+      text:
+        "Sympto needs more recorded days of nutrition and supporting health data before it can identify a meaningful personal pattern or comparison.",
+    });
+  }
+
   return insights.slice(0, 4);
 }
 export default function TodayNutritionGoal({ goal, onUpdated }: Props) {
