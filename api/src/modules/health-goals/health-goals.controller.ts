@@ -48,6 +48,18 @@ export class HealthGoalsController {
   }
 
   @Permissions('health-goals.read')
+  @Get('nutrition/foods')
+  nutritionFoodSearch(@Query('query') query: string, @Query('limit') limit?: string) {
+    return this.healthGoalsService.searchNutritionFoods(query, Number(limit));
+  }
+
+  @Permissions('health-goals.read')
+  @Get('nutrition/foods/:fdcId')
+  nutritionFood(@Param('fdcId') fdcId: string) {
+    return this.healthGoalsService.getNutritionFood(fdcId);
+  }
+
+  @Permissions('health-goals.read')
   @Get()
   findAll(@Query() query: QueryHealthGoalDto) { return this.healthGoalsService.findAll(query); }
 
