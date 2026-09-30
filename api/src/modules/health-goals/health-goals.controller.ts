@@ -74,6 +74,7 @@ export class HealthGoalsController {
       occurredAt: dto.occurredAt ? new Date(dto.occurredAt) : undefined,
       source: dto.source,
       sourceId: dto.sourceId,
+      metadata: dto.metadata,
     });
   }
 
