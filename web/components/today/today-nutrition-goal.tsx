@@ -5,6 +5,7 @@ import { ArrowRight, Check, Plus, Utensils } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 import { healthGoalsService, type NutritionFood } from "@/services/health-goals.service";
+import { healthJournalService } from "@/services/health-journal.service";
 
 type Props = {
   goal: any;
@@ -40,6 +41,13 @@ type NutritionEvent = {
   source: string;
   sourceId?: string | null;
   metadata?: Record<string, unknown> | null;
+};
+
+type TodayCheckIn = {
+  sleepHours: number | null;
+  sleepQuality: string | null;
+  exerciseMinutes: number | null;
+  waterIntakeMl: number | null;
 };
 
 function todayBounds() {
@@ -148,8 +156,21 @@ function localTime(value: string) {
   }).format(date);
 }
 
+function isTodayJournal(entry: any) {
+  if (String(entry?.title ?? "") !== "Daily Health Check-in") return false;
+  const createdAt = new Date(String(entry?.createdAt ?? ""));
+  const now = new Date();
+  return (
+    Number.isFinite(createdAt.getTime()) &&
+    createdAt.getFullYear() === now.getFullYear() &&
+    createdAt.getMonth() === now.getMonth() &&
+    createdAt.getDate() === now.getDate()
+  );
+}
+
 export default function TodayNutritionGoal({ goal, onUpdated }: Props) {
   const [events, setEvents] = useState<NutritionEvent[]>([]);
+  const [todayCheckIn, setTodayCheckIn] = useState<TodayCheckIn | null>(null);
   const [foods, setFoods] = useState<NutritionFood[]>([]);
   const [query, setQuery] = useState("");
   const [mealType, setMealType] = useState("Meal");
@@ -240,6 +261,36 @@ export default function TodayNutritionGoal({ goal, onUpdated }: Props) {
       window.removeEventListener("sympto:today-action-updated", handleUpdated);
     };
   }, [goalId]);
+
+  async function loadTodayCheckIn() {
+    try {
+      const response = await healthJournalService.getAll({ limit: 100 });
+      const entry = (response.data ?? []).find(isTodayJournal);
+      setTodayCheckIn(
+        entry
+          ? {
+              sleepHours: entry.sleepHours == null ? null : Number(entry.sleepHours),
+              sleepQuality: entry.sleepQuality ?? null,
+              exerciseMinutes: entry.exerciseMinutes == null ? null : Number(entry.exerciseMinutes),
+              waterIntakeMl: entry.waterIntakeMl == null ? null : Number(entry.waterIntakeMl),
+            }
+          : null,
+      );
+    } catch {
+      setTodayCheckIn(null);
+    }
+  }
+
+  useEffect(() => {
+    void loadTodayCheckIn();
+
+    const handleCheckInUpdated = () => void loadTodayCheckIn();
+    window.addEventListener("sympto:health-checkin-updated", handleCheckInUpdated);
+
+    return () => {
+      window.removeEventListener("sympto:health-checkin-updated", handleCheckInUpdated);
+    };
+  }, []);
 
   async function searchFood() {
     const parsed = extractFoodSearchTerm(query);
@@ -653,18 +704,29 @@ export default function TodayNutritionGoal({ goal, onUpdated }: Props) {
         <section className="mt-4 grid gap-2 sm:grid-cols-3">
           <Link href="#daily-health-check-in" className="rounded-[18px] border border-[#dfeaec] bg-[#f7fbfb] p-3.5 transition hover:border-[#24c1c4]">
             <p className="text-[8px] font-black uppercase tracking-[.13em] text-[#74859a]">Hydration</p>
-            <p className="mt-1 text-xs font-black text-[#0b2d54]">Update water</p>
-            <p className="mt-1 text-[9px] leading-4 text-[#8a99a4]">Log your water intake in the Daily Health Check-in.</p>
+            <div className="mt-1 flex items-end justify-between gap-2">
+              <p className="text-xs font-black text-[#0b2d54]">{todayCheckIn?.waterIntakeMl == null ? "Not logged" : todayCheckIn.waterIntakeMl.toLocaleString("en-ZA") + " ml"}</p>
+              <span className="text-[8px] font-black uppercase tracking-[.1em] text-[#0b7b80]">{todayCheckIn?.waterIntakeMl == null ? "Action needed" : "Logged today"}</span>
+            </div>
+            <p className="mt-1 text-[9px] leading-4 text-[#8a99a4]">{todayCheckIn?.waterIntakeMl == null ? "Log your water intake in the Daily Health Check-in." : "Water recorded in today's Daily Health Check-in."}</p>
           </Link>
+
           <Link href="#daily-health-check-in" className="rounded-[18px] border border-[#dfeaec] bg-[#f7fbfb] p-3.5 transition hover:border-[#24c1c4]">
             <p className="text-[8px] font-black uppercase tracking-[.13em] text-[#74859a]">Sleep</p>
-            <p className="mt-1 text-xs font-black text-[#0b2d54]">Update sleep</p>
-            <p className="mt-1 text-[9px] leading-4 text-[#8a99a4]">Record last night's sleep in the Daily Health Check-in.</p>
+            <div className="mt-1 flex items-end justify-between gap-2">
+              <p className="text-xs font-black text-[#0b2d54]">{todayCheckIn?.sleepHours == null ? "Not logged" : todayCheckIn.sleepHours + " h"}</p>
+              <span className="text-[8px] font-black uppercase tracking-[.1em] text-[#5265a9]">{todayCheckIn?.sleepHours == null ? "Action needed" : "Logged today"}</span>
+            </div>
+            <p className="mt-1 text-[9px] leading-4 text-[#8a99a4]">{todayCheckIn?.sleepHours == null ? "Record last night's sleep in the Daily Health Check-in." : "Sleep recorded in today's Daily Health Check-in."}</p>
           </Link>
+
           <Link href="#daily-health-check-in" className="rounded-[18px] border border-[#dfeaec] bg-[#f7fbfb] p-3.5 transition hover:border-[#24c1c4]">
             <p className="text-[8px] font-black uppercase tracking-[.13em] text-[#74859a]">Activity</p>
-            <p className="mt-1 text-xs font-black text-[#0b2d54]">Update movement</p>
-            <p className="mt-1 text-[9px] leading-4 text-[#8a99a4]">Record physical activity in the Daily Health Check-in.</p>
+            <div className="mt-1 flex items-end justify-between gap-2">
+              <p className="text-xs font-black text-[#0b2d54]">{todayCheckIn?.exerciseMinutes == null ? "Not logged" : todayCheckIn.exerciseMinutes + " min"}</p>
+              <span className="text-[8px] font-black uppercase tracking-[.1em] text-[#3f75bd]">{todayCheckIn?.exerciseMinutes == null ? "Action needed" : "Logged today"}</span>
+            </div>
+            <p className="mt-1 text-[9px] leading-4 text-[#8a99a4]">{todayCheckIn?.exerciseMinutes == null ? "Record physical activity in the Daily Health Check-in." : "Movement recorded in today's Daily Health Check-in."}</p>
           </Link>
         </section>
 
