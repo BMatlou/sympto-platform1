@@ -234,49 +234,9 @@ export default function TodayPage() {
   const activeGoalsArray = Array.isArray(data.activeGoalsArray)
     ? data.activeGoalsArray
     : allGoals.filter((goal: any) => ACTIVE_GOAL_STATUSES.has(String(goal?.status ?? "").toUpperCase()));
-  const medicationGoalCandidates = allGoals.filter((goal: any) => {
-    const status = String(goal?.status ?? "").toUpperCase();
-    return isMedicationGoal(goal) && !["ARCHIVED", "CANCELLED", "DELETED", "ACHIEVED"].includes(status);
-  });
   const todayGoalArray = activeGoalsArray;
   const goals = activeGoalsArray;
-  const medicationGoalCards = (Array.isArray(medications) ? medications : []).map((medication: any) => {
-    const goal = medicationGoalFor(medication, medicationGoalCandidates, medications.length);
-    const linkedPatientMedicationId =
-      goal?.patientMedicationId ??
-      goal?.patientMedication?.id ??
-      goal?.associatedPatientMedicationId ??
-      goal?.associatedPatientMedication?.id ??
-      null;
-    const resolvedMedication =
-      linkedPatientMedicationId && !patientMedicationId(medication)
-        ? {
-            ...medication,
-            patientMedicationId: String(linkedPatientMedicationId),
-            patientMedication: {
-              ...(medication?.patientMedication ?? {}),
-              id: String(linkedPatientMedicationId),
-            },
-          }
-        : medication;
-    return { medication: resolvedMedication, goal };
-  });
-  const unmatchedMedicationGoals = medicationGoalCandidates.filter((goal: any) => !medicationGoalCards.some((item: any) => item.goal?.id === goal?.id));
-  const matchedMedicationGoalCards = medicationGoalCards.filter((item: any) => Boolean(item.goal));
-  const unmatchedMedicationGoalCards = unmatchedMedicationGoals.map((goal: any) => ({
-    goal,
-    medication: (Array.isArray(medications) ? medications : []).find((medication: any) => {
-      const targetPatientMedicationId =
-        goal?.patientMedicationId ||
-        goal?.patientMedication?.id ||
-        goal?.associatedPatientMedicationId ||
-        goal?.associatedPatientMedication?.id;
-      return targetPatientMedicationId && String(patientMedicationId(medication)) === String(targetPatientMedicationId);
-    }) ?? medications[0] ?? null,
-  }));
-  const medicationGoalCardsForToday = [...matchedMedicationGoalCards, ...unmatchedMedicationGoalCards].filter((item: any) => Boolean(item.goal));
-  const matchedMedicationGoalCard = matchedMedicationGoalCards[0] ?? null;
-  const medicationGoal = medicationGoalCardsForToday[0]?.goal || null;
+
   const medicationGoalsForToday = activeGoalsArray.filter((goal: any) => isMedicationGoal(goal));
   const smokingGoals = activeGoalsArray.filter((goal: any) => String(goal?.category ?? "").toUpperCase() === "SMOKING");
   const alcoholGoals = activeGoalsArray.filter((goal: any) => String(goal?.category ?? "").toUpperCase() === "ALCOHOL");
@@ -343,6 +303,7 @@ export default function TodayPage() {
     );
   });
 
+  const medicationGoal = medicationGoalCardsForToday[0]?.goal ?? null;
   const primaryMedicationId = medicationGoalCardsForToday[0]?.medication
     ? patientMedicationId(medicationGoalCardsForToday[0].medication)
     : null;
