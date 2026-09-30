@@ -238,19 +238,15 @@ function buildNutritionInsights(
     insights.push({
       title:
         remaining >= 0
-          ? "Food intake remains the primary goal measure"
-          : "Food intake is above today's set target",
+          ? "Today's intake against your target"
+          : "Today's intake is above your target",
       text:
         remaining >= 0
           ? "You have logged " +
             formatNumber(todayTotal) +
             " kcal against the " +
             formatNumber(target) +
-            " kcal daily target. Protein (" +
-            (todayProtein > 0 ? todayProtein.toFixed(1) + " g" : "not yet enough data") +
-            ") and fibre (" +
-            (todayFibre > 0 ? todayFibre.toFixed(1) + " g" : "not yet enough data") +
-            ") are tracked separately."
+            " kcal daily target. Protein and fibre from detailed food entries are tracked separately."
           : "You have logged " +
             formatNumber(todayTotal) +
             " kcal against the " +
@@ -651,6 +647,7 @@ export default function TodayNutritionGoal({ goal, onUpdated }: Props) {
             exerciseMinutes: journal.exerciseMinutes == null ? null : Number(journal.exerciseMinutes),
           }))
           .filter((item) => Boolean(item.day))
+          .sort((a, b) => b.day.localeCompare(a.day))
           .slice(0, 14),
       );
     } catch {
@@ -955,11 +952,11 @@ export default function TodayNutritionGoal({ goal, onUpdated }: Props) {
 
           <div className="relative mt-6 grid grid-cols-2 gap-2 border-t border-white/10 pt-4">
             <div className="rounded-[15px] bg-white/[.06] p-3">
-              <p className="text-[8px] font-black uppercase tracking-[.13em] text-white/35">Protein logged</p>
+              <p className="text-[8px] font-black uppercase tracking-[.13em] text-white/35">Protein from meals</p>
               <p className="mt-1 text-lg font-black">{todayProtein > 0 ? todayProtein.toFixed(1) : "—"}<span className="ml-1 text-[9px] text-white/40">g</span></p>
             </div>
             <div className="rounded-[15px] bg-white/[.06] p-3">
-              <p className="text-[8px] font-black uppercase tracking-[.13em] text-white/35">Fibre logged</p>
+              <p className="text-[8px] font-black uppercase tracking-[.13em] text-white/35">Fibre from meals</p>
               <p className="mt-1 text-lg font-black">{todayFibre > 0 ? todayFibre.toFixed(1) : "—"}<span className="ml-1 text-[9px] text-white/40">g</span></p>
             </div>
           </div>
@@ -1110,11 +1107,11 @@ export default function TodayNutritionGoal({ goal, onUpdated }: Props) {
               <div>
                 <p className="text-[9px] font-black uppercase tracking-[.15em] text-[#74859a]">Today's meals</p>
                 <h3 className="mt-1 text-base font-black text-[#0b2d54]">
-                  {meals.length} logged meal{meals.length === 1 ? "" : "s"}
+                  {meals.length} detailed meal{meals.length === 1 ? "" : "s"}
                 </h3>
               </div>
               <span className="text-[9px] font-black text-[#0b7b80]">
-                {formatNumber(todayTotal)} kcal total
+                {formatNumber(meals.reduce((sum, meal) => sum + meal.calories, 0))} kcal from meals
               </span>
             </div>
             <div className="mt-3 space-y-2">
