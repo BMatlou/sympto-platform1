@@ -523,6 +523,20 @@ export default function TodayNutritionGoal({ goal, onUpdated }: Props) {
     [events],
   );
 
+  const otherCaloriesEvents = useMemo(
+    () => events.filter((event) => !metadataMeal(event)),
+    [events],
+  );
+
+  const otherCaloriesTotal = useMemo(
+    () =>
+      otherCaloriesEvents.reduce(
+        (sum, event) => sum + Number(event.loggedValue || 0),
+        0,
+      ),
+    [otherCaloriesEvents],
+  );
+
   const remaining = target == null ? null : target - todayTotal;
   const overTarget = target != null && todayTotal > target;
   const targetReached = target != null && todayTotal >= target;
@@ -1095,9 +1109,13 @@ export default function TodayNutritionGoal({ goal, onUpdated }: Props) {
             <div className="flex items-end justify-between gap-3">
               <div>
                 <p className="text-[9px] font-black uppercase tracking-[.15em] text-[#74859a]">Today's meals</p>
-                <h3 className="mt-1 text-base font-black text-[#0b2d54]">{meals.length} logged meal{meals.length === 1 ? "" : "s"}</h3>
+                <h3 className="mt-1 text-base font-black text-[#0b2d54]">
+                  {meals.length} logged meal{meals.length === 1 ? "" : "s"}
+                </h3>
               </div>
-              <span className="text-[9px] font-black text-[#0b7b80]">{formatNumber(todayTotal)} kcal</span>
+              <span className="text-[9px] font-black text-[#0b7b80]">
+                {formatNumber(todayTotal)} kcal total
+              </span>
             </div>
             <div className="mt-3 space-y-2">
               {meals.map((meal) => (
@@ -1105,15 +1123,59 @@ export default function TodayNutritionGoal({ goal, onUpdated }: Props) {
                   <div className="flex items-center justify-between gap-3">
                     <div className="min-w-0">
                       <p className="truncate text-xs font-black text-[#0b2d54]">{meal.mealName}</p>
-                      <p className="mt-1 text-[8px] font-black uppercase tracking-[.12em] text-[#8b9aa4]">{meal.mealType} · {localTime(meal.occurredAt)}</p>
+                      <p className="mt-1 text-[8px] font-black uppercase tracking-[.12em] text-[#8b9aa4]">
+                        {meal.mealType} · {localTime(meal.occurredAt)}
+                      </p>
                     </div>
-                    <span className="shrink-0 text-xs font-black text-[#0b6f73]">{formatNumber(meal.calories)} kcal</span>
+                    <span className="shrink-0 text-xs font-black text-[#0b6f73]">
+                      {formatNumber(meal.calories)} kcal
+                    </span>
                   </div>
                   <div className="mt-2 flex flex-wrap gap-2 text-[8px] font-bold text-[#7d8e99]">
                     <span>{meal.protein.toFixed(1)} g protein</span>
                     <span>·</span>
                     <span>{meal.fibre.toFixed(1)} g fibre</span>
                   </div>
+                </div>
+              ))}
+            </div>
+          </section>
+        )}
+
+        {otherCaloriesEvents.length > 0 && (
+          <section className="mt-4">
+            <div className="flex items-end justify-between gap-3">
+              <div>
+                <p className="text-[9px] font-black uppercase tracking-[.15em] text-[#74859a]">Other logged calories</p>
+                <h3 className="mt-1 text-base font-black text-[#0b2d54]">
+                  {otherCaloriesEvents.length} calorie entr{otherCaloriesEvents.length === 1 ? "y" : "ies"}
+                </h3>
+              </div>
+              <span className="text-[9px] font-black text-[#0b7b80]">
+                {formatNumber(otherCaloriesTotal)} kcal
+              </span>
+            </div>
+
+            <div className="mt-3 space-y-2">
+              {otherCaloriesEvents.map((event) => (
+                <div
+                  key={event.id}
+                  className="rounded-[18px] border border-dashed border-[#d9e5e9] bg-[#fbfdfd] p-3.5"
+                >
+                  <div className="flex items-center justify-between gap-3">
+                    <div className="min-w-0">
+                      <p className="text-xs font-black text-[#0b2d54]">Previously logged calories</p>
+                      <p className="mt-1 text-[8px] font-black uppercase tracking-[.12em] text-[#8b9aa4]">
+                        {localTime(event.occurredAt)} · Manual calorie entry
+                      </p>
+                    </div>
+                    <span className="shrink-0 text-xs font-black text-[#0b6f73]">
+                      {formatNumber(Number(event.loggedValue || 0))} kcal
+                    </span>
+                  </div>
+                  <p className="mt-2 text-[9px] leading-4 text-[#8797a2]">
+                    This calorie entry was recorded before the detailed food-and-portion meal logger. It remains part of today&apos;s nutrition total.
+                  </p>
                 </div>
               ))}
             </div>
