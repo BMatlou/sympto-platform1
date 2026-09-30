@@ -168,8 +168,9 @@ export default function TodayPage() {
     ? data.activeGoalsArray
     : allGoals.filter((goal: any) => ACTIVE_GOAL_STATUSES.has(String(goal?.status ?? "").toUpperCase()));
   const goals = activeGoalsArray;
+  const medicationGoalCandidates = activeGoalsArray.filter((goal: any) => isMedicationGoal(goal));
 
-  const medicationGoalsForToday = activeGoalsArray.filter((goal: any) => isMedicationGoal(goal));
+  const medicationGoalsForToday = medicationGoalCandidates;
   const smokingGoals = activeGoalsArray.filter((goal: any) => String(goal?.category ?? "").toUpperCase() === "SMOKING");
   const alcoholGoals = activeGoalsArray.filter((goal: any) => String(goal?.category ?? "").toUpperCase() === "ALCOHOL");
   const weightGoals = activeGoalsArray.filter((goal: any) => String(goal?.category ?? "").toUpperCase() === "WEIGHT");
