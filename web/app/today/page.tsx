@@ -82,73 +82,6 @@ function isMedicationGoal(goal: any) {
   return category === "MEDICATION" || metricType === "MEDICATION" || metricKey === "medication.adherence";
 }
 
-function medicationGoalFor(medication: any, goals: any[], medicationCount: number) {
-  const medicationId = patientMedicationId(medication);
-  const medicationRecordIds = [
-    medicationId,
-    medication?.patientMedicationId,
-    medication?.patientMedication?.id,
-  ].filter(Boolean).map(String);
-  const medicationCatalogIds = [
-    medication?.medicationId,
-    medication?.medication?.id,
-    medication?.medication?.medicationId,
-  ].filter(Boolean).map(String);
-
-  return goals.find((goal: any) => {
-    const status = String(goal?.status ?? "").toUpperCase();
-    const medicationGoalId = medication?.healthGoalId ?? medication?.medicationGoalId ?? null;
-    if (medicationGoalId && String(goal?.id ?? "") === String(medicationGoalId)) {
-      return isMedicationGoal(goal) && !["ARCHIVED", "CANCELLED", "DELETED", "ACHIEVED"].includes(status);
-    }
-    const isLiveMedicationGoal =
-      ACTIVE_GOAL_STATUSES.has(status) ||
-      status === "NOT_STARTED";
-    if (!isMedicationGoal(goal) || !isLiveMedicationGoal) return false;
-
-    const linkedPatientMedicationId =
-      goal?.patientMedicationId ||
-      goal?.patientMedication?.id ||
-      goal?.associatedPatientMedicationId ||
-      goal?.associatedPatientMedication?.id;
-
-    if (linkedPatientMedicationId && medicationRecordIds.length > 0) {
-      if (medicationRecordIds.includes(String(linkedPatientMedicationId))) return true;
-    }
-
-    const linkedMedicationId =
-      goal?.associatedMedicationId ||
-      goal?.medicationId ||
-      goal?.associatedMedication?.id ||
-      goal?.medication?.id;
-
-    if (linkedMedicationId && medicationCatalogIds.length > 0) {
-      if (medicationCatalogIds.includes(String(linkedMedicationId))) return true;
-    }
-
-    const name = medicationName(medication);
-    const goalNames = [
-      goal?.medication?.name,
-      goal?.medication?.genericName,
-      goal?.medication?.brandName,
-      goal?.title,
-      goal?.description,
-    ].map(normalise).filter(Boolean);
-
-    if (name) {
-      const matchesMedicationName = goalNames.some(
-        (candidate) =>
-          candidate === name ||
-          candidate.includes(name) ||
-          name.includes(candidate),
-      );
-      if (matchesMedicationName) return true;
-    }
-
-    return medicationCount === 1 && normalise(goal?.title) === "manage medication";
-  }) ?? null;
-}
-
 export default function TodayPage() {
   const { data, loading, error, reload } = useDashboard();
   const [symptomFeed, setSymptomFeed] = useState<any[]>([]);
@@ -234,7 +167,6 @@ export default function TodayPage() {
   const activeGoalsArray = Array.isArray(data.activeGoalsArray)
     ? data.activeGoalsArray
     : allGoals.filter((goal: any) => ACTIVE_GOAL_STATUSES.has(String(goal?.status ?? "").toUpperCase()));
-  const todayGoalArray = activeGoalsArray;
   const goals = activeGoalsArray;
 
   const medicationGoalsForToday = activeGoalsArray.filter((goal: any) => isMedicationGoal(goal));
