@@ -110,7 +110,7 @@ function nutritionTargetReview(target: number | null) {
 
   return {
     tone: "review" as const,
-    text: "This target is within the 800–1,200 calories/day low-energy range. Current NICE guidance recommends this range only within a specialist-supported, multicomponent approach for eligible adults and not as a routine long-term strategy.",
+    text: "This target is within the 800–1,200 calories/day low-energy range. Current NICE guidance recommends this range only within a specialist-supported, multicomponent approach for eligible adults, with ongoing clinical support, and for no more than 12 weeks.",
   };
 }
 
