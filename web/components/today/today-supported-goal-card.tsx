@@ -78,6 +78,14 @@ function sourceAction(category: string) {
   return { label: "Open health goal", href: "/health-goals" };
 }
 
+function nutritionTargetReview(target: number | null) {
+  if (target == null || !Number.isFinite(target) || target <= 0 || target > 1200) return null;
+  if (target < 800) {
+    return "This calorie target is below 800 calories/day. Sympto is flagging it for clinical review rather than recommending it; very-low-energy diets should only be used with specialist supervision for appropriate clinical circumstances.";
+  }
+  return "This calorie target is within the 800–1,200 calories/day low-energy range. Current NICE guidance recommends this range only within a specialist-supported, multicomponent approach for eligible adults. Review the target with a dietitian or other qualified healthcare professional.";
+}
+
 function goalNextStep(category: string, current: number | null, target: number | null) {
   if (current == null || target == null) {
     return category === "NUTRITION"
@@ -235,6 +243,7 @@ export default function TodaySupportedGoalCard({ goal, onUpdated }: SupportedGoa
 
         <div className="mt-3 rounded-[17px] bg-[#fbfdfd] p-3.5 ring-1 ring-[#e4edef]">
           <p className="text-[10px] leading-5 text-[#758896]">{meta.helper}</p>
+          {category === "NUTRITION" && nutritionTargetReview(target) && <div className="mt-2 rounded-[14px] border border-amber-200 bg-amber-50 px-3 py-2.5"><p className="text-[9px] font-black uppercase tracking-[.12em] text-amber-900">Target review</p><p className="mt-1 text-[10px] leading-5 text-amber-900/85">{nutritionTargetReview(target)}</p></div>}
           <div className="mt-2 rounded-xl bg-[#e9f9fa] px-3 py-2"><p className="text-[9px] font-bold leading-4 text-[#0b6f73]">{nextStep}</p></div>
           {meta.action === "MANUAL" ? (
             <div className="mt-3 flex flex-col gap-2 sm:flex-row">
