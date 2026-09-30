@@ -220,6 +220,7 @@ const modules = fs
 
     // Health Goals
     'health-goals.read',
+    'health-goals.update',
 
     // Goal Progress
     'health-goal-progress.read',
