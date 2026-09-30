@@ -96,7 +96,8 @@ function cumulativeTakenDoses(medication: any): number {
   }
 
   return 0;
-}\ntype MedicationInsight = {
+}
+type MedicationInsight = {
   title: string;
   text: string;
 };
