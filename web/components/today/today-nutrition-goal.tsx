@@ -1079,7 +1079,14 @@ export default function TodayNutritionGoal({ goal, onUpdated }: Props) {
         )}
 
         <section className="mt-4 grid gap-2 sm:grid-cols-3">
-          <Link href="#daily-health-check-in" className="rounded-[18px] border border-[#dfeaec] bg-[#f7fbfb] p-3.5 transition hover:border-[#24c1c4]">
+          <Link
+            href="#daily-health-check-in"
+            className={`rounded-[18px] border p-3.5 transition ${
+              todayCheckIn?.waterIntakeMl != null
+                ? "border-[#24c1c4]/45 bg-[#f2fbfb] shadow-[0_0_22px_rgba(36,193,196,.22)] hover:shadow-[0_0_28px_rgba(36,193,196,.3)]"
+                : "border-[#dfeaec] bg-[#f7fbfb] hover:border-[#24c1c4]"
+            }`}
+          >
             <p className="text-[8px] font-black uppercase tracking-[.13em] text-[#74859a]">Hydration</p>
             <div className="mt-1 flex items-end justify-between gap-2">
               <p className="text-xs font-black text-[#0b2d54]">{todayCheckIn?.waterIntakeMl == null ? "Not logged" : todayCheckIn.waterIntakeMl.toLocaleString("en-ZA") + " ml"}</p>
@@ -1088,8 +1095,15 @@ export default function TodayNutritionGoal({ goal, onUpdated }: Props) {
             <p className="mt-1 text-[9px] leading-4 text-[#8a99a4]">{todayCheckIn?.waterIntakeMl == null ? "Log your water intake in the Daily Health Check-in." : "Water recorded in today's Daily Health Check-in."}</p>
           </Link>
 
-          <Link href="#daily-health-check-in" className="rounded-[18px] border border-[#dfeaec] bg-[#f7fbfb] p-3.5 transition hover:border-[#24c1c4]">
-            <p className="text-[8px] font-black uppercase tracking-[.13em] text-[#74859a]">Sleep</p>
+          <Link
+            href="#daily-health-check-in"
+            className={`rounded-[18px] border p-3.5 transition ${
+              todayCheckIn?.sleepHours != null
+                ? "border-[#5265a9]/45 bg-[#f7f8fd] shadow-[0_0_22px_rgba(82,101,169,.2)] hover:shadow-[0_0_28px_rgba(82,101,169,.28)]"
+                : "border-[#dfeaec] bg-[#f7fbfb] hover:border-[#5265a9]"
+            }`}
+          >
+            <p className="text-[8px] font-black uppercase tracking-[.13em] text-[#5265a9]">Sleep</p>
             <div className="mt-1 flex items-end justify-between gap-2">
               <p className="text-xs font-black text-[#0b2d54]">{todayCheckIn?.sleepHours == null ? "Not logged" : todayCheckIn.sleepHours + " h"}</p>
               <span className="text-[8px] font-black uppercase tracking-[.1em] text-[#5265a9]">{todayCheckIn?.sleepHours == null ? "Action needed" : "Logged today"}</span>
@@ -1097,8 +1111,15 @@ export default function TodayNutritionGoal({ goal, onUpdated }: Props) {
             <p className="mt-1 text-[9px] leading-4 text-[#8a99a4]">{todayCheckIn?.sleepHours == null ? "Record last night's sleep in the Daily Health Check-in." : "Sleep recorded in today's Daily Health Check-in."}</p>
           </Link>
 
-          <Link href="#daily-health-check-in" className="rounded-[18px] border border-[#dfeaec] bg-[#f7fbfb] p-3.5 transition hover:border-[#24c1c4]">
-            <p className="text-[8px] font-black uppercase tracking-[.13em] text-[#74859a]">Activity</p>
+          <Link
+            href="#daily-health-check-in"
+            className={`rounded-[18px] border p-3.5 transition ${
+              todayCheckIn?.exerciseMinutes != null
+                ? "border-[#3f75bd]/45 bg-[#f5f9fd] shadow-[0_0_22px_rgba(63,117,189,.2)] hover:shadow-[0_0_28px_rgba(63,117,189,.28)]"
+                : "border-[#dfeaec] bg-[#f7fbfb] hover:border-[#3f75bd]"
+            }`}
+          >
+            <p className="text-[8px] font-black uppercase tracking-[.13em] text-[#3f75bd]">Activity</p>
             <div className="mt-1 flex items-end justify-between gap-2">
               <p className="text-xs font-black text-[#0b2d54]">{todayCheckIn?.exerciseMinutes == null ? "Not logged" : todayCheckIn.exerciseMinutes + " min"}</p>
               <span className="text-[8px] font-black uppercase tracking-[.1em] text-[#3f75bd]">{todayCheckIn?.exerciseMinutes == null ? "Action needed" : "Logged today"}</span>
