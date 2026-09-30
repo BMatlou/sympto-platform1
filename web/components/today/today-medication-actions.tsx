@@ -304,6 +304,56 @@ function buildMedicationInsights(
     }
   }
 
+  const hydrationMatched = matched.filter(
+    (record) =>
+      record.checkIn?.waterIntakeMl != null &&
+      Number.isFinite(Number(record.checkIn.waterIntakeMl)),
+  );
+
+  if (hydrationMatched.length >= 6) {
+    const hydrationValues = hydrationMatched
+      .map((record) => Number(record.checkIn?.waterIntakeMl))
+      .sort((a, b) => a - b);
+    const middle = Math.floor(hydrationValues.length / 2);
+    const median =
+      hydrationValues.length % 2 === 0
+        ? (hydrationValues[middle - 1] + hydrationValues[middle]) / 2
+        : hydrationValues[middle];
+
+    const lowerHydration = hydrationMatched.filter(
+      (record) => Number(record.checkIn?.waterIntakeMl) < median,
+    );
+    const higherHydration = hydrationMatched.filter(
+      (record) => Number(record.checkIn?.waterIntakeMl) >= median,
+    );
+
+    if (lowerHydration.length >= 3 && higherHydration.length >= 3) {
+      const lowerAverage =
+        lowerHydration.reduce((sum, record) => sum + record.adherence, 0) /
+        lowerHydration.length;
+      const higherAverage =
+        higherHydration.reduce((sum, record) => sum + record.adherence, 0) /
+        higherHydration.length;
+      const difference = lowerAverage - higherAverage;
+
+      if (Math.abs(difference) >= 10) {
+        insights.push({
+          title: "Hydration and medication adherence show a pattern",
+          text:
+            "On " +
+            lowerHydration.length +
+            " days with lower recorded water intake, your logged medication adherence averaged about " +
+            formatWhole(lowerAverage) +
+            "% versus " +
+            formatWhole(higherAverage) +
+            "% on " +
+            higherHydration.length +
+            " days with higher recorded water intake. This is an association in your records, not evidence that hydration caused the difference.",
+        });
+      }
+    }
+  }
+
   const weekdayRecords = priorRecords.filter((record) => {
     const day = new Date(record.day + "T12:00:00").getDay();
     return day >= 1 && day <= 5;
@@ -340,10 +390,21 @@ function buildMedicationInsights(
   }
 
   if (insights.length === 0) {
-    insights.push({
-      title: "Not enough data yet",
-      text: "Sympto needs more recorded medication doses and supporting health data before it can identify a meaningful personal adherence pattern or comparison.",
-    });
+    const matchedContextDays = new Set(
+      matched.map((record) => record.day),
+    ).size;
+
+    if (priorRecords.length < 3 || matchedContextDays < 6) {
+      insights.push({
+        title: "Not enough data yet",
+        text: "Sympto needs more recorded medication doses and supporting health data before it can identify a meaningful personal adherence pattern or comparison.",
+      });
+    } else {
+      insights.push({
+        title: "No clear pattern detected yet",
+        text: "Sympto has enough recorded data to compare your medication adherence, but the current differences are not large or consistent enough to surface as a personal pattern.",
+      });
+    }
   }
 
   return insights.slice(0, 4);
