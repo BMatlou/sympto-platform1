@@ -155,6 +155,7 @@ export default function TodayNutritionGoal({ goal, onUpdated }: Props) {
   const [mealType, setMealType] = useState("Meal");
   const [selectedFood, setSelectedFood] = useState<NutritionFood | null>(null);
   const [grams, setGrams] = useState("");
+  const [searchQuantity, setSearchQuantity] = useState(1);
   const [draftItems, setDraftItems] = useState<NutritionItem[]>([]);
   const [searching, setSearching] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -249,6 +250,7 @@ export default function TodayNutritionGoal({ goal, onUpdated }: Props) {
 
     setSearching(true);
     setSelectedFood(null);
+    setSearchQuantity(parsed.quantity);
 
     try {
       const result = await healthGoalsService.searchNutritionFoods(parsed.query, 8);
@@ -280,11 +282,10 @@ export default function TodayNutritionGoal({ goal, onUpdated }: Props) {
         detailed?.portions?.find((portion) => /medium|large|small|cup|slice|serving/i.test(String(portion.modifier ?? "") + " " + String(portion.unit ?? ""))) ??
         detailed?.portions?.[0];
 
-      setGrams(
-        suggested?.gramWeight
-          ? String(Math.round(suggested.gramWeight))
-          : "100",
-      );
+      const suggestedWeight = suggested?.gramWeight
+        ? Number(suggested.gramWeight) * Math.max(1, searchQuantity)
+        : 100 * Math.max(1, searchQuantity);
+      setGrams(String(Math.round(suggestedWeight)));
     } catch {
       setSelectedFood(food);
       setGrams("100");
@@ -510,7 +511,7 @@ export default function TodayNutritionGoal({ goal, onUpdated }: Props) {
               onKeyDown={(event) => {
                 if (event.key === "Enter") void searchFood();
               }}
-              placeholder="e.g. boiled eggs, oats, avocado"
+              placeholder="e.g. 2 boiled eggs"
               aria-label="Search for food"
               className="min-h-11 min-w-0 flex-1 rounded-xl border border-[#d8e5e9] bg-white px-3 text-xs font-bold text-[#0b2d54] outline-none placeholder:text-[#a2afb8] focus:border-[#24c1c4]"
             />
