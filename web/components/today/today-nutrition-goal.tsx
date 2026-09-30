@@ -307,6 +307,28 @@ export default function TodayNutritionGoal({ goal, onUpdated }: Props) {
   const draftProtein = draftItems.reduce((sum, item) => sum + Number(item.protein ?? 0), 0);
   const draftFibre = draftItems.reduce((sum, item) => sum + Number(item.fibre ?? 0), 0);
 
+  const nutritionInsights = useMemo(
+    () =>
+      buildNutritionInsights(
+        todayCheckIn,
+        todayTotal,
+        target,
+        todayProtein,
+        todayFibre,
+        recentNutritionDays,
+        recentCheckIns,
+      ),
+    [
+      todayCheckIn,
+      todayTotal,
+      target,
+      todayProtein,
+      todayFibre,
+      recentNutritionDays,
+      recentCheckIns,
+    ],
+  );
+
   async function loadToday() {
     if (!goalId) return;
 
@@ -355,7 +377,8 @@ export default function TodayNutritionGoal({ goal, onUpdated }: Props) {
   async function loadTodayCheckIn() {
     try {
       const response = await healthJournalService.getAll({ limit: 100 });
-      const entry = (response.data ?? []).find(isTodayJournal);
+      const journals = Array.isArray(response.data) ? response.data : [];
+      const entry = journals.find(isTodayJournal);
       setTodayCheckIn(
         entry
           ? {
@@ -366,8 +389,22 @@ export default function TodayNutritionGoal({ goal, onUpdated }: Props) {
             }
           : null,
       );
+
+      setRecentCheckIns(
+        journals
+          .filter((journal: any) => journal?.title === "Daily Health Check-in" && journal?.createdAt)
+          .map((journal: any) => ({
+            day: journalDayKey(journal.createdAt),
+            sleepHours: journal.sleepHours == null ? null : Number(journal.sleepHours),
+            waterIntakeMl: journal.waterIntakeMl == null ? null : Number(journal.waterIntakeMl),
+            exerciseMinutes: journal.exerciseMinutes == null ? null : Number(journal.exerciseMinutes),
+          }))
+          .filter((item) => Boolean(item.day))
+          .slice(0, 14),
+      );
     } catch {
       setTodayCheckIn(null);
+      setRecentCheckIns([]);
     }
   }
 
@@ -381,6 +418,51 @@ export default function TodayNutritionGoal({ goal, onUpdated }: Props) {
       window.removeEventListener("sympto:health-checkin-updated", handleCheckInUpdated);
     };
   }, []);
+
+  useEffect(() => {
+    let active = true;
+
+    async function loadRecentNutrition() {
+      try {
+        const end = new Date();
+        const start = new Date(end);
+        start.setDate(start.getDate() - 13);
+        start.setHours(0, 0, 0, 0);
+
+        const response = await healthGoalsService.getMetricEvents(
+          "NUTRITION",
+          "nutrition.calories",
+          start,
+          end,
+          "goal-manual",
+        );
+
+        const byDay = new Map<string, number>();
+        for (const event of response.events ?? []) {
+          const day = journalDayKey(event.occurredAt);
+          if (!day) continue;
+          byDay.set(day, (byDay.get(day) ?? 0) + Number(event.loggedValue ?? 0));
+        }
+
+        if (active) {
+          setRecentNutritionDays(
+            Array.from(byDay.entries()).map(([day, calories]) => ({
+              day,
+              calories,
+            })),
+          );
+        }
+      } catch {
+        if (active) setRecentNutritionDays([]);
+      }
+    }
+
+    void loadRecentNutrition();
+
+    return () => {
+      active = false;
+    };
+  }, [goalId]);
 
   async function searchFood() {
     const parsed = extractFoodSearchTerm(query);
