@@ -26,24 +26,86 @@ export class HealthGoalsService {
     return process.env.NODE_ENV === 'production' ? '' : 'DEMO_KEY';
   }
 
-  private nutritionNutrient(food: any, nutrientId: number) {
+  private nutritionNutrient(
+    food: any,
+    nutrientIds: number[],
+    nutrientNumbers: string[] = [],
+  ) {
     const nutrient = Array.isArray(food?.foodNutrients)
-      ? food.foodNutrients.find((item: any) =>
-          Number(item?.nutrientId ?? item?.nutrient?.id) === nutrientId,
-        )
+      ? food.foodNutrients.find((item: any) => {
+          const ids = [
+            item?.nutrientId,
+            item?.id,
+            item?.nutrient?.id,
+          ]
+            .map((value: unknown) => Number(value))
+            .filter(Number.isFinite);
+
+          const numbers = [
+            item?.nutrientNumber,
+            item?.number,
+            item?.nutrient?.number,
+          ]
+            .map((value: unknown) => String(value ?? '').trim())
+            .filter(Boolean);
+
+          return (
+            ids.some((id) => nutrientIds.includes(id)) ||
+            numbers.some((number) => nutrientNumbers.includes(number))
+          );
+        })
       : null;
-    const amount = Number(nutrient?.value ?? nutrient?.amount);
-    return Number.isFinite(amount) ? amount : null;
+
+    const amount = Number(
+      nutrient?.value ??
+        nutrient?.amount ??
+        nutrient?.nutrient?.value ??
+        nutrient?.nutrient?.amount,
+    );
+
+    if (Number.isFinite(amount)) return amount;
+
+    // Some branded-food responses expose nutrition through labelNutrients.
+    // Convert per-serving label values to a per-100-g basis only when
+    // USDA gives us a gram-based serving size.
+    const servingSize = Number(food?.servingSize);
+    const servingUnit = String(food?.servingSizeUnit ?? '').trim().toLowerCase();
+    const canConvertServing = Number.isFinite(servingSize) && servingSize > 0 && servingUnit === 'g';
+
+    return null;
   }
 
   private mapNutritionFood(food: any) {
+    const servingSize = Number(food?.servingSize);
+    const servingUnit = String(food?.servingSizeUnit ?? '').trim().toLowerCase();
+    const canConvertServing = Number.isFinite(servingSize) && servingSize > 0 && servingUnit === 'g';
+
+    const fromLabelNutrients = (key: 'calories' | 'protein' | 'fiber') => {
+      const value = Number(food?.labelNutrients?.[key]?.value);
+      if (!Number.isFinite(value)) return null;
+      if (canConvertServing) return (value * 100) / servingSize;
+      return value;
+    };
+
+    const caloriesPer100g =
+      this.nutritionNutrient(food, [1008, 2047, 2048], ['208']) ??
+      fromLabelNutrients('calories');
+
+    const proteinPer100g =
+      this.nutritionNutrient(food, [1003], ['203']) ??
+      fromLabelNutrients('protein');
+
+    const fibrePer100g =
+      this.nutritionNutrient(food, [1079], ['291']) ??
+      fromLabelNutrients('fiber');
+
     return {
       fdcId: String(food?.fdcId ?? ''),
       description: String(food?.description ?? food?.lowercaseDescription ?? 'Food'),
       dataType: String(food?.dataType ?? ''),
-      caloriesPer100g: this.nutritionNutrient(food, 1008),
-      proteinPer100g: this.nutritionNutrient(food, 1003),
-      fibrePer100g: this.nutritionNutrient(food, 1079),
+      caloriesPer100g,
+      proteinPer100g,
+      fibrePer100g,
       portions: Array.isArray(food?.foodPortions)
         ? food.foodPortions
             .map((portion: any) => ({
