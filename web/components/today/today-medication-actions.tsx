@@ -1,10 +1,11 @@
 "use client";
 
-import { Check, CircleSlash2, Pill } from "lucide-react";
+import { Check, CircleSlash2, Pill, Sparkles } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 import { api } from "@/lib/api";
 import { healthGoalsService } from "@/services/health-goals.service";
+import { healthJournalService } from "@/services/health-journal.service";
 
 interface TodayMedicationActionsProps {
   medications: any[];
@@ -95,7 +96,258 @@ function cumulativeTakenDoses(medication: any): number {
   }
 
   return 0;
+}\ntype MedicationInsight = {
+  title: string;
+  text: string;
+};
+
+type MedicationCheckIn = {
+  day: string;
+  sleepHours: number | null;
+  waterIntakeMl: number | null;
+  exerciseMinutes: number | null;
+};
+
+function journalDayKey(value: unknown) {
+  const date = new Date(String(value ?? ""));
+  if (Number.isNaN(date.getTime())) return "";
+  return new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Africa/Johannesburg",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).format(date);
 }
+
+function formatWhole(value: number) {
+  return new Intl.NumberFormat("en-ZA", {
+    maximumFractionDigits: 0,
+  }).format(Math.round(value));
+}
+
+function buildMedicationInsights(
+  adherenceEvents: Array<{
+    loggedValue: number;
+    occurredAt: string;
+  }>,
+  targetAdherence: number,
+  recentCheckIns: MedicationCheckIn[],
+): MedicationInsight[] {
+  const insights: MedicationInsight[] = [];
+
+  if (!adherenceEvents.length) {
+    return [{
+      title: "Not enough data yet",
+      text: "Sympto needs more recorded medication doses before it can identify a meaningful personal adherence pattern or comparison.",
+    }];
+  }
+
+  const sortedEvents = [...adherenceEvents].sort(
+    (a, b) =>
+      new Date(String(a.occurredAt)).getTime() -
+      new Date(String(b.occurredAt)).getTime(),
+  );
+
+  let cumulativeTaken = 0;
+  const byDay = new Map<string, { actions: number; taken: number }>();
+
+  sortedEvents.forEach((event, index) => {
+    const totalActions = index + 1;
+    const adherence = Number(event.loggedValue);
+    const inferredTaken = Number.isFinite(adherence)
+      ? Math.max(
+          0,
+          Math.min(totalActions, Math.round((totalActions * adherence) / 100)),
+        )
+      : cumulativeTaken;
+
+    const previousTaken = cumulativeTaken;
+    cumulativeTaken = Math.max(cumulativeTaken, inferredTaken);
+
+    const day = journalDayKey(event.occurredAt);
+    if (!day) return;
+
+    const current = byDay.get(day) ?? { actions: 0, taken: 0 };
+    current.actions += 1;
+    current.taken += Math.max(0, cumulativeTaken - previousTaken);
+    byDay.set(day, current);
+  });
+
+  const today = journalDayKey(new Date());
+  const dailyRecords = Array.from(byDay.entries())
+    .map(([day, stats]) => ({
+      day,
+      actions: stats.actions,
+      taken: stats.taken,
+      adherence:
+        stats.actions > 0
+          ? Math.max(0, Math.min(100, (stats.taken / stats.actions) * 100))
+          : 0,
+    }))
+    .sort((a, b) => b.day.localeCompare(a.day));
+
+  const priorRecords = dailyRecords.filter((record) => record.day !== today);
+  if (priorRecords.length >= 3) {
+    const average =
+      priorRecords.reduce((sum, record) => sum + record.adherence, 0) /
+      priorRecords.length;
+    const difference = average - targetAdherence;
+
+    if (Math.abs(difference) >= 5) {
+      insights.push({
+        title: "Recent adherence compared with your goal",
+        text:
+          "Across " +
+          priorRecords.length +
+          " recent recorded days, your logged medication adherence averaged about " +
+          formatWhole(average) +
+          "%, which is " +
+          formatWhole(Math.abs(difference)) +
+          " percentage points " +
+          (difference >= 0 ? "above" : "below") +
+          " your " +
+          formatWhole(targetAdherence) +
+          "% goal.",
+      });
+    }
+  }
+
+  const checkIns = new Map(recentCheckIns.map((item) => [item.day, item]));
+  const matched = dailyRecords
+    .map((record) => ({
+      ...record,
+      checkIn: checkIns.get(record.day),
+    }))
+    .filter((record) => record.checkIn);
+
+  const sleepMatched = matched.filter(
+    (record) =>
+      record.checkIn?.sleepHours != null &&
+      Number.isFinite(Number(record.checkIn.sleepHours)),
+  );
+
+  if (sleepMatched.length >= 6) {
+    const shortSleep = sleepMatched.filter(
+      (record) => Number(record.checkIn?.sleepHours) < 6,
+    );
+    const usualSleep = sleepMatched.filter(
+      (record) => Number(record.checkIn?.sleepHours) >= 6,
+    );
+
+    if (shortSleep.length >= 3 && usualSleep.length >= 3) {
+      const shortAverage =
+        shortSleep.reduce((sum, record) => sum + record.adherence, 0) /
+        shortSleep.length;
+      const usualAverage =
+        usualSleep.reduce((sum, record) => sum + record.adherence, 0) /
+        usualSleep.length;
+      const difference = shortAverage - usualAverage;
+
+      if (Math.abs(difference) >= 10) {
+        insights.push({
+          title: "Sleep and medication adherence show a pattern",
+          text:
+            "On " +
+            shortSleep.length +
+            " days with less than 6 hours of recorded sleep, your logged medication adherence averaged about " +
+            formatWhole(shortAverage) +
+            "% versus " +
+            formatWhole(usualAverage) +
+            "% on " +
+            usualSleep.length +
+            " days with 6 or more hours. This is an association in your records, not evidence that sleep caused the difference.",
+        });
+      }
+    }
+  }
+
+  const activityMatched = matched.filter(
+    (record) =>
+      record.checkIn?.exerciseMinutes != null &&
+      Number.isFinite(Number(record.checkIn.exerciseMinutes)),
+  );
+
+  if (activityMatched.length >= 6) {
+    const lowerActivity = activityMatched.filter(
+      (record) => Number(record.checkIn?.exerciseMinutes) < 30,
+    );
+    const higherActivity = activityMatched.filter(
+      (record) => Number(record.checkIn?.exerciseMinutes) >= 30,
+    );
+
+    if (lowerActivity.length >= 3 && higherActivity.length >= 3) {
+      const lowerAverage =
+        lowerActivity.reduce((sum, record) => sum + record.adherence, 0) /
+        lowerActivity.length;
+      const higherAverage =
+        higherActivity.reduce((sum, record) => sum + record.adherence, 0) /
+        higherActivity.length;
+      const difference = lowerAverage - higherAverage;
+
+      if (Math.abs(difference) >= 10) {
+        insights.push({
+          title: "Activity and medication adherence show a pattern",
+          text:
+            "On " +
+            lowerActivity.length +
+            " days with less than 30 minutes of recorded activity, your logged medication adherence averaged about " +
+            formatWhole(lowerAverage) +
+            "% versus " +
+            formatWhole(higherAverage) +
+            "% on " +
+            higherActivity.length +
+            " days with 30 minutes or more. This is an association in your records, not evidence that activity caused the difference.",
+        });
+      }
+    }
+  }
+
+  const weekdayRecords = priorRecords.filter((record) => {
+    const day = new Date(record.day + "T12:00:00").getDay();
+    return day >= 1 && day <= 5;
+  });
+  const weekendRecords = priorRecords.filter((record) => {
+    const day = new Date(record.day + "T12:00:00").getDay();
+    return day === 0 || day === 6;
+  });
+
+  if (weekdayRecords.length >= 4 && weekendRecords.length >= 2) {
+    const weekdayAverage =
+      weekdayRecords.reduce((sum, record) => sum + record.adherence, 0) /
+      weekdayRecords.length;
+    const weekendAverage =
+      weekendRecords.reduce((sum, record) => sum + record.adherence, 0) /
+      weekendRecords.length;
+    const difference = weekdayAverage - weekendAverage;
+
+    if (Math.abs(difference) >= 10) {
+      insights.push({
+        title: "Medication adherence differs across the week",
+        text:
+          "Your logged medication adherence averaged about " +
+          formatWhole(weekdayAverage) +
+          "% on " +
+          weekdayRecords.length +
+          " weekdays versus " +
+          formatWhole(weekendAverage) +
+          "% across " +
+          weekendRecords.length +
+          " weekend days. Sympto is identifying this as a timing pattern in your records.",
+      });
+    }
+  }
+
+  if (insights.length === 0) {
+    insights.push({
+      title: "Not enough data yet",
+      text: "Sympto needs more recorded medication doses and supporting health data before it can identify a meaningful personal adherence pattern or comparison.",
+    });
+  }
+
+  return insights.slice(0, 4);
+}
+
+
 
 export default function TodayMedicationActions({ medications, goal: suppliedGoal, onUpdated }: TodayMedicationActionsProps) {
   const [dosesLoggedToday, setDosesLoggedToday] = useState(0);
@@ -103,12 +355,10 @@ export default function TodayMedicationActions({ medications, goal: suppliedGoal
   const [isSyncing, setIsSyncing] = useState(false);
   const [savingKey, setSavingKey] = useState<string | null>(null);
   const [states, setStates] = useState<Record<string, Action | undefined>>({});
+  const [adherenceEvents, setAdherenceEvents] = useState<Array<{ loggedValue: number; occurredAt: string }>>([]);
+  const [recentCheckIns, setRecentCheckIns] = useState<MedicationCheckIn[]>([]);
 
   const trackedMedication = medications[0] ?? null;
-  const medication = {
-    ...(trackedMedication ?? {}),
-    name: trackedMedication?.name || trackedMedication?.medication?.name || trackedMedication?.medication?.genericName || trackedMedication?.medication?.brandName || "",
-  };
   const finalGoal = (() => {
     if (!suppliedGoal) return null;
 
@@ -150,6 +400,7 @@ export default function TodayMedicationActions({ medications, goal: suppliedGoal
     if (!medications.length || !medicationId) {
       setDosesLoggedToday(0);
       setTakenDosesForGoal(0);
+      setAdherenceEvents([]);
       return;
     }
 
@@ -174,8 +425,16 @@ export default function TodayMedicationActions({ medications, goal: suppliedGoal
       if (!medicationEvents.length) {
         setDosesLoggedToday(0);
         setTakenDosesForGoal(0);
+        setAdherenceEvents([]);
         return;
       }
+
+      setAdherenceEvents(
+        medicationEvents.map((event) => ({
+          loggedValue: Number(event.loggedValue),
+          occurredAt: String(event.occurredAt),
+        })),
+      );
 
       // Each medication-adherence event represents exactly one recorded dose
       // action. Its loggedValue is the cumulative adherence percentage after
@@ -212,6 +471,56 @@ export default function TodayMedicationActions({ medications, goal: suppliedGoal
   useEffect(() => {
     void loadAdherenceEvents();
   }, [medications.length, totalRequiredDosesPerDay, medicationId, finalGoal?.id]);
+
+  useEffect(() => {
+    let active = true;
+
+    async function loadRecentCheckIns() {
+      try {
+        const response = await healthJournalService.getAll({ limit: 100 });
+        const journals = Array.isArray(response.data) ? response.data : [];
+
+        const checkIns = journals
+          .filter(
+            (journal: any) =>
+              journal?.title === "Daily Health Check-in" && journal?.createdAt,
+          )
+          .map((journal: any) => ({
+            day: journalDayKey(journal.createdAt),
+            sleepHours:
+              journal.sleepHours == null ? null : Number(journal.sleepHours),
+            waterIntakeMl:
+              journal.waterIntakeMl == null
+                ? null
+                : Number(journal.waterIntakeMl),
+            exerciseMinutes:
+              journal.exerciseMinutes == null
+                ? null
+                : Number(journal.exerciseMinutes),
+          }))
+          .filter((item) => Boolean(item.day))
+          .sort((a, b) => b.day.localeCompare(a.day))
+          .slice(0, 30);
+
+        if (active) setRecentCheckIns(checkIns);
+      } catch {
+        if (active) setRecentCheckIns([]);
+      }
+    }
+
+    void loadRecentCheckIns();
+
+    const handleCheckInUpdated = () => void loadRecentCheckIns();
+    window.addEventListener("sympto:health-checkin-updated", handleCheckInUpdated);
+
+    return () => {
+      active = false;
+      window.removeEventListener(
+        "sympto:health-checkin-updated",
+        handleCheckInUpdated,
+      );
+    };
+  }, []);
 
   const doseLabel = useMemo(() => (totalRequiredDosesPerDay === 1 ? "1 dose" : `${totalRequiredDosesPerDay} doses`), [totalRequiredDosesPerDay]);
 
@@ -272,6 +581,16 @@ export default function TodayMedicationActions({ medications, goal: suppliedGoal
   const goalTitle = finalGoal?.title || `${medicationName(trackedMedication)} adherence`;
   const rawTargetAdherence = Number(finalGoal?.targetValue);
   const targetAdherence = Number.isFinite(rawTargetAdherence) && rawTargetAdherence > 0 ? rawTargetAdherence : 90;
+
+  const medicationInsights = useMemo(
+    () =>
+      buildMedicationInsights(
+        adherenceEvents,
+        targetAdherence,
+        recentCheckIns,
+      ),
+    [adherenceEvents, targetAdherence, recentCheckIns],
+  );
   const scheduledGoalDoses = Math.max(0, Math.ceil((daysLeft !== null ? daysLeft + journeyDay - 1 : 30) * totalRequiredDosesPerDay));
   const targetDoseCount = Math.ceil((scheduledGoalDoses * targetAdherence) / 100);
   const fallbackTakenDoses = cumulativeTakenDoses(trackedMedication);
@@ -287,6 +606,26 @@ export default function TodayMedicationActions({ medications, goal: suppliedGoal
       <div className="mx-3.5 mb-3.5 rounded-[22px] bg-[#0b2d54] px-4 py-4 text-white shadow-[0_12px_28px_rgba(11,45,84,.14)] sm:mx-4 sm:mb-4 sm:px-5 sm:py-4"><div className="flex items-center gap-4 sm:gap-5"><div className="relative shrink-0" style={{ width: ringSize, height: ringSize }}><svg width={ringSize} height={ringSize} viewBox={`0 0 ${ringSize} ${ringSize}`} className="-rotate-90"><circle cx={ringSize / 2} cy={ringSize / 2} r={radius} fill="none" stroke="rgba(255,255,255,.10)" strokeWidth={ringStroke} /><circle cx={ringSize / 2} cy={ringSize / 2} r={radius} fill="none" stroke="#24c1c4" strokeWidth={ringStroke} strokeLinecap="round" strokeDasharray={circumference} strokeDashoffset={dashOffset} /></svg><div className="absolute inset-0 grid place-items-center text-center"><p className="text-3xl font-black leading-none tracking-[-.07em]">{safeDosesLoggedToday}</p></div></div><div className="min-w-0 flex-1"><p className="text-[8px] font-black uppercase tracking-[.15em] text-white/45">Today’s medication</p><p className="mt-1 truncate text-lg font-black tracking-[-.045em]">{medicationName(trackedMedication)}</p><p className="mt-1 text-[10px] font-semibold uppercase tracking-[.08em] text-white/55">{medicationSchedule(trackedMedication)}</p><div className="mt-2.5 flex flex-wrap items-center gap-2"><span className="rounded-full bg-white/10 px-2.5 py-1 text-[8px] font-black text-white/75 ring-1 ring-white/10">{safeDosesLoggedToday}/{totalRequiredDosesPerDay} doses today</span><span className="rounded-full bg-white/10 px-2.5 py-1 text-[8px] font-black text-[#b8ffff] ring-1 ring-white/10">{percent}% today</span></div></div></div><div className="mt-3.5 border-t border-white/10 pt-3"><div className="flex items-center justify-between gap-3"><p className="text-[9px] font-semibold text-white/60">{safeDosesLoggedToday >= totalRequiredDosesPerDay ? "All scheduled doses logged today." : `${totalRequiredDosesPerDay - safeDosesLoggedToday} dose${totalRequiredDosesPerDay - safeDosesLoggedToday === 1 ? "" : "s"} left to log today.`}</p><p className="text-[9px] font-black text-white/75">{Math.max(0, totalRequiredDosesPerDay - safeDosesLoggedToday)} left today</p></div></div></div>
 
       <div className="border-t border-[#edf2f5] px-4 py-3.5 sm:px-5"><div className="mb-3 flex flex-wrap items-center justify-between gap-2"><div><p className="text-[8px] font-black uppercase tracking-[.14em] text-[#91a0ae]">Goal journey</p><p className="mt-0.5 text-[11px] font-black text-[#0b2d54]">Day {journeyDay}{daysLeft !== null ? ` · ${daysLeft} day${daysLeft === 1 ? "" : "s"} left` : ""}</p></div><div className="text-right"><p className="text-[10px] font-black text-[#0b7b80]">{targetAdherence}% adherence goal</p><p className="mt-0.5 text-[9px] font-semibold text-[#91a0ae]">Take at least {targetAdherence}% of your scheduled doses to reach this goal.</p></div></div><div className="mb-3 h-2 overflow-hidden rounded-full bg-[#edf3f5]"><div className="h-full rounded-full bg-[#24c1c4] transition-all" style={{ width: `${percent}%` }} /></div><div className="mb-3 rounded-[14px] bg-[#f7fbfb] px-3.5 py-3 ring-1 ring-[#e1ecef]"><div className="flex items-center justify-between gap-3"><div><p className="text-[8px] font-black uppercase tracking-[.13em] text-[#91a0ae]">Doses needed for your goal</p><p className="mt-0.5 text-[13px] font-black text-[#0b2d54]">{dosesNeededForGoal} more dose{dosesNeededForGoal === 1 ? "" : "s"}</p></div><p className="text-right text-[9px] font-bold text-[#7c8e9b]">{takenDosesSoFar} taken so far</p></div></div><div className="flex items-center justify-between gap-3"><div><p className="text-[11px] font-bold text-[#7c8e9b]">Dose status</p><p className="mt-0.5 text-[10px] font-semibold text-[#9aa7b1]">{states[String(medicationId)] === "TAKEN" ? "Taken today" : states[String(medicationId)] === "SKIPPED" ? "Skipped today" : "Choose an action below"}</p></div><div className="grid w-[180px] grid-cols-2 gap-2"><button type="button" onClick={() => void record(trackedMedication, "TAKEN")} disabled={isSyncing || safeDosesLoggedToday >= totalRequiredDosesPerDay} className="inline-flex h-10 items-center justify-center gap-1.5 rounded-[13px] bg-[#24c1c4] px-3 text-[10px] font-black text-[#0b2d54] transition hover:brightness-105 disabled:cursor-not-allowed disabled:opacity-45"><Check className="h-3.5 w-3.5" />{savingKey === `${String(medicationId)}:TAKEN` ? "Saving" : "Taken"}</button><button type="button" onClick={() => void record(trackedMedication, "SKIPPED")} disabled={isSyncing || safeDosesLoggedToday >= totalRequiredDosesPerDay} className="inline-flex h-10 items-center justify-center gap-1.5 rounded-[13px] border border-[#dce7eb] bg-white px-3 text-[10px] font-black text-[#0b2d54] transition hover:bg-[#f7fbfb] disabled:cursor-not-allowed disabled:opacity-45"><CircleSlash2 className="h-3.5 w-3.5" />{savingKey === `${String(medicationId)}:SKIPPED` ? "Saving" : "Skipped"}</button></div></div></div>
+
+      <section className="mx-3.5 mb-3.5 rounded-[22px] border border-[#0b2d54] bg-[#0b2d54] p-4 text-white shadow-[0_18px_40px_rgba(11,45,84,.18)] sm:mx-4 sm:mb-4 sm:p-5">
+        <div className="flex items-start gap-3">
+          <span className="grid h-9 w-9 shrink-0 place-items-center rounded-[13px] bg-[#24c1c4] text-[#0b2d54] shadow-[0_0_18px_rgba(36,193,196,.3)]">
+            <Sparkles className="h-4 w-4" />
+          </span>
+          <div className="min-w-0">
+            <p className="text-[9px] font-black uppercase tracking-[.15em] text-[#24c1c4]">Sympto insight</p>
+            <h3 className="mt-1 text-base font-black tracking-[-.025em] text-white">Medication adherence in context</h3>
+          </div>
+        </div>
+        <div className="mt-3 space-y-2">
+          {medicationInsights.map((insight, index) => (
+            <div key={insight.title + "-" + index} className="rounded-[17px] bg-[#123e63] px-3.5 py-3 ring-1 ring-white/10">
+              <p className="text-[10px] font-black text-white">{insight.title}</p>
+              <p className="mt-1 text-[10px] leading-5 text-white/70">{insight.text}</p>
+            </div>
+          ))}
+        </div>
+      </section>
     </section>
   );
 }
