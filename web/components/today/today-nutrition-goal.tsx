@@ -430,11 +430,6 @@ function buildNutritionInsights(
   }
 
   // Pattern 4: nutrition completeness and meal regularity.
-  const daysWithNutrition = new Set(
-    recentNutritionDays.filter((item) => item.calories > 0).map((item) => item.day),
-  );
-  if (todayDay && todayTotal > 0) daysWithNutrition.add(todayDay);
-
   const mealsByDay = new Map<string, Set<string>>();
   for (const event of nutritionEvents) {
     const meal = metadataMeal(event);
@@ -576,18 +571,26 @@ export default function TodayNutritionGoal({ goal, onUpdated }: Props) {
         "goal-manual",
       );
 
-      setEvents(
-        (response?.events ?? [])
-          .map((event) => ({
-            id: String(event.id),
-            loggedValue: Number(event.loggedValue),
-            occurredAt: String(event.occurredAt),
-            source: String(event.source ?? ""),
-            sourceId: event.sourceId ?? null,
-            metadata: event.metadata ?? null,
-          }))
-          .filter((event) => Number.isFinite(event.loggedValue) && event.loggedValue >= 0),
-      );
+      const loadedEvents = (response?.events ?? [])
+        .map((event) => ({
+          id: String(event.id),
+          loggedValue: Number(event.loggedValue),
+          occurredAt: String(event.occurredAt),
+          source: String(event.source ?? ""),
+          sourceId: event.sourceId ?? null,
+          metadata: event.metadata ?? null,
+        }))
+        .filter((event) => Number.isFinite(event.loggedValue) && event.loggedValue >= 0);
+
+      setEvents(loadedEvents);
+
+      // Keep the longitudinal insight dataset current with today's newly
+      // logged meals without waiting for the 14-day refresh effect.
+      const currentDay = journalDayKey(new Date());
+      setRecentNutritionEvents((current) => [
+        ...current.filter((event) => journalDayKey(event.occurredAt) !== currentDay),
+        ...loadedEvents,
+      ]);
     } catch {
       setEvents([]);
     } finally {
