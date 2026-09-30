@@ -277,13 +277,75 @@ export default function TodayPage() {
   const medicationGoalCardsForToday = [...matchedMedicationGoalCards, ...unmatchedMedicationGoalCards].filter((item: any) => Boolean(item.goal));
   const matchedMedicationGoalCard = matchedMedicationGoalCards[0] ?? null;
   const medicationGoal = medicationGoalCardsForToday[0]?.goal || null;
-  const smokingGoal = todayGoalArray.find((goal: any) => String(goal?.category ?? "").toUpperCase() === "SMOKING");
-  const alcoholGoal = todayGoalArray.find((goal: any) => String(goal?.category ?? "").toUpperCase() === "ALCOHOL");
-  const weightGoal = todayGoalArray.find((goal: any) => String(goal?.category ?? "").toUpperCase() === "WEIGHT");
-  const exerciseGoal = todayGoalArray.find((goal: any) => String(goal?.category ?? "").toUpperCase() === "EXERCISE");
+  const medicationGoalsForToday = activeGoalsArray.filter((goal: any) => isMedicationGoal(goal));
+  const smokingGoals = activeGoalsArray.filter((goal: any) => String(goal?.category ?? "").toUpperCase() === "SMOKING");
+  const alcoholGoals = activeGoalsArray.filter((goal: any) => String(goal?.category ?? "").toUpperCase() === "ALCOHOL");
+  const weightGoals = activeGoalsArray.filter((goal: any) => String(goal?.category ?? "").toUpperCase() === "WEIGHT");
+  const exerciseGoals = activeGoalsArray.filter((goal: any) => String(goal?.category ?? "").toUpperCase() === "EXERCISE");
+
+  const medicationGoalCardsForToday = medicationGoalsForToday.map((goal: any) => {
+    const linkedPatientMedicationId =
+      goal?.patientMedicationId ??
+      goal?.patientMedication?.id ??
+      goal?.associatedPatientMedicationId ??
+      goal?.associatedPatientMedication?.id ??
+      null;
+    const linkedMedicationId =
+      goal?.medicationId ??
+      goal?.associatedMedicationId ??
+      goal?.associatedMedication?.id ??
+      goal?.medication?.id ??
+      null;
+
+    const goalMedication = (Array.isArray(medications) ? medications : []).find((medication: any) => {
+      const medicationPatientId = patientMedicationId(medication);
+      const medicationCatalogId =
+        medication?.medicationId ??
+        medication?.medication?.id ??
+        medication?.medication?.medicationId ??
+        null;
+
+      if (linkedPatientMedicationId && medicationPatientId) {
+        return String(linkedPatientMedicationId) === String(medicationPatientId);
+      }
+
+      if (linkedMedicationId && medicationCatalogId) {
+        return String(linkedMedicationId) === String(medicationCatalogId);
+      }
+
+      const name = medicationName(medication);
+      const goalNames = [
+        goal?.medication?.name,
+        goal?.medication?.genericName,
+        goal?.medication?.brandName,
+        goal?.title,
+        goal?.description,
+      ].map(normalise).filter(Boolean);
+
+      return Boolean(name) && goalNames.some(
+        (candidate: string) =>
+          candidate === name ||
+          candidate.includes(name) ||
+          name.includes(candidate),
+      );
+    }) ?? null;
+
+    return { goal, medication: goalMedication };
+  });
+
   const dedicatedTodayCategories = new Set(["MEDICATION", "SMOKING", "ALCOHOL", "WEIGHT", "EXERCISE"]);
-  const otherTodayGoals = activeGoalsArray.filter((goal: any) => !dedicatedTodayCategories.has(String(goal?.category ?? "").toUpperCase()));
-  const primaryMedicationId = medicationGoalCardsForToday[0]?.medication ? patientMedicationId(medicationGoalCardsForToday[0].medication) : null;
+  const otherTodayGoals = activeGoalsArray.filter((goal: any) => {
+    const category = String(goal?.category ?? "").toUpperCase();
+    if (!dedicatedTodayCategories.has(category)) return true;
+    if (category !== "MEDICATION") return false;
+    return !medicationGoalCardsForToday.some((item: any) =>
+      String(item?.goal?.id ?? "") === String(goal?.id ?? "") && Boolean(item?.medication),
+    );
+  });
+
+  const primaryMedicationId = medicationGoalCardsForToday[0]?.medication
+    ? patientMedicationId(medicationGoalCardsForToday[0].medication)
+    : null;
 
   const carePlans = data.carePlans ?? [];
   const currentDayKey = dayKey(new Date());
