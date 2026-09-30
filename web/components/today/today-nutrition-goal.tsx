@@ -260,7 +260,7 @@ export default function TodayNutritionGoal({ goal, onUpdated }: Props) {
   const [events, setEvents] = useState<NutritionEvent[]>([]);
   const [todayCheckIn, setTodayCheckIn] = useState<TodayCheckIn | null>(null);
   const [recentNutritionDays, setRecentNutritionDays] = useState<Array<{ day: string; calories: number }>>([]);
-  const [recentCheckIns, setRecentCheckIns] = useState<Array<{ day: string; sleepHours: number | null; waterIntakeMl: number | null; exerciseMinutes: number | null }>>[];
+  const [recentCheckIns, setRecentCheckIns] = useState<Array<{ day: string; sleepHours: number | null; waterIntakeMl: number | null; exerciseMinutes: number | null }>>([]);
   const [foods, setFoods] = useState<NutritionFood[]>([]);
   const [query, setQuery] = useState("");
   const [mealType, setMealType] = useState("Meal");
