@@ -190,7 +190,7 @@ export default function TodayPage() {
       goal?.medication?.id ??
       null;
 
-    const goalMedication = (Array.isArray(medications) ? medications : []).find((medication: any) => {
+    const matchedMedication = (Array.isArray(medications) ? medications : []).find((medication: any) => {
       const medicationPatientId = patientMedicationId(medication);
       const medicationCatalogId =
         medication?.medicationId ??
@@ -223,7 +223,19 @@ export default function TodayPage() {
       );
     }) ?? null;
 
-    return { goal, medication: goalMedication };
+    const linkedMedication = goal?.patientMedication
+      ? {
+          ...goal.patientMedication,
+          patientMedicationId: String(goal.patientMedication.id ?? linkedPatientMedicationId ?? ""),
+          patientMedication: goal.patientMedication,
+          medication: goal.patientMedication.medication ?? goal?.medication ?? null,
+          name: goal.patientMedication.medication?.name ?? goal?.medication?.name ?? goal?.title ?? "Medication",
+          dosage: goal.patientMedication.dosage ?? goal?.medicationDosage ?? null,
+          frequency: goal.patientMedication.frequency ?? goal?.medicationFrequency ?? null,
+        }
+      : null;
+
+    return { goal, medication: matchedMedication ?? linkedMedication };
   });
 
   const dedicatedTodayCategories = new Set(["MEDICATION", "SMOKING", "ALCOHOL", "WEIGHT", "EXERCISE"]);
