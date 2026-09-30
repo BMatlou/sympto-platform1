@@ -375,7 +375,8 @@ export default function TodayNutritionGoal({ goal, onUpdated }: Props) {
   }
 
   const review = nutritionTargetReview(target);
-  const showThreeDayReminder = journey.journeyDay % 3 === 0;
+  const showThreeDayReminder =
+    review != null && journey.journeyDay % 3 === 0;
 
   return (
     <article className="flex h-full min-w-0 flex-col overflow-hidden rounded-[30px] border border-[#dce9ee] bg-white shadow-[0_18px_48px_rgba(11,45,84,.06)]">
