@@ -385,7 +385,7 @@ export default function TodayNutritionGoal({ goal, onUpdated }: Props) {
           </span>
           <div className="min-w-0">
             <p className="truncate text-base font-black tracking-[-.035em] text-[#0b2d54]">
-              {String(goal?.title || "Nutrition")}
+              Nutrition
             </p>
             <p className="mt-0.5 text-[9px] font-black uppercase tracking-[.15em] text-[#0b7b80]">
               Nutrition · Daily calorie target
