@@ -20,6 +20,106 @@ export class HealthGoalsService {
   ) {}
   async getActiveSnapshot(patientId: string) { return this.prisma.healthGoal.findMany({ where: { patientId, status: 'ACTIVE' } }); }
 
+  private nutritionApiKey() {
+    const configured = String(process.env.USDA_FDC_API_KEY ?? '').trim();
+    if (configured) return configured;
+    return process.env.NODE_ENV === 'production' ? '' : 'DEMO_KEY';
+  }
+
+  private nutritionNutrient(food: any, nutrientId: number) {
+    const nutrient = Array.isArray(food?.foodNutrients)
+      ? food.foodNutrients.find((item: any) =>
+          Number(item?.nutrientId ?? item?.nutrient?.id) === nutrientId,
+        )
+      : null;
+    const amount = Number(nutrient?.value ?? nutrient?.amount);
+    return Number.isFinite(amount) ? amount : null;
+  }
+
+  private mapNutritionFood(food: any) {
+    return {
+      fdcId: String(food?.fdcId ?? ''),
+      description: String(food?.description ?? food?.lowercaseDescription ?? 'Food'),
+      dataType: String(food?.dataType ?? ''),
+      caloriesPer100g: this.nutritionNutrient(food, 1008),
+      proteinPer100g: this.nutritionNutrient(food, 1003),
+      fibrePer100g: this.nutritionNutrient(food, 1079),
+      portions: Array.isArray(food?.foodPortions)
+        ? food.foodPortions
+            .map((portion: any) => ({
+              amount: Number(portion?.amount ?? 1),
+              modifier: portion?.modifier ? String(portion.modifier) : null,
+              gramWeight: Number(portion?.gramWeight),
+              unit: portion?.measureUnit?.name ? String(portion.measureUnit.name) : null,
+            }))
+            .filter((portion: any) => Number.isFinite(portion.gramWeight) && portion.gramWeight > 0)
+            .slice(0, 8)
+        : [],
+      source: 'USDA FoodData Central',
+    };
+  }
+
+  async searchNutritionFoods(query: string, limit = 8) {
+    const cleanQuery = String(query ?? '').trim();
+    if (!cleanQuery) throw new BadRequestException('A food search term is required.');
+
+    const apiKey = this.nutritionApiKey();
+    if (!apiKey) {
+      throw new InternalServerErrorException('USDA FoodData Central is not configured. Set USDA_FDC_API_KEY on the API server.');
+    }
+
+    const pageSize = Math.max(1, Math.min(10, Number.isFinite(limit) ? Math.floor(limit) : 8));
+    const url = new URL('https://api.nal.usda.gov/fdc/v1/foods/search');
+    url.searchParams.set('api_key', apiKey);
+    url.searchParams.set('query', cleanQuery);
+    url.searchParams.set('pageSize', String(pageSize));
+    url.searchParams.set('pageNumber', '1');
+    url.searchParams.set('requireAllWords', 'false');
+
+    const response = await fetch(url);
+    if (!response.ok) {
+      throw new InternalServerErrorException(
+        `USDA FoodData Central food search failed with status ${response.status}.`,
+      );
+    }
+
+    const payload = await response.json() as any;
+    return {
+      success: true,
+      source: 'USDA FoodData Central',
+      query: cleanQuery,
+      count: Array.isArray(payload?.foods) ? payload.foods.length : 0,
+      foods: Array.isArray(payload?.foods) ? payload.foods.map((food: any) => this.mapNutritionFood(food)) : [],
+    };
+  }
+
+  async getNutritionFood(fdcId: string) {
+    const id = String(fdcId ?? '').trim();
+    if (!id) throw new BadRequestException('A FoodData Central food ID is required.');
+
+    const apiKey = this.nutritionApiKey();
+    if (!apiKey) {
+      throw new InternalServerErrorException('USDA FoodData Central is not configured. Set USDA_FDC_API_KEY on the API server.');
+    }
+
+    const url = new URL(`https://api.nal.usda.gov/fdc/v1/food/${encodeURIComponent(id)}`);
+    url.searchParams.set('api_key', apiKey);
+    url.searchParams.set('nutrients', '1008,1003,1079');
+
+    const response = await fetch(url);
+    if (!response.ok) {
+      throw new InternalServerErrorException(
+        `USDA FoodData Central food lookup failed with status ${response.status}.`,
+      );
+    }
+
+    const food = await response.json() as any;
+    return {
+      success: true,
+      food: this.mapNutritionFood(food),
+    };
+  }
+
   async getMetricEventsForUser(userId: string, filters: any) {
     const patient = await this.findPatientForUser(userId); if (!patient) throw new NotFoundException('Patient not found.');
     const metricType = String(filters?.metricType ?? '').trim(); const metricKey = String(filters?.metricKey ?? '').trim(); const source = filters?.source ? String(filters.source).trim() : undefined; const from = filters?.from instanceof Date ? filters.from : new Date(filters?.from); const to = filters?.to instanceof Date ? filters.to : new Date(filters?.to);
