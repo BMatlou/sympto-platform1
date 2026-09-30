@@ -186,7 +186,9 @@ function buildMedicationInsights(
     }))
     .sort((a, b) => b.day.localeCompare(a.day));
 
-  const priorRecords = dailyRecords.filter((record) => record.day !== today);
+  const priorRecords = dailyRecords
+    .filter((record) => record.day !== today)
+    .slice(0, 14);
   if (priorRecords.length >= 3) {
     const average =
       priorRecords.reduce((sum, record) => sum + record.adherence, 0) /
@@ -523,6 +525,18 @@ export default function TodayMedicationActions({ medications, goal: suppliedGoal
   }, []);
 
   const doseLabel = useMemo(() => (totalRequiredDosesPerDay === 1 ? "1 dose" : `${totalRequiredDosesPerDay} doses`), [totalRequiredDosesPerDay]);
+  const rawTargetAdherence = Number(finalGoal?.targetValue);
+  const targetAdherence = Number.isFinite(rawTargetAdherence) && rawTargetAdherence > 0 ? rawTargetAdherence : 90;
+
+  const medicationInsights = useMemo(
+    () =>
+      buildMedicationInsights(
+        adherenceEvents,
+        targetAdherence,
+        recentCheckIns,
+      ),
+    [adherenceEvents, targetAdherence, recentCheckIns],
+  );
 
   if (!finalGoal) {
     return null;
@@ -579,18 +593,6 @@ export default function TodayMedicationActions({ medications, goal: suppliedGoal
   }
 
   const goalTitle = finalGoal?.title || `${medicationName(trackedMedication)} adherence`;
-  const rawTargetAdherence = Number(finalGoal?.targetValue);
-  const targetAdherence = Number.isFinite(rawTargetAdherence) && rawTargetAdherence > 0 ? rawTargetAdherence : 90;
-
-  const medicationInsights = useMemo(
-    () =>
-      buildMedicationInsights(
-        adherenceEvents,
-        targetAdherence,
-        recentCheckIns,
-      ),
-    [adherenceEvents, targetAdherence, recentCheckIns],
-  );
   const scheduledGoalDoses = Math.max(0, Math.ceil((daysLeft !== null ? daysLeft + journeyDay - 1 : 30) * totalRequiredDosesPerDay));
   const targetDoseCount = Math.ceil((scheduledGoalDoses * targetAdherence) / 100);
   const fallbackTakenDoses = cumulativeTakenDoses(trackedMedication);
