@@ -78,6 +78,18 @@ function nutritionTargetReview(value: string) {
   return { level: "review", title: "Low-energy target needs professional review", text: "This target is within the 800–1,200 calorie/day low-energy range. Current NICE guidance recommends these targets only within a multicomponent, specialist-supported approach for eligible adults; they should not be treated as a routine long-term diet target." };
 }
 
+function nutritionTargetChange(previousValue: unknown, nextValue: string) {
+  const previous = Number(previousValue);
+  const next = Number(nextValue);
+  if (!Number.isFinite(previous) || previous <= 0 || !Number.isFinite(next) || next <= 0 || previous === next) return null;
+  const difference = Math.abs(next - previous);
+  return {
+    direction: next < previous ? "lowering" as const : "increasing" as const,
+    difference,
+    percentage: Math.round((difference / previous) * 100),
+  };
+}
+
 function emptyDraft(): GoalDraft {
   return { title: "", description: "", category: "", priority: "MEDIUM", targetValue: "", unit: "", targetDate: "", weightDirection: "LOSE", patientMedicationId: "" };
 }
@@ -480,7 +492,38 @@ function HealthGoalsPageContent() {
                    <TextField type="date" label="Target date" value={draft.targetDate} onChange={(value) => setDraft((current) => ({ ...current, targetDate: value }))} />
                  </div>
                  {selectedCategory && <div className="rounded-2xl border border-[#e1eaed] bg-[#fbfdfd] px-4 py-3"><div className="flex flex-wrap items-center gap-2"><span className="rounded-full bg-[#e9f9fa] px-2.5 py-1 text-[9px] font-black text-[#0b6f73]">{selectedCategory.frequency === "DAILY" ? "Daily" : selectedCategory.frequency === "WEEKLY" ? "Weekly" : "Journey"}</span><span className="rounded-full bg-[#f3f6f7] px-2.5 py-1 text-[9px] font-black text-[#74859a]">{selectedCategory.comparison === "AT_LEAST" ? "At least target" : selectedCategory.comparison === "AT_MOST" ? "At most target" : selectedCategory.comparison === "CLOSEST" ? "Stay close to target" : String(selectedCategory.comparison) === "INCREASE_TO" ? "Increase toward target" : "Decrease toward target"}</span></div><p className="mt-2 text-[10px] leading-5 text-[#74859a]">{targetRule.helper}</p>
-                  {draft.category === "NUTRITION" && nutritionTargetReview(draft.targetValue) && (() => { const review = nutritionTargetReview(draft.targetValue)!; const strong = review.level === "strong"; return <div className={`mt-3 rounded-2xl border p-4 ${strong ? "border-red-200 bg-red-50" : "border-amber-200 bg-amber-50"}`}><p className={`text-[10px] font-black uppercase tracking-[.13em] ${strong ? "text-red-800" : "text-amber-900"}`}>{review.title}</p><p className={`mt-1.5 text-[11px] leading-5 ${strong ? "text-red-900/85" : "text-amber-900/85"}`}>{review.text}</p><p className={`mt-2 text-[10px] font-semibold ${strong ? "text-red-800" : "text-amber-800"}`}>This target can still be saved when it has been set as part of an appropriate clinical plan. Sympto is flagging it for review rather than recommending it.</p></div>; })()}</div>}
+                  {draft.category === "NUTRITION" && (() => {
+                    const review = nutritionTargetReview(draft.targetValue);
+                    const change = nutritionTargetChange(
+                      editingGoal?.targetValue,
+                      draft.targetValue,
+                    );
+                    return (
+                      <>
+                        {change && (
+                          <div className="mt-3 rounded-2xl border border-[#dce8eb] bg-[#f8fbfb] p-4">
+                            <p className="text-[10px] font-black uppercase tracking-[.13em] text-[#0b6f73]">Target change</p>
+                            <p className="mt-1.5 text-[11px] leading-5 text-[#647784]">
+                              You are {change.direction} the daily calorie target by {Math.round(change.difference)} kcal/day ({change.percentage}%).
+                              Sympto will apply the target you explicitly enter; it will not automatically choose a higher or lower target for you.
+                            </p>
+                          </div>
+                        )}
+                        {review && (() => {
+                          const strong = review.level === "strong";
+                          return (
+                            <div className={`mt-3 rounded-2xl border p-4 ${strong ? "border-red-200 bg-red-50" : "border-amber-200 bg-amber-50"}`}>
+                              <p className={`text-[10px] font-black uppercase tracking-[.13em] ${strong ? "text-red-800" : "text-amber-900"}`}>{review.title}</p>
+                              <p className={`mt-1.5 text-[11px] leading-5 ${strong ? "text-red-900/85" : "text-amber-900/85"}`}>{review.text}</p>
+                              <p className={`mt-2 text-[10px] font-semibold ${strong ? "text-red-800" : "text-amber-800"}`}>
+                                This target can still be saved when it has been set as part of an appropriate clinical plan. Sympto is flagging it for review rather than recommending it.
+                              </p>
+                            </div>
+                          );
+                        })()}
+                      </>
+                    );
+                  })()}</div>}
                </div>
               <TextField label="Why this goal matters" value={draft.description} placeholder="Optional context or motivation" onChange={(value) => setDraft((current) => ({ ...current, description: value }))} />
               <div className="rounded-2xl border border-[#dce9ee] bg-[#f7fbfc] p-4"><div className="flex items-start gap-3"><Target className="mt-0.5 h-4 w-4 shrink-0 text-[#0b6f73]" /><div><p className="text-xs font-black text-[#0b2d54]">Sympto will connect this goal to your health data</p><p className="mt-1 text-[11px] leading-5 text-[#74859a]">{draft.category === "WEIGHT" ? `${draft.weightDirection === "LOSE" ? "Loss" : draft.weightDirection === "GAIN" ? "Gain" : "Maintenance"} goal · directional target is the requested amount of weight change; destination is calculated from your baseline` : `${selectedCategory?.frequency === "DAILY" ? "Daily" : selectedCategory?.frequency === "WEEKLY" ? "Weekly" : "Overall"} tracking · ${selectedCategory?.comparison === "AT_LEAST" ? "at least" : selectedCategory?.comparison === "AT_MOST" ? "at most" : String(selectedCategory?.comparison ?? "") === "DECREASE_TO" ? "decrease toward" : "target comparison"} your target.`}</p></div></div></div>
