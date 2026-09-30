@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { ArrowRight, Check, Plus, Utensils } from "lucide-react";
+import { ArrowRight, Check, Plus, Sparkles, Utensils } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 import { healthGoalsService, type NutritionFood } from "@/services/health-goals.service";
@@ -48,6 +48,11 @@ type TodayCheckIn = {
   sleepQuality: string | null;
   exerciseMinutes: number | null;
   waterIntakeMl: number | null;
+};
+
+type NutritionInsight = {
+  title: string;
+  text: string;
 };
 
 function todayBounds() {
@@ -168,9 +173,94 @@ function isTodayJournal(entry: any) {
   );
 }
 
+function journalDayKey(value: unknown) {
+  const date = new Date(String(value ?? ""));
+  if (Number.isNaN(date.getTime())) return "";
+  return new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Africa/Johannesburg",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).format(date);
+}
+
+function buildNutritionInsights(
+  today: TodayCheckIn | null,
+  todayTotal: number,
+  target: number | null,
+  todayProtein: number,
+  todayFibre: number,
+  recentNutritionDays: Array<{ day: string; calories: number }>,
+  recentCheckIns: Array<{ day: string; sleepHours: number | null; waterIntakeMl: number | null; exerciseMinutes: number | null }>,
+): NutritionInsight[] {
+  const insights: NutritionInsight[] = [];
+  const supporting = [
+    today?.waterIntakeMl != null ? "hydration" : null,
+    today?.sleepHours != null ? "sleep" : null,
+    today?.exerciseMinutes != null ? "activity" : null,
+  ].filter(Boolean) as string[];
+
+  if (supporting.length === 3) {
+    insights.push({
+      title: "Today’s nutrition has supporting context",
+      text: "Hydration, sleep and activity are all recorded today. Sympto will use them as context when comparing your nutrition over time; they do not change your calorie target or subtract exercise from food intake.",
+    });
+  } else if (supporting.length > 0) {
+    const missing = ["hydration", "sleep", "activity"].filter((item) => !supporting.includes(item));
+    insights.push({
+      title: "Supporting context is partly recorded",
+      text: supporting.length + " of 3 supporting signals are recorded today. " + missing.join(" and ") + " " + (missing.length === 1 ? "is" : "are") + " still missing, so today’s nutrition picture is not yet complete.",
+    });
+  } else {
+    insights.push({
+      title: "Nutrition context is ready to build",
+      text: "Once hydration, sleep and activity are recorded in the Daily Health Check-in, Sympto can compare those signals with your nutrition records without changing the calorie goal itself.",
+    });
+  }
+
+  if (todayTotal > 0 && target != null && target > 0) {
+    const remaining = target - todayTotal;
+    insights.push({
+      title: remaining >= 0 ? "Food intake remains the primary goal measure" : "Food intake is above today’s set target",
+      text: remaining >= 0
+        ? "You have logged " + formatNumber(todayTotal) + " kcal against the " + formatNumber(target) + " kcal daily target. Protein (" + (todayProtein > 0 ? todayProtein.toFixed(1) + " g" : "not yet enough data") + ") and fibre (" + (todayFibre > 0 ? todayFibre.toFixed(1) + " g" : "not yet enough data") + ") are tracked separately."
+        : "You have logged " + formatNumber(todayTotal) + " kcal against the " + formatNumber(target) + " kcal daily target. Sympto keeps this separate from activity so exercise does not become a calorie allowance.",
+    });
+  }
+
+  const nutritionByDay = new Map(recentNutritionDays.map((item) => [item.day, item.calories]));
+  const matched = recentCheckIns
+    .map((checkIn) => ({ ...checkIn, calories: nutritionByDay.get(checkIn.day) }))
+    .filter((item) => item.calories != null && item.sleepHours != null);
+
+  if (matched.length >= 4) {
+    const sleeps = matched.map((item) => Number(item.sleepHours)).filter(Number.isFinite);
+    const sortedSleeps = [...sleeps].sort((a, b) => a - b);
+    const medianSleep = sortedSleeps[Math.floor(sortedSleeps.length / 2)];
+    const lowerSleep = matched.filter((item) => Number(item.sleepHours) < medianSleep);
+    const higherSleep = matched.filter((item) => Number(item.sleepHours) >= medianSleep);
+
+    if (lowerSleep.length >= 2 && higherSleep.length >= 2) {
+      const lowerAverage = lowerSleep.reduce((sum, item) => sum + Number(item.calories), 0) / lowerSleep.length;
+      const higherAverage = higherSleep.reduce((sum, item) => sum + Number(item.calories), 0) / higherSleep.length;
+      const difference = lowerAverage - higherAverage;
+      if (Math.abs(difference) >= 100) {
+        insights.push({
+          title: "A pattern is emerging in your recent records",
+          text: "Across " + matched.length + " matched days, days with sleep below your recent median were associated with about " + formatNumber(Math.abs(difference)) + " " + (difference > 0 ? "more" : "fewer") + " logged calories on average than the other matched days. This is an association in your records, not evidence that sleep caused the difference.",
+        });
+      }
+    }
+  }
+
+  return insights.slice(0, 3);
+}
+
 export default function TodayNutritionGoal({ goal, onUpdated }: Props) {
   const [events, setEvents] = useState<NutritionEvent[]>([]);
   const [todayCheckIn, setTodayCheckIn] = useState<TodayCheckIn | null>(null);
+  const [recentNutritionDays, setRecentNutritionDays] = useState<Array<{ day: string; calories: number }>>([]);
+  const [recentCheckIns, setRecentCheckIns] = useState<Array<{ day: string; sleepHours: number | null; waterIntakeMl: number | null; exerciseMinutes: number | null }>>[];
   const [foods, setFoods] = useState<NutritionFood[]>([]);
   const [query, setQuery] = useState("");
   const [mealType, setMealType] = useState("Meal");
