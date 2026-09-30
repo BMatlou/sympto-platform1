@@ -1083,11 +1083,11 @@ export default function TodayNutritionGoal({ goal, onUpdated }: Props) {
             href="#daily-health-check-in"
             className={`rounded-[18px] border p-3.5 transition ${
               todayCheckIn?.waterIntakeMl != null
-                ? "border-[#24c1c4]/45 bg-[#f2fbfb] shadow-[0_0_22px_rgba(36,193,196,.22)] hover:shadow-[0_0_28px_rgba(36,193,196,.3)]"
+                ? "border-[#24c1c4]/75 bg-[#dff7f7] shadow-[0_0_28px_rgba(36,193,196,.34)] hover:shadow-[0_0_36px_rgba(36,193,196,.44)]"
                 : "border-[#dfeaec] bg-[#f7fbfb] hover:border-[#24c1c4]"
             }`}
           >
-            <p className="text-[8px] font-black uppercase tracking-[.13em] text-[#74859a]">Hydration</p>
+            <p className="text-[8px] font-black uppercase tracking-[.13em] text-[#0b7b80]">Hydration</p>
             <div className="mt-1 flex items-end justify-between gap-2">
               <p className="text-xs font-black text-[#0b2d54]">{todayCheckIn?.waterIntakeMl == null ? "Not logged" : todayCheckIn.waterIntakeMl.toLocaleString("en-ZA") + " ml"}</p>
               <span className="text-[8px] font-black uppercase tracking-[.1em] text-[#0b7b80]">{todayCheckIn?.waterIntakeMl == null ? "Action needed" : "Logged today"}</span>
@@ -1099,7 +1099,7 @@ export default function TodayNutritionGoal({ goal, onUpdated }: Props) {
             href="#daily-health-check-in"
             className={`rounded-[18px] border p-3.5 transition ${
               todayCheckIn?.sleepHours != null
-                ? "border-[#5265a9]/45 bg-[#f7f8fd] shadow-[0_0_22px_rgba(82,101,169,.2)] hover:shadow-[0_0_28px_rgba(82,101,169,.28)]"
+                ? "border-[#5265a9]/75 bg-[#e8ebfa] shadow-[0_0_28px_rgba(82,101,169,.3)] hover:shadow-[0_0_36px_rgba(82,101,169,.4)]"
                 : "border-[#dfeaec] bg-[#f7fbfb] hover:border-[#5265a9]"
             }`}
           >
@@ -1115,7 +1115,7 @@ export default function TodayNutritionGoal({ goal, onUpdated }: Props) {
             href="#daily-health-check-in"
             className={`rounded-[18px] border p-3.5 transition ${
               todayCheckIn?.exerciseMinutes != null
-                ? "border-[#3f75bd]/45 bg-[#f5f9fd] shadow-[0_0_22px_rgba(63,117,189,.2)] hover:shadow-[0_0_28px_rgba(63,117,189,.28)]"
+                ? "border-[#3f75bd]/75 bg-[#e5f1fc] shadow-[0_0_28px_rgba(63,117,189,.3)] hover:shadow-[0_0_36px_rgba(63,117,189,.4)]"
                 : "border-[#dfeaec] bg-[#f7fbfb] hover:border-[#3f75bd]"
             }`}
           >
