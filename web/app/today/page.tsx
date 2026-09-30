@@ -14,6 +14,7 @@ import TodayAlcoholGoal from "@/components/today/today-alcohol-goal";
 import TodayWeightGoal from "@/components/today/today-weight-goal";
 import TodayExerciseGoal from "@/components/today/today-exercise-goal";
 import TodaySupportedGoalCard from "@/components/today/today-supported-goal-card";
+import TodayNutritionGoal from "@/components/today/today-nutrition-goal";
 import { healthJournalService } from "@/services/health-journal.service";
 
 const ACTIVE_GOAL_STATUSES = new Set(["IN_PROGRESS", "ACTIVE", "ON_TRACK", "IMPROVING", "STAGNANT", "DECLINING"]);
@@ -477,13 +478,19 @@ export default function TodayPage() {
             {exerciseGoals.map((goal: any) => (
               <TodayExerciseGoal key={`exercise-goal-${String(goal?.id)}`} goal={goal} />
             ))}
-            {otherTodayGoals.map((goal: any, index: number) => (
-              <TodaySupportedGoalCard
-                key={String(goal?.id ?? "goal-" + index)}
-                goal={goal}
-                onUpdated={reload}
-              />
-            ))}
+            {otherTodayGoals.map((goal: any, index: number) => {
+              const category = String(goal?.category ?? "").toUpperCase();
+              if (category === "NUTRITION") {
+                return <TodayNutritionGoal key={String(goal?.id ?? "nutrition-" + index)} goal={goal} onUpdated={reload} />;
+              }
+              return (
+                <TodaySupportedGoalCard
+                  key={String(goal?.id ?? "goal-" + index)}
+                  goal={goal}
+                  onUpdated={reload}
+                />
+              );
+            })}
           </div>
           {activeGoalsArray.length === 0 && (
             <div className="mt-3.5 rounded-[24px] border border-dashed border-[#dce8eb] bg-[#f8fbfb] p-6 text-center">
