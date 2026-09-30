@@ -27,7 +27,7 @@ type GoalMeta = {
 };
 
 const GOAL_META: Record<string, GoalMeta> = {
-  NUTRITION: { label: "Nutrition", unit: "calories/day", period: "Daily", comparison: "At most", action: "MANUAL", helper: "Record your total calories for today. Your nutrition goal is evaluated from the daily total.", icon: Activity, step: "50", min: "0", max: "10000", placeholder: "e.g. 2000" },
+  NUTRITION: { label: "Nutrition", unit: "calories/day", period: "Daily", comparison: "At most", action: "MANUAL", helper: "Keep today's total calorie intake at or below your target. Add up the calories from meals and snacks, then record the day's total.", icon: Activity, step: "50", min: "0", max: "10000", placeholder: "e.g. 2000" },
   BLOOD_PRESSURE: { label: "Blood pressure", unit: "mmHg", period: "Daily", comparison: "At most", action: "VITALS", helper: "Use Health Vitals to save a complete blood-pressure reading; the systolic value is then used by this goal.", icon: HeartPulse, step: "1", min: "40", max: "300", placeholder: "e.g. 130" },
   BLOOD_GLUCOSE: { label: "Blood glucose", unit: "mmol/L", period: "Daily", comparison: "At most", action: "MANUAL", helper: "Record the glucose value you want this goal to monitor.", icon: Activity, step: "0.1", min: "0.1", max: "50", placeholder: "e.g. 7.0" },
   CHOLESTEROL: { label: "Cholesterol", unit: "mmol/L", period: "Journey", comparison: "At most", action: "MANUAL", helper: "Record your total cholesterol result when you have a measured result available.", icon: Activity, step: "0.1", min: "0.1", max: "30", placeholder: "e.g. 5.0" },
@@ -79,8 +79,18 @@ function sourceAction(category: string) {
 }
 
 function goalNextStep(category: string, current: number | null, target: number | null) {
-  if (current == null || target == null) return "Record a measure to start meaningful progress tracking.";
-  if (category === "NUTRITION" || category === "BLOOD_PRESSURE" || category === "BLOOD_GLUCOSE" || category === "CHOLESTEROL" || category === "MENTAL_HEALTH" || category === "HEART_RATE") {
+  if (current == null || target == null) {
+    return category === "NUTRITION"
+      ? "Add up today's meals and snacks, then record the total calorie intake."
+      : "Record a measure to start meaningful progress tracking.";
+  }
+  if (category === "NUTRITION") {
+    if (current <= target) {
+      return "You are within today's calorie target. Keep logging meals and snacks and keep the daily total at or below the target.";
+    }
+    return "You are above today's calorie target. Keep recording your intake and review the next meal choices so the daily total stays at or below the target.";
+  }
+  if (category === "BLOOD_PRESSURE" || category === "BLOOD_GLUCOSE" || category === "CHOLESTEROL" || category === "MENTAL_HEALTH" || category === "HEART_RATE") {
     if (current <= target) return "You are currently within your ceiling. Keep tracking the next reading.";
     return "You are above the goal ceiling. Review the next reading and keep tracking the trend.";
   }
