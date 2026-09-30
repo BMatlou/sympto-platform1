@@ -375,7 +375,23 @@ async function countTodayGoalNeeds(
           end,
           "goal-manual",
         );
-        if (!Array.isArray(response?.events) || response.events.length === 0) {
+        const events = Array.isArray(response?.events) ? response.events : [];
+
+        if (category === "NUTRITION") {
+          const todayTotal = events.reduce(
+            (sum: number, event: any) => sum + Number(event?.loggedValue ?? 0),
+            0,
+          );
+          const target = Number(
+            goal?.metricConfig?.frequencyTarget ??
+              goal?.frequencyTarget ??
+              goal?.targetValue,
+          );
+
+          if (!events.length || (Number.isFinite(target) && target > 0 && todayTotal > target)) {
+            count += 1;
+          }
+        } else if (!events.length) {
           count += 1;
         }
       } catch {
