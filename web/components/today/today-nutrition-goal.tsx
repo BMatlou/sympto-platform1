@@ -185,11 +185,8 @@ function journalDayKey(value: unknown) {
 }
 
 function buildNutritionInsights(
-  today: TodayCheckIn | null,
   todayTotal: number,
   target: number | null,
-  todayProtein: number,
-  todayFibre: number,
   nutritionEvents: NutritionEvent[],
   recentNutritionDays: Array<{ day: string; calories: number }>,
   recentCheckIns: Array<{
@@ -487,21 +484,15 @@ export default function TodayNutritionGoal({ goal, onUpdated }: Props) {
   const nutritionInsights = useMemo(
     () =>
       buildNutritionInsights(
-        todayCheckIn,
         todayTotal,
         target,
-        todayProtein,
-        todayFibre,
         recentNutritionEvents,
         recentNutritionDays,
         recentCheckIns,
       ),
     [
-      todayCheckIn,
       todayTotal,
       target,
-      todayProtein,
-      todayFibre,
       recentNutritionEvents,
       recentNutritionDays,
       recentCheckIns,
