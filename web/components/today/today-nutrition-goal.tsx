@@ -195,6 +195,8 @@ function buildNutritionInsights(
     waterIntakeMl: number | null;
     exerciseMinutes: number | null;
   }>,
+  todayCheckIn: TodayCheckIn | null,
+  connectedGoals: any[],
 ): NutritionInsight[] {
   const insights: NutritionInsight[] = [];
 
@@ -217,6 +219,124 @@ function buildNutritionInsights(
   const priorDays = recentNutritionDays.filter(
     (item) => item.day !== todayDay && item.calories >= 0,
   );
+
+  if (todayTotal > 0 && target != null && target > 0) {
+    const difference = todayTotal - target;
+    insights.push({
+      title:
+        difference > 0
+          ? "Today is above your target"
+          : difference < 0
+            ? "Today is below your target"
+            : "Today is on your target",
+      text:
+        formatNumber(todayTotal) +
+        " kcal today — " +
+        (difference === 0
+          ? "right on your " + formatNumber(target) + " kcal target."
+          : formatNumber(Math.abs(difference)) +
+            " kcal " +
+            (difference > 0 ? "above " : "below ") +
+            " your " +
+            formatNumber(target) +
+            " kcal target."),
+    });
+  }
+
+  if (todayTotal > 0 && todayCheckIn) {
+    const contextParts: string[] = [];
+    if (todayCheckIn.sleepHours != null && Number.isFinite(Number(todayCheckIn.sleepHours))) {
+      contextParts.push("Sleep " + formatNumber(Number(todayCheckIn.sleepHours)) + " h");
+    }
+    if (todayCheckIn.waterIntakeMl != null && Number.isFinite(Number(todayCheckIn.waterIntakeMl))) {
+      contextParts.push("Water " + formatNumber(Number(todayCheckIn.waterIntakeMl)) + " ml");
+    }
+    if (todayCheckIn.exerciseMinutes != null && Number.isFinite(Number(todayCheckIn.exerciseMinutes))) {
+      contextParts.push("Activity " + formatNumber(Number(todayCheckIn.exerciseMinutes)) + " min");
+    }
+
+    if (contextParts.length > 0) {
+      insights.push({
+        title: "Today’s health picture",
+        text: contextParts.join(" · ") + ". Sympto can compare these with your nutrition as more days build up.",
+      });
+    }
+  }
+
+  if (todayTotal > 0 && connectedGoals.length > 0 && todayCheckIn) {
+    const supportingParts: string[] = [];
+    const supportGoal = (category: string) =>
+      connectedGoals.find(
+        (item: any) => String(item?.goal?.category ?? item?.category ?? "").toUpperCase() === category,
+      );
+
+    const sleepGoal = supportGoal("SLEEP");
+    const hydrationGoal = supportGoal("HYDRATION");
+    const exerciseGoal = supportGoal("EXERCISE");
+
+    const sleepTarget = numberOrNull(sleepGoal?.goal?.targetValue ?? sleepGoal?.targetValue);
+    const hydrationTargetRaw = numberOrNull(hydrationGoal?.goal?.targetValue ?? hydrationGoal?.targetValue);
+    const exerciseTarget = numberOrNull(exerciseGoal?.goal?.targetValue ?? exerciseGoal?.targetValue);
+
+    if (sleepTarget != null && todayCheckIn.sleepHours != null) {
+      supportingParts.push(
+        "Sleep " +
+          formatNumber(Number(todayCheckIn.sleepHours)) +
+          " h vs " +
+          formatNumber(sleepTarget) +
+          " h goal",
+      );
+    }
+    if (hydrationTargetRaw != null && todayCheckIn.waterIntakeMl != null) {
+      const hydrationUnit = String(hydrationGoal?.goal?.unit ?? hydrationGoal?.unit ?? "").toLowerCase();
+      const hydrationTarget =
+        ["l", "liter", "litre", "liters", "litres"].includes(hydrationUnit)
+          ? hydrationTargetRaw * 1000
+          : hydrationTargetRaw;
+      supportingParts.push(
+        "Water " +
+          formatNumber(Number(todayCheckIn.waterIntakeMl)) +
+          " ml vs " +
+          formatNumber(hydrationTarget) +
+          " ml goal",
+      );
+    }
+    if (exerciseTarget != null && todayCheckIn.exerciseMinutes != null) {
+      supportingParts.push(
+        "Activity " +
+          formatNumber(Number(todayCheckIn.exerciseMinutes)) +
+          " min vs " +
+          formatNumber(exerciseTarget) +
+          " min goal",
+      );
+    }
+
+    if (supportingParts.length > 0) {
+      insights.push({
+        title: "Your supporting goals today",
+        text: supportingParts.join(" · ") + ".",
+      });
+    }
+  }
+
+  if (todayTotal > 0 && priorDays.length >= 1) {
+    const previous = priorDays[0];
+    const difference = todayTotal - Number(previous.calories);
+    if (Math.abs(difference) >= 50) {
+      insights.push({
+        title: "Your intake is changing",
+        text:
+          "You logged " +
+          formatNumber(todayTotal) +
+          " kcal today versus " +
+          formatNumber(Number(previous.calories)) +
+          " kcal on your most recent recorded day — " +
+          (difference > 0 ? "up " : "down ") +
+          formatNumber(Math.abs(difference)) +
+          " kcal.",
+      });
+    }
+  }
 
   if (target != null && target > 0 && priorDays.length >= 3) {
     const recentAverage =
@@ -429,9 +549,9 @@ function buildNutritionInsights(
 
   if (insights.length === 0) {
     insights.push({
-      title: "Not enough data yet",
+      title: "Your nutrition pattern is building",
       text:
-        "Sympto needs more recorded days of nutrition and supporting health data before it can identify a meaningful personal pattern or comparison.",
+        "Keep logging your meals and daily health check-ins. Sympto will turn repeated days into personal trends and comparisons.",
     });
   }
 
@@ -497,6 +617,8 @@ export default function TodayNutritionGoal({ goal, onUpdated }: Props) {
         recentNutritionEvents,
         recentNutritionDays,
         recentCheckIns,
+        todayCheckIn,
+        Array.isArray(goal?.connectedGoals) ? goal.connectedGoals : [],
       ),
     [
       todayTotal,
@@ -1129,21 +1251,21 @@ export default function TodayNutritionGoal({ goal, onUpdated }: Props) {
         </section>
 
         {nutritionInsights.length > 0 && (
-          <section className="mt-4 rounded-[22px] border border-[#0b2d54] bg-[#0b2d54] p-4 text-white shadow-[0_18px_40px_rgba(11,45,84,.18)] sm:p-5">
-            <div className="flex items-start gap-3">
-              <span className="grid h-9 w-9 shrink-0 place-items-center rounded-[13px] bg-[#24c1c4] text-[#0b2d54] shadow-[0_0_18px_rgba(36,193,196,.3)]">
+          <section className="mt-4 rounded-[22px] border border-[#dce8eb] bg-white p-4 shadow-[0_10px_28px_rgba(11,45,84,.06)] sm:p-5">
+            <div className="flex items-center gap-3">
+              <span className="grid h-9 w-9 shrink-0 place-items-center rounded-[13px] bg-[#e8f8f7] text-[#24c1c4] ring-1 ring-[#d3efed]">
                 <Sparkles className="h-4 w-4" />
               </span>
               <div className="min-w-0">
-                <p className="text-[9px] font-black uppercase tracking-[.15em] text-[#24c1c4]">Sympto insight</p>
-                <h3 className="mt-1 text-base font-black tracking-[-.025em] text-white">Nutrition in context</h3>
+                <p className="text-[9px] font-black uppercase tracking-[.15em] text-[#0b7b80]">Sympto insight</p>
+                <h3 className="mt-1 text-base font-black tracking-[-.025em] text-[#0b2d54]">Nutrition in context</h3>
               </div>
             </div>
             <div className="mt-3 space-y-2">
               {nutritionInsights.map((insight, index) => (
-                <div key={insight.title + "-" + index} className="rounded-[17px] bg-[#123e63] px-3.5 py-3 ring-1 ring-white/10">
-                  <p className="text-[10px] font-black text-white">{insight.title}</p>
-                  <p className="mt-1 text-[10px] leading-5 text-white/70">{insight.text}</p>
+                <div key={insight.title + "-" + index} className="rounded-[17px] bg-[#f7fbfb] px-3.5 py-3 ring-1 ring-[#e1ecef]">
+                  <p className="text-[10px] font-black text-[#0b2d54]">{insight.title}</p>
+                  <p className="mt-1 text-[10px] leading-5 text-[#6f8190]">{insight.text}</p>
                 </div>
               ))}
             </div>
