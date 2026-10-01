@@ -16,6 +16,24 @@ interface TodayMedicationActionsProps {
 
 type Action = "TAKEN" | "SKIPPED";
 
+type MedicationCheckIn = {
+  day: string;
+  sleepHours: number | null;
+  waterIntakeMl: number | null;
+  exerciseMinutes: number | null;
+};
+
+function journalDayKey(value: unknown) {
+  const date = new Date(String(value ?? ""));
+  if (Number.isNaN(date.getTime())) return "";
+  return new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Africa/Johannesburg",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).format(date);
+}
+
 function medicationName(medication: any) {
   return medication?.medication?.name || medication?.medication?.genericName || medication?.name || "Your medicine";
 }
