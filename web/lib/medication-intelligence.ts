@@ -15,6 +15,13 @@ export type MedicationIntelligenceNutritionEvent = {
   occurredAt: string;
 };
 
+export type MedicationSupportingGoal = {
+  category: string;
+  title?: string | null;
+  targetValue?: number | string | null;
+  unit?: string | null;
+};
+
 export type MedicationIntelligenceInsight = {
   title: string;
   text: string;
@@ -308,6 +315,7 @@ export function buildMedicationIntelligence(input: {
   scheduledDosesPerDay: number;
   checkIns: MedicationIntelligenceCheckIn[];
   nutritionEvents: MedicationIntelligenceNutritionEvent[];
+  supportingGoals: MedicationSupportingGoal[];
 }): MedicationIntelligenceInsight[] {
   if (!input.adherenceEvents.length) {
     return [{
@@ -393,27 +401,40 @@ export function buildMedicationIntelligence(input: {
     }
   }
 
+  const getSupportingGoal = (category: string) =>
+    input.supportingGoals.find(
+      (goal) => String(goal.category ?? "").toUpperCase() === category,
+    );
+
+  const targetNumber = (goal?: MedicationSupportingGoal | null) => {
+    const value = Number(goal?.targetValue);
+    return Number.isFinite(value) && value > 0 ? value : null;
+  };
+
   // Sleep
   const sleepDays = days.filter((day) => {
     const value = checkIns.get(day.day)?.sleepHours;
     return value != null && Number.isFinite(Number(value));
   });
 
+  const sleepGoal = getSupportingGoal("SLEEP");
+  const sleepTarget = targetNumber(sleepGoal) ?? 6;
+
   compareContext(
     sleepDays,
-    (day) => Number(checkIns.get(day.day)?.sleepHours) < 6,
-    (day) => Number(checkIns.get(day.day)?.sleepHours) >= 6,
+    (day) => Number(checkIns.get(day.day)?.sleepHours) < sleepTarget,
+    (day) => Number(checkIns.get(day.day)?.sleepHours) >= sleepTarget,
     (a, b, countA, countB) =>
       "On " +
       formatWhole(countA) +
-      " shorter-sleep days, your medicine logging averaged " +
+      " days below your sleep target, your medicine logging averaged " +
       formatWhole(a) +
       "% versus " +
       formatWhole(b) +
       "% on " +
       formatWhole(countB) +
-      " days with 6+ hours of sleep.",
-    "Sleep & your medicine",
+      " days at or above it.",
+    sleepGoal?.title ? String(sleepGoal.title) + " & your medicine" : "Sleep & your medicine",
     insights,
   );
 
@@ -424,28 +445,51 @@ export function buildMedicationIntelligence(input: {
   });
 
   if (hydrationDays.length >= 4) {
-    const values = hydrationDays
-      .map((day) => Number(checkIns.get(day.day)?.waterIntakeMl))
-      .sort((a, b) => a - b);
-    const middle = Math.floor(values.length / 2);
-    const median =
-      values.length % 2 === 0
-        ? (values[middle - 1] + values[middle]) / 2
-        : values[middle];
+    const hydrationGoal = getSupportingGoal("HYDRATION");
+    const goalTarget = targetNumber(hydrationGoal);
 
-    compareContext(
-      hydrationDays,
-      (day) => Number(checkIns.get(day.day)?.waterIntakeMl) < median,
-      (day) => Number(checkIns.get(day.day)?.waterIntakeMl) >= median,
-      (a, b) =>
-        "On lower-water days, your medicine logging averaged " +
-        formatWhole(a) +
-        "% versus " +
-        formatWhole(b) +
-        "% on higher-water days.",
-      "Water & your medicine",
-      insights,
-    );
+    if (goalTarget != null) {
+      compareContext(
+        hydrationDays,
+        (day) => Number(checkIns.get(day.day)?.waterIntakeMl) < goalTarget,
+        (day) => Number(checkIns.get(day.day)?.waterIntakeMl) >= goalTarget,
+        (a, b, countA, countB) =>
+          "On " +
+          formatWhole(countA) +
+          " days below your water target, your medicine logging averaged " +
+          formatWhole(a) +
+          "% versus " +
+          formatWhole(b) +
+          "% on " +
+          formatWhole(countB) +
+          " days at or above it.",
+        hydrationGoal?.title ? String(hydrationGoal.title) + " & your medicine" : "Water & your medicine",
+        insights,
+      );
+    } else {
+      const values = hydrationDays
+        .map((day) => Number(checkIns.get(day.day)?.waterIntakeMl))
+        .sort((a, b) => a - b);
+      const middle = Math.floor(values.length / 2);
+      const median =
+        values.length % 2 === 0
+          ? (values[middle - 1] + values[middle]) / 2
+          : values[middle];
+
+      compareContext(
+        hydrationDays,
+        (day) => Number(checkIns.get(day.day)?.waterIntakeMl) < median,
+        (day) => Number(checkIns.get(day.day)?.waterIntakeMl) >= median,
+        (a, b) =>
+          "On lower-water days, your medicine logging averaged " +
+          formatWhole(a) +
+          "% versus " +
+          formatWhole(b) +
+          "% on higher-water days.",
+        "Water & your medicine",
+        insights,
+      );
+    }
   }
 
   // Activity
@@ -454,17 +498,20 @@ export function buildMedicationIntelligence(input: {
     return value != null && Number.isFinite(Number(value));
   });
 
+  const exerciseGoal = getSupportingGoal("EXERCISE");
+  const exerciseTarget = targetNumber(exerciseGoal) ?? 30;
+
   compareContext(
     activityDays,
-    (day) => Number(checkIns.get(day.day)?.exerciseMinutes) < 30,
-    (day) => Number(checkIns.get(day.day)?.exerciseMinutes) >= 30,
+    (day) => Number(checkIns.get(day.day)?.exerciseMinutes) < exerciseTarget,
+    (day) => Number(checkIns.get(day.day)?.exerciseMinutes) >= exerciseTarget,
     (a, b) =>
       "On lower-activity days, your medicine logging averaged " +
       formatWhole(a) +
       "% versus " +
       formatWhole(b) +
-      "% on days with 30+ minutes of activity.",
-    "Activity & your medicine",
+      "% on days meeting your activity target.",
+    exerciseGoal?.title ? String(exerciseGoal.title) + " & your medicine" : "Activity & your medicine",
     insights,
   );
 
@@ -472,22 +519,54 @@ export function buildMedicationIntelligence(input: {
   const nutritionLogged = days.filter((day) => nutritionDays.has(day.day));
   const nutritionNotLogged = days.filter((day) => !nutritionDays.has(day.day));
 
-  if (nutritionLogged.length >= 2 && nutritionNotLogged.length >= 2) {
-    const logged = adherenceFor(nutritionLogged).percentage;
-    const notLogged = adherenceFor(nutritionNotLogged).percentage;
+  const nutritionGoal = getSupportingGoal("NUTRITION");
+  const nutritionTarget = targetNumber(nutritionGoal);
 
-    if (Math.abs(logged - notLogged) >= 10) {
-      insights.push({
-        title: "Food & your medicine",
-        text:
-          "On days you logged food, your medicine logging averaged " +
-          formatWhole(logged) +
+  if (nutritionTarget != null) {
+    const caloriesByDay = new Map<string, number>();
+    input.nutritionEvents.forEach((event) => {
+      const day = dayKey(event.occurredAt);
+      if (!day) return;
+      caloriesByDay.set(day, (caloriesByDay.get(day) ?? 0) + Number(event.loggedValue || 0));
+    });
+
+    const nutritionComparedDays = days.filter((day) => caloriesByDay.has(day.day));
+    const targetNutrition = nutritionComparedDays.filter(
+      (day) => (caloriesByDay.get(day.day) ?? 0) >= nutritionTarget,
+    );
+    const belowNutrition = nutritionComparedDays.filter(
+      (day) => (caloriesByDay.get(day.day) ?? 0) < nutritionTarget,
+    );
+
+    if (targetNutrition.length >= 2 && belowNutrition.length >= 2) {
+      compareContext(
+        nutritionComparedDays,
+        (day) => (caloriesByDay.get(day.day) ?? 0) < nutritionTarget,
+        (day) => (caloriesByDay.get(day.day) ?? 0) >= nutritionTarget,
+        (a, b) =>
+          "On days below your food target, your medicine logging averaged " +
+          formatWhole(a) +
           "% versus " +
-          formatWhole(notLogged) +
-          "% on days without a food entry.",
-        tone: "context",
-      });
+          formatWhole(b) +
+          "% on days at or above it.",
+        nutritionGoal?.title ? String(nutritionGoal.title) + " & your medicine" : "Food & your medicine",
+        insights,
+      );
     }
+  } else if (nutritionLogged.length >= 2 && nutritionNotLogged.length >= 2) {
+    compareContext(
+      days,
+      (day) => nutritionDays.has(day.day),
+      (day) => !nutritionDays.has(day.day),
+      (a, b) =>
+        "On days you logged food, your medicine logging averaged " +
+        formatWhole(a) +
+        "% versus " +
+        formatWhole(b) +
+        "% on days without a food entry.",
+      "Food & your medicine",
+      insights,
+    );
   }
 
   // Always give a compact context summary when there is recorded context,
