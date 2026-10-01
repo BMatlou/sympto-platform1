@@ -806,22 +806,25 @@ export default function TodayMedicationActions({ medications, goal: suppliedGoal
 
       <div className="border-t border-[#edf2f5] px-4 py-3.5 sm:px-5"><div className="mb-3 flex flex-wrap items-center justify-between gap-2"><div><p className="text-[8px] font-black uppercase tracking-[.14em] text-[#91a0ae]">Goal journey</p><p className="mt-0.5 text-[11px] font-black text-[#0b2d54]">Day {journeyDay}{daysLeft !== null ? ` · ${daysLeft} day${daysLeft === 1 ? "" : "s"} left` : ""}</p></div><div className="text-right"><p className="text-[10px] font-black text-[#0b7b80]">{targetAdherence}% adherence goal</p><p className="mt-0.5 text-[9px] font-semibold text-[#91a0ae]">Take at least {targetAdherence}% of your scheduled doses to reach this goal.</p></div></div><div className="mb-3 h-2 overflow-hidden rounded-full bg-[#edf3f5]"><div className="h-full rounded-full bg-[#24c1c4] transition-all" style={{ width: `${percent}%` }} /></div><div className="mb-3 rounded-[14px] bg-[#f7fbfb] px-3.5 py-3 ring-1 ring-[#e1ecef]"><div className="flex items-center justify-between gap-3"><div><p className="text-[8px] font-black uppercase tracking-[.13em] text-[#91a0ae]">Doses needed for your goal</p><p className="mt-0.5 text-[13px] font-black text-[#0b2d54]">{dosesNeededForGoal} more dose{dosesNeededForGoal === 1 ? "" : "s"}</p></div><p className="text-right text-[9px] font-bold text-[#7c8e9b]">{takenDosesSoFar} taken so far</p></div></div><div className="flex items-center justify-between gap-3"><div><p className="text-[11px] font-bold text-[#7c8e9b]">Dose status</p><p className="mt-0.5 text-[10px] font-semibold text-[#9aa7b1]">{states[String(medicationId)] === "TAKEN" ? "Taken today" : states[String(medicationId)] === "SKIPPED" ? "Skipped today" : "Choose an action below"}</p></div><div className="grid w-[180px] grid-cols-2 gap-2"><button type="button" onClick={() => void record(trackedMedication, "TAKEN")} disabled={isSyncing || safeDosesLoggedToday >= totalRequiredDosesPerDay} className="inline-flex h-10 items-center justify-center gap-1.5 rounded-[13px] bg-[#24c1c4] px-3 text-[10px] font-black text-[#0b2d54] transition hover:brightness-105 disabled:cursor-not-allowed disabled:opacity-45"><Check className="h-3.5 w-3.5" />{savingKey === `${String(medicationId)}:TAKEN` ? "Saving" : "Taken"}</button><button type="button" onClick={() => void record(trackedMedication, "SKIPPED")} disabled={isSyncing || safeDosesLoggedToday >= totalRequiredDosesPerDay} className="inline-flex h-10 items-center justify-center gap-1.5 rounded-[13px] border border-[#dce7eb] bg-white px-3 text-[10px] font-black text-[#0b2d54] transition hover:bg-[#f7fbfb] disabled:cursor-not-allowed disabled:opacity-45"><CircleSlash2 className="h-3.5 w-3.5" />{savingKey === `${String(medicationId)}:SKIPPED` ? "Saving" : "Skipped"}</button></div></div></div>
 
-      <section className="mx-3.5 mb-3.5 rounded-[22px] border border-[#0b2d54] bg-[#0b2d54] p-4 text-white shadow-[0_18px_40px_rgba(11,45,84,.18)] sm:mx-4 sm:mb-4 sm:p-5">
+      <section className="mx-3.5 mb-3.5 rounded-[22px] border border-[#bfe9e9] bg-[#f4fbfb] p-4 text-[#0b2d54] shadow-[0_12px_30px_rgba(36,193,196,.12)] sm:mx-4 sm:mb-4 sm:p-5">
         <div className="flex items-start gap-3">
-          <span className="grid h-9 w-9 shrink-0 place-items-center rounded-[13px] bg-[#24c1c4] text-[#0b2d54] shadow-[0_0_18px_rgba(36,193,196,.3)]">
+          <span className="grid h-9 w-9 shrink-0 place-items-center rounded-[13px] bg-[#24c1c4] text-[#0b2d54] shadow-[0_0_18px_rgba(36,193,196,.24)]">
             <Sparkles className="h-4 w-4" />
           </span>
           <div className="min-w-0">
-            <p className="text-[9px] font-black uppercase tracking-[.15em] text-[#24c1c4]">Sympto insight</p>
-            <h3 className="mt-1 text-base font-black tracking-[-.025em] text-white">Medication adherence in context</h3>
+            <p className="text-[9px] font-black uppercase tracking-[.15em] text-[#0b7b80]">Sympto insight</p>
+            <h3 className="mt-1 text-base font-black tracking-[-.025em] text-[#0b2d54]">Your medication pattern</h3>
           </div>
         </div>
 
         <div className="mt-3 space-y-2">
           {medicationInsights.map((insight, index) => (
-            <div key={insight.title + "-" + index} className="rounded-[17px] bg-[#123e63] px-3.5 py-3 ring-1 ring-white/10">
-              <p className="text-[10px] font-black text-white">{insight.title}</p>
-              <p className="mt-1 text-[10px] leading-5 text-white/70">{insight.text}</p>
+            <div
+              key={insight.title + "-" + index}
+              className="rounded-[17px] border border-[#dcebec] bg-white px-3.5 py-3 shadow-[0_5px_16px_rgba(11,45,84,.04)]"
+            >
+              <p className="text-[10px] font-black text-[#0b2d54]">{insight.title}</p>
+              <p className="mt-1 text-[10px] leading-5 text-[#617487]">{insight.text}</p>
             </div>
           ))}
         </div>
