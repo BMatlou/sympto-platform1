@@ -7,6 +7,7 @@ import { toast } from "sonner";
 import { api } from "@/lib/api";
 import { healthGoalsService } from "@/services/health-goals.service";
 import { healthJournalService } from "@/services/health-journal.service";
+import { buildMedicationIntelligence } from "@/lib/medication-intelligence";
 
 interface TodayMedicationActionsProps {
   medications: any[];
@@ -498,6 +499,7 @@ export default function TodayMedicationActions({ medications, goal: suppliedGoal
   const [states, setStates] = useState<Record<string, Action | undefined>>({});
   const [adherenceEvents, setAdherenceEvents] = useState<Array<{ loggedValue: number; occurredAt: string }>>([]);
   const [recentCheckIns, setRecentCheckIns] = useState<MedicationCheckIn[]>([]);
+  const [recentNutritionEvents, setRecentNutritionEvents] = useState<Array<{ loggedValue: number; occurredAt: string }>>([]);
 
   const trackedMedication = medications[0] ?? null;
   const finalGoal = (() => {
@@ -663,19 +665,92 @@ export default function TodayMedicationActions({ medications, goal: suppliedGoal
     };
   }, []);
 
+  useEffect(() => {
+    let active = true;
+
+    async function loadRecentNutritionEvents() {
+      try {
+        const end = new Date();
+        const start = new Date(end);
+        start.setDate(start.getDate() - 29);
+        start.setHours(0, 0, 0, 0);
+
+        const response = await healthGoalsService.getMetricEvents(
+          "NUTRITION",
+          "nutrition.calories",
+          start,
+          end,
+          "goal-manual",
+        );
+
+        const events = (response?.events ?? [])
+          .map((event) => ({
+            loggedValue: Number(event.loggedValue),
+            occurredAt: String(event.occurredAt),
+          }))
+          .filter(
+            (event) =>
+              Number.isFinite(event.loggedValue) &&
+              event.loggedValue >= 0 &&
+              Boolean(journalDayKey(event.occurredAt)),
+          );
+
+        if (active) setRecentNutritionEvents(events);
+      } catch {
+        if (active) setRecentNutritionEvents([]);
+      }
+    }
+
+    void loadRecentNutritionEvents();
+
+    const handleNutritionUpdated = () => void loadRecentNutritionEvents();
+    window.addEventListener("sympto:health-goal-updated", handleNutritionUpdated);
+    window.addEventListener("sympto:today-action-updated", handleNutritionUpdated);
+
+    return () => {
+      active = false;
+      window.removeEventListener("sympto:health-goal-updated", handleNutritionUpdated);
+      window.removeEventListener("sympto:today-action-updated", handleNutritionUpdated);
+    };
+  }, []);
+
   const doseLabel = useMemo(() => (totalRequiredDosesPerDay === 1 ? "1 dose" : `${totalRequiredDosesPerDay} doses`), [totalRequiredDosesPerDay]);
   const rawTargetAdherence = Number(finalGoal?.targetValue);
   const targetAdherence = Number.isFinite(rawTargetAdherence) && rawTargetAdherence > 0 ? rawTargetAdherence : 90;
 
-  const medicationInsights = useMemo(
-    () =>
-      buildMedicationInsights(
-        adherenceEvents,
-        targetAdherence,
-        recentCheckIns,
-      ),
-    [adherenceEvents, targetAdherence, recentCheckIns],
-  );
+  const medicationInsights = useMemo(() => {
+    const frameworkInsights = buildMedicationIntelligence({
+      adherenceEvents,
+      goalStartAt: String(finalGoal?.createdAt ?? new Date().toISOString()),
+      scheduledDosesPerDay: totalRequiredDosesPerDay,
+      checkIns: recentCheckIns,
+      nutritionEvents: recentNutritionEvents,
+    });
+
+    const legacyInsights = buildMedicationInsights(
+      adherenceEvents,
+      targetAdherence,
+      recentCheckIns,
+    ).filter((insight) => insight.title !== "Not enough data yet");
+
+    const seen = new Set(frameworkInsights.map((insight) => insight.title));
+    const combined = [...frameworkInsights];
+
+    for (const insight of legacyInsights) {
+      if (combined.length >= 4 || seen.has(insight.title)) continue;
+      seen.add(insight.title);
+      combined.push(insight);
+    }
+
+    return combined.slice(0, 4);
+  }, [
+    adherenceEvents,
+    targetAdherence,
+    recentCheckIns,
+    recentNutritionEvents,
+    finalGoal?.createdAt,
+    totalRequiredDosesPerDay,
+  ]);
 
   const supportingGoals = useMemo(
     () =>
@@ -701,6 +776,7 @@ export default function TodayMedicationActions({ medications, goal: suppliedGoal
       sleepDays: recentCheckIns.filter((item) => item.sleepHours != null && Number.isFinite(Number(item.sleepHours))).length,
       hydrationDays: recentCheckIns.filter((item) => item.waterIntakeMl != null && Number.isFinite(Number(item.waterIntakeMl))).length,
       activityDays: recentCheckIns.filter((item) => item.exerciseMinutes != null && Number.isFinite(Number(item.exerciseMinutes))).length,
+      nutritionDays: new Set(recentNutritionEvents.map((event) => journalDayKey(event.occurredAt)).filter(Boolean)).size,
       latestCheckIn,
     };
   }, [adherenceEvents, recentCheckIns]);
@@ -833,6 +909,10 @@ export default function TodayMedicationActions({ medications, goal: suppliedGoal
                   <div className="rounded-[12px] bg-white/5 px-2.5 py-2 ring-1 ring-white/10">
                     <p className="text-[8px] font-black uppercase tracking-[.08em] text-white/45">Activity</p>
                     <p className="mt-0.5 text-[11px] font-black text-white">{supportingData.activityDays} days</p>
+                  </div>
+                  <div className="rounded-[12px] bg-white/5 px-2.5 py-2 ring-1 ring-white/10">
+                    <p className="text-[8px] font-black uppercase tracking-[.08em] text-white/45">Nutrition</p>
+                    <p className="mt-0.5 text-[11px] font-black text-white">{supportingData.nutritionDays} days</p>
                   </div>
                 </div>
                 <p className="mt-2 text-[9px] leading-4 text-white/55">
