@@ -863,7 +863,7 @@ export default function TodayMedicationActions({ medications, goal: suppliedGoal
           </div>
         </div>
 
-        {(supportingGoals.length > 0 || recentCheckIns.length > 0) && (
+        {(supportingGoals.length > 0 || recentCheckIns.length > 0 || recentNutritionEvents.length > 0) && (
           <div className="mt-3 rounded-[17px] bg-[#123e63] px-3.5 py-3 ring-1 ring-white/10">
             <p className="text-[9px] font-black uppercase tracking-[.14em] text-[#24c1c4]">Supporting context</p>
 
@@ -894,10 +894,10 @@ export default function TodayMedicationActions({ medications, goal: suppliedGoal
               </div>
             )}
 
-            {supportingData.matchedCheckInDays > 0 && (
+            {(supportingData.matchedCheckInDays > 0 || supportingData.nutritionDays > 0) && (
               <div className={supportingGoals.length > 0 ? "mt-3 border-t border-white/10 pt-3" : ""}>
                 <p className="text-[10px] font-black text-white">Supporting health data</p>
-                <div className="mt-2 grid grid-cols-3 gap-2">
+                <div className="mt-2 grid grid-cols-2 gap-2 sm:grid-cols-4">
                   <div className="rounded-[12px] bg-white/5 px-2.5 py-2 ring-1 ring-white/10">
                     <p className="text-[8px] font-black uppercase tracking-[.08em] text-white/45">Sleep</p>
                     <p className="mt-0.5 text-[11px] font-black text-white">{supportingData.sleepDays} days</p>
@@ -916,7 +916,16 @@ export default function TodayMedicationActions({ medications, goal: suppliedGoal
                   </div>
                 </div>
                 <p className="mt-2 text-[9px] leading-4 text-white/55">
-                  {supportingData.matchedCheckInDays} of {supportingData.medicationDays} medication-recorded days also have a Daily Health Check-in.
+                  {supportingData.matchedCheckInDays > 0
+                    ? supportingData.matchedCheckInDays +
+                      " of " +
+                      supportingData.medicationDays +
+                      " medication-plan days also have a Daily Health Check-in."
+                    : supportingData.nutritionDays > 0
+                      ? "Nutrition is also being recorded alongside your medication timeline on " +
+                        supportingData.nutritionDays +
+                        " recent days."
+                      : "Sympto will use matching check-ins as they are recorded."}
                 </p>
               </div>
             )}
