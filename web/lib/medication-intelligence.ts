@@ -18,6 +18,7 @@ export type MedicationIntelligenceNutritionEvent = {
 export type MedicationIntelligenceInsight = {
   title: string;
   text: string;
+  tone?: "positive" | "action" | "context" | "watch" | "neutral";
 };
 
 type MedicationDay = {
@@ -276,25 +277,29 @@ function compareContext(
   days: MedicationDay[],
   predicateA: (day: MedicationDay) => boolean,
   predicateB: (day: MedicationDay) => boolean,
+  buildText: (a: number, b: number, countA: number, countB: number) => string,
   title: string,
-  description: (a: number, b: number, countA: number, countB: number) => string,
   insights: MedicationIntelligenceInsight[],
 ) {
   const groupA = days.filter(predicateA);
   const groupB = days.filter(predicateB);
 
-  if (groupA.length < 3 || groupB.length < 3) return;
+  if (groupA.length < 2 || groupB.length < 2) return;
 
   const a = adherenceFor(groupA).percentage;
   const b = adherenceFor(groupB).percentage;
-  const difference = a - b;
 
-  if (Math.abs(difference) < 10) return;
+  if (Math.abs(a - b) < 10) return;
 
   insights.push({
     title,
-    text: description(a, b, groupA.length, groupB.length),
+    text: buildText(a, b, groupA.length, groupB.length),
+    tone: "context",
   });
+}
+
+function buildCoverage(label: string, recordedDays: number, planDays: number) {
+  return label + " " + formatWhole(recordedDays) + " of " + formatWhole(planDays) + " days.";
 }
 
 export function buildMedicationIntelligence(input: {
@@ -304,13 +309,11 @@ export function buildMedicationIntelligence(input: {
   checkIns: MedicationIntelligenceCheckIn[];
   nutritionEvents: MedicationIntelligenceNutritionEvent[];
 }): MedicationIntelligenceInsight[] {
-  const insights: MedicationIntelligenceInsight[] = [];
-
   if (!input.adherenceEvents.length) {
     return [{
-      title: "Not enough data yet",
-      text:
-        "Sympto has no recorded medication dose actions for this goal yet. As doses are recorded, it can build your trend, timing patterns and supporting-data comparisons.",
+      title: "Your medication pattern",
+      text: "Log a few doses and Sympto will start showing your personal pattern here.",
+      tone: "neutral",
     }];
   }
 
@@ -321,7 +324,7 @@ export function buildMedicationIntelligence(input: {
   );
 
   const today = dayKey(new Date());
-  const completedDays = timeline.filter((day) => day.day !== today);
+  const days = timeline.filter((day) => day.day !== today);
   const checkIns = new Map(input.checkIns.map((item) => [item.day, item]));
 
   const nutritionDays = new Set(
@@ -330,82 +333,97 @@ export function buildMedicationIntelligence(input: {
       .filter(Boolean),
   );
 
-  addTrendInsight(insights, completedDays);
-  addTimingPattern(insights, timeline, actionRecords);
+  const insights: MedicationIntelligenceInsight[] = [];
 
-  const sleepDays = timeline.filter(
-    (day) =>
-      checkIns.get(day.day)?.sleepHours != null &&
-      Number.isFinite(Number(checkIns.get(day.day)?.sleepHours)),
-  );
-  const hydrationDays = timeline.filter(
-    (day) =>
-      checkIns.get(day.day)?.waterIntakeMl != null &&
-      Number.isFinite(Number(checkIns.get(day.day)?.waterIntakeMl)),
-  );
-  const activityDays = timeline.filter(
-    (day) =>
-      checkIns.get(day.day)?.exerciseMinutes != null &&
-      Number.isFinite(Number(checkIns.get(day.day)?.exerciseMinutes)),
-  );
-  const nutritionLoggedDays = timeline.filter((day) => nutritionDays.has(day.day));
+  // Trend
+  if (days.length >= 4) {
+    const size = Math.min(5, Math.floor(days.length / 2));
+    const baseline = days.slice(-(size * 2), -size);
+    const recent = days.slice(-size);
+    const before = adherenceFor(baseline).percentage;
+    const after = adherenceFor(recent).percentage;
+    const delta = after - before;
 
-  const totalPlanDays = timeline.length;
-  const contextParts = [
-    ["sleep", sleepDays.length],
-    ["hydration", hydrationDays.length],
-    ["activity", activityDays.length],
-    ["nutrition", nutritionLoggedDays.length],
-  ].filter(([, count]) => Number(count) > 0);
-
-  if (totalPlanDays > 0 && contextParts.length > 0) {
-    const labelMap: Record<string, string> = {
-      sleep: "sleep",
-      hydration: "water",
-      activity: "activity",
-      nutrition: "food",
-    };
-
-    const summary = contextParts
-      .map(
-        ([label, count]) =>
-          labelMap[String(label)] +
-          " on " +
-          formatWhole(Number(count)) +
-          " of " +
-          formatWhole(totalPlanDays) +
-          " days",
-      )
-      .join(", ");
-
-    insights.push({
-      title: "Connecting the dots",
-      text:
-        "You’re also tracking " +
-        summary +
-        ". This helps Sympto see your daily routine alongside your medicine.",
-    });
+    if (Math.abs(delta) >= 5) {
+      insights.push({
+        title: delta > 0 ? "Your medicine routine is improving" : "Your medicine routine needs more consistency",
+        text:
+          "You moved from " +
+          formatWhole(before) +
+          "% to " +
+          formatWhole(after) +
+          "% lately — " +
+          (delta > 0 ? "up " : "down ") +
+          formatWhole(Math.abs(delta)) +
+          "%.",
+        tone: delta > 0 ? "positive" : "watch",
+      });
+    }
   }
+
+  // Time-of-day pattern
+  const skipped = actionRecords.filter((action) => action.skipped);
+  if (skipped.length >= 2) {
+    const counts = new Map<string, number>();
+    skipped.forEach((action) => {
+      const band = timeBand(action.hour);
+      counts.set(band, (counts.get(band) ?? 0) + 1);
+    });
+
+    const top = [...counts.entries()].sort((a, b) => b[1] - a[1])[0];
+    if (top && top[1] >= 2) {
+      const routine =
+        top[0] === "morning"
+          ? "your morning routine"
+          : top[0] === "afternoon"
+            ? "your afternoon routine"
+            : top[0] === "evening"
+              ? "supper"
+              : "getting ready for bed";
+
+      insights.push({
+        title: "Your " + top[0] + " routine stands out",
+        text:
+          formatWhole(top[1]) +
+          " of your uncompleted dose entries were recorded at night. Linking this dose to " +
+          routine +
+          " could make it easier to remember.",
+        tone: "action",
+      });
+    }
+  }
+
+  // Sleep
+  const sleepDays = days.filter((day) => {
+    const value = checkIns.get(day.day)?.sleepHours;
+    return value != null && Number.isFinite(Number(value));
+  });
 
   compareContext(
     sleepDays,
     (day) => Number(checkIns.get(day.day)?.sleepHours) < 6,
     (day) => Number(checkIns.get(day.day)?.sleepHours) >= 6,
-    "Sleep and medication adherence show a pattern",
     (a, b, countA, countB) =>
       "On " +
       formatWhole(countA) +
-      " days with less than 6 hours of recorded sleep, your medication adherence averaged about " +
+      " shorter-sleep days, your medicine logging averaged " +
       formatWhole(a) +
       "% versus " +
       formatWhole(b) +
       "% on " +
       formatWhole(countB) +
-      " days with 6 or more hours. This is an association in your records, not evidence that sleep caused the difference.",
+      " days with 6+ hours of sleep.",
+    "Sleep & your medicine",
     insights,
   );
 
-  if (hydrationDays.length >= 6) {
+  // Water
+  const hydrationDays = days.filter((day) => {
+    const value = checkIns.get(day.day)?.waterIntakeMl;
+    return value != null && Number.isFinite(Number(value));
+  });
+
+  if (hydrationDays.length >= 4) {
     const values = hydrationDays
       .map((day) => Number(checkIns.get(day.day)?.waterIntakeMl))
       .sort((a, b) => a - b);
@@ -419,72 +437,86 @@ export function buildMedicationIntelligence(input: {
       hydrationDays,
       (day) => Number(checkIns.get(day.day)?.waterIntakeMl) < median,
       (day) => Number(checkIns.get(day.day)?.waterIntakeMl) >= median,
-      "Hydration and medication adherence show a pattern",
-      (a, b, countA, countB) =>
-        "On " +
-        formatWhole(countA) +
-        " lower-hydration days, your medication adherence averaged about " +
+      (a, b) =>
+        "On lower-water days, your medicine logging averaged " +
         formatWhole(a) +
         "% versus " +
         formatWhole(b) +
-        "% on " +
-        formatWhole(countB) +
-        " higher-hydration days. This is an association in your records, not evidence that hydration caused the difference.",
+        "% on higher-water days.",
+      "Water & your medicine",
       insights,
     );
   }
+
+  // Activity
+  const activityDays = days.filter((day) => {
+    const value = checkIns.get(day.day)?.exerciseMinutes;
+    return value != null && Number.isFinite(Number(value));
+  });
 
   compareContext(
     activityDays,
     (day) => Number(checkIns.get(day.day)?.exerciseMinutes) < 30,
     (day) => Number(checkIns.get(day.day)?.exerciseMinutes) >= 30,
-    "Activity and medication adherence show a pattern",
-    (a, b, countA, countB) =>
-      "On " +
-      formatWhole(countA) +
-      " days with less than 30 minutes of recorded activity, your medication adherence averaged about " +
+    (a, b) =>
+      "On lower-activity days, your medicine logging averaged " +
       formatWhole(a) +
       "% versus " +
       formatWhole(b) +
-      "% on " +
-      formatWhole(countB) +
-      " days with 30 minutes or more. This is an association in your records, not evidence that activity caused the difference.",
+      "% on days with 30+ minutes of activity.",
+    "Activity & your medicine",
     insights,
   );
 
-  compareContext(
-    timeline,
-    (day) => nutritionDays.has(day.day),
-    (day) => !nutritionDays.has(day.day),
-    "Nutrition logging and medication adherence can be compared",
-    (a, b, countA, countB) =>
-      "On " +
-      formatWhole(countA) +
-      " days with nutrition recorded, your medication adherence averaged about " +
-      formatWhole(a) +
-      "% versus " +
-      formatWhole(b) +
-      "% across " +
-      formatWhole(countB) +
-      " days without a nutrition record. This is a record-completeness comparison, not evidence that food caused the adherence difference.",
-    insights,
-  );
+  // Nutrition logging
+  const nutritionLogged = days.filter((day) => nutritionDays.has(day.day));
+  const nutritionNotLogged = days.filter((day) => !nutritionDays.has(day.day));
 
-  const hasContext = contextParts.length > 0;
-  if (insights.length === 0 || (insights.length < 2 && !hasContext)) {
-    const totalActions = timeline.reduce((sum, day) => sum + day.recordedActions, 0);
+  if (nutritionLogged.length >= 2 && nutritionNotLogged.length >= 2) {
+    const logged = adherenceFor(nutritionLogged).percentage;
+    const notLogged = adherenceFor(nutritionNotLogged).percentage;
+
+    if (Math.abs(logged - notLogged) >= 10) {
+      insights.push({
+        title: "Food & your medicine",
+        text:
+          "On days you logged food, your medicine logging averaged " +
+          formatWhole(logged) +
+          "% versus " +
+          formatWhole(notLogged) +
+          "% on days without a food entry.",
+        tone: "context",
+      });
+    }
+  }
+
+  // Always give a compact context summary when there is recorded context,
+  // but do not present it as if the check-in itself caused the medication result.
+  if (insights.length < 3) {
+    const parts: string[] = [];
+    const planDays = days.length;
+
+    if (planDays > 0) {
+      if (sleepDays.length) parts.push(buildCoverage("Sleep", sleepDays.length, planDays));
+      if (hydrationDays.length) parts.push(buildCoverage("Water", hydrationDays.length, planDays));
+      if (activityDays.length) parts.push(buildCoverage("Activity", activityDays.length, planDays));
+      if (nutritionLogged.length) parts.push(buildCoverage("Food", nutritionLogged.length, planDays));
+    }
+
+    if (parts.length) {
+      insights.push({
+        title: "Your daily context",
+        text: "Sympto has " + parts.join(" ") + " It uses these entries to look for patterns in your medicine routine.",
+        tone: "context",
+      });
+    }
+  }
+
+  if (!insights.length) {
     insights.push({
-      title: "Your medication picture is building",
-      text:
-        "Sympto has " +
-        formatWhole(totalActions) +
-        " recorded dose action" +
-        (totalActions === 1 ? "" : "s") +
-        " across " +
-        formatWhole(totalPlanDays) +
-        " medication-plan day" +
-        (totalPlanDays === 1 ? "" : "s") +
-        ". More dated records will make the trend and pattern comparisons stronger.",
+      title: "Your medication pattern is building",
+      text: "Keep logging your doses. Sympto will compare your routine as more days are recorded.",
+      tone: "neutral",
     });
   }
 
