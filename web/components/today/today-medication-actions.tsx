@@ -1,6 +1,6 @@
 "use client";
 
-import { Check, CircleSlash2, Pill, Sparkles } from "lucide-react";
+import { Activity, Check, CircleSlash2, Clock3, Pill, Sparkles, TrendingUp } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 import { api } from "@/lib/api";
@@ -45,6 +45,13 @@ const medicationInsightTone = {
   watch: "border-[#ead9bc] bg-[#fff8eb] ring-[#f1e5cf]",
   neutral: "border-[#d9e4ee] bg-[#f8fbfb] ring-[#e8eef3]",
 } as const;
+
+function MedicationInsightIcon({ tone }: { tone?: keyof typeof medicationInsightTone }) {
+  if (tone === "positive") return <TrendingUp className="h-4 w-4" />;
+  if (tone === "action") return <Clock3 className="h-4 w-4" />;
+  if (tone === "context") return <Activity className="h-4 w-4" />;
+  return <Sparkles className="h-4 w-4" />;
+}
 
 function medicationSchedule(medication: any) {
   const dose = medication?.dosage || medication?.dose || "Dose not recorded";
@@ -482,10 +489,17 @@ export default function TodayMedicationActions({ medications, goal: suppliedGoal
             return (
               <div
                 key={insight.title + "-" + index}
-                className={`rounded-[17px] border px-3.5 py-3.5 ring-1 ${tone}`}
+                className={`rounded-[18px] border px-3.5 py-3.5 ring-1 ${tone} ${index === 0 ? "sm:px-4 sm:py-4" : ""}`}
               >
-                <p className="text-[11px] font-black leading-5 text-[#0b2d54]">{insight.title}</p>
-                <p className="mt-1 text-[11px] leading-5 text-[#5f7080]">{insight.text}</p>
+                <div className="flex items-start gap-3">
+                  <span className="grid h-8 w-8 shrink-0 place-items-center rounded-[11px] bg-white/80 text-[#0b7b80] ring-1 ring-black/[0.05]">
+                    <MedicationInsightIcon tone={insight.tone as keyof typeof medicationInsightTone | undefined} />
+                  </span>
+                  <div className="min-w-0">
+                    <p className="text-[11px] font-black leading-5 text-[#0b2d54]">{insight.title}</p>
+                    <p className="mt-1 text-[11px] leading-5 text-[#5f7080]">{insight.text}</p>
+                  </div>
+                </div>
               </div>
             );
           })}
