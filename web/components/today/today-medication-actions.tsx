@@ -768,18 +768,24 @@ export default function TodayMedicationActions({ medications, goal: suppliedGoal
     const medicationDays = new Set(
       adherenceEvents.map((event) => journalDayKey(event.occurredAt)).filter(Boolean),
     );
-    const latestCheckIn = [...recentCheckIns].sort((a, b) => b.day.localeCompare(a.day))[0] ?? null;
+    const nutritionDays = new Set(
+      recentNutritionEvents
+        .map((event) => journalDayKey(event.occurredAt))
+        .filter((day) => day && medicationDays.has(day)),
+    );
+    const matchedCheckIns = recentCheckIns.filter((item) => medicationDays.has(item.day));
+    const latestCheckIn = [...matchedCheckIns].sort((a, b) => b.day.localeCompare(a.day))[0] ?? null;
 
     return {
-      matchedCheckInDays: recentCheckIns.filter((item) => medicationDays.has(item.day)).length,
+      matchedCheckInDays: matchedCheckIns.length,
       medicationDays: medicationDays.size,
-      sleepDays: recentCheckIns.filter((item) => item.sleepHours != null && Number.isFinite(Number(item.sleepHours))).length,
-      hydrationDays: recentCheckIns.filter((item) => item.waterIntakeMl != null && Number.isFinite(Number(item.waterIntakeMl))).length,
-      activityDays: recentCheckIns.filter((item) => item.exerciseMinutes != null && Number.isFinite(Number(item.exerciseMinutes))).length,
-      nutritionDays: new Set(recentNutritionEvents.map((event) => journalDayKey(event.occurredAt)).filter(Boolean)).size,
+      sleepDays: matchedCheckIns.filter((item) => item.sleepHours != null && Number.isFinite(Number(item.sleepHours))).length,
+      hydrationDays: matchedCheckIns.filter((item) => item.waterIntakeMl != null && Number.isFinite(Number(item.waterIntakeMl))).length,
+      activityDays: matchedCheckIns.filter((item) => item.exerciseMinutes != null && Number.isFinite(Number(item.exerciseMinutes))).length,
+      nutritionDays: nutritionDays.size,
       latestCheckIn,
     };
-  }, [adherenceEvents, recentCheckIns]);
+  }, [adherenceEvents, recentCheckIns, recentNutritionEvents]);
 
   if (!finalGoal) {
     return null;
