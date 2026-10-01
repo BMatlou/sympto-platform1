@@ -381,8 +381,9 @@ export function buildMedicationIntelligence(input: {
     insights.push({
       title: "The big picture",
       text:
-        summary +
-        ". These records give Sympto additional context for comparing medication adherence over time; they do not by themselves establish that one habit caused another result.",
+        "You are also tracking " +
+        summary.replace(/; /g, ", ") +
+        ".",
     });
   }
 
