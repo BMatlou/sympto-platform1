@@ -237,13 +237,17 @@ function addTimingPattern(
   timeline: MedicationDay[],
   actionRecords: ActionRecord[],
 ) {
-  const recordedLaterInDay = actionRecords.filter((action) => action.hour >= 21);
+  const eveningNotTaken = actionRecords.filter(
+    (action) => action.hour >= 21 && action.skipped,
+  );
 
-  if (recordedLaterInDay.length >= 2) {
+  if (eveningNotTaken.length >= 2) {
     insights.push({
       title: "Your evening routine is the main pattern",
       text:
-        "Most of the dose entries needing attention are happening at night. Try linking your evening medicine to supper or brushing your teeth.",
+        "Night-time is where most of your dose entries need attention, with " +
+        formatWhole(eveningNotTaken.length) +
+        " recorded there. Try linking your evening medicine to supper or brushing your teeth.",
     });
     return;
   }
