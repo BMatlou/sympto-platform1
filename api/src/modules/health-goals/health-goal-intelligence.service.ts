@@ -93,6 +93,12 @@ const GOAL_SUPPORT_RULES: Record<string, Array<{ sourceCategory: string; rationa
   MENTAL_HEALTH: [
     { sourceCategory: 'SLEEP', rationale: 'Sleep provides useful context alongside a mental-health tracking goal.' },
   ],
+  MEDICATION: [
+    { sourceCategory: 'SLEEP', rationale: 'Sleep provides contextual information that can be monitored alongside medication adherence.' },
+    { sourceCategory: 'HYDRATION', rationale: 'Hydration provides contextual information that can be monitored alongside medication adherence.' },
+    { sourceCategory: 'EXERCISE', rationale: 'Exercise provides a supporting behaviour signal that can be viewed alongside medication adherence.' },
+    { sourceCategory: 'NUTRITION', rationale: 'Nutrition tracking provides contextual information that can be viewed alongside medication adherence.' },
+  ],
   HEART_RATE: [
     { sourceCategory: 'EXERCISE', rationale: 'Exercise provides an activity signal that can be viewed alongside heart-rate measurements.' },
   ],
