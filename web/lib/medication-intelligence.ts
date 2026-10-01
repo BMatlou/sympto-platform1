@@ -370,7 +370,7 @@ export function buildMedicationIntelligence(input: {
       .map(
         ([label, count]) =>
           String(label) +
-          " is recorded on " +
+          " on " +
           formatWhole(Number(count)) +
           " of " +
           formatWhole(totalPlanDays) +
@@ -488,5 +488,5 @@ export function buildMedicationIntelligence(input: {
     });
   }
 
-  return insights.slice(0, 4);
+  return insights.slice(0, 3);
 }
