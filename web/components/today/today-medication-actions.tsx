@@ -1,7 +1,6 @@
 "use client";
 
 import { Check, CircleSlash2, Pill, Sparkles } from "lucide-react";
-import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 import { api } from "@/lib/api";
@@ -718,74 +717,23 @@ export default function TodayMedicationActions({ medications, goal: suppliedGoal
   const rawTargetAdherence = Number(finalGoal?.targetValue);
   const targetAdherence = Number.isFinite(rawTargetAdherence) && rawTargetAdherence > 0 ? rawTargetAdherence : 90;
 
-  const medicationInsights = useMemo(() => {
-    const frameworkInsights = buildMedicationIntelligence({
-      adherenceEvents,
-      goalStartAt: String(finalGoal?.createdAt ?? new Date().toISOString()),
-      scheduledDosesPerDay: totalRequiredDosesPerDay,
-      checkIns: recentCheckIns,
-      nutritionEvents: recentNutritionEvents,
-    });
-
-    const legacyInsights = buildMedicationInsights(
-      adherenceEvents,
-      targetAdherence,
-      recentCheckIns,
-    ).filter((insight) => insight.title !== "Not enough data yet");
-
-    const seen = new Set(frameworkInsights.map((insight) => insight.title));
-    const combined = [...frameworkInsights];
-
-    for (const insight of legacyInsights) {
-      if (combined.length >= 4 || seen.has(insight.title)) continue;
-      seen.add(insight.title);
-      combined.push(insight);
-    }
-
-    return combined.slice(0, 4);
-  }, [
-    adherenceEvents,
-    targetAdherence,
-    recentCheckIns,
-    recentNutritionEvents,
-    finalGoal?.createdAt,
-    totalRequiredDosesPerDay,
-  ]);
-
-  const supportingGoals = useMemo(
+  const medicationInsights = useMemo(
     () =>
-      (Array.isArray(finalGoal?.connectedGoals) ? finalGoal.connectedGoals : [])
-        .filter(
-          (connection: any) =>
-            String(connection?.relationshipType ?? "").toUpperCase() === "SUPPORTS" &&
-            String(connection?.direction ?? "") === "supportsThisGoal",
-        )
-        .slice(0, 4),
-    [finalGoal?.connectedGoals],
+      buildMedicationIntelligence({
+        adherenceEvents,
+        goalStartAt: String(finalGoal?.createdAt ?? new Date().toISOString()),
+        scheduledDosesPerDay: totalRequiredDosesPerDay,
+        checkIns: recentCheckIns,
+        nutritionEvents: recentNutritionEvents,
+      }),
+    [
+      adherenceEvents,
+      finalGoal?.createdAt,
+      totalRequiredDosesPerDay,
+      recentCheckIns,
+      recentNutritionEvents,
+    ],
   );
-
-  const supportingData = useMemo(() => {
-    const medicationDays = new Set(
-      adherenceEvents.map((event) => journalDayKey(event.occurredAt)).filter(Boolean),
-    );
-    const nutritionDays = new Set(
-      recentNutritionEvents
-        .map((event) => journalDayKey(event.occurredAt))
-        .filter((day) => day && medicationDays.has(day)),
-    );
-    const matchedCheckIns = recentCheckIns.filter((item) => medicationDays.has(item.day));
-    const latestCheckIn = [...matchedCheckIns].sort((a, b) => b.day.localeCompare(a.day))[0] ?? null;
-
-    return {
-      matchedCheckInDays: matchedCheckIns.length,
-      medicationDays: medicationDays.size,
-      sleepDays: matchedCheckIns.filter((item) => item.sleepHours != null && Number.isFinite(Number(item.sleepHours))).length,
-      hydrationDays: matchedCheckIns.filter((item) => item.waterIntakeMl != null && Number.isFinite(Number(item.waterIntakeMl))).length,
-      activityDays: matchedCheckIns.filter((item) => item.exerciseMinutes != null && Number.isFinite(Number(item.exerciseMinutes))).length,
-      nutritionDays: nutritionDays.size,
-      latestCheckIn,
-    };
-  }, [adherenceEvents, recentCheckIns, recentNutritionEvents]);
 
   if (!finalGoal) {
     return null;
@@ -868,75 +816,6 @@ export default function TodayMedicationActions({ medications, goal: suppliedGoal
             <h3 className="mt-1 text-base font-black tracking-[-.025em] text-white">Medication adherence in context</h3>
           </div>
         </div>
-
-        {(supportingGoals.length > 0 || recentCheckIns.length > 0 || recentNutritionEvents.length > 0) && (
-          <div className="mt-3 rounded-[17px] bg-[#123e63] px-3.5 py-3 ring-1 ring-white/10">
-            <p className="text-[9px] font-black uppercase tracking-[.14em] text-[#24c1c4]">Supporting context</p>
-
-            {supportingGoals.length > 0 && (
-              <div className="mt-2">
-                <p className="text-[10px] font-black text-white">Connected supporting goals</p>
-                <div className="mt-2 grid gap-2 sm:grid-cols-2">
-                  {supportingGoals.map((connection: any) => (
-                    <Link
-                      key={String(connection?.id ?? connection?.goal?.id)}
-                      href={"/health-goals#goal-" + encodeURIComponent(String(connection?.goal?.id ?? ""))}
-                      className="rounded-[13px] bg-white/5 px-3 py-2.5 ring-1 ring-white/10 transition hover:bg-white/10"
-                    >
-                      <div className="flex items-center justify-between gap-2">
-                        <span className="min-w-0 truncate text-[10px] font-black text-white">
-                          {String(connection?.goal?.title ?? "Supporting goal")}
-                        </span>
-                        <span className="shrink-0 text-[8px] font-black uppercase tracking-[.1em] text-[#9feff0]">
-                          {String(connection?.goal?.category ?? "").replaceAll("_", " ")}
-                        </span>
-                      </div>
-                      <p className="mt-1 text-[9px] leading-4 text-white/55">
-                        {String(connection?.rationale ?? "Tracked alongside your medication adherence.")}
-                      </p>
-                    </Link>
-                  ))}
-                </div>
-              </div>
-            )}
-
-            {(supportingData.matchedCheckInDays > 0 || supportingData.nutritionDays > 0) && (
-              <div className={supportingGoals.length > 0 ? "mt-3 border-t border-white/10 pt-3" : ""}>
-                <p className="text-[10px] font-black text-white">Supporting health data</p>
-                <div className="mt-2 grid grid-cols-2 gap-2 sm:grid-cols-4">
-                  <div className="rounded-[12px] bg-white/5 px-2.5 py-2 ring-1 ring-white/10">
-                    <p className="text-[8px] font-black uppercase tracking-[.08em] text-white/45">Sleep</p>
-                    <p className="mt-0.5 text-[11px] font-black text-white">{supportingData.sleepDays} days</p>
-                  </div>
-                  <div className="rounded-[12px] bg-white/5 px-2.5 py-2 ring-1 ring-white/10">
-                    <p className="text-[8px] font-black uppercase tracking-[.08em] text-white/45">Hydration</p>
-                    <p className="mt-0.5 text-[11px] font-black text-white">{supportingData.hydrationDays} days</p>
-                  </div>
-                  <div className="rounded-[12px] bg-white/5 px-2.5 py-2 ring-1 ring-white/10">
-                    <p className="text-[8px] font-black uppercase tracking-[.08em] text-white/45">Activity</p>
-                    <p className="mt-0.5 text-[11px] font-black text-white">{supportingData.activityDays} days</p>
-                  </div>
-                  <div className="rounded-[12px] bg-white/5 px-2.5 py-2 ring-1 ring-white/10">
-                    <p className="text-[8px] font-black uppercase tracking-[.08em] text-white/45">Nutrition</p>
-                    <p className="mt-0.5 text-[11px] font-black text-white">{supportingData.nutritionDays} days</p>
-                  </div>
-                </div>
-                <p className="mt-2 text-[9px] leading-4 text-white/55">
-                  {supportingData.matchedCheckInDays > 0
-                    ? supportingData.matchedCheckInDays +
-                      " of " +
-                      supportingData.medicationDays +
-                      " medication-plan days also have a Daily Health Check-in."
-                    : supportingData.nutritionDays > 0
-                      ? "Nutrition is also being recorded alongside your medication timeline on " +
-                        supportingData.nutritionDays +
-                        " recent days."
-                      : "Sympto will use matching check-ins as they are recorded."}
-                </p>
-              </div>
-            )}
-          </div>
-        )}
 
         <div className="mt-3 space-y-2">
           {medicationInsights.map((insight, index) => (
