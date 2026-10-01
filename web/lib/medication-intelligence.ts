@@ -335,12 +335,6 @@ export function buildMedicationIntelligence(input: {
   const days = timeline.filter((day) => day.day !== today);
   const checkIns = new Map(input.checkIns.map((item) => [item.day, item]));
 
-  const nutritionDays = new Set(
-    input.nutritionEvents
-      .map((event) => dayKey(event.occurredAt))
-      .filter(Boolean),
-  );
-
   const insights: MedicationIntelligenceInsight[] = [];
 
   // 1. Trend: earlier completed plan days versus the most recent completed days.
