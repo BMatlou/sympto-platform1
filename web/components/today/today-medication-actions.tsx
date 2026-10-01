@@ -97,6 +97,7 @@ function cumulativeTakenDoses(medication: any): number {
 
   return 0;
 }
+
 type MedicationInsight = {
   title: string;
   text: string;
