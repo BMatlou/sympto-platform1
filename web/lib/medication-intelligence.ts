@@ -202,28 +202,33 @@ function addTrendInsight(
 
   if (Math.abs(delta) < 5) {
     insights.push({
-      title: "Adherence is holding steady",
+      title: "Your medication routine is holding steady",
       text:
-        "Your logged medication adherence was about " +
-        formatWhole(baselineStats.percentage) +
-        "% in the earlier period and " +
+        "You are at about " +
         formatWhole(recentStats.percentage) +
-        "% in the latest period.",
+        "% recently, compared with " +
+        formatWhole(baselineStats.percentage) +
+        "% earlier in your plan.",
     });
     return;
   }
 
   insights.push({
-    title: delta > 0 ? "Medication adherence is improving" : "Medication adherence is drifting down",
+    title: delta > 0 ? "Medication adherence is improving" : "Medication adherence needs more consistency",
     text:
-      "Your logged medication adherence moved from about " +
-      formatWhole(baselineStats.percentage) +
-      "% to " +
-      formatWhole(recentStats.percentage) +
-      "% in the latest period — " +
-      (delta > 0 ? "up " : "down ") +
-      formatWhole(Math.abs(delta)) +
-      " percentage points.",
+      delta > 0
+        ? "You moved from about " +
+          formatWhole(baselineStats.percentage) +
+          "% to " +
+          formatWhole(recentStats.percentage) +
+          "% recently — up " +
+          formatWhole(Math.abs(delta)) +
+          " percentage points."
+        : "You moved from about " +
+          formatWhole(baselineStats.percentage) +
+          "% to " +
+          formatWhole(recentStats.percentage) +
+          "% recently. Keeping the same routine more consistently may help.",
   });
 }
 
@@ -232,30 +237,15 @@ function addTimingPattern(
   timeline: MedicationDay[],
   actionRecords: ActionRecord[],
 ) {
-  const skippedActions = actionRecords.filter((action) => action.skipped);
+  const recordedLaterInDay = actionRecords.filter((action) => action.hour >= 21);
 
-  if (skippedActions.length >= 2) {
-    const bandCounts = new Map<string, number>();
-    for (const action of skippedActions) {
-      const band = timeBand(action.hour);
-      bandCounts.set(band, (bandCounts.get(band) ?? 0) + 1);
-    }
-
-    const topBand = [...bandCounts.entries()].sort((a, b) => b[1] - a[1])[0];
-    if (topBand && topBand[1] >= 2) {
-      insights.push({
-        title: "A dose-timing pattern is emerging",
-        text:
-          "Your logged skipped doses cluster most around the " +
-          topBand[0] +
-          ", with " +
-          topBand[1] +
-          " skipped dose action" +
-          (topBand[1] === 1 ? "" : "s") +
-          " recorded there. This may help you focus reminders around that part of the day.",
-      });
-      return;
-    }
+  if (recordedLaterInDay.length >= 2) {
+    insights.push({
+      title: "Your evening routine is the main pattern",
+      text:
+        "Most of the dose entries needing attention are happening at night. Try linking your evening medicine to supper or brushing your teeth.",
+    });
+    return;
   }
 
   const weekdayCounts = new Map<string, number>();
@@ -270,11 +260,10 @@ function addTimingPattern(
 
   if (topWeekday && totalUnrecorded >= 3 && topWeekday[1] / totalUnrecorded >= 0.4) {
     insights.push({
-      title: "Some scheduled doses are going unrecorded",
+      title: "One day of the week needs more attention",
       text:
-        "Your records show the largest share of unrecorded scheduled doses on " +
         topWeekday[0] +
-        ". This is a timing pattern in your records, not a statement about why the doses were missed.",
+        " is where your medication routine has been hardest to keep complete. A simple phone reminder on that day may help.",
     });
   }
 }
@@ -379,11 +368,11 @@ export function buildMedicationIntelligence(input: {
       .join("; ");
 
     insights.push({
-      title: "The big picture",
+      title: "Connecting the dots",
       text:
-        "You are also tracking " +
-        summary.replace(/; /g, ", ") +
-        ".",
+        "You are tracking " +
+        summary.replace(/ is recorded on /g, " on ").replace(/; /g, ", ") +
+        ". Logging these alongside your medicine helps Sympto compare your daily routine with your medication pattern.",
     });
   }
 
@@ -474,7 +463,7 @@ export function buildMedicationIntelligence(input: {
   if (insights.length === 0 || (insights.length < 2 && !hasContext)) {
     const totalActions = timeline.reduce((sum, day) => sum + day.recordedActions, 0);
     insights.push({
-      title: "Your medication timeline is building",
+      title: "Your medication picture is building",
       text:
         "Sympto has " +
         formatWhole(totalActions) +
