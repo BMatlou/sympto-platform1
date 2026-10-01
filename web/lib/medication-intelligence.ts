@@ -393,7 +393,9 @@ export function buildMedicationIntelligence(input: {
         title: "Your " + top[0] + " routine stands out",
         text:
           formatWhole(top[1]) +
-          " of your uncompleted dose entries were recorded at night. Linking this dose to " +
+          " of your dose entries were recorded in the " +
+          top[0] +
+          ". Linking this dose to " +
           routine +
           " could make it easier to remember.",
         tone: "action",
