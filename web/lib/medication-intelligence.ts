@@ -468,6 +468,8 @@ export function buildMedicationIntelligence(input: {
     label: string,
     goal: MedicationSupportingGoal | undefined,
     contextDays: MedicationDay[],
+    lowerText: string,
+    higherText: string,
     lower: (day: MedicationDay) => boolean,
     higher: (day: MedicationDay) => boolean,
   ) {
@@ -483,16 +485,10 @@ export function buildMedicationIntelligence(input: {
     const difference = Math.abs(lowerStats.percentage - higherStats.percentage);
     if (difference < 10) return;
 
-    const lowerNotLogged =
-      lowerDays.reduce(
-        (sum, day) => sum + day.unrecorded + day.skippedActions,
-        0,
-      );
-    const higherNotLogged =
-      higherDays.reduce(
-        (sum, day) => sum + day.unrecorded + day.skippedActions,
-        0,
-      );
+    const lowerSkipped = lowerDays.reduce((sum, day) => sum + day.skippedActions, 0);
+    const lowerUnrecorded = lowerDays.reduce((sum, day) => sum + day.unrecorded, 0);
+    const higherSkipped = higherDays.reduce((sum, day) => sum + day.skippedActions, 0);
+    const higherUnrecorded = higherDays.reduce((sum, day) => sum + day.unrecorded, 0);
 
     const goalLabel = goal?.title ? String(goal.title) : label;
 
@@ -500,26 +496,26 @@ export function buildMedicationIntelligence(input: {
       title: goalLabel + " & your medicine",
       text:
         "On " +
-        formatWhole(lowerDays.length) +
-        " lower " +
-        label.toLowerCase() +
-        " days, you logged " +
+        lowerText +
+        ", you logged " +
         formatWhole(lowerStats.taken) +
         " of " +
         formatWhole(lowerStats.scheduled) +
-        " doses. On " +
-        formatWhole(higherDays.length) +
-        " higher " +
-        label.toLowerCase() +
-        " days, you logged " +
+        " doses. " +
+        formatWhole(lowerSkipped) +
+        " were skipped and " +
+        formatWhole(lowerUnrecorded) +
+        " were never logged. On " +
+        higherText +
+        ", you logged " +
         formatWhole(higherStats.taken) +
         " of " +
         formatWhole(higherStats.scheduled) +
-        ". That is " +
-        formatWhole(lowerNotLogged) +
-        " versus " +
-        formatWhole(higherNotLogged) +
-        " doses not taken or not recorded.",
+        ". " +
+        formatWhole(higherSkipped) +
+        " were skipped and " +
+        formatWhole(higherUnrecorded) +
+        " were never logged.",
       tone: "context",
       difference,
     });
@@ -534,9 +530,11 @@ export function buildMedicationIntelligence(input: {
   const sleepTarget = supportingTarget(sleepGoal, "SLEEP") ?? 6;
 
   addContextCandidate(
-    "sleep target",
+    "sleep",
     sleepGoal,
     sleepDays,
+    "days below your sleep goal",
+    "days at or above your sleep goal",
     (day) => Number(checkIns.get(day.day)?.sleepHours) < sleepTarget,
     (day) => Number(checkIns.get(day.day)?.sleepHours) >= sleepTarget,
   );
@@ -551,9 +549,11 @@ export function buildMedicationIntelligence(input: {
 
   if (hydrationTarget != null) {
     addContextCandidate(
-      "water target",
+      "water",
       hydrationGoal,
       hydrationDays,
+      "days below your water goal",
+      "days at or above your water goal",
       (day) => Number(checkIns.get(day.day)?.waterIntakeMl) < hydrationTarget,
       (day) => Number(checkIns.get(day.day)?.waterIntakeMl) >= hydrationTarget,
     );
@@ -571,6 +571,8 @@ export function buildMedicationIntelligence(input: {
       "water intake",
       undefined,
       hydrationDays,
+      "lower-water days",
+      "higher-water days",
       (day) => Number(checkIns.get(day.day)?.waterIntakeMl) < median,
       (day) => Number(checkIns.get(day.day)?.waterIntakeMl) >= median,
     );
@@ -585,9 +587,11 @@ export function buildMedicationIntelligence(input: {
   const exerciseTarget = supportingTarget(exerciseGoal, "EXERCISE") ?? 30;
 
   addContextCandidate(
-    "activity target",
+    "activity",
     exerciseGoal,
     activityDays,
+    "days below your activity goal",
+    "days at or above your activity goal",
     (day) => Number(checkIns.get(day.day)?.exerciseMinutes) < exerciseTarget,
     (day) => Number(checkIns.get(day.day)?.exerciseMinutes) >= exerciseTarget,
   );
@@ -610,9 +614,11 @@ export function buildMedicationIntelligence(input: {
 
   if (nutritionTarget != null && nutritionDays.length >= 4) {
     addContextCandidate(
-      "food target",
+      "food",
       nutritionGoal,
       nutritionDays,
+      "days below your food target",
+      "days at or above your food target",
       (day) => (caloriesByDay.get(day.day) ?? 0) < nutritionTarget,
       (day) => (caloriesByDay.get(day.day) ?? 0) >= nutritionTarget,
     );
@@ -621,13 +627,34 @@ export function buildMedicationIntelligence(input: {
     const nutritionNotLogged = days.filter((day) => !nutritionDays.some((item) => item.day === day.day));
 
     if (nutritionLogged.length >= 2 && nutritionNotLogged.length >= 2) {
-      addContextCandidate(
-        "food-logged",
-        undefined,
-        days,
-        (day) => nutritionDays.some((item) => item.day === day.day),
-        (day) => !nutritionDays.some((item) => item.day === day.day),
-      );
+      const loggedStats = adherenceFor(nutritionLogged);
+      const unloggedStats = adherenceFor(nutritionNotLogged);
+      const difference = Math.abs(loggedStats.percentage - unloggedStats.percentage);
+
+      if (difference >= 10) {
+        const loggedSkipped = nutritionLogged.reduce((sum, day) => sum + day.skippedActions, 0);
+        const loggedUnrecorded = nutritionLogged.reduce((sum, day) => sum + day.unrecorded, 0);
+
+        candidates.push({
+          title: "Food logging & your medicine",
+          text:
+            "On days you logged food, you logged " +
+            formatWhole(loggedStats.taken) +
+            " of " +
+            formatWhole(loggedStats.scheduled) +
+            " doses. " +
+            formatWhole(loggedSkipped) +
+            " were skipped and " +
+            formatWhole(loggedUnrecorded) +
+            " were never logged. On days without a food entry, you logged " +
+            formatWhole(unloggedStats.taken) +
+            " of " +
+            formatWhole(unloggedStats.scheduled) +
+            " doses.",
+          tone: "context",
+          difference,
+        });
+      }
     }
   }
 
