@@ -1,6 +1,7 @@
 "use client";
 
 import { Check, CircleSlash2, Pill, Sparkles } from "lucide-react";
+import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 import { api } from "@/lib/api";
@@ -214,6 +215,56 @@ function buildMedicationInsights(
           "% goal.",
       });
     }
+
+    const todayRecord = dailyRecords.find((record) => record.day === today);
+    if (todayRecord && todayRecord.actions > 0) {
+      const todayDifference = todayRecord.adherence - average;
+      if (Math.abs(todayDifference) >= 10) {
+        insights.push({
+          title: "Today compared with your recent pattern",
+          text:
+            "Today’s logged medication adherence is about " +
+            formatWhole(todayRecord.adherence) +
+            "% across " +
+            todayRecord.actions +
+            " recorded dose action" +
+            (todayRecord.actions === 1 ? "" : "s") +
+            ", compared with about " +
+            formatWhole(average) +
+            "% across your " +
+            priorRecords.length +
+            " recent recorded days.",
+        });
+      }
+    }
+  }
+
+  if (priorRecords.length >= 4) {
+    const chronological = [...priorRecords].sort((a, b) => a.day.localeCompare(b.day));
+    const split = Math.floor(chronological.length / 2);
+    const earlier = chronological.slice(0, split);
+    const recent = chronological.slice(split);
+    const earlierAverage =
+      earlier.reduce((sum, record) => sum + record.adherence, 0) /
+      Math.max(1, earlier.length);
+    const recentAverage =
+      recent.reduce((sum, record) => sum + record.adherence, 0) /
+      Math.max(1, recent.length);
+    const trendDifference = recentAverage - earlierAverage;
+
+    if (Math.abs(trendDifference) >= 8) {
+      insights.push({
+        title: trendDifference > 0 ? "Medication adherence is improving" : "Medication adherence is drifting down",
+        text:
+          "Your more recent recorded days average about " +
+          formatWhole(recentAverage) +
+          "% adherence versus " +
+          formatWhole(earlierAverage) +
+          "% in the earlier part of this period, a difference of about " +
+          formatWhole(Math.abs(trendDifference)) +
+          " percentage points.",
+      });
+    }
   }
 
   const checkIns = new Map(recentCheckIns.map((item) => [item.day, item]));
@@ -392,19 +443,44 @@ function buildMedicationInsights(
   }
 
   if (insights.length === 0) {
+    const recordedDays = dailyRecords.length;
     const matchedContextDays = new Set(
       matched.map((record) => record.day),
     ).size;
+    const actionCount = dailyRecords.reduce(
+      (sum, record) => sum + record.actions,
+      0,
+    );
 
-    if (priorRecords.length < 3 || matchedContextDays < 6) {
+    if (recordedDays < 3) {
       insights.push({
-        title: "Not enough data yet",
-        text: "Sympto needs more recorded medication doses and supporting health data before it can identify a meaningful personal adherence pattern or comparison.",
+        title: "Early medication pattern",
+        text:
+          "Sympto has " +
+          formatWhole(actionCount) +
+          " recorded dose action" +
+          (actionCount === 1 ? "" : "s") +
+          " across " +
+          recordedDays +
+          " day" +
+          (recordedDays === 1 ? "" : "s") +
+          ". More dated medication records will allow stronger comparisons over time.",
       });
     } else {
       insights.push({
         title: "No clear pattern detected yet",
-        text: "Sympto has enough recorded data to compare your medication adherence, but the current differences are not large or consistent enough to surface as a personal pattern.",
+        text:
+          "Sympto has " +
+          formatWhole(actionCount) +
+          " recorded dose action" +
+          (actionCount === 1 ? "" : "s") +
+          " across " +
+          recordedDays +
+          " days, including " +
+          matchedContextDays +
+          " day" +
+          (matchedContextDays === 1 ? "" : "s") +
+          " matched with supporting check-in data. The current differences are not large or consistent enough to surface as a personal pattern yet.",
       });
     }
   }
@@ -601,6 +677,34 @@ export default function TodayMedicationActions({ medications, goal: suppliedGoal
     [adherenceEvents, targetAdherence, recentCheckIns],
   );
 
+  const supportingGoals = useMemo(
+    () =>
+      (Array.isArray(finalGoal?.connectedGoals) ? finalGoal.connectedGoals : [])
+        .filter(
+          (connection: any) =>
+            String(connection?.relationshipType ?? "").toUpperCase() === "SUPPORTS" &&
+            String(connection?.direction ?? "") === "supportsThisGoal",
+        )
+        .slice(0, 4),
+    [finalGoal?.connectedGoals],
+  );
+
+  const supportingData = useMemo(() => {
+    const medicationDays = new Set(
+      adherenceEvents.map((event) => journalDayKey(event.occurredAt)).filter(Boolean),
+    );
+    const latestCheckIn = [...recentCheckIns].sort((a, b) => b.day.localeCompare(a.day))[0] ?? null;
+
+    return {
+      matchedCheckInDays: recentCheckIns.filter((item) => medicationDays.has(item.day)).length,
+      medicationDays: medicationDays.size,
+      sleepDays: recentCheckIns.filter((item) => item.sleepHours != null && Number.isFinite(Number(item.sleepHours))).length,
+      hydrationDays: recentCheckIns.filter((item) => item.waterIntakeMl != null && Number.isFinite(Number(item.waterIntakeMl))).length,
+      activityDays: recentCheckIns.filter((item) => item.exerciseMinutes != null && Number.isFinite(Number(item.exerciseMinutes))).length,
+      latestCheckIn,
+    };
+  }, [adherenceEvents, recentCheckIns]);
+
   if (!finalGoal) {
     return null;
   }
@@ -682,6 +786,63 @@ export default function TodayMedicationActions({ medications, goal: suppliedGoal
             <h3 className="mt-1 text-base font-black tracking-[-.025em] text-white">Medication adherence in context</h3>
           </div>
         </div>
+
+        {(supportingGoals.length > 0 || supportingData.matchedCheckInDays > 0) && (
+          <div className="mt-3 rounded-[17px] bg-[#123e63] px-3.5 py-3 ring-1 ring-white/10">
+            <p className="text-[9px] font-black uppercase tracking-[.14em] text-[#24c1c4]">Supporting context</p>
+
+            {supportingGoals.length > 0 && (
+              <div className="mt-2">
+                <p className="text-[10px] font-black text-white">Connected supporting goals</p>
+                <div className="mt-2 grid gap-2 sm:grid-cols-2">
+                  {supportingGoals.map((connection: any) => (
+                    <Link
+                      key={String(connection?.id ?? connection?.goal?.id)}
+                      href={"/health-goals#goal-" + encodeURIComponent(String(connection?.goal?.id ?? ""))}
+                      className="rounded-[13px] bg-white/5 px-3 py-2.5 ring-1 ring-white/10 transition hover:bg-white/10"
+                    >
+                      <div className="flex items-center justify-between gap-2">
+                        <span className="min-w-0 truncate text-[10px] font-black text-white">
+                          {String(connection?.goal?.title ?? "Supporting goal")}
+                        </span>
+                        <span className="shrink-0 text-[8px] font-black uppercase tracking-[.1em] text-[#9feff0]">
+                          {String(connection?.goal?.category ?? "").replaceAll("_", " ")}
+                        </span>
+                      </div>
+                      <p className="mt-1 text-[9px] leading-4 text-white/55">
+                        {String(connection?.rationale ?? "Tracked alongside your medication adherence.")}
+                      </p>
+                    </Link>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {supportingData.matchedCheckInDays > 0 && (
+              <div className={supportingGoals.length > 0 ? "mt-3 border-t border-white/10 pt-3" : ""}>
+                <p className="text-[10px] font-black text-white">Supporting health data</p>
+                <div className="mt-2 grid grid-cols-3 gap-2">
+                  <div className="rounded-[12px] bg-white/5 px-2.5 py-2 ring-1 ring-white/10">
+                    <p className="text-[8px] font-black uppercase tracking-[.08em] text-white/45">Sleep</p>
+                    <p className="mt-0.5 text-[11px] font-black text-white">{supportingData.sleepDays} days</p>
+                  </div>
+                  <div className="rounded-[12px] bg-white/5 px-2.5 py-2 ring-1 ring-white/10">
+                    <p className="text-[8px] font-black uppercase tracking-[.08em] text-white/45">Hydration</p>
+                    <p className="mt-0.5 text-[11px] font-black text-white">{supportingData.hydrationDays} days</p>
+                  </div>
+                  <div className="rounded-[12px] bg-white/5 px-2.5 py-2 ring-1 ring-white/10">
+                    <p className="text-[8px] font-black uppercase tracking-[.08em] text-white/45">Activity</p>
+                    <p className="mt-0.5 text-[11px] font-black text-white">{supportingData.activityDays} days</p>
+                  </div>
+                </div>
+                <p className="mt-2 text-[9px] leading-4 text-white/55">
+                  {supportingData.matchedCheckInDays} of {supportingData.medicationDays} medication-recorded days also have a Daily Health Check-in.
+                </p>
+              </div>
+            )}
+          </div>
+        )}
+
         <div className="mt-3 space-y-2">
           {medicationInsights.map((insight, index) => (
             <div key={insight.title + "-" + index} className="rounded-[17px] bg-[#123e63] px-3.5 py-3 ring-1 ring-white/10">
