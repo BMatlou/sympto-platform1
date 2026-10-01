@@ -1,5 +1,3 @@
-"use client";
-
 export type MedicationIntelligenceEvent = {
   loggedValue: number;
   occurredAt: string;
@@ -65,12 +63,6 @@ function formatWhole(value: number) {
   return new Intl.NumberFormat("en-ZA", {
     maximumFractionDigits: 0,
   }).format(Math.round(value));
-}
-
-function average(values: number[]) {
-  return values.length
-    ? values.reduce((sum, value) => sum + value, 0) / values.length
-    : 0;
 }
 
 function adherenceFor(days: MedicationDay[]) {
@@ -459,8 +451,6 @@ export function buildMedicationIntelligence(input: {
     insights,
   );
 
-  const nutritionLogged = nutritionLoggedDays;
-  const nutritionUnlogged = timeline.filter((day) => !nutritionDays.has(day.day));
   compareContext(
     timeline,
     (day) => nutritionDays.has(day.day),
