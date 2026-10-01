@@ -359,24 +359,31 @@ export function buildMedicationIntelligence(input: {
   ].filter(([, count]) => Number(count) > 0);
 
   if (totalPlanDays > 0 && contextParts.length > 0) {
+    const labelMap: Record<string, string> = {
+      sleep: "sleep",
+      hydration: "water",
+      activity: "activity",
+      nutrition: "food",
+    };
+
     const summary = contextParts
       .map(
         ([label, count]) =>
-          String(label) +
+          labelMap[String(label)] +
           " on " +
           formatWhole(Number(count)) +
           " of " +
           formatWhole(totalPlanDays) +
-          " medication-plan days",
+          " days",
       )
-      .join("; ");
+      .join(", ");
 
     insights.push({
       title: "Connecting the dots",
       text:
-        "You are tracking " +
-        summary.replace(/ is recorded on /g, " on ").replace(/; /g, ", ") +
-        ". Logging these alongside your medicine helps Sympto compare your daily routine with your medication pattern.",
+        "You’re also tracking " +
+        summary +
+        ". This helps Sympto see your daily routine alongside your medicine.",
     });
   }
 
