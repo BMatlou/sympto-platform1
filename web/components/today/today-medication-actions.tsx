@@ -360,6 +360,12 @@ export default function TodayMedicationActions({ medications, goal: suppliedGoal
     [totalRequiredDosesPerDay],
   );
 
+  const rawTargetAdherence = Number(finalGoal?.targetValue);
+  const targetAdherence =
+    Number.isFinite(rawTargetAdherence) && rawTargetAdherence > 0
+      ? rawTargetAdherence
+      : 90;
+
   const supportingGoals = useMemo(
     () =>
       (Array.isArray(finalGoal?.connectedGoals) ? finalGoal.connectedGoals : [])
