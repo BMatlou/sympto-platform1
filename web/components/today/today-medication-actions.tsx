@@ -20,6 +20,14 @@ function medicationName(medication: any) {
   return medication?.medication?.name || medication?.medication?.genericName || medication?.name || "Your medicine";
 }
 
+const medicationInsightTone = {
+  positive: "border-[#bfe9e6] bg-[#e9faf8] ring-[#d7f2f0]",
+  action: "border-[#c9e1f0] bg-[#eef8fc] ring-[#dceef5]",
+  context: "border-[#d9e4ee] bg-white ring-[#e8eef3]",
+  watch: "border-[#ead9bc] bg-[#fff8eb] ring-[#f1e5cf]",
+  neutral: "border-[#d9e4ee] bg-[#f8fbfb] ring-[#e8eef3]",
+} as const;
+
 function medicationSchedule(medication: any) {
   const dose = medication?.dosage || medication?.dose || "Dose not recorded";
   const frequency = medication?.frequency || medication?.schedule || "Schedule not recorded";
@@ -98,397 +106,6 @@ function cumulativeTakenDoses(medication: any): number {
 
   return 0;
 }
-
-type MedicationInsight = {
-  title: string;
-  text: string;
-};
-
-type MedicationCheckIn = {
-  day: string;
-  sleepHours: number | null;
-  waterIntakeMl: number | null;
-  exerciseMinutes: number | null;
-};
-
-function journalDayKey(value: unknown) {
-  const date = new Date(String(value ?? ""));
-  if (Number.isNaN(date.getTime())) return "";
-  return new Intl.DateTimeFormat("en-CA", {
-    timeZone: "Africa/Johannesburg",
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-  }).format(date);
-}
-
-function formatWhole(value: number) {
-  return new Intl.NumberFormat("en-ZA", {
-    maximumFractionDigits: 0,
-  }).format(Math.round(value));
-}
-
-function buildMedicationInsights(
-  adherenceEvents: Array<{
-    loggedValue: number;
-    occurredAt: string;
-  }>,
-  targetAdherence: number,
-  recentCheckIns: MedicationCheckIn[],
-): MedicationInsight[] {
-  const insights: MedicationInsight[] = [];
-
-  if (!adherenceEvents.length) {
-    return [{
-      title: "Not enough data yet",
-      text: "Sympto needs more recorded medication doses before it can identify a meaningful personal adherence pattern or comparison.",
-    }];
-  }
-
-  const sortedEvents = [...adherenceEvents].sort(
-    (a, b) =>
-      new Date(String(a.occurredAt)).getTime() -
-      new Date(String(b.occurredAt)).getTime(),
-  );
-
-  let cumulativeTaken = 0;
-  const byDay = new Map<string, { actions: number; taken: number }>();
-
-  sortedEvents.forEach((event, index) => {
-    const totalActions = index + 1;
-    const adherence = Number(event.loggedValue);
-    const inferredTaken = Number.isFinite(adherence)
-      ? Math.max(
-          0,
-          Math.min(totalActions, Math.round((totalActions * adherence) / 100)),
-        )
-      : cumulativeTaken;
-
-    const previousTaken = cumulativeTaken;
-    cumulativeTaken = Math.max(cumulativeTaken, inferredTaken);
-
-    const day = journalDayKey(event.occurredAt);
-    if (!day) return;
-
-    const current = byDay.get(day) ?? { actions: 0, taken: 0 };
-    current.actions += 1;
-    current.taken += Math.max(0, cumulativeTaken - previousTaken);
-    byDay.set(day, current);
-  });
-
-  const today = journalDayKey(new Date());
-  const dailyRecords = Array.from(byDay.entries())
-    .map(([day, stats]) => ({
-      day,
-      actions: stats.actions,
-      taken: stats.taken,
-      adherence:
-        stats.actions > 0
-          ? Math.max(0, Math.min(100, (stats.taken / stats.actions) * 100))
-          : 0,
-    }))
-    .sort((a, b) => b.day.localeCompare(a.day));
-
-  const priorRecords = dailyRecords
-    .filter((record) => record.day !== today)
-    .slice(0, 14);
-  if (priorRecords.length >= 3) {
-    const average =
-      priorRecords.reduce((sum, record) => sum + record.adherence, 0) /
-      priorRecords.length;
-    const difference = average - targetAdherence;
-
-    if (Math.abs(difference) >= 5) {
-      insights.push({
-        title: "Recent adherence compared with your goal",
-        text:
-          "Across " +
-          priorRecords.length +
-          " recent recorded days, your logged medication adherence averaged about " +
-          formatWhole(average) +
-          "%, which is " +
-          formatWhole(Math.abs(difference)) +
-          " percentage points " +
-          (difference >= 0 ? "above" : "below") +
-          " your " +
-          formatWhole(targetAdherence) +
-          "% goal.",
-      });
-    }
-
-    const todayRecord = dailyRecords.find((record) => record.day === today);
-    if (todayRecord && todayRecord.actions > 0) {
-      const todayDifference = todayRecord.adherence - average;
-      if (Math.abs(todayDifference) >= 10) {
-        insights.push({
-          title: "Today compared with your recent pattern",
-          text:
-            "Today’s logged medication adherence is about " +
-            formatWhole(todayRecord.adherence) +
-            "% across " +
-            todayRecord.actions +
-            " recorded dose action" +
-            (todayRecord.actions === 1 ? "" : "s") +
-            ", compared with about " +
-            formatWhole(average) +
-            "% across your " +
-            priorRecords.length +
-            " recent recorded days.",
-        });
-      }
-    }
-  }
-
-  if (priorRecords.length >= 4) {
-    const chronological = [...priorRecords].sort((a, b) => a.day.localeCompare(b.day));
-    const split = Math.floor(chronological.length / 2);
-    const earlier = chronological.slice(0, split);
-    const recent = chronological.slice(split);
-    const earlierAverage =
-      earlier.reduce((sum, record) => sum + record.adherence, 0) /
-      Math.max(1, earlier.length);
-    const recentAverage =
-      recent.reduce((sum, record) => sum + record.adherence, 0) /
-      Math.max(1, recent.length);
-    const trendDifference = recentAverage - earlierAverage;
-
-    if (Math.abs(trendDifference) >= 8) {
-      insights.push({
-        title: trendDifference > 0 ? "Medication adherence is improving" : "Medication adherence is drifting down",
-        text:
-          "Your more recent recorded days average about " +
-          formatWhole(recentAverage) +
-          "% adherence versus " +
-          formatWhole(earlierAverage) +
-          "% in the earlier part of this period, a difference of about " +
-          formatWhole(Math.abs(trendDifference)) +
-          " percentage points.",
-      });
-    }
-  }
-
-  const checkIns = new Map(recentCheckIns.map((item) => [item.day, item]));
-  const matched = dailyRecords
-    .map((record) => ({
-      ...record,
-      checkIn: checkIns.get(record.day),
-    }))
-    .filter((record) => record.checkIn);
-
-  const sleepMatched = matched.filter(
-    (record) =>
-      record.checkIn?.sleepHours != null &&
-      Number.isFinite(Number(record.checkIn.sleepHours)),
-  );
-
-  if (sleepMatched.length >= 6) {
-    const shortSleep = sleepMatched.filter(
-      (record) => Number(record.checkIn?.sleepHours) < 6,
-    );
-    const usualSleep = sleepMatched.filter(
-      (record) => Number(record.checkIn?.sleepHours) >= 6,
-    );
-
-    if (shortSleep.length >= 3 && usualSleep.length >= 3) {
-      const shortAverage =
-        shortSleep.reduce((sum, record) => sum + record.adherence, 0) /
-        shortSleep.length;
-      const usualAverage =
-        usualSleep.reduce((sum, record) => sum + record.adherence, 0) /
-        usualSleep.length;
-      const difference = shortAverage - usualAverage;
-
-      if (Math.abs(difference) >= 10) {
-        insights.push({
-          title: "Sleep and medication adherence show a pattern",
-          text:
-            "On " +
-            shortSleep.length +
-            " days with less than 6 hours of recorded sleep, your logged medication adherence averaged about " +
-            formatWhole(shortAverage) +
-            "% versus " +
-            formatWhole(usualAverage) +
-            "% on " +
-            usualSleep.length +
-            " days with 6 or more hours. This is an association in your records, not evidence that sleep caused the difference.",
-        });
-      }
-    }
-  }
-
-  const activityMatched = matched.filter(
-    (record) =>
-      record.checkIn?.exerciseMinutes != null &&
-      Number.isFinite(Number(record.checkIn.exerciseMinutes)),
-  );
-
-  if (activityMatched.length >= 6) {
-    const lowerActivity = activityMatched.filter(
-      (record) => Number(record.checkIn?.exerciseMinutes) < 30,
-    );
-    const higherActivity = activityMatched.filter(
-      (record) => Number(record.checkIn?.exerciseMinutes) >= 30,
-    );
-
-    if (lowerActivity.length >= 3 && higherActivity.length >= 3) {
-      const lowerAverage =
-        lowerActivity.reduce((sum, record) => sum + record.adherence, 0) /
-        lowerActivity.length;
-      const higherAverage =
-        higherActivity.reduce((sum, record) => sum + record.adherence, 0) /
-        higherActivity.length;
-      const difference = lowerAverage - higherAverage;
-
-      if (Math.abs(difference) >= 10) {
-        insights.push({
-          title: "Activity and medication adherence show a pattern",
-          text:
-            "On " +
-            lowerActivity.length +
-            " days with less than 30 minutes of recorded activity, your logged medication adherence averaged about " +
-            formatWhole(lowerAverage) +
-            "% versus " +
-            formatWhole(higherAverage) +
-            "% on " +
-            higherActivity.length +
-            " days with 30 minutes or more. This is an association in your records, not evidence that activity caused the difference.",
-        });
-      }
-    }
-  }
-
-  const hydrationMatched = matched.filter(
-    (record) =>
-      record.checkIn?.waterIntakeMl != null &&
-      Number.isFinite(Number(record.checkIn.waterIntakeMl)),
-  );
-
-  if (hydrationMatched.length >= 6) {
-    const hydrationValues = hydrationMatched
-      .map((record) => Number(record.checkIn?.waterIntakeMl))
-      .sort((a, b) => a - b);
-    const middle = Math.floor(hydrationValues.length / 2);
-    const median =
-      hydrationValues.length % 2 === 0
-        ? (hydrationValues[middle - 1] + hydrationValues[middle]) / 2
-        : hydrationValues[middle];
-
-    const lowerHydration = hydrationMatched.filter(
-      (record) => Number(record.checkIn?.waterIntakeMl) < median,
-    );
-    const higherHydration = hydrationMatched.filter(
-      (record) => Number(record.checkIn?.waterIntakeMl) >= median,
-    );
-
-    if (lowerHydration.length >= 3 && higherHydration.length >= 3) {
-      const lowerAverage =
-        lowerHydration.reduce((sum, record) => sum + record.adherence, 0) /
-        lowerHydration.length;
-      const higherAverage =
-        higherHydration.reduce((sum, record) => sum + record.adherence, 0) /
-        higherHydration.length;
-      const difference = lowerAverage - higherAverage;
-
-      if (Math.abs(difference) >= 10) {
-        insights.push({
-          title: "Hydration and medication adherence show a pattern",
-          text:
-            "On " +
-            lowerHydration.length +
-            " days with lower recorded water intake, your logged medication adherence averaged about " +
-            formatWhole(lowerAverage) +
-            "% versus " +
-            formatWhole(higherAverage) +
-            "% on " +
-            higherHydration.length +
-            " days with higher recorded water intake. This is an association in your records, not evidence that hydration caused the difference.",
-        });
-      }
-    }
-  }
-
-  const weekdayRecords = priorRecords.filter((record) => {
-    const day = new Date(record.day + "T12:00:00").getDay();
-    return day >= 1 && day <= 5;
-  });
-  const weekendRecords = priorRecords.filter((record) => {
-    const day = new Date(record.day + "T12:00:00").getDay();
-    return day === 0 || day === 6;
-  });
-
-  if (weekdayRecords.length >= 4 && weekendRecords.length >= 2) {
-    const weekdayAverage =
-      weekdayRecords.reduce((sum, record) => sum + record.adherence, 0) /
-      weekdayRecords.length;
-    const weekendAverage =
-      weekendRecords.reduce((sum, record) => sum + record.adherence, 0) /
-      weekendRecords.length;
-    const difference = weekdayAverage - weekendAverage;
-
-    if (Math.abs(difference) >= 10) {
-      insights.push({
-        title: "Medication adherence differs across the week",
-        text:
-          "Your logged medication adherence averaged about " +
-          formatWhole(weekdayAverage) +
-          "% on " +
-          weekdayRecords.length +
-          " weekdays versus " +
-          formatWhole(weekendAverage) +
-          "% across " +
-          weekendRecords.length +
-          " weekend days. Sympto is identifying this as a timing pattern in your records.",
-      });
-    }
-  }
-
-  if (insights.length === 0) {
-    const recordedDays = dailyRecords.length;
-    const matchedContextDays = new Set(
-      matched.map((record) => record.day),
-    ).size;
-    const actionCount = dailyRecords.reduce(
-      (sum, record) => sum + record.actions,
-      0,
-    );
-
-    if (recordedDays < 3) {
-      insights.push({
-        title: "Early medication pattern",
-        text:
-          "Sympto has " +
-          formatWhole(actionCount) +
-          " recorded dose action" +
-          (actionCount === 1 ? "" : "s") +
-          " across " +
-          recordedDays +
-          " day" +
-          (recordedDays === 1 ? "" : "s") +
-          ". More dated medication records will allow stronger comparisons over time.",
-      });
-    } else {
-      insights.push({
-        title: "No clear pattern detected yet",
-        text:
-          "Sympto has " +
-          formatWhole(actionCount) +
-          " recorded dose action" +
-          (actionCount === 1 ? "" : "s") +
-          " across " +
-          recordedDays +
-          " days, including " +
-          matchedContextDays +
-          " day" +
-          (matchedContextDays === 1 ? "" : "s") +
-          " matched with supporting check-in data. The current differences are not large or consistent enough to surface as a personal pattern yet.",
-      });
-    }
-  }
-
-  return insights.slice(0, 4);
-}
-
-
 
 export default function TodayMedicationActions({ medications, goal: suppliedGoal, onUpdated }: TodayMedicationActionsProps) {
   const [dosesLoggedToday, setDosesLoggedToday] = useState(0);
@@ -713,9 +330,27 @@ export default function TodayMedicationActions({ medications, goal: suppliedGoal
     };
   }, []);
 
-  const doseLabel = useMemo(() => (totalRequiredDosesPerDay === 1 ? "1 dose" : `${totalRequiredDosesPerDay} doses`), [totalRequiredDosesPerDay]);
-  const rawTargetAdherence = Number(finalGoal?.targetValue);
-  const targetAdherence = Number.isFinite(rawTargetAdherence) && rawTargetAdherence > 0 ? rawTargetAdherence : 90;
+  const doseLabel = useMemo(
+    () => (totalRequiredDosesPerDay === 1 ? "1 dose" : `${totalRequiredDosesPerDay} doses`),
+    [totalRequiredDosesPerDay],
+  );
+
+  const supportingGoals = useMemo(
+    () =>
+      (Array.isArray(finalGoal?.connectedGoals) ? finalGoal.connectedGoals : [])
+        .filter(
+          (connection: any) =>
+            String(connection?.relationshipType ?? "").toUpperCase() === "SUPPORTS" &&
+            String(connection?.direction ?? "") === "supportsThisGoal",
+        )
+        .map((connection: any) => ({
+          category: String(connection?.goal?.category ?? "").toUpperCase(),
+          title: connection?.goal?.title ?? null,
+          targetValue: connection?.goal?.targetValue ?? null,
+          unit: connection?.goal?.unit ?? null,
+        })),
+    [finalGoal?.connectedGoals],
+  );
 
   const medicationInsights = useMemo(
     () =>
@@ -725,6 +360,7 @@ export default function TodayMedicationActions({ medications, goal: suppliedGoal
         scheduledDosesPerDay: totalRequiredDosesPerDay,
         checkIns: recentCheckIns,
         nutritionEvents: recentNutritionEvents,
+        supportingGoals,
       }),
     [
       adherenceEvents,
@@ -732,6 +368,7 @@ export default function TodayMedicationActions({ medications, goal: suppliedGoal
       totalRequiredDosesPerDay,
       recentCheckIns,
       recentNutritionEvents,
+      supportingGoals,
     ],
   );
 
@@ -817,16 +454,23 @@ export default function TodayMedicationActions({ medications, goal: suppliedGoal
           </div>
         </div>
 
-        <div className="mt-3 space-y-2">
-          {medicationInsights.map((insight, index) => (
-            <div
-              key={insight.title + "-" + index}
-              className="rounded-[17px] border border-[#dcebec] bg-white px-3.5 py-3 shadow-[0_5px_16px_rgba(11,45,84,.04)]"
-            >
-              <p className="text-[10px] font-black text-[#0b2d54]">{insight.title}</p>
-              <p className="mt-1 text-[10px] leading-5 text-[#617487]">{insight.text}</p>
-            </div>
-          ))}
+        <div className="mt-3 space-y-2.5">
+          {medicationInsights.map((insight, index) => {
+            const tone =
+              insight.tone && insight.tone in medicationInsightTone
+                ? medicationInsightTone[insight.tone as keyof typeof medicationInsightTone]
+                : medicationInsightTone.neutral;
+
+            return (
+              <div
+                key={insight.title + "-" + index}
+                className={`rounded-[17px] border px-3.5 py-3.5 ring-1 ${tone}`}
+              >
+                <p className="text-[11px] font-black leading-5 text-[#0b2d54]">{insight.title}</p>
+                <p className="mt-1 text-[11px] leading-5 text-[#5f7080]">{insight.text}</p>
+              </div>
+            );
+          })}
         </div>
       </section>
     </section>
