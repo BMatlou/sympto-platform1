@@ -787,7 +787,7 @@ export default function TodayMedicationActions({ medications, goal: suppliedGoal
           </div>
         </div>
 
-        {(supportingGoals.length > 0 || supportingData.matchedCheckInDays > 0) && (
+        {(supportingGoals.length > 0 || recentCheckIns.length > 0) && (
           <div className="mt-3 rounded-[17px] bg-[#123e63] px-3.5 py-3 ring-1 ring-white/10">
             <p className="text-[9px] font-black uppercase tracking-[.14em] text-[#24c1c4]">Supporting context</p>
 
