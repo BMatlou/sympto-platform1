@@ -223,7 +223,7 @@ function addTrendInsight(
           formatWhole(recentStats.percentage) +
           "% recently — up " +
           formatWhole(Math.abs(delta)) +
-          " percentage points."
+          "%."
         : "You moved from about " +
           formatWhole(baselineStats.percentage) +
           "% to " +
