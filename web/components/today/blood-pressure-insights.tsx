@@ -1,10 +1,9 @@
 "use client";
 
-import { Activity, AlertTriangle, BarChart3, Moon, Sparkles, TrendingDown, TrendingUp } from "lucide-react";
+import { AlertTriangle, Dumbbell, Sparkles, TrendingDown, TrendingUp } from "lucide-react";
 import { useEffect, useState } from "react";
 import { healthGoalsService } from "@/services/health-goals.service";
-import { healthJournalService } from "@/services/health-journal.service";
-import { buildBloodPressureInsights, type BloodPressureInsight } from "@/lib/blood-pressure-insights";
+import { canonicalExerciseDayTotals } from "@/lib/exercise-metric";
 
 type Props = {
   target: number | null;
@@ -13,61 +12,352 @@ type Props = {
   exerciseGoalFrequency?: string | null;
 };
 
-const iconFor = (insight: BloodPressureInsight) => {
-  if (insight.title.includes("higher lately") || insight.title.includes("above your target")) return TrendingUp;
-  if (insight.title.includes("lower lately") || insight.title.includes("within your target")) return TrendingDown;
-  if (insight.kind === "time") return BarChart3;
-  if (insight.kind === "sleep") return Moon;
-  if (insight.kind === "exercise") return Activity;
-  return Sparkles;
+type InsightState = {
+  loading: boolean;
+  title: string;
+  body: string;
+  tone: "info" | "warning";
+  evidence: string[];
+  bpAverage: number | null;
+  latestBp: number | null;
+  exerciseTotal: number | null;
+  exerciseTarget: number | null;
+  exerciseLabel: string;
+  pattern: "LOWER" | "HIGHER" | "BUILDING" | "NONE";
 };
 
-export default function BloodPressureInsights({ target, exerciseGoalTarget = null, exerciseGoalTitle = "Exercise", exerciseGoalFrequency = "DAILY" }: Props) {
-  const [insights, setInsights] = useState<BloodPressureInsight[]>([]);
-  const [loading, setLoading] = useState(true);
+function numberOrNull(value: unknown) {
+  const numeric = Number(value);
+  return Number.isFinite(numeric) ? numeric : null;
+}
+
+function round(value: number | null) {
+  return value == null || !Number.isFinite(value) ? null : Math.round(value);
+}
+
+function localDayKey(value: string | Date) {
+  const date = value instanceof Date ? value : new Date(value);
+  if (Number.isNaN(date.getTime())) return "";
+  return new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Africa/Johannesburg",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).format(date);
+}
+
+function mondayKey(value: string | Date) {
+  const date = value instanceof Date ? new Date(value) : new Date(value);
+  if (Number.isNaN(date.getTime())) return "";
+  const parts = new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Africa/Johannesburg",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).formatToParts(date);
+  const map = Object.fromEntries(parts.map((part) => [part.type, part.value]));
+  const local = new Date(Date.UTC(Number(map.year), Number(map.month) - 1, Number(map.day), 12));
+  const mondayOffset = (local.getUTCDay() + 6) % 7;
+  local.setUTCDate(local.getUTCDate() - mondayOffset);
+  return [
+    local.getUTCFullYear(),
+    String(local.getUTCMonth() + 1).padStart(2, "0"),
+    String(local.getUTCDate()).padStart(2, "0"),
+  ].join("-");
+}
+
+function shiftWeek(key: string, offset: number) {
+  const [year, month, day] = key.split("-").map(Number);
+  if (![year, month, day].every(Number.isFinite)) return "";
+  const date = new Date(Date.UTC(year, month - 1, day, 12));
+  date.setUTCDate(date.getUTCDate() + offset * 7);
+  return [
+    date.getUTCFullYear(),
+    String(date.getUTCMonth() + 1).padStart(2, "0"),
+    String(date.getUTCDate()).padStart(2, "0"),
+  ].join("-");
+}
+
+function average(values: number[]) {
+  return values.length ? values.reduce((sum, value) => sum + value, 0) / values.length : null;
+}
+
+export default function BloodPressureInsights({
+  target,
+  exerciseGoalTarget = null,
+  exerciseGoalTitle = "Exercise",
+  exerciseGoalFrequency = "WEEKLY",
+}: Props) {
+  const [state, setState] = useState<InsightState>({
+    loading: true,
+    title: "",
+    body: "",
+    tone: "info",
+    evidence: [],
+    bpAverage: null,
+    latestBp: null,
+    exerciseTotal: null,
+    exerciseTarget: numberOrNull(exerciseGoalTarget),
+    exerciseLabel: String(exerciseGoalTitle || "Exercise"),
+    pattern: "BUILDING",
+  });
 
   useEffect(() => {
     let active = true;
 
     async function load() {
-      setLoading(true);
-      const to = new Date();
-      const from = new Date(0);
+      setState((current) => ({ ...current, loading: true }));
 
       try {
-        const [bloodPressure, exercise, journals, symptoms] = await Promise.all([
-          healthGoalsService.getMetricEvents("BLOOD_PRESSURE", "blood_pressure.systolic", from, to),
-          healthGoalsService.getMetricEvents("EXERCISE", "exercise.minutes", from, to),
-          healthJournalService.getAll({ limit: 100 }),
-          healthJournalService.getSymptoms({ limit: 100 }),
+        const now = new Date();
+        const from = new Date(0);
+        const [bloodPressure, exercise] = await Promise.all([
+          healthGoalsService.getMetricEvents(
+            "BLOOD_PRESSURE",
+            "blood_pressure.systolic",
+            from,
+            now,
+          ),
+          healthGoalsService.getMetricEvents(
+            "EXERCISE",
+            "exercise.minutes",
+            from,
+            now,
+          ),
         ]);
 
         if (!active) return;
 
-        setInsights(
-          buildBloodPressureInsights({
-            bloodPressureEvents: bloodPressure.events ?? [],
-            exerciseEvents: exercise.events ?? [],
-            journals: journals.data ?? [],
-            symptoms,
-            target,
-            exerciseGoalTarget,
-            exerciseGoalTitle,
-            exerciseGoalFrequency,
-            now: to,
-          }),
-        );
-      } catch {
-        if (active) {
-          setInsights([{
-            kind: "data",
-            tone: "info",
-            title: "Keep building your blood pressure record",
-            body: "Your goal is still connected to Health Vitals. More recorded readings will give Sympto more information to identify useful patterns.",
-          }]);
+        const bpEvents = (bloodPressure.events ?? [])
+          .map((event: any) => ({
+            value: numberOrNull(event?.loggedValue),
+            occurredAt: String(event?.occurredAt ?? ""),
+          }))
+          .filter((event: any) => event.value != null && event.occurredAt);
+
+        const latestByDay = new Map<string, { value: number; at: number }>();
+        const dailyValues = new Map<string, number[]>();
+
+        for (const event of bpEvents) {
+          const day = localDayKey(event.occurredAt);
+          if (!day) continue;
+
+          const at = new Date(event.occurredAt).getTime();
+          const latest = latestByDay.get(day);
+          if (!latest || at >= latest.at) {
+            latestByDay.set(day, { value: event.value, at });
+          }
+
+          const list = dailyValues.get(day) ?? [];
+          list.push(event.value);
+          dailyValues.set(day, list);
         }
-      } finally {
-        if (active) setLoading(false);
+
+        const dailyAverage = new Map(
+          [...dailyValues.entries()].map(([day, values]) => [day, average(values) ?? 0] as const),
+        );
+
+        const orderedDays = [...dailyAverage.keys()].sort();
+        const recentDays = orderedDays.slice(-7);
+        const earlierDays = orderedDays.slice(-14, -7);
+        const bpAverage = round(average(recentDays.map((day) => dailyAverage.get(day) ?? 0)));
+        const earlierAverage = round(average(earlierDays.map((day) => dailyAverage.get(day) ?? 0)));
+        const latestDay = orderedDays.at(-1);
+        const latestBp = latestDay ? round(latestByDay.get(latestDay)?.value ?? null) : null;
+        const bpChange = bpAverage != null && earlierAverage != null
+          ? bpAverage - earlierAverage
+          : null;
+
+        const rawExerciseEvents = (exercise.events ?? [])
+          .map((event: any) => ({
+            value: numberOrNull(event?.loggedValue),
+            occurredAt: String(event?.occurredAt ?? ""),
+            source: event?.source ?? null,
+          }))
+          .filter((event: any) => event.value != null && event.occurredAt);
+
+        const canonicalInput = rawExerciseEvents.map((event: any) => ({
+          day: localDayKey(event.occurredAt),
+          value: event.value,
+          source: event.source,
+          occurredAt: event.occurredAt,
+        }));
+
+        const dayTotals = canonicalExerciseDayTotals(canonicalInput);
+        const exerciseFrequency = String(exerciseGoalFrequency || "WEEKLY").toUpperCase();
+        const numericExerciseTarget = numberOrNull(exerciseGoalTarget);
+
+        const currentWeek = mondayKey(now);
+        const exerciseTotal = exerciseFrequency === "WEEKLY"
+          ? round(
+              [...dayTotals.entries()]
+                .filter(([day]) => mondayKey(day) === currentWeek)
+                .reduce((sum, [, value]) => sum + value, 0),
+            )
+          : round(dayTotals.get(localDayKey(now)) ?? 0);
+
+        const title = String(exerciseGoalTitle || "Exercise");
+
+        // Compare complete/recent weeks where both Exercise and BP were recorded.
+        const exerciseWeeks = new Map<string, number>();
+        for (const [day, minutes] of dayTotals.entries()) {
+          const week = mondayKey(day);
+          if (!week) continue;
+          exerciseWeeks.set(week, (exerciseWeeks.get(week) ?? 0) + minutes);
+        }
+
+        const bpWeeks = new Map<string, number[]>();
+        for (const [day, value] of dailyAverage.entries()) {
+          const week = mondayKey(day);
+          if (!week) continue;
+          const values = bpWeeks.get(week) ?? [];
+          values.push(value);
+          bpWeeks.set(week, values);
+        }
+
+        const reachedGoalWeeks: number[] = [];
+        const belowGoalWeeks: number[] = [];
+
+        if (numericExerciseTarget != null && exerciseFrequency === "WEEKLY") {
+          for (const [week, minutes] of exerciseWeeks.entries()) {
+            const bpWeekAverage = average(bpWeeks.get(week) ?? []);
+            if (bpWeekAverage == null) continue;
+            if (minutes >= numericExerciseTarget) reachedGoalWeeks.push(bpWeekAverage);
+            else belowGoalWeeks.push(bpWeekAverage);
+          }
+        }
+
+        const enoughComparisonData =
+          reachedGoalWeeks.length >= 2 &&
+          belowGoalWeeks.length >= 2;
+
+        const reachedAverage = round(average(reachedGoalWeeks));
+        const belowAverage = round(average(belowGoalWeeks));
+        const exerciseDifference =
+          reachedAverage != null && belowAverage != null
+            ? reachedAverage - belowAverage
+            : null;
+
+        let titleText = "";
+        let bodyText = "";
+        let tone: "info" | "warning" = "info";
+        let pattern: InsightState["pattern"] = "BUILDING";
+
+        if (numericExerciseTarget != null && exerciseFrequency === "WEEKLY") {
+          const total = exerciseTotal ?? 0;
+          const remaining = Math.max(0, numericExerciseTarget - total);
+
+          if (enoughComparisonData && exerciseDifference != null && Math.abs(exerciseDifference) >= 5) {
+            pattern = exerciseDifference < 0 ? "LOWER" : "HIGHER";
+            titleText = exerciseDifference < 0
+              ? title + " and blood pressure show a lower-reading pattern"
+              : title + " and blood pressure show a higher-reading pattern";
+            bodyText =
+              "In your recorded weeks, reaching your " +
+              numericExerciseTarget +
+              "-minute " +
+              title +
+              " goal was associated with an average systolic reading of " +
+              reachedAverage +
+              " mmHg, compared with " +
+              belowAverage +
+              " mmHg in weeks where the goal was not reached.";
+          } else {
+            titleText = title + " is part of your blood-pressure picture";
+            bodyText =
+              "This week you have logged " +
+              total +
+              " of " +
+              numericExerciseTarget +
+              " minutes toward your " +
+              title +
+              " goal. Sympto is comparing your weekly activity with your blood-pressure readings as more matching weeks build up.";
+            pattern = "BUILDING";
+          }
+
+          tone = bpAverage != null && target != null && bpAverage > target ? "warning" : "info";
+        } else {
+          titleText = target != null && bpAverage != null && bpAverage > target
+            ? "Your recent readings are above your target"
+            : "Your recent blood-pressure pattern";
+          bodyText = bpAverage != null && target != null
+            ? "Your recent average is " +
+              bpAverage +
+              " mmHg against your " +
+              target +
+              " mmHg target."
+            : bpAverage != null
+              ? "Your recent average systolic reading is " + bpAverage + " mmHg."
+              : "Keep recording blood-pressure readings so Sympto can build your personal pattern.";
+          tone = target != null && bpAverage != null && bpAverage > target ? "warning" : "info";
+        }
+
+        const evidence: string[] = [];
+        if (bpAverage != null) evidence.push("Recent BP " + bpAverage + " mmHg");
+        if (target != null && bpAverage != null) {
+          const distance = bpAverage - target;
+          evidence.push(
+            distance > 0
+              ? distance + " mmHg above target"
+              : distance < 0
+                ? Math.abs(distance) + " mmHg below target"
+                : "At target",
+          );
+        }
+        if (latestBp != null) evidence.push("Latest " + latestBp + " mmHg");
+
+        if (numericExerciseTarget != null && exerciseFrequency === "WEEKLY") {
+          evidence.push((exerciseTotal ?? 0) + "/" + numericExerciseTarget + " min this week");
+          if (enoughComparisonData && reachedAverage != null && belowAverage != null) {
+            evidence.push(
+              "Goal weeks " +
+              reachedAverage +
+              " vs " +
+              belowAverage +
+              " mmHg",
+            );
+          }
+        }
+
+        if (bpChange != null && Math.abs(bpChange) >= 5 && earlierAverage != null && bpAverage != null) {
+          evidence.push("Earlier " + earlierAverage + " mmHg · Recent " + bpAverage + " mmHg");
+        }
+
+        if (numericExerciseTarget != null && exerciseFrequency === "WEEKLY" && enoughComparisonData) {
+          bodyText +=
+            exerciseDifference != null && Math.abs(exerciseDifference) >= 5
+              ? " This is an association in your records, not proof that exercise caused the difference."
+              : "";
+        }
+
+        setState({
+          loading: false,
+          title: titleText,
+          body: bodyText,
+          tone,
+          evidence,
+          bpAverage,
+          latestBp,
+          exerciseTotal,
+          exerciseTarget: numericExerciseTarget,
+          exerciseLabel: title,
+          pattern,
+        });
+      } catch {
+        if (!active) return;
+        setState({
+          loading: false,
+          title: "Keep building your personal pattern",
+          body: "Record both blood pressure and exercise in Sympto. Once those records overlap, Sympto can compare them instead of giving you a generic trend.",
+          tone: "info",
+          evidence: [],
+          bpAverage: null,
+          latestBp: null,
+          exerciseTotal: null,
+          exerciseTarget: numberOrNull(exerciseGoalTarget),
+          exerciseLabel: String(exerciseGoalTitle || "Exercise"),
+          pattern: "BUILDING",
+        });
       }
     }
 
@@ -84,89 +374,100 @@ export default function BloodPressureInsights({ target, exerciseGoalTarget = nul
     };
   }, [target, exerciseGoalTarget, exerciseGoalTitle, exerciseGoalFrequency]);
 
+  const warning = state.tone === "warning";
+  const trendIcon = state.pattern === "LOWER"
+    ? TrendingDown
+    : state.pattern === "HIGHER"
+      ? TrendingUp
+      : state.pattern === "BUILDING"
+        ? Dumbbell
+        : Sparkles;
+  const TrendIcon = trendIcon;
+
   return (
-    <section className="mt-3 rounded-[19px] border border-[#dcebed] bg-[#f8fbfc] p-3.5">
-      <div className="flex items-start justify-between gap-3">
-        <div className="flex items-center gap-2.5">
-          <span className="grid h-8 w-8 place-items-center rounded-xl bg-[#e8f8f7] text-[#0b7b80]">
-            <Sparkles className="h-3.5 w-3.5" />
-          </span>
-          <div>
-            <p className="text-[8px] font-black uppercase tracking-[.16em] text-[#0b7b80]">Sympto Insights</p>
-            <p className="mt-0.5 text-[9px] font-semibold text-[#7d8f9c]">Patterns across your blood pressure and connected health data</p>
-          </div>
+    <section className="mt-3 rounded-[22px] border border-[#dcebed] bg-[#f8fbfc] p-4 sm:p-5">
+      <div className="flex items-center gap-2.5">
+        <span className="grid h-8 w-8 place-items-center rounded-[11px] bg-[#e8f8f7] text-[#0b7b80]">
+          <Sparkles className="h-3.5 w-3.5" />
+        </span>
+        <div>
+          <p className="text-[8px] font-black uppercase tracking-[.16em] text-[#0b7b80]">Sympto Insights</p>
+          <p className="mt-0.5 text-[9px] font-semibold text-[#7d8f9c]">
+            How your blood pressure connects with your {state.exerciseLabel}
+          </p>
         </div>
       </div>
 
-      {loading ? (
-        <div className="mt-3 space-y-2" aria-busy="true">
-          <div className="h-14 animate-pulse rounded-xl bg-white" />
-          <div className="h-14 animate-pulse rounded-xl bg-white" />
+      {state.loading ? (
+        <div className="mt-4 rounded-[18px] border border-[#e1ecef] bg-white p-4" aria-busy="true">
+          <div className="h-3 w-40 animate-pulse rounded bg-[#eef3f5]" />
+          <div className="mt-3 h-10 w-full animate-pulse rounded bg-[#f4f8f9]" />
+          <div className="mt-3 h-14 w-full animate-pulse rounded-[14px] bg-[#f4f8f9]" />
         </div>
       ) : (
-        <div className="mt-3 space-y-2">
-          {insights.map((insight, index) => {
-            const Icon = iconFor(insight);
-            const warning = insight.tone === "warning";
-            const primary = index === 0;
-            return (
-              <article
-                key={insight.kind + "-" + insight.title}
-                className={
-                  warning
-                    ? "rounded-[18px] border border-red-100 bg-red-50/70 p-4"
-                    : primary
-                      ? "rounded-[18px] border border-[#dcebed] bg-white p-4"
-                      : "rounded-[17px] border border-[#e1ecef] bg-white p-3.5"
-                }
-              >
-                <div className="flex items-start gap-3">
-                  <span
-                    className={
-                      warning
-                        ? "mt-0.5 grid h-8 w-8 shrink-0 place-items-center rounded-[11px] bg-red-100 text-red-700"
-                        : "mt-0.5 grid h-8 w-8 shrink-0 place-items-center rounded-[11px] bg-[#e8f8f7] text-[#0b7b80]"
-                    }
-                  >
-                    {warning ? <AlertTriangle className="h-3.5 w-3.5" /> : <Icon className="h-3.5 w-3.5" />}
-                  </span>
+        <article
+          className={
+            warning
+              ? "mt-4 rounded-[19px] border border-red-100 bg-red-50/65 p-4 sm:p-5"
+              : "mt-4 rounded-[19px] border border-[#dfeaec] bg-white p-4 sm:p-5"
+          }
+        >
+          <div className="flex items-start gap-3">
+            <span
+              className={
+                warning
+                  ? "mt-0.5 grid h-8 w-8 shrink-0 place-items-center rounded-[11px] bg-red-100 text-red-700"
+                  : "mt-0.5 grid h-8 w-8 shrink-0 place-items-center rounded-[11px] bg-[#e8f8f7] text-[#0b7b80]"
+              }
+            >
+              {warning ? <AlertTriangle className="h-3.5 w-3.5" /> : <TrendIcon className="h-3.5 w-3.5" />}
+            </span>
+            <div className="min-w-0 flex-1">
+              <p className={warning ? "text-[11px] font-black tracking-[-.01em] text-red-950" : "text-[11px] font-black tracking-[-.01em] text-[#0b2d54]"}>
+                {state.title}
+              </p>
+              <p className={warning ? "mt-1 text-[10px] leading-5 text-red-900/80" : "mt-1 text-[10px] leading-5 text-[#637986]"}>
+                {state.body}
+              </p>
+            </div>
+          </div>
 
-                  <div className="min-w-0 flex-1">
-                    <p
-                      className={
-                        warning
-                          ? "text-[11px] font-black tracking-[-.01em] text-red-950"
-                          : "text-[11px] font-black tracking-[-.01em] text-[#0b2d54]"
-                      }
-                    >
-                      {insight.title}
-                    </p>
-                    <p
-                      className={
-                        warning
-                          ? "mt-1 text-[10px] leading-5 text-red-900/80"
-                          : "mt-1 text-[10px] leading-5 text-[#637986]"
-                      }
-                    >
-                      {insight.body}
-                    </p>
+          <div className="mt-4 grid gap-2 sm:grid-cols-2">
+            <div className="rounded-[15px] bg-[#f7fbfb] p-3">
+              <p className="text-[8px] font-black uppercase tracking-[.13em] text-[#8b9aa4]">Blood pressure</p>
+              <p className="mt-1 text-base font-black text-[#0b2d54]">
+                {state.bpAverage == null ? "—" : state.bpAverage + " mmHg"}
+              </p>
+              <p className="mt-0.5 text-[8px] font-semibold text-[#8b9aa4]">
+                Recent daily average
+              </p>
+            </div>
+            <div className="rounded-[15px] bg-[#f7fbfb] p-3">
+              <p className="text-[8px] font-black uppercase tracking-[.13em] text-[#0b7b80]">{state.exerciseLabel}</p>
+              <p className="mt-1 text-base font-black text-[#0b2d54]">
+                {state.exerciseTotal == null || state.exerciseTarget == null
+                  ? "—"
+                  : state.exerciseTotal + " / " + state.exerciseTarget + " min"}
+              </p>
+              <p className="mt-0.5 text-[8px] font-semibold text-[#8b9aa4]">
+                This week
+              </p>
+            </div>
+          </div>
 
-                    {insight.evidence && (
-                      <div className="mt-3 rounded-[13px] bg-[#f7fbfb] px-3 py-2.5">
-                        <p className="text-[8px] font-black uppercase tracking-[.13em] text-[#8b9aa4]">At a glance</p>
-                        <p className="mt-1 text-[9px] font-bold leading-4 text-[#0b2d54]">{insight.evidence}</p>
-                      </div>
-                    )}
-                  </div>
-                </div>
-              </article>
-            );
-          })}
-        </div>
+          {state.evidence.length > 0 && (
+            <div className="mt-3 rounded-[14px] bg-[#f7fbfb] px-3 py-2.5">
+              <p className="text-[8px] font-black uppercase tracking-[.13em] text-[#8b9aa4]">What Sympto is seeing</p>
+              <p className="mt-1 text-[9px] font-bold leading-4 text-[#0b2d54]">
+                {state.evidence.join(" · ")}
+              </p>
+            </div>
+          )}
+        </article>
       )}
 
       <p className="mt-3 text-[8px] leading-4 text-[#97a5ae]">
-        Sympto highlights patterns in the readings you record. It does not diagnose a condition.
+        Sympto compares the health data you record. A pattern does not prove that one factor caused another.
       </p>
     </section>
   );
