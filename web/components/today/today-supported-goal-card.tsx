@@ -162,72 +162,98 @@ export default function TodaySupportedGoalCard({ goal, activeGoals = [], onUpdat
   const metricType = String(goal?.metricConfig?.metricType ?? defaultMetric.metricType).toUpperCase();
   const metricKey = String(goal?.metricConfig?.metricKey ?? defaultMetric.metricKey);
   const [liveCurrent, setLiveCurrent] = useState<number | null>(null);
+  const [bpGoalStats, setBpGoalStats] = useState({ recordedDays: 0, targetDays: 0 });
 
   useEffect(() => {
     if (category !== "BLOOD_PRESSURE" || metricType !== "BLOOD_PRESSURE" || metricKey !== "blood_pressure.systolic") {
       setLiveCurrent(null);
+      setBpGoalStats({ recordedDays: 0, targetDays: 0 });
       return;
     }
 
     let active = true;
     const now = new Date();
-    const localDate = new Intl.DateTimeFormat("en-CA", {
-      timeZone: "Africa/Johannesburg",
-      year: "numeric",
-      month: "2-digit",
-      day: "2-digit",
-    }).format(now);
-    const from = new Date(localDate + "T00:00:00+02:00");
+    const createdAt = new Date(String(goal?.createdAt ?? ""));
+    const from = Number.isNaN(createdAt.getTime()) ? new Date(0) : createdAt;
 
     healthGoalsService
       .getMetricEvents(metricType, metricKey, from, now)
       .then((result) => {
         if (!active) return;
-        const events = Array.isArray(result?.events) ? result.events : [];
-        const latest = events
-          .filter((event: any) => Number.isFinite(Number(event?.loggedValue)))
+
+        const events = (Array.isArray(result?.events) ? result.events : [])
+          .filter((event: any) => Number.isFinite(Number(event?.loggedValue)));
+
+        const latest = [...events]
           .sort((a: any, b: any) => new Date(String(a?.occurredAt ?? 0)).getTime() - new Date(String(b?.occurredAt ?? 0)).getTime())
           .at(-1);
+
         setLiveCurrent(latest ? Number(latest.loggedValue) : null);
+
+        const latestByDay = new Map<string, { value: number; occurredAt: number }>();
+        for (const event of events) {
+          const occurredAt = new Date(String(event?.occurredAt ?? ""));
+          if (Number.isNaN(occurredAt.getTime())) continue;
+
+          const parts = new Intl.DateTimeFormat("en-GB", {
+            timeZone: "Africa/Johannesburg",
+            year: "numeric",
+            month: "2-digit",
+            day: "2-digit",
+          }).formatToParts(occurredAt);
+          const values = Object.fromEntries(parts.map((part) => [part.type, part.value]));
+          const dayKey = String(values.year) + "-" + String(values.month) + "-" + String(values.day);
+          const value = Number(event.loggedValue);
+          const existing = latestByDay.get(dayKey);
+
+          if (!existing || occurredAt.getTime() >= existing.occurredAt) {
+            latestByDay.set(dayKey, { value, occurredAt: occurredAt.getTime() });
+          }
+        }
+
+        const daily = Array.from(latestByDay.values());
+        const targetDays = target == null
+          ? 0
+          : daily.filter((entry) => entry.value <= target).length;
+
+        setBpGoalStats({
+          recordedDays: daily.length,
+          targetDays,
+        });
       })
       .catch(() => {
-        if (active) setLiveCurrent(null);
+        if (active) {
+          setLiveCurrent(null);
+          setBpGoalStats({ recordedDays: 0, targetDays: 0 });
+        }
       });
 
     return () => {
       active = false;
     };
-  }, [category, metricType, metricKey, goalId, goal?.updatedAt]);
+  }, [category, metricType, metricKey, goalId, goal?.createdAt, goal?.updatedAt, target]);
 
   const displayCurrent = category === "BLOOD_PRESSURE" && liveCurrent != null ? liveCurrent : current;
-  const displayProgress =
-    category === "BLOOD_PRESSURE" && displayCurrent != null && target != null
-      ? Math.max(
-          0,
-          Math.min(
-            100,
-            Math.round(
-              String(goal?.metricConfig?.comparison ?? "AT_MOST").toUpperCase() === "AT_LEAST"
-                ? target > 0
-                  ? (displayCurrent / target) * 100
-                  : 100
-                : target > 0
-                  ? Math.min(100, (target / displayCurrent) * 100)
-                  : displayCurrent <= target
-                    ? 100
-                    : 0
-            )
-          )
-        )
-      : displayCurrent == null
-        ? progress
-        : progressPercent({
-            ...goal,
-            currentValue: displayCurrent,
-            progress: [],
-            latestProgress: null,
-            progressPercent: null,
-          });
+  const bpDistance = category === "BLOOD_PRESSURE" && displayCurrent != null && target != null
+    ? displayCurrent - target
+    : null;
+  const bpWithinTarget = category === "BLOOD_PRESSURE" && displayCurrent != null && target != null
+    ? displayCurrent <= target
+    : null;
+  const bpAttainmentPercent = category === "BLOOD_PRESSURE" && bpGoalStats.recordedDays > 0
+    ? Math.round((bpGoalStats.targetDays / bpGoalStats.recordedDays) * 100)
+    : 0;
+  const displayProgress = category === "BLOOD_PRESSURE"
+    ? bpAttainmentPercent
+    : displayCurrent == null
+      ? progress
+      : progressPercent({
+          ...goal,
+          currentValue: displayCurrent,
+          progress: [],
+          latestProgress: null,
+          progressPercent: null,
+        });
 
   const nextStep = goalNextStep(category, displayCurrent, target);
 
@@ -291,12 +317,56 @@ export default function TodaySupportedGoalCard({ goal, activeGoals = [], onUpdat
 
       <div className="px-4 pb-4 pt-4 sm:px-5">
         <div className="grid grid-cols-3 gap-2">
-          <div className="rounded-[16px] bg-[#f7fbfb] p-3"><p className="text-[8px] font-black uppercase tracking-[.12em] text-[#95a3ad]">Current</p><p className="mt-1 text-base font-black text-[#0b2d54]">{displayCurrent == null ? "—" : displayCurrent}{meta.unit && displayCurrent != null ? " " + meta.unit : ""}</p></div>
-          <div className="rounded-[16px] bg-[#f7fbfb] p-3"><p className="text-[8px] font-black uppercase tracking-[.12em] text-[#95a3ad]">Target</p><p className="mt-1 text-base font-black text-[#0b2d54]">{target == null ? "—" : target}{meta.unit && target != null ? " " + meta.unit : ""}</p></div>
-          <div className="rounded-[16px] bg-[#e9f9fa] p-3"><p className="text-[8px] font-black uppercase tracking-[.12em] text-[#0b7b80]">Progress</p><p className="mt-1 text-base font-black text-[#0b6f73]">{displayProgress}%</p></div>
+          <div className="rounded-[16px] bg-[#f7fbfb] p-3">
+            <p className="text-[8px] font-black uppercase tracking-[.12em] text-[#95a3ad]">Current</p>
+            <p className="mt-1 text-base font-black text-[#0b2d54]">{displayCurrent == null ? "—" : displayCurrent}{meta.unit && displayCurrent != null ? " " + meta.unit : ""}</p>
+          </div>
+          <div className="rounded-[16px] bg-[#f7fbfb] p-3">
+            <p className="text-[8px] font-black uppercase tracking-[.12em] text-[#95a3ad]">Target</p>
+            <p className="mt-1 text-base font-black text-[#0b2d54]">{category === "BLOOD_PRESSURE" && target != null ? "≤" : ""}{target == null ? "—" : target}{meta.unit && target != null ? " " + meta.unit : ""}</p>
+          </div>
+          <div className={category === "BLOOD_PRESSURE" && bpWithinTarget === false ? "rounded-[16px] bg-red-50 p-3 ring-1 ring-red-200" : "rounded-[16px] bg-[#e9f9fa] p-3"}>
+            <p className={category === "BLOOD_PRESSURE" && bpWithinTarget === false ? "text-[8px] font-black uppercase tracking-[.12em] text-red-700" : "text-[8px] font-black uppercase tracking-[.12em] text-[#0b7b80]"}>Progress</p>
+            <p className={category === "BLOOD_PRESSURE" && bpWithinTarget === false ? "mt-1 text-base font-black text-red-700" : "mt-1 text-base font-black text-[#0b6f73]"}>{displayProgress}%</p>
+          </div>
         </div>
 
-        <div className="mt-3 h-2 overflow-hidden rounded-full bg-[#edf3f5]"><div className="h-full rounded-full bg-[#24c1c4] transition-all" style={{ width: Math.max(0, displayProgress) + "%" }} /></div>
+        <div className="mt-3 h-2 overflow-hidden rounded-full bg-[#edf3f5]">
+          <div
+            className={category === "BLOOD_PRESSURE" && bpWithinTarget === false ? "h-full rounded-full bg-red-500 transition-all" : "h-full rounded-full bg-[#24c1c4] transition-all"}
+            style={{ width: Math.max(0, displayProgress) + "%" }}
+          />
+        </div>
+
+        {category === "BLOOD_PRESSURE" && displayCurrent != null && target != null && (
+          <div className={bpWithinTarget ? "mt-3 rounded-[18px] border border-[#bcebed] bg-[#effafa] p-3.5" : "mt-3 rounded-[18px] border border-red-200 bg-red-50 p-3.5"}>
+            <p className={bpWithinTarget ? "text-[9px] font-black uppercase tracking-[.14em] text-[#0b7b80]" : "text-[9px] font-black uppercase tracking-[.14em] text-red-700"}>
+              {bpWithinTarget ? "At target today" : "Above target today"}
+            </p>
+            <p className={bpWithinTarget ? "mt-1 text-sm font-black text-[#0b6f73]" : "mt-1 text-sm font-black text-red-700"}>
+              {bpWithinTarget
+                ? (bpDistance ?? 0) === 0
+                  ? "Your reading is at your target."
+                  : Math.abs(bpDistance ?? 0) + " mmHg below your target."
+                : Math.abs(bpDistance ?? 0) + " mmHg above your target."}
+            </p>
+            <p className={bpWithinTarget ? "mt-1 text-[10px] leading-5 text-[#55747c]" : "mt-1 text-[10px] leading-5 text-red-700/80"}>
+              {bpWithinTarget
+                ? "Keep tracking daily readings so Sympto can measure how consistently you stay within your target."
+                : "Your current reading is above the target. Keep recording readings so Sympto can show whether your trend is moving toward it."}
+            </p>
+          </div>
+        )}
+
+        {category === "BLOOD_PRESSURE" && bpGoalStats.recordedDays > 0 && (
+          <div className="mt-3 flex items-center justify-between gap-3 rounded-[16px] bg-[#f7fbfb] px-3.5 py-3 ring-1 ring-[#e4edef]">
+            <div>
+              <p className="text-[8px] font-black uppercase tracking-[.14em] text-[#82939f]">Goal attainment</p>
+              <p className="mt-1 text-[11px] font-black text-[#0b2d54]">{bpGoalStats.targetDays} of {bpGoalStats.recordedDays} recorded days at target</p>
+            </div>
+            <span className="text-[10px] font-black text-[#0b6f73]">{displayProgress}%</span>
+          </div>
+        )}
 
         {Array.isArray(goal?.connectedGoals) && goal.connectedGoals.length > 0 && (
           <div className="mt-3 rounded-[17px] border border-[#dcebec] bg-[#f7fbfc] p-3.5">
