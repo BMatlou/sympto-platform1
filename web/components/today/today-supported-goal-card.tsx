@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { Activity, ArrowRight, Check, Droplets, HeartPulse, Moon, PencilLine, Target } from "lucide-react";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 import { healthGoalsService } from "@/services/health-goals.service";
 import { healthJournalService } from "@/services/health-journal.service";
@@ -154,7 +154,7 @@ export default function TodaySupportedGoalCard({ goal, activeGoals = [], onUpdat
   const target = targetValue(goal);
   const progress = progressPercent(goal);
   const source = sourceAction(category);
-  const nextStep = goalNextStep(category, current, target);
+  const nextStep = goalNextStep(category, displayCurrent, target);
   const goalId = String(goal?.id ?? "");
   const journey = useMemo(() => journeyFor(goal), [goal]);
   const linkedExerciseGoal = activeGoals.find((item: any) => String(item?.category ?? "").toUpperCase() === "EXERCISE");
@@ -162,6 +162,52 @@ export default function TodaySupportedGoalCard({ goal, activeGoals = [], onUpdat
   const defaultMetric = DEFAULT_METRICS[category] ?? DEFAULT_METRICS.OTHER;
   const metricType = String(goal?.metricConfig?.metricType ?? defaultMetric.metricType).toUpperCase();
   const metricKey = String(goal?.metricConfig?.metricKey ?? defaultMetric.metricKey);
+  const [liveCurrent, setLiveCurrent] = useState<number | null>(null);
+
+  useEffect(() => {
+    if (category !== "BLOOD_PRESSURE" || metricType !== "BLOOD_PRESSURE" || metricKey !== "blood_pressure.systolic") {
+      setLiveCurrent(null);
+      return;
+    }
+
+    let active = true;
+    const now = new Date();
+    const localDate = new Intl.DateTimeFormat("en-CA", {
+      timeZone: "Africa/Johannesburg",
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+    }).format(now);
+    const from = new Date(localDate + "T00:00:00+02:00");
+
+    healthGoalsService
+      .getMetricEvents(metricType, metricKey, from, now)
+      .then((result) => {
+        if (!active) return;
+        const events = Array.isArray(result?.events) ? result.events : [];
+        const latest = events
+          .filter((event: any) => Number.isFinite(Number(event?.loggedValue)))
+          .sort((a: any, b: any) => new Date(String(a?.occurredAt ?? 0)).getTime() - new Date(String(b?.occurredAt ?? 0)).getTime())
+          .at(-1);
+        setLiveCurrent(latest ? Number(latest.loggedValue) : null);
+      })
+      .catch(() => {
+        if (active) setLiveCurrent(null);
+      });
+
+    return () => {
+      active = false;
+    };
+  }, [category, metricType, metricKey, goalId, goal?.updatedAt]);
+
+  const displayCurrent = category === "BLOOD_PRESSURE" && liveCurrent != null ? liveCurrent : current;
+  const displayProgress = displayCurrent == null
+    ? progress
+    : progressPercent({
+        ...goal,
+        currentValue: displayCurrent,
+        latestProgress: null,
+      });
 
   async function recordValue() {
     const numeric = Number(value);
@@ -223,12 +269,12 @@ export default function TodaySupportedGoalCard({ goal, activeGoals = [], onUpdat
 
       <div className="px-4 pb-4 pt-4 sm:px-5">
         <div className="grid grid-cols-3 gap-2">
-          <div className="rounded-[16px] bg-[#f7fbfb] p-3"><p className="text-[8px] font-black uppercase tracking-[.12em] text-[#95a3ad]">Current</p><p className="mt-1 text-base font-black text-[#0b2d54]">{current == null ? "—" : current}{meta.unit && current != null ? " " + meta.unit : ""}</p></div>
+          <div className="rounded-[16px] bg-[#f7fbfb] p-3"><p className="text-[8px] font-black uppercase tracking-[.12em] text-[#95a3ad]">Current</p><p className="mt-1 text-base font-black text-[#0b2d54]">{displayCurrent == null ? "—" : displayCurrent}{meta.unit && displayCurrent != null ? " " + meta.unit : ""}</p></div>
           <div className="rounded-[16px] bg-[#f7fbfb] p-3"><p className="text-[8px] font-black uppercase tracking-[.12em] text-[#95a3ad]">Target</p><p className="mt-1 text-base font-black text-[#0b2d54]">{target == null ? "—" : target}{meta.unit && target != null ? " " + meta.unit : ""}</p></div>
-          <div className="rounded-[16px] bg-[#e9f9fa] p-3"><p className="text-[8px] font-black uppercase tracking-[.12em] text-[#0b7b80]">Progress</p><p className="mt-1 text-base font-black text-[#0b6f73]">{progress}%</p></div>
+          <div className="rounded-[16px] bg-[#e9f9fa] p-3"><p className="text-[8px] font-black uppercase tracking-[.12em] text-[#0b7b80]">Progress</p><p className="mt-1 text-base font-black text-[#0b6f73]">{displayProgress}%</p></div>
         </div>
 
-        <div className="mt-3 h-2 overflow-hidden rounded-full bg-[#edf3f5]"><div className="h-full rounded-full bg-[#24c1c4] transition-all" style={{ width: Math.max(0, progress) + "%" }} /></div>
+        <div className="mt-3 h-2 overflow-hidden rounded-full bg-[#edf3f5]"><div className="h-full rounded-full bg-[#24c1c4] transition-all" style={{ width: Math.max(0, displayProgress) + "%" }} /></div>
 
         {Array.isArray(goal?.connectedGoals) && goal.connectedGoals.length > 0 && (
           <div className="mt-3 rounded-[17px] border border-[#dcebec] bg-[#f7fbfc] p-3.5">
