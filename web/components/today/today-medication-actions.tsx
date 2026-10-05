@@ -9,7 +9,6 @@ import { healthGoalsService } from "@/services/health-goals.service";
 interface TodayMedicationActionsProps {
   medications: any[];
   goal?: any;
-  supportingGoals?: any[];
   onUpdated?: () => Promise<void> | void;
 }
 
@@ -52,6 +51,106 @@ function formatConnectedGoalValue(category: string, value: number): string {
     : Math.round(value).toLocaleString();
 }
 
+function MedicationConnectedGoalInsightCard({ insight }: { insight: any }) {
+  const target = Number(insight?.targetValue);
+  const comparison = String(insight?.comparison ?? "").toUpperCase();
+  const targetPrefix =
+    comparison === "AT_MOST" || comparison === "DECREASE_TO"
+      ? "≤"
+      : comparison === "AT_LEAST" || comparison === "INCREASE_TO"
+        ? "≥"
+        : "≈";
+
+  const status = String(insight?.latestStatus ?? "INSUFFICIENT_DATA");
+  const statusLabel =
+    status === "ON_TARGET"
+      ? "On target"
+      : status === "ABOVE_TARGET"
+        ? "Above target"
+        : status === "BELOW_TARGET"
+          ? "Below target"
+          : "Insufficient data";
+
+  const statusClass =
+    status === "ON_TARGET"
+      ? "text-[#0b7b80]"
+      : status === "INSUFFICIENT_DATA"
+        ? "text-[#8a99a6]"
+        : "text-[#b05c2b]";
+
+  const observedPeriods = Number(insight?.observedPeriods ?? 0);
+  const onTarget = insight?.onTarget ?? {};
+  const offTarget = insight?.offTarget ?? {};
+  const comparisonValid = insight?.comparisonValid === true;
+  const delta = Number(insight?.medicationDeltaPercentagePoints);
+
+  return (
+    <div className="rounded-[18px] border border-[#d9e4ee] bg-white px-3.5 py-3.5 ring-1 ring-[#e8eef3] sm:px-4 sm:py-4">
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0">
+          <p className="text-[11px] font-black leading-5 text-[#0b2d54]">
+            {String(insight?.supportingGoalName ?? "Connected goal")}
+          </p>
+          <p className="mt-0.5 text-[8px] font-black uppercase tracking-[.12em] text-[#91a0ae]">
+            {String(insight?.supportingGoalCategory ?? "").replaceAll("_", " ")}
+          </p>
+        </div>
+        <p className={`shrink-0 text-[9px] font-black ${statusClass}`}>
+          {statusLabel}
+        </p>
+      </div>
+
+      <p className="mt-2 text-[10px] font-semibold leading-5 text-[#5f7080]">
+        Target {Number.isFinite(target) ? `${targetPrefix} ${formatConnectedGoalValue(String(insight?.supportingGoalCategory ?? ""), target)}` : "not configured"} {insight?.unit || ""}
+        {insight?.latestValue != null && insight?.latestPeriodLabel
+          ? ` · Latest ${formatConnectedGoalValue(String(insight?.supportingGoalCategory ?? ""), Number(insight.latestValue))} ${insight?.unit || ""} (${insight.latestPeriodLabel})`
+          : ""}
+      </p>
+
+      {observedPeriods > 0 ? (
+        <p className="mt-1 text-[10px] font-semibold leading-5 text-[#7c8e9b]">
+          {observedPeriods} period{observedPeriods === 1 ? "" : "s"} tracked · {Number(insight?.targetMetPeriods ?? 0)} on target · {Number(insight?.targetMissedPeriods ?? 0)} off target.
+        </p>
+      ) : null}
+
+      {comparisonValid ? (
+        <div className="mt-2.5 rounded-[14px] bg-[#f7fbfb] px-3 py-2.5 ring-1 ring-[#e1ecef]">
+          <p className="text-[8px] font-black uppercase tracking-[.12em] text-[#91a0ae]">
+            Medication comparison · matched calendar days
+          </p>
+          <p className="mt-1 text-[10px] font-black leading-5 text-[#0b2d54]">
+            {Number(onTarget?.takenDoses ?? 0)} / {Number(onTarget?.scheduledDoses ?? 0)} doses
+            {" · "}
+            {Math.round(Number(onTarget?.adherencePercent ?? 0))}% on target
+          </p>
+          <p className="mt-0.5 text-[10px] font-black leading-5 text-[#0b2d54]">
+            {Number(offTarget?.takenDoses ?? 0)} / {Number(offTarget?.scheduledDoses ?? 0)} doses
+            {" · "}
+            {Math.round(Number(offTarget?.adherencePercent ?? 0))}% off target
+          </p>
+          {Number.isFinite(delta) ? (
+            <p className="mt-1 text-[9px] font-semibold leading-5 text-[#5f7080]">
+              Observed difference: {delta > 0 ? "+" : ""}{Math.round(delta)} percentage points.
+            </p>
+          ) : null}
+        </div>
+      ) : null}
+
+      {insight?.insight ? (
+        <p className="mt-2 text-[10px] leading-5 text-[#5f7080]">
+          {String(insight.insight)}
+        </p>
+      ) : null}
+
+      {comparisonValid && Number.isFinite(delta) && Math.abs(delta) >= 5 ? (
+        <p className="mt-1 text-[8px] font-semibold leading-4 text-[#9aa7b1]">
+          Observed pattern in your recorded data; this does not prove that one goal caused the other.
+        </p>
+      ) : null}
+    </div>
+  );
+}
+
 function errorMessage(error: unknown) {
   const message = (error as { response?: { data?: { message?: string | string[] } } })?.response?.data?.message;
   if (Array.isArray(message)) return message.join(" ");
@@ -73,104 +172,6 @@ function journeyProgress(goal: any) {
   const journeyDay = Number.isNaN(startDate.getTime()) ? 1 : Math.max(1, Math.floor((Date.now() - startDate.getTime()) / 86400000) + 1);
   const daysLeft = !targetDate || Number.isNaN(targetDate.getTime()) ? null : Math.max(0, Math.ceil((targetDate.getTime() - Date.now()) / 86400000));
   return { journeyDay, daysLeft };
-}
-
-function localDayKey(value: unknown) {
-  const date = new Date(String(value));
-  if (Number.isNaN(date.getTime())) return "";
-  return new Intl.DateTimeFormat("en-CA", {
-    timeZone: "Africa/Johannesburg",
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-  }).format(date);
-}
-
-function localWeekStart(day: string) {
-  const date = new Date(`${day}T12:00:00Z`);
-  const weekday = date.getUTCDay() || 7;
-  date.setUTCDate(date.getUTCDate() - (weekday - 1));
-  return date.toISOString().slice(0, 10);
-}
-
-function localWeekEnd(day: string) {
-  const date = new Date(`${day}T12:00:00Z`);
-  date.setUTCDate(date.getUTCDate() + 6);
-  return date.toISOString().slice(0, 10);
-}
-
-function localGoalRule(goal: any) {
-  const category = String(goal?.category ?? "").toUpperCase();
-  if (category === "NUTRITION") return { metricType: "NUTRITION", metricKey: "nutrition.calories", frequency: "DAILY", aggregation: "SUM", comparison: "AT_MOST", unit: "kcal/day" };
-  if (category === "EXERCISE") return { metricType: "EXERCISE", metricKey: "exercise.minutes", frequency: "WEEKLY", aggregation: "SUM", comparison: "AT_LEAST", unit: "min/week" };
-  if (category === "SLEEP") return { metricType: "SLEEP", metricKey: "sleep.hours", frequency: "DAILY", aggregation: "LATEST", comparison: "AT_LEAST", unit: "hours/night" };
-  if (category === "HYDRATION") return { metricType: "HYDRATION", metricKey: "hydration.ml", frequency: "DAILY", aggregation: "SUM", comparison: "AT_LEAST", unit: "ml/day" };
-  return null;
-}
-
-function localGoalStatus(value: number, target: number | null, comparison: string) {
-  if (!Number.isFinite(value) || target == null || !Number.isFinite(target)) return "INSUFFICIENT_DATA";
-  if (comparison === "AT_MOST" || comparison === "DECREASE_TO") return value <= target ? "ON_TARGET" : "ABOVE_TARGET";
-  if (comparison === "CLOSEST") {
-    const tolerance = Math.max(Math.abs(target) * 0.1, 0.1);
-    return Math.abs(value - target) <= tolerance ? "ON_TARGET" : value < target ? "BELOW_TARGET" : "ABOVE_TARGET";
-  }
-  return value >= target ? "ON_TARGET" : "BELOW_TARGET";
-}
-
-function localAggregate(values: number[], aggregation: string) {
-  if (!values.length) return Number.NaN;
-  switch (String(aggregation).toUpperCase()) {
-    case "AVERAGE": return values.reduce((sum, value) => sum + value, 0) / values.length;
-    case "MIN": return Math.min(...values);
-    case "MAX": return Math.max(...values);
-    case "LATEST": return values[values.length - 1];
-    default: return values.reduce((sum, value) => sum + value, 0);
-  }
-}
-
-function localSupportingPeriods(events: any[], goal: any, rule: any) {
-  const grouped = new Map<string, any[]>();
-  for (const event of events) {
-    const day = localDayKey(event?.occurredAt);
-    if (!day) continue;
-    const key = rule.frequency === "WEEKLY" ? localWeekStart(day) : day;
-    const bucket = grouped.get(key) ?? [];
-    bucket.push(event);
-    grouped.set(key, bucket);
-  }
-
-  const targetCandidate = goal?.metricConfig?.frequencyTarget ?? goal?.targetValue;
-  const target = Number(targetCandidate);
-  const comparison = String(goal?.metricConfig?.comparison ?? rule.comparison).toUpperCase();
-  const aggregation = String(goal?.metricConfig?.aggregation ?? rule.aggregation).toUpperCase();
-
-  return [...grouped.entries()].sort(([a], [b]) => a.localeCompare(b)).map(([key, periodEvents]) => {
-    const values = periodEvents.map((event) => Number(event?.loggedValue)).filter((value) => Number.isFinite(value));
-    const value = localAggregate(values, aggregation);
-    const startDay = key;
-    const endDay = rule.frequency === "WEEKLY" ? localWeekEnd(startDay) : startDay;
-    return {
-      startDay,
-      endDay,
-      label: rule.frequency === "WEEKLY" ? "week of " + startDay : startDay,
-      value,
-      status: localGoalStatus(value, Number.isFinite(target) ? target : null, comparison),
-    };
-  });
-}
-
-function localMedicationAdherence(days: any[]) {
-  let taken = 0;
-  let expected = 0;
-  for (const day of days) {
-    const dayExpected = Number(day?.expectedDoses);
-    const dayTaken = Number(day?.takenDoses);
-    if (!Number.isFinite(dayExpected) || dayExpected <= 0 || !Number.isFinite(dayTaken)) continue;
-    expected += dayExpected;
-    taken += Math.max(0, Math.min(dayExpected, dayTaken));
-  }
-  return expected > 0 ? (taken / expected) * 100 : null;
 }
 
 function cumulativeTakenDoses(medication: any): number {
@@ -203,13 +204,12 @@ function cumulativeTakenDoses(medication: any): number {
   return 0;
 }
 
-export default function TodayMedicationActions({ medications, goal: suppliedGoal, supportingGoals = [], onUpdated }: TodayMedicationActionsProps) {
+export default function TodayMedicationActions({ medications, goal: suppliedGoal, onUpdated }: TodayMedicationActionsProps) {
   const [dosesLoggedToday, setDosesLoggedToday] = useState(0);
   const [takenDosesForGoal, setTakenDosesForGoal] = useState(0);
   const [isSyncing, setIsSyncing] = useState(false);
   const [savingKey, setSavingKey] = useState<string | null>(null);
   const [states, setStates] = useState<Record<string, Action | undefined>>({});
-  const [localConnectedGoalInsights, setLocalConnectedGoalInsights] = useState<any[]>([]);
 
   const trackedMedication = medications[0] ?? null;
   const finalGoal = (() => {
@@ -357,106 +357,6 @@ export default function TodayMedicationActions({ medications, goal: suppliedGoal
   const journeyInsight = medicationInsight?.analysis?.journeyAdherence;
   const trendInsight = medicationInsight?.analysis?.trend;
 
-  const supportingGoalSignature = useMemo(
-    () =>
-      supportingGoals
-        .filter((goal: any) =>
-          ["NUTRITION", "EXERCISE", "SLEEP", "HYDRATION"].includes(
-            String(goal?.category ?? "").toUpperCase(),
-          ),
-        )
-        .map((goal: any) =>
-          [goal?.id, goal?.updatedAt, goal?.currentValue, goal?.targetValue, goal?.metricConfig?.metricKey]
-            .map((value) => String(value ?? ""))
-            .join(":"),
-        )
-        .sort()
-        .join("|"),
-    [supportingGoals],
-  );
-
-  useEffect(() => {
-    let active = true;
-    async function loadLocalConnectedGoalInsights() {
-      const candidates = supportingGoals.filter((goal: any) =>
-        ["NUTRITION", "EXERCISE", "SLEEP", "HYDRATION"].includes(String(goal?.category ?? "").toUpperCase()),
-      );
-      if (!candidates.length || !journeyInsight) {
-        if (active) setLocalConnectedGoalInsights([]);
-        return;
-      }
-      const medicationDays = Array.isArray(medicationInsight?.analysis?.dailyBuckets) ? medicationInsight.analysis.dailyBuckets : [];
-      const today = localDayKey(new Date());
-      const historicalMedicationDays = medicationDays.filter((day: any) => String(day?.day) < today && Number(day?.expectedDoses) > 0);
-      const results = await Promise.all(candidates.map(async (goal: any) => {
-        const rule = localGoalRule(goal);
-        if (!rule) return null;
-        try {
-          const goalDate = new Date(String(goal?.createdAt ?? finalGoal?.createdAt ?? Date.now()));
-          const medicationDate = new Date(String(finalGoal?.createdAt ?? Date.now()));
-          const goalTime = Number.isNaN(goalDate.getTime()) ? 0 : goalDate.getTime();
-          const medicationTime = Number.isNaN(medicationDate.getTime()) ? 0 : medicationDate.getTime();
-          const from = new Date(Math.max(goalTime, medicationTime) || Date.now());
-          const response = await healthGoalsService.getMetricEvents(rule.metricType, rule.metricKey, from, new Date());
-          const events = Array.isArray(response?.events) ? response.events : [];
-          const periods = localSupportingPeriods(events, goal, rule);
-          const historicalPeriods = periods.filter((period: any) => period.endDay < today);
-          const latestPeriod = periods[periods.length - 1] ?? null;
-          const targetPeriods = historicalPeriods.filter((period: any) => period.status === "ON_TARGET");
-          const missedPeriods = historicalPeriods.filter((period: any) => period.status === "BELOW_TARGET" || period.status === "ABOVE_TARGET");
-          const targetDays = new Set<string>();
-          const missedDays = new Set<string>();
-          for (const period of targetPeriods) {
-            const start = new Date(period.startDay + "T12:00:00Z");
-            const end = new Date(period.endDay + "T12:00:00Z");
-            for (const cursor = new Date(start); cursor <= end; cursor.setUTCDate(cursor.getUTCDate() + 1)) targetDays.add(cursor.toISOString().slice(0, 10));
-          }
-          for (const period of missedPeriods) {
-            const start = new Date(period.startDay + "T12:00:00Z");
-            const end = new Date(period.endDay + "T12:00:00Z");
-            for (const cursor = new Date(start); cursor <= end; cursor.setUTCDate(cursor.getUTCDate() + 1)) missedDays.add(cursor.toISOString().slice(0, 10));
-          }
-          const onTargetDays = historicalMedicationDays.filter((day: any) => targetDays.has(String(day?.day)));
-          const offTargetDays = historicalMedicationDays.filter((day: any) => missedDays.has(String(day?.day)));
-          const adherenceOnTarget = localMedicationAdherence(onTargetDays);
-          const adherenceOnMissed = localMedicationAdherence(offTargetDays);
-          const delta = adherenceOnTarget != null && adherenceOnMissed != null ? Number((adherenceOnTarget - adherenceOnMissed).toFixed(2)) : null;
-          const observedPeriods = historicalPeriods.length;
-          const comparableDays = onTargetDays.length + offTargetDays.length;
-          const evidenceLevel = observedPeriods >= 6 && comparableDays >= 8 ? "STRONG" : observedPeriods >= 3 && comparableDays >= 4 ? "EMERGING" : observedPeriods >= 1 ? "EARLY" : "INSUFFICIENT_DATA";
-          let insight: string | null = null;
-          if (delta != null && onTargetDays.length >= 2 && offTargetDays.length >= 2) insight = "Medication adherence was " + Math.round(adherenceOnTarget) + "% when " + String(goal?.title ?? "this goal") + " was on target versus " + Math.round(adherenceOnMissed) + "% when it was not.";
-          else if (latestPeriod && latestPeriod.status !== "INSUFFICIENT_DATA") insight = String(goal?.title ?? "This goal") + (latestPeriod.status === "ON_TARGET" ? " is on target in the latest recorded period." : " is off target in the latest recorded period.");
-          const targetCandidate = goal?.metricConfig?.frequencyTarget ?? goal?.targetValue;
-          const parsedTarget = Number(targetCandidate);
-          return {
-            supportingGoalId: String(goal?.id),
-            supportingGoalName: String(goal?.title ?? goal?.category ?? "Connected goal"),
-            supportingGoalCategory: String(goal?.category ?? "").toUpperCase(),
-            targetValue: Number.isFinite(parsedTarget) ? parsedTarget : null,
-            unit: goal?.unit || rule.unit,
-            frequency: String(goal?.metricConfig?.frequency ?? rule.frequency),
-            comparison: String(goal?.metricConfig?.comparison ?? rule.comparison).toUpperCase(),
-            aggregation: String(goal?.metricConfig?.aggregation ?? rule.aggregation).toUpperCase(),
-            observedPeriods,
-            targetMetPeriods: targetPeriods.length,
-            targetMissedPeriods: missedPeriods.length,
-            latestValue: latestPeriod?.value ?? null,
-            latestPeriodLabel: latestPeriod?.label ?? null,
-            latestStatus: latestPeriod?.status ?? "INSUFFICIENT_DATA",
-            medicationAdherenceOnTargetPeriods: adherenceOnTarget,
-            medicationAdherenceOnMissedTargetPeriods: adherenceOnMissed,
-            medicationDeltaPercentagePoints: delta,
-            evidenceLevel,
-            insight,
-          };
-        } catch { return null; }
-      }));
-      if (active) setLocalConnectedGoalInsights(results.filter(Boolean));
-    }
-    void loadLocalConnectedGoalInsights();
-    return () => { active = false; };
-  }, [finalGoal?.id, finalGoal?.createdAt, journeyInsight, medicationInsight?.analysis?.dailyBuckets, supportingGoalSignature]);
   const associationInsight = (medicationInsight?.analysis?.associations ?? []).find(
     (association: any) => association?.statisticallyRelevant && association?.insight,
   );
@@ -468,9 +368,9 @@ export default function TodayMedicationActions({ medications, goal: suppliedGoal
   const strongestConnectedInsight = connectedGoalInsights
     .filter(
       (item: any) =>
-        Number.isFinite(Number(item?.medicationDeltaPercentagePoints)) &&
-        Number(item?.targetMetPeriods ?? 0) >= 2 &&
-        Number(item?.targetMissedPeriods ?? 0) >= 2,
+        item?.comparisonValid === true &&
+        item?.insight &&
+        Number.isFinite(Number(item?.medicationDeltaPercentagePoints)),
     )
     .sort(
       (a: any, b: any) =>
@@ -640,115 +540,12 @@ export default function TodayMedicationActions({ medications, goal: suppliedGoal
                   </p>
                 </div>
 
-                {connectedGoalInsights.map((connectedGoal: any) => {
-                  const target = Number(connectedGoal?.targetValue);
-                  const latest = Number(connectedGoal?.latestValue);
-                  const targetValid = Number.isFinite(target);
-                  const latestValid = Number.isFinite(latest);
-                  const comparison = String(connectedGoal?.comparison ?? "").toUpperCase();
-                  const targetPrefix =
-                    comparison === "AT_MOST" || comparison === "DECREASE_TO"
-                      ? "≤"
-                      : comparison === "AT_LEAST" || comparison === "INCREASE_TO"
-                        ? "≥"
-                        : "≈";
-                  const status = String(connectedGoal?.latestStatus ?? "INSUFFICIENT_DATA");
-                  const statusLabel =
-                    status === "ON_TARGET"
-                      ? "On target"
-                      : status === "ABOVE_TARGET"
-                        ? "Above target"
-                        : status === "BELOW_TARGET"
-                          ? "Below target"
-                          : "Insufficient data";
-                  const statusClass =
-                    status === "ON_TARGET"
-                      ? "text-[#0b7b80]"
-                      : status === "INSUFFICIENT_DATA"
-                        ? "text-[#8a99a6]"
-                        : "text-[#b05c2b]";
-                  const observedPeriods = Number(connectedGoal?.observedPeriods ?? 0);
-                  const targetMetPeriods = Number(connectedGoal?.targetMetPeriods ?? 0);
-                  const targetMissedPeriods = Number(connectedGoal?.targetMissedPeriods ?? 0);
-                  const adherenceOnTarget = Number(connectedGoal?.medicationAdherenceOnTargetPeriods);
-                  const adherenceOnMissed = Number(connectedGoal?.medicationAdherenceOnMissedTargetPeriods);
-                  const delta = Number(connectedGoal?.medicationDeltaPercentagePoints);
-                  const hasComparison =
-                    Number.isFinite(adherenceOnTarget) &&
-                    Number.isFinite(adherenceOnMissed) &&
-                    targetMetPeriods > 0 &&
-                    targetMissedPeriods > 0;
-
-                  return (
-                    <div
-                      key={String(connectedGoal?.supportingGoalId)}
-                      className="rounded-[18px] border border-[#d9e4ee] bg-white px-3.5 py-3.5 ring-1 ring-[#e8eef3] sm:px-4 sm:py-4"
-                    >
-                      <div className="flex items-start justify-between gap-3">
-                        <div className="min-w-0">
-                          <p className="text-[11px] font-black leading-5 text-[#0b2d54]">
-                            {connectedGoal?.supportingGoalName}
-                          </p>
-                          <p className="mt-0.5 text-[8px] font-black uppercase tracking-[.12em] text-[#91a0ae]">
-                            {String(connectedGoal?.supportingGoalCategory ?? "").replaceAll("_", " ")}
-                          </p>
-                        </div>
-                        <p className={`shrink-0 text-[9px] font-black ${statusClass}`}>
-                          {statusLabel}
-                        </p>
-                      </div>
-
-                      <p className="mt-2 text-[10px] font-semibold leading-5 text-[#5f7080]">
-                        Target {targetValid ? `${targetPrefix} ${formatConnectedGoalValue(String(connectedGoal?.supportingGoalCategory ?? ""), target)}` : "not configured"} {connectedGoal?.unit || ""}
-                        {latestValid && connectedGoal?.latestPeriodLabel
-                          ? ` · Latest ${formatConnectedGoalValue(String(connectedGoal?.supportingGoalCategory ?? ""), latest)} ${connectedGoal?.unit || ""} (${connectedGoal.latestPeriodLabel})`
-                          : ""}
-                      </p>
-
-                      {observedPeriods > 0 ? (
-                        <p className="mt-1 text-[10px] font-semibold leading-5 text-[#7c8e9b]">
-                          {observedPeriods} period{observedPeriods === 1 ? "" : "s"} tracked · {targetMetPeriods} on target · {targetMissedPeriods} off target.
-                          {connectedGoal?.evidenceLevel
-                            ? ` · ${String(connectedGoal.evidenceLevel).toLowerCase().replaceAll("_", " ")} evidence`
-                            : ""}
-                        </p>
-                      ) : null}
-
-                      {hasComparison ? (
-                        <div className="mt-2.5 rounded-[14px] bg-[#f7fbfb] px-3 py-2.5 ring-1 ring-[#e1ecef]">
-                          <p className="text-[8px] font-black uppercase tracking-[.12em] text-[#91a0ae]">
-                            Medication comparison
-                          </p>
-                          <p className="mt-1 text-[10px] font-black leading-5 text-[#0b2d54]">
-                            {Math.round(adherenceOnTarget)}% adherence when on target
-                            {" · "}
-                            {Math.round(adherenceOnMissed)}% when off target
-                          </p>
-                          {Number.isFinite(delta) ? (
-                            <p className="mt-0.5 text-[9px] font-semibold leading-5 text-[#5f7080]">
-                              {delta > 0 ? "+" : ""}{Math.round(delta)} percentage points when the goal was on target.
-                            </p>
-                          ) : null}
-                        </div>
-                      ) : null}
-
-                      {connectedGoal?.insight ? (
-                        <p className="mt-2 text-[10px] leading-5 text-[#5f7080]">
-                          {connectedGoal.insight}
-                        </p>
-                      ) : connectedGoal?.evidenceLevel === "INSUFFICIENT_DATA" ? (
-                        <p className="mt-2 text-[9px] font-semibold leading-5 text-[#9aa7b1]">
-                          More logged data is needed before Sympto compares this goal with medication adherence.
-                        </p>
-                      ) : null}
-
-                      {hasComparison && Math.abs(delta) >= 10 ? (
-                        <p className="mt-1 text-[8px] font-semibold leading-4 text-[#9aa7b1]">
-                          Observed pattern in your records; this does not prove that one goal caused the other.
-                        </p>
-                      ) : null}
-                    </div>
-                  );
+                {connectedGoalInsights.map((connectedGoal: any) => (
+                  <MedicationConnectedGoalInsightCard
+                    key={String(connectedGoal?.supportingGoalId)}
+                    insight={connectedGoal}
+                  />
+                ))}
                 })}
               </div>
             ) : associationInsight?.insight ? (
