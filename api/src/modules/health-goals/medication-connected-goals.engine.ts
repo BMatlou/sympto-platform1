@@ -130,9 +130,11 @@ export class MedicationConnectedGoalsEngine {
       input.timezone,
     );
     const completedPeriods = periods.filter((period) => {
-      if (period.endDay >= input.today) return false;
+      const frequency = input.goal.frequency.toUpperCase();
+      if (frequency === 'WEEKLY' && period.endDay >= input.today) return false;
+      if (frequency !== 'WEEKLY' && period.endDay > input.today) return false;
       if (
-        input.goal.frequency.toUpperCase() === 'WEEKLY' &&
+        frequency === 'WEEKLY' &&
         period.startDay < dayKey(new Date(input.goal.createdAt), input.timezone)
       ) {
         return false;
