@@ -318,87 +318,116 @@ export default function TodaySupportedGoalCard({ goal, activeGoals = [], onUpdat
       <div className="px-4 pb-4 pt-4 sm:px-5">
         {category === "BLOOD_PRESSURE" ? (
           <>
-            <div className="grid grid-cols-3 gap-2">
-              <div className="rounded-[16px] bg-[#f7fbfb] p-3">
-                <p className="text-[8px] font-black uppercase tracking-[.12em] text-[#95a3ad]">Current</p>
-                <p className="mt-1 text-base font-black text-[#0b2d54]">
-                  {displayCurrent == null ? "—" : displayCurrent} mmHg
-                </p>
-              </div>
-              <div className="rounded-[16px] bg-[#f7fbfb] p-3">
-                <p className="text-[8px] font-black uppercase tracking-[.12em] text-[#95a3ad]">Target</p>
-                <p className="mt-1 text-base font-black text-[#0b2d54]">
-                  {target == null ? "—" : "≤" + target} mmHg
-                </p>
-              </div>
-              <div className={bpWithinTarget === false ? "rounded-[16px] bg-red-50 p-3 ring-1 ring-red-200" : "rounded-[16px] bg-[#e9f9fa] p-3 ring-1 ring-[#c9eeee]"}>
-                <p className={bpWithinTarget === false ? "text-[8px] font-black uppercase tracking-[.12em] text-red-700" : "text-[8px] font-black uppercase tracking-[.12em] text-[#0b7b80]"}>
-                  Distance
-                </p>
-                <p className={bpWithinTarget === false ? "mt-1 text-base font-black text-red-700" : "mt-1 text-base font-black text-[#0b6f73]"}>
-                  {displayCurrent == null || target == null
-                    ? "—"
-                    : bpWithinTarget
-                      ? (Math.abs(bpDistance ?? 0) === 0 ? "At target" : Math.abs(bpDistance ?? 0) + " mmHg below")
-                      : "+" + Math.abs(bpDistance ?? 0) + " mmHg"}
-                </p>
-              </div>
-            </div>
+            <section className="relative overflow-hidden rounded-[28px] bg-[#0b2d54] px-5 py-6 text-white shadow-[0_16px_34px_rgba(11,45,84,.16)] sm:px-6 sm:py-7">
+              <div className="pointer-events-none absolute -right-16 -top-16 h-44 w-44 rounded-full bg-[#24c1c4]/10 blur-3xl" aria-hidden="true" />
+              <div className="pointer-events-none absolute -bottom-20 -left-16 h-40 w-40 rounded-full bg-[#0f5a62]/35 blur-3xl" aria-hidden="true" />
 
-            {displayCurrent != null && target != null && (
-              <div className={bpWithinTarget ? "mt-3 rounded-[20px] border border-[#bcebed] bg-[#effafa] p-4" : "mt-3 rounded-[20px] border border-red-200 bg-red-50 p-4"}>
-                <div className="flex items-start gap-3">
-                  <span className={bpWithinTarget ? "mt-0.5 grid h-8 w-8 shrink-0 place-items-center rounded-[11px] bg-[#24c1c4]/15 text-[#0b7b80]" : "mt-0.5 grid h-8 w-8 shrink-0 place-items-center rounded-[11px] bg-red-100 text-red-700"}>
-                    <HeartPulse className="h-4 w-4" />
-                  </span>
-                  <div className="min-w-0">
-                    <p className={bpWithinTarget ? "text-[9px] font-black uppercase tracking-[.15em] text-[#0b7b80]" : "text-[9px] font-black uppercase tracking-[.15em] text-red-700"}>
-                      {bpWithinTarget ? "At target today" : "Above target today"}
-                    </p>
-                    <p className={bpWithinTarget ? "mt-1 text-sm font-black text-[#0b6f73]" : "mt-1 text-sm font-black text-red-700"}>
-                      {bpWithinTarget
-                        ? (bpDistance ?? 0) === 0
-                          ? "Your reading is at your target."
-                          : Math.abs(bpDistance ?? 0) + " mmHg below your target."
-                        : Math.abs(bpDistance ?? 0) + " mmHg above your target."}
-                    </p>
-                    <p className={bpWithinTarget ? "mt-1 text-[10px] leading-5 text-[#55747c]" : "mt-1 text-[10px] leading-5 text-red-700/80"}>
-                      {bpWithinTarget
-                        ? "Keep tracking daily readings so Sympto can measure how consistently you stay within your target."
-                        : "Your reading is above the target. Keep recording readings so Sympto can show whether your trend is moving toward it."}
-                    </p>
-                  </div>
-                </div>
-              </div>
-            )}
-
-            {bpGoalStats.recordedDays > 0 && (
-              <div className="mt-3 rounded-[20px] border border-[#dfeaec] bg-white p-4">
-                <div className="flex items-end justify-between gap-3">
+              <div className="relative">
+                <div className="flex items-start justify-between gap-4">
                   <div>
-                    <p className="text-[8px] font-black uppercase tracking-[.15em] text-[#82939f]">Goal attainment</p>
-                    <p className="mt-1 text-sm font-black text-[#0b2d54]">
-                      {bpGoalStats.targetDays} of {bpGoalStats.recordedDays} recorded days at target
+                    <p className="text-[9px] font-black uppercase tracking-[.17em] text-[#24c1c4]">Blood pressure · Daily target</p>
+                    <p className="mt-1 text-[10px] font-semibold text-white/55">
+                      {bpGoalStats.recordedDays > 0
+                        ? `${bpGoalStats.targetDays} of ${bpGoalStats.recordedDays} recorded days at target`
+                        : "Start recording readings to build your trend"}
                     </p>
                   </div>
-                  <span className="text-lg font-black tracking-[-.04em] text-[#0b2d54]">{displayProgress}%</span>
+                  <span className={bpWithinTarget === false
+                    ? "rounded-full bg-red-400/10 px-2.5 py-1 text-[8px] font-black uppercase tracking-[.12em] text-red-200 ring-1 ring-red-300/20"
+                    : "rounded-full bg-[#24c1c4]/10 px-2.5 py-1 text-[8px] font-black uppercase tracking-[.12em] text-[#8ef0ef] ring-1 ring-[#24c1c4]/20]"}>
+                    {displayCurrent == null || target == null ? "No reading" : bpWithinTarget ? "Within target" : "Above target"}
+                  </span>
                 </div>
-                <div className="mt-3 h-2 overflow-hidden rounded-full bg-[#edf3f5]">
-                  <div
-                    className="h-full rounded-full bg-[#24c1c4] transition-all"
-                    style={{ width: Math.max(0, displayProgress) + "%" }}
-                  />
-                </div>
-                <p className="mt-2 text-[9px] leading-4 text-[#7b8d98]">
-                  Progress is based on the days you have actually recorded a reading at or below your target.
-                </p>
-              </div>
-            )}
 
-            <div className="mt-3 rounded-[17px] bg-[#fbfdfd] p-3.5 ring-1 ring-[#e4edef]">
-              <p className="text-[10px] leading-5 text-[#758896]">{meta.helper}</p>
-            </div>
+                <div className="mt-6 grid gap-5 sm:grid-cols-[1.15fr_.85fr] sm:items-end">
+                  <div>
+                    <p className="text-[9px] font-black uppercase tracking-[.16em] text-white/40">Current</p>
+                    <div className="mt-1 flex items-end gap-2">
+                      <p className="text-[48px] font-black leading-none tracking-[-.085em]">
+                        {displayCurrent == null ? "—" : displayCurrent}
+                      </p>
+                      <span className="mb-1.5 text-sm font-bold text-white/45">mmHg</span>
+                    </div>
+                    <p className="mt-3 text-[10px] font-semibold leading-5 text-white/55">Latest systolic reading recorded in Health Vitals.</p>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-2">
+                    <div className="rounded-[18px] bg-white/[.06] p-3.5 ring-1 ring-white/10">
+                      <p className="text-[8px] font-black uppercase tracking-[.13em] text-white/35">Target</p>
+                      <p className="mt-1 text-lg font-black tracking-[-.04em]">{target == null ? "—" : "≤" + target}</p>
+                      <p className="mt-0.5 text-[8px] font-bold text-white/35">mmHg systolic</p>
+                    </div>
+                    <div className={bpWithinTarget === false
+                      ? "rounded-[18px] bg-red-400/10 p-3.5 ring-1 ring-red-300/20"
+                      : "rounded-[18px] bg-[#24c1c4]/10 p-3.5 ring-1 ring-[#24c1c4]/20]"}>
+                      <p className={bpWithinTarget === false
+                        ? "text-[8px] font-black uppercase tracking-[.13em] text-red-200"
+                        : "text-[8px] font-black uppercase tracking-[.13em] text-[#8ef0ef]"}>Distance</p>
+                      <p className={bpWithinTarget === false
+                        ? "mt-1 text-lg font-black tracking-[-.04em] text-red-100"
+                        : "mt-1 text-lg font-black tracking-[-.04em] text-white"}>
+                        {displayCurrent == null || target == null
+                          ? "—"
+                          : bpWithinTarget
+                            ? Math.abs(bpDistance ?? 0) === 0 ? "At target" : Math.abs(bpDistance ?? 0) + " below"
+                            : "+" + Math.abs(bpDistance ?? 0)}
+                      </p>
+                      <p className={bpWithinTarget === false ? "mt-0.5 text-[8px] font-bold text-red-200/65" : "mt-0.5 text-[8px] font-bold text-white/35"}>
+                        {displayCurrent == null || target == null || bpWithinTarget === true ? "target" : "mmHg above target"}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+
+                {displayCurrent != null && target != null && (
+                  <div className={bpWithinTarget === false
+                    ? "mt-5 rounded-[20px] bg-red-400/10 p-4 ring-1 ring-red-300/20"
+                    : "mt-5 rounded-[20px] bg-[#24c1c4]/10 p-4 ring-1 ring-[#24c1c4]/20]"}>
+                    <div className="flex items-start gap-3">
+                      <span className={bpWithinTarget === false
+                        ? "mt-0.5 grid h-8 w-8 shrink-0 place-items-center rounded-[11px] bg-red-400/10 text-red-200"
+                        : "mt-0.5 grid h-8 w-8 shrink-0 place-items-center rounded-[11px] bg-[#24c1c4]/10 text-[#8ef0ef]"}>
+                        <HeartPulse className="h-4 w-4" />
+                      </span>
+                      <div className="min-w-0">
+                        <p className={bpWithinTarget === false
+                          ? "text-[9px] font-black uppercase tracking-[.15em] text-red-200"
+                          : "text-[9px] font-black uppercase tracking-[.15em] text-[#8ef0ef]"}>
+                          {bpWithinTarget ? "At target today" : "Above target today"}
+                        </p>
+                        <p className="mt-1 text-sm font-black text-white">
+                          {bpWithinTarget
+                            ? (bpDistance ?? 0) === 0
+                              ? "Your reading is at your target."
+                              : Math.abs(bpDistance ?? 0) + " mmHg below your target."
+                            : Math.abs(bpDistance ?? 0) + " mmHg above your target."}
+                        </p>
+                        <p className="mt-1 text-[10px] leading-5 text-white/55">
+                          {bpWithinTarget
+                            ? "Keep tracking daily readings so Sympto can measure how consistently you stay within your target."
+                            : "Your reading is above the target. Keep recording readings so Sympto can show whether your trend is moving toward it."}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                <div className="mt-5">
+                  <div className="flex items-end justify-between gap-3">
+                    <div>
+                      <p className="text-[8px] font-black uppercase tracking-[.15em] text-white/35">Goal attainment</p>
+                      <p className="mt-1 text-[10px] font-semibold text-white/55">Based on days with a recorded latest reading at or below target.</p>
+                    </div>
+                    <span className="text-lg font-black tracking-[-.04em] text-white">{displayProgress}%</span>
+                  </div>
+                  <div className="mt-2 h-2 overflow-hidden rounded-full bg-white/10">
+                    <div className="h-full rounded-full bg-[#24c1c4] transition-all" style={{ width: Math.max(0, displayProgress) + "%" }} />
+                  </div>
+                </div>
+              </div>
+            </section>
           </>
+        )
         ) : (
           <>
           <div className="grid grid-cols-3 gap-2">
@@ -446,27 +475,79 @@ export default function TodaySupportedGoalCard({ goal, activeGoals = [], onUpdat
           </div>
         )}
 
-        <div className="mt-3 rounded-[17px] bg-[#fbfdfd] p-3.5 ring-1 ring-[#e4edef]">
-          <p className="text-[10px] leading-5 text-[#758896]">{meta.helper}</p>
-          {category === "NUTRITION" && nutritionTargetReview(target) && <div className="mt-2 rounded-[14px] border border-amber-200 bg-amber-50 px-3 py-2.5"><p className="text-[9px] font-black uppercase tracking-[.12em] text-amber-900">Target review</p><p className="mt-1 text-[10px] leading-5 text-amber-900/85">{nutritionTargetReview(target)}</p></div>}
-          {category === "BLOOD_PRESSURE" && <BloodPressureInsights target={target} />}
-          {meta.action === "MANUAL" ? (
-            <div className="mt-3 flex flex-col gap-2 sm:flex-row">
-              <input type="number" inputMode="decimal" step={meta.step} min={meta.min} max={meta.max} value={value} onChange={(event) => setValue(event.target.value)} placeholder={meta.placeholder} aria-label={"Record " + meta.label + " value"} className="min-h-10 w-full rounded-xl border border-[#d8e5e9] bg-white px-3 text-xs font-bold text-[#0b2d54] outline-none placeholder:text-[#a2afb8] focus:border-[#24c1c4]" />
-              <button type="button" onClick={() => void recordValue()} disabled={saving || value.trim() === ""} className="inline-flex min-h-10 shrink-0 items-center justify-center gap-1.5 rounded-xl bg-[#0b2d54] px-4 py-2 text-[9px] font-black text-white disabled:cursor-not-allowed disabled:opacity-40"><Check className="h-3.5 w-3.5 text-[#24c1c4]" />{saving ? "Saving…" : "Record value"}</button>
+{Array.isArray(goal?.connectedGoals) && goal.connectedGoals.length > 0 && (
+          <div className="mt-3 rounded-[17px] border border-[#dcebec] bg-[#f7fbfc] p-3.5">
+            <div className="flex items-center justify-between gap-2">
+              <p className="text-[8px] font-black uppercase tracking-[.14em] text-[#82939f]">Goal connections</p>
+              <span className="text-[8px] font-bold text-[#9aa8b1]">{goal.connectedGoals.length} connected</span>
             </div>
-          ) : (
-            <Link href={source.href} className="mt-3 inline-flex min-h-10 w-full items-center justify-center gap-1.5 rounded-xl bg-[#0b2d54] px-4 py-2 text-[9px] font-black text-white"><ArrowRight className="h-3.5 w-3.5 text-[#24c1c4]" />{source.label}</Link>
-          )}
-          {meta.action === "MANUAL" && (category === "BLOOD_GLUCOSE" || category === "CHOLESTEROL") && <Link href="/tests-results" className="mt-2 inline-flex min-h-9 w-full items-center justify-center gap-1.5 rounded-xl border border-[#dce7eb] bg-white px-3 py-2 text-[9px] font-black text-[#0b2d54]">View recorded results <ArrowRight className="h-3.5 w-3.5" /></Link>}
-          {category === "BLOOD_PRESSURE" && (
-            <div className="mt-3 flex items-center justify-between gap-3 border-t border-[#edf2f4] pt-3">
+            <div className="mt-2 flex flex-wrap gap-2">
+              {goal.connectedGoals.slice(0, 4).map((relation: any) => {
+                const related = relation?.goal;
+                const relatedCategory = String(related?.category ?? "").toUpperCase();
+                const isExerciseConnection = category === "BLOOD_PRESSURE" || relatedCategory === "EXERCISE";
+                const direction = String(relation?.direction ?? "");
+                const relationLabel = String(relation?.relationshipType ?? "").toUpperCase() === "SUPPORTS"
+                  ? direction === "supportsThisGoal" ? "Supports this" : "Supports another"
+                  : "Related";
+                const href = isExerciseConnection
+                  ? exerciseConnectionHref
+                  : related?.id ? "/health-goals#goal-" + encodeURIComponent(String(related.id)) : "/health-goals";
+                return (
+                  <Link
+                    key={String(relation?.id ?? related?.id ?? relatedCategory)}
+                    href={href}
+                    className="inline-flex min-w-0 items-center gap-1 rounded-full bg-white px-2.5 py-1.5 text-[8px] font-bold text-[#0b6f73] ring-1 ring-[#dce8eb] transition hover:border-[#24c1c4]"
+                    title={String(relation?.rationale ?? (isExerciseConnection ? (linkedExerciseGoal ? "Open your exercise goal in Today." : "Set an exercise goal to connect it with your blood-pressure goal.") : ""))}
+                  >
+                    <span className="truncate">{isExerciseConnection ? "Exercise" : String(related?.title ?? related?.category ?? "Connected goal")}</span>
+                    <span className="shrink-0 text-[#91a2ad]">· {relationLabel}</span>
+                  </Link>
+                );
+              })}
+            </div>
+          </div>
+        )}
+
+        {category === "BLOOD_PRESSURE" ? (
+          <div className="mt-4 space-y-3">
+            <section className="rounded-[22px] border border-[#dfeaec] bg-[#f8fbfb] p-4 sm:p-5">
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                <div className="min-w-0">
+                  <p className="text-[8px] font-black uppercase tracking-[.15em] text-[#0b7b80]">Record your reading</p>
+                  <p className="mt-1 text-sm font-black text-[#0b2d54]">Keep Health Vitals up to date</p>
+                  <p className="mt-1 text-[10px] leading-5 text-[#758896]">{meta.helper}</p>
+                </div>
+                <Link href={source.href} className="inline-flex min-h-10 shrink-0 items-center justify-center gap-1.5 rounded-xl bg-[#0b2d54] px-3.5 py-2.5 text-[9px] font-black text-white transition hover:bg-[#0f5a62]">
+                  {source.label} <ArrowRight className="h-3.5 w-3.5 text-[#24c1c4]" />
+                </Link>
+              </div>
+            </section>
+
+            <BloodPressureInsights target={target} />
+
+            <div className="flex items-center justify-between gap-3 border-t border-[#edf2f4] px-1 pt-3">
               <div className="min-w-0">
                 <p className="text-[10px] font-black text-[#6f818d]">Day {journey.journeyDay} · {journey.daysLeft === null ? "Journey active" : journey.daysLeft === 0 ? "Target date today" : journey.daysLeft + " days left"}</p>
                 <p className="mt-1 text-[9px] text-[#9aa8b1]">Target date: {journey.targetDate && !Number.isNaN(journey.targetDate.getTime()) ? formatJourneyDate(journey.targetDate) : "No date set"} · Daily target ≤ {target ?? "—"} mmHg</p>
               </div>
             </div>
-          )}        </div>
+          </div>
+        ) : (
+          <div className="mt-3 rounded-[17px] bg-[#fbfdfd] p-3.5 ring-1 ring-[#e4edef]">
+            <p className="text-[10px] leading-5 text-[#758896]">{meta.helper}</p>
+            {category === "NUTRITION" && nutritionTargetReview(target) && <div className="mt-2 rounded-[14px] border border-amber-200 bg-amber-50 px-3 py-2.5"><p className="text-[9px] font-black uppercase tracking-[.12em] text-amber-900">Target review</p><p className="mt-1 text-[10px] leading-5 text-amber-900/85">{nutritionTargetReview(target)}</p></div>}
+            {meta.action === "MANUAL" ? (
+              <div className="mt-3 flex flex-col gap-2 sm:flex-row">
+                <input type="number" inputMode="decimal" step={meta.step} min={meta.min} max={meta.max} value={value} onChange={(event) => setValue(event.target.value)} placeholder={meta.placeholder} aria-label={"Record " + meta.label + " value"} className="min-h-10 w-full rounded-xl border border-[#d8e5e9] bg-white px-3 text-xs font-bold text-[#0b2d54] outline-none placeholder:text-[#a2afb8] focus:border-[#24c1c4]" />
+                <button type="button" onClick={() => void recordValue()} disabled={saving || value.trim() === ""} className="inline-flex min-h-10 shrink-0 items-center justify-center gap-1.5 rounded-xl bg-[#0b2d54] px-4 py-2 text-[9px] font-black text-white disabled:cursor-not-allowed disabled:opacity-40"><Check className="h-3.5 w-3.5 text-[#24c1c4]" />{saving ? "Saving…" : "Record value"}</button>
+              </div>
+            ) : (
+              <Link href={source.href} className="mt-3 inline-flex min-h-10 w-full items-center justify-center gap-1.5 rounded-xl bg-[#0b2d54] px-4 py-2 text-[9px] font-black text-white"><ArrowRight className="h-3.5 w-3.5 text-[#24c1c4]" />{source.label}</Link>
+            )}
+            {meta.action === "MANUAL" && (category === "BLOOD_GLUCOSE" || category === "CHOLESTEROL") && <Link href="/tests-results" className="mt-2 inline-flex min-h-9 w-full items-center justify-center gap-1.5 rounded-xl border border-[#dce7eb] bg-white px-3 py-2 text-[9px] font-black text-[#0b2d54]">View recorded results <ArrowRight className="h-3.5 w-3.5" /></Link>}
+          </div>
+        )}
       </div>
     </article>
   );
