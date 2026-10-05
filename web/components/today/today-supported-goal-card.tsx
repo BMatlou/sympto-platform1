@@ -502,9 +502,13 @@ export default function TodaySupportedGoalCard({ goal, activeGoals = [], onUpdat
 
             <BloodPressureInsights
               target={target}
-              exerciseGoalTarget={linkedExerciseGoal?.targetValue ?? linkedExerciseGoal?.metricConfig?.frequencyTarget ?? null}
+              exerciseGoalTarget={(() => {
+                const raw = linkedExerciseGoal?.targetValue ?? linkedExerciseGoal?.frequencyTarget ?? linkedExerciseGoal?.metricConfig?.frequencyTarget;
+                const numeric = Number(raw);
+                return Number.isFinite(numeric) ? numeric : null;
+              })()}
               exerciseGoalTitle={linkedExerciseGoal?.title ?? "Exercise goal"}
-              exerciseGoalFrequency={linkedExerciseGoal?.metricConfig?.frequency ?? linkedExerciseGoal?.frequency ?? "WEEKLY"}
+              exerciseGoalFrequency={String(linkedExerciseGoal?.metricConfig?.frequency ?? linkedExerciseGoal?.frequency ?? "WEEKLY").toUpperCase()}
             />
 
             <div className="flex items-center justify-between gap-3 border-t border-[#edf2f4] px-1 pt-3">
