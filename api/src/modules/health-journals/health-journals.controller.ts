@@ -1,7 +1,6 @@
 import {
   Body,
   Controller,
-  BadRequestException,
   Delete,
   Get,
   Param,
@@ -9,11 +8,8 @@ import {
   Post,
   Query,
   Req,
-  UploadedFile,
   UseGuards,
-  UseInterceptors,
 } from '@nestjs/common';
-import { FileInterceptor } from '@nestjs/platform-express';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
@@ -22,7 +18,6 @@ import { Permissions } from '../auth/decorators/permissions.decorator';
 
 import { HealthJournalsService } from './health-journals.service';
 import { SymptomIntelligenceService } from './symptom-intelligence.service';
-import { VoiceTranscriptionService } from './voice-transcription.service';
 
 import { CreateHealthJournalDto } from './dto/create-health-journal.dto';
 import { UpdateHealthJournalDto } from './dto/update-health-journal.dto';
@@ -39,7 +34,6 @@ export class HealthJournalsController {
   constructor(
     private readonly healthJournalsService: HealthJournalsService,
     private readonly symptomIntelligenceService: SymptomIntelligenceService,
-    private readonly voiceTranscriptionService: VoiceTranscriptionService,
   ) {}
 
   @Permissions('health-journals.create')
@@ -78,33 +72,6 @@ export class HealthJournalsController {
       id,
       dto,
     );
-  }
-
-  @Permissions('health-journals.create')
-  @Post('talk-to-sympto/transcribe')
-  @UseInterceptors(
-    FileInterceptor('audio', {
-      limits: {
-        fileSize: 15 * 1024 * 1024,
-      },
-    }),
-  )
-  async transcribeTalkToSympto(
-    @UploadedFile() file: {
-      buffer: Buffer;
-      mimetype: string;
-      originalname: string;
-    } | undefined,
-  ) {
-    if (!file?.buffer?.length) {
-      throw new BadRequestException('No audio recording was provided.');
-    }
-
-    if (!String(file.mimetype ?? '').toLowerCase().startsWith('audio/')) {
-      throw new BadRequestException('The uploaded file must be an audio recording.');
-    }
-
-    return this.voiceTranscriptionService.transcribe(file);
   }
 
   @Permissions('health-journals.create')
