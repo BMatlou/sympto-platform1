@@ -24,7 +24,14 @@ async function getTranscriber(
 ): Promise<Transcriber> {
   if (!transcriberPromise) {
     transcriberPromise = (async () => {
-      const { pipeline } = await import("@huggingface/transformers");
+      const { pipeline, env, LogLevel } = await import("@huggingface/transformers");
+
+      // ONNX Runtime may legitimately assign a few graph operations to CPU
+      // while the preferred WebGPU provider handles the rest. Keep that
+      // non-fatal provider warning out of the app's console-error overlay,
+      // while preserving real errors.
+      env.logLevel = LogLevel.ERROR;
+      env.backends.onnx?.setLogLevel?.(LogLevel.ERROR);
 
       const hasWebGpu =
         typeof navigator !== "undefined" &&
