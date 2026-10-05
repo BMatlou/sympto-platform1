@@ -170,11 +170,19 @@ export default function TodaySupportedGoalCard({ goal, activeGoals = [], onUpdat
   const metricKey = String(goal?.metricConfig?.metricKey ?? defaultMetric.metricKey);
   const [liveCurrent, setLiveCurrent] = useState<number | null>(null);
   const [bpGoalStats, setBpGoalStats] = useState({ recordedDays: 0, targetDays: 0 });
+  const [bpMetricEvents, setBpMetricEvents] = useState<Array<{
+    id?: string;
+    loggedValue: number;
+    occurredAt: string;
+    source?: string | null;
+    sourceId?: string | null;
+  }> | null>(null);
 
   useEffect(() => {
     if (category !== "BLOOD_PRESSURE" || metricType !== "BLOOD_PRESSURE" || metricKey !== "blood_pressure.systolic") {
       setLiveCurrent(null);
       setBpGoalStats({ recordedDays: 0, targetDays: 0 });
+      setBpMetricEvents([]);
       return;
     }
 
@@ -189,13 +197,21 @@ export default function TodaySupportedGoalCard({ goal, activeGoals = [], onUpdat
         if (!active) return;
 
         const events = (Array.isArray(result?.events) ? result.events : [])
-          .filter((event: any) => Number.isFinite(Number(event?.loggedValue)));
+          .filter((event: any) => Number.isFinite(Number(event?.loggedValue)))
+          .map((event: any) => ({
+            id: event?.id == null ? undefined : String(event.id),
+            loggedValue: Number(event.loggedValue),
+            occurredAt: String(event.occurredAt),
+            source: event?.source == null ? null : String(event.source),
+            sourceId: event?.sourceId == null ? null : String(event.sourceId),
+          }));
 
         const latest = [...events]
           .sort((a: any, b: any) => new Date(String(a?.occurredAt ?? 0)).getTime() - new Date(String(b?.occurredAt ?? 0)).getTime())
           .at(-1);
 
         setLiveCurrent(latest ? Number(latest.loggedValue) : null);
+        setBpMetricEvents(events);
 
         const latestByDay = new Map<string, { value: number; occurredAt: number }>();
         for (const event of events) {
@@ -232,6 +248,7 @@ export default function TodaySupportedGoalCard({ goal, activeGoals = [], onUpdat
         if (active) {
           setLiveCurrent(null);
           setBpGoalStats({ recordedDays: 0, targetDays: 0 });
+          setBpMetricEvents([]);
         }
       });
 
@@ -509,6 +526,7 @@ export default function TodaySupportedGoalCard({ goal, activeGoals = [], onUpdat
               })()}
               exerciseGoalTitle={linkedExerciseGoal?.title ?? "Exercise goal"}
               exerciseGoalFrequency={String(linkedExerciseGoal?.metricConfig?.frequency ?? linkedExerciseGoal?.frequency ?? "WEEKLY").toUpperCase()}
+              bloodPressureEvents={bpMetricEvents}
             />
 
             <div className="flex items-center justify-between gap-3 border-t border-[#edf2f4] px-1 pt-3">
