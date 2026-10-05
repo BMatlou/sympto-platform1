@@ -281,8 +281,48 @@ export default function TodayMedicationActions({ medications, goal: suppliedGoal
     insightExpectedScheduledDoses > 0;
 
   const clinicalNarrative = clinicalIntelligence?.clinicalNarrative ?? null;
-  const narrativeInterference = clinicalNarrative?.interference ?? null;
-  const narrativeRoutineAnchor = clinicalNarrative?.routineAnchor ?? null;
+  const rawInterference = clinicalIntelligence?.chronologicalInterference ?? null;
+  const rawAssociations = Array.isArray(clinicalIntelligence?.crossGoalAssociations)
+    ? clinicalIntelligence.crossGoalAssociations
+    : [];
+  const narrativeInterference = clinicalNarrative?.interference ?? rawInterference ?? null;
+  const rawAssociation = rawAssociations.find(
+    (association: any) =>
+      Boolean(association?.meaningful) &&
+      Number(association?.deltaPercentagePoints) >= 15,
+  ) ?? null;
+  const narrativeRoutineAnchor =
+    clinicalNarrative?.routineAnchor ??
+    (rawAssociation && narrativeInterference
+      ? {
+          goalId: String(rawAssociation.goalId),
+          goalName: String(rawAssociation.goalName),
+          goalCategory: String(rawAssociation.goalCategory),
+          timeBucket: String(narrativeInterference.bucket),
+          timeLabel: String(narrativeInterference.label).toLowerCase(),
+          loggedDays: Number(rawAssociation.loggedDays),
+          nonLoggedDays: Number(rawAssociation.nonLoggedDays),
+          loggedWindowAdherencePercent: Number(rawAssociation.adherenceOnLoggedDays),
+          nonLoggedWindowAdherencePercent: Number(rawAssociation.adherenceOnNonLoggedDays),
+          deltaPercentagePoints: Number(rawAssociation.deltaPercentagePoints),
+          latestJournalValue: Number(rawAssociation.latestJournalValue ?? NaN),
+          latestJournalDate: rawAssociation.latestJournalDate
+            ? String(rawAssociation.latestJournalDate)
+            : null,
+          unit: rawAssociation.unit ? String(rawAssociation.unit) : null,
+          statement:
+            String(rawAssociation.statement ??
+              ("Cross-goal mapping shows " + String(rawAssociation.goalName) +
+                " is associated with a " + Number(rawAssociation.deltaPercentagePoints) +
+                " percentage-point difference in medication adherence.")),
+          actionStatement:
+            "Insight: The strongest linked routine signal occurs around " +
+            String(narrativeInterference.label).toLowerCase() +
+            " tracking. Anchoring medication logging to the " +
+            String(rawAssociation.goalName) +
+            " routine may reduce tracking friction.",
+        }
+      : null);
   const narrativeComparisons = Array.isArray(narrativeInterference?.comparison)
     ? narrativeInterference.comparison
     : [];
