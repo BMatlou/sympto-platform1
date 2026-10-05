@@ -8,7 +8,9 @@ import {
   Post,
   Query,
   Req,
+  UploadedFile,
   UseGuards,
+  UseInterceptors,
 } from '@nestjs/common';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 
@@ -18,6 +20,8 @@ import { Permissions } from '../auth/decorators/permissions.decorator';
 
 import { HealthJournalsService } from './health-journals.service';
 import { SymptomIntelligenceService } from './symptom-intelligence.service';
+import { VoiceTranscriptionService } from './voice-transcription.service';
+import { FileInterceptor } from '@nestjs/platform-express';
 
 import { CreateHealthJournalDto } from './dto/create-health-journal.dto';
 import { UpdateHealthJournalDto } from './dto/update-health-journal.dto';
@@ -34,6 +38,7 @@ export class HealthJournalsController {
   constructor(
     private readonly healthJournalsService: HealthJournalsService,
     private readonly symptomIntelligenceService: SymptomIntelligenceService,
+    private readonly voiceTranscriptionService: VoiceTranscriptionService,
   ) {}
 
   @Permissions('health-journals.create')
@@ -72,6 +77,25 @@ export class HealthJournalsController {
       id,
       dto,
     );
+  }
+
+  @Permissions('health-journals.create')
+  @Post('talk-to-sympto/transcribe')
+  @UseInterceptors(
+    FileInterceptor('audio', {
+      limits: {
+        fileSize: 15 * 1024 * 1024,
+      },
+    }),
+  )
+  async transcribeTalkToSympto(
+    @UploadedFile() file: Express.Multer.File,
+  ) {
+    return this.voiceTranscriptionService.transcribe({
+      buffer: file?.buffer,
+      mimetype: file?.mimetype,
+      originalname: file?.originalname,
+    });
   }
 
   @Permissions('health-journals.create')
