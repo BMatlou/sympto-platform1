@@ -574,7 +574,7 @@ export class MedicationInsightService {
       );
 
       const sql =
-        'SELECT "occurredAt", "loggedValue"::double precision AS "loggedValue", "source" ' +
+        'SELECT "occurredAt", "loggedValue"::double precision AS "loggedValue", "source", "sourceId" ' +
         'FROM "HealthGoalMetricEvent" ' +
         'WHERE "patientId" = $1 AND "metricType" = $2 AND "metricKey" = $3 ' +
         'AND "occurredAt" >= $4 AND "occurredAt" <= CURRENT_TIMESTAMP ' +
