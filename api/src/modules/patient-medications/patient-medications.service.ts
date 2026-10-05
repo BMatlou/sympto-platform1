@@ -223,21 +223,28 @@ export class PatientMedicationsService {
       LIMIT 1
     `;
 
+    const adherenceEventMetadata = {
+      action: dto.action,
+      patientMedicationId: id,
+      source: 'medication-adherence',
+    };
+
     if (existingEvent.length) {
       await this.prisma.$executeRaw`
         UPDATE "HealthGoalMetricEvent"
         SET "metricType" = 'MEDICATION',
             "metricKey" = 'medication.adherence',
             "loggedValue" = ${adherencePercentage},
-            "occurredAt" = ${effectiveMeasuredAt}
+            "occurredAt" = ${effectiveMeasuredAt},
+            "metadata" = ${JSON.stringify(adherenceEventMetadata)}::jsonb
         WHERE "id" = ${existingEvent[0].id}::uuid
       `;
     } else {
       await this.prisma.$executeRaw`
         INSERT INTO "HealthGoalMetricEvent"
-          ("id", "patientId", "metricType", "metricKey", "loggedValue", "occurredAt", "source", "sourceId")
+          ("id", "patientId", "metricType", "metricKey", "loggedValue", "occurredAt", "source", "sourceId", "metadata")
         VALUES
-          (gen_random_uuid(), ${patientId}, 'MEDICATION', 'medication.adherence', ${adherencePercentage}, ${effectiveMeasuredAt}, ${source}, ${sourceId})
+          (gen_random_uuid(), ${patientId}, 'MEDICATION', 'medication.adherence', ${adherencePercentage}, ${effectiveMeasuredAt}, ${source}, ${sourceId}, ${JSON.stringify(adherenceEventMetadata)}::jsonb)
     `;
     }
 
