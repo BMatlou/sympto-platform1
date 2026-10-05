@@ -316,58 +316,102 @@ export default function TodaySupportedGoalCard({ goal, activeGoals = [], onUpdat
       </header>
 
       <div className="px-4 pb-4 pt-4 sm:px-5">
-        <div className="grid grid-cols-3 gap-2">
-          <div className="rounded-[16px] bg-[#f7fbfb] p-3">
-            <p className="text-[8px] font-black uppercase tracking-[.12em] text-[#95a3ad]">Current</p>
-            <p className="mt-1 text-base font-black text-[#0b2d54]">{displayCurrent == null ? "—" : displayCurrent}{meta.unit && displayCurrent != null ? " " + meta.unit : ""}</p>
-          </div>
-          <div className="rounded-[16px] bg-[#f7fbfb] p-3">
-            <p className="text-[8px] font-black uppercase tracking-[.12em] text-[#95a3ad]">Target</p>
-            <p className="mt-1 text-base font-black text-[#0b2d54]">{category === "BLOOD_PRESSURE" && target != null ? "≤" : ""}{target == null ? "—" : target}{meta.unit && target != null ? " " + meta.unit : ""}</p>
-          </div>
-          <div className={category === "BLOOD_PRESSURE" && bpWithinTarget === false ? "rounded-[16px] bg-red-50 p-3 ring-1 ring-red-200" : "rounded-[16px] bg-[#e9f9fa] p-3"}>
-            <p className={category === "BLOOD_PRESSURE" && bpWithinTarget === false ? "text-[8px] font-black uppercase tracking-[.12em] text-red-700" : "text-[8px] font-black uppercase tracking-[.12em] text-[#0b7b80]"}>Progress</p>
-            <p className={category === "BLOOD_PRESSURE" && bpWithinTarget === false ? "mt-1 text-base font-black text-red-700" : "mt-1 text-base font-black text-[#0b6f73]"}>{displayProgress}%</p>
-          </div>
-        </div>
-
-        <div className="mt-3 h-2 overflow-hidden rounded-full bg-[#edf3f5]">
-          <div
-            className={category === "BLOOD_PRESSURE" && bpWithinTarget === false ? "h-full rounded-full bg-red-500 transition-all" : "h-full rounded-full bg-[#24c1c4] transition-all"}
-            style={{ width: Math.max(0, displayProgress) + "%" }}
-          />
-        </div>
-
-        {category === "BLOOD_PRESSURE" && displayCurrent != null && target != null && (
-          <div className={bpWithinTarget ? "mt-3 rounded-[18px] border border-[#bcebed] bg-[#effafa] p-3.5" : "mt-3 rounded-[18px] border border-red-200 bg-red-50 p-3.5"}>
-            <p className={bpWithinTarget ? "text-[9px] font-black uppercase tracking-[.14em] text-[#0b7b80]" : "text-[9px] font-black uppercase tracking-[.14em] text-red-700"}>
-              {bpWithinTarget ? "At target today" : "Above target today"}
-            </p>
-            <p className={bpWithinTarget ? "mt-1 text-sm font-black text-[#0b6f73]" : "mt-1 text-sm font-black text-red-700"}>
-              {bpWithinTarget
-                ? (bpDistance ?? 0) === 0
-                  ? "Your reading is at your target."
-                  : Math.abs(bpDistance ?? 0) + " mmHg below your target."
-                : Math.abs(bpDistance ?? 0) + " mmHg above your target."}
-            </p>
-            <p className={bpWithinTarget ? "mt-1 text-[10px] leading-5 text-[#55747c]" : "mt-1 text-[10px] leading-5 text-red-700/80"}>
-              {bpWithinTarget
-                ? "Keep tracking daily readings so Sympto can measure how consistently you stay within your target."
-                : "Your current reading is above the target. Keep recording readings so Sympto can show whether your trend is moving toward it."}
-            </p>
-          </div>
-        )}
-
-        {category === "BLOOD_PRESSURE" && bpGoalStats.recordedDays > 0 && (
-          <div className="mt-3 flex items-center justify-between gap-3 rounded-[16px] bg-[#f7fbfb] px-3.5 py-3 ring-1 ring-[#e4edef]">
-            <div>
-              <p className="text-[8px] font-black uppercase tracking-[.14em] text-[#82939f]">Goal attainment</p>
-              <p className="mt-1 text-[11px] font-black text-[#0b2d54]">{bpGoalStats.targetDays} of {bpGoalStats.recordedDays} recorded days at target</p>
+        {category === "BLOOD_PRESSURE" ? (
+          <>
+            <div className="grid grid-cols-3 gap-2">
+              <div className="rounded-[16px] bg-[#f7fbfb] p-3">
+                <p className="text-[8px] font-black uppercase tracking-[.12em] text-[#95a3ad]">Current</p>
+                <p className="mt-1 text-base font-black text-[#0b2d54]">
+                  {displayCurrent == null ? "—" : displayCurrent} mmHg
+                </p>
+              </div>
+              <div className="rounded-[16px] bg-[#f7fbfb] p-3">
+                <p className="text-[8px] font-black uppercase tracking-[.12em] text-[#95a3ad]">Target</p>
+                <p className="mt-1 text-base font-black text-[#0b2d54]">
+                  {target == null ? "—" : "≤" + target} mmHg
+                </p>
+              </div>
+              <div className={bpWithinTarget === false ? "rounded-[16px] bg-red-50 p-3 ring-1 ring-red-200" : "rounded-[16px] bg-[#e9f9fa] p-3 ring-1 ring-[#c9eeee]"}>
+                <p className={bpWithinTarget === false ? "text-[8px] font-black uppercase tracking-[.12em] text-red-700" : "text-[8px] font-black uppercase tracking-[.12em] text-[#0b7b80]"}>
+                  Distance
+                </p>
+                <p className={bpWithinTarget === false ? "mt-1 text-base font-black text-red-700" : "mt-1 text-base font-black text-[#0b6f73]"}>
+                  {displayCurrent == null || target == null
+                    ? "—"
+                    : bpWithinTarget
+                      ? (Math.abs(bpDistance ?? 0) === 0 ? "At target" : Math.abs(bpDistance ?? 0) + " below")
+                      : Math.abs(bpDistance ?? 0) + " above"}
+                </p>
+              </div>
             </div>
-            <span className="text-[10px] font-black text-[#0b6f73]">{displayProgress}%</span>
-          </div>
-        )}
 
+            {displayCurrent != null && target != null && (
+              <div className={bpWithinTarget ? "mt-3 rounded-[20px] border border-[#bcebed] bg-[#effafa] p-4" : "mt-3 rounded-[20px] border border-red-200 bg-red-50 p-4"}>
+                <div className="flex items-start gap-3">
+                  <span className={bpWithinTarget ? "mt-0.5 grid h-8 w-8 shrink-0 place-items-center rounded-[11px] bg-[#24c1c4]/15 text-[#0b7b80]" : "mt-0.5 grid h-8 w-8 shrink-0 place-items-center rounded-[11px] bg-red-100 text-red-700"}>
+                    <HeartPulse className="h-4 w-4" />
+                  </span>
+                  <div className="min-w-0">
+                    <p className={bpWithinTarget ? "text-[9px] font-black uppercase tracking-[.15em] text-[#0b7b80]" : "text-[9px] font-black uppercase tracking-[.15em] text-red-700"}>
+                      {bpWithinTarget ? "At target today" : "Above target today"}
+                    </p>
+                    <p className={bpWithinTarget ? "mt-1 text-sm font-black text-[#0b6f73]" : "mt-1 text-sm font-black text-red-700"}>
+                      {bpWithinTarget
+                        ? (bpDistance ?? 0) === 0
+                          ? "Your reading is at your target."
+                          : Math.abs(bpDistance ?? 0) + " mmHg below your target."
+                        : Math.abs(bpDistance ?? 0) + " mmHg above your target."}
+                    </p>
+                    <p className={bpWithinTarget ? "mt-1 text-[10px] leading-5 text-[#55747c]" : "mt-1 text-[10px] leading-5 text-red-700/80"}>
+                      {bpWithinTarget
+                        ? "Keep tracking daily readings so Sympto can measure how consistently you stay within your target."
+                        : "Your reading is above the target. Keep recording readings so Sympto can show whether your trend is moving toward it."}
+                    </p>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {bpGoalStats.recordedDays > 0 && (
+              <div className="mt-3 rounded-[20px] border border-[#dfeaec] bg-white p-4">
+                <div className="flex items-end justify-between gap-3">
+                  <div>
+                    <p className="text-[8px] font-black uppercase tracking-[.15em] text-[#82939f]">Goal attainment</p>
+                    <p className="mt-1 text-sm font-black text-[#0b2d54]">
+                      {bpGoalStats.targetDays} of {bpGoalStats.recordedDays} recorded days at target
+                    </p>
+                  </div>
+                  <span className="text-lg font-black tracking-[-.04em] text-[#0b2d54]">{displayProgress}%</span>
+                </div>
+                <div className="mt-3 h-2 overflow-hidden rounded-full bg-[#edf3f5]">
+                  <div
+                    className="h-full rounded-full bg-[#24c1c4] transition-all"
+                    style={{ width: Math.max(0, displayProgress) + "%" }}
+                  />
+                </div>
+                <p className="mt-2 text-[9px] leading-4 text-[#7b8d98]">
+                  Progress is based on the days you have actually recorded a reading at or below your target.
+                </p>
+              </div>
+            )}
+
+            <div className="mt-3 rounded-[17px] bg-[#fbfdfd] p-3.5 ring-1 ring-[#e4edef]">
+              <p className="text-[10px] leading-5 text-[#758896]">{meta.helper}</p>
+            </div>
+          </>
+        ) : (
+          <>
+          <div className="grid grid-cols-3 gap-2">
+          <div className="rounded-[16px] bg-[#f7fbfb] p-3"><p className="text-[8px] font-black uppercase tracking-[.12em] text-[#95a3ad]">Current</p><p className="mt-1 text-base font-black text-[#0b2d54]">{displayCurrent == null ? "—" : displayCurrent}{meta.unit && displayCurrent != null ? " " + meta.unit : ""}</p></div>
+          <div className="rounded-[16px] bg-[#f7fbfb] p-3"><p className="text-[8px] font-black uppercase tracking-[.12em] text-[#95a3ad]">Target</p><p className="mt-1 text-base font-black text-[#0b2d54]">{target == null ? "—" : target}{meta.unit && target != null ? " " + meta.unit : ""}</p></div>
+          <div className="rounded-[16px] bg-[#e9f9fa] p-3"><p className="text-[8px] font-black uppercase tracking-[.12em] text-[#0b7b80]">Progress</p><p className="mt-1 text-base font-black text-[#0b6f73]">{displayProgress}%</p></div>
+        </div>
+
+        <div className="mt-3 h-2 overflow-hidden rounded-full bg-[#edf3f5]"><div className="h-full rounded-full bg-[#24c1c4] transition-all" style={{ width: Math.max(0, displayProgress) + "%" }} /></div>
+
+        <div className="mt-3 rounded-xl bg-[#e9f9fa] px-3 py-2"><p className="text-[9px] font-bold leading-4 text-[#0b6f73]">{nextStep}</p></div>
+          </>
+        )}
         {Array.isArray(goal?.connectedGoals) && goal.connectedGoals.length > 0 && (
           <div className="mt-3 rounded-[17px] border border-[#dcebec] bg-[#f7fbfc] p-3.5">
             <div className="flex items-center justify-between gap-2">
@@ -405,7 +449,6 @@ export default function TodaySupportedGoalCard({ goal, activeGoals = [], onUpdat
         <div className="mt-3 rounded-[17px] bg-[#fbfdfd] p-3.5 ring-1 ring-[#e4edef]">
           <p className="text-[10px] leading-5 text-[#758896]">{meta.helper}</p>
           {category === "NUTRITION" && nutritionTargetReview(target) && <div className="mt-2 rounded-[14px] border border-amber-200 bg-amber-50 px-3 py-2.5"><p className="text-[9px] font-black uppercase tracking-[.12em] text-amber-900">Target review</p><p className="mt-1 text-[10px] leading-5 text-amber-900/85">{nutritionTargetReview(target)}</p></div>}
-          <div className="mt-2 rounded-xl bg-[#e9f9fa] px-3 py-2"><p className="text-[9px] font-bold leading-4 text-[#0b6f73]">{nextStep}</p></div>
           {category === "BLOOD_PRESSURE" && <BloodPressureInsights target={target} />}
           {meta.action === "MANUAL" ? (
             <div className="mt-3 flex flex-col gap-2 sm:flex-row">
