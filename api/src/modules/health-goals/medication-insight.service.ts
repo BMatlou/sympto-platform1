@@ -330,6 +330,15 @@ export class MedicationInsightService {
       timezone: schedule.timezone,
     });
 
+    // Use the verified connected-goal analysis as the source for Clinical Intelligence.
+    // This is the same persisted goal/metric-event data already used by the working
+    // medication insight path, so the clinical card cannot silently report "no data"
+    // while the database-backed comparison already exists.
+    this.enrichClinicalIntelligenceFromConnectedGoals(
+      clinicalIntelligence,
+      connectedGoalInsights,
+    );
+
     const associations = connectedGoalInsights
       .filter((insight) => insight.comparisonValid)
       .map((insight) => ({
@@ -405,6 +414,136 @@ export class MedicationInsightService {
           todayExcludedFromLongitudinalAnalysis: true,
         },
       },
+    };
+  }
+
+  private enrichClinicalIntelligenceFromConnectedGoals(
+    clinical: ClinicalIntelligenceOutput,
+    connectedGoalInsights: ConnectedGoalInsight[],
+  ): void {
+    const verifiedAssociations: ClinicalIntelligenceOutput['crossGoalAssociations'] =
+      connectedGoalInsights
+        .filter(
+          (insight) =>
+            insight.comparisonValid &&
+            insight.medicationDeltaPercentagePoints != null,
+        )
+        .map((insight) => {
+          const delta = Number(insight.medicationDeltaPercentagePoints);
+          const loggedAdherence = Number(
+            insight.medicationAdherenceOnTargetPeriods ?? 0,
+          );
+          const nonLoggedAdherence = Number(
+            insight.medicationAdherenceOnMissedTargetPeriods ?? 0,
+          );
+
+          return {
+            goalId: String(insight.supportingGoalId),
+            goalName: String(insight.supportingGoalName),
+            goalCategory: String(insight.supportingGoalCategory),
+            loggedDays: Number(insight.onTarget.calendarDays),
+            nonLoggedDays: Number(insight.offTarget.calendarDays),
+            scheduledDosesOnLoggedDays: Number(insight.onTarget.scheduledDoses),
+            takenDosesOnLoggedDays: Number(insight.onTarget.takenDoses),
+            adherenceOnLoggedDays: Number.isFinite(loggedAdherence)
+              ? loggedAdherence
+              : null,
+            scheduledDosesOnNonLoggedDays: Number(insight.offTarget.scheduledDoses),
+            takenDosesOnNonLoggedDays: Number(insight.offTarget.takenDoses),
+            adherenceOnNonLoggedDays: Number.isFinite(nonLoggedAdherence)
+              ? nonLoggedAdherence
+              : null,
+            deltaPercentagePoints: Number.isFinite(delta) ? delta : null,
+            meaningful: Number.isFinite(delta) && Math.abs(delta) >= 5,
+            direction:
+              delta > 0
+                ? 'HIGHER_WITH_LOGGED_DAYS'
+                : delta < 0
+                  ? 'LOWER_WITH_LOGGED_DAYS'
+                  : 'NO_MEASURABLE_DIFFERENCE',
+            latestJournalValue:
+              insight.latestValue == null ? null : Number(insight.latestValue),
+            latestJournalDate: insight.latestPeriodLabel
+              ? String(insight.latestPeriodLabel)
+              : null,
+            unit: insight.unit ? String(insight.unit) : null,
+            statement: insight.insight ? String(insight.insight) : null,
+          };
+        });
+
+    if (!verifiedAssociations.length) return;
+
+    verifiedAssociations.sort(
+      (a, b) =>
+        Math.abs(Number(b.deltaPercentagePoints ?? 0)) -
+        Math.abs(Number(a.deltaPercentagePoints ?? 0)),
+    );
+
+    clinical.crossGoalAssociations = verifiedAssociations;
+
+    const strongest = verifiedAssociations[0];
+    const strongestDelta = Number(strongest.deltaPercentagePoints ?? 0);
+    const temporalBucket = [...clinical.timeBuckets]
+      .filter(
+        (bucket) =>
+          bucket.expectedDoses > 0 &&
+          bucket.failureRatePercent != null &&
+          bucket.failureRatePercent > 0,
+      )
+      .sort(
+        (a, b) =>
+          Number(b.failureRatePercent ?? 0) -
+          Number(a.failureRatePercent ?? 0),
+      )[0];
+
+    const timeBucket = temporalBucket?.bucket ?? 'EVENING_NIGHT';
+    const timeLabel = temporalBucket?.label.toLowerCase() ?? 'daily';
+    const loggedAdherence = Number(
+      strongest.adherenceOnLoggedDays ?? 0,
+    ).toFixed(1);
+    const nonLoggedAdherence = Number(
+      strongest.adherenceOnNonLoggedDays ?? 0,
+    ).toFixed(1);
+
+    clinical.clinicalNarrative.routineAnchor = {
+      goalId: strongest.goalId,
+      goalName: strongest.goalName,
+      goalCategory: strongest.goalCategory,
+      timeBucket,
+      timeLabel,
+      loggedDays: strongest.loggedDays,
+      nonLoggedDays: strongest.nonLoggedDays,
+      loggedWindowAdherencePercent: Number(loggedAdherence),
+      nonLoggedWindowAdherencePercent: Number(nonLoggedAdherence),
+      deltaPercentagePoints: strongestDelta,
+      latestJournalValue: strongest.latestJournalValue,
+      latestJournalDate: strongest.latestJournalDate,
+      unit: strongest.unit,
+      statement:
+        strongest.statement ??
+        (strongestDelta > 0
+          ? strongest.goalName +
+            ': medication adherence was ' +
+            Math.abs(strongestDelta) +
+            ' percentage points higher on the logged goal periods (' +
+            loggedAdherence +
+            '% vs ' +
+            nonLoggedAdherence +
+            '%).'
+          : strongest.goalName +
+            ': medication adherence was ' +
+            Math.abs(strongestDelta) +
+            ' percentage points lower on the logged goal periods (' +
+            loggedAdherence +
+            '% vs ' +
+            nonLoggedAdherence +
+            '%).'),
+      actionStatement:
+        strongestDelta > 0
+          ? 'Insight: The medication routine is more consistent during periods when this goal is being maintained. Anchoring medication logging to the same established ' +
+            strongest.goalName +
+            ' routine may reduce tracking friction.'
+          : 'Insight: The medication routine is less consistent during periods when this goal is being maintained. Review the timing and context of both routines together before changing the medication schedule.',
     };
   }
 
