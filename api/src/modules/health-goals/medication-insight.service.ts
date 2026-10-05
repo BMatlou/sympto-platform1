@@ -231,15 +231,27 @@ export class MedicationInsightService {
     const relations = await this.loadRelations(goal.patientId, goalId);
     const supportingEvents = await this.loadSupportingEvents(goal.patientId, goal.createdAt, relations);
     const now = new Date();
-    const clinicalSupportingGoals = await this.loadClinicalSupportingGoals(
-      goal.patientId,
-      goalId,
-    );
-    const clinicalJournalEvents = await this.loadClinicalJournalEvents(
-      goal.patientId,
-      goal.createdAt,
-      clinicalSupportingGoals,
-    );
+    let clinicalSupportingGoals: ClinicalSupportingGoal[] = [];
+    let clinicalJournalEvents: ClinicalJournalEvent[] = [];
+
+    try {
+      clinicalSupportingGoals = await this.loadClinicalSupportingGoals(
+        goal.patientId,
+        goalId,
+      );
+      clinicalJournalEvents = await this.loadClinicalJournalEvents(
+        goal.patientId,
+        goal.createdAt,
+        clinicalSupportingGoals,
+      );
+    } catch (error) {
+      console.warn(
+        'Medication clinical graph enrichment unavailable; continuing with medication-only intelligence.',
+        error instanceof Error ? error.message : String(error),
+      );
+      clinicalSupportingGoals = [];
+      clinicalJournalEvents = [];
+    }
 
     const dailyBuckets = buildDailyBuckets(goal.createdAt, now, schedule, doseRows);
     const journeyAdherence = calculateJourneyAdherence(dailyBuckets, now, goal.targetDate);
