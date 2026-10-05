@@ -2,6 +2,7 @@ import { BadRequestException, Injectable } from '@nestjs/common';
 import { PrismaService } from '../../database/prisma.service';
 import { goalRuleFor } from './goal-metric-rules';
 import { MedicationConnectedGoalsEngine, type ConnectedGoalInsight } from './medication-connected-goals.engine';
+import { MedicationGoalIntelligenceEngine, type MedicationGoalIntelligence } from './medication-goal-intelligence.engine';
 
 export type MedicationDoseAction = 'TAKEN' | 'SKIPPED';
 export type MedicationDailyTrend =
@@ -135,6 +136,7 @@ export interface MedicationInsightResult {
     dailyBuckets: MedicationDayBucket[];
     trend: MedicationTrendResult;
     associations: SupportingGoalAssociation[];
+    goalIntelligence: MedicationGoalIntelligence;
     dataQuality: {
       explicitAdherenceEvents: number;
       legacyAdherenceEventsIgnored: number;
@@ -205,6 +207,7 @@ export class MedicationInsightService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly connectedGoalsEngine: MedicationConnectedGoalsEngine,
+    private readonly medicationGoalIntelligenceEngine: MedicationGoalIntelligenceEngine,
   ) {}
 
   async buildForGoal(goalId: string): Promise<MedicationInsightResult> {
@@ -242,6 +245,20 @@ export class MedicationInsightService {
       supportingGoalEvents: supportingEvents,
       now,
       timezone: schedule.timezone,
+    });
+
+    const goalIntelligence = this.medicationGoalIntelligenceEngine.calculate({
+      targetAdherencePercent:
+        Number.isFinite(Number(goal.targetAdherence)) && Number(goal.targetAdherence) > 0
+          ? Number(goal.targetAdherence)
+          : 90,
+      targetDate: goal.targetDate,
+      now,
+      timezone: schedule.timezone,
+      schedule,
+      dailyBuckets,
+      journeyAdherence,
+      trend,
     });
 
     const associations = connectedGoalInsights
@@ -309,6 +326,7 @@ export class MedicationInsightService {
         trend,
         associations,
         connectedGoalInsights,
+        goalIntelligence,
         dataQuality: {
           explicitAdherenceEvents: doseRows.length,
           legacyAdherenceEventsIgnored,
