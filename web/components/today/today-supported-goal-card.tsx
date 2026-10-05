@@ -156,8 +156,15 @@ export default function TodaySupportedGoalCard({ goal, activeGoals = [], onUpdat
   const source = sourceAction(category);
   const goalId = String(goal?.id ?? "");
   const journey = useMemo(() => journeyFor(goal), [goal]);
-  const linkedExerciseGoal = activeGoals.find((item: any) => String(item?.category ?? "").toUpperCase() === "EXERCISE");
-  const exerciseConnectionHref = linkedExerciseGoal?.id ? "/today#today-goal-" + encodeURIComponent(String(linkedExerciseGoal.id)) : "/health-goals?open=exercise";
+  const connectedExerciseGoal = Array.isArray(goal?.connectedGoals)
+    ? goal.connectedGoals
+        .map((relation: any) => relation?.goal)
+        .find((item: any) => String(item?.category ?? "").toUpperCase() === "EXERCISE")
+    : null;
+  const linkedExerciseGoal = connectedExerciseGoal ?? activeGoals.find((item: any) => String(item?.category ?? "").toUpperCase() === "EXERCISE");
+  const exerciseConnectionHref = linkedExerciseGoal?.id
+    ? "/today#today-goal-" + encodeURIComponent(String(linkedExerciseGoal.id))
+    : "/health-goals?open=exercise";
   const defaultMetric = DEFAULT_METRICS[category] ?? DEFAULT_METRICS.OTHER;
   const metricType = String(goal?.metricConfig?.metricType ?? defaultMetric.metricType).toUpperCase();
   const metricKey = String(goal?.metricConfig?.metricKey ?? defaultMetric.metricKey);
@@ -450,41 +457,7 @@ export default function TodaySupportedGoalCard({ goal, activeGoals = [], onUpdat
               {goal.connectedGoals.slice(0, 4).map((relation: any) => {
                 const related = relation?.goal;
                 const relatedCategory = String(related?.category ?? "").toUpperCase();
-                const isExerciseConnection = category === "BLOOD_PRESSURE" || relatedCategory === "EXERCISE";
-                const direction = String(relation?.direction ?? "");
-                const relationLabel = String(relation?.relationshipType ?? "").toUpperCase() === "SUPPORTS"
-                  ? direction === "supportsThisGoal" ? "Supports this" : "Supports another"
-                  : "Related";
-                const href = isExerciseConnection
-                  ? exerciseConnectionHref
-                  : related?.id ? "/health-goals#goal-" + encodeURIComponent(String(related.id)) : "/health-goals";
-                return (
-                  <Link
-                    key={String(relation?.id ?? related?.id ?? relatedCategory)}
-                    href={href}
-                    className="inline-flex min-w-0 items-center gap-1 rounded-full bg-white px-2.5 py-1.5 text-[8px] font-bold text-[#0b6f73] ring-1 ring-[#dce8eb]"
-                    title={String(relation?.rationale ?? (isExerciseConnection ? (linkedExerciseGoal ? "Open your exercise goal in Today." : "Set an exercise goal to connect it with your blood-pressure goal.") : ""))}
-                  >
-                    <span className="truncate">{isExerciseConnection ? "Exercise" : String(related?.title ?? related?.category ?? "Connected goal")}</span>
-                    <span className="shrink-0 text-[#91a2ad]">· {relationLabel}</span>
-                  </Link>
-                );
-              })}
-            </div>
-          </div>
-        )}
-
-{Array.isArray(goal?.connectedGoals) && goal.connectedGoals.length > 0 && (
-          <div className="mt-3 rounded-[17px] border border-[#dcebec] bg-[#f7fbfc] p-3.5">
-            <div className="flex items-center justify-between gap-2">
-              <p className="text-[8px] font-black uppercase tracking-[.14em] text-[#82939f]">Goal connections</p>
-              <span className="text-[8px] font-bold text-[#9aa8b1]">{goal.connectedGoals.length} connected</span>
-            </div>
-            <div className="mt-2 flex flex-wrap gap-2">
-              {goal.connectedGoals.slice(0, 4).map((relation: any) => {
-                const related = relation?.goal;
-                const relatedCategory = String(related?.category ?? "").toUpperCase();
-                const isExerciseConnection = category === "BLOOD_PRESSURE" || relatedCategory === "EXERCISE";
+                const isExerciseConnection = relatedCategory === "EXERCISE";
                 const direction = String(relation?.direction ?? "");
                 const relationLabel = String(relation?.relationshipType ?? "").toUpperCase() === "SUPPORTS"
                   ? direction === "supportsThisGoal" ? "Supports this" : "Supports another"
@@ -497,7 +470,11 @@ export default function TodaySupportedGoalCard({ goal, activeGoals = [], onUpdat
                     key={String(relation?.id ?? related?.id ?? relatedCategory)}
                     href={href}
                     className="inline-flex min-w-0 items-center gap-1 rounded-full bg-white px-2.5 py-1.5 text-[8px] font-bold text-[#0b6f73] ring-1 ring-[#dce8eb] transition hover:border-[#24c1c4]"
-                    title={String(relation?.rationale ?? (isExerciseConnection ? (linkedExerciseGoal ? "Open your exercise goal in Today." : "Set an exercise goal to connect it with your blood-pressure goal.") : ""))}
+                    title={isExerciseConnection
+                      ? (linkedExerciseGoal
+                        ? "Open your connected Exercise goal in Today."
+                        : "Set an Exercise goal to connect it with your blood-pressure goal.")
+                      : String(relation?.rationale ?? "")}
                   >
                     <span className="truncate">{isExerciseConnection ? "Exercise" : String(related?.title ?? related?.category ?? "Connected goal")}</span>
                     <span className="shrink-0 text-[#91a2ad]">· {relationLabel}</span>
@@ -526,8 +503,8 @@ export default function TodaySupportedGoalCard({ goal, activeGoals = [], onUpdat
             <BloodPressureInsights
               target={target}
               exerciseGoalTarget={linkedExerciseGoal?.targetValue ?? linkedExerciseGoal?.metricConfig?.frequencyTarget ?? null}
-              exerciseGoalTitle={linkedExerciseGoal?.title ?? "Exercise"}
-              exerciseGoalFrequency={linkedExerciseGoal?.metricConfig?.frequency ?? linkedExerciseGoal?.frequency ?? "DAILY"}
+              exerciseGoalTitle={linkedExerciseGoal?.title ?? "Exercise goal"}
+              exerciseGoalFrequency={linkedExerciseGoal?.metricConfig?.frequency ?? linkedExerciseGoal?.frequency ?? "WEEKLY"}
             />
 
             <div className="flex items-center justify-between gap-3 border-t border-[#edf2f4] px-1 pt-3">
