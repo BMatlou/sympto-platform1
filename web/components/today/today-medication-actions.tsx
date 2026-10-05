@@ -356,12 +356,115 @@ export default function TodayMedicationActions({ medications, goal: suppliedGoal
 
   const journeyInsight = medicationInsight?.analysis?.journeyAdherence;
   const trendInsight = medicationInsight?.analysis?.trend;
+
+  const supportingGoalSignature = useMemo(
+    () =>
+      supportingGoals
+        .filter((goal: any) =>
+          ["NUTRITION", "EXERCISE", "SLEEP", "HYDRATION"].includes(
+            String(goal?.category ?? "").toUpperCase(),
+          ),
+        )
+        .map((goal: any) =>
+          [goal?.id, goal?.updatedAt, goal?.currentValue, goal?.targetValue, goal?.metricConfig?.metricKey]
+            .map((value) => String(value ?? ""))
+            .join(":"),
+        )
+        .sort()
+        .join("|"),
+    [supportingGoals],
+  );
+
+  useEffect(() => {
+    let active = true;
+    async function loadLocalConnectedGoalInsights() {
+      const candidates = supportingGoals.filter((goal: any) =>
+        ["NUTRITION", "EXERCISE", "SLEEP", "HYDRATION"].includes(String(goal?.category ?? "").toUpperCase()),
+      );
+      if (!candidates.length || !journeyInsight) {
+        if (active) setLocalConnectedGoalInsights([]);
+        return;
+      }
+      const medicationDays = Array.isArray(medicationInsight?.analysis?.dailyBuckets) ? medicationInsight.analysis.dailyBuckets : [];
+      const today = localDayKey(new Date());
+      const historicalMedicationDays = medicationDays.filter((day: any) => String(day?.day) < today && Number(day?.expectedDoses) > 0);
+      const results = await Promise.all(candidates.map(async (goal: any) => {
+        const rule = localGoalRule(goal);
+        if (!rule) return null;
+        try {
+          const goalDate = new Date(String(goal?.createdAt ?? finalGoal?.createdAt ?? Date.now()));
+          const medicationDate = new Date(String(finalGoal?.createdAt ?? Date.now()));
+          const goalTime = Number.isNaN(goalDate.getTime()) ? 0 : goalDate.getTime();
+          const medicationTime = Number.isNaN(medicationDate.getTime()) ? 0 : medicationDate.getTime();
+          const from = new Date(Math.max(goalTime, medicationTime) || Date.now());
+          const response = await healthGoalsService.getMetricEvents(rule.metricType, rule.metricKey, from, new Date());
+          const events = Array.isArray(response?.events) ? response.events : [];
+          const periods = localSupportingPeriods(events, goal, rule);
+          const historicalPeriods = periods.filter((period: any) => period.endDay < today);
+          const latestPeriod = periods[periods.length - 1] ?? null;
+          const targetPeriods = historicalPeriods.filter((period: any) => period.status === "ON_TARGET");
+          const missedPeriods = historicalPeriods.filter((period: any) => period.status === "BELOW_TARGET" || period.status === "ABOVE_TARGET");
+          const targetDays = new Set<string>();
+          const missedDays = new Set<string>();
+          for (const period of targetPeriods) {
+            const start = new Date(period.startDay + "T12:00:00Z");
+            const end = new Date(period.endDay + "T12:00:00Z");
+            for (const cursor = new Date(start); cursor <= end; cursor.setUTCDate(cursor.getUTCDate() + 1)) targetDays.add(cursor.toISOString().slice(0, 10));
+          }
+          for (const period of missedPeriods) {
+            const start = new Date(period.startDay + "T12:00:00Z");
+            const end = new Date(period.endDay + "T12:00:00Z");
+            for (const cursor = new Date(start); cursor <= end; cursor.setUTCDate(cursor.getUTCDate() + 1)) missedDays.add(cursor.toISOString().slice(0, 10));
+          }
+          const onTargetDays = historicalMedicationDays.filter((day: any) => targetDays.has(String(day?.day)));
+          const offTargetDays = historicalMedicationDays.filter((day: any) => missedDays.has(String(day?.day)));
+          const adherenceOnTarget = localMedicationAdherence(onTargetDays);
+          const adherenceOnMissed = localMedicationAdherence(offTargetDays);
+          const delta = adherenceOnTarget != null && adherenceOnMissed != null ? Number((adherenceOnTarget - adherenceOnMissed).toFixed(2)) : null;
+          const observedPeriods = historicalPeriods.length;
+          const comparableDays = onTargetDays.length + offTargetDays.length;
+          const evidenceLevel = observedPeriods >= 6 && comparableDays >= 8 ? "STRONG" : observedPeriods >= 3 && comparableDays >= 4 ? "EMERGING" : observedPeriods >= 1 ? "EARLY" : "INSUFFICIENT_DATA";
+          let insight: string | null = null;
+          if (delta != null && onTargetDays.length >= 2 && offTargetDays.length >= 2) insight = "Medication adherence was " + Math.round(adherenceOnTarget) + "% when " + String(goal?.title ?? "this goal") + " was on target versus " + Math.round(adherenceOnMissed) + "% when it was not.";
+          else if (latestPeriod && latestPeriod.status !== "INSUFFICIENT_DATA") insight = String(goal?.title ?? "This goal") + (latestPeriod.status === "ON_TARGET" ? " is on target in the latest recorded period." : " is off target in the latest recorded period.");
+          const targetCandidate = goal?.metricConfig?.frequencyTarget ?? goal?.targetValue;
+          const parsedTarget = Number(targetCandidate);
+          return {
+            supportingGoalId: String(goal?.id),
+            supportingGoalName: String(goal?.title ?? goal?.category ?? "Connected goal"),
+            supportingGoalCategory: String(goal?.category ?? "").toUpperCase(),
+            targetValue: Number.isFinite(parsedTarget) ? parsedTarget : null,
+            unit: goal?.unit || rule.unit,
+            frequency: String(goal?.metricConfig?.frequency ?? rule.frequency),
+            comparison: String(goal?.metricConfig?.comparison ?? rule.comparison).toUpperCase(),
+            aggregation: String(goal?.metricConfig?.aggregation ?? rule.aggregation).toUpperCase(),
+            observedPeriods,
+            targetMetPeriods: targetPeriods.length,
+            targetMissedPeriods: missedPeriods.length,
+            latestValue: latestPeriod?.value ?? null,
+            latestPeriodLabel: latestPeriod?.label ?? null,
+            latestStatus: latestPeriod?.status ?? "INSUFFICIENT_DATA",
+            medicationAdherenceOnTargetPeriods: adherenceOnTarget,
+            medicationAdherenceOnMissedTargetPeriods: adherenceOnMissed,
+            medicationDeltaPercentagePoints: delta,
+            evidenceLevel,
+            insight,
+          };
+        } catch { return null; }
+      }));
+      if (active) setLocalConnectedGoalInsights(results.filter(Boolean));
+    }
+    void loadLocalConnectedGoalInsights();
+    return () => { active = false; };
+  }, [finalGoal?.id, finalGoal?.createdAt, journeyInsight, medicationInsight?.analysis?.dailyBuckets, supportingGoalSignature]);
   const associationInsight = (medicationInsight?.analysis?.associations ?? []).find(
     (association: any) => association?.statisticallyRelevant && association?.insight,
   );
-  const connectedGoalInsights = Array.isArray(medicationInsight?.analysis?.connectedGoalInsights)
+  const apiConnectedGoalInsights = Array.isArray(medicationInsight?.analysis?.connectedGoalInsights)
     ? medicationInsight.analysis.connectedGoalInsights
     : [];
+  const connectedGoalInsights =
+    apiConnectedGoalInsights.length > 0 ? apiConnectedGoalInsights : localConnectedGoalInsights;
   const strongestConnectedInsight = connectedGoalInsights
     .filter(
       (item: any) =>
