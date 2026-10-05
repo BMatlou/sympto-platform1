@@ -1,4 +1,4 @@
-@import "react-phone-number-input/style.css";
+@import "../styles/phone-input.css";
 @import "tailwindcss";
 @import "tw-animate-css";
 @import "shadcn/tailwind.css";
