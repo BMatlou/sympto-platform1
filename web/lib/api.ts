@@ -48,10 +48,20 @@ function unwrapResponseData<T>(response: { data: { data?: T } | T }): T {
 }
 
 function getApiErrorMessage(error: any) {
-  const message = error?.response?.data?.message;
+  const payload = error?.response?.data;
+  const message =
+    payload?.message ??
+    payload?.error?.message ??
+    payload?.error?.detail;
+
   if (Array.isArray(message)) return message.join(" ");
   if (typeof message === "string" && message.trim()) return message;
-  if (error?.code === "ERR_NETWORK") return "Sympto could not reach the health service. Please try again.";
+  if (error?.code === "ERR_NETWORK") {
+    return "Sympto could not reach the health service. Please try again.";
+  }
+  if (typeof error?.message === "string" && error.message.trim()) {
+    return error.message;
+  }
   return "Something went wrong. Please try again.";
 }
 
