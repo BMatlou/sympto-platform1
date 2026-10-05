@@ -126,6 +126,58 @@ export interface BehavioralCluster {
   statement: string;
 }
 
+export interface ClinicalNarrativeRoutineAnchor {
+  goalId: string;
+  goalName: string;
+  goalCategory: string;
+  timeBucket: ClinicalTimeBucket;
+  timeLabel: string;
+  loggedDays: number;
+  nonLoggedDays: number;
+  loggedWindowAdherencePercent: number;
+  nonLoggedWindowAdherencePercent: number;
+  deltaPercentagePoints: number;
+  latestJournalValue: number | null;
+  latestJournalDate: string | null;
+  unit: string | null;
+  statement: string;
+  actionStatement: string;
+}
+
+export interface ClinicalNarrative {
+  baseline: {
+    takenDoses: number;
+    expectedDoses: number;
+    adherencePercent: number;
+    targetAdherencePercent: number;
+    variancePercentagePoints: number;
+    status: 'BELOW_TARGET' | 'ON_TARGET' | 'ABOVE_TARGET';
+  };
+  today: {
+    takenDoses: number;
+    expectedDoses: number;
+    adherencePercent: number;
+    isComplete: boolean;
+  };
+  interference: {
+    bucket: ClinicalTimeBucket;
+    label: string;
+    failureRatePercent: number;
+    failedDoses: number;
+    expectedDoses: number;
+    consistencyRatePercent: number;
+    comparison: Array<{
+      label: string;
+      consistencyRatePercent: number;
+      expectedDoses: number;
+      failureDoses: number;
+      available: boolean;
+    }>;
+  } | null;
+  routineAnchor: ClinicalNarrativeRoutineAnchor | null;
+  statisticalAssociationNote: string;
+}
+
 export interface ClinicalIntelligenceOutput {
   trajectory: TrajectoryAnalysis;
   timeBuckets: TimeBucketAnalysis[];
@@ -133,6 +185,7 @@ export interface ClinicalIntelligenceOutput {
   crossGoalAssociations: CrossGoalAssociation[];
   behavioralClusters: BehavioralCluster[];
   headline: string | null;
+  clinicalNarrative: ClinicalNarrative;
   secondaryInsights: string[];
   dataCoverage: {
     medicationEvents: number;
@@ -185,6 +238,13 @@ export class MedicationClinicalIntelligenceEngine {
     );
 
     const behavioralClusters = calculateBehavioralClusters(crossGoalAssociations);
+    const clinicalNarrative = buildClinicalNarrative(
+      input,
+      trajectory,
+      timeBuckets,
+      chronologicalInterference,
+      rules,
+    );
 
     const headline = buildHeadline(trajectory, chronologicalInterference, behavioralClusters);
     const secondaryInsights = [
@@ -201,6 +261,7 @@ export class MedicationClinicalIntelligenceEngine {
       chronologicalInterference,
       crossGoalAssociations,
       behavioralClusters,
+      clinicalNarrative,
       headline,
       secondaryInsights: uniqueStrings(secondaryInsights),
       dataCoverage: {
@@ -605,6 +666,309 @@ function calculateBehavioralClusters(
   }
 
   return clusters;
+}
+
+function buildClinicalNarrative(
+  input: MedicationClinicalIntelligenceInput,
+  trajectory: TrajectoryAnalysis,
+  timeBuckets: TimeBucketAnalysis[],
+  chronologicalInterference: ChronologicalInterference | null,
+  rules: ClinicalIntelligenceRules,
+): ClinicalNarrative {
+  const todayDay = dateKey(input.now, input.timezone);
+  const todayBucket = input.scheduledDays.find((day) => day.day === todayDay);
+  const todayExpected = Math.max(0, Number(todayBucket?.expectedDoses ?? 0));
+  const todayTaken = Math.min(
+    todayExpected,
+    Math.max(0, Number(todayBucket?.takenDoses ?? 0)),
+  );
+  const todayAdherence =
+    todayExpected > 0 ? round((todayTaken / todayExpected) * 100) : 0;
+
+  const routineAnchor = chronologicalInterference
+    ? findRoutineAnchor(input, chronologicalInterference.bucket, rules)
+    : null;
+
+  const interference = chronologicalInterference
+    ? {
+        bucket: chronologicalInterference.bucket,
+        label: chronologicalInterference.label,
+        failureRatePercent: chronologicalInterference.failureRatePercent,
+        failedDoses: chronologicalInterference.failedDoses,
+        expectedDoses: chronologicalInterference.expectedDoses,
+        consistencyRatePercent: round(
+          100 - chronologicalInterference.failureRatePercent,
+        ),
+        comparison: timeBuckets
+          .filter((bucket) => bucket.expectedDoses > 0)
+          .map((bucket) => ({
+            label: bucket.label,
+            consistencyRatePercent: round(
+              100 - Number(bucket.failureRatePercent ?? 100),
+            ),
+            expectedDoses: bucket.expectedDoses,
+            failureDoses: bucket.failureCount,
+            available: bucket.expectedDoses > 0,
+          })),
+      }
+    : null;
+
+  return {
+    baseline: {
+      takenDoses: trajectory.takenDoses,
+      expectedDoses: trajectory.expectedDosesToDate,
+      adherencePercent: trajectory.adherencePercent,
+      targetAdherencePercent: trajectory.targetAdherencePercent,
+      variancePercentagePoints: trajectory.variancePercentagePoints,
+      status: trajectory.varianceType,
+    },
+    today: {
+      takenDoses: todayTaken,
+      expectedDoses: todayExpected,
+      adherencePercent: todayAdherence,
+      isComplete: todayExpected > 0 && todayTaken >= todayExpected,
+    },
+    interference,
+    routineAnchor,
+    statisticalAssociationNote:
+      'Statistical Association: Identifies correlations across your logged data streams. Does not imply direct clinical causation.',
+  };
+}
+
+function findRoutineAnchor(
+  input: MedicationClinicalIntelligenceInput,
+  timeBucket: ClinicalTimeBucket,
+  rules: ClinicalIntelligenceRules,
+): ClinicalNarrativeRoutineAnchor | null {
+  const dailyWindow = aggregateTimeBucketByDay(input, timeBucket);
+  const today = dateKey(input.now, input.timezone);
+  const associations: ClinicalNarrativeRoutineAnchor[] = [];
+
+  for (const goal of input.supportingGoals) {
+    const goalEvents = input.journalEvents
+      .filter(
+        (event) =>
+          event.goalId === goal.goalId &&
+          event.timestamp >= input.medicationGoal.startDate &&
+          event.timestamp <=
+            (input.medicationGoal.targetDate &&
+            input.medicationGoal.targetDate < input.now
+              ? input.medicationGoal.targetDate
+              : input.now),
+      )
+      .sort((a, b) => a.timestamp.getTime() - b.timestamp.getTime());
+
+    const loggedDates = new Set(
+      goalEvents.map((event) => dateKey(event.timestamp, input.timezone)),
+    );
+
+    const comparisonStartDay = dateKey(
+      goal.createdAt > input.medicationGoal.startDate
+        ? goal.createdAt
+        : input.medicationGoal.startDate,
+      input.timezone,
+    );
+
+    const eligibleDays = dailyWindow.filter(
+      (day) =>
+        day.day >= comparisonStartDay &&
+        day.day < today &&
+        day.expectedDoses > 0,
+    );
+
+    const loggedDays = eligibleDays.filter((day) => loggedDates.has(day.day));
+    const nonLoggedDays = eligibleDays.filter((day) => !loggedDates.has(day.day));
+
+    const loggedExpected = sum(loggedDays.map((day) => day.expectedDoses));
+    const loggedTaken = sum(loggedDays.map((day) => day.takenDoses));
+    const nonLoggedExpected = sum(
+      nonLoggedDays.map((day) => day.expectedDoses),
+    );
+    const nonLoggedTaken = sum(nonLoggedDays.map((day) => day.takenDoses));
+
+    const loggedAdherence =
+      loggedExpected > 0 ? round((loggedTaken / loggedExpected) * 100) : null;
+    const nonLoggedAdherence =
+      nonLoggedExpected > 0
+        ? round((nonLoggedTaken / nonLoggedExpected) * 100)
+        : null;
+
+    if (
+      loggedAdherence == null ||
+      nonLoggedAdherence == null ||
+      loggedDays.length < rules.minimumComparisonDaysPerGroup ||
+      nonLoggedDays.length < rules.minimumComparisonDaysPerGroup
+    ) {
+      continue;
+    }
+
+    const delta = round(loggedAdherence - nonLoggedAdherence);
+    if (delta < rules.behavioralDeltaPercentagePoints) continue;
+
+    const latest = goalEvents.at(-1);
+
+    const timeLabel =
+      timeBucket === 'MORNING'
+        ? 'morning'
+        : timeBucket === 'AFTERNOON'
+          ? 'afternoon'
+          : 'evening/night';
+
+    const observation = latest
+      ? ' Latest linked observation: ' +
+        round(Number(latest.value)) +
+        (goal.unit ? ' ' + goal.unit : '') +
+        ' on ' +
+        dateKey(latest.timestamp, input.timezone) +
+        '.'
+      : '';
+
+    associations.push({
+      goalId: goal.goalId,
+      goalName: goal.name,
+      goalCategory: goal.category,
+      timeBucket,
+      timeLabel,
+      loggedDays: loggedDays.length,
+      nonLoggedDays: nonLoggedDays.length,
+      loggedWindowAdherencePercent: loggedAdherence,
+      nonLoggedWindowAdherencePercent: nonLoggedAdherence,
+      deltaPercentagePoints: delta,
+      latestJournalValue: latest ? Number(latest.value) : null,
+      latestJournalDate: latest
+        ? dateKey(latest.timestamp, input.timezone)
+        : null,
+      unit: goal.unit,
+      statement:
+        'Cross-goal mapping indicates a measurable association with ' +
+        goal.name +
+        ': on ' +
+        loggedDays.length +
+        ' days with a recorded ' +
+        goal.name +
+        ' observation, ' +
+        timeLabel +
+        ' adherence was ' +
+        loggedAdherence +
+        '% versus ' +
+        nonLoggedAdherence +
+        '% across ' +
+        nonLoggedDays.length +
+        ' days without the observation (' +
+        delta +
+        ' percentage points higher).' +
+        observation,
+      actionStatement:
+        'Insight: Your tracking vulnerability clusters around ' +
+        timeLabel +
+        ' wind-downs. Consider anchoring the ' +
+        input.medicationGoal.name +
+        ' ' +
+        timeLabel +
+        ' dose to your high-consistency ' +
+        goal.name +
+        ' check-in; this may reduce tracking friction.',
+    });
+  }
+
+  associations.sort((a, b) => {
+    if (b.deltaPercentagePoints !== a.deltaPercentagePoints) {
+      return b.deltaPercentagePoints - a.deltaPercentagePoints;
+    }
+    if (b.loggedDays !== a.loggedDays) return b.loggedDays - a.loggedDays;
+    return a.goalName.localeCompare(b.goalName);
+  });
+
+  return associations[0] ?? null;
+}
+
+function aggregateTimeBucketByDay(
+  input: MedicationClinicalIntelligenceInput,
+  bucket: ClinicalTimeBucket,
+): Array<{
+  day: string;
+  expectedDoses: number;
+  takenDoses: number;
+}> {
+  const definitions: Record<
+    ClinicalTimeBucket,
+    { start: number; end: number }
+  > = {
+    MORNING: { start: 5 * 60, end: 12 * 60 },
+    AFTERNOON: { start: 12 * 60, end: 17 * 60 },
+    EVENING_NIGHT: { start: 17 * 60, end: 29 * 60 },
+  };
+
+  const definition = definitions[bucket];
+  const today = dateKey(input.now, input.timezone);
+  const lifecycleEndDay = dateKey(
+    input.medicationGoal.targetDate &&
+      input.medicationGoal.targetDate < input.now
+      ? input.medicationGoal.targetDate
+      : input.now,
+    input.timezone,
+  );
+
+  const expectedByDay = new Map<string, number>();
+  const takenByDay = new Map<string, number>();
+
+  for (const day of input.scheduledDays) {
+    if (
+      day.day > lifecycleEndDay ||
+      day.expectedDoses <= 0 ||
+      !scheduleDayIsActive(input.medicationSchedule, day.day, input.timezone)
+    ) {
+      continue;
+    }
+
+    let bucketExpected = 0;
+    for (const slot of input.medicationSchedule.reminderSlots) {
+      const minutes = timeToMinutes(slot);
+      if (
+        Number.isFinite(minutes) &&
+        isMinuteInBucket(minutes, definition.start, definition.end)
+      ) {
+        if (day.day === today) {
+          const nowMinutes = timeToMinutes(
+            localTime(input.now, input.timezone),
+          );
+          if (minutes > nowMinutes) continue;
+        }
+        bucketExpected += 1;
+      }
+    }
+
+    if (bucketExpected > 0) expectedByDay.set(day.day, bucketExpected);
+  }
+
+  for (const event of input.medicationEvents) {
+    if (
+      event.action !== 'TAKEN' ||
+      event.timestamp < input.medicationGoal.startDate ||
+      event.timestamp > input.now
+    ) {
+      continue;
+    }
+
+    if (bucketForTimestamp(event.timestamp, input.timezone) !== bucket) {
+      continue;
+    }
+
+    const day = dateKey(event.timestamp, input.timezone);
+    if (day > lifecycleEndDay) continue;
+    takenByDay.set(day, (takenByDay.get(day) ?? 0) + 1);
+  }
+
+  return [...expectedByDay.keys()]
+    .sort()
+    .map((day) => ({
+      day,
+      expectedDoses: expectedByDay.get(day) ?? 0,
+      takenDoses: Math.min(
+        expectedByDay.get(day) ?? 0,
+        takenByDay.get(day) ?? 0,
+      ),
+    }));
 }
 
 function buildHeadline(
