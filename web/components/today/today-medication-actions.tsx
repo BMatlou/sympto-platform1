@@ -277,7 +277,7 @@ export default function TodayMedicationActions({ medications, goal: suppliedGoal
 
   // Never render a stale server-side zero when the parent card already has a positive count.
   const hasMeaningfulMedicationInsight =
-    Boolean(clinicalIntelligence) &&
+    Boolean(journeyInsight) &&
     insightExpectedScheduledDoses > 0;
 
 
@@ -360,14 +360,16 @@ export default function TodayMedicationActions({ medications, goal: suppliedGoal
             </p>
           </div>
 
-          {clinicalIntelligence?.headline ? (
-            <div className="mt-3 rounded-[18px] border border-[#cfe8e6] bg-[#f4fbfb] px-3.5 py-3.5 ring-1 ring-[#dcefed] sm:px-4 sm:py-4">
-              <p className="text-[8px] font-black uppercase tracking-[.13em] text-[#0b7b80]">Primary signal</p>
-              <p className="mt-1.5 text-[11px] font-black leading-5 text-[#0b2d54]">
-                {String(clinicalIntelligence.headline)}
-              </p>
-            </div>
-          ) : null}
+          <div className="mt-3 rounded-[18px] border border-[#cfe8e6] bg-[#f4fbfb] px-3.5 py-3.5 ring-1 ring-[#dcefed] sm:px-4 sm:py-4">
+            <p className="text-[8px] font-black uppercase tracking-[.13em] text-[#0b7b80]">Primary signal</p>
+            <p className="mt-1.5 text-[11px] font-black leading-5 text-[#0b2d54]">
+              {clinicalIntelligence?.headline
+                ? String(clinicalIntelligence.headline)
+                : insightAdherencePercent < targetAdherence
+                  ? `Your medication adherence is ${Math.round(insightAdherencePercent)}%, ${Math.round(targetAdherence - insightAdherencePercent)} percentage points below the ${Math.round(targetAdherence)}% goal.`
+                  : `Your medication adherence is ${Math.round(insightAdherencePercent)}%, meeting the ${Math.round(targetAdherence)}% goal.`}
+            </p>
+          </div>
 
           <div className="mt-3 space-y-2.5">
             <div className="rounded-[18px] border border-[#d9e4ee] bg-white px-3.5 py-3.5 ring-1 ring-[#e8eef3] sm:px-4 sm:py-4">
