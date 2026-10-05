@@ -7,6 +7,7 @@ import { HealthGoalIntelligenceService } from './health-goal-intelligence.servic
 import { HealthGoalMetricSchemaService } from './health-goal-metric-schema.service';
 import { GoalsEngineService } from './goals-engine-v3.service';
 import { GoalsEngineService as CategoryAwareGoalsEngineService } from './goals-engine-v2.service';
+import { MedicationInsightService } from './medication-insight.service';
 
 @Module({
   imports: [DatabaseModule],
@@ -17,6 +18,7 @@ import { GoalsEngineService as CategoryAwareGoalsEngineService } from './goals-e
     HealthGoalsService,
     HealthGoalIntelligenceService,
     HealthGoalMetricSchemaService,
+    MedicationInsightService,
   ],
   exports: [
     GoalsEngineService,
