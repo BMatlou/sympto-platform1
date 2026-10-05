@@ -1,11 +1,10 @@
 "use client";
 
-import { Activity, Check, CircleSlash2, Clock3, Pill, Sparkles, TrendingUp } from "lucide-react";
+import { Check, CircleSlash2, Pill } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 import { api } from "@/lib/api";
 import { healthGoalsService } from "@/services/health-goals.service";
-import { buildLiveMedicationInsights } from "@/lib/medication-intelligence";
 
 interface TodayMedicationActionsProps {
   medications: any[];
@@ -15,34 +14,8 @@ interface TodayMedicationActionsProps {
 
 type Action = "TAKEN" | "SKIPPED";
 
-function journalDayKey(value: unknown) {
-  const date = new Date(String(value ?? ""));
-  if (Number.isNaN(date.getTime())) return "";
-  return new Intl.DateTimeFormat("en-CA", {
-    timeZone: "Africa/Johannesburg",
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-  }).format(date);
-}
-
 function medicationName(medication: any) {
   return medication?.medication?.name || medication?.medication?.genericName || medication?.name || "Your medicine";
-}
-
-const medicationInsightTone = {
-  positive: "border-[#bfe9e6] bg-[#e9faf8] ring-[#d7f2f0]",
-  action: "border-[#c9e1f0] bg-[#eef8fc] ring-[#dceef5]",
-  context: "border-[#d9e4ee] bg-white ring-[#e8eef3]",
-  watch: "border-[#ead9bc] bg-[#fff8eb] ring-[#f1e5cf]",
-  neutral: "border-[#d9e4ee] bg-[#f8fbfb] ring-[#e8eef3]",
-} as const;
-
-function MedicationInsightIcon({ tone }: { tone?: keyof typeof medicationInsightTone }) {
-  if (tone === "positive") return <TrendingUp className="h-4 w-4" />;
-  if (tone === "action") return <Clock3 className="h-4 w-4" />;
-  if (tone === "context") return <Activity className="h-4 w-4" />;
-  return <Sparkles className="h-4 w-4" />;
 }
 
 function medicationSchedule(medication: any) {
@@ -130,8 +103,6 @@ export default function TodayMedicationActions({ medications, goal: suppliedGoal
   const [isSyncing, setIsSyncing] = useState(false);
   const [savingKey, setSavingKey] = useState<string | null>(null);
   const [states, setStates] = useState<Record<string, Action | undefined>>({});
-  const [adherenceEvents, setAdherenceEvents] = useState<Array<{ loggedValue: number; occurredAt: string; metadata?: Record<string, unknown> | null }>>([]);
-  const [recentNutritionEvents, setRecentNutritionEvents] = useState<Array<{ loggedValue: number; occurredAt: string }>>([]);
 
   const trackedMedication = medications[0] ?? null;
   const finalGoal = (() => {
@@ -175,7 +146,6 @@ export default function TodayMedicationActions({ medications, goal: suppliedGoal
     if (!medications.length || !medicationId) {
       setDosesLoggedToday(0);
       setTakenDosesForGoal(0);
-      setAdherenceEvents([]);
       return;
     }
 
@@ -200,17 +170,8 @@ export default function TodayMedicationActions({ medications, goal: suppliedGoal
       if (!medicationEvents.length) {
         setDosesLoggedToday(0);
         setTakenDosesForGoal(0);
-        setAdherenceEvents([]);
         return;
       }
-
-      setAdherenceEvents(
-        medicationEvents.map((event) => ({
-          loggedValue: Number(event.loggedValue),
-          occurredAt: String(event.occurredAt),
-          metadata: event.metadata ?? null,
-        })),
-      );
 
       // Each medication-adherence event represents exactly one recorded dose
       // action. Its loggedValue is the cumulative adherence percentage after
@@ -248,55 +209,6 @@ export default function TodayMedicationActions({ medications, goal: suppliedGoal
     void loadAdherenceEvents();
   }, [medications.length, totalRequiredDosesPerDay, medicationId, finalGoal?.id]);
 
-  useEffect(() => {
-    let active = true;
-
-    async function loadRecentNutritionEvents() {
-      try {
-        const end = new Date();
-        const start = new Date(end);
-        start.setDate(start.getDate() - 29);
-        start.setHours(0, 0, 0, 0);
-
-        const response = await healthGoalsService.getMetricEvents(
-          "NUTRITION",
-          "nutrition.calories",
-          start,
-          end,
-          "goal-manual",
-        );
-
-        const events = (response?.events ?? [])
-          .map((event) => ({
-            loggedValue: Number(event.loggedValue),
-            occurredAt: String(event.occurredAt),
-          }))
-          .filter(
-            (event) =>
-              Number.isFinite(event.loggedValue) &&
-              event.loggedValue >= 0 &&
-              Boolean(journalDayKey(event.occurredAt)),
-          );
-
-        if (active) setRecentNutritionEvents(events);
-      } catch {
-        if (active) setRecentNutritionEvents([]);
-      }
-    }
-
-    void loadRecentNutritionEvents();
-
-    const handleNutritionUpdated = () => void loadRecentNutritionEvents();
-    window.addEventListener("sympto:health-goal-updated", handleNutritionUpdated);
-    window.addEventListener("sympto:today-action-updated", handleNutritionUpdated);
-
-    return () => {
-      active = false;
-      window.removeEventListener("sympto:health-goal-updated", handleNutritionUpdated);
-      window.removeEventListener("sympto:today-action-updated", handleNutritionUpdated);
-    };
-  }, []);
-
   const doseLabel = useMemo(
     () => (totalRequiredDosesPerDay === 1 ? "1 dose" : `${totalRequiredDosesPerDay} doses`),
     [totalRequiredDosesPerDay],
@@ -312,35 +224,39 @@ export default function TodayMedicationActions({ medications, goal: suppliedGoal
   const fallbackTakenDoses = cumulativeTakenDoses(trackedMedication);
   const takenDosesSoFar = Math.max(0, takenDosesForGoal || fallbackTakenDoses);
 
-  const todayMealsCount = useMemo(() => {
-    const today = journalDayKey(new Date());
-    return recentNutritionEvents.filter(
-      (event) => journalDayKey(event.occurredAt) === today,
-    ).length;
-  }, [recentNutritionEvents]);
+  const [medicationInsight, setMedicationInsight] = useState<any | null>(null);
 
-  const medicationInsights = useMemo(
-    () =>
-      buildLiveMedicationInsights({
-        medication_name:
-          medicationName(trackedMedication) ||
-          String(finalGoal?.title ?? "Your medicine"),
-        current_lifecycle_day: journeyDay,
-        daily_target_doses: totalRequiredDosesPerDay,
-        total_taken_to_date: takenDosesSoFar,
-        today_logged_meals_count: todayMealsCount,
-        today_doses_logged: safeDosesLoggedToday,
-      }),
-    [
-      trackedMedication,
-      finalGoal?.title,
-      journeyDay,
-      totalRequiredDosesPerDay,
-      takenDosesSoFar,
-      todayMealsCount,
-      safeDosesLoggedToday,
-    ],
+  async function loadMedicationInsight() {
+    if (!finalGoal?.id) {
+      setMedicationInsight(null);
+      return;
+    }
+
+    try {
+      const response = await api.get(
+        `/patient-health-goals/${encodeURIComponent(String(finalGoal.id))}/medication-insight`,
+      );
+      setMedicationInsight(response.data ?? null);
+    } catch {
+      setMedicationInsight(null);
+    }
+  }
+
+  useEffect(() => {
+    void loadMedicationInsight();
+  }, [finalGoal?.id]);
+
+  const journeyInsight = medicationInsight?.analysis?.journeyAdherence;
+  const trendInsight = medicationInsight?.analysis?.trend;
+  const associationInsight = (medicationInsight?.analysis?.associations ?? []).find(
+    (association: any) => association?.statisticallyRelevant && association?.insight,
   );
+
+  const hasMeaningfulMedicationInsight =
+    Boolean(associationInsight) ||
+    Boolean(trendInsight?.state && trendInsight.state !== "INSUFFICIENT_DATA");
+
+
 
   if (!finalGoal) {
     return null;
@@ -386,6 +302,7 @@ export default function TodayMedicationActions({ medications, goal: suppliedGoal
         });
       }
       await onUpdated?.();
+      await loadMedicationInsight();
     } catch (error) {
       toast.error("Medication update failed", { description: errorMessage(error) });
     } finally {
@@ -409,43 +326,47 @@ export default function TodayMedicationActions({ medications, goal: suppliedGoal
 
       <div className="border-t border-[#edf2f5] px-4 py-3.5 sm:px-5"><div className="mb-3 flex flex-wrap items-center justify-between gap-2"><div><p className="text-[8px] font-black uppercase tracking-[.14em] text-[#91a0ae]">Goal journey</p><p className="mt-0.5 text-[11px] font-black text-[#0b2d54]">Day {journeyDay}{daysLeft !== null ? ` · ${daysLeft} day${daysLeft === 1 ? "" : "s"} left` : ""}</p></div><div className="text-right"><p className="text-[10px] font-black text-[#0b7b80]">{targetAdherence}% adherence goal</p><p className="mt-0.5 text-[9px] font-semibold text-[#91a0ae]">Take at least {targetAdherence}% of your scheduled doses to reach this goal.</p></div></div><div className="mb-3 h-2 overflow-hidden rounded-full bg-[#edf3f5]"><div className="h-full rounded-full bg-[#24c1c4] transition-all" style={{ width: `${percent}%` }} /></div><div className="mb-3 rounded-[14px] bg-[#f7fbfb] px-3.5 py-3 ring-1 ring-[#e1ecef]"><div className="flex items-center justify-between gap-3"><div><p className="text-[8px] font-black uppercase tracking-[.13em] text-[#91a0ae]">Doses needed for your goal</p><p className="mt-0.5 text-[13px] font-black text-[#0b2d54]">{dosesNeededForGoal} more dose{dosesNeededForGoal === 1 ? "" : "s"}</p></div><p className="text-right text-[9px] font-bold text-[#7c8e9b]">{takenDosesSoFar} taken so far</p></div></div><div className="flex items-center justify-between gap-3"><div><p className="text-[11px] font-bold text-[#7c8e9b]">Dose status</p><p className="mt-0.5 text-[10px] font-semibold text-[#9aa7b1]">{states[String(medicationId)] === "TAKEN" ? "Taken today" : states[String(medicationId)] === "SKIPPED" ? "Skipped today" : "Choose an action below"}</p></div><div className="grid w-[180px] grid-cols-2 gap-2"><button type="button" onClick={() => void record(trackedMedication, "TAKEN")} disabled={isSyncing || safeDosesLoggedToday >= totalRequiredDosesPerDay} className="inline-flex h-10 items-center justify-center gap-1.5 rounded-[13px] bg-[#24c1c4] px-3 text-[10px] font-black text-[#0b2d54] transition hover:brightness-105 disabled:cursor-not-allowed disabled:opacity-45"><Check className="h-3.5 w-3.5" />{savingKey === `${String(medicationId)}:TAKEN` ? "Saving" : "Taken"}</button><button type="button" onClick={() => void record(trackedMedication, "SKIPPED")} disabled={isSyncing || safeDosesLoggedToday >= totalRequiredDosesPerDay} className="inline-flex h-10 items-center justify-center gap-1.5 rounded-[13px] border border-[#dce7eb] bg-white px-3 text-[10px] font-black text-[#0b2d54] transition hover:bg-[#f7fbfb] disabled:cursor-not-allowed disabled:opacity-45"><CircleSlash2 className="h-3.5 w-3.5" />{savingKey === `${String(medicationId)}:SKIPPED` ? "Saving" : "Skipped"}</button></div></div></div>
 
-      <section className="mx-3.5 mb-3.5 rounded-[22px] border border-[#bfe9e9] bg-[#f4fbfb] p-4 text-[#0b2d54] shadow-[0_12px_30px_rgba(36,193,196,.12)] sm:mx-4 sm:mb-4 sm:p-5">
-        <div className="flex items-start gap-3">
-          <span className="grid h-9 w-9 shrink-0 place-items-center rounded-[13px] bg-[#24c1c4] text-[#0b2d54] shadow-[0_0_18px_rgba(36,193,196,.24)]">
-            <Sparkles className="h-4 w-4" />
-          </span>
-          <div className="min-w-0">
+      {hasMeaningfulMedicationInsight ? (
+        <section className="mx-3.5 mb-3.5 rounded-[22px] border border-[#dce9ee] bg-[#f8fbfb] p-4 text-[#0b2d54] sm:mx-4 sm:mb-4 sm:p-5">
+          <div>
             <p className="text-[9px] font-black uppercase tracking-[.15em] text-[#0b7b80]">Sympto insight</p>
             <h3 className="mt-1 text-base font-black tracking-[-.025em] text-[#0b2d54]">Your medication pattern</h3>
           </div>
-        </div>
 
-        <div className="mt-3 space-y-2.5">
-          {medicationInsights.map((insight, index) => {
-            const tone =
-              insight.tone && insight.tone in medicationInsightTone
-                ? medicationInsightTone[insight.tone as keyof typeof medicationInsightTone]
-                : medicationInsightTone.neutral;
-
-            return (
-              <div
-                key={insight.title + "-" + index}
-                className={`rounded-[18px] border px-3.5 py-3.5 ring-1 ${tone} ${index === 0 ? "sm:px-4 sm:py-4" : ""}`}
-              >
-                <div className="flex items-start gap-3">
-                  <span className="grid h-8 w-8 shrink-0 place-items-center rounded-[11px] bg-white/80 text-[#0b7b80] ring-1 ring-black/[0.05]">
-                    <MedicationInsightIcon tone={insight.tone as keyof typeof medicationInsightTone | undefined} />
-                  </span>
-                  <div className="min-w-0">
-                    <p className="text-[11px] font-black leading-5 text-[#0b2d54]">{insight.title}</p>
-                    <p className="mt-1 text-[11px] leading-5 text-[#5f7080]">{insight.text}</p>
-                  </div>
-                </div>
+          <div className="mt-3 space-y-2.5">
+            {journeyInsight ? (
+              <div className="rounded-[18px] border border-[#d9e4ee] bg-white px-3.5 py-3.5 ring-1 ring-[#e8eef3] sm:px-4 sm:py-4">
+                <p className="text-[11px] font-black leading-5 text-[#0b2d54]">Medication journey</p>
+                <p className="mt-1 text-[11px] leading-5 text-[#5f7080]">
+                  {journeyInsight.takenDoses} of {journeyInsight.expectedScheduledDoses} scheduled doses taken · {Math.round(journeyInsight.adherencePercent)}% adherence.
+                </p>
               </div>
-            );
-          })}
-        </div>
-      </section>
+            ) : null}
+
+            {trendInsight?.state && trendInsight.state !== "INSUFFICIENT_DATA" ? (
+              <div className="rounded-[18px] border border-[#d9e4ee] bg-white px-3.5 py-3.5 ring-1 ring-[#e8eef3] sm:px-4 sm:py-4">
+                <p className="text-[11px] font-black leading-5 text-[#0b2d54]">Recent pattern</p>
+                <p className="mt-1 text-[11px] leading-5 text-[#5f7080]">
+                  {trendInsight.state === "IMPROVING"
+                    ? "Your medication routine is improving across the days with recorded doses."
+                    : trendInsight.state === "DECLINING"
+                      ? "Your medication routine has been declining across the days with recorded doses."
+                      : trendInsight.state === "INCONSISTENT"
+                        ? "Your medication routine has been inconsistent across the days with recorded doses."
+                        : "Your medication routine has been stable across the days with recorded doses."}
+                </p>
+              </div>
+            ) : null}
+
+            {associationInsight?.insight ? (
+              <div className="rounded-[18px] border border-[#d9e4ee] bg-white px-3.5 py-3.5 ring-1 ring-[#e8eef3] sm:px-4 sm:py-4">
+                <p className="text-[11px] font-black leading-5 text-[#0b2d54]">Connected goal</p>
+                <p className="mt-1 text-[11px] leading-5 text-[#5f7080]">{associationInsight.insight}</p>
+              </div>
+            ) : null}
+          </div>
+        </section>
+      ) : null}
     </section>
   );
 }
