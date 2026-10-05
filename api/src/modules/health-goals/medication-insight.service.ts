@@ -185,7 +185,7 @@ type RelationRow = {
   comparison: string | null;
 };
 
-type SupportEventRow = {
+export type SupportEventRow = {
   healthGoalId: string;
   occurredAt: Date;
   loggedValue: number;
