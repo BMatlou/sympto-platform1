@@ -339,8 +339,8 @@ export default function TodaySupportedGoalCard({ goal, activeGoals = [], onUpdat
                   {displayCurrent == null || target == null
                     ? "—"
                     : bpWithinTarget
-                      ? (Math.abs(bpDistance ?? 0) === 0 ? "At target" : Math.abs(bpDistance ?? 0) + " below")
-                      : Math.abs(bpDistance ?? 0) + " above"}
+                      ? (Math.abs(bpDistance ?? 0) === 0 ? "At target" : Math.abs(bpDistance ?? 0) + " mmHg below")
+                      : "+" + Math.abs(bpDistance ?? 0) + " mmHg"}
                 </p>
               </div>
             </div>
