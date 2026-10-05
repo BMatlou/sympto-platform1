@@ -228,6 +228,197 @@ describe('MedicationClinicalIntelligenceEngine', () => {
     expect(result.clinicalNarrative.routineAnchor?.deltaPercentagePoints).toBeGreaterThanOrEqual(15);
   });
 
+  it('uses today\'s active nutrition data as the real-time Metformin routine anchor', () => {
+    const supportingGoals: ClinicalSupportingGoal[] = [
+      {
+        goalId: 'goal-nutrition',
+        name: 'Daily nutrition target',
+        category: 'NUTRITION',
+        unit: 'kcal/day',
+        targetValue: 1000,
+        frequency: 'DAILY',
+        metricType: 'NUTRITION',
+        metricKey: 'nutrition.calories',
+        aggregation: 'SUM',
+        comparison: 'AT_MOST',
+        createdAt: new Date('2026-09-22T00:00:00+02:00'),
+      },
+      {
+        goalId: 'goal-exercise',
+        name: 'Exercise',
+        category: 'EXERCISE',
+        unit: 'min/week',
+        targetValue: 90,
+        frequency: 'WEEKLY',
+        metricType: 'EXERCISE',
+        metricKey: 'exercise.minutes',
+        aggregation: 'SUM',
+        comparison: 'AT_LEAST',
+        createdAt: new Date('2026-09-22T00:00:00+02:00'),
+      },
+      {
+        goalId: 'goal-sleep',
+        name: 'Sleep',
+        category: 'SLEEP',
+        unit: 'hours/night',
+        targetValue: 6,
+        frequency: 'DAILY',
+        metricType: 'SLEEP',
+        metricKey: 'sleep.hours',
+        aggregation: 'LATEST',
+        comparison: 'AT_LEAST',
+        createdAt: new Date('2026-09-22T00:00:00+02:00'),
+      },
+    ];
+
+    const journalEvents: ClinicalJournalEvent[] = [
+      {
+        goalId: 'goal-nutrition',
+        timestamp: new Date('2026-10-05T09:48:00+02:00'),
+        value: 1081,
+        source: 'journal',
+      },
+      {
+        goalId: 'goal-exercise',
+        timestamp: new Date('2026-10-05T15:00:00+02:00'),
+        value: 90,
+        source: 'journal',
+      },
+      {
+        goalId: 'goal-sleep',
+        timestamp: new Date('2026-10-05T06:30:00+02:00'),
+        value: 6,
+        source: 'journal',
+      },
+    ];
+
+    const result = engine.calculate({
+      medicationGoal: {
+        medicationId: 'metformin',
+        name: 'Metformin',
+        frequency: 3,
+        startDate: new Date('2026-09-22T00:00:00+02:00'),
+        targetDate: new Date('2027-05-17T00:00:00+02:00'),
+        targetAdherence: 0.9,
+      },
+      medicationEvents: [
+        event('2026-10-05T08:05:00+02:00', 'TAKEN'),
+        event('2026-10-05T13:05:00+02:00', 'TAKEN'),
+        event('2026-10-05T19:05:00+02:00', 'TAKEN'),
+      ],
+      supportingGoals,
+      journalEvents,
+      medicationSchedule: schedule(),
+      scheduledDays: buckets().map((day) =>
+        day.day === '2026-10-05'
+          ? {
+              ...day,
+              takenDoses: 3,
+              recordedActions: 3,
+              unrecordedDoses: 0,
+              adherencePercent: 100,
+            }
+          : day,
+      ),
+      now,
+      timezone: 'Africa/Johannesburg',
+    });
+
+    expect(result.clinicalNarrative.pattern).toBe(
+      "⚡ Daily Routine Anchor: Today's perfect 3/3 execution directly matches your active digital health engagement. Your morning Metformin tracking successfully aligned with your 09:48 AM meal entry, completely eliminating tracking friction for the first half of your daily rhythm.",
+    );
+  });
+
+  it('uses today\'s exercise and sleep data as the real-time Paracetamol routine anchor', () => {
+    const supportingGoals: ClinicalSupportingGoal[] = [
+      {
+        goalId: 'goal-exercise',
+        name: 'Exercise',
+        category: 'EXERCISE',
+        unit: 'min/week',
+        targetValue: 90,
+        frequency: 'WEEKLY',
+        metricType: 'EXERCISE',
+        metricKey: 'exercise.minutes',
+        aggregation: 'SUM',
+        comparison: 'AT_LEAST',
+        createdAt: new Date('2026-09-22T00:00:00+02:00'),
+      },
+      {
+        goalId: 'goal-sleep',
+        name: 'Sleep',
+        category: 'SLEEP',
+        unit: 'hours/night',
+        targetValue: 6,
+        frequency: 'DAILY',
+        metricType: 'SLEEP',
+        metricKey: 'sleep.hours',
+        aggregation: 'LATEST',
+        comparison: 'AT_LEAST',
+        createdAt: new Date('2026-09-22T00:00:00+02:00'),
+      },
+    ];
+
+    const result = engine.calculate({
+      medicationGoal: {
+        medicationId: 'paracetamol',
+        name: 'Paracetamol',
+        frequency: 2,
+        startDate: new Date('2026-09-22T00:00:00+02:00'),
+        targetDate: new Date('2027-05-17T00:00:00+02:00'),
+        targetAdherence: 0.9,
+      },
+      medicationEvents: [
+        event('2026-10-05T08:10:00+02:00', 'TAKEN'),
+        event('2026-10-05T20:10:00+02:00', 'TAKEN'),
+      ],
+      supportingGoals,
+      journalEvents: [
+        {
+          goalId: 'goal-exercise',
+          timestamp: new Date('2026-10-05T15:00:00+02:00'),
+          value: 90,
+          source: 'journal',
+        },
+        {
+          goalId: 'goal-sleep',
+          timestamp: new Date('2026-10-05T06:30:00+02:00'),
+          value: 6,
+          source: 'journal',
+        },
+      ],
+      medicationSchedule: {
+        ...schedule(),
+        name: 'Paracetamol',
+        frequency: 'TWICE_DAILY',
+        dosesPerDay: 2,
+        reminderSlots: ['08:00', '20:00'],
+      },
+      scheduledDays: buckets().map((day) =>
+        day.day === '2026-10-05'
+          ? {
+              ...day,
+              expectedDoses: 2,
+              takenDoses: 2,
+              recordedActions: 2,
+              unrecordedDoses: 0,
+              adherencePercent: 100,
+            }
+          : {
+              ...day,
+              expectedDoses: 2,
+              unrecordedDoses: 2,
+            },
+      ),
+      now,
+      timezone: 'Africa/Johannesburg',
+    });
+
+    expect(result.clinicalNarrative.pattern).toBe(
+      '⚡ Daily Routine Anchor: Your 100% logging streak today perfectly mirrors your active physical metrics. You successfully paired your complete medication tracking window with a highly active day, alongside your recorded 90 minutes of exercise and 6 hours of sleep.',
+    );
+  });
+
   it('joins linked goal journal days to medication days without treating missing data as a positive event', () => {
     const supportGoal: ClinicalSupportingGoal = {
       goalId: 'goal-nutrition',
