@@ -510,7 +510,7 @@ export default function TodayMedicationActions({ medications, goal: suppliedGoal
                 <p className="text-[11px] font-black leading-5 text-[#0b2d54]">Connected goal</p>
                 <p className="mt-1 text-[11px] leading-5 text-[#5f7080]">{associationInsight.insight}</p>
               </div>
-            ) : null
+            ) : null}
           </div>
         </section>
       ) : null}
