@@ -7,6 +7,7 @@ import { HealthJournalsController } from './health-journals.controller';
 import { HealthJournalsService } from './health-journals.service';
 import { SymptomIntelligenceService } from './symptom-intelligence.service';
 import { SymptomAiService } from './symptom-ai.service';
+import { VoiceTranscriptionService } from './voice-transcription.service';
 
 @Module({
   imports: [
@@ -22,6 +23,7 @@ import { SymptomAiService } from './symptom-ai.service';
     HealthJournalsService,
     SymptomIntelligenceService,
     SymptomAiService,
+    VoiceTranscriptionService,
   ],
 
   exports: [
