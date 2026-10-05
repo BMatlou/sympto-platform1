@@ -235,8 +235,6 @@ export class MedicationInsightService {
     let clinicalJournalEvents: ClinicalJournalEvent[] = [];
 
     try {
-      // Use the same supporting-goal graph already used by the medication insight
-      // path. This intentionally does not require a separate relation-table hit.
       clinicalSupportingGoals = relations.map((relation) => ({
         goalId: relation.healthGoalId,
         name: relation.title,
@@ -251,18 +249,29 @@ export class MedicationInsightService {
         createdAt: new Date(relation.createdAt),
       }));
 
-      clinicalJournalEvents = await this.loadClinicalJournalEvents(
-        goal.patientId,
-        goal.createdAt,
-        clinicalSupportingGoals,
+      const supportingGoalIds = new Set(
+        clinicalSupportingGoals.map((supportingGoal) => supportingGoal.goalId),
       );
+
+      clinicalJournalEvents = supportingEvents
+        .filter(
+          (event) =>
+            supportingGoalIds.has(event.healthGoalId) &&
+            Number.isFinite(Number(event.loggedValue)) &&
+            event.occurredAt >= goal.createdAt &&
+            event.occurredAt <= now,
+        )
+        .map((event) => ({
+          goalId: event.healthGoalId,
+          timestamp: event.occurredAt,
+          value: Number(event.loggedValue),
+          source: event.source,
+        }));
     } catch (error) {
       console.warn(
         'Medication clinical graph enrichment unavailable; continuing with medication-only intelligence.',
         error instanceof Error ? error.message : String(error),
       );
-      clinicalSupportingGoals = [];
-      clinicalJournalEvents = [];
     }
 
     const dailyBuckets = buildDailyBuckets(goal.createdAt, now, schedule, doseRows);
