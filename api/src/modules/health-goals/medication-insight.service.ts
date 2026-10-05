@@ -200,6 +200,7 @@ type RelationRow = {
   metricKey: string | null;
   frequency: string | null;
   frequencyTarget: number | null;
+  relatedTargetValue: number | null;
   aggregation: string | null;
   comparison: string | null;
 };
@@ -447,7 +448,8 @@ export class MedicationInsightService {
   private async loadRelations(patientId: string, medicationGoalId: string): Promise<ConnectedSupportingGoal[]> {
     const sql =
       'SELECT g."id" AS "relatedGoalId", g."category"::text AS "relatedCategory", g."title" AS "relatedTitle", ' +
-      'g."status"::text AS "relatedStatus", g."createdAt" AS "relatedCreatedAt", r."rationale", ' +
+      'g."status"::text AS "relatedStatus", g."createdAt" AS "relatedCreatedAt", ' +
+      'g."targetValue"::double precision AS "relatedTargetValue", r."rationale", ' +
       'c."metricType", c."metricKey", c."frequency", c."frequencyTarget"::double precision AS "frequencyTarget", ' +
       'c."aggregation", c."comparison" FROM "HealthGoalRelation" r ' +
       'INNER JOIN "HealthGoal" g ON g."id" = r."sourceGoalId" ' +
@@ -471,7 +473,12 @@ export class MedicationInsightService {
         metricType: String(row.metricType ?? fallback.metricType),
         metricKey: String(row.metricKey ?? fallback.metricKey),
         frequency: String(row.frequency ?? fallback.frequency),
-        frequencyTarget: row.frequencyTarget == null ? null : Number(row.frequencyTarget),
+        frequencyTarget:
+          row.frequencyTarget == null
+            ? row.relatedTargetValue == null
+              ? null
+              : Number(row.relatedTargetValue)
+            : Number(row.frequencyTarget),
         aggregation: String(row.aggregation ?? fallback.aggregation),
         comparison: String(row.comparison ?? fallback.comparison),
       };
@@ -969,9 +976,11 @@ function aggregateSupportingGoalEvents(
 function compareSupportingGoalToTarget(
   value: number,
   relation: ConnectedSupportingGoal,
-): 'ON_TARGET' | 'BELOW_TARGET' | 'ABOVE_TARGET' {
+): 'ON_TARGET' | 'BELOW_TARGET' | 'ABOVE_TARGET' | 'INSUFFICIENT_DATA' {
   const target = relation.frequencyTarget == null ? null : Number(relation.frequencyTarget);
-  if (target == null || !Number.isFinite(target)) return 'BELOW_TARGET';
+  if (target == null || !Number.isFinite(target) || !Number.isFinite(value)) {
+    return 'INSUFFICIENT_DATA';
+  }
 
   const comparison = String(relation.comparison).toUpperCase();
   if (comparison === 'AT_MOST' || comparison === 'DECREASE_TO') {
