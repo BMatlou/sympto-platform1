@@ -143,7 +143,10 @@ export default function BloodPressureInsights({
             value: numberOrNull(event.loggedValue),
             occurredAt: String(event.occurredAt ?? ""),
           }))
-          .filter((event) => event.value != null && event.occurredAt);
+          .filter(
+            (event): event is { value: number; occurredAt: string } =>
+              event.value != null && Boolean(event.occurredAt),
+          );
 
         const latestByDay = new Map<string, { value: number; at: number }>();
 
@@ -221,7 +224,7 @@ export default function BloodPressureInsights({
         }
 
         const bpWeeks = new Map<string, number[]>();
-        for (const [day, value] of dailyAverage.entries()) {
+        for (const [day, value] of dailyLatest.entries()) {
           const week = mondayKey(day);
           if (!week) continue;
           const values = bpWeeks.get(week) ?? [];
