@@ -252,9 +252,7 @@ export default function TodayMedicationActions({ medications, goal: suppliedGoal
     (association: any) => association?.statisticallyRelevant && association?.insight,
   );
 
-  const hasMeaningfulMedicationInsight =
-    Boolean(associationInsight) ||
-    Boolean(trendInsight?.state && trendInsight.state !== "INSUFFICIENT_DATA");
+  const hasMeaningfulMedicationInsight = Boolean(journeyInsight);
 
 
 
