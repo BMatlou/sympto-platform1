@@ -16,9 +16,6 @@ function getApiBaseUrl() {
 
 export const api = axios.create({
   baseURL: getApiBaseUrl(),
-  headers: {
-    "Content-Type": "application/json",
-  },
 });
 
 api.interceptors.request.use((config) => {
@@ -27,6 +24,13 @@ api.interceptors.request.use((config) => {
 
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;
+    }
+
+    // Let the browser set the multipart Content-Type boundary for FormData.
+    // Forcing application/json here makes Nest receive the audio field as
+    // an empty object instead of a Multer file.
+    if (config.data instanceof FormData) {
+      delete config.headers["Content-Type"];
     }
   }
 
