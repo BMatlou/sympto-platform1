@@ -1,0 +1,111 @@
+"use client";
+
+const MODEL_ID = "Xenova/whisper-tiny.en";
+const SAMPLE_RATE = 16_000;
+const MAX_SECONDS = 60;
+
+type ProgressInfo = {
+  status?: string;
+  progress?: number;
+};
+
+type Transcriber = (
+  audio: Float32Array,
+  options?: {
+    language?: string;
+    task?: string;
+    chunk_length_s?: number;
+    stride_length_s?: number;
+  },
+) => Promise<{ text?: string } | Array<{ text?: string }>>;
+
+let transcriberPromise: Promise<Transcriber> | null = null;
+
+async function getTranscriber(
+  onProgress?: (progress: number) => void,
+): Promise<Transcriber> {
+  if (!transcriberPromise) {
+    transcriberPromise = (async () => {
+      const { pipeline } = await import("@huggingface/transformers");
+
+      return (await pipeline(
+        "automatic-speech-recognition",
+        MODEL_ID,
+        {
+          progress_callback: (info: ProgressInfo) => {
+            if (info.status === "progress_total" && Number.isFinite(info.progress)) {
+              onProgress?.(Math.max(0, Math.min(100, Number(info.progress))));
+            }
+          },
+        },
+      )) as unknown as Transcriber;
+    })().catch((error) => {
+      transcriberPromise = null;
+      throw error;
+    });
+  }
+
+  return transcriberPromise;
+}
+
+export function isLocalVoiceTranscriptionSupported() {
+  return typeof window !== "undefined" && typeof WebAssembly !== "undefined";
+}
+
+export async function transcribeLocalVoice(
+  file: File,
+  onProgress?: (progress: number) => void,
+): Promise<string> {
+  if (!isLocalVoiceTranscriptionSupported()) {
+    throw new Error("This browser cannot run local voice transcription.");
+  }
+
+  if (!file.type.startsWith("audio/")) {
+    throw new Error("Please provide an audio recording.");
+  }
+
+  if (file.size <= 0) {
+    throw new Error("The voice recording is empty.");
+  }
+
+  const objectUrl = URL.createObjectURL(file);
+
+  try {
+    const { load_audio } = await import("@huggingface/transformers");
+    const audio = await load_audio(objectUrl, SAMPLE_RATE);
+
+    if (!audio?.length) {
+      throw new Error("Sympto could not decode that recording.");
+    }
+
+    const maxSamples = SAMPLE_RATE * MAX_SECONDS;
+    const input = audio.length > maxSamples ? audio.slice(0, maxSamples) : audio;
+
+    onProgress?.(100);
+
+    const transcriber = await getTranscriber(onProgress);
+
+    const result = await transcriber(input, {
+      language: "en",
+      task: "transcribe",
+      chunk_length_s: 20,
+      stride_length_s: 5,
+    });
+
+    const text = Array.isArray(result)
+      ? result.map((item) => String(item?.text ?? "")).join(" ")
+      : String(result?.text ?? "");
+
+    const transcript = text.trim();
+
+    if (!transcript) {
+      throw new Error(
+        "Sympto could not make out any words. Please speak clearly and try again.",
+      );
+    }
+
+    return transcript;
+  } finally {
+    URL.revokeObjectURL(objectUrl);
+  }
+}
