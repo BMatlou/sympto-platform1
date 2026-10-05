@@ -428,7 +428,7 @@ export default function AIHealthHelperFab() {
                 <button
                   type="button"
                   onClick={analyzeWithSympto}
-                  disabled={processing || transcribing || !user?.id},
+                  disabled={processing || transcribing || !user?.id}
                   className="mt-4 flex min-h-14 w-full items-center justify-center gap-2 rounded-2xl bg-[#0b2d54] px-5 text-base font-extrabold text-white transition hover:bg-[#082544] disabled:cursor-not-allowed disabled:opacity-60 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[#24c1c4]/30"
                 >
                   <Sparkles className="h-5 w-5" aria-hidden="true" />
