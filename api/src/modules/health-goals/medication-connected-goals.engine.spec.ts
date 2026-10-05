@@ -1,4 +1,7 @@
-import { MedicationConnectedGoalsEngine } from './medication-connected-goals.engine';
+import {
+  MedicationConnectedGoalsEngine,
+  validateMedicationComparison,
+} from './medication-connected-goals.engine';
 
 describe('MedicationConnectedGoalsEngine', () => {
   const engine = new MedicationConnectedGoalsEngine();
@@ -128,5 +131,53 @@ describe('MedicationConnectedGoalsEngine', () => {
     expect(insight.medicationDeltaPercentagePoints).toBe(0);
     expect(insight.comparisonValid).toBe(false);
     expect(insight.insight).toBeNull();
+  });
+
+  it('suppresses a comparison when the joined result cannot reconcile to the journey', () => {
+    const validation = validateMedicationComparison({
+      onTarget: {
+        calendarDays: 2,
+        takenDoses: 6,
+        scheduledDoses: 6,
+        adherencePercent: 100,
+      },
+      offTarget: {
+        calendarDays: 2,
+        takenDoses: 0,
+        scheduledDoses: 6,
+        adherencePercent: 0,
+      },
+      comparisonCoverageDays: 4,
+      eligibleJourneyDays: 4,
+      comparisonCoversEntireEligibleJourney: true,
+      overallAdherencePercent: 43,
+    });
+
+    expect(validation.comparisonValid).toBe(false);
+    expect(validation.reason).toContain('does not reconcile');
+  });
+
+  it('rejects impossible taken-over-scheduled aggregates', () => {
+    const validation = validateMedicationComparison({
+      onTarget: {
+        calendarDays: 2,
+        takenDoses: 7,
+        scheduledDoses: 6,
+        adherencePercent: 116.67,
+      },
+      offTarget: {
+        calendarDays: 2,
+        takenDoses: 1,
+        scheduledDoses: 6,
+        adherencePercent: 16.67,
+      },
+      comparisonCoverageDays: 4,
+      eligibleJourneyDays: 4,
+      comparisonCoversEntireEligibleJourney: false,
+      overallAdherencePercent: null,
+    });
+
+    expect(validation.comparisonValid).toBe(false);
+    expect(validation.reason).toContain('exceed scheduled');
   });
 });
