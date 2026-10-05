@@ -488,7 +488,7 @@ export default function TodaySupportedGoalCard({ goal, activeGoals = [], onUpdat
           <div className="mt-3 rounded-[17px] border border-[#dcebec] bg-[#f7fbfc] p-3.5">
             <div className="flex items-center justify-between gap-2">
               <p className="text-[8px] font-black uppercase tracking-[.14em] text-[#82939f]">Goal connections</p>
-              <span className="text-[8px] font-bold text-[#9aa8b1]">1 connected</span>
+              <span className="text-[8px] font-bold text-[#9aa8b1]">{linkedExerciseGoal ? "1 connected" : "Not set"}</span>
             </div>
             <div className="mt-2">
               <Link
