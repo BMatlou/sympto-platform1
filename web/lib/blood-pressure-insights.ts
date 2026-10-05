@@ -201,6 +201,7 @@ export function buildBloodPressureInsights({
   exerciseGoalTarget = null,
   exerciseGoalTitle = "Exercise",
   exerciseGoalFrequency = "DAILY",
+  challengeStartAt = null,
   now = new Date(),
 }: {
   bloodPressureEvents: BloodPressureMetricEvent[];
@@ -211,13 +212,26 @@ export function buildBloodPressureInsights({
   exerciseGoalTarget?: number | null;
   exerciseGoalTitle?: string | null;
   exerciseGoalFrequency?: string | null;
+  challengeStartAt?: string | Date | null;
   now?: Date;
 }): BloodPressureInsight[] {
+  const challengeStartMs =
+    challengeStartAt == null
+      ? null
+      : new Date(challengeStartAt).getTime();
+
   const bp = bloodPressureEvents
     .map((event) => {
       const value = finite(event.loggedValue);
       const parts = localParts(event.occurredAt);
-      return value != null && parts ? { value, day: parts.key, hour: parts.hour, occurredAt: event.occurredAt } : null;
+      const occurredAtMs = new Date(event.occurredAt).getTime();
+      const insideChallenge =
+        challengeStartMs == null ||
+        (Number.isFinite(occurredAtMs) && occurredAtMs >= challengeStartMs);
+
+      return value != null && parts && insideChallenge
+        ? { value, day: parts.key, hour: parts.hour, occurredAt: event.occurredAt }
+        : null;
     })
     .filter((item): item is { value: number; day: string; hour: number; occurredAt: string } => Boolean(item))
     .sort((a, b) => new Date(a.occurredAt).getTime() - new Date(b.occurredAt).getTime());
