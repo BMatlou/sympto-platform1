@@ -6,6 +6,7 @@ import { useState } from "react";
 import { toast } from "sonner";
 import { healthGoalsService } from "@/services/health-goals.service";
 import { healthJournalService } from "@/services/health-journal.service";
+import BloodPressureInsights from "@/components/today/blood-pressure-insights";
 
 type SupportedGoalCardProps = {
   goal: any;
@@ -245,6 +246,7 @@ export default function TodaySupportedGoalCard({ goal, onUpdated }: SupportedGoa
           <p className="text-[10px] leading-5 text-[#758896]">{meta.helper}</p>
           {category === "NUTRITION" && nutritionTargetReview(target) && <div className="mt-2 rounded-[14px] border border-amber-200 bg-amber-50 px-3 py-2.5"><p className="text-[9px] font-black uppercase tracking-[.12em] text-amber-900">Target review</p><p className="mt-1 text-[10px] leading-5 text-amber-900/85">{nutritionTargetReview(target)}</p></div>}
           <div className="mt-2 rounded-xl bg-[#e9f9fa] px-3 py-2"><p className="text-[9px] font-bold leading-4 text-[#0b6f73]">{nextStep}</p></div>
+          {category === "BLOOD_PRESSURE" && <BloodPressureInsights target={target} />}
           {meta.action === "MANUAL" ? (
             <div className="mt-3 flex flex-col gap-2 sm:flex-row">
               <input type="number" inputMode="decimal" step={meta.step} min={meta.min} max={meta.max} value={value} onChange={(event) => setValue(event.target.value)} placeholder={meta.placeholder} aria-label={"Record " + meta.label + " value"} className="min-h-10 w-full rounded-xl border border-[#d8e5e9] bg-white px-3 text-xs font-bold text-[#0b2d54] outline-none placeholder:text-[#a2afb8] focus:border-[#24c1c4]" />

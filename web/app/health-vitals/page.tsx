@@ -3,12 +3,15 @@
 import Link from "next/link";
 import { Activity, ArrowLeft, Bluetooth, Check, HeartPulse, Plus, Scale, Thermometer, Watch, Wind, X } from "lucide-react";
 import { FormEvent, useMemo, useState, Suspense } from "react";
+import BloodPressureSafetyOverlay from "@/components/health-vitals/blood-pressure-safety-overlay";
+import { isVeryHighBloodPressure, type BloodPressureSafetyStage } from "@/lib/blood-pressure-safety";
 import { useSearchParams } from "next/navigation";
 import ProtectedRoute from "@/components/auth/protected-route";
 import { useDashboard } from "@/hooks/use-dashboard";
 import { healthHomeService } from "@/services/health-home.service";
 
 type Vital = { type: string; name: string; value: number | string; unit?: string | null; measuredAt?: string | null; source?: string | null };
+type BloodPressureSafetyState = { stage: BloodPressureSafetyStage; systolic: number; diastolic: number; initialSystolic?: number; initialDiastolic?: number };
 
 const CATEGORY_LABEL: Record<string, string> = { UNDERWEIGHT: "Below healthy range", HEALTHY_WEIGHT: "Healthy weight range", OVERWEIGHT: "Above healthy range", OBESITY_CLASS_1: "Obesity class 1", OBESITY_CLASS_2: "Obesity class 2", OBESITY_CLASS_3: "Obesity class 3" };
 
@@ -51,6 +54,8 @@ function HealthVitalsPageContent() {
   const [bmiWeight, setBmiWeight] = useState("");
   const [bmiHeight, setBmiHeight] = useState("");
   const [manual, setManual] = useState({ systolicPressure: "", diastolicPressure: "", restingHeartRate: "", oxygenSaturation: "", bodyTemperature: "", respiratoryRate: "", weightKg: "" });
+  const [bpSafety, setBpSafety] = useState<BloodPressureSafetyState | null>(null);
+  const [bpSafetySymptoms, setBpSafetySymptoms] = useState<string[]>([]);
 
   const vitals = useMemo(() => normalizeVitals(data), [data]);
 
@@ -84,9 +89,65 @@ function HealthVitalsPageContent() {
     }
 
     setBusy(true);
-    try { await healthHomeService.recordManualVitals(input); setMessage("Your manual measurement was saved to your health record."); setPanel(null); await reload(); }
+    try {
+      await healthHomeService.recordManualVitals(input);
+
+      const systolic = input.systolicPressure;
+      const diastolic = input.diastolicPressure;
+      const repeatingHighReading = bpSafety?.stage === "initial" && systolic != null && diastolic != null;
+
+      if (repeatingHighReading && systolic != null && diastolic != null) {
+        const remainsVeryHigh = isVeryHighBloodPressure(systolic, diastolic);
+        setPanel(null);
+        setBpSafetySymptoms([]);
+        setBpSafety({
+          stage: remainsVeryHigh ? "symptoms" : "resolved",
+          systolic,
+          diastolic,
+          initialSystolic: bpSafety.initialSystolic ?? bpSafety.systolic,
+          initialDiastolic: bpSafety.initialDiastolic ?? bpSafety.diastolic,
+        });
+      } else if (systolic != null && diastolic != null && isVeryHighBloodPressure(systolic, diastolic)) {
+        setPanel(null);
+        setBpSafetySymptoms([]);
+        setBpSafety({ stage: "initial", systolic, diastolic });
+      } else {
+        setPanel(null);
+      }
+
+      setMessage("Your manual measurement was saved to your health record.");
+      await reload();
+      window.dispatchEvent(new Event("sympto:today-action-updated"));
+    }
     catch (err: any) { setMessage(err?.response?.data?.message || "We couldn't save the manual vitals."); }
     finally { setBusy(false); }
+  }
+
+  function closeBpSafety() {
+    setBpSafety(null);
+    setBpSafetySymptoms([]);
+  }
+
+  function startBpRepeat() {
+    setBpSafetySymptoms([]);
+    setManual((current) => ({ ...current, systolicPressure: "", diastolicPressure: "" }));
+    setPanel("manual");
+    setMessage("Sit quietly and repeat the blood-pressure measurement after at least 1 minute.");
+  }
+
+  function toggleBpSafetySymptom(symptom: string) {
+    setBpSafetySymptoms((current) =>
+      current.includes(symptom) ? current.filter((item) => item !== symptom) : [...current, symptom],
+    );
+  }
+
+  function continueBpSafety() {
+    if (!bpSafety || bpSafety.stage !== "symptoms") return;
+    setBpSafety((current) =>
+      current
+        ? { ...current, stage: bpSafetySymptoms.length > 0 ? "emergency" : "review" }
+        : null,
+    );
   }
 
   if (loading) return <ProtectedRoute><main className="min-h-screen bg-[#f5f8fb] p-6"><div className="mx-auto max-w-5xl space-y-4"><div className="h-14 w-40 animate-pulse rounded-2xl bg-white"/><div className="h-44 animate-pulse rounded-[28px] bg-white"/><div className="h-72 animate-pulse rounded-[28px] bg-white"/></div></main></ProtectedRoute>;
@@ -127,7 +188,22 @@ function HealthVitalsPageContent() {
     <section className="mt-5 rounded-[28px] border border-[#dfeaed] bg-white p-5 shadow-[0_8px_28px_rgba(11,45,84,0.04)] sm:p-6"><div className="flex items-center justify-between gap-4"><div><p className="text-[10px] font-black uppercase tracking-[0.15em] text-[#71839a]">Connected devices</p><h2 className="mt-1 text-lg font-black text-[#0b2d54]">Smartwatch & wearable readings</h2></div><Bluetooth className="h-5 w-5 text-[#24c1c4]"/></div>{connectedDevices.length === 0 ? <div className="mt-4 rounded-2xl border border-dashed border-slate-200 p-5"><p className="text-sm font-bold text-[#0b2d54]">No watch connected yet.</p><p className="mt-1 text-xs leading-5 text-slate-500">Connect a compatible device to start bringing supported readings into Sympto.</p><Link href="/wearables" className="mt-4 inline-flex items-center gap-2 rounded-xl bg-[#0b2d54] px-4 py-2.5 text-[11px] font-black text-white"><Watch className="h-4 w-4"/>Connect a watch</Link></div> : <div className="mt-4 space-y-2">{connectedDevices.map((device: any) => <div key={device.id} className="flex items-center justify-between rounded-2xl bg-[#f8fbfc] p-4"><div><p className="text-sm font-bold text-[#0b2d54]">{device.manufacturer || "Wearable"} {device.model || "device"}</p><p className="mt-1 text-xs text-slate-500">{device.status || "CONNECTED"}{device.lastSyncAt ? ` · Last sync ${date(device.lastSyncAt)}` : ""}</p></div><Link href="/wearables" className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-[10px] font-black text-[#0b2d54]">Manage</Link></div>)}</div>}</section>
 
     <section className="mt-5 rounded-[28px] border border-[#24c1c4]/20 bg-[#24c1c4]/5 p-5"><div className="flex gap-3"><HeartPulse className="h-5 w-5 shrink-0 text-[#0b2d54]"/><div><p className="font-semibold text-[#0b2d54]">Keep your measurements current</p><p className="mt-1 text-sm leading-6 text-slate-600">Use BMI when your weight or height changes, connect a watch for supported live readings, and enter home measurements when you check your vital signs manually.</p></div></div></section>
-  </div></main></ProtectedRoute>;
+  </div>
+    {bpSafety && (
+      <BloodPressureSafetyOverlay
+        stage={bpSafety.stage}
+        systolic={bpSafety.systolic}
+        diastolic={bpSafety.diastolic}
+        initialSystolic={bpSafety.initialSystolic}
+        initialDiastolic={bpSafety.initialDiastolic}
+        selectedSymptoms={bpSafetySymptoms}
+        onToggleSymptom={toggleBpSafetySymptom}
+        onRepeat={startBpRepeat}
+        onContinueSymptoms={continueBpSafety}
+        onClose={closeBpSafety}
+      />
+    )}
+  </main></ProtectedRoute>;
 }
 
 
