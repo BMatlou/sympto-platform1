@@ -44,6 +44,13 @@ function patientMedicationId(medication: any) {
     null;
 }
 
+function formatConnectedGoalValue(category: string, value: number): string {
+  if (!Number.isFinite(value)) return "—";
+  return String(category).toUpperCase() === "SLEEP"
+    ? value.toFixed(1)
+    : Math.round(value).toLocaleString();
+}
+
 function errorMessage(error: unknown) {
   const message = (error as { response?: { data?: { message?: string | string[] } } })?.response?.data?.message;
   if (Array.isArray(message)) return message.join(" ");
@@ -255,6 +262,18 @@ export default function TodayMedicationActions({ medications, goal: suppliedGoal
   const connectedGoalInsights = Array.isArray(medicationInsight?.analysis?.connectedGoalInsights)
     ? medicationInsight.analysis.connectedGoalInsights
     : [];
+  const strongestConnectedInsight = connectedGoalInsights
+    .filter(
+      (item: any) =>
+        Number.isFinite(Number(item?.medicationDeltaPercentagePoints)) &&
+        Number(item?.targetMetPeriods ?? 0) >= 2 &&
+        Number(item?.targetMissedPeriods ?? 0) >= 2,
+    )
+    .sort(
+      (a: any, b: any) =>
+        Math.abs(Number(b.medicationDeltaPercentagePoints)) -
+        Math.abs(Number(a.medicationDeltaPercentagePoints)),
+    )[0] ?? null;
 
   useEffect(() => {
     if (!finalGoal?.id || !journeyInsight) return;
@@ -388,6 +407,27 @@ export default function TodayMedicationActions({ medications, goal: suppliedGoal
               </div>
             ) : null}
 
+            {strongestConnectedInsight ? (
+              <div className="rounded-[18px] border border-[#cfe8e6] bg-[#f4fbfb] px-3.5 py-3.5 ring-1 ring-[#dcefed] sm:px-4 sm:py-4">
+                <p className="text-[8px] font-black uppercase tracking-[.13em] text-[#0b7b80]">What your data shows</p>
+                <p className="mt-1.5 text-[11px] font-black leading-5 text-[#0b2d54]">
+                  {strongestConnectedInsight.supportingGoalName}
+                </p>
+                <p className="mt-1 text-[10px] leading-5 text-[#5f7080]">
+                  Medication adherence was{" "}
+                  {Math.round(Number(strongestConnectedInsight.medicationAdherenceOnTargetPeriods))}% when this goal was on target versus{" "}
+                  {Math.round(Number(strongestConnectedInsight.medicationAdherenceOnMissedTargetPeriods))}% when it was off target.
+                  {" "}
+                  The observed difference was{" "}
+                  {Number(strongestConnectedInsight.medicationDeltaPercentagePoints) > 0 ? "+" : ""}
+                  {Math.round(Number(strongestConnectedInsight.medicationDeltaPercentagePoints))} percentage points.
+                </p>
+                <p className="mt-1.5 text-[8px] font-semibold leading-4 text-[#8a99a6]">
+                  This is an observed pattern in your recorded data, not proof that one goal caused the other.
+                </p>
+              </div>
+            ) : null}
+
             {connectedGoalInsights.length > 0 ? (
               <div className="space-y-2.5">
                 <div className="pt-1">
@@ -456,15 +496,18 @@ export default function TodayMedicationActions({ medications, goal: suppliedGoal
                       </div>
 
                       <p className="mt-2 text-[10px] font-semibold leading-5 text-[#5f7080]">
-                        Target {targetValid ? `${targetPrefix} ${Math.round(target).toLocaleString()}` : "not configured"} {connectedGoal?.unit || ""}
+                        Target {targetValid ? `${targetPrefix} ${formatConnectedGoalValue(String(connectedGoal?.supportingGoalCategory ?? ""), target)}` : "not configured"} {connectedGoal?.unit || ""}
                         {latestValid && connectedGoal?.latestPeriodLabel
-                          ? ` · Latest ${Math.round(latest).toLocaleString()} ${connectedGoal?.unit || ""} (${connectedGoal.latestPeriodLabel})`
+                          ? ` · Latest ${formatConnectedGoalValue(String(connectedGoal?.supportingGoalCategory ?? ""), latest)} ${connectedGoal?.unit || ""} (${connectedGoal.latestPeriodLabel})`
                           : ""}
                       </p>
 
                       {observedPeriods > 0 ? (
                         <p className="mt-1 text-[10px] font-semibold leading-5 text-[#7c8e9b]">
                           {observedPeriods} period{observedPeriods === 1 ? "" : "s"} tracked · {targetMetPeriods} on target · {targetMissedPeriods} off target.
+                          {connectedGoal?.evidenceLevel
+                            ? ` · ${String(connectedGoal.evidenceLevel).toLowerCase().replaceAll("_", " ")} evidence`
+                            : ""}
                         </p>
                       ) : null}
 
@@ -509,6 +552,13 @@ export default function TodayMedicationActions({ medications, goal: suppliedGoal
               <div className="rounded-[18px] border border-[#d9e4ee] bg-white px-3.5 py-3.5 ring-1 ring-[#e8eef3] sm:px-4 sm:py-4">
                 <p className="text-[11px] font-black leading-5 text-[#0b2d54]">Connected goal</p>
                 <p className="mt-1 text-[11px] leading-5 text-[#5f7080]">{associationInsight.insight}</p>
+              </div>
+            ) : (
+              <div className="rounded-[18px] border border-[#dce9ee] bg-white px-3.5 py-3.5 ring-1 ring-[#e8eef3] sm:px-4 sm:py-4">
+                <p className="text-[11px] font-black leading-5 text-[#0b2d54]">Connected goals</p>
+                <p className="mt-1 text-[10px] leading-5 text-[#7c8e9b]">
+                  No active Nutrition, Exercise, Sleep or Hydration goal has enough linked data for a medication comparison yet.
+                </p>
               </div>
             ) : null}
           </div>
