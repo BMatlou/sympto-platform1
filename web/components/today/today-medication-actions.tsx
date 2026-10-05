@@ -360,7 +360,7 @@ export default function TodayMedicationActions({ medications, goal: suppliedGoal
         <section className="mx-3.5 mb-3.5 rounded-[22px] border border-[#dce9ee] bg-[#f8fbfb] p-4 text-[#0b2d54] sm:mx-4 sm:mb-4 sm:p-5">
           <div>
             <p className="text-[9px] font-black uppercase tracking-[.15em] text-[#0b7b80]">Sympto insight</p>
-            <h3 className="mt-1 text-base font-black tracking-[-.025em] text-[#0b2d54]">Your medication pattern</h3>
+            <h3 className="mt-1 text-base font-black tracking-[-.025em] text-[#0b2d54]">Medication & connected goals</h3>
           </div>
 
           <div className="mt-3 space-y-2.5">
