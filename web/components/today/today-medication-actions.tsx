@@ -363,8 +363,7 @@ export default function TodayMedicationActions({ medications, goal: suppliedGoal
   const apiConnectedGoalInsights = Array.isArray(medicationInsight?.analysis?.connectedGoalInsights)
     ? medicationInsight.analysis.connectedGoalInsights
     : [];
-  const connectedGoalInsights =
-    apiConnectedGoalInsights.length > 0 ? apiConnectedGoalInsights : localConnectedGoalInsights;
+  const connectedGoalInsights = apiConnectedGoalInsights;
   const strongestConnectedInsight = connectedGoalInsights
     .filter(
       (item: any) =>
