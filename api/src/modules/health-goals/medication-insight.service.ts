@@ -866,15 +866,23 @@ export class MedicationInsightService {
       );
 
       const goalPrefix = 'goal-' + relation.healthGoalId + '-';
+      const goalExactSourceId = 'goal-' + relation.healthGoalId;
       const scopedRows = rows.filter((event) => {
-        const sourceId = String(event.sourceId ?? '');
+        const sourceId = String(event.sourceId ?? '').trim();
+
         // Explicit goal-scoped events belong only to their originating goal.
-        // Backfilled journal/check-in events without a goal prefix remain valid
-        // contextual evidence for the single active goal in that metric family.
+        // Accept all known goal-id encodings used by existing writers:
+        //   goal-{goalId}
+        //   goal-{goalId}-{suffix}
+        //   {goalId}
+        //   {goalId}:{suffix}
+        // Generic journal/check-in events without a goal prefix remain valid
+        // contextual evidence for the metric family.
         return (
           !sourceId.startsWith('goal-') ||
-          sourceId === relation.healthGoalId ||
+          sourceId === goalExactSourceId ||
           sourceId.startsWith(goalPrefix) ||
+          sourceId === relation.healthGoalId ||
           sourceId.startsWith(relation.healthGoalId + ':')
         );
       });
