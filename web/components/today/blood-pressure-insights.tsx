@@ -146,7 +146,6 @@ export default function BloodPressureInsights({
           .filter((event) => event.value != null && event.occurredAt);
 
         const latestByDay = new Map<string, { value: number; at: number }>();
-        const dailyValues = new Map<string, number[]>();
 
         for (const event of bpEvents) {
           const day = localDayKey(event.occurredAt);
@@ -158,9 +157,6 @@ export default function BloodPressureInsights({
             latestByDay.set(day, { value: event.value, at });
           }
 
-          const list = dailyValues.get(day) ?? [];
-          list.push(event.value);
-          dailyValues.set(day, list);
         }
 
         // Match the Goal Card exactly: one latest systolic value per active challenge day.
