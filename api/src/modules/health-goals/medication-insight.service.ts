@@ -793,8 +793,11 @@ function calculateConnectedGoalInsights(
       .sort((a, b) => a.occurredAt.getTime() - b.occurredAt.getTime());
 
     const periods = buildSupportingGoalPeriods(events, relation);
+    const relationStartDay = dayKey(new Date(relation.createdAt));
     const historicalPeriods = periods.filter(
-      (period) => period.endDay < today,
+      (period) =>
+        period.endDay < today &&
+        (relation.frequency !== 'WEEKLY' || period.startDay >= relationStartDay),
     );
 
     const latestPeriod = historicalPeriods.at(-1) ?? null;
