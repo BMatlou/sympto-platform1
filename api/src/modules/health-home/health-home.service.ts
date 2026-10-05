@@ -246,7 +246,7 @@ export class HealthHomeService {
       this.prisma.healthGoal.findMany({ where: { patientId, status: { in: ['ACTIVE', 'ACHIEVED', 'ON_HOLD'] } }, include: { progress: { orderBy: { measuredAt: 'desc' }, take: 1 } }, orderBy: [{ priority: 'desc' }, { targetDate: 'asc' }] }),
       this.prisma.familyMember.findMany({ where: { ownerPatientId: ownerPatient.id }, include: { memberPatient: { include: { person: true } } }, orderBy: { createdAt: 'desc' } }),
       this.prisma.appointment.findMany({ where: { patientId, status: { in: [...ACTIVE_APPOINTMENT_STATUSES] }, scheduledStart: { gte: now } }, include: { practitioner: { include: { person: true } }, practice: true, telemedicineSession: true }, orderBy: { scheduledStart: 'asc' }, take: 10 }),
-      this.prisma.notification.findMany({ where: { userId: selectedUserId, readAt: null, status: { in: ['PENDING', 'QUEUED', 'SENT', 'DELIVERED'] } }, orderBy: [{ priority: 'desc' }, { createdAt: 'desc' }], take: 10 }),
+      this.prisma.notification.findMany({ where: { userId: selectedUserId, channel: 'IN_APP', readAt: null, status: { in: ['PENDING', 'QUEUED', 'SENT', 'DELIVERED'] } }, orderBy: [{ priority: 'desc' }, { createdAt: 'desc' }], take: 10 }),
       this.prisma.wearableDevice.findMany({ where: { patientId }, orderBy: { lastSyncAt: 'desc' }, include: { _count: { select: { measurements: true } } } }),
       this.prisma.deviceMeasurement.findMany({ where: { device: { patientId } }, orderBy: { measuredAt: 'desc' }, take: 100 }),
       this.prisma.deviceAlert.findMany({ where: { device: { patientId }, acknowledged: false }, include: { device: true, measurement: true }, orderBy: { createdAt: 'desc' }, take: 20 }),
