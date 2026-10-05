@@ -207,6 +207,23 @@ class HealthJournalService {
     return data.data;
   }
 
+  async transcribeTalkToSympto(audio: File): Promise<string> {
+    const form = new FormData();
+    form.append("audio", audio, audio.name || "sympto-voice.webm");
+
+    const { data } = await api.post(
+      "/health-journals/talk-to-sympto/transcribe",
+      form,
+    );
+
+    const text = String(data?.data?.text ?? data?.text ?? "").trim();
+    if (!text) {
+      throw new Error("Sympto could not transcribe that recording.");
+    }
+
+    return text;
+  }
+
   async getAll(params: GetHealthJournalsParams = {}): Promise<HealthJournalListResponse> {
     const { data } = await api.get("/health-journals", {
       params: {
