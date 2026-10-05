@@ -37,9 +37,16 @@ export class VoiceTranscriptionService {
 
     const form = new FormData();
 
+    // Node's Buffer can be backed by ArrayBufferLike (including SharedArrayBuffer).
+    // Copy it into a plain ArrayBuffer so the Blob constructor satisfies the
+    // TypeScript DOM BlobPart type and remains safe across Node versions.
+    const audioBytes = new Uint8Array(audio.buffer.byteLength);
+    audioBytes.set(audio.buffer);
+    const audioArrayBuffer = audioBytes.buffer as ArrayBuffer;
+
     form.append(
       'file',
-      new Blob([audio.buffer], {
+      new Blob([audioArrayBuffer], {
         type: audio.mimetype || 'application/octet-stream',
       }),
       audio.originalname || 'sympto-voice.webm',
