@@ -236,7 +236,7 @@ export default function TodayMedicationActions({ medications, goal: suppliedGoal
       const response = await api.get(
         `/patient-health-goals/${encodeURIComponent(String(finalGoal.id))}/medication-insight`,
       );
-      setMedicationInsight(response.data ?? null);
+      setMedicationInsight(response.data?.data ?? response.data ?? null);
     } catch {
       setMedicationInsight(null);
     }
