@@ -10,6 +10,7 @@ import { GoalsEngineService as CategoryAwareGoalsEngineService } from './goals-e
 import { MedicationInsightService } from './medication-insight.service';
 import { MedicationConnectedGoalsEngine } from './medication-connected-goals.engine';
 import { MedicationGoalIntelligenceEngine } from './medication-goal-intelligence.engine';
+import { MedicationClinicalIntelligenceEngine } from './medication-clinical-intelligence.engine';
 
 @Module({
   imports: [DatabaseModule],
@@ -23,6 +24,7 @@ import { MedicationGoalIntelligenceEngine } from './medication-goal-intelligence
     MedicationInsightService,
     MedicationConnectedGoalsEngine,
     MedicationGoalIntelligenceEngine,
+    MedicationClinicalIntelligenceEngine,
   ],
   exports: [
     GoalsEngineService,
