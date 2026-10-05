@@ -29,6 +29,94 @@ export type MedicationIntelligenceInsight = {
   tone?: "positive" | "action" | "context" | "watch" | "neutral";
 };
 
+export type LiveMedicationInsightState = {
+  medication_name: string;
+  current_lifecycle_day: number;
+  daily_target_doses: number;
+  total_taken_to_date: number;
+  today_logged_meals_count: number;
+  today_doses_logged: number;
+};
+
+type MedicationInsightTemplateTokens = {
+  medication_name: string;
+  live_adherence_pct: string;
+  historical_expected_doses: string;
+};
+
+function formatInsightToken(value: unknown, fallback = "your medicine") {
+  const text = String(value ?? "").trim();
+  return text || fallback;
+}
+
+export function renderMedicationInsightTemplate(
+  template: string,
+  tokens: MedicationInsightTemplateTokens,
+) {
+  return template.replace(/\\{([a-z0-9_]+)\\}/gi, (match, key: string) => {
+    const value = tokens[key as keyof MedicationInsightTemplateTokens];
+    return value == null ? match : String(value);
+  });
+}
+
+/**
+ * Live medication Insight source of truth.
+ *
+ * This intentionally does not inspect HealthGoalMetricEvent percentages,
+ * historical trend windows, or inferred dose actions. The medication card
+ * already has the authoritative local state used for the current journey.
+ */
+export function buildLiveMedicationInsights(
+  state: LiveMedicationInsightState,
+): MedicationIntelligenceInsight[] {
+  const lifecycleDay = Math.max(0, Math.floor(Number(state.current_lifecycle_day) || 0));
+  const dailyTarget = Math.max(0, Math.floor(Number(state.daily_target_doses) || 0));
+  const totalTaken = Math.max(0, Math.floor(Number(state.total_taken_to_date) || 0));
+  const mealsToday = Math.max(0, Math.floor(Number(state.today_logged_meals_count) || 0));
+  const dosesToday = Math.max(0, Math.floor(Number(state.today_doses_logged) || 0));
+
+  const historicalExpectedDoses = lifecycleDay * dailyTarget;
+  const liveAdherence =
+    historicalExpectedDoses > 0
+      ? Math.min(100, Math.max(0, Math.round((totalTaken / historicalExpectedDoses) * 100)))
+      : 0;
+
+  const tokens: MedicationInsightTemplateTokens = {
+    medication_name: formatInsightToken(state.medication_name),
+    live_adherence_pct: String(liveAdherence),
+    historical_expected_doses: String(historicalExpectedDoses),
+  };
+
+  const insights: MedicationIntelligenceInsight[] = [
+    {
+      title: "Your medication routine",
+      text: renderMedicationInsightTemplate(
+        "Your medicine routine is improving. You are at {live_adherence_pct}% adherence for your {medication_name} goal journey.",
+        tokens,
+      ),
+      tone: liveAdherence >= 80 ? "positive" : "context",
+    },
+  ];
+
+  const todayIsComplete =
+    dailyTarget > 0 &&
+    dosesToday >= dailyTarget;
+
+  if (mealsToday > 0 && todayIsComplete) {
+    insights.push({
+      title: "Food logging & your medicine",
+      text: renderMedicationInsightTemplate(
+        "Excellent consistency today! You successfully matched your {medication_name} schedule alongside your active meals.",
+        tokens,
+      ),
+      tone: "positive",
+    });
+  }
+
+  return insights.slice(0, 3);
+}
+
+
 type MedicationDay = {
   day: string;
   scheduled: number;
