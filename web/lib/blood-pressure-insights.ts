@@ -447,8 +447,9 @@ export function buildBloodPressureInsights({
   const exerciseGoalFrequencyNormalized = String(exerciseGoalFrequency ?? "DAILY").toUpperCase();
   const todayKey = dayKey(now);
 
-  if (exerciseGoalTarget != null && Number.isFinite(exerciseGoalTarget)) {
-    const goalTarget = Math.max(0, round(exerciseGoalTarget) ?? exerciseGoalTarget);
+  const numericExerciseGoalTarget = exerciseGoalTarget == null ? null : Number(exerciseGoalTarget);
+  if (numericExerciseGoalTarget != null && Number.isFinite(numericExerciseGoalTarget)) {
+    const goalTarget = Math.max(0, round(numericExerciseGoalTarget) ?? numericExerciseGoalTarget);
     const exerciseGoalTitleSafe = String(exerciseGoalTitle || "Exercise goal");
 
     if (exerciseGoalFrequencyNormalized === "WEEKLY") {
