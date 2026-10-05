@@ -343,23 +343,56 @@ export class MedicationInsightService {
 
   private async loadExplicitDoseEvents(patientId: string, patientMedicationId: string, from: Date): Promise<DoseRow[]> {
     const sql =
-      'SELECT "occurredAt", "metadata", "sourceId" FROM "HealthGoalMetricEvent" ' +
+      'SELECT "occurredAt", "loggedValue", "metadata", "sourceId" FROM "HealthGoalMetricEvent" ' +
       'WHERE "patientId" = $1 AND "metricType" = \'MEDICATION\' AND "metricKey" = \'medication.adherence\' ' +
       'AND "source" = \'medication-adherence\' AND "occurredAt" >= $2 ' +
       'AND ("metadata"->>\'patientMedicationId\' = $3 OR "sourceId" LIKE $4) ORDER BY "occurredAt" ASC';
+
     const rows = await this.prisma.$queryRawUnsafe<Array<{
       occurredAt: Date;
+      loggedValue: number | null;
       metadata: Record<string, unknown> | null;
       sourceId: string | null;
     }>>(sql, patientId, from, patientMedicationId, patientMedicationId + ':%');
 
-    return rows
-      .map((row) => ({
+    let previousInferredTaken = 0;
+    let validActionIndex = 0;
+
+    return rows.flatMap((row) => {
+      const explicitAction = String(row.metadata?.action ?? '').trim().toUpperCase();
+      const adherence = Number(row.loggedValue);
+
+      // Ignore structurally empty legacy events; they cannot safely contribute
+      // either a taken or skipped dose to longitudinal medication insight.
+      if (
+        explicitAction !== 'TAKEN' &&
+        explicitAction !== 'SKIPPED' &&
+        !Number.isFinite(adherence)
+      ) {
+        return [];
+      }
+
+      validActionIndex += 1;
+      const totalActions = validActionIndex;
+      const inferredTaken = Number.isFinite(adherence)
+        ? Math.max(0, Math.min(totalActions, Math.round((totalActions * adherence) / 100)))
+        : previousInferredTaken;
+
+      const action =
+        explicitAction === 'TAKEN' || explicitAction === 'SKIPPED'
+          ? explicitAction
+          : inferredTaken > previousInferredTaken
+            ? 'TAKEN'
+            : 'SKIPPED';
+
+      previousInferredTaken = Math.max(previousInferredTaken, inferredTaken);
+
+      return [{
         occurredAt: row.occurredAt,
-        action: String(row.metadata?.action ?? '').trim().toUpperCase(),
+        action,
         sourceId: row.sourceId,
-      }))
-      .filter((row) => row.action === 'TAKEN' || row.action === 'SKIPPED') as DoseRow[];
+      }];
+    });
   }
 
   private async countNonExplicitDoseEvents(patientId: string, patientMedicationId: string, from: Date): Promise<number> {
@@ -368,6 +401,7 @@ export class MedicationInsightService {
       'WHERE "patientId" = $1 AND "metricType" = \'MEDICATION\' AND "metricKey" = \'medication.adherence\' ' +
       'AND "source" = \'medication-adherence\' AND "occurredAt" >= $2 ' +
       'AND ("metadata"->>\'patientMedicationId\' = $3 OR "sourceId" LIKE $4) ' +
+      'AND "loggedValue" IS NULL ' +
       'AND COALESCE(UPPER("metadata"->>\'action\'), \'\') NOT IN (\'TAKEN\', \'SKIPPED\')';
     const rows = await this.prisma.$queryRawUnsafe<Array<{ count: bigint }>>(
       sql,
