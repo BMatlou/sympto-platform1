@@ -357,9 +357,6 @@ export default function TodayMedicationActions({ medications, goal: suppliedGoal
   const journeyInsight = medicationInsight?.analysis?.journeyAdherence;
   const trendInsight = medicationInsight?.analysis?.trend;
 
-  const associationInsight = (medicationInsight?.analysis?.associations ?? []).find(
-    (association: any) => association?.statisticallyRelevant && association?.insight,
-  );
   const apiConnectedGoalInsights = Array.isArray(medicationInsight?.analysis?.connectedGoalInsights)
     ? medicationInsight.analysis.connectedGoalInsights
     : [];
@@ -545,18 +542,12 @@ export default function TodayMedicationActions({ medications, goal: suppliedGoal
                     insight={connectedGoal}
                   />
                 ))}
-                })}
-              </div>
-            ) : associationInsight?.insight ? (
-              <div className="rounded-[18px] border border-[#d9e4ee] bg-white px-3.5 py-3.5 ring-1 ring-[#e8eef3] sm:px-4 sm:py-4">
-                <p className="text-[11px] font-black leading-5 text-[#0b2d54]">Connected goal</p>
-                <p className="mt-1 text-[11px] leading-5 text-[#5f7080]">{associationInsight.insight}</p>
               </div>
             ) : (
-              <div className="rounded-[18px] border border-[#dce9ee] bg-white px-3.5 py-3.5 ring-1 ring-[#e8eef3] sm:px-4 sm:py-4">
+              <div className="rounded-[18px] border border-[#dce9ee] bg-white px-3.5 py-3.5 ring-1 ring-[#e8eef3]">
                 <p className="text-[11px] font-black leading-5 text-[#0b2d54]">Connected goals</p>
                 <p className="mt-1 text-[10px] leading-5 text-[#7c8e9b]">
-                  No active Nutrition, Exercise, Sleep or Hydration goal has enough linked data for a medication comparison yet.
+                  No active Nutrition, Exercise, Sleep or Hydration goal is available to compare with this medication yet.
                 </p>
               </div>
             )}
