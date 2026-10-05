@@ -449,159 +449,6 @@ export function buildBloodPressureInsights({
 
   if (exerciseGoalTarget != null && Number.isFinite(exerciseGoalTarget)) {
     const goalTarget = Math.max(0, round(exerciseGoalTarget) ?? exerciseGoalTarget);
-    const title = String(exerciseGoalTitle || "Exercise");
-
-    if (exerciseGoalFrequencyNormalized === "WEEKLY") {
-      const exerciseByWeek = new Map<string, number>();
-      for (const [day, minutes] of exerciseByDay.entries()) {
-        if (!withinLookback(day + "T12:00:00Z", 30, now)) continue;
-        const week = weekStartKey(day);
-        exerciseByWeek.set(week, (exerciseByWeek.get(week) ?? 0) + minutes);
-      }
-
-      const thisWeek = weekStartKey(todayKey);
-      const thisWeekMinutes = exerciseByWeek.get(thisWeek) ?? 0;
-      const thisWeekRounded = round(thisWeekMinutes) ?? 0;
-      const remaining = Math.max(0, goalTarget - thisWeekRounded);
-      const completedWeeks = Array.from(exerciseByWeek.values()).filter((minutes) => minutes >= goalTarget).length;
-
-      insights.push({
-        kind: "exercise",
-        tone: "info",
-        title: title + " and your blood-pressure goal",
-        body:
-          "This week you have logged " +
-          thisWeekRounded +
-          " minutes of activity against your " +
-          goalTarget +
-          "-minute weekly goal" +
-          (remaining > 0
-            ? ". You need " + remaining + " more minutes to reach it."
-            : ". You have reached this week's activity target.") +
-          " Sympto uses this alongside your blood-pressure readings to look for personal patterns.",
-        evidence:
-          "This week " +
-          thisWeekRounded +
-          "/" +
-          goalTarget +
-          " min · " +
-          completedWeeks +
-          " of " +
-          exerciseByWeek.size +
-          " recorded weeks reached the goal.",
-      });
-
-      const bpByWeek = new Map<string, number[]>();
-      for (const [day, bpValue] of allDailyBp.entries()) {
-        const week = weekStartKey(day);
-        const list = bpByWeek.get(week) ?? [];
-        list.push(bpValue);
-        bpByWeek.set(week, list);
-      }
-
-      const reachedGoalBp: number[] = [];
-      const belowGoalBp: number[] = [];
-      for (const [week, minutes] of exerciseByWeek.entries()) {
-        const averageBp = mean(bpByWeek.get(week) ?? []);
-        if (averageBp == null) continue;
-        if (minutes >= goalTarget) reachedGoalBp.push(averageBp);
-        else belowGoalBp.push(averageBp);
-      }
-
-      if (reachedGoalBp.length >= 3 && belowGoalBp.length >= 3) {
-        const comparison = compareGroups(reachedGoalBp, belowGoalBp);
-        if (comparison && Math.abs(comparison.difference) >= 5) {
-          insights.push({
-            kind: "exercise",
-            tone: "info",
-            title: comparison.difference < 0
-              ? "Your exercise-goal weeks had lower readings"
-              : "Your exercise-goal weeks had higher readings",
-            body:
-              "In your recorded data, weeks where you reached the " +
-              goalTarget +
-              "-minute exercise goal had an average systolic reading of " +
-              (round(comparison.highAverage) ?? 0) +
-              " mmHg, compared with " +
-              (round(comparison.lowAverage) ?? 0) +
-              " mmHg in weeks where you did not reach it. This is an observed pattern, not proof that exercise caused the difference.",
-            evidence:
-              "Goal weeks " +
-              (round(comparison.highAverage) ?? 0) +
-              " mmHg · Other weeks " +
-              (round(comparison.lowAverage) ?? 0) +
-              " mmHg.",
-          });
-        }
-      }
-    } else {
-      const exercisePairs: Array<{ activity: number; nextDayBp: number }> = [];
-      for (const [exerciseDay, activity] of exerciseByDay.entries()) {
-        const nextDay = shiftDayKey(exerciseDay, 1);
-        const bpValue = allDailyBp.get(nextDay);
-        if (bpValue != null) exercisePairs.push({ activity, nextDayBp: bpValue });
-      }
-
-      const activityDays = Array.from(exerciseByDay.entries())
-        .filter(([day]) => withinLookback(day + "T12:00:00Z", 30, now));
-      const goalDays = activityDays.filter(([, minutes]) => minutes >= goalTarget).length;
-      const todayMinutes = exerciseByDay.get(todayKey) ?? null;
-
-      insights.push({
-        kind: "exercise",
-        tone: "info",
-        title: title + " and your blood-pressure goal",
-        body:
-          todayMinutes != null
-            ? "Today you have logged " +
-              (round(todayMinutes) ?? 0) +
-              " minutes against your " +
-              goalTarget +
-              "-minute goal. Sympto can use these activity records alongside your blood-pressure readings to look for personal patterns."
-            : "Your blood-pressure goal is connected to your " +
-              goalTarget +
-              "-minute exercise target. Record activity and blood pressure on the same days so Sympto can compare the two over time.",
-        evidence:
-          goalDays +
-          " of " +
-          activityDays.length +
-          " recorded activity days reached the target.",
-      });
-
-      if (exercisePairs.length >= 6) {
-        const goalReachedBp = exercisePairs.filter((pair) => pair.activity >= goalTarget).map((pair) => pair.nextDayBp);
-        const belowGoalBp = exercisePairs.filter((pair) => pair.activity < goalTarget).map((pair) => pair.nextDayBp);
-        const comparison = compareGroups(goalReachedBp, belowGoalBp);
-
-        if (comparison && Math.abs(comparison.difference) >= 5) {
-          insights.push({
-            kind: "exercise",
-            tone: "info",
-            title: comparison.difference < 0
-              ? "Your goal days were followed by lower readings"
-              : "Your goal days were followed by higher readings",
-            body:
-              "On days when you reached the " +
-              goalTarget +
-              "-minute exercise goal, the next day's systolic readings averaged " +
-              (round(comparison.highAverage) ?? 0) +
-              " mmHg, compared with " +
-              (round(comparison.lowAverage) ?? 0) +
-              " mmHg after days below the goal. This is a pattern in your records, not proof that exercise caused the difference.",
-            evidence:
-              "Reached goal " +
-              (round(comparison.highAverage) ?? 0) +
-              " mmHg next day · Below goal " +
-              (round(comparison.lowAverage) ?? 0) +
-              " mmHg next day.",
-          });
-        }
-      }
-    }
-  }
-
-  if (exerciseGoalTarget != null && Number.isFinite(exerciseGoalTarget)) {
-    const goalTarget = Math.max(0, round(exerciseGoalTarget) ?? exerciseGoalTarget);
     const exerciseGoalTitleSafe = String(exerciseGoalTitle || "Exercise goal");
 
     if (exerciseGoalFrequencyNormalized === "WEEKLY") {
@@ -642,7 +489,7 @@ export function buildBloodPressureInsights({
           insights.unshift({
             kind: "exercise",
             tone: "info",
-            title: "Your Exercise goal and blood pressure show a pattern",
+            title: exerciseGoalTitleSafe + " and your blood pressure show a pattern",
             body:
               "In your recorded data, weeks when you reached your " +
               goalTarget +
@@ -669,13 +516,15 @@ export function buildBloodPressureInsights({
         insights.unshift({
           kind: "exercise",
           tone: "info",
-          title: "Your Exercise goal is connected to this pattern",
+          title: exerciseGoalTitleSafe + " is connected to your blood-pressure pattern",
           body:
             "This week you have logged " +
             thisWeekRounded +
             " of " +
             goalTarget +
-            " minutes. Sympto will compare your Exercise goal and blood-pressure readings as more weeks are recorded.",
+            " minutes toward your " +
+            exerciseGoalTitleSafe +
+            " target. Sympto will compare these exercise records with your blood-pressure readings as more weeks are recorded.",
           evidence:
             remaining > 0
               ? remaining + " minutes remaining this week."
