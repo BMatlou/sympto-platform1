@@ -90,9 +90,7 @@ export class MedicationConnectedGoalsEngine {
   calculate(input: MedicationConnectedGoalsInput): ConnectedGoalInsight[] {
     const today = dayKey(input.now, input.timezone);
     const eligibleMedicationDays = input.scheduledDays.filter(
-      (day) =>
-        day.expectedDoses > 0 &&
-        (day.day < today || day.day === today ? day.unrecordedDoses === 0 : false),
+      (day) => day.expectedDoses > 0 && day.day <= today,
     );
 
     const takenByDay = this.buildTakenDoseMap(
@@ -126,7 +124,11 @@ export class MedicationConnectedGoalsEngine {
       .filter((event) => Number.isFinite(Number(event.loggedValue)))
       .sort((a, b) => a.occurredAt.getTime() - b.occurredAt.getTime());
 
-    const periods = this.buildSupportingGoalPeriods(goalEvents, input.goal);
+    const periods = this.buildSupportingGoalPeriods(
+      goalEvents,
+      input.goal,
+      input.timezone,
+    );
     const completedPeriods = periods.filter((period) => {
       if (period.endDay >= input.today) return false;
       if (
@@ -138,7 +140,7 @@ export class MedicationConnectedGoalsEngine {
       return true;
     });
 
-    const latestPeriod = periods.at(-1) ?? null;
+    const latestPeriod = completedPeriods.at(-1) ?? null;
     const latestStatus = latestPeriod?.status ?? 'INSUFFICIENT_DATA';
 
     const periodByDay = new Map<string, SupportingGoalPeriod>();
@@ -433,11 +435,12 @@ export class MedicationConnectedGoalsEngine {
   private buildSupportingGoalPeriods(
     events: SupportEventRow[],
     relation: ConnectedSupportingGoal,
+    timezone: string,
   ): SupportingGoalPeriod[] {
     const byKey = new Map<string, SupportEventRow[]>();
 
     for (const event of events) {
-      const day = dayKey(event.occurredAt, 'Africa/Johannesburg');
+      const day = dayKey(event.occurredAt, timezone);
       if (!day) continue;
 
       const key =
