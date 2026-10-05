@@ -98,6 +98,14 @@ export type ValidatedComparison = {
 export function validateMedicationComparison(
   input: MedicationComparisonValidationInput,
 ): ValidatedComparison {
+  if (input.comparisonCoverageDays > input.eligibleJourneyDays) {
+    return {
+      comparisonValid: false,
+      reason: 'Comparison coverage cannot exceed the medication journey days being analysed.',
+      delta: null,
+    };
+  }
+
   if (input.onTarget.calendarDays < 2 || input.offTarget.calendarDays < 2) {
     return {
       comparisonValid: false,
