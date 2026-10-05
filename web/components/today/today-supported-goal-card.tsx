@@ -200,13 +200,34 @@ export default function TodaySupportedGoalCard({ goal, activeGoals = [], onUpdat
   }, [category, metricType, metricKey, goalId, goal?.updatedAt]);
 
   const displayCurrent = category === "BLOOD_PRESSURE" && liveCurrent != null ? liveCurrent : current;
-  const displayProgress = displayCurrent == null
-    ? progress
-    : progressPercent({
-        ...goal,
-        currentValue: displayCurrent,
-        latestProgress: null,
-      });
+  const displayProgress =
+    category === "BLOOD_PRESSURE" && displayCurrent != null && target != null
+      ? Math.max(
+          0,
+          Math.min(
+            100,
+            Math.round(
+              String(goal?.metricConfig?.comparison ?? "AT_MOST").toUpperCase() === "AT_LEAST"
+                ? target > 0
+                  ? (displayCurrent / target) * 100
+                  : 100
+                : target > 0
+                  ? Math.min(100, (target / displayCurrent) * 100)
+                  : displayCurrent <= target
+                    ? 100
+                    : 0
+            )
+          )
+        )
+      : displayCurrent == null
+        ? progress
+        : progressPercent({
+            ...goal,
+            currentValue: displayCurrent,
+            progress: [],
+            latestProgress: null,
+            progressPercent: null,
+          });
 
   const nextStep = goalNextStep(category, displayCurrent, target);
 
