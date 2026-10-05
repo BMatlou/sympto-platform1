@@ -647,15 +647,18 @@ export default function HealthHome({ patientId }: { patientId?: string }) {
     const refreshOnVisibility = () => {
       if (document.visibilityState === "visible") void refresh();
     };
+    const refreshAfterNotificationChange = () => void refresh();
 
     window.addEventListener("focus", refreshOnFocus);
     document.addEventListener("visibilitychange", refreshOnVisibility);
+    window.addEventListener("sympto:notifications-updated", refreshAfterNotificationChange);
 
     return () => {
       active = false;
       window.clearInterval(timer);
       window.removeEventListener("focus", refreshOnFocus);
       document.removeEventListener("visibilitychange", refreshOnVisibility);
+      window.removeEventListener("sympto:notifications-updated", refreshAfterNotificationChange);
     };
   }, [data?.patient?.id, data?.generatedAt]);
 
