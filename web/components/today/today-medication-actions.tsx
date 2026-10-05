@@ -292,6 +292,21 @@ export default function TodayMedicationActions({ medications, goal: suppliedGoal
   const routineAnchorTitle = narrativeRoutineAnchor
     ? "Lifestyle Routine Anchor (" + String(narrativeRoutineAnchor.goalName) + " Cross-Analysis)"
     : "Lifestyle Routine Anchor";
+  const narrativeAdherence = Number(
+    clinicalNarrative?.baseline?.adherencePercent ?? insightAdherencePercent,
+  );
+  const narrativeTarget = Number(
+    clinicalNarrative?.baseline?.targetAdherencePercent ?? targetAdherence,
+  );
+  const narrativeStatus =
+    narrativeAdherence < narrativeTarget
+      ? "BELOW_TARGET"
+      : narrativeAdherence > narrativeTarget
+        ? "ABOVE_TARGET"
+        : "ON_TARGET";
+  const narrativeGap = Math.abs(
+    Number((narrativeAdherence - narrativeTarget).toFixed(1)),
+  );
 
 
 
@@ -373,7 +388,7 @@ export default function TodayMedicationActions({ medications, goal: suppliedGoal
           <div className="mt-3 rounded-[18px] border border-[#d9e4ee] bg-white px-3.5 py-4 ring-1 ring-[#e8eef3] sm:px-4">
             <div className="flex flex-wrap items-center gap-2">
               <p className="text-[8px] font-black uppercase tracking-[.14em] text-[#0b7b80]">Medication Journey</p>
-              {clinicalNarrative?.baseline?.status === "BELOW_TARGET" ? (
+              {narrativeStatus === "BELOW_TARGET" ? (
                 <span className="rounded-full bg-[#fff3eb] px-2 py-1 text-[8px] font-black uppercase tracking-[.08em] text-[#9a633e]">
                   ⚠️ Routine Sub-Optimal Window
                 </span>
@@ -385,7 +400,7 @@ export default function TodayMedicationActions({ medications, goal: suppliedGoal
             </p>
 
             <p className="mt-2 text-[11px] leading-5 text-[#5f7080]">
-              Your {safeDosesLoggedToday}/{totalRequiredDosesPerDay} logs today demonstrate {safeDosesLoggedToday >= totalRequiredDosesPerDay ? "perfect short-term execution" : "partial short-term execution"}, but the longitudinal adherence vector remains {clinicalNarrative?.baseline?.status === "BELOW_TARGET" ? Math.abs(Number(clinicalNarrative?.baseline?.variancePercentagePoints ?? 0)) + " percentage points below" : clinicalNarrative?.baseline?.status === "ABOVE_TARGET" ? Math.abs(Number(clinicalNarrative?.baseline?.variancePercentagePoints ?? 0)) + " percentage points above" : "at"} the {Math.round(Number(clinicalNarrative?.baseline?.targetAdherencePercent ?? targetAdherence))}% goal threshold.
+              Your {safeDosesLoggedToday}/{totalRequiredDosesPerDay} logs today demonstrate {safeDosesLoggedToday >= totalRequiredDosesPerDay ? "perfect short-term execution" : "partial short-term execution"}, but the longitudinal adherence vector remains {narrativeStatus === "BELOW_TARGET" ? narrativeGap + " percentage points below" : narrativeStatus === "ABOVE_TARGET" ? narrativeGap + " percentage points above" : "at"} the {Math.round(narrativeTarget)}% goal threshold.
             </p>
           </div>
 
