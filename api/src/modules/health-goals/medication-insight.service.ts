@@ -274,6 +274,44 @@ export class MedicationInsightService {
       );
     }
 
+    // Exercise/sleep/hydration can also be persisted through the existing HealthJournal
+    // check-in path. Merge today's journal values into the same clinical evidence stream
+    // so active-day insight does not depend on a duplicate metric-event write.
+    const todayJournalContext = await this.loadTodayHealthJournalContext(
+      goal.patientId,
+      schedule.timezone,
+      now,
+    );
+
+    if (todayJournalContext) {
+      const todayDay = dayKey(now, schedule.timezone);
+      const todayGoalIds = new Set(
+        clinicalJournalEvents
+          .filter((event) => dayKey(event.timestamp, schedule.timezone) === todayDay)
+          .map((event) => event.goalId),
+      );
+
+      for (const supportingGoal of clinicalSupportingGoals) {
+        if (todayGoalIds.has(supportingGoal.goalId)) continue;
+
+        const category = String(supportingGoal.category).toUpperCase();
+        let value: number | null = null;
+
+        if (category === 'EXERCISE') value = todayJournalContext.exerciseMinutes;
+        if (category === 'SLEEP') value = todayJournalContext.sleepHours;
+        if (category === 'HYDRATION') value = todayJournalContext.waterIntakeMl;
+
+        if (value != null && Number.isFinite(value)) {
+          clinicalJournalEvents.push({
+            goalId: supportingGoal.goalId,
+            timestamp: todayJournalContext.occurredAt,
+            value,
+            source: 'health-journal-check-in',
+          });
+        }
+      }
+    }
+
     const dailyBuckets = buildDailyBuckets(goal.createdAt, now, schedule, doseRows);
     const journeyAdherence = calculateJourneyAdherence(dailyBuckets, now, goal.targetDate);
     const todayStatus = calculateTodayStatus(dailyBuckets, now);
@@ -544,6 +582,58 @@ export class MedicationInsightService {
             strongest.goalName +
             ' routine may reduce tracking friction.'
           : 'Insight: The medication routine is less consistent during periods when this goal is being maintained. Review the timing and context of both routines together before changing the medication schedule.',
+    };
+  }
+
+  private async loadTodayHealthJournalContext(
+    patientId: string,
+    timezone: string,
+    now: Date,
+  ): Promise<{
+    occurredAt: Date;
+    sleepHours: number | null;
+    exerciseMinutes: number | null;
+    waterIntakeMl: number | null;
+  } | null> {
+    const from = new Date(now.getTime() - 36 * 60 * 60 * 1000);
+
+    const rows = await this.prisma.$queryRawUnsafe<Array<{
+      createdAt: Date;
+      sleepHours: number | null;
+      exerciseMinutes: number | null;
+      waterIntakeMl: number | null;
+    }>>(
+      'SELECT "createdAt", "sleepHours"::double precision AS "sleepHours", ' +
+        '"exerciseMinutes"::double precision AS "exerciseMinutes", ' +
+        '"waterIntakeMl"::double precision AS "waterIntakeMl" ' +
+        'FROM "HealthJournal" ' +
+        'WHERE "patientId" = $1 AND "createdAt" >= $2 ' +
+        'ORDER BY "createdAt" DESC',
+      patientId,
+      from,
+    );
+
+    const today = dayKey(now, timezone);
+    const row = rows.find(
+      (candidate) => dayKey(candidate.createdAt, timezone) === today,
+    );
+
+    if (!row) return null;
+
+    return {
+      occurredAt: row.createdAt,
+      sleepHours:
+        row.sleepHours == null || !Number.isFinite(Number(row.sleepHours))
+          ? null
+          : Number(row.sleepHours),
+      exerciseMinutes:
+        row.exerciseMinutes == null || !Number.isFinite(Number(row.exerciseMinutes))
+          ? null
+          : Number(row.exerciseMinutes),
+      waterIntakeMl:
+        row.waterIntakeMl == null || !Number.isFinite(Number(row.waterIntakeMl))
+          ? null
+          : Number(row.waterIntakeMl),
     };
   }
 
