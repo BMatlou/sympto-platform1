@@ -107,6 +107,7 @@ export default function NotificationsPage() {
             : notification,
         ),
       );
+      window.dispatchEvent(new CustomEvent("sympto:notifications-updated"));
     } catch {
       setNotice("We couldn't update that notification.");
     } finally {
@@ -128,6 +129,7 @@ export default function NotificationsPage() {
           status: notification.readAt ? notification.status : "READ",
         })),
       );
+      window.dispatchEvent(new CustomEvent("sympto:notifications-updated"));
       setNotice("All notifications marked as read.");
     } catch {
       setNotice("We couldn't mark all notifications as read.");
