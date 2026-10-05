@@ -235,10 +235,22 @@ export class MedicationInsightService {
     let clinicalJournalEvents: ClinicalJournalEvent[] = [];
 
     try {
-      clinicalSupportingGoals = await this.loadClinicalSupportingGoals(
-        goal.patientId,
-        goalId,
-      );
+      // Use the same supporting-goal graph already used by the medication insight
+      // path. This intentionally does not require a separate relation-table hit.
+      clinicalSupportingGoals = relations.map((relation) => ({
+        goalId: relation.healthGoalId,
+        name: relation.title,
+        category: relation.category,
+        unit: null,
+        targetValue: relation.frequencyTarget,
+        frequency: relation.frequency,
+        metricType: relation.metricType,
+        metricKey: relation.metricKey,
+        aggregation: relation.aggregation,
+        comparison: relation.comparison,
+        createdAt: new Date(relation.createdAt),
+      }));
+
       clinicalJournalEvents = await this.loadClinicalJournalEvents(
         goal.patientId,
         goal.createdAt,
