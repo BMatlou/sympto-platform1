@@ -154,7 +154,6 @@ export default function TodaySupportedGoalCard({ goal, activeGoals = [], onUpdat
   const target = targetValue(goal);
   const progress = progressPercent(goal);
   const source = sourceAction(category);
-  const nextStep = goalNextStep(category, displayCurrent, target);
   const goalId = String(goal?.id ?? "");
   const journey = useMemo(() => journeyFor(goal), [goal]);
   const linkedExerciseGoal = activeGoals.find((item: any) => String(item?.category ?? "").toUpperCase() === "EXERCISE");
@@ -208,6 +207,8 @@ export default function TodaySupportedGoalCard({ goal, activeGoals = [], onUpdat
         currentValue: displayCurrent,
         latestProgress: null,
       });
+
+  const nextStep = goalNextStep(category, displayCurrent, target);
 
   async function recordValue() {
     const numeric = Number(value);
