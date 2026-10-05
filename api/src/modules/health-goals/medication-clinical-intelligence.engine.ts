@@ -468,8 +468,19 @@ function calculateCrossGoalAssociation(
     input.timezone,
   );
 
-  const loggedDays = medicationByDay.filter((day) => loggedDates.has(day.day));
-  const nonLoggedDays = medicationByDay.filter((day) => !loggedDates.has(day.day));
+  const comparisonStartDay = dateKey(
+    goal.createdAt > input.medicationGoal.startDate
+      ? goal.createdAt
+      : input.medicationGoal.startDate,
+    input.timezone,
+  );
+
+  const eligibleComparisonDays = medicationByDay.filter(
+    (day) => day.day >= comparisonStartDay,
+  );
+
+  const loggedDays = eligibleComparisonDays.filter((day) => loggedDates.has(day.day));
+  const nonLoggedDays = eligibleComparisonDays.filter((day) => !loggedDates.has(day.day));
 
   const loggedScheduled = sum(loggedDays.map((day) => day.expected));
   const loggedTaken = sum(loggedDays.map((day) => day.taken));
