@@ -10,6 +10,7 @@ type Props = {
   target: number | null;
   exerciseGoalTarget?: number | null;
   exerciseGoalTitle?: string | null;
+  exerciseGoalFrequency?: string | null;
 };
 
 const iconFor = (insight: BloodPressureInsight) => {
@@ -21,7 +22,7 @@ const iconFor = (insight: BloodPressureInsight) => {
   return Sparkles;
 };
 
-export default function BloodPressureInsights({ target, exerciseGoalTarget = null, exerciseGoalTitle = "Exercise" }: Props) {
+export default function BloodPressureInsights({ target, exerciseGoalTarget = null, exerciseGoalTitle = "Exercise", exerciseGoalFrequency = "DAILY" }: Props) {
   const [insights, setInsights] = useState<BloodPressureInsight[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -52,6 +53,7 @@ export default function BloodPressureInsights({ target, exerciseGoalTarget = nul
             target,
             exerciseGoalTarget,
             exerciseGoalTitle,
+            exerciseGoalFrequency,
             now: to,
           }),
         );
@@ -80,7 +82,7 @@ export default function BloodPressureInsights({ target, exerciseGoalTarget = nul
       window.removeEventListener("sympto:today-action-updated", handleRefresh);
       window.removeEventListener("sympto:health-checkin-updated", handleRefresh);
     };
-  }, [target, exerciseGoalTarget, exerciseGoalTitle]);
+  }, [target, exerciseGoalTarget, exerciseGoalTitle, exerciseGoalFrequency]);
 
   return (
     <section className="mt-3 rounded-[19px] border border-[#dcebed] bg-[#f8fbfc] p-3.5">
