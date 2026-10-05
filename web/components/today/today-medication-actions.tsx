@@ -252,6 +252,9 @@ export default function TodayMedicationActions({ medications, goal: suppliedGoal
   const associationInsight = (medicationInsight?.analysis?.associations ?? []).find(
     (association: any) => association?.statisticallyRelevant && association?.insight,
   );
+  const connectedGoalInsights = Array.isArray(medicationInsight?.analysis?.connectedGoalInsights)
+    ? medicationInsight.analysis.connectedGoalInsights
+    : [];
 
   useEffect(() => {
     if (!finalGoal?.id || !journeyInsight) return;
@@ -385,12 +388,129 @@ export default function TodayMedicationActions({ medications, goal: suppliedGoal
               </div>
             ) : null}
 
-            {associationInsight?.insight ? (
+            {connectedGoalInsights.length > 0 ? (
+              <div className="space-y-2.5">
+                <div className="pt-1">
+                  <p className="text-[11px] font-black leading-5 text-[#0b2d54]">Connected goals</p>
+                  <p className="mt-1 text-[10px] leading-5 text-[#7c8e9b]">
+                    Sympto compares your goal progress with your medication routine using the data you have actually logged.
+                  </p>
+                </div>
+
+                {connectedGoalInsights.map((connectedGoal: any) => {
+                  const target = Number(connectedGoal?.targetValue);
+                  const latest = Number(connectedGoal?.latestValue);
+                  const targetValid = Number.isFinite(target);
+                  const latestValid = Number.isFinite(latest);
+                  const comparison = String(connectedGoal?.comparison ?? "").toUpperCase();
+                  const targetPrefix =
+                    comparison === "AT_MOST" || comparison === "DECREASE_TO"
+                      ? "≤"
+                      : comparison === "AT_LEAST" || comparison === "INCREASE_TO"
+                        ? "≥"
+                        : "≈";
+                  const status = String(connectedGoal?.latestStatus ?? "INSUFFICIENT_DATA");
+                  const statusLabel =
+                    status === "ON_TARGET"
+                      ? "On target"
+                      : status === "ABOVE_TARGET"
+                        ? "Above target"
+                        : status === "BELOW_TARGET"
+                          ? "Below target"
+                          : "Insufficient data";
+                  const statusClass =
+                    status === "ON_TARGET"
+                      ? "text-[#0b7b80]"
+                      : status === "INSUFFICIENT_DATA"
+                        ? "text-[#8a99a6]"
+                        : "text-[#b05c2b]";
+                  const observedPeriods = Number(connectedGoal?.observedPeriods ?? 0);
+                  const targetMetPeriods = Number(connectedGoal?.targetMetPeriods ?? 0);
+                  const targetMissedPeriods = Number(connectedGoal?.targetMissedPeriods ?? 0);
+                  const adherenceOnTarget = Number(connectedGoal?.medicationAdherenceOnTargetPeriods);
+                  const adherenceOnMissed = Number(connectedGoal?.medicationAdherenceOnMissedTargetPeriods);
+                  const delta = Number(connectedGoal?.medicationDeltaPercentagePoints);
+                  const hasComparison =
+                    Number.isFinite(adherenceOnTarget) &&
+                    Number.isFinite(adherenceOnMissed) &&
+                    targetMetPeriods > 0 &&
+                    targetMissedPeriods > 0;
+
+                  return (
+                    <div
+                      key={String(connectedGoal?.supportingGoalId)}
+                      className="rounded-[18px] border border-[#d9e4ee] bg-white px-3.5 py-3.5 ring-1 ring-[#e8eef3] sm:px-4 sm:py-4"
+                    >
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="min-w-0">
+                          <p className="text-[11px] font-black leading-5 text-[#0b2d54]">
+                            {connectedGoal?.supportingGoalName}
+                          </p>
+                          <p className="mt-0.5 text-[8px] font-black uppercase tracking-[.12em] text-[#91a0ae]">
+                            {String(connectedGoal?.supportingGoalCategory ?? "").replaceAll("_", " ")}
+                          </p>
+                        </div>
+                        <p className={`shrink-0 text-[9px] font-black ${statusClass}`}>
+                          {statusLabel}
+                        </p>
+                      </div>
+
+                      <p className="mt-2 text-[10px] font-semibold leading-5 text-[#5f7080]">
+                        Target {targetValid ? `${targetPrefix} ${Math.round(target).toLocaleString()}` : "not configured"} {connectedGoal?.unit || ""}
+                        {latestValid && connectedGoal?.latestPeriodLabel
+                          ? ` · Latest ${Math.round(latest).toLocaleString()} ${connectedGoal?.unit || ""} (${connectedGoal.latestPeriodLabel})`
+                          : ""}
+                      </p>
+
+                      {observedPeriods > 0 ? (
+                        <p className="mt-1 text-[10px] font-semibold leading-5 text-[#7c8e9b]">
+                          {observedPeriods} period{observedPeriods === 1 ? "" : "s"} tracked · {targetMetPeriods} on target · {targetMissedPeriods} off target.
+                        </p>
+                      ) : null}
+
+                      {hasComparison ? (
+                        <div className="mt-2.5 rounded-[14px] bg-[#f7fbfb] px-3 py-2.5 ring-1 ring-[#e1ecef]">
+                          <p className="text-[8px] font-black uppercase tracking-[.12em] text-[#91a0ae]">
+                            Medication comparison
+                          </p>
+                          <p className="mt-1 text-[10px] font-black leading-5 text-[#0b2d54]">
+                            {Math.round(adherenceOnTarget)}% adherence when on target
+                            {" · "}
+                            {Math.round(adherenceOnMissed)}% when off target
+                          </p>
+                          {Number.isFinite(delta) ? (
+                            <p className="mt-0.5 text-[9px] font-semibold leading-5 text-[#5f7080]">
+                              {delta > 0 ? "+" : ""}{Math.round(delta)} percentage points when the goal was on target.
+                            </p>
+                          ) : null}
+                        </div>
+                      ) : null}
+
+                      {connectedGoal?.insight ? (
+                        <p className="mt-2 text-[10px] leading-5 text-[#5f7080]">
+                          {connectedGoal.insight}
+                        </p>
+                      ) : connectedGoal?.evidenceLevel === "INSUFFICIENT_DATA" ? (
+                        <p className="mt-2 text-[9px] font-semibold leading-5 text-[#9aa7b1]">
+                          More logged data is needed before Sympto compares this goal with medication adherence.
+                        </p>
+                      ) : null}
+
+                      {hasComparison && Math.abs(delta) >= 10 ? (
+                        <p className="mt-1 text-[8px] font-semibold leading-4 text-[#9aa7b1]">
+                          Observed pattern in your records; this does not prove that one goal caused the other.
+                        </p>
+                      ) : null}
+                    </div>
+                  );
+                })}
+              </div>
+            ) : associationInsight?.insight ? (
               <div className="rounded-[18px] border border-[#d9e4ee] bg-white px-3.5 py-3.5 ring-1 ring-[#e8eef3] sm:px-4 sm:py-4">
                 <p className="text-[11px] font-black leading-5 text-[#0b2d54]">Connected goal</p>
                 <p className="mt-1 text-[11px] leading-5 text-[#5f7080]">{associationInsight.insight}</p>
               </div>
-            ) : null}
+            ) : null
           </div>
         </section>
       ) : null}
