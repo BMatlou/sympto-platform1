@@ -5,6 +5,7 @@ import { HealthGoalsService } from './health-goals.service';
 import { CreateHealthGoalDto } from './dto/create-health-goal.dto';
 import { UpdateHealthGoalDto } from './dto/update-health-goal.dto';
 import { HealthGoalIntelligenceService } from './health-goal-intelligence.service';
+import { MedicationInsightService } from './medication-insight.service';
 
 type AuthenticatedRequest = { user?: { sub?: string; id?: string; userId?: string } };
 
@@ -15,6 +16,7 @@ export class PatientHealthGoalsController {
     private readonly prisma: PrismaService,
     private readonly healthGoalsService: HealthGoalsService,
     private readonly healthGoalIntelligence: HealthGoalIntelligenceService,
+    private readonly medicationInsightService: MedicationInsightService,
   ) {}
 
   private userId(request: AuthenticatedRequest) {
@@ -148,6 +150,19 @@ export class PatientHealthGoalsController {
     }
     await this.healthGoalIntelligence.syncGoalRelations(existing.patient.id);
     return this.healthGoalsService.findOne(updated.id);
+  }
+
+  /**
+   * Safe read-only preview of the new event-driven medication intelligence model.
+   * This endpoint does not change the existing medication card or Goal Engine.
+   */
+  @Get(':id/medication-insight')
+  async medicationInsight(@Param('id') id: string, @Req() request: AuthenticatedRequest) {
+    const goal = await this.assertOwnGoal(id, this.userId(request));
+    if (String(goal.category).toUpperCase() !== 'MEDICATION') {
+      throw new BadRequestException('Medication insight is only available for medication goals.');
+    }
+    return this.medicationInsightService.buildForGoal(goal.id);
   }
 
   @Get(':id/relationships')
