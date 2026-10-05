@@ -1,3 +1,4 @@
+import { Injectable } from '@nestjs/common';
 import type {
   MedicationDayBucket,
   MedicationSchedule,
@@ -245,4 +246,11 @@ export function calculateMedicationGoalIntelligence(
     trend: input.trend,
     insight,
   };
+}
+
+@Injectable()
+export class MedicationGoalIntelligenceEngine {
+  calculate(input: MedicationGoalIntelligenceInput): MedicationGoalIntelligence {
+    return calculateMedicationGoalIntelligence(input);
+  }
 }
