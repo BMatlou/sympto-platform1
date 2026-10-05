@@ -115,6 +115,30 @@ export interface SupportingGoalAssociation {
   insight: string | null;
 }
 
+export type ConnectedGoalEvidenceLevel = 'STRONG' | 'EMERGING' | 'EARLY' | 'INSUFFICIENT_DATA';
+
+export interface ConnectedGoalInsight {
+  supportingGoalId: string;
+  supportingGoalName: string;
+  supportingGoalCategory: ConnectedSupportingGoal['category'];
+  targetValue: number | null;
+  unit: string;
+  frequency: string;
+  comparison: string;
+  aggregation: string;
+  observedPeriods: number;
+  targetMetPeriods: number;
+  targetMissedPeriods: number;
+  latestValue: number | null;
+  latestPeriodLabel: string | null;
+  latestStatus: 'ON_TARGET' | 'BELOW_TARGET' | 'ABOVE_TARGET' | 'INSUFFICIENT_DATA';
+  medicationAdherenceOnTargetPeriods: number | null;
+  medicationAdherenceOnMissedTargetPeriods: number | null;
+  medicationDeltaPercentagePoints: number | null;
+  evidenceLevel: ConnectedGoalEvidenceLevel;
+  insight: string | null;
+}
+
 export interface MedicationInsightResult {
   unified: {
     goalConfig: MedicationGoalConfig;
@@ -221,6 +245,12 @@ export class MedicationInsightService {
     const todayStatus = calculateTodayStatus(dailyBuckets, now);
     const trend = classifyTrend(dailyBuckets, now);
     const associations = calculateAssociations(dailyBuckets, now, relations, supportingEvents);
+    const connectedGoalInsights = calculateConnectedGoalInsights(
+      dailyBuckets,
+      now,
+      relations,
+      supportingEvents,
+    );
 
     const supportingGoalEvents: Record<string, SupportingGoalEvent[]> = {};
     for (const relation of relations) {
@@ -269,6 +299,7 @@ export class MedicationInsightService {
         dailyBuckets,
         trend,
         associations,
+        connectedGoalInsights,
         dataQuality: {
           explicitAdherenceEvents: doseRows.length,
           legacyAdherenceEventsIgnored,
@@ -736,4 +767,257 @@ function calculateAssociations(
         : null,
     };
   });
+}
+
+function calculateConnectedGoalInsights(
+  buckets: MedicationDayBucket[],
+  now: Date,
+  relations: ConnectedSupportingGoal[],
+  supportEvents: SupportEventRow[],
+): ConnectedGoalInsight[] {
+  const today = dayKey(now);
+  const historicalMedicationDays = buckets.filter(
+    (day) => day.day < today && day.expectedDoses > 0,
+  );
+
+  return relations.map((relation) => {
+    const events = supportEvents
+      .filter((event) => event.healthGoalId === relation.healthGoalId)
+      .sort((a, b) => a.occurredAt.getTime() - b.occurredAt.getTime());
+
+    const periods = buildSupportingGoalPeriods(events, relation);
+    const historicalPeriods = periods.filter(
+      (period) => period.endDay < today,
+    );
+
+    const latestPeriod = historicalPeriods.at(-1) ?? null;
+    const latestValue = latestPeriod?.value ?? null;
+    const latestStatus = latestPeriod
+      ? compareSupportingGoalToTarget(latestValue, relation)
+      : 'INSUFFICIENT_DATA';
+
+    const targetPeriods = historicalPeriods.filter((period) => period.status === 'ON_TARGET');
+    const missedPeriods = historicalPeriods.filter(
+      (period) => period.status === 'BELOW_TARGET' || period.status === 'ABOVE_TARGET',
+    );
+
+    const periodByMedicationDay = new Map<string, SupportingGoalPeriod>();
+    for (const period of historicalPeriods) {
+      for (const day of period.days) {
+        periodByMedicationDay.set(day, period);
+      }
+    }
+
+    const metMedicationDays = historicalMedicationDays.filter(
+      (day) => periodByMedicationDay.get(day.day)?.status === 'ON_TARGET',
+    );
+    const missedMedicationDays = historicalMedicationDays.filter((day) => {
+      const status = periodByMedicationDay.get(day.day)?.status;
+      return status === 'BELOW_TARGET' || status === 'ABOVE_TARGET';
+    });
+
+    const adherenceOnTarget = weightedAdherence(metMedicationDays);
+    const adherenceOnMissed = weightedAdherence(missedMedicationDays);
+    const delta =
+      adherenceOnTarget != null && adherenceOnMissed != null
+        ? Number((adherenceOnTarget - adherenceOnMissed).toFixed(2))
+        : null;
+
+    const observedPeriods = historicalPeriods.length;
+    const medicationComparableDays = metMedicationDays.length + missedMedicationDays.length;
+    const evidenceLevel: ConnectedGoalEvidenceLevel =
+      observedPeriods >= 6 && medicationComparableDays >= 8
+        ? 'STRONG'
+        : observedPeriods >= 3 && medicationComparableDays >= 4
+          ? 'EMERGING'
+          : observedPeriods >= 1
+            ? 'EARLY'
+            : 'INSUFFICIENT_DATA';
+
+    let insight: string | null = null;
+    if (
+      delta != null &&
+      metMedicationDays.length >= 2 &&
+      missedMedicationDays.length >= 2 &&
+      Math.abs(delta) >= 10
+    ) {
+      const direction = delta > 0 ? 'higher' : 'lower';
+      insight =
+        `Your medication adherence was ${Math.abs(Math.round(delta))} percentage points ${direction} on days when your ${relation.title} target was met compared with days when it was not.`;
+    } else if (
+      delta != null &&
+      metMedicationDays.length >= 2 &&
+      missedMedicationDays.length >= 2
+    ) {
+      insight =
+        `Medication adherence was ${Math.round(adherenceOnTarget ?? 0)}% on days when your ${relation.title} target was met versus ${Math.round(adherenceOnMissed ?? 0)}% when it was not.`;
+    } else if (latestStatus !== 'INSUFFICIENT_DATA') {
+      insight =
+        latestStatus === 'ON_TARGET'
+          ? `${relation.title} is currently on target in the latest recorded period.`
+          : `${relation.title} is currently off target in the latest recorded period.`;
+    }
+
+    return {
+      supportingGoalId: relation.healthGoalId,
+      supportingGoalName: relation.title,
+      supportingGoalCategory: relation.category,
+      targetValue: relation.frequencyTarget,
+      unit: metricUnitForRelation(relation),
+      frequency: relation.frequency,
+      comparison: relation.comparison,
+      aggregation: relation.aggregation,
+      observedPeriods,
+      targetMetPeriods: targetPeriods.length,
+      targetMissedPeriods: missedPeriods.length,
+      latestValue,
+      latestPeriodLabel: latestPeriod?.label ?? null,
+      latestStatus,
+      medicationAdherenceOnTargetPeriods:
+        adherenceOnTarget == null ? null : Number(adherenceOnTarget.toFixed(2)),
+      medicationAdherenceOnMissedTargetPeriods:
+        adherenceOnMissed == null ? null : Number(adherenceOnMissed.toFixed(2)),
+      medicationDeltaPercentagePoints: delta,
+      evidenceLevel,
+      insight,
+    };
+  });
+}
+
+type SupportingGoalPeriod = {
+  key: string;
+  startDay: string;
+  endDay: string;
+  label: string;
+  value: number;
+  status: 'ON_TARGET' | 'BELOW_TARGET' | 'ABOVE_TARGET';
+  days: string[];
+};
+
+function buildSupportingGoalPeriods(
+  events: SupportEventRow[],
+  relation: ConnectedSupportingGoal,
+): SupportingGoalPeriod[] {
+  const byKey = new Map<string, SupportEventRow[]>();
+
+  for (const event of events) {
+    const date = dayKey(event.occurredAt);
+    const key =
+      relation.frequency === 'WEEKLY'
+        ? weekStartDay(date)
+        : relation.frequency === 'TOTAL'
+          ? 'TOTAL'
+          : date;
+    const current = byKey.get(key) ?? [];
+    current.push(event);
+    byKey.set(key, current);
+  }
+
+  return [...byKey.entries()]
+    .sort(([a], [b]) => a.localeCompare(b))
+    .map(([key, periodEvents]) => {
+      const value = aggregateSupportingGoalEvents(periodEvents, relation.aggregation);
+      const startDay = key === 'TOTAL' ? dayKey(periodEvents[0].occurredAt) : key;
+      const endDay =
+        key === 'TOTAL'
+          ? dayKey(periodEvents.at(-1)?.occurredAt ?? periodEvents[0].occurredAt)
+          : relation.frequency === 'WEEKLY'
+            ? nextDayAfterDays(startDay, 6)
+            : startDay;
+      return {
+        key,
+        startDay,
+        endDay,
+        label:
+          relation.frequency === 'WEEKLY'
+            ? `week of ${startDay}`
+            : relation.frequency === 'TOTAL'
+              ? 'recorded journey'
+              : startDay,
+        value,
+        status: compareSupportingGoalToTarget(value, relation),
+        days: enumerateDays(startDay, endDay),
+      };
+    });
+}
+
+function aggregateSupportingGoalEvents(
+  events: SupportEventRow[],
+  aggregation: string,
+): number {
+  const values = events
+    .map((event) => Number(event.loggedValue))
+    .filter((value) => Number.isFinite(value));
+
+  if (!values.length) return Number.NaN;
+
+  switch (String(aggregation).toUpperCase()) {
+    case 'AVERAGE':
+      return values.reduce((sum, value) => sum + value, 0) / values.length;
+    case 'MIN':
+      return Math.min(...values);
+    case 'MAX':
+      return Math.max(...values);
+    case 'LATEST':
+      return values[values.length - 1];
+    case 'SUM':
+    default:
+      return values.reduce((sum, value) => sum + value, 0);
+  }
+}
+
+function compareSupportingGoalToTarget(
+  value: number,
+  relation: ConnectedSupportingGoal,
+): 'ON_TARGET' | 'BELOW_TARGET' | 'ABOVE_TARGET' {
+  const target = relation.frequencyTarget == null ? null : Number(relation.frequencyTarget);
+  if (target == null || !Number.isFinite(target)) return 'BELOW_TARGET';
+
+  const comparison = String(relation.comparison).toUpperCase();
+  if (comparison === 'AT_MOST' || comparison === 'DECREASE_TO') {
+    return value <= target ? 'ON_TARGET' : 'ABOVE_TARGET';
+  }
+  if (comparison === 'CLOSEST') {
+    const tolerance = Math.max(Math.abs(target) * 0.1, 0.1);
+    return Math.abs(value - target) <= tolerance
+      ? 'ON_TARGET'
+      : value < target
+        ? 'BELOW_TARGET'
+        : 'ABOVE_TARGET';
+  }
+  return value >= target ? 'ON_TARGET' : 'BELOW_TARGET';
+}
+
+function metricUnitForRelation(relation: ConnectedSupportingGoal): string {
+  switch (String(relation.metricKey).toLowerCase()) {
+    case 'nutrition.calories': return 'kcal/day';
+    case 'exercise.minutes': return 'min/week';
+    case 'sleep.hours': return 'hours/night';
+    case 'hydration.ml': return 'ml/day';
+    default: return '';
+  }
+}
+
+function weekStartDay(day: string): string {
+  const date = new Date(day + 'T12:00:00Z');
+  const weekdayNumber = date.getUTCDay() || 7;
+  date.setUTCDate(date.getUTCDate() - (weekdayNumber - 1));
+  return date.toISOString().slice(0, 10);
+}
+
+function nextDayAfterDays(day: string, days: number): string {
+  const date = new Date(day + 'T12:00:00Z');
+  date.setUTCDate(date.getUTCDate() + days);
+  return date.toISOString().slice(0, 10);
+}
+
+function enumerateDays(start: string, end: string): string[] {
+  const days: string[] = [];
+  let cursor = start;
+  for (let guard = 0; guard < 370; guard += 1) {
+    days.push(cursor);
+    if (cursor === end) break;
+    cursor = nextDay(cursor);
+  }
+  return days;
 }
