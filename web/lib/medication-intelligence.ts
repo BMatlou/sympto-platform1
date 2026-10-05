@@ -313,6 +313,8 @@ export function buildMedicationIntelligence(input: {
   adherenceEvents: MedicationIntelligenceEvent[];
   goalStartAt: string;
   scheduledDosesPerDay: number;
+  lifecycleDayCount?: number | null;
+  totalHistoricalTakenDoses?: number | null;
   checkIns: MedicationIntelligenceCheckIn[];
   nutritionEvents: MedicationIntelligenceNutritionEvent[];
   supportingGoals: MedicationSupportingGoal[];
@@ -333,6 +335,32 @@ export function buildMedicationIntelligence(input: {
 
   const today = dayKey(new Date());
   const days = timeline.filter((day) => day.day !== today);
+
+  // Keep the existing completed-day logic for general medication trend/timing
+  // insights. For a same-day food comparison, include today only when all of
+  // today's scheduled doses have already been resolved. A partial day must not
+  // silently become a "no food" or "missed medicine" day.
+  const comparisonDays = timeline.filter(
+    (day) => day.day !== today || day.unrecorded === 0,
+  );
+
+  const comparisonTaken = adherenceFor(comparisonDays).taken;
+  const comparisonScheduled = adherenceFor(comparisonDays).scheduled;
+  const expectedScheduled =
+    Number.isFinite(Number(input.lifecycleDayCount)) &&
+    Number(input.lifecycleDayCount) > 0
+      ? Number(input.lifecycleDayCount) * Math.max(1, Math.floor(input.scheduledDosesPerDay || 1))
+      : null;
+  const historicalTaken = Number(input.totalHistoricalTakenDoses);
+
+  const doseHistoryReconciled =
+    Number.isFinite(historicalTaken) &&
+    historicalTaken >= 0 &&
+    comparisonTaken === Math.floor(historicalTaken) &&
+    (expectedScheduled == null || comparisonScheduled === expectedScheduled);
+
+  let nutritionComparisonSuppressed = false;
+
   const checkIns = new Map(input.checkIns.map((item) => [item.day, item]));
 
   const insights: MedicationIntelligenceInsight[] = [];
@@ -617,42 +645,83 @@ export function buildMedicationIntelligence(input: {
       (day) => (caloriesByDay.get(day.day) ?? 0) >= nutritionTarget,
     );
   } else {
-    const nutritionLogged = days.filter((day) => nutritionDays.some((item) => item.day === day.day));
-    const nutritionNotLogged = days.filter((day) => !nutritionDays.some((item) => item.day === day.day));
+    // This comparison is deliberately fail-closed. It is patient-facing
+    // telemetry, so the grouped dose counts must reconcile to the same
+    // historical total already shown by the medication goal card.
+    if (
+      !doseHistoryReconciled ||
+      comparisonDays.length !== timeline.length
+    ) {
+      nutritionComparisonSuppressed = true;
+    } else {
+      const nutritionLogged = comparisonDays.filter((day) =>
+        nutritionDays.some((item) => item.day === day.day),
+      );
+      const nutritionNotLogged = comparisonDays.filter(
+        (day) => !nutritionDays.some((item) => item.day === day.day),
+      );
 
-    if (nutritionLogged.length >= 2 && nutritionNotLogged.length >= 2) {
-      const loggedStats = adherenceFor(nutritionLogged);
-      const unloggedStats = adherenceFor(nutritionNotLogged);
-      const difference = Math.abs(loggedStats.percentage - unloggedStats.percentage);
+      if (nutritionLogged.length >= 2 && nutritionNotLogged.length >= 2) {
+        const loggedStats = adherenceFor(nutritionLogged);
+        const unloggedStats = adherenceFor(nutritionNotLogged);
+        const groupedTaken =
+          loggedStats.taken + unloggedStats.taken;
+        const groupedScheduled =
+          loggedStats.scheduled + unloggedStats.scheduled;
+        const difference = Math.abs(
+          loggedStats.percentage - unloggedStats.percentage,
+        );
 
-      if (difference >= 10) {
-        const loggedSkipped = nutritionLogged.reduce((sum, day) => sum + day.skippedActions, 0);
-        const loggedUnrecorded = nutritionLogged.reduce((sum, day) => sum + day.unrecorded, 0);
+        const groupedCountsReconcile =
+          groupedTaken === historicalTaken &&
+          (expectedScheduled == null || groupedScheduled === expectedScheduled);
 
-        candidates.push({
-          title: "Food logging & your medicine",
-          text:
-            "On days you logged food, you logged " +
-            formatWhole(loggedStats.taken) +
-            " of " +
-            formatWhole(loggedStats.scheduled) +
-            " doses. " +
-            formatWhole(loggedSkipped) +
-            " were skipped and " +
-            formatWhole(loggedUnrecorded) +
-            " were never logged. On days without a food entry, you logged " +
-            formatWhole(unloggedStats.taken) +
-            " of " +
-            formatWhole(unloggedStats.scheduled) +
-            " doses.",
-          tone: "context",
-          difference,
-        });
+        if (groupedCountsReconcile && difference >= 10) {
+          const loggedSkipped = nutritionLogged.reduce(
+            (sum, day) => sum + day.skippedActions,
+            0,
+          );
+          const loggedUnrecorded = nutritionLogged.reduce(
+            (sum, day) => sum + day.unrecorded,
+            0,
+          );
+
+          candidates.push({
+            title: "Food logging & your medicine",
+            text:
+              "On days you logged food, you logged " +
+              formatWhole(loggedStats.taken) +
+              " of " +
+              formatWhole(loggedStats.scheduled) +
+              " doses. " +
+              formatWhole(loggedSkipped) +
+              " were skipped and " +
+              formatWhole(loggedUnrecorded) +
+              " were never logged. On days without a food entry, you logged " +
+              formatWhole(unloggedStats.taken) +
+              " of " +
+              formatWhole(unloggedStats.scheduled) +
+              " doses.",
+            tone: "context",
+            difference,
+          });
+        } else {
+          nutritionComparisonSuppressed = true;
+        }
       }
     }
   }
 
   candidates.sort((a, b) => b.difference - a.difference);
+
+  if (nutritionComparisonSuppressed && insights.length < 3) {
+    insights.push({
+      title: "Food and medicine history is still syncing",
+      text:
+        "Sympto will only compare food logging with your medicine when the grouped dose totals reconcile with your medication history. Your recorded medication totals are unchanged.",
+      tone: "neutral",
+    });
+  }
 
   // Put one useful connected-data comparison after the two primary medication patterns.
   if (candidates[0]) {
