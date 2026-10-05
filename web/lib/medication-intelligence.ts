@@ -403,6 +403,7 @@ function buildCoverage(label: string, recordedDays: number, planDays: number) {
   return label + " " + formatWhole(recordedDays) + " of " + formatWhole(planDays) + " days.";
 }
 
+/** @deprecated The Today medication Insight UI now uses buildLiveMedicationInsights. */
 export function buildMedicationIntelligence(input: {
   adherenceEvents: MedicationIntelligenceEvent[];
   goalStartAt: string;
@@ -810,9 +811,9 @@ export function buildMedicationIntelligence(input: {
 
   if (nutritionComparisonSuppressed && insights.length < 3) {
     insights.push({
-      title: "Food and medicine history is still syncing",
+      title: "Medication pattern",
       text:
-        "Sympto will only compare food logging with your medicine when the grouped dose totals reconcile with your medication history. Your recorded medication totals are unchanged.",
+        "Keep logging your doses and meals to build a clearer personal pattern.",
       tone: "neutral",
     });
   }
