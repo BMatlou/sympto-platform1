@@ -324,7 +324,7 @@ export class MedicationInsightService {
     const slots = await this.prisma.$queryRawUnsafe<Array<{ time: string }>>(slotsSql, goal.patientMedicationId);
 
     return {
-      patientMedicationId: goal.patientMedicationId,
+      patientMedicationId: goal.patientMedicationId!,
       medicationId: goal.medicationId,
       name: goal.medicationName ?? 'Medication',
       dosage: goal.dosage,
