@@ -80,11 +80,104 @@ type SupportingGoalPeriod = {
   days: string[];
 };
 
-type ValidatedComparison = {
+export type MedicationComparisonValidationInput = {
+  onTarget: MedicationComparisonGroup;
+  offTarget: MedicationComparisonGroup;
+  comparisonCoverageDays: number;
+  eligibleJourneyDays: number;
+  comparisonCoversEntireEligibleJourney: boolean;
+  overallAdherencePercent: number | null;
+};
+
+export type ValidatedComparison = {
   comparisonValid: boolean;
   reason: string | null;
   delta: number | null;
 };
+
+export function validateMedicationComparison(
+  input: MedicationComparisonValidationInput,
+): ValidatedComparison {
+  if (input.onTarget.calendarDays < 2 || input.offTarget.calendarDays < 2) {
+    return {
+      comparisonValid: false,
+      reason: 'Each comparison group needs at least two completed calendar days.',
+      delta: null,
+    };
+  }
+
+  if (input.onTarget.scheduledDoses <= 0 || input.offTarget.scheduledDoses <= 0) {
+    return {
+      comparisonValid: false,
+      reason: 'Both comparison groups need scheduled medication doses.',
+      delta: null,
+    };
+  }
+
+  if (
+    input.onTarget.takenDoses > input.onTarget.scheduledDoses ||
+    input.offTarget.takenDoses > input.offTarget.scheduledDoses
+  ) {
+    return {
+      comparisonValid: false,
+      reason: 'Taken doses exceed scheduled doses in a comparison group.',
+      delta: null,
+    };
+  }
+
+  const onTargetPercent = input.onTarget.adherencePercent;
+  const offTargetPercent = input.offTarget.adherencePercent;
+
+  if (onTargetPercent == null || offTargetPercent == null) {
+    return {
+      comparisonValid: false,
+      reason: 'Adherence could not be calculated for both comparison groups.',
+      delta: null,
+    };
+  }
+
+  const delta = Number((onTargetPercent - offTargetPercent).toFixed(2));
+
+  if (Math.abs(delta) < 0.01) {
+    return {
+      comparisonValid: false,
+      reason: 'There is no measurable adherence difference between the joined groups.',
+      delta: 0,
+    };
+  }
+
+  if (
+    input.comparisonCoversEntireEligibleJourney &&
+    input.overallAdherencePercent != null
+  ) {
+    const joinedExpected =
+      input.onTarget.scheduledDoses + input.offTarget.scheduledDoses;
+    const joinedTaken =
+      input.onTarget.takenDoses + input.offTarget.takenDoses;
+    const joinedPercent =
+      joinedExpected > 0
+        ? Number(((joinedTaken / joinedExpected) * 100).toFixed(2))
+        : null;
+
+    if (
+      joinedPercent == null ||
+      Math.abs(joinedPercent - input.overallAdherencePercent) > 0.01
+    ) {
+      return {
+        comparisonValid: false,
+        reason:
+          'The date-joined comparison does not reconcile with the medication journey adherence.',
+        delta: null,
+      };
+    }
+  }
+
+  return {
+    comparisonValid: true,
+    reason: null,
+    delta,
+  };
+}
 
 export class MedicationConnectedGoalsEngine {
   calculate(input: MedicationConnectedGoalsInput): ConnectedGoalInsight[] {
@@ -295,93 +388,9 @@ export class MedicationConnectedGoalsEngine {
     };
   }
 
-  private validateComparison(input: {
-    onTarget: MedicationComparisonGroup;
-    offTarget: MedicationComparisonGroup;
-    comparisonCoverageDays: number;
-    eligibleJourneyDays: number;
-    comparisonCoversEntireEligibleJourney: boolean;
-    overallAdherencePercent: number | null;
-  }): ValidatedComparison {
-    if (input.onTarget.calendarDays < 2 || input.offTarget.calendarDays < 2) {
-      return {
-        comparisonValid: false,
-        reason: 'Each comparison group needs at least two completed calendar days.',
-        delta: null,
-      };
-    }
-
-    if (input.onTarget.scheduledDoses <= 0 || input.offTarget.scheduledDoses <= 0) {
-      return {
-        comparisonValid: false,
-        reason: 'Both comparison groups need scheduled medication doses.',
-        delta: null,
-      };
-    }
-
-    if (
-      input.onTarget.takenDoses > input.onTarget.scheduledDoses ||
-      input.offTarget.takenDoses > input.offTarget.scheduledDoses
-    ) {
-      return {
-        comparisonValid: false,
-        reason: 'Taken doses exceed scheduled doses in a comparison group.',
-        delta: null,
-      };
-    }
-
-    const onTargetPercent = input.onTarget.adherencePercent;
-    const offTargetPercent = input.offTarget.adherencePercent;
-
-    if (onTargetPercent == null || offTargetPercent == null) {
-      return {
-        comparisonValid: false,
-        reason: 'Adherence could not be calculated for both comparison groups.',
-        delta: null,
-      };
-    }
-
-    const delta = Number((onTargetPercent - offTargetPercent).toFixed(2));
-
-    if (Math.abs(delta) < 0.01) {
-      return {
-        comparisonValid: false,
-        reason: 'There is no measurable adherence difference between the joined groups.',
-        delta: 0,
-      };
-    }
-
-    if (
-      input.comparisonCoversEntireEligibleJourney &&
-      input.overallAdherencePercent != null
-    ) {
-      const joinedExpected =
-        input.onTarget.scheduledDoses + input.offTarget.scheduledDoses;
-      const joinedTaken =
-        input.onTarget.takenDoses + input.offTarget.takenDoses;
-      const joinedPercent =
-        joinedExpected > 0
-          ? Number(((joinedTaken / joinedExpected) * 100).toFixed(2))
-          : null;
-
-      if (
-        joinedPercent == null ||
-        Math.abs(joinedPercent - input.overallAdherencePercent) > 0.01
-      ) {
-        return {
-          comparisonValid: false,
-          reason:
-            'The date-joined comparison does not reconcile with the medication journey adherence.',
-          delta: null,
-        };
-      }
-    }
-
-    return {
-      comparisonValid: true,
-      reason: null,
-      delta,
-    };
+  // Kept as a method wrapper so the engine remains the single owner of validation.
+  private validateComparison(input: MedicationComparisonValidationInput): ValidatedComparison {
+    return validateMedicationComparison(input);
   }
 
   private evidenceLevel(
