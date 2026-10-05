@@ -201,18 +201,12 @@ export function buildBloodPressureInsights({
 
   if (trendDaily.size >= 3) {
     const dailyValues = trendDays
-      .map((day) => trendDaily.get(day) ?? 0)
-      .filter((value) => Number.isFinite(value));
+      .map((day) => trendDaily.get(day))
+      .filter((value): value is number => value != null && Number.isFinite(value));
 
+    const recordedDays = dailyValues.length;
     const averageSystolic = mean(dailyValues) ?? 0;
-    const averageRounded = round(averageSystolic) ?? 0;
-    const recordedDays = trendDaily.size;
-    const targetDays = target == null
-      ? 0
-      : dailyValues.filter((value) => value <= target).length;
-    const targetRate = target != null && recordedDays > 0
-      ? Math.round((targetDays / recordedDays) * 100)
-      : null;
+    const overallAverage = round(averageSystolic) ?? 0;
 
     const midpoint = Math.floor(trendDays.length / 2);
     const earlyValues = trendDays
@@ -226,145 +220,131 @@ export function buildBloodPressureInsights({
 
     const earlyAverage = mean(earlyValues);
     const recentAverage = mean(recentValues);
-    const directionDelta =
-      earlyAverage != null && recentAverage != null
-        ? recentAverage - earlyAverage
-        : 0;
+    const change = earlyAverage != null && recentAverage != null
+      ? recentAverage - earlyAverage
+      : null;
 
     const latestDay = trendDays.at(-1);
-    const latestAverage = latestDay ? trendDaily.get(latestDay) ?? null : null;
-    const latestRounded = round(latestAverage) ?? null;
-    const targetRounded = target == null ? null : round(target) ?? null;
+    const latestReading = latestDay ? trendDaily.get(latestDay) ?? null : null;
 
-    const strongRecentShift =
-      Math.abs(directionDelta) >= 5 &&
+    const targetValue = target != null ? round(target) : null;
+    const recentRounded = round(recentAverage);
+    const earlyRounded = round(earlyAverage);
+    const latestRounded = round(latestReading);
+
+    const recentAboveTarget =
+      targetValue != null &&
+      recentRounded != null &&
+      recentRounded > targetValue;
+
+    const recentAtOrBelowTarget =
+      targetValue != null &&
+      recentRounded != null &&
+      recentRounded <= targetValue;
+
+    const meaningfulChange =
+      change != null &&
+      Math.abs(change) >= 5 &&
       earlyValues.length >= 2 &&
       recentValues.length >= 2;
 
-    let title = "Your blood-pressure pattern is still building";
-    let body =
-      "You have enough recorded readings for Sympto to start describing the pattern, but not enough change to call the recent direction meaningful.";
-
-    if (targetRounded != null && recentAverage != null && recentAverage > targetRounded) {
-      if (strongRecentShift && directionDelta >= 5) {
-        title = "Your recent readings are above target and higher";
-        body =
-          "Across " +
+    if (targetValue != null && recentRounded != null) {
+      if (recentAboveTarget) {
+        const distance = recentRounded - targetValue;
+        insights.push({
+          kind: "trend",
+          tone: "warning",
+          title: "Your readings are above your target",
+          body:
+            "Your recent average is " +
+            recentRounded +
+            " mmHg, which is " +
+            distance +
+            " mmHg above your " +
+            targetValue +
+            " mmHg target.",
+          evidence:
+            "Recent average " +
+            recentRounded +
+            " mmHg · Target " +
+            targetValue +
+            " mmHg" +
+            (latestRounded != null ? " · Latest " + latestRounded + " mmHg" : ""),
+        });
+      } else if (recentAtOrBelowTarget) {
+        const margin = targetValue - recentRounded;
+        insights.push({
+          kind: "trend",
+          tone: "info",
+          title: "Your readings are within your target",
+          body:
+            "Your recent average is " +
+            recentRounded +
+            " mmHg, which is " +
+            margin +
+            " mmHg below your " +
+            targetValue +
+            " mmHg target.",
+          evidence:
+            "Recent average " +
+            recentRounded +
+            " mmHg · Target " +
+            targetValue +
+            " mmHg" +
+            (latestRounded != null ? " · Latest " + latestRounded + " mmHg" : ""),
+        });
+      }
+    } else if (recentRounded != null) {
+      insights.push({
+        kind: "trend",
+        tone: "info",
+        title: "Your recent readings",
+        body:
+          "Your recent average systolic reading is " +
+          recentRounded +
+          " mmHg across " +
           recordedDays +
-          " recorded days in this " +
-          trendWindowLabel +
-          " window, your recent daily average was " +
-          (round(recentAverage) ?? 0) +
-          " mmHg, compared with " +
-          (round(earlyAverage) ?? 0) +
-          " mmHg earlier. Your recent average is also above your " +
-          targetRounded +
-          " mmHg target.";
-      } else if (strongRecentShift && directionDelta <= -5) {
-        title = "Your readings remain above target, but are lower recently";
-        body =
-          "Your recent daily average was " +
-          (round(recentAverage) ?? 0) +
-          " mmHg versus " +
-          (round(earlyAverage) ?? 0) +
-          " mmHg earlier. The direction is improving in your recorded data, although the recent average remains above your " +
-          targetRounded +
-          " mmHg target.";
-      } else {
-        title = "Your recent readings are above your target";
-        body =
-          "Your recent daily average is " +
-          (round(recentAverage) ?? 0) +
-          " mmHg against a " +
-          targetRounded +
-          " mmHg target. Keep recording readings so Sympto can distinguish a persistent pattern from short-term variation.";
-      }
-    } else if (targetRounded != null && recentAverage != null && recentAverage <= targetRounded) {
-      if (strongRecentShift && directionDelta >= 5) {
-        title = "Your recent readings are moving closer to your upper limit";
-        body =
-          "Your recent daily average was " +
-          (round(recentAverage) ?? 0) +
-          " mmHg, up from " +
-          (round(earlyAverage) ?? 0) +
-          " mmHg earlier, but it is still at or below your " +
-          targetRounded +
-          " mmHg target. Keep tracking the next readings.";
-      } else if (strongRecentShift && directionDelta <= -5) {
-        title = "Your recent readings are lower and within target";
-        body =
-          "Your recent daily average was " +
-          (round(recentAverage) ?? 0) +
-          " mmHg, down from " +
-          (round(earlyAverage) ?? 0) +
-          " mmHg earlier, and remains at or below your " +
-          targetRounded +
-          " mmHg target.";
-      } else {
-        title = "Your recent readings are within your target";
-        body =
-          "Your recent daily average is " +
-          (round(recentAverage) ?? 0) +
-          " mmHg, at or below your " +
-          targetRounded +
-          " mmHg target. Keep recording consistently so Sympto can show whether this holds over time.";
-      }
-    } else if (strongRecentShift && directionDelta >= 5) {
-      title = "Your recent readings are higher than earlier";
-      body =
-        "Your recent daily average was " +
-        (round(recentAverage) ?? 0) +
-        " mmHg versus " +
-        (round(earlyAverage) ?? 0) +
-        " mmHg earlier in the record. This is a change in your recorded readings, so keep tracking to see whether it continues.";
-    } else if (strongRecentShift && directionDelta <= -5) {
-      title = "Your recent readings are lower than earlier";
-      body =
-        "Your recent daily average was " +
-        (round(recentAverage) ?? 0) +
-        " mmHg versus " +
-        (round(earlyAverage) ?? 0) +
-        " mmHg earlier in the record. Keep tracking to see whether the lower pattern continues.";
-    } else if (earlyAverage != null && recentAverage != null) {
-      title = "Your readings are relatively stable";
-      body =
-        "Your recent daily average is " +
-        (round(recentAverage) ?? 0) +
-        " mmHg versus " +
-        (round(earlyAverage) ?? 0) +
-        " mmHg earlier. The difference is small enough that Sympto is treating the pattern as relatively stable for now.";
+          " recorded days.",
+        evidence: latestRounded != null ? "Latest " + latestRounded + " mmHg" : undefined,
+      });
     }
 
-    const evidenceParts = [
-      trendWindowLabel + " · " + recordedDays + " recorded days",
-      "Overall average " + averageRounded + " mmHg",
-      latestRounded != null ? "Latest day " + latestRounded + " mmHg" : null,
-      targetRounded != null ? "Target " + targetRounded + " mmHg" : null,
-      targetRate != null ? "At target " + targetDays + "/" + recordedDays + " days (" + targetRate + "%)" : null,
-      strongRecentShift && recentAverage != null && earlyAverage != null
-        ? "Recent vs earlier " + (round(recentAverage) ?? 0) + " vs " + (round(earlyAverage) ?? 0) + " mmHg"
-        : null,
-    ].filter((item): item is string => Boolean(item));
-
-    insights.push({
-      kind: "trend",
-      tone:
-        targetRounded != null && recentAverage != null && recentAverage > targetRounded
-          ? "warning"
-          : "info",
-      title,
-      body,
-      evidence: evidenceParts.join(" · "),
-    });
+    if (meaningfulChange && change != null && recentRounded != null && earlyRounded != null) {
+      const absoluteChange = Math.abs(round(change) ?? 0);
+      const direction = change > 0 ? "higher" : "lower";
+      insights.push({
+        kind: "trend",
+        tone: change > 0 ? "warning" : "info",
+        title: change > 0 ? "Your readings have been higher lately" : "Your readings have been lower lately",
+        body:
+          "Your recent average is " +
+          absoluteChange +
+          " mmHg " +
+          direction +
+          " than your earlier average.",
+        evidence:
+          "Earlier " +
+          earlyRounded +
+          " mmHg · Recent " +
+          recentRounded +
+          " mmHg",
+      });
+    }
   } else {
+    const historicalDays = dailyAll.size;
     insights.push({
       kind: "data",
       tone: "info",
-      title: "More readings will make this pattern clearer",
-      body: "Keep recording your blood pressure regularly. Sympto needs more observations before it can identify a meaningful pattern.",
-      evidence: dailyAll.size
-        ? dailyAll.size + " recorded days are available historically; more consistent recent readings will make the comparison stronger."
-        : "No historical systolic readings are available yet.",
+      title: historicalDays === 0 ? "Start tracking your blood pressure" : "Add a few more readings",
+      body:
+        historicalDays === 0
+          ? "Record your blood pressure in Health Vitals and Sympto will start showing your personal patterns here."
+          : "You have " +
+            historicalDays +
+            " recorded day" +
+            (historicalDays === 1 ? "" : "s") +
+            " so far. A few more readings will make the pattern easier to understand.",
+      evidence: historicalDays === 0 ? undefined : historicalDays + " day" + (historicalDays === 1 ? "" : "s") + " recorded",
     });
   }
 
@@ -512,7 +492,8 @@ export function buildBloodPressureInsights({
 
   const unique = new Map<string, BloodPressureInsight>();
   for (const insight of insights) {
-    if (!unique.has(insight.kind)) unique.set(insight.kind, insight);
+    const key = insight.kind + "::" + insight.title;
+    if (!unique.has(key)) unique.set(key, insight);
   }
   return [...unique.values()].slice(0, 5);
 }
