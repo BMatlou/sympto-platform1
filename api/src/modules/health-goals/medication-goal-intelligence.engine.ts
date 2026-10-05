@@ -173,8 +173,19 @@ export function calculateMedicationGoalIntelligence(
   let projectedFinalAdherenceAtCurrentPace: number | null = null;
 
   if (futureScheduledDoses != null) {
-    const totalPlannedDoses =
-      input.journeyAdherence.expectedScheduledDoses + futureScheduledDoses;
+    const todayBucket = input.dailyBuckets.find((day) => day.day === today);
+    const todayScheduledDoses = Math.max(0, Number(todayBucket?.expectedDoses) || 0);
+
+    // Keep the projection aligned with the existing medication-card journey
+    // calculation: the current day's scheduled doses are not added to the
+    // remaining goal denominator twice, while any doses already taken today
+    // remain part of the actual taken numerator.
+    const totalPlannedDoses = Math.max(
+      0,
+      input.journeyAdherence.expectedScheduledDoses -
+        todayScheduledDoses +
+        futureScheduledDoses,
+    );
 
     const targetTotalDoses = Math.ceil((totalPlannedDoses * target) / 100);
     additionalDosesNeeded = Math.max(
