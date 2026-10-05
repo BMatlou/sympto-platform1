@@ -6,19 +6,6 @@ import { ClipboardPlus, Mic, Save, Sparkles, X } from "lucide-react";
 import { useAuth } from "@/hooks/use-auth";
 import { healthJournalService, type TalkToSymptoResult } from "@/services/health-journal.service";
 
-type SpeechRecognitionLike = {
-  lang: string;
-  continuous: boolean;
-  interimResults: boolean;
-  start: () => void;
-  stop: () => void;
-  abort?: () => void;
-  onstart: (() => void) | null;
-  onend: (() => void) | null;
-  onerror: ((event: { error?: string }) => void) | null;
-  onresult: ((event: { results: ArrayLike<{ 0: { transcript: string } }> }) => void) | null;
-};
-
 function human(value: string | null | undefined) {
   return String(value ?? "").replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
 }
@@ -30,8 +17,12 @@ export default function AIHealthHelperFab() {
   const [message, setMessage] = useState("");
   const [talkResult, setTalkResult] = useState<TalkToSymptoResult | null>(null);
   const [processing, setProcessing] = useState(false);
+  const [transcribing, setTranscribing] = useState(false);
   const [processError, setProcessError] = useState("");
-  const recognitionRef = useRef<SpeechRecognitionLike | null>(null);
+  const recorderRef = useRef<MediaRecorder | null>(null);
+  const streamRef = useRef<MediaStream | null>(null);
+  const audioChunksRef = useRef<Blob[]>([]);
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -44,9 +35,11 @@ export default function AIHealthHelperFab() {
 
     return () => {
       window.removeEventListener("keydown", onKeyDown);
-      recognitionRef.current?.abort?.();
-      recognitionRef.current?.stop();
-      recognitionRef.current = null;
+      recorderRef.current?.stop();
+      recorderRef.current = null;
+      streamRef.current?.getTracks().forEach((track) => track.stop());
+      streamRef.current = null;
+      audioChunksRef.current = [];
     };
   }, []);
 
@@ -58,10 +51,13 @@ export default function AIHealthHelperFab() {
   }, [open]);
 
   const closeHelper = () => {
-    recognitionRef.current?.abort?.();
-    recognitionRef.current?.stop();
-    recognitionRef.current = null;
+    recorderRef.current?.stop();
+    recorderRef.current = null;
+    streamRef.current?.getTracks().forEach((track) => track.stop());
+    streamRef.current = null;
+    audioChunksRef.current = [];
     setListening(false);
+    setTranscribing(false);
     setOpen(false);
   };
 
@@ -70,69 +66,172 @@ export default function AIHealthHelperFab() {
     setMessage("");
     setTalkResult(null);
     setProcessing(false);
+    setTranscribing(false);
     setProcessError("");
   };
 
-  const stopListening = () => {
-    recognitionRef.current?.stop();
-    setListening(false);
+  const transcribeAudio = async (file: File) => {
+    if (!user?.id || transcribing) return;
+
+    setTranscribing(true);
+    setProcessError("");
+
+    try {
+      const transcript = await healthJournalService.transcribeTalkToSympto(file);
+      setMessage((current) =>
+        current.trim() ? `${current.trim()} ${transcript}` : transcript,
+      );
+      setTalkResult(null);
+    } catch (error: any) {
+      setProcessError(
+        error?.response?.data?.message ||
+          error?.message ||
+          "Sympto could not understand that recording. Please try again or type your update.",
+      );
+    } finally {
+      setTranscribing(false);
+    }
   };
 
-  const startListening = () => {
-    if (typeof window === "undefined") return;
+  const handleAudioFile = (file: File | undefined) => {
+    if (!file) return;
 
-    const speechWindow = window as typeof window & {
-      SpeechRecognition?: new () => SpeechRecognitionLike;
-      webkitSpeechRecognition?: new () => SpeechRecognitionLike;
-    };
-
-    const Recognition =
-      speechWindow.SpeechRecognition || speechWindow.webkitSpeechRecognition;
-
-    if (!Recognition) {
-      setProcessError("Voice input is not available on this device. Type your update below instead.");
+    if (!file.type.startsWith("audio/")) {
+      setProcessError("Please choose or record an audio file.");
       return;
     }
 
-    recognitionRef.current?.abort?.();
+    if (file.size > 15 * 1024 * 1024) {
+      setProcessError("That recording is too large. Please keep the voice note under 15 MB.");
+      return;
+    }
 
-    const recognition = new Recognition();
-    recognition.lang = "en-ZA";
-    recognition.continuous = false;
-    recognition.interimResults = false;
+    void transcribeAudio(file);
+  };
 
-    recognition.onstart = () => {
+  const stopListening = () => {
+    const recorder = recorderRef.current;
+
+    if (!recorder || recorder.state === "inactive") {
+      setListening(false);
+      return;
+    }
+
+    recorder.stop();
+  };
+
+  const startListening = async () => {
+    if (typeof window === "undefined" || processing || transcribing) return;
+
+    setProcessError("");
+
+    // Native mobile capture is the fallback for LAN HTTP testing and browsers
+    // that do not expose getUserMedia/MediaRecorder. The resulting audio file
+    // still follows the same server transcription + Talk to Sympto pipeline.
+    if (
+      !window.isSecureContext ||
+      !navigator.mediaDevices?.getUserMedia ||
+      typeof MediaRecorder === "undefined"
+    ) {
+      fileInputRef.current?.click();
+      return;
+    }
+
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({
+        audio: {
+          echoCancellation: true,
+          noiseSuppression: true,
+          autoGainControl: true,
+        },
+      });
+
+      streamRef.current = stream;
+      audioChunksRef.current = [];
+
+      const mimeTypes = [
+        "audio/webm;codecs=opus",
+        "audio/webm",
+        "audio/mp4",
+        "audio/ogg;codecs=opus",
+      ];
+
+      const mimeType = mimeTypes.find((type) =>
+        MediaRecorder.isTypeSupported(type),
+      );
+
+      const recorder = mimeType
+        ? new MediaRecorder(stream, { mimeType })
+        : new MediaRecorder(stream);
+
+      recorderRef.current = recorder;
+
+      recorder.ondataavailable = (event) => {
+        if (event.data.size > 0) {
+          audioChunksRef.current.push(event.data);
+        }
+      };
+
+      recorder.onerror = () => {
+        setListening(false);
+        setProcessError("I couldn't record your voice. Please try again.");
+        stream.getTracks().forEach((track) => track.stop());
+        recorderRef.current = null;
+        streamRef.current = null;
+        audioChunksRef.current = [];
+      };
+
+      recorder.onstop = () => {
+        const blob = new Blob(audioChunksRef.current, {
+          type: recorder.mimeType || "audio/webm",
+        });
+
+        const extension =
+          blob.type.includes("mp4") ? "m4a" :
+          blob.type.includes("ogg") ? "ogg" :
+          "webm";
+
+        const file = new File(
+          [blob],
+          `sympto-voice-${Date.now()}.${extension}`,
+          { type: blob.type || "audio/webm" },
+        );
+
+        stream.getTracks().forEach((track) => track.stop());
+        recorderRef.current = null;
+        streamRef.current = null;
+        audioChunksRef.current = [];
+
+        setListening(false);
+        if (file.size > 0) {
+          void transcribeAudio(file);
+        }
+      };
+
+      recorder.start();
       setListening(true);
-      setProcessError("");
-    };
 
-    recognition.onend = () => {
+      window.setTimeout(() => {
+        if (recorderRef.current === recorder && recorder.state === "recording") {
+          recorder.stop();
+        }
+      }, 60_000);
+    } catch (error: any) {
       setListening(false);
-      recognitionRef.current = null;
-    };
 
-    recognition.onerror = () => {
-      setListening(false);
-      recognitionRef.current = null;
-      setProcessError("I couldn't capture your voice. Please try again or type the update below.");
-    };
-
-    recognition.onresult = (event) => {
-      const spoken = Array.from(event.results)
-        .map((result) => result[0]?.transcript ?? "")
-        .join(" ")
-        .trim();
-
-      if (!spoken) return;
-
-      setMessage(spoken);
-      setTalkResult(null);
-      setProcessError("");
-      setListening(false);
-    };
-
-    recognitionRef.current = recognition;
-    recognition.start();
+      if (error?.name === "NotAllowedError") {
+        setProcessError(
+          "Microphone access was blocked. Allow microphone access for Sympto and try again.",
+        );
+      } else if (error?.name === "NotFoundError") {
+        setProcessError("No microphone was found on this device.");
+      } else {
+        setProcessError(
+          "Sympto could not start the microphone. You can use your phone's audio recorder instead.",
+        );
+        fileInputRef.current?.click();
+      }
+    }
   };
 
   const analyzeWithSympto = async () => {
@@ -254,12 +353,28 @@ export default function AIHealthHelperFab() {
                 <button
                   type="button"
                   onClick={listening ? stopListening : startListening}
-                  disabled={processing}
+                  disabled={processing || transcribing}
                   className="mt-5 inline-flex min-h-14 min-w-44 items-center justify-center gap-2 rounded-full bg-[#24c1c4] px-6 text-sm font-extrabold text-slate-950 shadow-lg transition hover:bg-[#5edadd] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-white/40 disabled:cursor-not-allowed disabled:opacity-60"
                 >
                   <Mic className="h-5 w-5" aria-hidden="true" />
-                  {listening ? "Stop listening" : "Speak to Sympto"}
+                  {transcribing
+                    ? "Transcribing…"
+                    : listening
+                      ? "Stop listening"
+                      : "Speak to Sympto"}
                 </button>
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept="audio/*"
+                  capture="user"
+                  className="hidden"
+                  onChange={(event) => {
+                    const file = event.target.files?.[0];
+                    event.target.value = "";
+                    handleAudioFile(file);
+                  }}
+                />
               </div>
 
               <div className="mt-4">
@@ -296,7 +411,8 @@ export default function AIHealthHelperFab() {
                 <button
                   type="button"
                   onClick={analyzeWithSympto}
-                  disabled={processing || !user?.id}
+,
+                  disabled={processing || transcribing || !user?.id},
                   className="mt-4 flex min-h-14 w-full items-center justify-center gap-2 rounded-2xl bg-[#0b2d54] px-5 text-base font-extrabold text-white transition hover:bg-[#082544] disabled:cursor-not-allowed disabled:opacity-60 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[#24c1c4]/30"
                 >
                   <Sparkles className="h-5 w-5" aria-hidden="true" />
