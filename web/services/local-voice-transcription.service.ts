@@ -10,7 +10,7 @@ type ProgressInfo = {
 };
 
 type Transcriber = (
-  audio: Float32Array,
+  audio: string | Float32Array,
   options?: {
     language?: string;
     task?: string;
@@ -71,21 +71,14 @@ export async function transcribeLocalVoice(
   const objectUrl = URL.createObjectURL(file);
 
   try {
-    const { load_audio } = await import("@huggingface/transformers");
-    const audio = await load_audio(objectUrl, SAMPLE_RATE);
-
-    if (!audio?.length) {
-      throw new Error("Sympto could not decode that recording.");
-    }
-
-    const maxSamples = SAMPLE_RATE * MAX_SECONDS;
-    const input = audio.length > maxSamples ? audio.slice(0, maxSamples) : audio;
-
+    // Transformers.js can decode a browser-supported audio URL directly.
+    // This avoids depending on an internal audio helper that is not part of
+    // the installed package's public TypeScript exports.
     onProgress?.(100);
 
     const transcriber = await getTranscriber(onProgress);
 
-    const result = await transcriber(input, {
+    const result = await transcriber(objectUrl, {
       language: "en",
       task: "transcribe",
       chunk_length_s: 20,
