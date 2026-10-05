@@ -248,7 +248,7 @@ export default function TodayMedicationActions({ medications, goal: suppliedGoal
   }, [finalGoal?.id]);
 
   const journeyInsight = medicationInsight?.analysis?.journeyAdherence;
-  const goalIntelligence = medicationInsight?.analysis?.goalIntelligence ?? null;
+  const clinicalIntelligence = medicationInsight?.analysis?.clinicalIntelligence ?? null;
 
   useEffect(() => {
     if (!finalGoal?.id || !journeyInsight) return;
@@ -277,7 +277,7 @@ export default function TodayMedicationActions({ medications, goal: suppliedGoal
 
   // Never render a stale server-side zero when the parent card already has a positive count.
   const hasMeaningfulMedicationInsight =
-    Boolean(goalIntelligence) &&
+    Boolean(clinicalIntelligence) &&
     insightExpectedScheduledDoses > 0;
 
 
@@ -354,73 +354,79 @@ export default function TodayMedicationActions({ medications, goal: suppliedGoal
         <section className="mx-3.5 mb-3.5 rounded-[22px] border border-[#dce9ee] bg-[#f8fbfb] p-4 text-[#0b2d54] sm:mx-4 sm:mb-4 sm:p-5">
           <div>
             <p className="text-[9px] font-black uppercase tracking-[.15em] text-[#0b7b80]">Sympto insight</p>
-            <h3 className="mt-1 text-base font-black tracking-[-.025em] text-[#0b2d54]">Medication goal intelligence</h3>
+            <h3 className="mt-1 text-base font-black tracking-[-.025em] text-[#0b2d54]">Clinical intelligence</h3>
             <p className="mt-1 text-[10px] leading-5 text-[#7c8e9b]">
-              Your progress, adherence pattern, and what the remaining goal journey requires.
+              Longitudinal analysis of adherence, timing friction, and linked health-goal behavior.
             </p>
           </div>
+
+          {clinicalIntelligence?.headline ? (
+            <div className="mt-3 rounded-[18px] border border-[#cfe8e6] bg-[#f4fbfb] px-3.5 py-3.5 ring-1 ring-[#dcefed] sm:px-4 sm:py-4">
+              <p className="text-[8px] font-black uppercase tracking-[.13em] text-[#0b7b80]">Primary signal</p>
+              <p className="mt-1.5 text-[11px] font-black leading-5 text-[#0b2d54]">
+                {String(clinicalIntelligence.headline)}
+              </p>
+            </div>
+          ) : null}
 
           <div className="mt-3 space-y-2.5">
             <div className="rounded-[18px] border border-[#d9e4ee] bg-white px-3.5 py-3.5 ring-1 ring-[#e8eef3] sm:px-4 sm:py-4">
               <div className="flex items-start justify-between gap-3">
                 <div>
-                  <p className="text-[11px] font-black leading-5 text-[#0b2d54]">Goal performance</p>
+                  <p className="text-[11px] font-black leading-5 text-[#0b2d54]">Trajectory</p>
                   <p className="mt-1 text-[11px] leading-5 text-[#5f7080]">
-                    {insightTakenDoses} of {insightExpectedScheduledDoses} scheduled doses taken · {Math.round(insightAdherencePercent)}% adherence.
+                    {Number(clinicalIntelligence?.trajectory?.takenDoses ?? insightTakenDoses)} of {Number(clinicalIntelligence?.trajectory?.expectedDosesToDate ?? insightExpectedScheduledDoses)} doses taken · {Math.round(Number(clinicalIntelligence?.trajectory?.adherencePercent ?? insightAdherencePercent))}% adherence.
                   </p>
                 </div>
                 <div className="shrink-0 text-right">
-                  <p className="text-[11px] font-black text-[#0b7b80]">{Math.round(Number(goalIntelligence?.targetAdherencePercent ?? targetAdherence))}% goal</p>
-                  {Number.isFinite(Number(goalIntelligence?.gapPercentagePoints)) && Number(goalIntelligence?.gapPercentagePoints) !== 0 ? (
-                    <p className="mt-0.5 text-[9px] font-bold text-[#b05c2b]">
-                      {Math.round(Math.abs(Number(goalIntelligence?.gapPercentagePoints)))} pp {Number(goalIntelligence?.gapPercentagePoints) > 0 ? "below" : "above"}
-                    </p>
-                  ) : null}
+                  <p className="text-[10px] font-black text-[#0b7b80]">{Math.round(Number(clinicalIntelligence?.trajectory?.targetAdherencePercent ?? targetAdherence))}% target</p>
+                  <p className="mt-0.5 text-[8px] font-bold text-[#91a0ae]">
+                    {Math.round(Math.abs(Number(clinicalIntelligence?.trajectory?.variancePercentagePoints ?? 0)))} pp {String(clinicalIntelligence?.trajectory?.varianceType ?? "") === "BELOW_TARGET" ? "below" : String(clinicalIntelligence?.trajectory?.varianceType ?? "") === "ABOVE_TARGET" ? "above" : "on"} target
+                  </p>
                 </div>
               </div>
               <p className="mt-2 text-[9px] font-semibold leading-4 text-[#8a99a6]">
-                {Number(goalIntelligence?.takenDoses ?? insightTakenDoses)} taken · {Number(goalIntelligence?.skippedDoses ?? 0)} skipped · {Number(goalIntelligence?.unrecordedDoses ?? 0)} not recorded.
+                {Number(clinicalIntelligence?.trajectory?.elapsedLifecycleDays ?? 0)} elapsed lifecycle days · {Number(clinicalIntelligence?.trajectory?.dailyFrequency ?? totalRequiredDosesPerDay)} scheduled doses/day.
               </p>
+              {Number(clinicalIntelligence?.trajectory?.remainingDosesNeededForTarget ?? 0) > 0 ? (
+                <p className="mt-1 text-[9px] font-bold leading-4 text-[#b05c2b]">
+                  {Number(clinicalIntelligence.trajectory.remainingDosesNeededForTarget)} additional taken doses are required across the goal lifetime to reach target adherence.
+                </p>
+              ) : null}
             </div>
 
-            {goalIntelligence?.trend?.state && goalIntelligence.trend.state !== "INSUFFICIENT_DATA" ? (
-              <div className="rounded-[18px] border border-[#d9e4ee] bg-white px-3.5 py-3.5 ring-1 ring-[#e8eef3] sm:px-4 sm:py-4">
-                <p className="text-[11px] font-black leading-5 text-[#0b2d54]">Recent pattern</p>
-                <p className="mt-1 text-[10px] leading-5 text-[#5f7080]">
-                  {goalIntelligence.trend.state === "IMPROVING"
-                    ? "Adherence has improved."
-                    : goalIntelligence.trend.state === "DECLINING"
-                      ? "Adherence has declined."
-                      : goalIntelligence.trend.state === "INCONSISTENT"
-                        ? "Adherence has been inconsistent."
-                        : "Adherence has remained broadly stable."}
-                  {Number.isFinite(Number(goalIntelligence.trend.baselinePercent)) && Number.isFinite(Number(goalIntelligence.trend.recentPercent))
-                    ? ` Earlier ${Math.round(Number(goalIntelligence.trend.baselinePercent))}% · recent ${Math.round(Number(goalIntelligence.trend.recentPercent))}%${Number.isFinite(Number(goalIntelligence.trend.deltaPercentagePoints)) ? ` · ${Number(goalIntelligence.trend.deltaPercentagePoints) > 0 ? "+" : ""}${Math.round(Number(goalIntelligence.trend.deltaPercentagePoints))} pp` : ""}.`
-                    : ""}
-                </p>
-                <p className="mt-1.5 text-[9px] font-semibold leading-4 text-[#8a99a6]">
-                  {Number(goalIntelligence?.completedDays ?? 0)} full-dose days · {Number(goalIntelligence?.partialDays ?? 0)} partial days · {Number(goalIntelligence?.missedDays ?? 0)} days with no recorded dose.
+            {clinicalIntelligence?.chronologicalInterference ? (
+              <div className="rounded-[18px] border border-[#eadfd7] bg-[#fffaf6] px-3.5 py-3.5 ring-1 ring-[#f0e5dd] sm:px-4 sm:py-4">
+                <p className="text-[8px] font-black uppercase tracking-[.13em] text-[#9a633e]">Chronological interference</p>
+                <p className="mt-1.5 text-[11px] font-black leading-5 text-[#0b2d54]">
+                  {String(clinicalIntelligence.chronologicalInterference.statement)}
                 </p>
               </div>
             ) : null}
 
-            {goalIntelligence?.insight ? (
-              <div className="rounded-[18px] border border-[#cfe8e6] bg-[#f4fbfb] px-3.5 py-3.5 ring-1 ring-[#dcefed] sm:px-4 sm:py-4">
-                <p className="text-[8px] font-black uppercase tracking-[.13em] text-[#0b7b80]">Goal trajectory</p>
-                <p className="mt-1.5 text-[11px] font-black leading-5 text-[#0b2d54]">
-                  {String(goalIntelligence.insight)}
-                </p>
-                {Number.isFinite(Number(goalIntelligence?.additionalDosesNeeded)) && Number(goalIntelligence?.futureScheduledDoses ?? 0) > 0 ? (
-                  <p className="mt-1.5 text-[9px] font-semibold leading-4 text-[#5f7080]">
-                    {Number(goalIntelligence.additionalDosesNeeded)} more taken dose{Number(goalIntelligence.additionalDosesNeeded) === 1 ? "" : "s"} are required across {Number(goalIntelligence.futureScheduledDoses)} remaining scheduled doses.
-                  </p>
-                ) : null}
-                {Number.isFinite(Number(goalIntelligence?.projectedFinalAdherenceAtCurrentPace)) ? (
-                  <p className="mt-1 text-[8px] font-semibold leading-4 text-[#8a99a6]">
-                    At the current {Math.round(Number(goalIntelligence.currentAdherencePercent))}% adherence pace, projected final adherence is about {Math.round(Number(goalIntelligence.projectedFinalAdherenceAtCurrentPace))}%.
-                  </p>
-                ) : null}
-              </div>
+            {Array.isArray(clinicalIntelligence?.crossGoalAssociations) ? (
+              clinicalIntelligence.crossGoalAssociations
+                .filter((item: any) => item?.meaningful === true && item?.statement)
+                .map((item: any) => (
+                  <div key={String(item.goalId)} className="rounded-[18px] border border-[#d9e4ee] bg-white px-3.5 py-3.5 ring-1 ring-[#e8eef3] sm:px-4 sm:py-4">
+                    <p className="text-[8px] font-black uppercase tracking-[.13em] text-[#0b7b80]">Behavioral association</p>
+                    <p className="mt-1.5 text-[11px] font-black leading-5 text-[#0b2d54]">{String(item.statement)}</p>
+                    {item.latestJournalValue != null && item.latestJournalDate ? (
+                      <p className="mt-1 text-[8px] font-semibold leading-4 text-[#8a99a6]">
+                        Latest linked observation: {String(item.latestJournalValue)}{item.unit ? ` ${String(item.unit)}` : ""} · {String(item.latestJournalDate)}.
+                      </p>
+                    ) : null}
+                  </div>
+                ))
+            ) : null}
+
+            {Array.isArray(clinicalIntelligence?.behavioralClusters) ? (
+              clinicalIntelligence.behavioralClusters.map((cluster: any, index: number) => (
+                <div key={`cluster-${index}`} className="rounded-[18px] border border-[#cfe8e6] bg-[#f4fbfb] px-3.5 py-3.5 ring-1 ring-[#dcefed] sm:px-4 sm:py-4">
+                  <p className="text-[8px] font-black uppercase tracking-[.13em] text-[#0b7b80]">Cross-goal cluster</p>
+                  <p className="mt-1.5 text-[11px] font-black leading-5 text-[#0b2d54]">{String(cluster.statement)}</p>
+                </div>
+              ))
             ) : null}
           </div>
         </section>
