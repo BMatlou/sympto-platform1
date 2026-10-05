@@ -456,6 +456,7 @@ export default function TodayPage() {
                   key={`medication-goal-${String(item.goal?.id ?? patientMedicationId(item.medication) ?? index)}`}
                   medications={[item.medication]}
                   goal={item.goal}
+                  supportingGoals={activeGoalsArray.filter((goal: any) => String(goal?.id ?? "") !== String(item.goal?.id ?? ""))}
                   onUpdated={reload}
                 />
               ) : (
