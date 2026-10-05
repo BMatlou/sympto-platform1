@@ -732,7 +732,12 @@ export class MedicationInsightService {
         // Explicit goal-scoped events belong only to their originating goal.
         // Backfilled journal/check-in events without a goal prefix remain valid
         // contextual evidence for the single active goal in that metric family.
-        return !sourceId.startsWith('goal-') || sourceId.startsWith(goalPrefix);
+        return (
+          !sourceId.startsWith('goal-') ||
+          sourceId === relation.healthGoalId ||
+          sourceId.startsWith(goalPrefix) ||
+          sourceId.startsWith(relation.healthGoalId + ':')
+        );
       });
 
       result.push(...scopedRows);
