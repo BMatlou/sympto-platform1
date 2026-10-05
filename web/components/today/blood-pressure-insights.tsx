@@ -1,6 +1,6 @@
 "use client";
 
-import { Activity, AlertTriangle, BarChart3, Moon, Sparkles } from "lucide-react";
+import { Activity, AlertTriangle, BarChart3, Moon, Sparkles, TrendingDown, TrendingUp } from "lucide-react";
 import { useEffect, useState } from "react";
 import { healthGoalsService } from "@/services/health-goals.service";
 import { healthJournalService } from "@/services/health-journal.service";
@@ -10,10 +10,12 @@ type Props = {
   target: number | null;
 };
 
-const iconFor = (kind: BloodPressureInsight["kind"]) => {
-  if (kind === "time") return BarChart3;
-  if (kind === "sleep") return Moon;
-  if (kind === "exercise") return Activity;
+const iconFor = (insight: BloodPressureInsight) => {
+  if (insight.title.includes("higher lately") || insight.title.includes("above your target")) return TrendingUp;
+  if (insight.title.includes("lower lately") || insight.title.includes("within your target")) return TrendingDown;
+  if (insight.kind === "time") return BarChart3;
+  if (insight.kind === "sleep") return Moon;
+  if (insight.kind === "exercise") return Activity;
   return Sparkles;
 };
 
@@ -85,7 +87,7 @@ export default function BloodPressureInsights({ target }: Props) {
           </span>
           <div>
             <p className="text-[8px] font-black uppercase tracking-[.16em] text-[#0b7b80]">Sympto Insights</p>
-            <p className="mt-0.5 text-[9px] font-semibold text-[#7d8f9c]">Patterns from your recorded health data</p>
+            <p className="mt-0.5 text-[9px] font-semibold text-[#7d8f9c]">What your recent readings show</p>
           </div>
         </div>
       </div>
@@ -97,25 +99,57 @@ export default function BloodPressureInsights({ target }: Props) {
         </div>
       ) : (
         <div className="mt-3 space-y-2">
-          {insights.map((insight) => {
-            const Icon = iconFor(insight.kind);
+          {insights.map((insight, index) => {
+            const Icon = iconFor(insight);
             const warning = insight.tone === "warning";
+            const primary = index === 0;
             return (
               <article
-                key={insight.kind}
-                className={warning ? "rounded-[15px] border border-amber-200 bg-amber-50 p-3" : "rounded-[15px] border border-[#e1ecef] bg-white p-3"}
+                key={insight.kind + "-" + insight.title}
+                className={
+                  warning
+                    ? "rounded-[18px] border border-red-100 bg-red-50/70 p-4"
+                    : primary
+                      ? "rounded-[18px] border border-[#dcebed] bg-white p-4"
+                      : "rounded-[17px] border border-[#e1ecef] bg-white p-3.5"
+                }
               >
-                <div className="flex items-start gap-2.5">
-                  <span className={warning ? "mt-0.5 grid h-7 w-7 shrink-0 place-items-center rounded-lg bg-amber-100 text-amber-800" : "mt-0.5 grid h-7 w-7 shrink-0 place-items-center rounded-lg bg-[#eef8f8] text-[#0b7b80]"}>
+                <div className="flex items-start gap-3">
+                  <span
+                    className={
+                      warning
+                        ? "mt-0.5 grid h-8 w-8 shrink-0 place-items-center rounded-[11px] bg-red-100 text-red-700"
+                        : "mt-0.5 grid h-8 w-8 shrink-0 place-items-center rounded-[11px] bg-[#e8f8f7] text-[#0b7b80]"
+                    }
+                  >
                     {warning ? <AlertTriangle className="h-3.5 w-3.5" /> : <Icon className="h-3.5 w-3.5" />}
                   </span>
-                  <div className="min-w-0">
-                    <p className={warning ? "text-[10px] font-black text-amber-950" : "text-[10px] font-black text-[#0b2d54]"}>{insight.title}</p>
-                    <p className={warning ? "mt-1 text-[10px] leading-5 text-amber-900/85" : "mt-1 text-[10px] leading-5 text-[#6f818d]"}>{insight.body}</p>
+
+                  <div className="min-w-0 flex-1">
+                    <p
+                      className={
+                        warning
+                          ? "text-[11px] font-black tracking-[-.01em] text-red-950"
+                          : "text-[11px] font-black tracking-[-.01em] text-[#0b2d54]"
+                      }
+                    >
+                      {insight.title}
+                    </p>
+                    <p
+                      className={
+                        warning
+                          ? "mt-1 text-[10px] leading-5 text-red-900/80"
+                          : "mt-1 text-[10px] leading-5 text-[#637986]"
+                      }
+                    >
+                      {insight.body}
+                    </p>
+
                     {insight.evidence && (
-                      <p className={warning ? "mt-1.5 text-[8px] font-black uppercase tracking-[.11em] text-amber-800/80" : "mt-1.5 text-[8px] font-black uppercase tracking-[.11em] text-[#91a2ad]"}>
-                        {insight.evidence}
-                      </p>
+                      <div className="mt-3 rounded-[13px] bg-[#f7fbfb] px-3 py-2.5">
+                        <p className="text-[8px] font-black uppercase tracking-[.13em] text-[#8b9aa4]">At a glance</p>
+                        <p className="mt-1 text-[9px] font-bold leading-4 text-[#0b2d54]">{insight.evidence}</p>
+                      </div>
                     )}
                   </div>
                 </div>
@@ -125,9 +159,8 @@ export default function BloodPressureInsights({ target }: Props) {
         </div>
       )}
 
-      <p className="mt-3 flex items-start gap-1.5 text-[8px] leading-4 text-[#97a5ae]">
-        <Sparkles className="mt-0.5 h-2.5 w-2.5 shrink-0" />
-        These are observations from your records, not a diagnosis or proof that one factor caused another.
+      <p className="mt-3 text-[8px] leading-4 text-[#97a5ae]">
+        Sympto highlights patterns in the readings you record. It does not diagnose a condition.
       </p>
     </section>
   );
