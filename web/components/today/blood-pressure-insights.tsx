@@ -5,11 +5,20 @@ import { useEffect, useState } from "react";
 import { healthGoalsService } from "@/services/health-goals.service";
 import { canonicalExerciseDayTotals } from "@/lib/exercise-metric";
 
+type BloodPressureEvent = {
+  id?: string;
+  loggedValue: number;
+  occurredAt: string;
+  source?: string | null;
+  sourceId?: string | null;
+};
+
 type Props = {
   target: number | null;
   exerciseGoalTarget?: number | null;
   exerciseGoalTitle?: string | null;
   exerciseGoalFrequency?: string | null;
+  bloodPressureEvents: BloodPressureEvent[] | null;
 };
 
 type InsightState = {
@@ -87,9 +96,10 @@ export default function BloodPressureInsights({
   exerciseGoalTarget = null,
   exerciseGoalTitle = "Exercise",
   exerciseGoalFrequency = "WEEKLY",
+  bloodPressureEvents,
 }: Props) {
   const [state, setState] = useState<InsightState>({
-    loading: true,
+    loading: bloodPressureEvents === null,
     title: "",
     body: "",
     tone: "info",
@@ -111,29 +121,24 @@ export default function BloodPressureInsights({
       try {
         const now = new Date();
         const from = new Date(0);
-        const [bloodPressure, exercise] = await Promise.all([
-          healthGoalsService.getMetricEvents(
-            "BLOOD_PRESSURE",
-            "blood_pressure.systolic",
-            from,
-            now,
-          ),
-          healthGoalsService.getMetricEvents(
-            "EXERCISE",
-            "exercise.minutes",
-            from,
-            now,
-          ),
-        ]);
+        const exercise = await healthGoalsService.getMetricEvents(
+          "EXERCISE",
+          "exercise.minutes",
+          from,
+          now,
+        );
 
         if (!active) return;
 
-        const bpEvents = (bloodPressure.events ?? [])
-          .map((event: any) => ({
-            value: numberOrNull(event?.loggedValue),
-            occurredAt: String(event?.occurredAt ?? ""),
+        // IMPORTANT: BP events come directly from TodaySupportedGoalCard.
+        // That component already applies the goal.createdAt -> now challenge window.
+        // Never fetch BP history again here, otherwise baseline/historical readings can leak into Insights.
+        const bpEvents = (bloodPressureEvents ?? [])
+          .map((event) => ({
+            value: numberOrNull(event.loggedValue),
+            occurredAt: String(event.occurredAt ?? ""),
           }))
-          .filter((event: any) => event.value != null && event.occurredAt);
+          .filter((event) => event.value != null && event.occurredAt);
 
         const latestByDay = new Map<string, { value: number; at: number }>();
         const dailyValues = new Map<string, number[]>();
@@ -153,17 +158,26 @@ export default function BloodPressureInsights({
           dailyValues.set(day, list);
         }
 
-        const dailyAverage = new Map(
-          [...dailyValues.entries()].map(([day, values]) => [day, average(values) ?? 0] as const),
+        // Match the Goal Card exactly: one latest systolic value per active challenge day.
+        const dailyLatest = new Map(
+          [...latestByDay.entries()].map(([day, item]) => [day, item.value] as const),
         );
 
-        const orderedDays = [...dailyAverage.keys()].sort();
+        const orderedDays = [...dailyLatest.keys()].sort();
+        const recordedDays = orderedDays.length;
         const recentDays = orderedDays.slice(-7);
         const earlierDays = orderedDays.slice(-14, -7);
-        const bpAverage = round(average(recentDays.map((day) => dailyAverage.get(day) ?? 0)));
-        const earlierAverage = round(average(earlierDays.map((day) => dailyAverage.get(day) ?? 0)));
         const latestDay = orderedDays.at(-1);
-        const latestBp = latestDay ? round(latestByDay.get(latestDay)?.value ?? null) : null;
+        const latestBp = latestDay ? round(dailyLatest.get(latestDay) ?? null) : null;
+
+        // Do not manufacture a trend or average from one/two active challenge days.
+        const incompleteChallengeData = recordedDays < 3;
+        const bpAverage = incompleteChallengeData
+          ? null
+          : round(average(recentDays.map((day) => dailyLatest.get(day) ?? 0)));
+        const earlierAverage = incompleteChallengeData || earlierDays.length < 2
+          ? null
+          : round(average(earlierDays.map((day) => dailyLatest.get(day) ?? 0)));
         const bpChange = bpAverage != null && earlierAverage != null
           ? bpAverage - earlierAverage
           : null;
@@ -242,7 +256,37 @@ export default function BloodPressureInsights({
         let tone: "info" | "warning" = "info";
         let pattern: InsightState["pattern"] = "BUILDING";
 
-        if (numericExerciseTarget != null && exerciseFrequency === "WEEKLY") {
+        if (incompleteChallengeData) {
+          const latestValue = latestBp;
+          const distance = latestValue != null && target != null ? latestValue - target : null;
+          const recordedLabel = recordedDays === 1 ? "1 recorded blood-pressure day" : recordedDays + " recorded blood-pressure days";
+
+          titleText = recordedDays === 0
+            ? "More blood-pressure data is needed"
+            : recordedDays === 1
+              ? "Your first blood-pressure reading is recorded"
+              : "Keep building your blood-pressure pattern";
+
+          bodyText = recordedDays === 0
+            ? "Sympto does not have enough blood-pressure readings inside this goal yet to describe a trend."
+            : "You have " +
+              recordedLabel +
+              " in this goal. " +
+              (latestValue != null
+                ? "Your latest systolic reading is " + latestValue + " mmHg" +
+                  (target != null
+                    ? distance != null && distance > 0
+                      ? ", which is " + distance + " mmHg above your " + target + " mmHg target."
+                      : distance != null && distance < 0
+                        ? ", which is " + Math.abs(distance) + " mmHg below your " + target + " mmHg target."
+                        : ", exactly at your " + target + " mmHg target."
+                    : ".")
+                : "") +
+              " Sympto will wait for more recorded challenge days before showing a blood-pressure trend.";
+
+          pattern = "BUILDING";
+          tone = distance != null && distance > 0 ? "warning" : "info";
+        } else if (numericExerciseTarget != null && exerciseFrequency === "WEEKLY") {
           const total = exerciseTotal ?? 0;
           const remaining = Math.max(0, numericExerciseTarget - total);
 
@@ -292,18 +336,33 @@ export default function BloodPressureInsights({
         }
 
         const evidence: string[] = [];
-        if (bpAverage != null) evidence.push("Recent BP " + bpAverage + " mmHg");
-        if (target != null && bpAverage != null) {
-          const distance = bpAverage - target;
-          evidence.push(
-            distance > 0
-              ? distance + " mmHg above target"
-              : distance < 0
-                ? Math.abs(distance) + " mmHg below target"
-                : "At target",
-          );
+        if (recordedDays === 1 && latestBp != null) {
+          evidence.push("1 recorded BP day");
+          evidence.push("Latest " + latestBp + " mmHg");
+          if (target != null) {
+            const distance = latestBp - target;
+            evidence.push(
+              distance > 0
+                ? distance + " mmHg above target"
+                : distance < 0
+                  ? Math.abs(distance) + " mmHg below target"
+                  : "At target",
+            );
+          }
+        } else if (bpAverage != null) {
+          evidence.push("Recent BP " + bpAverage + " mmHg");
+          if (target != null) {
+            const distance = bpAverage - target;
+            evidence.push(
+              distance > 0
+                ? distance + " mmHg above target"
+                : distance < 0
+                  ? Math.abs(distance) + " mmHg below target"
+                  : "At target",
+            );
+          }
+          if (latestBp != null) evidence.push("Latest " + latestBp + " mmHg");
         }
-        if (latestBp != null) evidence.push("Latest " + latestBp + " mmHg");
 
         if (numericExerciseTarget != null && exerciseFrequency === "WEEKLY") {
           evidence.push((exerciseTotal ?? 0) + "/" + numericExerciseTarget + " min this week");
@@ -371,7 +430,7 @@ export default function BloodPressureInsights({
       window.removeEventListener("sympto:today-action-updated", handleRefresh);
       window.removeEventListener("sympto:health-checkin-updated", handleRefresh);
     };
-  }, [target, exerciseGoalTarget, exerciseGoalTitle, exerciseGoalFrequency]);
+  }, [target, exerciseGoalTarget, exerciseGoalTitle, exerciseGoalFrequency, bloodPressureEvents]);
 
   const warning = state.tone === "warning";
   const trendIcon = state.pattern === "LOWER"
@@ -435,10 +494,12 @@ export default function BloodPressureInsights({
             <div className="rounded-[15px] bg-[#f7fbfb] p-3">
               <p className="text-[8px] font-black uppercase tracking-[.13em] text-[#8b9aa4]">Blood pressure</p>
               <p className="mt-1 text-base font-black text-[#0b2d54]">
-                {state.bpAverage == null ? "—" : state.bpAverage + " mmHg"}
+                {state.latestBp == null ? "—" : state.latestBp + " mmHg"}
               </p>
               <p className="mt-0.5 text-[8px] font-semibold text-[#8b9aa4]">
-                Recent daily average
+                {state.bpAverage == null
+                  ? (state.latestBp == null ? "No reading yet" : (state.pattern === "BUILDING" ? "Latest recorded reading" : "Latest reading"))
+                  : "Recent daily average"}
               </p>
             </div>
             <div className="rounded-[15px] bg-[#f7fbfb] p-3">
