@@ -456,13 +456,13 @@ export default function TodayPage() {
                   key={`medication-goal-${String(item.goal?.id ?? patientMedicationId(item.medication) ?? index)}`}
                   medications={[item.medication]}
                   goal={item.goal}
-                  activeGoals={activeGoalsArray}
                   onUpdated={reload}
                 />
               ) : (
                 <TodaySupportedGoalCard
                   key={`medication-goal-fallback-${String(item.goal?.id ?? index)}`}
                   goal={item.goal}
+                  activeGoals={activeGoalsArray}
                   onUpdated={reload}
                 />
               ),

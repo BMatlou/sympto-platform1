@@ -83,7 +83,7 @@ export default function TodayExerciseGoal({ goal }: Props) {
       : `${remainingMinutes} minutes to go this week.`;
 
   return (
-    <article id={`today-goal-${String(goal?.id ?? "")}`} className="flex h-full min-w-0 flex-col overflow-hidden rounded-[30px border border-[#dfeaec] bg-white shadow-[0_18px_48px_rgba(11,45,84,.065)]">
+    <article id={`today-goal-${String(goal?.id ?? "")}`} className="flex h-full min-w-0 flex-col overflow-hidden rounded-[30px] border border-[#dfeaec] bg-white shadow-[0_18px_48px_rgba(11,45,84,.065)]">
       <div className="flex items-center gap-3 px-5 pb-4 pt-5 sm:px-6 sm:pt-6">
         <span className="grid h-10 w-10 shrink-0 place-items-center rounded-[14px] bg-[#e8f8f7] text-[#0b7b80] ring-1 ring-[#d8efed]"><Dumbbell className="h-4 w-4" /></span>
         <div className="min-w-0">
