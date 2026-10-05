@@ -17,7 +17,10 @@ async function bootstrap() {
   });
 
   app.enableCors({
-    origin: 'http://localhost:3000',
+    origin: [
+      'http://localhost:3000',
+      'http://192.168.1.100:3000',
+    ],
     credentials: true,
     methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
     allowedHeaders: ['Content-Type', 'Authorization'],
@@ -66,7 +69,7 @@ async function bootstrap() {
   await adminBootstrap.bootstrap();
 
   const port = 3001;
-  await app.listen(port);
+  await app.listen(port, '0.0.0.0');
 
   console.log(`🚀 Sympto API running at: http://localhost:${port}/api`);
   console.log(`📚 Swagger UI: http://localhost:${port}/api/docs`);
