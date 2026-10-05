@@ -526,6 +526,7 @@ export default function TodaySupportedGoalCard({ goal, activeGoals = [], onUpdat
               })()}
               exerciseGoalTitle={linkedExerciseGoal?.title ?? "Exercise goal"}
               exerciseGoalFrequency={String(linkedExerciseGoal?.metricConfig?.frequency ?? linkedExerciseGoal?.frequency ?? "WEEKLY").toUpperCase()}
+              challengeStartAt={goal?.createdAt ? String(goal.createdAt) : null}
               bloodPressureEvents={bpMetricEvents}
             />
 
