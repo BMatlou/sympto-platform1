@@ -334,7 +334,7 @@ export default function TodaySupportedGoalCard({ goal, activeGoals = [], onUpdat
                   </div>
                   <span className={bpWithinTarget === false
                     ? "rounded-full bg-red-400/10 px-2.5 py-1 text-[8px] font-black uppercase tracking-[.12em] text-red-200 ring-1 ring-red-300/20"
-                    : "rounded-full bg-[#24c1c4]/10 px-2.5 py-1 text-[8px] font-black uppercase tracking-[.12em] text-[#8ef0ef] ring-1 ring-[#24c1c4]/20]"}>
+                    : "rounded-full bg-[#24c1c4]/10 px-2.5 py-1 text-[8px] font-black uppercase tracking-[.12em] text-[#8ef0ef] ring-1 ring-[#24c1c4]/20"}>
                     {displayCurrent == null || target == null ? "No reading" : bpWithinTarget ? "Within target" : "Above target"}
                   </span>
                 </div>
@@ -359,7 +359,7 @@ export default function TodaySupportedGoalCard({ goal, activeGoals = [], onUpdat
                     </div>
                     <div className={bpWithinTarget === false
                       ? "rounded-[18px] bg-red-400/10 p-3.5 ring-1 ring-red-300/20"
-                      : "rounded-[18px] bg-[#24c1c4]/10 p-3.5 ring-1 ring-[#24c1c4]/20]"}>
+                      : "rounded-[18px] bg-[#24c1c4]/10 p-3.5 ring-1 ring-[#24c1c4]/20"}>
                       <p className={bpWithinTarget === false
                         ? "text-[8px] font-black uppercase tracking-[.13em] text-red-200"
                         : "text-[8px] font-black uppercase tracking-[.13em] text-[#8ef0ef]"}>Distance</p>
@@ -382,7 +382,7 @@ export default function TodaySupportedGoalCard({ goal, activeGoals = [], onUpdat
                 {displayCurrent != null && target != null && (
                   <div className={bpWithinTarget === false
                     ? "mt-5 rounded-[20px] bg-red-400/10 p-4 ring-1 ring-red-300/20"
-                    : "mt-5 rounded-[20px] bg-[#24c1c4]/10 p-4 ring-1 ring-[#24c1c4]/20]"}>
+                    : "mt-5 rounded-[20px] bg-[#24c1c4]/10 p-4 ring-1 ring-[#24c1c4]/20"}>
                     <div className="flex items-start gap-3">
                       <span className={bpWithinTarget === false
                         ? "mt-0.5 grid h-8 w-8 shrink-0 place-items-center rounded-[11px] bg-red-400/10 text-red-200"
@@ -427,7 +427,6 @@ export default function TodaySupportedGoalCard({ goal, activeGoals = [], onUpdat
               </div>
             </section>
           </>
-        )
         ) : (
           <>
           <div className="grid grid-cols-3 gap-2">
