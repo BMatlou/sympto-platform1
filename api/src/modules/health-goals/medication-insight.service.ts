@@ -137,6 +137,7 @@ export interface MedicationInsightResult {
     dailyBuckets: MedicationDayBucket[];
     trend: MedicationTrendResult;
     associations: SupportingGoalAssociation[];
+    connectedGoalInsights: ConnectedGoalInsight[];
     goalIntelligence: MedicationGoalIntelligence;
     clinicalIntelligence: ClinicalIntelligenceOutput;
     dataQuality: {
