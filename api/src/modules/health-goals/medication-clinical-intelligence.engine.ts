@@ -210,7 +210,7 @@ const TEMPLATE_LIBRARY = {
   trajectoryAbove:
     'Your medication goal is currently at {adherencePercent}% adherence, {varianceAbs} percentage points above the {targetAdherencePercent}% target.',
   interference:
-    'Chronological interference: the {timeBucket} dose window has a {failureRatePercent}% failure rate ({failedDoses} of {expectedDoses} expected doses not taken).',
+    'Chronological interference: the {timeBucket} dose window has a {failureRatePercent}% failure rate ({failedDoses} of {expectedDoses} expected doses skipped or unlogged).',
   associationHigher:
     '{goalName}: medication adherence was {deltaAbs}% higher on days with a recorded goal entry ({loggedAdherencePercent}% vs {nonLoggedAdherencePercent}%).',
   associationLower:
