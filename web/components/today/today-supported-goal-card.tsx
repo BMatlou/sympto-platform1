@@ -523,7 +523,11 @@ export default function TodaySupportedGoalCard({ goal, activeGoals = [], onUpdat
               </div>
             </section>
 
-            <BloodPressureInsights target={target} />
+            <BloodPressureInsights
+              target={target}
+              exerciseGoalTarget={linkedExerciseGoal?.targetValue ?? linkedExerciseGoal?.metricConfig?.frequencyTarget ?? null}
+              exerciseGoalTitle={linkedExerciseGoal?.title ?? "Exercise"}
+            />
 
             <div className="flex items-center justify-between gap-3 border-t border-[#edf2f4] px-1 pt-3">
               <div className="min-w-0">
