@@ -1,6 +1,7 @@
 import { BadRequestException, Injectable } from '@nestjs/common';
 import { PrismaService } from '../../database/prisma.service';
 import { goalRuleFor } from './goal-metric-rules';
+import { HealthGoalIntelligenceService } from './health-goal-intelligence.service';
 
 export type MedicationDoseAction = 'TAKEN' | 'SKIPPED';
 export type MedicationDailyTrend =
@@ -226,7 +227,10 @@ const INCONSISTENCY_STD_DEV = 25;
 
 @Injectable()
 export class MedicationInsightService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly healthGoalIntelligence: HealthGoalIntelligenceService,
+  ) {}
 
   async buildForGoal(goalId: string): Promise<MedicationInsightResult> {
     const goal = await this.loadGoal(goalId);
@@ -237,6 +241,21 @@ export class MedicationInsightService {
 
     const schedule = await this.loadSchedule(goal);
     const doseRows = await this.loadExplicitDoseEvents(goal.patientId, goal.patientMedicationId, goal.createdAt);
+
+    // Relationship rows are system-derived. Synchronize them immediately before
+    // reading them so a newly-created nutrition/exercise/sleep/hydration goal
+    // becomes available to medication intelligence without relying on another
+    // screen having loaded first. A relationship-sync failure must never break
+    // the existing medication insight path.
+    try {
+      await this.healthGoalIntelligence.syncGoalRelations(goal.patientId);
+    } catch (error) {
+      console.warn(
+        'Medication connected-goal relationship sync unavailable; using existing relations.',
+        error instanceof Error ? error.message : String(error),
+      );
+    }
+
     const relations = await this.loadRelations(goal.patientId, goalId);
     const supportingEvents = await this.loadSupportingEvents(goal.patientId, goal.createdAt, relations);
     const now = new Date();
