@@ -63,8 +63,10 @@ export interface MedicationClinicalIntelligenceInput {
 }
 
 export interface TrajectoryAnalysis {
-  lifecycleDays: number;
+  elapsedLifecycleDays: number;
+  lifetimeDays: number;
   dailyFrequency: number;
+  expectedDosesToDate: number;
   lifetimeExpectedDoses: number;
   takenDoses: number;
   adherencePercent: number;
@@ -218,22 +220,35 @@ function calculateTrajectory(
   input: MedicationClinicalIntelligenceInput,
 ): TrajectoryAnalysis {
   const start = dateKey(input.medicationGoal.startDate, input.timezone);
-  const end = dateKey(input.medicationGoal.targetDate ?? input.now, input.timezone);
-  const lifecycleDays = Math.max(1, inclusiveDayCount(start, end));
+  const today = dateKey(input.now, input.timezone);
+  const targetDay = input.medicationGoal.targetDate
+    ? dateKey(input.medicationGoal.targetDate, input.timezone)
+    : today;
+  const elapsedEnd = targetDay < today ? targetDay : today;
+
+  const elapsedLifecycleDays = Math.max(
+    1,
+    inclusiveDayCount(start, elapsedEnd),
+  );
+  const lifetimeDays = Math.max(
+    elapsedLifecycleDays,
+    inclusiveDayCount(start, targetDay),
+  );
 
   const dailyFrequency = Math.max(
     1,
     Number(input.medicationGoal.frequency) || Number(input.medicationSchedule.dosesPerDay) || 1,
   );
 
-  const lifetimeExpectedDoses = lifecycleDays * dailyFrequency;
+  const expectedDosesToDate = elapsedLifecycleDays * dailyFrequency;
+  const lifetimeExpectedDoses = lifetimeDays * dailyFrequency;
   const takenDoses = input.medicationEvents.filter(
     (event) => event.action === 'TAKEN',
   ).length;
 
   const adherencePercent =
-    lifetimeExpectedDoses > 0
-      ? round((takenDoses / lifetimeExpectedDoses) * 100)
+    expectedDosesToDate > 0
+      ? round((takenDoses / expectedDosesToDate) * 100)
       : 0;
 
   const targetAdherencePercent = normalizeTarget(input.medicationGoal.targetAdherence);
@@ -268,8 +283,10 @@ function calculateTrajectory(
         Math.ceil((lifetimeExpectedDoses * targetAdherencePercent) / 100);
 
   return {
-    lifecycleDays,
+    elapsedLifecycleDays,
+    lifetimeDays,
     dailyFrequency,
+    expectedDosesToDate,
     lifetimeExpectedDoses,
     takenDoses,
     adherencePercent,
