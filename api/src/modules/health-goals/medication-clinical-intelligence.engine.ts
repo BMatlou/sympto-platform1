@@ -175,6 +175,7 @@ export interface ClinicalNarrative {
     }>;
   } | null;
   routineAnchor: ClinicalNarrativeRoutineAnchor | null;
+  pattern: string | null;
   statisticalAssociationNote: string;
 }
 
@@ -688,6 +689,7 @@ function buildClinicalNarrative(
   const routineAnchor = temporalFocus
     ? findRoutineAnchor(input, temporalFocus.bucket, rules)
     : null;
+  const pattern = buildRealTimePattern(input, todayTaken, todayExpected);
 
   const interference = chronologicalInterference
     ? {
@@ -730,9 +732,136 @@ function buildClinicalNarrative(
     },
     interference,
     routineAnchor,
+    pattern,
     statisticalAssociationNote:
       'Statistical Association: Identifies correlations across your logged data streams. Does not imply direct clinical causation.',
   };
+}
+
+function buildRealTimePattern(
+  input: MedicationClinicalIntelligenceInput,
+  todayTaken: number,
+  todayExpected: number,
+): string | null {
+  if (todayExpected <= 0 || todayTaken < todayExpected) return null;
+
+  const today = dateKey(input.now, input.timezone);
+  const isToday = (event: ClinicalJournalEvent) =>
+    dateKey(event.timestamp, input.timezone) === today &&
+    event.timestamp <= input.now;
+
+  const todayGoalEvents = input.supportingGoals.map((goal) => ({
+    goal,
+    events: input.journalEvents
+      .filter((event) => event.goalId === goal.goalId)
+      .filter(isToday)
+      .sort((a, b) => a.timestamp.getTime() - b.timestamp.getTime()),
+  }));
+
+  const nutrition = todayGoalEvents.find(
+    (item) => item.goal.category.toUpperCase() === 'NUTRITION' && item.events.length > 0,
+  );
+  const exercise = todayGoalEvents.find(
+    (item) => item.goal.category.toUpperCase() === 'EXERCISE' && item.events.length > 0,
+  );
+  const sleep = todayGoalEvents.find(
+    (item) => item.goal.category.toUpperCase() === 'SLEEP' && item.events.length > 0,
+  );
+
+  const medicationEventsToday = input.medicationEvents
+    .filter(
+      (event) =>
+        event.action === 'TAKEN' &&
+        dateKey(event.timestamp, input.timezone) === today &&
+        event.timestamp <= input.now,
+    )
+    .sort((a, b) => a.timestamp.getTime() - b.timestamp.getTime());
+
+  const morningMedicationLogged = medicationEventsToday.some(
+    (event) => timeToMinutes(localTime(event.timestamp, input.timezone)) < 12 * 60,
+  );
+
+  const medicationName = input.medicationGoal.name.trim() || 'Medication';
+  const normalizedMedication = medicationName.toLowerCase();
+
+  // Explicit medication-specific templates requested by the product specification.
+  // They are activated only from real persisted supporting-goal events occurring today.
+  if (normalizedMedication === 'metformin' && nutrition && morningMedicationLogged) {
+    const mealEvent = nutrition.events[0];
+    return (
+      '⚡ Daily Routine Anchor: Today\'s perfect ' +
+      todayTaken +
+      '/' +
+      todayExpected +
+      ' execution directly matches your active digital health engagement. Your morning ' +
+      medicationName +
+      ' tracking successfully aligned with your ' +
+      formatTime(mealEvent.timestamp, input.timezone) +
+      ' meal entry, completely eliminating tracking friction for the first half of your daily rhythm.'
+    );
+  }
+
+  if (normalizedMedication === 'paracetamol' && exercise && sleep) {
+    const exerciseMinutes = exercise.events.reduce(
+      (sumValue, event) => sumValue + Math.max(0, Number(event.value) || 0),
+      0,
+    );
+    const latestSleep = sleep.events.at(-1);
+    if (exerciseMinutes > 0 && latestSleep) {
+      return (
+        '⚡ Daily Routine Anchor: Your 100% logging streak today perfectly mirrors your active physical metrics. You successfully paired your complete medication tracking window with a highly active day, alongside your recorded ' +
+        formatValue(exerciseMinutes) +
+        ' minutes of exercise and ' +
+        formatValue(Number(latestSleep.value)) +
+        ' hours of sleep.'
+      );
+    }
+  }
+
+  // Generic real-time anchor for other medications. This keeps the engine evidence-led
+  // without inventing medication-specific text when the active-day data belongs to
+  // another goal category.
+  if (nutrition) {
+    const mealEvent = nutrition.events[0];
+    return (
+      '⚡ Daily Routine Anchor: Today\'s perfect ' +
+      todayTaken +
+      '/' +
+      todayExpected +
+      ' execution aligns with your active nutrition tracking. Your medication logging coincided with a ' +
+      formatTime(mealEvent.timestamp, input.timezone) +
+      ' nutrition entry.'
+    );
+  }
+
+  if (exercise) {
+    const exerciseMinutes = exercise.events.reduce(
+      (sumValue, event) => sumValue + Math.max(0, Number(event.value) || 0),
+      0,
+    );
+    if (exerciseMinutes > 0) {
+      return (
+        '⚡ Daily Routine Anchor: Your 100% medication execution aligns with today\'s active exercise tracking, with ' +
+        formatValue(exerciseMinutes) +
+        ' minutes recorded.'
+      );
+    }
+  }
+
+  return null;
+}
+
+function formatTime(value: Date, timezone: string): string {
+  return new Intl.DateTimeFormat('en-US', {
+    timeZone: timezone,
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: true,
+  }).format(value);
+}
+
+function formatValue(value: number): string {
+  return Number.isInteger(value) ? String(value) : value.toFixed(1);
 }
 
 function selectTemporalFocus(
