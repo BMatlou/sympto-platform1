@@ -8,6 +8,8 @@ import { buildBloodPressureInsights, type BloodPressureInsight } from "@/lib/blo
 
 type Props = {
   target: number | null;
+  exerciseGoalTarget?: number | null;
+  exerciseGoalTitle?: string | null;
 };
 
 const iconFor = (insight: BloodPressureInsight) => {
@@ -19,7 +21,7 @@ const iconFor = (insight: BloodPressureInsight) => {
   return Sparkles;
 };
 
-export default function BloodPressureInsights({ target }: Props) {
+export default function BloodPressureInsights({ target, exerciseGoalTarget = null, exerciseGoalTitle = "Exercise" }: Props) {
   const [insights, setInsights] = useState<BloodPressureInsight[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -48,6 +50,8 @@ export default function BloodPressureInsights({ target }: Props) {
             journals: journals.data ?? [],
             symptoms,
             target,
+            exerciseGoalTarget,
+            exerciseGoalTitle,
             now: to,
           }),
         );
@@ -76,7 +80,7 @@ export default function BloodPressureInsights({ target }: Props) {
       window.removeEventListener("sympto:today-action-updated", handleRefresh);
       window.removeEventListener("sympto:health-checkin-updated", handleRefresh);
     };
-  }, [target]);
+  }, [target, exerciseGoalTarget, exerciseGoalTitle]);
 
   return (
     <section className="mt-3 rounded-[19px] border border-[#dcebed] bg-[#f8fbfc] p-3.5">
@@ -87,7 +91,7 @@ export default function BloodPressureInsights({ target }: Props) {
           </span>
           <div>
             <p className="text-[8px] font-black uppercase tracking-[.16em] text-[#0b7b80]">Sympto Insights</p>
-            <p className="mt-0.5 text-[9px] font-semibold text-[#7d8f9c]">What your recent readings show</p>
+            <p className="mt-0.5 text-[9px] font-semibold text-[#7d8f9c]">Patterns across your blood pressure and connected health data</p>
           </div>
         </div>
       </div>
