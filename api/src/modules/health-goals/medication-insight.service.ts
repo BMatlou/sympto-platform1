@@ -471,7 +471,8 @@ function nextDay(day: string): string {
 }
 
 function weekday(day: string): number {
-  return new Date(day + 'T12:00:00Z').getUTCDay();
+  const sundayZero = new Date(day + 'T12:00:00Z').getUTCDay();
+  return sundayZero === 0 ? 7 : sundayZero;
 }
 
 function scheduleActive(schedule: MedicationSchedule, day: string): boolean {
@@ -485,7 +486,8 @@ function scheduleActive(schedule: MedicationSchedule, day: string): boolean {
 function expectedForDay(schedule: MedicationSchedule, day: string): number {
   if (!scheduleActive(schedule, day)) return 0;
   const frequency = String(schedule.frequency ?? '').trim().toUpperCase();
-  if (frequency === 'AS_NEEDED' || frequency === 'WEEKLY' || frequency === 'MONTHLY') return 0;
+  if (frequency === 'AS_NEEDED') return 0;
+  if ((frequency === 'WEEKLY' || frequency === 'MONTHLY') && schedule.scheduleSource !== 'REMINDER_SCHEDULE') return 0;
   return schedule.dosesPerDay;
 }
 
