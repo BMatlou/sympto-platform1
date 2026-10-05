@@ -168,6 +168,7 @@ export class NotificationsService {
   ) {
     const where: Prisma.NotificationWhereInput = {
       userId,
+      channel: 'IN_APP',
       status: { in: ['SENT', 'DELIVERED', 'READ'] },
       OR: [
         { scheduledFor: null },
@@ -221,6 +222,7 @@ export class NotificationsService {
     return this.prisma.notification.count({
       where: {
         userId,
+        channel: 'IN_APP',
         readAt: null,
         status: { in: ['SENT', 'DELIVERED'] },
         OR: [
@@ -233,7 +235,7 @@ export class NotificationsService {
 
   async markReadForUser(userId: string, notificationId: string) {
     const notification = await this.prisma.notification.findFirst({
-      where: { id: notificationId, userId },
+      where: { id: notificationId, userId, channel: 'IN_APP' },
       select: { id: true, readAt: true, status: true },
     });
 
@@ -263,6 +265,7 @@ export class NotificationsService {
     const result = await this.prisma.notification.updateMany({
       where: {
         userId,
+        channel: 'IN_APP',
         readAt: null,
         status: { in: ['SENT', 'DELIVERED', 'READ'] },
       },
