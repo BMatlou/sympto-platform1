@@ -18,6 +18,7 @@ type Props = {
   exerciseGoalTarget?: number | null;
   exerciseGoalTitle?: string | null;
   exerciseGoalFrequency?: string | null;
+  challengeStartAt: string | null;
   bloodPressureEvents: BloodPressureEvent[] | null;
 };
 
@@ -96,6 +97,7 @@ export default function BloodPressureInsights({
   exerciseGoalTarget = null,
   exerciseGoalTitle = "Exercise",
   exerciseGoalFrequency = "WEEKLY",
+  challengeStartAt,
   bloodPressureEvents,
 }: Props) {
   const [state, setState] = useState<InsightState>({
@@ -120,7 +122,10 @@ export default function BloodPressureInsights({
 
       try {
         const now = new Date();
-        const from = new Date(0);
+        const parsedChallengeStart = challengeStartAt ? new Date(challengeStartAt) : null;
+        const from = parsedChallengeStart && !Number.isNaN(parsedChallengeStart.getTime())
+          ? parsedChallengeStart
+          : new Date(0);
         const exercise = await healthGoalsService.getMetricEvents(
           "EXERCISE",
           "exercise.minutes",
@@ -430,7 +435,7 @@ export default function BloodPressureInsights({
       window.removeEventListener("sympto:today-action-updated", handleRefresh);
       window.removeEventListener("sympto:health-checkin-updated", handleRefresh);
     };
-  }, [target, exerciseGoalTarget, exerciseGoalTitle, exerciseGoalFrequency, bloodPressureEvents]);
+  }, [target, exerciseGoalTarget, exerciseGoalTitle, exerciseGoalFrequency, challengeStartAt, bloodPressureEvents]);
 
   const warning = state.tone === "warning";
   const trendIcon = state.pattern === "LOWER"
