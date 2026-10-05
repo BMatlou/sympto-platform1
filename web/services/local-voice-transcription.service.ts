@@ -28,17 +28,37 @@ async function getTranscriber(
     transcriberPromise = (async () => {
       const { pipeline } = await import("@huggingface/transformers");
 
-      return (await pipeline(
-        "automatic-speech-recognition",
-        MODEL_ID,
-        {
-          progress_callback: (info: ProgressInfo) => {
-            if (info.status === "progress_total" && Number.isFinite(info.progress)) {
-              onProgress?.(Math.max(0, Math.min(100, Number(info.progress))));
-            }
+      const hasWebGpu =
+        typeof navigator !== "undefined" &&
+        Boolean((navigator as Navigator & { gpu?: unknown }).gpu);
+
+      const progress_callback = (info: ProgressInfo) => {
+        if (
+          (info.status === "progress_total" || info.status === "progress") &&
+          Number.isFinite(info.progress)
+        ) {
+          onProgress?.(Math.max(0, Math.min(100, Number(info.progress))));
+        }
+      };
+
+      const load = (device?: "webgpu") =>
+        pipeline(
+          "automatic-speech-recognition",
+          MODEL_ID,
+          {
+            ...(device ? { device } : {}),
+            progress_callback,
           },
-        },
-      )) as unknown as Transcriber;
+        );
+
+      try {
+        return (await load(hasWebGpu ? "webgpu" : undefined)) as unknown as Transcriber;
+      } catch (error) {
+        // Some browsers expose navigator.gpu but cannot initialize this model
+        // with WebGPU. Fall back to the normal browser runtime instead of failing voice.
+        if (!hasWebGpu) throw error;
+        return (await load()) as unknown as Transcriber;
+      }
     })().catch((error) => {
       transcriberPromise = null;
       throw error;
@@ -81,7 +101,8 @@ export async function transcribeLocalVoice(
     const result = await transcriber(objectUrl, {
       language: "en",
       task: "transcribe",
-      chunk_length_s: 20,
+      // Larger chunks reduce repeated Whisper work for ordinary short health updates.
+      chunk_length_s: 30,
       stride_length_s: 5,
     });
 
