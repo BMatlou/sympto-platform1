@@ -126,6 +126,108 @@ describe('MedicationClinicalIntelligenceEngine', () => {
     expect(result.chronologicalInterference?.failureRatePercent).toBeGreaterThanOrEqual(50);
   });
 
+  it('derives a temporal signal from historical action timestamps when no reminder slots exist', () => {
+    const events = Array.from({ length: 18 }, (_, index) =>
+      event(
+        \`2026-09-\${String(22 + Math.floor(index / 3)).padStart(2, '0')}T19:00:00+02:00\`,
+        'TAKEN',
+      ),
+    );
+
+    const result = engine.calculate({
+      medicationGoal: {
+        medicationId: 'med-1',
+        name: 'Any medicine',
+        frequency: 3,
+        startDate: new Date('2026-09-22T00:00:00+02:00'),
+        targetDate: new Date('2027-05-17T00:00:00+02:00'),
+        targetAdherence: 0.9,
+      },
+      medicationEvents: events,
+      supportingGoals: [],
+      journalEvents: [],
+      medicationSchedule: {
+        ...schedule(),
+        reminderSlots: [],
+      },
+      scheduledDays: buckets(),
+      now,
+      timezone: 'Africa/Johannesburg',
+    });
+
+    expect(result.clinicalNarrative.baseline.adherencePercent).toBe(42.86);
+    expect(result.timeBuckets.some((bucket) => bucket.expectedDoses > 0)).toBe(true);
+    expect(result.chronologicalInterference).not.toBeNull();
+    expect(result.chronologicalInterference?.label).toBe('Evening/Night');
+  });
+
+  it('uses the strongest temporal window to evaluate a linked routine even when the failure threshold is not crossed', () => {
+    const supportGoal: ClinicalSupportingGoal = {
+      goalId: 'goal-sleep',
+      name: 'Sleep duration',
+      category: 'SLEEP',
+      unit: 'hours',
+      targetValue: 6,
+      frequency: 'DAILY',
+      metricType: 'SLEEP',
+      metricKey: 'sleep.duration',
+      aggregation: 'LATEST',
+      comparison: 'AT_LEAST',
+      createdAt: new Date('2026-09-22T00:00:00+02:00'),
+    };
+
+    const journalEvents: ClinicalJournalEvent[] = [
+      { goalId: 'goal-sleep', timestamp: new Date('2026-09-22T22:00:00+02:00'), value: 6, source: 'journal' },
+      { goalId: 'goal-sleep', timestamp: new Date('2026-09-23T22:00:00+02:00'), value: 6, source: 'journal' },
+      { goalId: 'goal-sleep', timestamp: new Date('2026-09-24T22:00:00+02:00'), value: 6, source: 'journal' },
+      { goalId: 'goal-sleep', timestamp: new Date('2026-09-25T22:00:00+02:00'), value: 6, source: 'journal' },
+      { goalId: 'goal-sleep', timestamp: new Date('2026-09-26T22:00:00+02:00'), value: 6, source: 'journal' },
+    ];
+
+    const events = [
+      event('2026-09-22T19:00:00+02:00', 'TAKEN'),
+      event('2026-09-22T08:00:00+02:00', 'TAKEN'),
+      event('2026-09-23T19:00:00+02:00', 'TAKEN'),
+      event('2026-09-24T19:00:00+02:00', 'TAKEN'),
+      event('2026-09-25T19:00:00+02:00', 'TAKEN'),
+      event('2026-09-26T19:00:00+02:00', 'TAKEN'),
+      event('2026-09-27T08:00:00+02:00', 'TAKEN'),
+      event('2026-09-28T08:00:00+02:00', 'TAKEN'),
+    ];
+
+    const result = engine.calculate({
+      medicationGoal: {
+        medicationId: 'med-1',
+        name: 'Any medicine',
+        frequency: 1,
+        startDate: new Date('2026-09-22T00:00:00+02:00'),
+        targetDate: null,
+        targetAdherence: 0.9,
+      },
+      medicationEvents: events,
+      supportingGoals: [supportGoal],
+      journalEvents,
+      medicationSchedule: {
+        ...schedule(),
+        frequency: 'ONCE_DAILY',
+        dosesPerDay: 1,
+        reminderSlots: ['19:00'],
+      },
+      scheduledDays: buckets().map((day) => ({
+        ...day,
+        expectedDoses: 1,
+        takenDoses: 0,
+        unrecordedDoses: 1,
+      })),
+      now,
+      timezone: 'Africa/Johannesburg',
+    });
+
+    expect(result.clinicalNarrative.routineAnchor).not.toBeNull();
+    expect(result.clinicalNarrative.routineAnchor?.goalName).toBe('Sleep duration');
+    expect(result.clinicalNarrative.routineAnchor?.deltaPercentagePoints).toBeGreaterThanOrEqual(15);
+  });
+
   it('joins linked goal journal days to medication days without treating missing data as a positive event', () => {
     const supportGoal: ClinicalSupportingGoal = {
       goalId: 'goal-nutrition',
