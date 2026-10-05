@@ -9,6 +9,7 @@ import { healthGoalsService } from "@/services/health-goals.service";
 interface TodayMedicationActionsProps {
   medications: any[];
   goal?: any;
+  supportingGoals?: any[];
   onUpdated?: () => Promise<void> | void;
 }
 
@@ -74,6 +75,104 @@ function journeyProgress(goal: any) {
   return { journeyDay, daysLeft };
 }
 
+function localDayKey(value: unknown) {
+  const date = new Date(String(value));
+  if (Number.isNaN(date.getTime())) return "";
+  return new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Africa/Johannesburg",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).format(date);
+}
+
+function localWeekStart(day: string) {
+  const date = new Date(`${day}T12:00:00Z`);
+  const weekday = date.getUTCDay() || 7;
+  date.setUTCDate(date.getUTCDate() - (weekday - 1));
+  return date.toISOString().slice(0, 10);
+}
+
+function localWeekEnd(day: string) {
+  const date = new Date(`${day}T12:00:00Z`);
+  date.setUTCDate(date.getUTCDate() + 6);
+  return date.toISOString().slice(0, 10);
+}
+
+function localGoalRule(goal: any) {
+  const category = String(goal?.category ?? "").toUpperCase();
+  if (category === "NUTRITION") return { metricType: "NUTRITION", metricKey: "nutrition.calories", frequency: "DAILY", aggregation: "SUM", comparison: "AT_MOST", unit: "kcal/day" };
+  if (category === "EXERCISE") return { metricType: "EXERCISE", metricKey: "exercise.minutes", frequency: "WEEKLY", aggregation: "SUM", comparison: "AT_LEAST", unit: "min/week" };
+  if (category === "SLEEP") return { metricType: "SLEEP", metricKey: "sleep.hours", frequency: "DAILY", aggregation: "LATEST", comparison: "AT_LEAST", unit: "hours/night" };
+  if (category === "HYDRATION") return { metricType: "HYDRATION", metricKey: "hydration.ml", frequency: "DAILY", aggregation: "SUM", comparison: "AT_LEAST", unit: "ml/day" };
+  return null;
+}
+
+function localGoalStatus(value: number, target: number | null, comparison: string) {
+  if (!Number.isFinite(value) || target == null || !Number.isFinite(target)) return "INSUFFICIENT_DATA";
+  if (comparison === "AT_MOST" || comparison === "DECREASE_TO") return value <= target ? "ON_TARGET" : "ABOVE_TARGET";
+  if (comparison === "CLOSEST") {
+    const tolerance = Math.max(Math.abs(target) * 0.1, 0.1);
+    return Math.abs(value - target) <= tolerance ? "ON_TARGET" : value < target ? "BELOW_TARGET" : "ABOVE_TARGET";
+  }
+  return value >= target ? "ON_TARGET" : "BELOW_TARGET";
+}
+
+function localAggregate(values: number[], aggregation: string) {
+  if (!values.length) return Number.NaN;
+  switch (String(aggregation).toUpperCase()) {
+    case "AVERAGE": return values.reduce((sum, value) => sum + value, 0) / values.length;
+    case "MIN": return Math.min(...values);
+    case "MAX": return Math.max(...values);
+    case "LATEST": return values[values.length - 1];
+    default: return values.reduce((sum, value) => sum + value, 0);
+  }
+}
+
+function localSupportingPeriods(events: any[], goal: any, rule: any) {
+  const grouped = new Map<string, any[]>();
+  for (const event of events) {
+    const day = localDayKey(event?.occurredAt);
+    if (!day) continue;
+    const key = rule.frequency === "WEEKLY" ? localWeekStart(day) : day;
+    const bucket = grouped.get(key) ?? [];
+    bucket.push(event);
+    grouped.set(key, bucket);
+  }
+
+  const targetCandidate = goal?.metricConfig?.frequencyTarget ?? goal?.targetValue;
+  const target = Number(targetCandidate);
+  const comparison = String(goal?.metricConfig?.comparison ?? rule.comparison).toUpperCase();
+  const aggregation = String(goal?.metricConfig?.aggregation ?? rule.aggregation).toUpperCase();
+
+  return [...grouped.entries()].sort(([a], [b]) => a.localeCompare(b)).map(([key, periodEvents]) => {
+    const values = periodEvents.map((event) => Number(event?.loggedValue)).filter((value) => Number.isFinite(value));
+    const value = localAggregate(values, aggregation);
+    const startDay = key;
+    const endDay = rule.frequency === "WEEKLY" ? localWeekEnd(startDay) : startDay;
+    return {
+      startDay,
+      endDay,
+      label: rule.frequency === "WEEKLY" ? "week of " + startDay : startDay,
+      value,
+      status: localGoalStatus(value, Number.isFinite(target) ? target : null, comparison),
+    };
+  });
+}
+
+function localMedicationAdherence(days: any[]) {
+  let taken = 0;
+  let expected = 0;
+  for (const day of days) {
+    const dayExpected = Number(day?.expectedDoses);
+    const dayTaken = Number(day?.takenDoses);
+    if (!Number.isFinite(dayExpected) || dayExpected <= 0 || !Number.isFinite(dayTaken)) continue;
+    expected += dayExpected;
+    taken += Math.max(0, Math.min(dayExpected, dayTaken));
+  }
+  return expected > 0 ? (taken / expected) * 100 : null;
+}
+
 function cumulativeTakenDoses(medication: any): number {
   const exactCandidates = [
     medication?.takenDoses,
@@ -104,12 +203,13 @@ function cumulativeTakenDoses(medication: any): number {
   return 0;
 }
 
-export default function TodayMedicationActions({ medications, goal: suppliedGoal, onUpdated }: TodayMedicationActionsProps) {
+export default function TodayMedicationActions({ medications, goal: suppliedGoal, supportingGoals = [], onUpdated }: TodayMedicationActionsProps) {
   const [dosesLoggedToday, setDosesLoggedToday] = useState(0);
   const [takenDosesForGoal, setTakenDosesForGoal] = useState(0);
   const [isSyncing, setIsSyncing] = useState(false);
   const [savingKey, setSavingKey] = useState<string | null>(null);
   const [states, setStates] = useState<Record<string, Action | undefined>>({});
+  const [localConnectedGoalInsights, setLocalConnectedGoalInsights] = useState<any[]>([]);
 
   const trackedMedication = medications[0] ?? null;
   const finalGoal = (() => {
