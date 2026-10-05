@@ -488,7 +488,7 @@ export default function TodaySupportedGoalCard({ goal, activeGoals = [], onUpdat
           <div className="mt-3 rounded-[17px] border border-[#dcebec] bg-[#f7fbfc] p-3.5">
             <div className="flex items-center justify-between gap-2">
               <p className="text-[8px] font-black uppercase tracking-[.14em] text-[#82939f]">Goal connections</p>
-              <span className="text-[8px] font-bold text-[#9aa8b1]">Exercise support</span>
+              <span className="text-[8px] font-bold text-[#9aa8b1]">1 connected</span>
             </div>
             <div className="mt-2">
               <Link
@@ -499,7 +499,7 @@ export default function TodaySupportedGoalCard({ goal, activeGoals = [], onUpdat
                   : "Set an Exercise goal to support this blood-pressure goal."}
               >
                 <span className="truncate">Exercise</span>
-                <span className="shrink-0 text-[#91a2ad]">· {linkedExerciseGoal ? "Open goal" : "Add goal"}</span>
+                <span className="shrink-0 text-[#91a2ad]">· {linkedExerciseGoal ? "Supports this" : "Add goal"}</span>
               </Link>
             </div>
           </div>
