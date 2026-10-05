@@ -684,8 +684,9 @@ function buildClinicalNarrative(
   const todayAdherence =
     todayExpected > 0 ? round((todayTaken / todayExpected) * 100) : 0;
 
-  const routineAnchor = chronologicalInterference
-    ? findRoutineAnchor(input, chronologicalInterference.bucket, rules)
+  const temporalFocus = selectTemporalFocus(timeBuckets, rules);
+  const routineAnchor = temporalFocus
+    ? findRoutineAnchor(input, temporalFocus.bucket, rules)
     : null;
 
   const interference = chronologicalInterference
@@ -732,6 +733,28 @@ function buildClinicalNarrative(
     statisticalAssociationNote:
       'Statistical Association: Identifies correlations across your logged data streams. Does not imply direct clinical causation.',
   };
+}
+
+function selectTemporalFocus(
+  buckets: TimeBucketAnalysis[],
+  rules: ClinicalIntelligenceRules,
+): TimeBucketAnalysis | null {
+  return (
+    buckets
+      .filter(
+        (bucket) =>
+          bucket.expectedDoses >= rules.minimumExpectedDosesForInterference &&
+          bucket.failureRatePercent != null &&
+          bucket.failureRatePercent > 0,
+      )
+      .sort((a, b) => {
+        const failureDelta =
+          Number(b.failureRatePercent ?? -1) -
+          Number(a.failureRatePercent ?? -1);
+        if (failureDelta !== 0) return failureDelta;
+        return b.failureCount - a.failureCount;
+      })[0] ?? null
+  );
 }
 
 function findRoutineAnchor(
@@ -802,7 +825,12 @@ function findRoutineAnchor(
     }
 
     const delta = round(loggedAdherence - nonLoggedAdherence);
-    if (delta < rules.behavioralDeltaPercentagePoints) continue;
+    if (
+      Math.abs(delta) < rules.behavioralDeltaPercentagePoints ||
+      delta <= 0
+    ) {
+      continue;
+    }
 
     const latest = goalEvents.at(-1);
 
