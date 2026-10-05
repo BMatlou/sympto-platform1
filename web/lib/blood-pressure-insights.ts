@@ -134,6 +134,37 @@ function sumDaily(values: Array<{ day: string; value: number }>) {
   return map;
 }
 
+function canonicalExerciseDayTotals(values: Array<{ day: string; value: number; source?: string | null; occurredAt: string }>) {
+  const byDay = new Map<string, Array<{ value: number; source?: string | null; occurredAt: string }>>();
+
+  for (const item of values) {
+    if (!item.day || !Number.isFinite(item.value)) continue;
+    const list = byDay.get(item.day) ?? [];
+    list.push({
+      value: item.value,
+      source: item.source,
+      occurredAt: item.occurredAt,
+    });
+    byDay.set(item.day, list);
+  }
+
+  return new Map(
+    [...byDay.entries()].map(([day, dayEvents]) => {
+      const wearableTotal = dayEvents
+        .filter((event) => String(event.source ?? "").toLowerCase().startsWith("wearable"))
+        .reduce((sum, event) => sum + event.value, 0);
+
+      const manualEvents = dayEvents
+        .filter((event) => !String(event.source ?? "").toLowerCase().startsWith("wearable"))
+        .sort((a, b) => new Date(a.occurredAt).getTime() - new Date(b.occurredAt).getTime());
+
+      const manualTotal = manualEvents.length ? manualEvents[manualEvents.length - 1].value : 0;
+
+      return [day, Math.max(wearableTotal, manualTotal)] as const;
+    }),
+  );
+}
+
 function severityScore(value: unknown) {
   const normalized = String(value ?? "").toUpperCase();
   if (normalized === "MILD") return 1;
@@ -386,14 +417,30 @@ export function buildBloodPressureInsights({
     }
   }
 
-  const exerciseByDay = sumDaily(
+  const exerciseByDay = canonicalExerciseDayTotals(
     exerciseEvents
       .map((event) => {
         const value = finite(event.loggedValue);
-        const day = dayKey(event.occurredAt);
-        return value != null && day ? { day, value } : null;
+        const parts = localParts(event.occurredAt);
+        return value != null && parts
+          ? {
+              day: parts.key,
+              value,
+              source: event.source,
+              occurredAt: event.occurredAt,
+            }
+          : null;
       })
-      .filter((item): item is { day: string; value: number } => Boolean(item)),
+      .filter(
+        (
+          item,
+        ): item is {
+          day: string;
+          value: number;
+          source?: string | null;
+          occurredAt: string;
+        } => Boolean(item),
+      ),
   );
 
   const allDailyBp = groupDaily(bp.map((item) => ({ day: item.day, value: item.value })));
@@ -553,6 +600,91 @@ export function buildBloodPressureInsights({
     }
   }
 
+  if (exerciseGoalTarget != null && Number.isFinite(exerciseGoalTarget)) {
+    const goalTarget = Math.max(0, round(exerciseGoalTarget) ?? exerciseGoalTarget);
+    const exerciseGoalTitleSafe = String(exerciseGoalTitle || "Exercise goal");
+
+    if (exerciseGoalFrequencyNormalized === "WEEKLY") {
+      const exerciseByWeek = new Map<string, number>();
+      for (const [day, minutes] of exerciseByDay.entries()) {
+        if (!withinLookback(day + "T12:00:00Z", 30, now)) continue;
+        const week = weekStartKey(day);
+        exerciseByWeek.set(week, (exerciseByWeek.get(week) ?? 0) + minutes);
+      }
+
+      const thisWeek = weekStartKey(todayKey);
+      const thisWeekMinutes = exerciseByWeek.get(thisWeek) ?? 0;
+      const thisWeekRounded = round(thisWeekMinutes) ?? 0;
+      const remaining = Math.max(0, goalTarget - thisWeekRounded);
+
+      const bpByWeek = new Map<string, number[]>();
+      for (const [day, bpValue] of allDailyBp.entries()) {
+        const week = weekStartKey(day);
+        const list = bpByWeek.get(week) ?? [];
+        list.push(bpValue);
+        bpByWeek.set(week, list);
+      }
+
+      const reachedGoalWeeks: number[] = [];
+      const otherWeeks: number[] = [];
+
+      for (const [week, minutes] of exerciseByWeek.entries()) {
+        const weeklyBp = mean(bpByWeek.get(week) ?? []);
+        if (weeklyBp == null) continue;
+        if (minutes >= goalTarget) reachedGoalWeeks.push(weeklyBp);
+        else otherWeeks.push(weeklyBp);
+      }
+
+      if (reachedGoalWeeks.length >= 3 && otherWeeks.length >= 3) {
+        const comparison = compareGroups(reachedGoalWeeks, otherWeeks);
+        if (comparison && Math.abs(comparison.difference) >= 5) {
+          const direction = comparison.difference < 0 ? "lower" : "higher";
+          insights.unshift({
+            kind: "exercise",
+            tone: "info",
+            title: "Your Exercise goal and blood pressure show a pattern",
+            body:
+              "In your recorded data, weeks when you reached your " +
+              goalTarget +
+              "-minute Exercise goal had an average systolic reading of " +
+              (round(comparison.highAverage) ?? 0) +
+              " mmHg. Weeks when you did not reach the goal averaged " +
+              (round(comparison.lowAverage) ?? 0) +
+              " mmHg. The readings were " +
+              direction +
+              " during the goal weeks; this is an observed pattern, not proof that exercise caused the difference.",
+            evidence:
+              "Goal weeks " +
+              (round(comparison.highAverage) ?? 0) +
+              " mmHg · Other weeks " +
+              (round(comparison.lowAverage) ?? 0) +
+              " mmHg · " +
+              reachedGoalWeeks.length +
+              " vs " +
+              otherWeeks.length +
+              " weeks.",
+          });
+        }
+      } else {
+        insights.unshift({
+          kind: "exercise",
+          tone: "info",
+          title: "Your Exercise goal is connected to this pattern",
+          body:
+            "This week you have logged " +
+            thisWeekRounded +
+            " of " +
+            goalTarget +
+            " minutes. Sympto will compare your Exercise goal and blood-pressure readings as more weeks are recorded.",
+          evidence:
+            remaining > 0
+              ? remaining + " minutes remaining this week."
+              : "Weekly Exercise goal reached.",
+        });
+      }
+    }
+  }
+
   const journalByDay = new Map<string, BloodPressureJournal>();
   for (const journal of journals) {
     const date = journal.updatedAt ?? journal.createdAt;
@@ -646,5 +778,16 @@ export function buildBloodPressureInsights({
     const key = insight.kind + "::" + insight.title;
     if (!unique.has(key)) unique.set(key, insight);
   }
-  return [...unique.values()].slice(0, 5);
+  const priority: Record<BloodPressureInsight["kind"], number> = {
+    exercise: 0,
+    trend: 1,
+    time: 2,
+    stress: 3,
+    sleep: 4,
+    symptom: 5,
+    data: 6,
+  };
+  return [...unique.values()]
+    .sort((a, b) => (priority[a.kind] ?? 99) - (priority[b.kind] ?? 99))
+    .slice(0, 5);
 }
