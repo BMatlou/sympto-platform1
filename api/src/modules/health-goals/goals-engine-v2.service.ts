@@ -304,8 +304,97 @@ export class GoalsEngineService {
         : title + ': ' + (config.comparison === 'INCREASE_TO' ? 'gain' : 'loss') + ' ' + requestedChangeKg.toFixed(1) + ' kg from your ' + baseline.toFixed(1) + ' kg baseline toward ' + targetWeight.toFixed(1) + ' kg.';
     return { strategy: 'DELTA_REDUCTION', currentValue: latest, progressPercent: achieved ? 100 : progressPercent, achieved, guidanceText };
   }
+  private async evaluateBloodPressureStrategy(
+    patientId: string,
+    title: string,
+    config: GoalConfig,
+    goalCreatedAt: Date,
+    now: Date,
+    target: number,
+  ): Promise<StrategyEvaluation> {
+    const rows = await this.prisma.$queryRawUnsafe<Array<{ loggedValue: Prisma.Decimal; occurredAt: Date }>>(
+      'SELECT "loggedValue", "occurredAt" FROM "HealthGoalMetricEvent" WHERE "patientId" = $1 AND "metricType" = $2 AND "metricKey" = $3 AND "source" <> $4 AND "occurredAt" >= $5 AND "occurredAt" <= $6 ORDER BY "occurredAt" ASC',
+      patientId,
+      'BLOOD_PRESSURE',
+      'blood_pressure.systolic',
+      'goal-baseline',
+      goalCreatedAt,
+      now,
+    );
+
+    const latestByDay = new Map<string, { value: number; occurredAt: number }>();
+    const dayKey = (value: Date) =>
+      new Intl.DateTimeFormat('en-CA', {
+        timeZone: 'Africa/Johannesburg',
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit',
+      }).format(value);
+
+    for (const row of rows) {
+      const value = Number(row.loggedValue);
+      if (!Number.isFinite(value)) continue;
+      const key = dayKey(row.occurredAt);
+      const existing = latestByDay.get(key);
+      if (!existing || row.occurredAt.getTime() >= existing.occurredAt) {
+        latestByDay.set(key, { value, occurredAt: row.occurredAt.getTime() });
+      }
+    }
+
+    const daily = Array.from(latestByDay.values()).sort((a, b) => a.occurredAt - b.occurredAt);
+    const latest = daily.length ? daily[daily.length - 1].value : null;
+    const recordedDays = daily.length;
+    const targetDays = daily.filter((entry) =>
+      config.comparison === 'AT_LEAST'
+        ? entry.value >= target
+        : entry.value <= target,
+    ).length;
+
+    if (latest == null || !Number.isFinite(target)) {
+      return {
+        strategy: 'TARGET_RANGE_STABILIZATION',
+        currentValue: latest ?? 0,
+        progressPercent: 0,
+        achieved: false,
+        guidanceText: title + ': record a blood-pressure reading to start tracking target attainment.',
+      };
+    }
+
+    const progressPercent = recordedDays > 0
+      ? Math.round((targetDays / recordedDays) * 100)
+      : 0;
+
+    const gap = config.comparison === 'AT_LEAST'
+      ? target - latest
+      : latest - target;
+
+    const achieved = config.comparison === 'AT_LEAST'
+      ? latest >= target
+      : latest <= target;
+
+    const guidanceText = achieved
+      ? title + ': today\'s systolic reading is at target. ' + targetDays + ' of ' + recordedDays + ' recorded days have met the target.'
+      : title + ': today\'s systolic reading is ' + Math.abs(gap).toFixed(0) + ' mmHg ' + (gap > 0 ? 'above' : 'below') + ' the target. ' + targetDays + ' of ' + recordedDays + ' recorded days have met the target.';
+
+    return {
+      strategy: 'TARGET_RANGE_STABILIZATION',
+      currentValue: latest,
+      progressPercent,
+      achieved,
+      guidanceText,
+    };
+  }
+
   private async evaluateStrategy(patientId: string, title: string, config: GoalConfig, goalCreatedAt: Date, start: Date, now: Date, aggregate: number, target: number, strategy: TrackingStrategy): Promise<StrategyEvaluation> {
     if (strategy === 'DELTA_REDUCTION') return this.evaluateWeightStrategy(patientId, title, config, goalCreatedAt, now, target);
+    if (
+      strategy === 'TARGET_RANGE_STABILIZATION' &&
+      config.metricType === 'BLOOD_PRESSURE' &&
+      config.metricKey === 'blood_pressure.systolic' &&
+      config.frequency === 'DAILY'
+    ) {
+      return this.evaluateBloodPressureStrategy(patientId, title, config, goalCreatedAt, now, target);
+    }
     const history = await this.prisma.$queryRaw<Array<{ loggedValue: Prisma.Decimal; occurredAt: Date }>>`SELECT "loggedValue", "occurredAt" FROM "HealthGoalMetricEvent" WHERE "patientId" = ${patientId} AND "metricType" = ${config.metricType} AND "metricKey" = ${config.metricKey} AND "occurredAt" >= ${goalCreatedAt} AND "occurredAt" <= ${now} ORDER BY "occurredAt" ASC`;
     const values = history.map((row) => Number(row.loggedValue)).filter(Number.isFinite);
     const latest = values.length ? values[values.length - 1] : aggregate;
