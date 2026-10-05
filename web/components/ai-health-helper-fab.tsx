@@ -22,6 +22,7 @@ export default function AIHealthHelperFab() {
   const recorderRef = useRef<MediaRecorder | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
   const audioChunksRef = useRef<Blob[]>([]);
+  const discardRecordingRef = useRef(false);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
 
   useEffect(() => {
@@ -35,6 +36,7 @@ export default function AIHealthHelperFab() {
 
     return () => {
       window.removeEventListener("keydown", onKeyDown);
+      discardRecordingRef.current = true;
       recorderRef.current?.stop();
       recorderRef.current = null;
       streamRef.current?.getTracks().forEach((track) => track.stop());
@@ -51,6 +53,7 @@ export default function AIHealthHelperFab() {
   }, [open]);
 
   const closeHelper = () => {
+    discardRecordingRef.current = true;
     recorderRef.current?.stop();
     recorderRef.current = null;
     streamRef.current?.getTracks().forEach((track) => track.stop());
@@ -68,6 +71,7 @@ export default function AIHealthHelperFab() {
     setProcessing(false);
     setTranscribing(false);
     setProcessError("");
+    discardRecordingRef.current = false;
   };
 
   const transcribeAudio = async (file: File) => {
@@ -165,6 +169,7 @@ export default function AIHealthHelperFab() {
         : new MediaRecorder(stream);
 
       recorderRef.current = recorder;
+      discardRecordingRef.current = false;
 
       recorder.ondataavailable = (event) => {
         if (event.data.size > 0) {
@@ -182,6 +187,18 @@ export default function AIHealthHelperFab() {
       };
 
       recorder.onstop = () => {
+        const shouldDiscard = discardRecordingRef.current;
+        discardRecordingRef.current = false;
+
+        if (shouldDiscard) {
+          stream.getTracks().forEach((track) => track.stop());
+          recorderRef.current = null;
+          streamRef.current = null;
+          audioChunksRef.current = [];
+          setListening(false);
+          return;
+        }
+
         const blob = new Blob(audioChunksRef.current, {
           type: recorder.mimeType || "audio/webm",
         });
