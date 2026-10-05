@@ -897,7 +897,7 @@ type SupportingGoalPeriod = {
   endDay: string;
   label: string;
   value: number;
-  status: 'ON_TARGET' | 'BELOW_TARGET' | 'ABOVE_TARGET';
+  status: 'ON_TARGET' | 'BELOW_TARGET' | 'ABOVE_TARGET' | 'INSUFFICIENT_DATA';
   days: string[];
 };
 
