@@ -9,7 +9,7 @@ import BloodPressureSafetyOverlay from "@/components/health-vitals/blood-pressur
 import { isVeryHighBloodPressure, type BloodPressureSafetyStage } from "@/lib/blood-pressure-safety";
 
 export type DashboardVital = { type?: string; name?: string; value?: number | string; unit?: string; measuredAt?: string; source?: string | null };
-type Props = { bmi?: number | null; bmiCategory?: string | null; weightKg?: number | null; heightCm?: number | null; measurements?: DashboardVital[] };
+type Props = { bmi?: number | null; bmiCategory?: string | null; weightKg?: number | null; heightCm?: number | null; measurements?: DashboardVital[]; onUpdated?: () => Promise<void> | void };
 type FormState = { weightKg: string; heightCm: string; systolicPressure: string; diastolicPressure: string; restingHeartRate: string; oxygenSaturation: string; bodyTemperature: string; respiratoryRate: string };
 type BloodPressureSafetyState = { stage: BloodPressureSafetyStage; systolic: number; diastolic: number; initialSystolic?: number; initialDiastolic?: number };
 const EMPTY_FORM: FormState = { weightKg: "", heightCm: "", systolicPressure: "", diastolicPressure: "", restingHeartRate: "", oxygenSaturation: "", bodyTemperature: "", respiratoryRate: "" };
@@ -24,7 +24,7 @@ function formFromMeasurements(measurements: DashboardVital[]): FormState { const
 function measurementsFromJournal(journal: any): DashboardVital[] { const recordedAt = String(journal?.updatedAt || journal?.createdAt || ""); if (!sameLocalDay(recordedAt)) return []; const result: DashboardVital[] = []; const add = (type: string, value: unknown, unit: string) => { if (value !== null && value !== undefined && value !== "") result.push({ type, value: Number(value), unit, measuredAt: recordedAt, source: "Health Journal" }); }; add("WEIGHT", journal.weightKg, "kg"); const heightMatch = String(journal.notes ?? "").match(/Height:\s*([0-9.]+)\s*cm/i); if (heightMatch) add("HEIGHT", heightMatch[1], "cm"); if (journal.bloodPressureSystolic != null && journal.bloodPressureDiastolic != null) result.push({ type: "BLOOD_PRESSURE", value: `${journal.bloodPressureSystolic}/${journal.bloodPressureDiastolic}`, unit: "mmHg", measuredAt: recordedAt, source: "Health Journal" }); add("HEART_RATE", journal.heartRate, "bpm"); add("OXYGEN_SATURATION", journal.oxygenSaturation, "%"); add("BODY_TEMPERATURE", journal.temperature, "°C"); add("RESPIRATORY_RATE", journal.respiratoryRate, "/min"); return result; }
 function mergeMeasurements(current: DashboardVital[], incoming: DashboardVital[]) { const map = new Map<string, DashboardVital>(); for (const item of [...current, ...incoming]) { const key = String(item.type ?? item.name ?? "").toUpperCase(); if (!key || !sameLocalDay(item.measuredAt)) continue; const previous = map.get(key); if (!previous || new Date(String(item.measuredAt ?? 0)).getTime() >= new Date(String(previous.measuredAt ?? 0)).getTime()) map.set(key, item); } return Array.from(map.values()); }
 
-export default function HealthVitalsSummary({ measurements = [] }: Props) {
+export default function HealthVitalsSummary({ measurements = [], onUpdated }: Props) {
   const [dayKey, setDayKey] = useState(() => localDayKey()); const [open, setOpen] = useState(false); const [busy, setBusy] = useState(false); const [message, setMessage] = useState("");
   const [bpSafety, setBpSafety] = useState<BloodPressureSafetyState | null>(null); const [bpSafetySymptoms, setBpSafetySymptoms] = useState<string[]>([]);
   const [todayMeasurements, setTodayMeasurements] = useState<DashboardVital[]>(() => measurements.filter((item) => sameLocalDay(item.measuredAt)));
@@ -61,6 +61,8 @@ export default function HealthVitalsSummary({ measurements = [] }: Props) {
       setTodayMeasurements((current) => mergeMeasurements(current, nextMeasurements));
       setForm(formFromMeasurements(nextMeasurements));
       window.dispatchEvent(new CustomEvent("sympto:weight-updated"));
+      window.dispatchEvent(new CustomEvent("sympto:vitals-updated"));
+      await onUpdated?.();
 
       const systolic = input.systolicPressure;
       const diastolic = input.diastolicPressure;
