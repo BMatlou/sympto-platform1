@@ -239,8 +239,17 @@ function calculateTrajectory(
 
   const expectedDosesToDate = elapsedLifecycleDays * dailyFrequency;
   const lifetimeExpectedDoses = lifetimeDays * dailyFrequency;
+  const lifecycleEnd = input.medicationGoal.targetDate
+    ? input.medicationGoal.targetDate < input.now
+      ? input.medicationGoal.targetDate
+      : input.now
+    : input.now;
+
   const takenDoses = input.medicationEvents.filter(
-    (event) => event.action === 'TAKEN',
+    (event) =>
+      event.action === 'TAKEN' &&
+      event.timestamp >= input.medicationGoal.startDate &&
+      event.timestamp <= lifecycleEnd,
   ).length;
 
   const adherencePercent =
@@ -342,7 +351,20 @@ function calculateTimeBuckets(
     }
   }
 
+  const lifecycleEnd = input.medicationGoal.targetDate
+    ? input.medicationGoal.targetDate < input.now
+      ? input.medicationGoal.targetDate
+      : input.now
+    : input.now;
+
   for (const event of input.medicationEvents) {
+    if (
+      event.timestamp < input.medicationGoal.startDate ||
+      event.timestamp > lifecycleEnd
+    ) {
+      continue;
+    }
+
     const bucket = bucketForTimestamp(event.timestamp, input.timezone);
     if (!bucket) continue;
 
@@ -422,8 +444,19 @@ function calculateCrossGoalAssociation(
   goal: ClinicalSupportingGoal,
   rules: ClinicalIntelligenceRules,
 ): CrossGoalAssociation {
+  const lifecycleEnd = input.medicationGoal.targetDate
+    ? input.medicationGoal.targetDate < input.now
+      ? input.medicationGoal.targetDate
+      : input.now
+    : input.now;
+
   const goalEvents = input.journalEvents
-    .filter((event) => event.goalId === goal.goalId)
+    .filter(
+      (event) =>
+        event.goalId === goal.goalId &&
+        event.timestamp >= input.medicationGoal.startDate &&
+        event.timestamp <= lifecycleEnd,
+    )
     .sort((a, b) => a.timestamp.getTime() - b.timestamp.getTime());
 
   const loggedDates = new Set(
@@ -602,14 +635,33 @@ function aggregateMedicationByDay(
 ): Array<{ day: string; expected: number; taken: number }> {
   const takenByDay = new Map<string, number>();
 
+  const lifecycleEnd = input.medicationGoal.targetDate
+    ? input.medicationGoal.targetDate < input.now
+      ? input.medicationGoal.targetDate
+      : input.now
+    : input.now;
+
   for (const event of input.medicationEvents) {
-    if (event.action !== 'TAKEN') continue;
+    if (
+      event.action !== 'TAKEN' ||
+      event.timestamp < input.medicationGoal.startDate ||
+      event.timestamp > lifecycleEnd
+    ) {
+      continue;
+    }
     const day = dateKey(event.timestamp, timezone);
     takenByDay.set(day, (takenByDay.get(day) ?? 0) + 1);
   }
 
+  const lifecycleEndDay = dateKey(
+    input.medicationGoal.targetDate && input.medicationGoal.targetDate < input.now
+      ? input.medicationGoal.targetDate
+      : input.now,
+    timezone,
+  );
+
   return input.scheduledDays
-    .filter((day) => day.expectedDoses > 0 && day.day <= dateKey(input.now, timezone))
+    .filter((day) => day.expectedDoses > 0 && day.day <= lifecycleEndDay)
     .map((day) => ({
       day: day.day,
       expected: Math.max(0, Number(day.expectedDoses) || 0),
