@@ -323,30 +323,14 @@ export default function TodayMedicationActions({ medications, goal: suppliedGoal
             " routine may reduce tracking friction.",
         }
       : null);
-  const narrativeComparisons = Array.isArray(narrativeInterference?.comparison)
-    ? narrativeInterference.comparison
-    : [];
-  const morningNarrative = narrativeComparisons.find(
-    (item: any) => String(item?.label) === "Morning",
-  );
-  const routineAnchorTitle = narrativeRoutineAnchor
-    ? "Lifestyle Routine Anchor (" + String(narrativeRoutineAnchor.goalName) + " Cross-Analysis)"
-    : "Lifestyle Routine Anchor";
-  const narrativeAdherence = Number(
-    clinicalNarrative?.baseline?.adherencePercent ?? insightAdherencePercent,
-  );
-  const narrativeTarget = Number(
-    clinicalNarrative?.baseline?.targetAdherencePercent ?? targetAdherence,
-  );
-  const narrativeStatus =
-    narrativeAdherence < narrativeTarget
-      ? "BELOW_TARGET"
-      : narrativeAdherence > narrativeTarget
-        ? "ABOVE_TARGET"
-        : "ON_TARGET";
-  const narrativeGap = Math.abs(
-    Number((narrativeAdherence - narrativeTarget).toFixed(1)),
-  );
+  const realTimePattern = clinicalNarrative?.pattern ?? null;
+  const patternText =
+    realTimePattern ??
+    narrativeRoutineAnchor?.statement ??
+    rawAssociation?.statement ??
+    (narrativeInterference
+      ? "Chronological pattern detected in your medication timing. Review the time window shown above alongside today’s activity."
+      : "Today’s medication execution is being evaluated against your active health data.");
 
 
 
@@ -428,63 +412,37 @@ export default function TodayMedicationActions({ medications, goal: suppliedGoal
           <div className="mt-3 rounded-[18px] border border-[#d9e4ee] bg-white px-3.5 py-4 ring-1 ring-[#e8eef3] sm:px-4">
             <div className="flex flex-wrap items-center gap-2">
               <p className="text-[8px] font-black uppercase tracking-[.14em] text-[#0b7b80]">Medication Journey</p>
-              {narrativeInterference ? (
-                <span className="rounded-full bg-[#fff3eb] px-2 py-1 text-[8px] font-black uppercase tracking-[.08em] text-[#9a633e]">
-                  ⚠️ Routine Sub-Optimal Window
-                </span>
-              ) : null}
             </div>
 
             <p className="mt-2 text-[11px] font-bold leading-5 text-[#0b2d54]">
-              Accumulated baseline: {Number(clinicalNarrative?.baseline?.takenDoses ?? insightTakenDoses)} of {Number(clinicalNarrative?.baseline?.expectedDoses ?? insightExpectedScheduledDoses)} scheduled doses logged ({Number(clinicalNarrative?.baseline?.adherencePercent ?? insightAdherencePercent).toFixed(1)}% adherence).
-            </p>
-
-            <p className="mt-2 text-[11px] leading-5 text-[#5f7080]">
-              Your {safeDosesLoggedToday}/{totalRequiredDosesPerDay} logs today demonstrate {safeDosesLoggedToday >= totalRequiredDosesPerDay ? "perfect short-term execution" : "partial short-term execution"}, but the longitudinal adherence vector remains {narrativeStatus === "BELOW_TARGET" ? narrativeGap + " percentage points below" : narrativeStatus === "ABOVE_TARGET" ? narrativeGap + " percentage points above" : "at"} the {Math.round(narrativeTarget)}% goal threshold.
+              ⚠️ Therapeutic Adherence Variance: Accumulated baseline: {Number(clinicalNarrative?.baseline?.takenDoses ?? insightTakenDoses)} of {Number(clinicalNarrative?.baseline?.expectedDoses ?? insightExpectedScheduledDoses)} scheduled doses logged ({Number(clinicalNarrative?.baseline?.adherencePercent ?? insightAdherencePercent).toFixed(1)}% adherence). Your {safeDosesLoggedToday}/{totalRequiredDosesPerDay} logs today demonstrate {safeDosesLoggedToday >= totalRequiredDosesPerDay ? "perfect short-term execution" : "partial short-term execution"}, but the longitudinal vector remains {Math.abs(Number(((clinicalNarrative?.baseline?.adherencePercent ?? insightAdherencePercent) - (clinicalNarrative?.baseline?.targetAdherencePercent ?? targetAdherence)).toFixed(1)))} percentage points {Number(clinicalNarrative?.baseline?.adherencePercent ?? insightAdherencePercent) < Number(clinicalNarrative?.baseline?.targetAdherencePercent ?? targetAdherence) ? "below" : Number(clinicalNarrative?.baseline?.adherencePercent ?? insightAdherencePercent) > Number(clinicalNarrative?.baseline?.targetAdherencePercent ?? targetAdherence) ? "above" : "at"} the {Math.round(Number(clinicalNarrative?.baseline?.targetAdherencePercent ?? targetAdherence))}% target.
             </p>
           </div>
 
-          {narrativeInterference ? (
+          {!realTimePattern && narrativeInterference ? (
             <div className="mt-3 rounded-[18px] border border-[#eadfd7] bg-[#fffaf6] px-3.5 py-4 ring-1 ring-[#f0e5dd] sm:px-4">
               <p className="text-[8px] font-black uppercase tracking-[.14em] text-[#9a633e]">Chronological Interference</p>
               <p className="mt-2 text-[11px] font-bold leading-5 text-[#0b2d54]">
-                A time-series analysis reveals a systematic drop-off clustered specifically around the {String(narrativeInterference.label).toLowerCase()} schedule.{" "}
-                {morningNarrative ? (
-                  <>Morning doses track at {Number(morningNarrative.consistencyRatePercent).toFixed(1)}% consistency{Number(morningNarrative.expectedDoses) > 0 ? " (" + Math.max(0, Number(morningNarrative.expectedDoses) - Number(morningNarrative.failureDoses)) + " of " + Number(morningNarrative.expectedDoses) + " successful)." : "."}</>
-                ) : null}{" "}
-                The {String(narrativeInterference.label).toLowerCase()} window exhibits a {Number(narrativeInterference.failureRatePercent).toFixed(0)}% failure rate ({Number(narrativeInterference.failedDoses)} of {Number(narrativeInterference.expectedDoses)} skipped or unlogged).
+                A time-series analysis reveals a systematic drop-off clustered specifically around the {String(narrativeInterference.label).toLowerCase()} schedule. The {String(narrativeInterference.label).toLowerCase()} window exhibits a {Number(narrativeInterference.failureRatePercent).toFixed(0)}% failure rate ({Number(narrativeInterference.failedDoses)} of {Number(narrativeInterference.expectedDoses)} skipped or unlogged).
               </p>
             </div>
           ) : null}
 
-          {narrativeRoutineAnchor ? (
+          {!realTimePattern && narrativeRoutineAnchor ? (
             <div className="mt-3 rounded-[18px] border border-[#cfe8e6] bg-[#f4fbfb] px-3.5 py-4 ring-1 ring-[#dcefed] sm:px-4">
-              <p className="text-[8px] font-black uppercase tracking-[.14em] text-[#0b7b80]">{routineAnchorTitle}</p>
+              <p className="text-[8px] font-black uppercase tracking-[.14em] text-[#0b7b80]">Longitudinal Pattern</p>
               <p className="mt-2 text-[11px] font-bold leading-5 text-[#0b2d54]">
                 {String(narrativeRoutineAnchor.statement)}
               </p>
-              {narrativeRoutineAnchor.latestJournalValue != null && narrativeRoutineAnchor.latestJournalDate ? (
-                <p className="mt-1.5 text-[9px] font-semibold leading-4 text-[#7c8e9b]">
-                  Latest linked observation: {Number(narrativeRoutineAnchor.latestJournalValue)}{narrativeRoutineAnchor.unit ? " " + String(narrativeRoutineAnchor.unit) : ""} · {String(narrativeRoutineAnchor.latestJournalDate)}.
-                </p>
-              ) : null}
-              <p className="mt-2.5 text-[11px] font-black leading-5 text-[#0b2d54]">
-                {String(narrativeRoutineAnchor.actionStatement)}
-              </p>
             </div>
           ) : null}
 
-          {!narrativeInterference && !narrativeRoutineAnchor ? (
-            <div className="mt-3 rounded-[18px] border border-[#d9e4ee] bg-white px-3.5 py-4 ring-1 ring-[#e8eef3] sm:px-4">
-              <p className="text-[8px] font-black uppercase tracking-[.14em] text-[#0b7b80]">Longitudinal Pattern</p>
-              <p className="mt-2 text-[11px] font-bold leading-5 text-[#0b2d54]">
-                The longitudinal record contains {Number(clinicalNarrative?.baseline?.takenDoses ?? insightTakenDoses)} of {Number(clinicalNarrative?.baseline?.expectedDoses ?? insightExpectedScheduledDoses)} scheduled doses ({narrativeAdherence.toFixed(1)}% adherence), which is {narrativeStatus === "BELOW_TARGET" ? narrativeGap + " percentage points below" : narrativeStatus === "ABOVE_TARGET" ? narrativeGap + " percentage points above" : "at"} the {Math.round(narrativeTarget)}% goal threshold.
-              </p>
-              <p className="mt-1.5 text-[9px] leading-4 text-[#7c8e9b]">
-                A stronger temporal or cross-goal association will be surfaced automatically when the observed data supports it.
-              </p>
-            </div>
-          ) : null}
+          <div className="mt-3 rounded-[18px] border border-[#d9e4ee] bg-white px-3.5 py-4 ring-1 ring-[#e8eef3] sm:px-4">
+            <p className="text-[8px] font-black uppercase tracking-[.14em] text-[#0b7b80]">Longitudinal Pattern</p>
+            <p className="mt-2 text-[11px] font-bold leading-5 text-[#0b2d54]">
+              {patternText}
+            </p>
+          </div>
 
           <p className="mt-3 border-t border-[#e3ecef] pt-3 text-[9px] font-semibold leading-4 text-[#8a99a6]">
             {String(clinicalNarrative?.statisticalAssociationNote ?? "Statistical Association: Identifies correlations across your logged data streams. Does not imply direct clinical causation.")}
