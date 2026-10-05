@@ -388,7 +388,7 @@ export default function TodayMedicationActions({ medications, goal: suppliedGoal
           <div className="mt-3 rounded-[18px] border border-[#d9e4ee] bg-white px-3.5 py-4 ring-1 ring-[#e8eef3] sm:px-4">
             <div className="flex flex-wrap items-center gap-2">
               <p className="text-[8px] font-black uppercase tracking-[.14em] text-[#0b7b80]">Medication Journey</p>
-              {narrativeStatus === "BELOW_TARGET" ? (
+              {narrativeInterference ? (
                 <span className="rounded-full bg-[#fff3eb] px-2 py-1 text-[8px] font-black uppercase tracking-[.08em] text-[#9a633e]">
                   ⚠️ Routine Sub-Optimal Window
                 </span>
@@ -436,9 +436,12 @@ export default function TodayMedicationActions({ medications, goal: suppliedGoal
 
           {!narrativeInterference && !narrativeRoutineAnchor ? (
             <div className="mt-3 rounded-[18px] border border-[#d9e4ee] bg-white px-3.5 py-4 ring-1 ring-[#e8eef3] sm:px-4">
-              <p className="text-[8px] font-black uppercase tracking-[.14em] text-[#0b7b80]">Pattern coverage</p>
-              <p className="mt-2 text-[11px] leading-5 text-[#5f7080]">
-                No time-window or cross-goal association has crossed the evidence threshold yet. The engine will continue testing chronological and behavioral patterns as more longitudinal observations accumulate.
+              <p className="text-[8px] font-black uppercase tracking-[.14em] text-[#0b7b80]">Longitudinal Pattern</p>
+              <p className="mt-2 text-[11px] font-bold leading-5 text-[#0b2d54]">
+                The longitudinal record contains {Number(clinicalNarrative?.baseline?.takenDoses ?? insightTakenDoses)} of {Number(clinicalNarrative?.baseline?.expectedDoses ?? insightExpectedScheduledDoses)} scheduled doses ({narrativeAdherence.toFixed(1)}% adherence), which is {narrativeStatus === "BELOW_TARGET" ? narrativeGap + " percentage points below" : narrativeStatus === "ABOVE_TARGET" ? narrativeGap + " percentage points above" : "at"} the {Math.round(narrativeTarget)}% goal threshold.
+              </p>
+              <p className="mt-1.5 text-[9px] leading-4 text-[#7c8e9b]">
+                A stronger temporal or cross-goal association will be surfaced automatically when the observed data supports it.
               </p>
             </div>
           ) : null}
