@@ -3,6 +3,7 @@ import { PrismaService } from '../../database/prisma.service';
 import { goalRuleFor } from './goal-metric-rules';
 import { MedicationConnectedGoalsEngine, type ConnectedGoalInsight } from './medication-connected-goals.engine';
 import { MedicationGoalIntelligenceEngine, type MedicationGoalIntelligence } from './medication-goal-intelligence.engine';
+import { MedicationClinicalIntelligenceEngine, type ClinicalIntelligenceOutput, type ClinicalJournalEvent, type ClinicalMedicationEvent, type ClinicalMedicationGoal, type ClinicalSupportingGoal } from './medication-clinical-intelligence.engine';
 
 export type MedicationDoseAction = 'TAKEN' | 'SKIPPED';
 export type MedicationDailyTrend =
@@ -137,6 +138,7 @@ export interface MedicationInsightResult {
     trend: MedicationTrendResult;
     associations: SupportingGoalAssociation[];
     goalIntelligence: MedicationGoalIntelligence;
+    clinicalIntelligence: ClinicalIntelligenceOutput;
     dataQuality: {
       explicitAdherenceEvents: number;
       legacyAdherenceEventsIgnored: number;
@@ -208,6 +210,7 @@ export class MedicationInsightService {
     private readonly prisma: PrismaService,
     private readonly connectedGoalsEngine: MedicationConnectedGoalsEngine,
     private readonly medicationGoalIntelligenceEngine: MedicationGoalIntelligenceEngine,
+    private readonly medicationClinicalIntelligenceEngine: MedicationClinicalIntelligenceEngine,
   ) {}
 
   async buildForGoal(goalId: string): Promise<MedicationInsightResult> {
@@ -228,6 +231,15 @@ export class MedicationInsightService {
     const relations = await this.loadRelations(goal.patientId, goalId);
     const supportingEvents = await this.loadSupportingEvents(goal.patientId, goal.createdAt, relations);
     const now = new Date();
+    const clinicalSupportingGoals = await this.loadClinicalSupportingGoals(
+      goal.patientId,
+      goalId,
+    );
+    const clinicalJournalEvents = await this.loadClinicalJournalEvents(
+      goal.patientId,
+      goal.createdAt,
+      clinicalSupportingGoals,
+    );
 
     const dailyBuckets = buildDailyBuckets(goal.createdAt, now, schedule, doseRows);
     const journeyAdherence = calculateJourneyAdherence(dailyBuckets, now, goal.targetDate);
@@ -259,6 +271,30 @@ export class MedicationInsightService {
       dailyBuckets,
       journeyAdherence,
       trend,
+    });
+
+    const clinicalIntelligence = this.medicationClinicalIntelligenceEngine.calculate({
+      medicationGoal: {
+        medicationId: goal.medicationId,
+        name: goal.medicationName ?? 'Medication',
+        frequency: schedule.dosesPerDay,
+        startDate: goal.createdAt,
+        targetDate: goal.targetDate,
+        targetAdherence:
+          Number.isFinite(Number(goal.targetAdherence)) && Number(goal.targetAdherence) > 0
+            ? Number(goal.targetAdherence)
+            : 90,
+      } satisfies ClinicalMedicationGoal,
+      medicationEvents: doseRows.map((event) => ({
+        timestamp: event.occurredAt,
+        action: event.action as ClinicalMedicationEvent['action'],
+      })),
+      supportingGoals: clinicalSupportingGoals,
+      journalEvents: clinicalJournalEvents,
+      medicationSchedule: schedule,
+      scheduledDays: dailyBuckets,
+      now,
+      timezone: schedule.timezone,
     });
 
     const associations = connectedGoalInsights
@@ -327,6 +363,7 @@ export class MedicationInsightService {
         associations,
         connectedGoalInsights,
         goalIntelligence,
+        clinicalIntelligence,
         dataQuality: {
           explicitAdherenceEvents: doseRows.length,
           legacyAdherenceEventsIgnored,
@@ -469,6 +506,112 @@ export class MedicationInsightService {
       patientMedicationId + ':%',
     );
     return Number(rows[0]?.count ?? 0);
+  }
+
+  private async loadClinicalSupportingGoals(
+    patientId: string,
+    medicationGoalId: string,
+  ): Promise<ClinicalSupportingGoal[]> {
+    const sql =
+      'SELECT g."id" AS "goalId", g."title" AS "name", g."category"::text AS "category", ' +
+      'g."unit" AS "unit", g."targetValue"::double precision AS "targetValue", ' +
+      'g."createdAt" AS "createdAt", c."metricType", c."metricKey", c."frequency", ' +
+      'c."frequencyTarget"::double precision AS "frequencyTarget", c."aggregation", c."comparison" ' +
+      'FROM "HealthGoalRelation" r ' +
+      'JOIN "HealthGoal" g ON g."id" = r."sourceGoalId" ' +
+      'LEFT JOIN "HealthGoalMetricConfig" c ON c."healthGoalId" = g."id" ' +
+      'WHERE r."targetGoalId" = $1 AND r."relationshipType" = \'SUPPORTS\' ' +
+      'AND g."patientId" = $2 AND g."id" <> $1 ' +
+      'AND g."status"::text IN (\'ACTIVE\', \'ON_HOLD\') ' +
+      'AND c."metricKey" IS NOT NULL ' +
+      'ORDER BY g."createdAt" DESC';
+
+    const rows = await this.prisma.$queryRawUnsafe<Array<{
+      goalId: string;
+      name: string;
+      category: string;
+      unit: string | null;
+      targetValue: number | null;
+      createdAt: Date;
+      metricType: string;
+      metricKey: string;
+      frequency: string | null;
+      frequencyTarget: number | null;
+      aggregation: string | null;
+      comparison: string | null;
+    }>>(sql, medicationGoalId, patientId);
+
+    return rows.map((row) => ({
+      goalId: String(row.goalId),
+      name: String(row.name ?? row.category),
+      category: String(row.category ?? 'UNKNOWN'),
+      unit: row.unit == null ? null : String(row.unit),
+      targetValue:
+        row.frequencyTarget == null
+          ? row.targetValue == null
+            ? null
+            : Number(row.targetValue)
+          : Number(row.frequencyTarget),
+      frequency: String(row.frequency ?? 'DAILY'),
+      metricType: String(row.metricType),
+      metricKey: String(row.metricKey),
+      aggregation: String(row.aggregation ?? 'LATEST'),
+      comparison: String(row.comparison ?? 'AT_LEAST'),
+      createdAt: row.createdAt,
+    }));
+  }
+
+  private async loadClinicalJournalEvents(
+    patientId: string,
+    medicationGoalCreatedAt: Date,
+    goals: ClinicalSupportingGoal[],
+  ): Promise<ClinicalJournalEvent[]> {
+    const result: ClinicalJournalEvent[] = [];
+
+    for (const goal of goals) {
+      const start = new Date(
+        Math.max(medicationGoalCreatedAt.getTime(), goal.createdAt.getTime()),
+      );
+
+      const sql =
+        'SELECT "occurredAt", "loggedValue"::double precision AS "loggedValue", "source" ' +
+        'FROM "HealthGoalMetricEvent" ' +
+        'WHERE "patientId" = $1 AND "metricType" = $2 AND "metricKey" = $3 ' +
+        'AND "occurredAt" >= $4 AND "occurredAt" <= CURRENT_TIMESTAMP ' +
+        'ORDER BY "occurredAt" ASC';
+
+      const rows = await this.prisma.$queryRawUnsafe<Array<{
+        occurredAt: Date;
+        loggedValue: number;
+        source: string;
+        sourceId?: string | null;
+      }>>(sql, patientId, goal.metricType, goal.metricKey, start);
+
+      const goalPrefix = 'goal-' + goal.goalId + '-';
+
+      for (const row of rows) {
+        // Explicit goal-scoped events are attributed only to their originating
+        // goal. Generic journal/check-in events remain eligible as contextual
+        // evidence because they are not stamped with another goal id.
+        // sourceId is selected opportunistically in deployments where it exists.
+        const sourceId = String(row.sourceId ?? '');
+        if (sourceId.startsWith('goal-') && !sourceId.startsWith(goalPrefix)) {
+          continue;
+        }
+
+        const value = Number(row.loggedValue);
+        if (!Number.isFinite(value)) continue;
+
+        result.push({
+          goalId: goal.goalId,
+          timestamp: row.occurredAt,
+          value,
+          source: String(row.source),
+        });
+      }
+    }
+
+    return result;
   }
 
   private async loadRelations(
