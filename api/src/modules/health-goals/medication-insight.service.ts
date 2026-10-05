@@ -1,6 +1,7 @@
 import { BadRequestException, Injectable } from '@nestjs/common';
 import { PrismaService } from '../../database/prisma.service';
 import { goalRuleFor } from './goal-metric-rules';
+import { assertMedicationInsightNumeratorSynchronized } from './medication-insight.guard';
 
 export type MedicationDoseAction = 'TAKEN' | 'SKIPPED';
 export type MedicationDailyTrend =
@@ -218,6 +219,11 @@ export class MedicationInsightService {
 
     const dailyBuckets = buildDailyBuckets(goal.createdAt, now, schedule, doseRows);
     const journeyAdherence = calculateJourneyAdherence(dailyBuckets, now, goal.targetDate);
+    const loadedTakenDoses = doseRows.filter((event) => event.action === 'TAKEN').length;
+    assertMedicationInsightNumeratorSynchronized(
+      loadedTakenDoses,
+      journeyAdherence.takenDoses,
+    );
     const todayStatus = calculateTodayStatus(dailyBuckets, now);
     const trend = classifyTrend(dailyBuckets, now);
     const associations = calculateAssociations(dailyBuckets, now, relations, supportingEvents);

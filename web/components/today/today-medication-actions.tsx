@@ -1,10 +1,15 @@
 "use client";
 
 import { Check, CircleSlash2, Pill } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 import { api } from "@/lib/api";
 import { healthGoalsService } from "@/services/health-goals.service";
+import {
+  buildMedicationJourneyInsight,
+  medicationInsightNumeratorMismatch,
+  type MedicationAdherenceStreamEvent,
+} from "@/lib/medication-insight";
 
 interface TodayMedicationActionsProps {
   medications: any[];
@@ -100,6 +105,7 @@ function cumulativeTakenDoses(medication: any): number {
 export default function TodayMedicationActions({ medications, goal: suppliedGoal, onUpdated }: TodayMedicationActionsProps) {
   const [dosesLoggedToday, setDosesLoggedToday] = useState(0);
   const [takenDosesForGoal, setTakenDosesForGoal] = useState(0);
+  const [adherenceStream, setAdherenceStream] = useState<MedicationAdherenceStreamEvent[]>([]);
   const [isSyncing, setIsSyncing] = useState(false);
   const [savingKey, setSavingKey] = useState<string | null>(null);
   const [states, setStates] = useState<Record<string, Action | undefined>>({});
@@ -142,11 +148,12 @@ export default function TodayMedicationActions({ medications, goal: suppliedGoal
     ? Math.min(100, Math.max(0, Math.round((safeDosesLoggedToday / totalRequiredDosesPerDay) * 100)))
     : 0;
 
-  async function loadAdherenceEvents() {
+  async function loadAdherenceEvents(): Promise<number> {
     if (!medications.length || !medicationId) {
       setDosesLoggedToday(0);
       setTakenDosesForGoal(0);
-      return;
+      setAdherenceStream([]);
+      return 0;
     }
 
     try {
@@ -167,10 +174,12 @@ export default function TodayMedicationActions({ medications, goal: suppliedGoal
         .filter((event) => String(event?.sourceId ?? "").startsWith(medicationPrefix))
         .sort((a, b) => new Date(String(a.occurredAt)).getTime() - new Date(String(b.occurredAt)).getTime());
 
+      setAdherenceStream(medicationEvents);
+
       if (!medicationEvents.length) {
         setDosesLoggedToday(0);
         setTakenDosesForGoal(0);
-        return;
+        return 0;
       }
 
       // Each medication-adherence event represents exactly one recorded dose
@@ -198,16 +207,15 @@ export default function TodayMedicationActions({ medications, goal: suppliedGoal
         }
       });
 
-      setTakenDosesForGoal(Math.max(0, cumulativeTaken));
+      const safeCumulativeTaken = Math.max(0, cumulativeTaken);
+      setTakenDosesForGoal(safeCumulativeTaken);
       setDosesLoggedToday(Math.min(totalRequiredDosesPerDay, Math.max(0, todayTaken)));
+      return safeCumulativeTaken;
     } catch {
       // Keep the current UI if event history cannot be loaded.
+      return 0;
     }
   }
-
-  useEffect(() => {
-    void loadAdherenceEvents();
-  }, [medications.length, totalRequiredDosesPerDay, medicationId, finalGoal?.id]);
 
   const doseLabel = useMemo(
     () => (totalRequiredDosesPerDay === 1 ? "1 dose" : `${totalRequiredDosesPerDay} doses`),
@@ -225,28 +233,78 @@ export default function TodayMedicationActions({ medications, goal: suppliedGoal
   const takenDosesSoFar = Math.max(0, takenDosesForGoal || fallbackTakenDoses);
 
   const [medicationInsight, setMedicationInsight] = useState<any | null>(null);
+  const [insightSyncRetrying, setInsightSyncRetrying] = useState(false);
+  const insightSyncRetriedForGoal = useRef<string | null>(null);
 
-  async function loadMedicationInsight() {
+  async function loadMedicationInsight(loadedTakenCount = takenDosesSoFar) {
     if (!finalGoal?.id) {
       setMedicationInsight(null);
       return;
     }
 
     try {
-      const response = await api.get(
-        `/patient-health-goals/${encodeURIComponent(String(finalGoal.id))}/medication-insight`,
-      );
-      setMedicationInsight(response.data?.data ?? response.data ?? null);
+      const requestInsight = async () => {
+        const response = await api.get(
+          `/patient-health-goals/${encodeURIComponent(String(finalGoal.id))}/medication-insight`,
+        );
+        return response.data?.data ?? response.data ?? null;
+      };
+
+      const data = await requestInsight();
+      const serverTakenCount = Number(data?.analysis?.journeyAdherence?.takenDoses ?? 0);
+
+      if (
+        medicationInsightNumeratorMismatch(loadedTakenCount, serverTakenCount) &&
+        insightSyncRetriedForGoal.current !== String(finalGoal.id)
+      ) {
+        insightSyncRetriedForGoal.current = String(finalGoal.id);
+        setInsightSyncRetrying(true);
+        try {
+          await onUpdated?.();
+          const retriedData = await requestInsight();
+          setMedicationInsight(retriedData);
+        } finally {
+          setInsightSyncRetrying(false);
+        }
+        return;
+      }
+
+      setMedicationInsight(data);
     } catch {
       setMedicationInsight(null);
+      setInsightSyncRetrying(false);
     }
   }
 
   useEffect(() => {
-    void loadMedicationInsight();
-  }, [finalGoal?.id]);
+    insightSyncRetriedForGoal.current = null;
 
-  const journeyInsight = medicationInsight?.analysis?.journeyAdherence;
+    let active = true;
+    const syncMedicationState = async () => {
+      const loadedTakenCount = await loadAdherenceEvents();
+      if (!active) return;
+      await loadMedicationInsight(loadedTakenCount);
+    };
+
+    void syncMedicationState();
+
+    return () => {
+      active = false;
+    };
+  }, [medications.length, totalRequiredDosesPerDay, medicationId, finalGoal?.id]);
+
+  const journeyInsightFromApi = medicationInsight?.analysis?.journeyAdherence;
+  const journeyInsight = useMemo(
+    () =>
+      buildMedicationJourneyInsight({
+        adherenceStream,
+        takenCount: takenDosesSoFar,
+        expectedScheduledDoses: Number(
+          journeyInsightFromApi?.expectedScheduledDoses,
+        ),
+      }),
+    [adherenceStream, takenDosesSoFar, journeyInsightFromApi?.expectedScheduledDoses],
+  );
   const trendInsight = medicationInsight?.analysis?.trend;
   const associationInsight = (medicationInsight?.analysis?.associations ?? []).find(
     (association: any) => association?.statisticallyRelevant && association?.insight,
@@ -300,7 +358,8 @@ export default function TodayMedicationActions({ medications, goal: suppliedGoal
         });
       }
       await onUpdated?.();
-      await loadMedicationInsight();
+      const refreshedTakenCount = await loadAdherenceEvents();
+      await loadMedicationInsight(refreshedTakenCount);
     } catch (error) {
       toast.error("Medication update failed", { description: errorMessage(error) });
     } finally {
@@ -336,7 +395,7 @@ export default function TodayMedicationActions({ medications, goal: suppliedGoal
               <div className="rounded-[18px] border border-[#d9e4ee] bg-white px-3.5 py-3.5 ring-1 ring-[#e8eef3] sm:px-4 sm:py-4">
                 <p className="text-[11px] font-black leading-5 text-[#0b2d54]">Medication journey</p>
                 <p className="mt-1 text-[11px] leading-5 text-[#5f7080]">
-                  {journeyInsight.takenDoses} of {journeyInsight.expectedScheduledDoses} scheduled doses taken · {Math.round(journeyInsight.adherencePercent)}% adherence.
+                  {journeyInsight.takenDoses} of {journeyInsight.expectedScheduledDoses} scheduled doses taken · {Math.round(journeyInsight.adherencePercent)}% adherence{insightSyncRetrying ? " · synchronising" : ""}.
                 </p>
               </div>
             ) : null}
