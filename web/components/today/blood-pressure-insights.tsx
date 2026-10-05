@@ -177,10 +177,9 @@ export default function BloodPressureInsights({
           .filter((event: any) => event.value != null && event.occurredAt);
 
         const canonicalInput = rawExerciseEvents.map((event: any) => ({
-          day: localDayKey(event.occurredAt),
-          value: event.value,
-          source: event.source,
+          loggedValue: event.value,
           occurredAt: event.occurredAt,
+          source: event.source,
         }));
 
         const dayTotals = canonicalExerciseDayTotals(canonicalInput);
