@@ -5,10 +5,13 @@ import { useEffect, useMemo, useState } from "react";
 import { Activity, ArrowRight, HeartPulse, Plus, Thermometer, Wind, X } from "lucide-react";
 import { healthHomeService } from "@/services/health-home.service";
 import { healthJournalService } from "@/services/health-journal.service";
+import BloodPressureSafetyOverlay from "@/components/health-vitals/blood-pressure-safety-overlay";
+import { isVeryHighBloodPressure, type BloodPressureSafetyStage } from "@/lib/blood-pressure-safety";
 
 export type DashboardVital = { type?: string; name?: string; value?: number | string; unit?: string; measuredAt?: string; source?: string | null };
 type Props = { bmi?: number | null; bmiCategory?: string | null; weightKg?: number | null; heightCm?: number | null; measurements?: DashboardVital[] };
 type FormState = { weightKg: string; heightCm: string; systolicPressure: string; diastolicPressure: string; restingHeartRate: string; oxygenSaturation: string; bodyTemperature: string; respiratoryRate: string };
+type BloodPressureSafetyState = { stage: BloodPressureSafetyStage; systolic: number; diastolic: number; initialSystolic?: number; initialDiastolic?: number };
 const EMPTY_FORM: FormState = { weightKg: "", heightCm: "", systolicPressure: "", diastolicPressure: "", restingHeartRate: "", oxygenSaturation: "", bodyTemperature: "", respiratoryRate: "" };
 const categoryLabel: Record<string, string> = { UNDERWEIGHT: "Below healthy range", HEALTHY_WEIGHT: "Healthy weight range", OVERWEIGHT: "Above healthy range", OBESITY_CLASS_1: "Obesity class 1", OBESITY_CLASS_2: "Obesity class 2", OBESITY_CLASS_3: "Obesity class 3" };
 function localDayKey(date = new Date()) { const parts = new Intl.DateTimeFormat("en-GB", { timeZone: "Africa/Johannesburg", year: "numeric", month: "2-digit", day: "2-digit" }).formatToParts(date); const values = Object.fromEntries(parts.map((part) => [part.type, part.value])); return `${values.year}-${values.month}-${values.day}`; }
@@ -23,6 +26,7 @@ function mergeMeasurements(current: DashboardVital[], incoming: DashboardVital[]
 
 export default function HealthVitalsSummary({ measurements = [] }: Props) {
   const [dayKey, setDayKey] = useState(() => localDayKey()); const [open, setOpen] = useState(false); const [busy, setBusy] = useState(false); const [message, setMessage] = useState("");
+  const [bpSafety, setBpSafety] = useState<BloodPressureSafetyState | null>(null); const [bpSafetySymptoms, setBpSafetySymptoms] = useState<string[]>([]);
   const [todayMeasurements, setTodayMeasurements] = useState<DashboardVital[]>(() => measurements.filter((item) => sameLocalDay(item.measuredAt)));
   const [form, setForm] = useState<FormState>(() => formFromMeasurements(measurements.filter((item) => sameLocalDay(item.measuredAt))));
   useEffect(() => { const incoming = measurements.filter((item) => sameLocalDay(item.measuredAt)); setTodayMeasurements((current) => mergeMeasurements(current, incoming)); if (incoming.length) setForm((current) => ({ ...current, ...formFromMeasurements(incoming) })); }, [measurements, dayKey]);
@@ -31,7 +35,80 @@ export default function HealthVitalsSummary({ measurements = [] }: Props) {
   const todayWeight = Number(form.weightKg || findMeasurement(todayMeasurements, ["WEIGHT", "BODY_WEIGHT"])?.value || 0); const todayHeight = Number(form.heightCm || findMeasurement(todayMeasurements, ["HEIGHT", "BODY_HEIGHT"])?.value || 0); const todayBmi = todayWeight > 0 && todayHeight > 0 ? todayWeight / Math.pow(todayHeight / 100, 2) : null; const bmiCategory = bmiCategoryFor(todayBmi); const bloodPressure = findMeasurement(todayMeasurements, ["BLOOD_PRESSURE"]); const heartRate = findMeasurement(todayMeasurements, ["HEART_RATE", "HEARTRATE"]); const oxygen = findMeasurement(todayMeasurements, ["OXYGEN_SATURATION", "OXYGENSATURATION"]); const temperature = findMeasurement(todayMeasurements, ["BODY_TEMPERATURE", "BODYTEMPERATURE"]); const respiratory = findMeasurement(todayMeasurements, ["RESPIRATORY_RATE", "RESPIRATORYRATE"]); const bloodPressureLabel = useMemo(() => bloodPressure?.value == null ? "—" : `${bloodPressure.value}${bloodPressure.unit ? ` ${bloodPressure.unit}` : ""}`, [bloodPressure]); const hasTodayMeasurements = todayMeasurements.length > 0 || todayWeight > 0 || todayHeight > 0;
   function openEntry() { setMessage(""); setForm(formFromMeasurements(todayMeasurements)); setOpen(true); }
   function updateField(key: keyof FormState, value: string) { setForm((current) => ({ ...current, [key]: value })); }
-  async function saveToday() { setMessage(""); const input: Record<string, number> = {}; for (const key of Object.keys(form) as Array<keyof FormState>) { if (form[key] === "") continue; const value = Number(form[key]); if (Number.isFinite(value)) input[key] = value; } if (Object.keys(input).length === 0) { setMessage("Enter at least one measurement for today."); return; } if ((input.systolicPressure != null) !== (input.diastolicPressure != null)) { setMessage("Enter both blood pressure values together."); return; } setBusy(true); try { const measuredAt = new Date().toISOString(); await healthHomeService.recordManualVitals({ ...input, measuredAt }); const nextMeasurements: DashboardVital[] = []; const add = (type: string, value: number | undefined, unit: string) => { if (value != null) nextMeasurements.push({ type, value, unit, measuredAt, source: "Today entry" }); }; add("WEIGHT", input.weightKg, "kg"); add("HEIGHT", input.heightCm, "cm"); if (input.systolicPressure != null && input.diastolicPressure != null) nextMeasurements.push({ type: "BLOOD_PRESSURE", value: `${input.systolicPressure}/${input.diastolicPressure}`, unit: "mmHg", measuredAt, source: "Today entry" }); add("HEART_RATE", input.restingHeartRate, "bpm"); add("OXYGEN_SATURATION", input.oxygenSaturation, "%"); add("BODY_TEMPERATURE", input.bodyTemperature, "°C"); add("RESPIRATORY_RATE", input.respiratoryRate, "/min"); setTodayMeasurements((current) => mergeMeasurements(current, nextMeasurements)); setForm(formFromMeasurements(nextMeasurements)); window.dispatchEvent(new CustomEvent("sympto:weight-updated")); setMessage("Today’s measurements saved."); setOpen(false); } catch (error: any) { setMessage(error?.response?.data?.message || "We couldn’t save today’s measurements."); } finally { setBusy(false); } }
+  async function saveToday() {
+    setMessage("");
+    const input: Record<string, number> = {};
+    for (const key of Object.keys(form) as Array<keyof FormState>) {
+      if (form[key] === "") continue;
+      const value = Number(form[key]);
+      if (Number.isFinite(value)) input[key] = value;
+    }
+    if (Object.keys(input).length === 0) { setMessage("Enter at least one measurement for today."); return; }
+    if ((input.systolicPressure != null) !== (input.diastolicPressure != null)) { setMessage("Enter both blood pressure values together."); return; }
+    setBusy(true);
+    try {
+      const measuredAt = new Date().toISOString();
+      await healthHomeService.recordManualVitals({ ...input, measuredAt });
+      const nextMeasurements: DashboardVital[] = [];
+      const add = (type: string, value: number | undefined, unit: string) => { if (value != null) nextMeasurements.push({ type, value, unit, measuredAt, source: "Today entry" }); };
+      add("WEIGHT", input.weightKg, "kg");
+      add("HEIGHT", input.heightCm, "cm");
+      if (input.systolicPressure != null && input.diastolicPressure != null) nextMeasurements.push({ type: "BLOOD_PRESSURE", value: String(input.systolicPressure) + "/" + String(input.diastolicPressure), unit: "mmHg", measuredAt, source: "Today entry" });
+      add("HEART_RATE", input.restingHeartRate, "bpm");
+      add("OXYGEN_SATURATION", input.oxygenSaturation, "%");
+      add("BODY_TEMPERATURE", input.bodyTemperature, "°C");
+      add("RESPIRATORY_RATE", input.respiratoryRate, "/min");
+      setTodayMeasurements((current) => mergeMeasurements(current, nextMeasurements));
+      setForm(formFromMeasurements(nextMeasurements));
+      window.dispatchEvent(new CustomEvent("sympto:weight-updated"));
+
+      const systolic = input.systolicPressure;
+      const diastolic = input.diastolicPressure;
+      const repeatingHighReading = bpSafety?.stage === "initial" && systolic != null && diastolic != null;
+      if (repeatingHighReading && systolic != null && diastolic != null) {
+        const remainsVeryHigh = isVeryHighBloodPressure(systolic, diastolic);
+        setBpSafetySymptoms([]);
+        setBpSafety({
+          stage: remainsVeryHigh ? "symptoms" : "resolved",
+          systolic,
+          diastolic,
+          initialSystolic: bpSafety.initialSystolic ?? bpSafety.systolic,
+          initialDiastolic: bpSafety.initialDiastolic ?? bpSafety.diastolic,
+        });
+      } else if (systolic != null && diastolic != null && isVeryHighBloodPressure(systolic, diastolic)) {
+        setBpSafetySymptoms([]);
+        setBpSafety({ stage: "initial", systolic, diastolic });
+      }
+
+      setMessage("Today’s measurements saved.");
+      setOpen(false);
+    } catch (error: any) {
+      setMessage(error?.response?.data?.message || "We couldn’t save today’s measurements.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  function closeBpSafety() {
+    setBpSafety(null);
+    setBpSafetySymptoms([]);
+  }
+
+  function startBpRepeat() {
+    setBpSafetySymptoms([]);
+    setForm((current) => ({ ...current, systolicPressure: "", diastolicPressure: "" }));
+    setOpen(true);
+    setMessage("Sit quietly and repeat the blood-pressure measurement after at least 1 minute.");
+  }
+
+  function toggleBpSafetySymptom(symptom: string) {
+    setBpSafetySymptoms((current) => current.includes(symptom) ? current.filter((item) => item !== symptom) : [...current, symptom]);
+  }
+
+  function continueBpSafety() {
+    if (!bpSafety || bpSafety.stage !== "symptoms") return;
+    setBpSafety((current) => current ? { ...current, stage: bpSafetySymptoms.length > 0 ? "emergency" : "review" } : null);
+  }
 
   const vitals = [
     { label: "Blood pressure", value: bloodPressureLabel, icon: <HeartPulse className="h-4 w-4"/> },
@@ -65,6 +142,20 @@ export default function HealthVitalsSummary({ measurements = [] }: Props) {
 
       {open && <div className="border-t border-[#e7eff1] bg-[#f9fcfc] p-5 sm:p-6"><div className="flex items-start justify-between gap-4"><div><p className="text-[9px] font-black uppercase tracking-[.15em] text-[#71839a]">Today’s entry</p><h3 className="mt-1 text-lg font-black text-[#0b2d54]">Add your measurements</h3><p className="mt-1 text-[11px] text-[#8795a0]">These fields reset automatically when a new day starts.</p></div><button type="button" onClick={()=>setOpen(false)} className="grid h-9 w-9 place-items-center rounded-xl bg-white text-slate-500 ring-1 ring-[#dce8eb]"><X className="h-4 w-4"/></button></div><div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-4"><Field label="Weight (kg)" value={form.weightKg} onChange={(value)=>updateField("weightKg",value)}/><Field label="Height (cm)" value={form.heightCm} onChange={(value)=>updateField("heightCm",value)}/><Field label="Systolic" value={form.systolicPressure} onChange={(value)=>updateField("systolicPressure",value)}/><Field label="Diastolic" value={form.diastolicPressure} onChange={(value)=>updateField("diastolicPressure",value)}/><Field label="Heart rate (bpm)" value={form.restingHeartRate} onChange={(value)=>updateField("restingHeartRate",value)}/><Field label="Oxygen (%)" value={form.oxygenSaturation} onChange={(value)=>updateField("oxygenSaturation",value)}/><Field label="Temperature (°C)" value={form.bodyTemperature} onChange={(value)=>updateField("bodyTemperature",value)} step="0.1"/><Field label="Respiratory (/min)" value={form.respiratoryRate} onChange={(value)=>updateField("respiratoryRate",value)}/></div><div className="mt-4 flex justify-end gap-2"><button type="button" onClick={()=>setOpen(false)} className="min-h-10 rounded-xl border border-[#d7e4e8] bg-white px-4 py-2 text-[10px] font-black text-[#74859a]">Cancel</button><button type="button" disabled={busy} onClick={()=>void saveToday()} className="min-h-10 rounded-xl bg-[#0b2d54] px-5 py-2 text-[10px] font-black text-white disabled:cursor-not-allowed disabled:opacity-50">{busy ? "Saving…" : "Save measurements"}</button></div></div>}
 
+      {bpSafety && (
+        <BloodPressureSafetyOverlay
+          stage={bpSafety.stage}
+          systolic={bpSafety.systolic}
+          diastolic={bpSafety.diastolic}
+          initialSystolic={bpSafety.initialSystolic}
+          initialDiastolic={bpSafety.initialDiastolic}
+          selectedSymptoms={bpSafetySymptoms}
+          onToggleSymptom={toggleBpSafetySymptom}
+          onRepeat={startBpRepeat}
+          onContinueSymptoms={continueBpSafety}
+          onClose={closeBpSafety}
+        />
+      )}
       <footer className="border-t border-[#edf2f4] px-5 py-3 sm:px-6"><p className="text-[9px] leading-4 text-[#8b9aa5]">BMI is a screening measure and should be considered with other health information. Saved measurements remain in your health history.</p></footer>
     </section>
   );

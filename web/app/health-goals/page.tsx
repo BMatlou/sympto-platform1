@@ -183,6 +183,7 @@ function HealthGoalsPageContent() {
   const { data: dashboard, loading, error, reload } = useDashboard();
   const searchParams = useSearchParams();
   const medicationPrefillHandled = useRef(false);
+  const exercisePrefillHandled = useRef(false);
   const goalEditHandled = useRef(false);
   const [draft, setDraft] = useState<GoalDraft>(emptyDraft());
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -249,6 +250,25 @@ function HealthGoalsPageContent() {
     requestAnimationFrame(scrollToGoal);
     return () => { if (timer) clearTimeout(timer); };
   }, [healthGoals, loading, searchParams]);
+
+  useEffect(() => {
+    if (
+      exercisePrefillHandled.current ||
+      !dashboard?.patient?.id ||
+      loading ||
+      searchParams.get("open") !== "exercise"
+    ) return;
+
+    exercisePrefillHandled.current = true;
+    setEditingId(null);
+    setDraft({
+      ...emptyDraft(),
+      title: "Exercise goal",
+      category: "EXERCISE",
+      unit: "mins/week",
+    });
+    setEditorOpen(true);
+  }, [dashboard?.patient?.id, loading, searchParams]);
 
   useEffect(() => {
     if (goalEditHandled.current || loading || searchParams.get("open") || !dashboard?.goals) return;

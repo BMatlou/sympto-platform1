@@ -171,22 +171,40 @@ export function buildBloodPressureInsights({
       return value != null && parts ? { value, day: parts.key, hour: parts.hour, occurredAt: event.occurredAt } : null;
     })
     .filter((item): item is { value: number; day: string; hour: number; occurredAt: string } => Boolean(item))
-    .filter((item) => withinLookback(item.occurredAt, 30, now))
     .sort((a, b) => new Date(a.occurredAt).getTime() - new Date(b.occurredAt).getTime());
 
-  const days = recentDayKeySet(7, now);
+  const days7 = recentDayKeySet(7, now);
+  const dailyAll = groupDaily(bp.map((item) => ({ day: item.day, value: item.value })));
   const dailySevenDay = groupDaily(
-    bp.filter((item) => days.includes(item.day)).map((item) => ({ day: item.day, value: item.value })),
+    bp.filter((item) => days7.includes(item.day)).map((item) => ({ day: item.day, value: item.value })),
+  );
+  const days30 = recentDayKeySet(30, now);
+  const dailyThirtyDay = groupDaily(
+    bp.filter((item) => days30.includes(item.day)).map((item) => ({ day: item.day, value: item.value })),
   );
   const insights: BloodPressureInsight[] = [];
 
-  if (dailySevenDay.size >= 5) {
-    const dailyValues = [...dailySevenDay.entries()].map(([, value]) => value);
+  const ordered7 = days7.filter((day) => dailySevenDay.has(day));
+  const ordered30 = days30.filter((day) => dailyThirtyDay.has(day));
+  let trendWindowLabel = "historical";
+  let trendDays = [...dailyAll.keys()].sort();
+  let trendDaily = dailyAll;
+  if (ordered7.length >= 5) {
+    trendWindowLabel = "7-day";
+    trendDays = ordered7;
+    trendDaily = dailySevenDay;
+  } else if (ordered30.length >= 5) {
+    trendWindowLabel = "30-day";
+    trendDays = ordered30;
+    trendDaily = dailyThirtyDay;
+  }
+
+  if (trendDaily.size >= 3) {
+    const dailyValues = trendDays.map((day) => trendDaily.get(day) ?? 0).filter((value) => Number.isFinite(value));
     const averageSystolic = mean(dailyValues) ?? 0;
-    const orderedDays = days.filter((day) => dailySevenDay.has(day));
-    const midpoint = Math.max(1, Math.floor(orderedDays.length / 2));
-    const earlyAverage = mean(orderedDays.slice(0, midpoint).map((day) => dailySevenDay.get(day) ?? 0));
-    const recentAverage = mean(orderedDays.slice(midpoint).map((day) => dailySevenDay.get(day) ?? 0));
+    const midpoint = Math.max(1, Math.floor(trendDays.length / 2));
+    const earlyAverage = mean(trendDays.slice(0, midpoint).map((day) => trendDaily.get(day) ?? 0));
+    const recentAverage = mean(trendDays.slice(midpoint).map((day) => trendDaily.get(day) ?? 0));
     const directionDelta = earlyAverage != null && recentAverage != null ? recentAverage - earlyAverage : 0;
     const averageRounded = round(averageSystolic) ?? 0;
 
@@ -194,48 +212,48 @@ export function buildBloodPressureInsights({
       insights.push({
         kind: "trend",
         tone: "warning",
-        title: "Your 7-day average is regularly elevated",
-        body: "Your average systolic reading over the last 7 days is in a range commonly used to classify Stage 2 high blood pressure. Keep recording and discuss this pattern with your healthcare professional.",
-        evidence: "7-day average: " + averageRounded + " mmHg across " + dailySevenDay.size + " days.",
+        title: "Your " + trendWindowLabel + " average is regularly elevated",
+        body: "Your average systolic reading across this " + trendWindowLabel + " window is in a range commonly used to classify Stage 2 high blood pressure. Keep recording and discuss this pattern with your healthcare professional.",
+        evidence: trendWindowLabel + " average: " + averageRounded + " mmHg across " + trendDaily.size + " recorded days.",
       });
     } else if (averageSystolic >= 130) {
       insights.push({
         kind: "trend",
         tone: "warning",
-        title: "Your 7-day average is above your target",
-        body: "Your average systolic reading over the last 7 days is in a range commonly used to classify Stage 1 high blood pressure. Keep recording and discuss this pattern with your healthcare professional.",
-        evidence: "7-day average: " + averageRounded + " mmHg across " + dailySevenDay.size + " days.",
+        title: "Your " + trendWindowLabel + " average is above your goal",
+        body: "Your average systolic reading across this " + trendWindowLabel + " window is in a range commonly used to classify Stage 1 high blood pressure. Keep recording and discuss this pattern with your healthcare professional.",
+        evidence: trendWindowLabel + " average: " + averageRounded + " mmHg across " + trendDaily.size + " recorded days.",
       });
     } else if (target != null && averageSystolic > target) {
       insights.push({
         kind: "trend",
         tone: "info",
-        title: "Your recent average is above your goal",
-        body: "Your recent systolic average is above your configured goal. Keep recording consistently so you can see whether the pattern changes over time.",
-        evidence: "7-day average: " + averageRounded + " mmHg · goal: " + round(target) + " mmHg.",
+        title: "Your " + trendWindowLabel + " average is above your goal",
+        body: "Your average systolic reading across this " + trendWindowLabel + " window is above your configured goal. Keep recording consistently so you can see whether the pattern changes over time.",
+        evidence: trendWindowLabel + " average: " + averageRounded + " mmHg · goal: " + round(target) + " mmHg · " + trendDaily.size + " recorded days.",
       });
     }
 
-    if (Math.abs(directionDelta) >= 5) {
+    if (Math.abs(directionDelta) >= 5 && trendDays.length >= 4) {
       insights.push({
         kind: "trend",
         tone: "info",
-        title: directionDelta < 0 ? "Your recent readings are trending lower" : "Your recent readings are trending higher",
-        body:
-          directionDelta < 0
-            ? "Your recent daily averages are lower than the earlier part of this 7-day window. Keep tracking to see whether the pattern continues."
-            : "Your recent daily averages are higher than the earlier part of this 7-day window. Keep tracking and consider discussing the pattern with your healthcare professional.",
+        title: directionDelta < 0 ? "Your readings are trending lower" : "Your readings are trending higher",
+        body: directionDelta < 0
+          ? "Your daily averages are lower in the more recent part of this " + trendWindowLabel + " record. Keep tracking to see whether the pattern continues."
+          : "Your daily averages are higher in the more recent part of this " + trendWindowLabel + " record. Keep tracking and consider discussing the pattern with your healthcare professional.",
         evidence: "Recent versus earlier daily average changed by about " + Math.abs(round(directionDelta) ?? 0) + " mmHg.",
       });
     }
   } else {
-    const recordedDays = dailySevenDay.size;
     insights.push({
       kind: "data",
       tone: "info",
       title: "More readings will make this pattern clearer",
-      body: "Keep recording your blood pressure regularly. Sympto needs more observations before it can identify a meaningful 7-day pattern.",
-      evidence: recordedDays + " of 7 recent days have a systolic reading.",
+      body: "Keep recording your blood pressure regularly. Sympto needs more observations before it can identify a meaningful pattern.",
+      evidence: dailyAll.size
+        ? dailyAll.size + " recorded days are available historically; more consistent recent readings will make the comparison stronger."
+        : "No historical systolic readings are available yet.",
     });
   }
 

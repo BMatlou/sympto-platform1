@@ -27,7 +27,7 @@ export default function BloodPressureInsights({ target }: Props) {
     async function load() {
       setLoading(true);
       const to = new Date();
-      const from = new Date(to.getTime() - 30 * 86_400_000);
+      const from = new Date(0);
 
       try {
         const [bloodPressure, exercise, journals, symptoms] = await Promise.all([

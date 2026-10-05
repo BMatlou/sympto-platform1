@@ -10,6 +10,7 @@ import BloodPressureInsights from "@/components/today/blood-pressure-insights";
 
 type SupportedGoalCardProps = {
   goal: any;
+  activeGoals?: any[];
   onUpdated?: () => Promise<void> | void;
 };
 
@@ -75,10 +76,27 @@ function progressPercent(goal: any) {
 
 function sourceAction(category: string) {
   if (category === "EXERCISE" || category === "SLEEP" || category === "MENTAL_HEALTH" || category === "HYDRATION") return { label: "Update Daily Health Check-in", href: "#daily-health-check-in" };
-  if (category === "WEIGHT" || category === "BLOOD_PRESSURE" || category === "HEART_RATE") return { label: "Open Health Vitals", href: "/health-vitals" };
+  if (category === "BLOOD_PRESSURE") return { label: "Open Today’s Vitals", href: "/today#current-health" };
+  if (category === "WEIGHT" || category === "HEART_RATE") return { label: "Open Health Vitals", href: "/health-vitals" };
   return { label: "Open health goal", href: "/health-goals" };
 }
 
+
+function journeyFor(goal: any) {
+  const startDate = new Date(String(goal?.createdAt ?? ""));
+  const targetDate = new Date(String(goal?.targetDate ?? ""));
+  const now = Date.now();
+  return {
+    journeyDay: Number.isNaN(startDate.getTime()) ? 1 : Math.max(1, Math.floor((now - startDate.getTime()) / 86400000) + 1),
+    daysLeft: Number.isNaN(targetDate.getTime()) ? null : Math.max(0, Math.ceil((targetDate.getTime() - now) / 86400000)),
+    targetDate,
+  };
+}
+
+function formatJourneyDate(value: Date | null) {
+  if (!value || Number.isNaN(value.getTime())) return "—";
+  return new Intl.DateTimeFormat("en-ZA", { day: "2-digit", month: "short", year: "numeric" }).format(value);
+}
 function nutritionTargetReview(target: number | null) {
   if (target == null || !Number.isFinite(target) || target <= 0 || target > 1200) return null;
   if (target < 800) {
@@ -126,7 +144,7 @@ const DEFAULT_METRICS: Record<string, { metricType: string; metricKey: string }>
   OTHER: { metricType: "OTHER", metricKey: "other.value" },
 };
 
-export default function TodaySupportedGoalCard({ goal, onUpdated }: SupportedGoalCardProps) {
+export default function TodaySupportedGoalCard({ goal, activeGoals = [], onUpdated }: SupportedGoalCardProps) {
   const [value, setValue] = useState("");
   const [saving, setSaving] = useState(false);
   const category = normaliseCategory(goal);
@@ -138,6 +156,9 @@ export default function TodaySupportedGoalCard({ goal, onUpdated }: SupportedGoa
   const source = sourceAction(category);
   const nextStep = goalNextStep(category, current, target);
   const goalId = String(goal?.id ?? "");
+  const journey = useMemo(() => journeyFor(goal), [goal]);
+  const linkedExerciseGoal = activeGoals.find((item: any) => String(item?.category ?? "").toUpperCase() === "EXERCISE");
+  const exerciseConnectionHref = linkedExerciseGoal?.id ? "/today#today-goal-" + encodeURIComponent(String(linkedExerciseGoal.id)) : "/health-goals?open=exercise";
   const defaultMetric = DEFAULT_METRICS[category] ?? DEFAULT_METRICS.OTHER;
   const metricType = String(goal?.metricConfig?.metricType ?? defaultMetric.metricType).toUpperCase();
   const metricKey = String(goal?.metricConfig?.metricKey ?? defaultMetric.metricKey);
@@ -218,22 +239,23 @@ export default function TodaySupportedGoalCard({ goal, onUpdated }: SupportedGoa
             <div className="mt-2 flex flex-wrap gap-2">
               {goal.connectedGoals.slice(0, 4).map((relation: any) => {
                 const related = relation?.goal;
-                const relatedId = String(related?.id ?? "");
+                const relatedCategory = String(related?.category ?? "").toUpperCase();
+                const isExerciseConnection = category === "BLOOD_PRESSURE" || relatedCategory === "EXERCISE";
                 const direction = String(relation?.direction ?? "");
-                const relationLabel =
-                  String(relation?.relationshipType ?? "").toUpperCase() === "SUPPORTS"
-                    ? direction === "supportsThisGoal"
-                      ? "Supports this"
-                      : "Supports another"
-                    : "Related";
+                const relationLabel = String(relation?.relationshipType ?? "").toUpperCase() === "SUPPORTS"
+                  ? direction === "supportsThisGoal" ? "Supports this" : "Supports another"
+                  : "Related";
+                const href = isExerciseConnection
+                  ? exerciseConnectionHref
+                  : related?.id ? "/health-goals#goal-" + encodeURIComponent(String(related.id)) : "/health-goals";
                 return (
                   <Link
-                    key={String(relation?.id ?? relatedId)}
-                    href={relatedId ? "/health-goals#goal-" + encodeURIComponent(relatedId) : "/health-goals"}
+                    key={String(relation?.id ?? related?.id ?? relatedCategory)}
+                    href={href}
                     className="inline-flex min-w-0 items-center gap-1 rounded-full bg-white px-2.5 py-1.5 text-[8px] font-bold text-[#0b6f73] ring-1 ring-[#dce8eb]"
-                    title={String(relation?.rationale ?? "")}
+                    title={String(relation?.rationale ?? (isExerciseConnection ? (linkedExerciseGoal ? "Open your exercise goal in Today." : "Set an exercise goal to connect it with your blood-pressure goal.") : ""))}
                   >
-                    <span className="truncate">{String(related?.title ?? related?.category ?? "Connected goal")}</span>
+                    <span className="truncate">{isExerciseConnection ? "Exercise" : String(related?.title ?? related?.category ?? "Connected goal")}</span>
                     <span className="shrink-0 text-[#91a2ad]">· {relationLabel}</span>
                   </Link>
                 );
@@ -256,7 +278,14 @@ export default function TodaySupportedGoalCard({ goal, onUpdated }: SupportedGoa
             <Link href={source.href} className="mt-3 inline-flex min-h-10 w-full items-center justify-center gap-1.5 rounded-xl bg-[#0b2d54] px-4 py-2 text-[9px] font-black text-white"><ArrowRight className="h-3.5 w-3.5 text-[#24c1c4]" />{source.label}</Link>
           )}
           {meta.action === "MANUAL" && (category === "BLOOD_GLUCOSE" || category === "CHOLESTEROL") && <Link href="/tests-results" className="mt-2 inline-flex min-h-9 w-full items-center justify-center gap-1.5 rounded-xl border border-[#dce7eb] bg-white px-3 py-2 text-[9px] font-black text-[#0b2d54]">View recorded results <ArrowRight className="h-3.5 w-3.5" /></Link>}
-        </div>
+          {category === "BLOOD_PRESSURE" && (
+            <div className="mt-3 flex items-center justify-between gap-3 border-t border-[#edf2f4] pt-3">
+              <div className="min-w-0">
+                <p className="text-[10px] font-black text-[#6f818d]">Day {journey.journeyDay} · {journey.daysLeft === null ? "Journey active" : journey.daysLeft === 0 ? "Target date today" : journey.daysLeft + " days left"}</p>
+                <p className="mt-1 text-[9px] text-[#9aa8b1]">Target date: {journey.targetDate && !Number.isNaN(journey.targetDate.getTime()) ? formatJourneyDate(journey.targetDate) : "No date set"} · Daily target ≤ {target ?? "—"} mmHg</p>
+              </div>
+            </div>
+          )}        </div>
       </div>
     </article>
   );
