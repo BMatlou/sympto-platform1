@@ -1,6 +1,7 @@
 export type MedicationIntelligenceEvent = {
   loggedValue: number;
   occurredAt: string;
+  metadata?: Record<string, unknown> | null;
 };
 
 export type MedicationIntelligenceCheckIn = {
@@ -112,6 +113,11 @@ function reconstructActions(events: MedicationIntelligenceEvent[]) {
     const at = new Date(String(event.occurredAt));
     if (Number.isNaN(at.getTime())) return;
 
+    const explicitAction = String(event.metadata?.action ?? "").toUpperCase();
+    const explicitTaken = explicitAction === "TAKEN";
+    const explicitSkipped = explicitAction === "SKIPPED";
+    const hasExplicitAction = explicitTaken || explicitSkipped;
+
     actions.push({
       day: dayKey(at),
       hour: Number(
@@ -121,8 +127,8 @@ function reconstructActions(events: MedicationIntelligenceEvent[]) {
           hour12: false,
         }).format(at),
       ),
-      taken: takenDelta > 0,
-      skipped: takenDelta === 0,
+      taken: hasExplicitAction ? explicitTaken : takenDelta > 0,
+      skipped: hasExplicitAction ? explicitSkipped : takenDelta === 0,
     });
   });
 
