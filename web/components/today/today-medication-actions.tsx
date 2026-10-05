@@ -5,8 +5,7 @@ import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 import { api } from "@/lib/api";
 import { healthGoalsService } from "@/services/health-goals.service";
-import { healthJournalService } from "@/services/health-journal.service";
-import { buildMedicationIntelligence } from "@/lib/medication-intelligence";
+import { buildLiveMedicationInsights } from "@/lib/medication-intelligence";
 
 interface TodayMedicationActionsProps {
   medications: any[];
@@ -15,13 +14,6 @@ interface TodayMedicationActionsProps {
 }
 
 type Action = "TAKEN" | "SKIPPED";
-
-type MedicationCheckIn = {
-  day: string;
-  sleepHours: number | null;
-  waterIntakeMl: number | null;
-  exerciseMinutes: number | null;
-};
 
 function journalDayKey(value: unknown) {
   const date = new Date(String(value ?? ""));
@@ -138,8 +130,7 @@ export default function TodayMedicationActions({ medications, goal: suppliedGoal
   const [isSyncing, setIsSyncing] = useState(false);
   const [savingKey, setSavingKey] = useState<string | null>(null);
   const [states, setStates] = useState<Record<string, Action | undefined>>({});
-  const [adherenceEvents, setAdherenceEvents] = useState<Array<{ loggedValue: number; occurredAt: string }>>([]);
-  const [recentCheckIns, setRecentCheckIns] = useState<MedicationCheckIn[]>([]);
+  const [adherenceEvents, setAdherenceEvents] = useState<Array<{ loggedValue: number; occurredAt: string; metadata?: Record<string, unknown> | null }>>([]);
   const [recentNutritionEvents, setRecentNutritionEvents] = useState<Array<{ loggedValue: number; occurredAt: string }>>([]);
 
   const trackedMedication = medications[0] ?? null;
@@ -260,56 +251,6 @@ export default function TodayMedicationActions({ medications, goal: suppliedGoal
   useEffect(() => {
     let active = true;
 
-    async function loadRecentCheckIns() {
-      try {
-        const response = await healthJournalService.getAll({ limit: 100 });
-        const journals = Array.isArray(response.data) ? response.data : [];
-
-        const checkIns = journals
-          .filter(
-            (journal: any) =>
-              journal?.title === "Daily Health Check-in" && journal?.createdAt,
-          )
-          .map((journal: any) => ({
-            day: journalDayKey(journal.createdAt),
-            sleepHours:
-              journal.sleepHours == null ? null : Number(journal.sleepHours),
-            waterIntakeMl:
-              journal.waterIntakeMl == null
-                ? null
-                : Number(journal.waterIntakeMl),
-            exerciseMinutes:
-              journal.exerciseMinutes == null
-                ? null
-                : Number(journal.exerciseMinutes),
-          }))
-          .filter((item) => Boolean(item.day))
-          .sort((a, b) => b.day.localeCompare(a.day))
-          .slice(0, 30);
-
-        if (active) setRecentCheckIns(checkIns);
-      } catch {
-        if (active) setRecentCheckIns([]);
-      }
-    }
-
-    void loadRecentCheckIns();
-
-    const handleCheckInUpdated = () => void loadRecentCheckIns();
-    window.addEventListener("sympto:health-checkin-updated", handleCheckInUpdated);
-
-    return () => {
-      active = false;
-      window.removeEventListener(
-        "sympto:health-checkin-updated",
-        handleCheckInUpdated,
-      );
-    };
-  }, []);
-
-  useEffect(() => {
-    let active = true;
-
     async function loadRecentNutritionEvents() {
       try {
         const end = new Date();
@@ -367,48 +308,37 @@ export default function TodayMedicationActions({ medications, goal: suppliedGoal
       ? rawTargetAdherence
       : 90;
 
-  const supportingGoals = useMemo(
-    () =>
-      (Array.isArray(finalGoal?.connectedGoals) ? finalGoal.connectedGoals : [])
-        .filter(
-          (connection: any) =>
-            String(connection?.relationshipType ?? "").toUpperCase() === "SUPPORTS" &&
-            String(connection?.direction ?? "") === "supportsThisGoal",
-        )
-        .map((connection: any) => ({
-          category: String(connection?.goal?.category ?? "").toUpperCase(),
-          title: connection?.goal?.title ?? null,
-          targetValue: connection?.goal?.targetValue ?? null,
-          unit: connection?.goal?.unit ?? null,
-        })),
-    [finalGoal?.connectedGoals],
-  );
-
   const { journeyDay, daysLeft } = journeyProgress(finalGoal);
   const fallbackTakenDoses = cumulativeTakenDoses(trackedMedication);
   const takenDosesSoFar = Math.max(0, takenDosesForGoal || fallbackTakenDoses);
 
+  const todayMealsCount = useMemo(() => {
+    const today = journalDayKey(new Date());
+    return recentNutritionEvents.filter(
+      (event) => journalDayKey(event.occurredAt) === today,
+    ).length;
+  }, [recentNutritionEvents]);
+
   const medicationInsights = useMemo(
     () =>
-      buildMedicationIntelligence({
-        adherenceEvents,
-        goalStartAt: String(finalGoal?.createdAt ?? new Date().toISOString()),
-        scheduledDosesPerDay: totalRequiredDosesPerDay,
-        lifecycleDayCount: journeyDay,
-        totalHistoricalTakenDoses: takenDosesSoFar,
-        checkIns: recentCheckIns,
-        nutritionEvents: recentNutritionEvents,
-        supportingGoals,
+      buildLiveMedicationInsights({
+        medication_name:
+          medicationName(trackedMedication) ||
+          String(finalGoal?.title ?? "Your medicine"),
+        current_lifecycle_day: journeyDay,
+        daily_target_doses: totalRequiredDosesPerDay,
+        total_taken_to_date: takenDosesSoFar,
+        today_logged_meals_count: todayMealsCount,
+        today_doses_logged: safeDosesLoggedToday,
       }),
     [
-      adherenceEvents,
-      finalGoal?.createdAt,
-      totalRequiredDosesPerDay,
+      trackedMedication,
+      finalGoal?.title,
       journeyDay,
+      totalRequiredDosesPerDay,
       takenDosesSoFar,
-      recentCheckIns,
-      recentNutritionEvents,
-      supportingGoals,
+      todayMealsCount,
+      safeDosesLoggedToday,
     ],
   );
 
