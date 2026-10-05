@@ -41,6 +41,10 @@ export default function MedicationReminderNotifier() {
     let active = true;
 
     const check = async () => {
+      // This component is mounted globally, including on public auth pages.
+      // Do not call authenticated notification endpoints before sign-in.
+      if (!localStorage.getItem("accessToken")) return;
+
       try {
         const payload = await patientNotificationsService.list({ page: 1, limit: 100 });
         const rows = Array.isArray(payload)
