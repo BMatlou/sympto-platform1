@@ -531,7 +531,17 @@ export class MedicationInsightService {
         relation.metricKey,
         start,
       );
-      result.push(...rows);
+
+      const goalPrefix = 'goal-' + relation.healthGoalId + '-';
+      const scopedRows = rows.filter((event) => {
+        const sourceId = String(event.sourceId ?? '');
+        // Explicit goal-scoped events belong only to their originating goal.
+        // Backfilled journal/check-in events without a goal prefix remain valid
+        // contextual evidence for the single active goal in that metric family.
+        return !sourceId.startsWith('goal-') || sourceId.startsWith(goalPrefix);
+      });
+
+      result.push(...scopedRows);
     }
     return result.filter((event) => Number.isFinite(Number(event.loggedValue)));
   }
