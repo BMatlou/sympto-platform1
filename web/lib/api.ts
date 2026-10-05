@@ -66,7 +66,7 @@ api.interceptors.response.use(
           const refreshToken = localStorage.getItem("refreshToken");
 
           if (!refreshToken) {
-            throw new Error("No refresh token available.");
+            throw error;
           }
 
           const response = await axios.post(
@@ -91,7 +91,13 @@ api.interceptors.response.use(
       } catch {
         localStorage.removeItem("accessToken");
         localStorage.removeItem("refreshToken");
-        if (typeof window !== "undefined") window.location.href = "/auth/sign-in";
+
+        if (
+          typeof window !== "undefined" &&
+          !window.location.pathname.startsWith("/auth/")
+        ) {
+          window.location.replace("/auth/sign-in");
+        }
       } finally {
         isRefreshing = false;
         refreshPromise = null;
