@@ -383,12 +383,18 @@ export default function TodayMedicationActions({ medications, goal: suppliedGoal
     [finalGoal?.connectedGoals],
   );
 
+  const { journeyDay, daysLeft } = journeyProgress(finalGoal);
+  const fallbackTakenDoses = cumulativeTakenDoses(trackedMedication);
+  const takenDosesSoFar = Math.max(0, takenDosesForGoal || fallbackTakenDoses);
+
   const medicationInsights = useMemo(
     () =>
       buildMedicationIntelligence({
         adherenceEvents,
         goalStartAt: String(finalGoal?.createdAt ?? new Date().toISOString()),
         scheduledDosesPerDay: totalRequiredDosesPerDay,
+        lifecycleDayCount: journeyDay,
+        totalHistoricalTakenDoses: takenDosesSoFar,
         checkIns: recentCheckIns,
         nutritionEvents: recentNutritionEvents,
         supportingGoals,
@@ -397,6 +403,8 @@ export default function TodayMedicationActions({ medications, goal: suppliedGoal
       adherenceEvents,
       finalGoal?.createdAt,
       totalRequiredDosesPerDay,
+      journeyDay,
+      takenDosesSoFar,
       recentCheckIns,
       recentNutritionEvents,
       supportingGoals,
@@ -406,8 +414,6 @@ export default function TodayMedicationActions({ medications, goal: suppliedGoal
   if (!finalGoal) {
     return null;
   }
-
-  const { journeyDay, daysLeft } = journeyProgress(finalGoal);
   const medicationCardAnchorId = medicationAnchorId
     ? `medication-adherence-card-${String(medicationAnchorId)}`
     : null;
@@ -460,8 +466,6 @@ export default function TodayMedicationActions({ medications, goal: suppliedGoal
   const goalTitle = finalGoal?.title || `${medicationName(trackedMedication)} adherence`;
   const scheduledGoalDoses = Math.max(0, Math.ceil((daysLeft !== null ? daysLeft + journeyDay - 1 : 30) * totalRequiredDosesPerDay));
   const targetDoseCount = Math.ceil((scheduledGoalDoses * targetAdherence) / 100);
-  const fallbackTakenDoses = cumulativeTakenDoses(trackedMedication);
-  const takenDosesSoFar = Math.max(0, takenDosesForGoal || fallbackTakenDoses);
   const dosesNeededForGoal = Math.max(0, targetDoseCount - takenDosesSoFar);
   const cardClass = "w-full overflow-hidden rounded-[26px] border border-[#dce9ee] bg-white shadow-[0_14px_34px_rgba(11,45,84,.06)]";
 
