@@ -1,7 +1,7 @@
 "use client";
 
 import { Check, CircleSlash2, Pill } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 import { api } from "@/lib/api";
 import { healthGoalsService } from "@/services/health-goals.service";
@@ -225,6 +225,7 @@ export default function TodayMedicationActions({ medications, goal: suppliedGoal
   const takenDosesSoFar = Math.max(0, takenDosesForGoal || fallbackTakenDoses);
 
   const [medicationInsight, setMedicationInsight] = useState<any | null>(null);
+  const insightSyncRetriedForGoal = useRef<string | null>(null);
 
   async function loadMedicationInsight() {
     if (!finalGoal?.id) {
@@ -252,7 +253,35 @@ export default function TodayMedicationActions({ medications, goal: suppliedGoal
     (association: any) => association?.statisticallyRelevant && association?.insight,
   );
 
-  const hasMeaningfulMedicationInsight = Boolean(journeyInsight);
+  useEffect(() => {
+    if (!finalGoal?.id || !journeyInsight) return;
+
+    const parentTakenCount = Math.max(0, Math.floor(Number(takenDosesSoFar) || 0));
+    const serverTakenCount = Number(journeyInsight?.takenDoses ?? 0);
+    const mismatch = parentTakenCount > 0 && serverTakenCount === 0;
+
+    if (!mismatch || insightSyncRetriedForGoal.current === String(finalGoal.id)) return;
+
+    insightSyncRetriedForGoal.current = String(finalGoal.id);
+
+    void Promise.resolve(onUpdated?.())
+      .finally(() => {
+        void loadMedicationInsight();
+      });
+  }, [finalGoal?.id, journeyInsight?.takenDoses, takenDosesSoFar, onUpdated]);
+
+  // Keep the medication card's validated cumulative numerator as the single source of truth.
+  const insightExpectedScheduledDoses = Number(journeyInsight?.expectedScheduledDoses ?? 0);
+  const insightTakenDoses = Math.max(0, Math.floor(Number(takenDosesSoFar) || 0));
+  const insightAdherencePercent =
+    insightExpectedScheduledDoses > 0
+      ? Number(((insightTakenDoses / insightExpectedScheduledDoses) * 100).toFixed(2))
+      : 0;
+
+  // Never render a stale server-side zero when the parent card already has a positive count.
+  const hasMeaningfulMedicationInsight =
+    Boolean(journeyInsight) &&
+    insightExpectedScheduledDoses > 0;
 
 
 
@@ -336,7 +365,7 @@ export default function TodayMedicationActions({ medications, goal: suppliedGoal
               <div className="rounded-[18px] border border-[#d9e4ee] bg-white px-3.5 py-3.5 ring-1 ring-[#e8eef3] sm:px-4 sm:py-4">
                 <p className="text-[11px] font-black leading-5 text-[#0b2d54]">Medication journey</p>
                 <p className="mt-1 text-[11px] leading-5 text-[#5f7080]">
-                  {journeyInsight.takenDoses} of {journeyInsight.expectedScheduledDoses} scheduled doses taken · {Math.round(journeyInsight.adherencePercent)}% adherence.
+                  {insightTakenDoses} of {insightExpectedScheduledDoses} scheduled doses taken · {Math.round(insightAdherencePercent)}% adherence.
                 </p>
               </div>
             ) : null}
