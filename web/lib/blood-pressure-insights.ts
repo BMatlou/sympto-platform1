@@ -451,7 +451,7 @@ export function buildBloodPressureInsights({
         ): item is {
           day: string;
           value: number;
-          source?: string | null;
+          source: string | null | undefined;
           occurredAt: string;
         } => Boolean(item),
       ),
