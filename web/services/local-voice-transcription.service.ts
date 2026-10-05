@@ -12,8 +12,6 @@ type ProgressInfo = {
 type Transcriber = (
   audio: string | Float32Array,
   options?: {
-    language?: string;
-    task?: string;
     chunk_length_s?: number;
     stride_length_s?: number;
   },
@@ -98,9 +96,10 @@ export async function transcribeLocalVoice(
 
     const transcriber = await getTranscriber(onProgress);
 
+    // whisper-tiny.en is English-only. Do not pass language/task generation
+    // arguments; Transformers.js derives the correct generation settings from
+    // the model configuration.
     const result = await transcriber(objectUrl, {
-      language: "en",
-      task: "transcribe",
       // Larger chunks reduce repeated Whisper work for ordinary short health updates.
       chunk_length_s: 30,
       stride_length_s: 5,
