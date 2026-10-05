@@ -53,7 +53,7 @@ export function renderMedicationInsightTemplate(
   template: string,
   tokens: MedicationInsightTemplateTokens,
 ) {
-  return template.replace(/\\{([a-z0-9_]+)\\}/gi, (match, key: string) => {
+  return template.replace(/\{([a-z0-9_]+)\}/gi, (match, key: string) => {
     const value = tokens[key as keyof MedicationInsightTemplateTokens];
     return value == null ? match : String(value);
   });
