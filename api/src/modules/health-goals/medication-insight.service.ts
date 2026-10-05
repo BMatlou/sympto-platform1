@@ -464,23 +464,37 @@ export class MedicationInsightService {
     return Number(rows[0]?.count ?? 0);
   }
 
-  private async loadRelations(patientId: string, medicationGoalId: string): Promise<ConnectedSupportingGoal[]> {
+  private async loadRelations(
+    patientId: string,
+    medicationGoalId: string,
+  ): Promise<ConnectedSupportingGoal[]> {
+    // Derive the Medication card's supporting goals directly from the
+    // patient's active goals. HealthGoalRelation is still read for rationale
+    // when available, but the insight must not disappear simply because the
+    // relation table has not been synchronized yet.
     const sql =
-      'SELECT g."id" AS "relatedGoalId", g."category"::text AS "relatedCategory", g."title" AS "relatedTitle", ' +
-      'g."status"::text AS "relatedStatus", g."createdAt" AS "relatedCreatedAt", ' +
-      'g."targetValue"::double precision AS "relatedTargetValue", r."rationale", ' +
-      'c."metricType", c."metricKey", c."frequency", c."frequencyTarget"::double precision AS "frequencyTarget", ' +
-      'c."aggregation", c."comparison" FROM "HealthGoalRelation" r ' +
-      'INNER JOIN "HealthGoal" g ON g."id" = r."sourceGoalId" ' +
+      'SELECT g."id" AS "relatedGoalId", g."category"::text AS "relatedCategory", ' +
+      'g."title" AS "relatedTitle", g."status"::text AS "relatedStatus", ' +
+      'g."createdAt" AS "relatedCreatedAt", g."targetValue"::double precision AS "relatedTargetValue", ' +
+      'r."rationale", c."metricType", c."metricKey", c."frequency", ' +
+      'c."frequencyTarget"::double precision AS "frequencyTarget", c."aggregation", c."comparison" ' +
+      'FROM "HealthGoal" g ' +
+      'LEFT JOIN "HealthGoalRelation" r ON r."sourceGoalId" = g."id" ' +
+      'AND r."targetGoalId" = $2 AND r."relationshipType" = \'SUPPORTS\' ' +
       'LEFT JOIN "HealthGoalMetricConfig" c ON c."healthGoalId" = g."id" ' +
-      'WHERE r."patientId" = $1 AND r."targetGoalId" = $2 AND r."relationshipType" = \'SUPPORTS\' ' +
+      'WHERE g."patientId" = $1 AND g."id" <> $2 ' +
       'AND g."category"::text IN (\'NUTRITION\', \'EXERCISE\', \'SLEEP\', \'HYDRATION\') ' +
-      'AND g."status"::text IN (\'ACTIVE\', \'ON_HOLD\') ORDER BY g."category"::text, g."title"';
+      'AND g."status"::text IN (\'ACTIVE\', \'ON_HOLD\') ' +
+      'ORDER BY CASE g."category"::text ' +
+      'WHEN \'NUTRITION\' THEN 1 WHEN \'EXERCISE\' THEN 2 WHEN \'SLEEP\' THEN 3 WHEN \'HYDRATION\' THEN 4 ELSE 5 END, ' +
+      'g."createdAt" DESC';
+
     const rows = await this.prisma.$queryRawUnsafe<RelationRow[]>(sql, patientId, medicationGoalId);
 
     return rows.map((row) => {
       const category = String(row.relatedCategory).toUpperCase() as ConnectedSupportingGoal['category'];
       const fallback = goalRuleFor(category);
+
       return {
         healthGoalId: String(row.relatedGoalId),
         category,
@@ -488,7 +502,9 @@ export class MedicationInsightService {
         status: String(row.relatedStatus),
         createdAt: row.relatedCreatedAt.toISOString(),
         relationshipType: 'SUPPORTS',
-        rationale: row.rationale,
+        rationale:
+          row.rationale ??
+          `Your ${category.toLowerCase()} goal provides supporting context alongside this medication goal.`,
         metricType: String(row.metricType ?? fallback.metricType),
         metricKey: String(row.metricKey ?? fallback.metricKey),
         frequency: String(row.frequency ?? fallback.frequency),
