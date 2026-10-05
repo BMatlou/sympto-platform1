@@ -217,6 +217,7 @@ export default function TodayMedicationActions({ medications, goal: suppliedGoal
         medicationEvents.map((event) => ({
           loggedValue: Number(event.loggedValue),
           occurredAt: String(event.occurredAt),
+          metadata: event.metadata ?? null,
         })),
       );
 
