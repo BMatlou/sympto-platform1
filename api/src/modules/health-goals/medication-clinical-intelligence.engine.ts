@@ -388,27 +388,26 @@ function calculateTimeBuckets(
     skipped.set(definition.bucket, 0);
   }
 
-  if (input.medicationSchedule.reminderSlots.length) {
-    for (const day of input.scheduledDays.filter((candidate) => candidate.expectedDoses > 0)) {
-      if (!scheduleDayIsActive(input.medicationSchedule, day.day, input.timezone)) continue;
+  const timingSlots = resolveTimingSlots(input);
 
-      for (const slot of input.medicationSchedule.reminderSlots) {
-        const slotMinutes = timeToMinutes(slot);
-        const definition = bucketDefinitions.find((candidate) =>
-          isMinuteInBucket(slotMinutes, candidate.startMinutes, candidate.endMinutes),
-        );
-        if (!definition) continue;
+  for (const day of input.scheduledDays.filter((candidate) => candidate.expectedDoses > 0)) {
+    if (!scheduleDayIsActive(input.medicationSchedule, day.day, input.timezone)) continue;
 
-        if (day.day === dateKey(input.now, input.timezone)) {
-          const currentMinutes = timeToMinutes(localTime(input.now, input.timezone));
-          if (slotMinutes > currentMinutes) continue;
-        }
+    for (const slotMinutes of timingSlots) {
+      const definition = bucketDefinitions.find((candidate) =>
+        isMinuteInBucket(slotMinutes, candidate.startMinutes, candidate.endMinutes),
+      );
+      if (!definition) continue;
 
-        expected.set(
-          definition.bucket,
-          (expected.get(definition.bucket) ?? 0) + 1,
-        );
+      if (day.day === dateKey(input.now, input.timezone)) {
+        const currentMinutes = timeToMinutes(localTime(input.now, input.timezone));
+        if (slotMinutes > currentMinutes) continue;
       }
+
+      expected.set(
+        definition.bucket,
+        (expected.get(definition.bucket) ?? 0) + 1,
+      );
     }
   }
 
@@ -911,6 +910,7 @@ function aggregateTimeBucketByDay(
 
   const expectedByDay = new Map<string, number>();
   const takenByDay = new Map<string, number>();
+  const timingSlots = resolveTimingSlots(input);
 
   for (const day of input.scheduledDays) {
     if (
@@ -922,17 +922,11 @@ function aggregateTimeBucketByDay(
     }
 
     let bucketExpected = 0;
-    for (const slot of input.medicationSchedule.reminderSlots) {
-      const minutes = timeToMinutes(slot);
-      if (
-        Number.isFinite(minutes) &&
-        isMinuteInBucket(minutes, definition.start, definition.end)
-      ) {
+    for (const slotMinutes of timingSlots) {
+      if (isMinuteInBucket(slotMinutes, definition.start, definition.end)) {
         if (day.day === today) {
-          const nowMinutes = timeToMinutes(
-            localTime(input.now, input.timezone),
-          );
-          if (minutes > nowMinutes) continue;
+          const nowMinutes = timeToMinutes(localTime(input.now, input.timezone));
+          if (slotMinutes > nowMinutes) continue;
         }
         bucketExpected += 1;
       }
@@ -969,6 +963,119 @@ function aggregateTimeBucketByDay(
         takenByDay.get(day) ?? 0,
       ),
     }));
+}
+
+function resolveTimingSlots(
+  input: MedicationClinicalIntelligenceInput,
+): number[] {
+  const configured = input.medicationSchedule.reminderSlots
+    .map(timeToMinutes)
+    .filter(Number.isFinite);
+
+  if (configured.length > 0) {
+    return configured;
+  }
+
+  const lifecycleEnd =
+    input.medicationGoal.targetDate && input.medicationGoal.targetDate < input.now
+      ? input.medicationGoal.targetDate
+      : input.now;
+
+  const observations = input.medicationEvents
+    .filter(
+      (event) =>
+        event.timestamp >= input.medicationGoal.startDate &&
+        event.timestamp <= lifecycleEnd,
+    )
+    .map((event) => timeToMinutes(localTime(event.timestamp, input.timezone)))
+    .filter(Number.isFinite);
+
+  const k = Math.max(
+    1,
+    Math.min(
+      Math.round(
+        Number(input.medicationGoal.frequency) ||
+          input.medicationSchedule.dosesPerDay ||
+          1,
+      ),
+      4,
+    ),
+  );
+
+  if (observations.length < Math.max(6, k * 2)) {
+    return [];
+  }
+
+  return circularKMeans(observations, k);
+}
+
+function circularKMeans(values: number[], k: number): number[] {
+  const sorted = [...values].sort((a, b) => a - b);
+  const centers = Array.from({ length: k }, (_, index) => {
+    const position = ((index + 0.5) / k) * sorted.length;
+    return sorted[Math.min(sorted.length - 1, Math.floor(position))];
+  });
+
+  for (let iteration = 0; iteration < 12; iteration += 1) {
+    const groups = Array.from({ length: k }, () => [] as number[]);
+
+    for (const value of values) {
+      let nearest = 0;
+      let nearestDistance = circularMinuteDistance(value, centers[0]);
+
+      for (let index = 1; index < centers.length; index += 1) {
+        const distance = circularMinuteDistance(value, centers[index]);
+        if (distance < nearestDistance) {
+          nearest = index;
+          nearestDistance = distance;
+        }
+      }
+
+      groups[nearest].push(value);
+    }
+
+    let changed = false;
+
+    for (let index = 0; index < groups.length; index += 1) {
+      if (!groups[index].length) continue;
+      const nextCenter = circularMean(groups[index]);
+      if (circularMinuteDistance(nextCenter, centers[index]) > 1) {
+        changed = true;
+        centers[index] = nextCenter;
+      }
+    }
+
+    if (!changed) break;
+  }
+
+  return centers
+    .map((value) => ((Math.round(value) % 1440) + 1440) % 1440)
+    .sort((a, b) => a - b);
+}
+
+function circularMinuteDistance(a: number, b: number): number {
+  const distance = Math.abs(a - b);
+  return Math.min(distance, 1440 - distance);
+}
+
+function circularMean(values: number[]): number {
+  let sinSum = 0;
+  let cosSum = 0;
+
+  for (const value of values) {
+    const radians = (value / 1440) * 2 * Math.PI;
+    sinSum += Math.sin(radians);
+    cosSum += Math.cos(radians);
+  }
+
+  let radians = Math.atan2(
+    sinSum / values.length,
+    cosSum / values.length,
+  );
+
+  if (radians < 0) radians += 2 * Math.PI;
+
+  return (radians / (2 * Math.PI)) * 1440;
 }
 
 function buildHeadline(
