@@ -527,6 +527,7 @@ export default function TodaySupportedGoalCard({ goal, activeGoals = [], onUpdat
               target={target}
               exerciseGoalTarget={linkedExerciseGoal?.targetValue ?? linkedExerciseGoal?.metricConfig?.frequencyTarget ?? null}
               exerciseGoalTitle={linkedExerciseGoal?.title ?? "Exercise"}
+              exerciseGoalFrequency={linkedExerciseGoal?.metricConfig?.frequency ?? linkedExerciseGoal?.frequency ?? "DAILY"}
             />
 
             <div className="flex items-center justify-between gap-3 border-t border-[#edf2f4] px-1 pt-3">
