@@ -560,7 +560,7 @@ export default function TodayMedicationActions({ medications, goal: suppliedGoal
                   No active Nutrition, Exercise, Sleep or Hydration goal has enough linked data for a medication comparison yet.
                 </p>
               </div>
-            ) : null}
+            )}
           </div>
         </section>
       ) : null}
