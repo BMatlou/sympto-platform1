@@ -44,6 +44,26 @@ function normaliseCategory(goal: any) {
   return String(goal?.category ?? goal?.metricConfig?.metricType ?? "OTHER").toUpperCase();
 }
 
+function goalCategoryLabel(category: string) {
+  const labels: Record<string, string> = {
+    WEIGHT: "Weight",
+    EXERCISE: "Exercise",
+    NUTRITION: "Nutrition",
+    BLOOD_PRESSURE: "Blood pressure",
+    BLOOD_GLUCOSE: "Blood glucose",
+    CHOLESTEROL: "Cholesterol",
+    MEDICATION: "Medication",
+    SLEEP: "Sleep",
+    MENTAL_HEALTH: "Mental health",
+    HYDRATION: "Hydration",
+    SMOKING: "Smoking",
+    ALCOHOL: "Alcohol",
+    HEART_RATE: "Heart rate",
+    OTHER: "Personal goal",
+  };
+  return labels[category] ?? category.replaceAll("_", " ").toLowerCase().replace(/\b\w/g, (letter) => letter.toUpperCase());
+}
+
 function metaFor(goal: any) {
   return GOAL_META[normaliseCategory(goal)] ?? GOAL_META.OTHER;
 }
@@ -464,43 +484,69 @@ export default function TodaySupportedGoalCard({ goal, activeGoals = [], onUpdat
         <div className="mt-3 rounded-xl bg-[#e9f9fa] px-3 py-2"><p className="text-[9px] font-bold leading-4 text-[#0b6f73]">{nextStep}</p></div>
           </>
         )}
-        {Array.isArray(goal?.connectedGoals) && goal.connectedGoals.length > 0 && (
-          <div className="mt-3 rounded-[17px] border border-[#dcebec] bg-[#f7fbfc] p-3.5">
-            <div className="flex items-center justify-between gap-2">
-              <p className="text-[8px] font-black uppercase tracking-[.14em] text-[#82939f]">Goal connections</p>
-              <span className="text-[8px] font-bold text-[#9aa8b1]">{goal.connectedGoals.length} connected</span>
-            </div>
-            <div className="mt-2 flex flex-wrap gap-2">
-              {goal.connectedGoals.slice(0, 4).map((relation: any) => {
-                const related = relation?.goal;
-                const relatedCategory = String(related?.category ?? "").toUpperCase();
-                const isExerciseConnection = relatedCategory === "EXERCISE";
-                const direction = String(relation?.direction ?? "");
-                const relationLabel = String(relation?.relationshipType ?? "").toUpperCase() === "SUPPORTS"
-                  ? direction === "supportsThisGoal" ? "Supports this" : "Supports another"
-                  : "Related";
-                const href = isExerciseConnection
-                  ? exerciseConnectionHref
-                  : related?.id ? "/health-goals#goal-" + encodeURIComponent(String(related.id)) : "/health-goals";
-                return (
+        {(() => {
+          const connections = Array.isArray(goal?.connectedGoals) ? goal.connectedGoals : [];
+          const hasExerciseConnection = connections.some(
+            (relation: any) =>
+              String(relation?.goal?.category ?? "").toUpperCase() === "EXERCISE",
+          );
+          const showExerciseAction = category === "BLOOD_PRESSURE" && !hasExerciseConnection;
+          const exerciseActionText = linkedExerciseGoal ? "Open goal" : "Add goal";
+          const exerciseActionTitle = linkedExerciseGoal
+            ? "Open the connected Exercise goal in Today."
+            : "Set an Exercise goal to connect it with your blood-pressure goal.";
+
+          if (connections.length === 0 && !showExerciseAction) return null;
+
+          return (
+            <div className="mt-3 rounded-[17px] border border-[#dcebec] bg-[#f7fbfc] p-3.5">
+              <div className="flex items-center justify-between gap-2">
+                <p className="text-[8px] font-black uppercase tracking-[.14em] text-[#82939f]">Goal connections</p>
+                <span className="text-[8px] font-bold text-[#9aa8b1]">
+                  {connections.length > 0 ? connections.length + " connected" : "Add a supporting goal"}
+                </span>
+              </div>
+              <div className="mt-2 flex flex-wrap gap-2">
+                {connections.slice(0, 4).map((relation: any) => {
+                  const related = relation?.goal;
+                  const relatedCategory = String(related?.category ?? "").toUpperCase();
+                  const isExerciseConnection = relatedCategory === "EXERCISE";
+                  const direction = String(relation?.direction ?? "");
+                  const relationLabel = String(relation?.relationshipType ?? "").toUpperCase() === "SUPPORTS"
+                    ? direction === "supportsThisGoal" ? "Supports this" : "Supports another"
+                    : "Related";
+                  const href = isExerciseConnection
+                    ? exerciseConnectionHref
+                    : related?.id ? "/health-goals#goal-" + encodeURIComponent(String(related.id)) : "/health-goals";
+                  return (
+                    <Link
+                      key={String(relation?.id ?? related?.id ?? relatedCategory)}
+                      href={href}
+                      className="inline-flex min-w-0 items-center gap-1 rounded-full bg-white px-2.5 py-1.5 text-[8px] font-bold text-[#0b6f73] ring-1 ring-[#dce8eb] transition hover:border-[#24c1c4]"
+                      title={isExerciseConnection ? exerciseActionTitle : String(relation?.rationale ?? "")}
+                    >
+                      <span className="truncate">
+                        {goalCategoryLabel(relatedCategory || "OTHER")}
+                      </span>
+                      <span className="shrink-0 text-[#91a2ad]">· {relationLabel}</span>
+                    </Link>
+                  );
+                })}
+
+                {showExerciseAction && (
                   <Link
-                    key={String(relation?.id ?? related?.id ?? relatedCategory)}
-                    href={href}
-                    className="inline-flex min-w-0 items-center gap-1 rounded-full bg-white px-2.5 py-1.5 text-[8px] font-bold text-[#0b6f73] ring-1 ring-[#dce8eb] transition hover:border-[#24c1c4]"
-                    title={isExerciseConnection
-                      ? (linkedExerciseGoal
-                        ? "Open your connected Exercise goal in Today."
-                        : "Set an Exercise goal to connect it with your blood-pressure goal.")
-                      : String(relation?.rationale ?? "")}
+                    href={exerciseConnectionHref}
+                    className="inline-flex min-w-0 items-center gap-1 rounded-full bg-[#e9f9fa] px-2.5 py-1.5 text-[8px] font-black text-[#0b6f73] ring-1 ring-[#c9e7e8] transition hover:bg-[#def5f5]"
+                    title={exerciseActionTitle}
                   >
-                    <span className="truncate">{isExerciseConnection ? "Exercise" : String(related?.title ?? related?.category ?? "Connected goal")}</span>
-                    <span className="shrink-0 text-[#91a2ad]">· {relationLabel}</span>
+                    <span>Exercise</span>
+                    <span className="shrink-0 text-[#91a2ad]">· {exerciseActionText}</span>
                   </Link>
-                );
-              })}
+                )}
+              </div>
             </div>
-          </div>
-        )}
+          );
+        })()}
 
         {category === "BLOOD_PRESSURE" ? (
           <div className="mt-4 space-y-3">
