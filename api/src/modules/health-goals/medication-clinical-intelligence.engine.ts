@@ -151,7 +151,7 @@ const DEFAULT_RULES: ClinicalIntelligenceRules = {
 
 const TEMPLATE_LIBRARY = {
   trajectoryBelow:
-    '⚠️ {varianceType}: {takenDoses} of {lifetimeExpectedDoses} lifecycle doses are currently represented ({adherencePercent}%). The trajectory is {varianceAbs}% below the {targetAdherencePercent}% target.',
+    '⚠️ {varianceType}: {takenDoses} of {expectedDosesToDate} lifecycle doses are currently represented ({adherencePercent}%). The trajectory is {varianceAbs}% below the {targetAdherencePercent}% target.',
   trajectoryOn:
     'Your medication goal is currently at {adherencePercent}% adherence, meeting the {targetAdherencePercent}% target.',
   trajectoryAbove:
@@ -184,10 +184,7 @@ export class MedicationClinicalIntelligenceEngine {
       calculateCrossGoalAssociation(input, goal, rules),
     );
 
-    const behavioralClusters = calculateBehavioralClusters(
-      crossGoalAssociations,
-      rules,
-    );
+    const behavioralClusters = calculateBehavioralClusters(crossGoalAssociations);
 
     const headline = buildHeadline(trajectory, chronologicalInterference, behavioralClusters);
     const secondaryInsights = [
@@ -266,14 +263,7 @@ function calculateTrajectory(
       : 0;
 
   const remainingScheduledDoses = input.medicationGoal.targetDate
-    ? Math.max(
-        0,
-        lifetimeExpectedDoses -
-          Math.max(0, input.scheduledDays.filter((day) => day.day <= end && day.expectedDoses > 0).reduce(
-            (sum, day) => sum + day.expectedDoses,
-            0,
-          )),
-      )
+    ? Math.max(0, lifetimeExpectedDoses - expectedDosesToDate)
     : null;
 
   const targetReachable =
@@ -527,7 +517,6 @@ function calculateCrossGoalAssociation(
 
 function calculateBehavioralClusters(
   associations: CrossGoalAssociation[],
-  rules: ClinicalIntelligenceRules,
 ): BehavioralCluster[] {
   const meaningful = associations.filter(
     (association) => association.meaningful && association.deltaPercentagePoints != null,
@@ -586,7 +575,7 @@ function buildHeadline(
     return renderTemplate(TEMPLATE_LIBRARY.trajectoryBelow, {
       varianceType: 'BELOW_TARGET',
       takenDoses: trajectory.takenDoses,
-      lifetimeExpectedDoses: trajectory.lifetimeExpectedDoses,
+      expectedDosesToDate: trajectory.expectedDosesToDate,
       adherencePercent: trajectory.adherencePercent,
       varianceAbs: Math.abs(trajectory.variancePercentagePoints),
       targetAdherencePercent: trajectory.targetAdherencePercent,
