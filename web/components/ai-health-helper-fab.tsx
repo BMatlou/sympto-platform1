@@ -5,6 +5,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { ClipboardPlus, Mic, Save, Sparkles, X } from "lucide-react";
 import { useAuth } from "@/hooks/use-auth";
 import { healthJournalService, type TalkToSymptoResult } from "@/services/health-journal.service";
+import { transcribeLocalVoice } from "@/services/local-voice-transcription.service";
 
 function human(value: string | null | undefined) {
   return String(value ?? "").replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
@@ -18,6 +19,7 @@ export default function AIHealthHelperFab() {
   const [talkResult, setTalkResult] = useState<TalkToSymptoResult | null>(null);
   const [processing, setProcessing] = useState(false);
   const [transcribing, setTranscribing] = useState(false);
+  const [transcriptionProgress, setTranscriptionProgress] = useState<number | null>(null);
   const [processError, setProcessError] = useState("");
   const recorderRef = useRef<MediaRecorder | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
@@ -61,6 +63,7 @@ export default function AIHealthHelperFab() {
     audioChunksRef.current = [];
     setListening(false);
     setTranscribing(false);
+    setTranscriptionProgress(null);
     setOpen(false);
   };
 
@@ -70,30 +73,37 @@ export default function AIHealthHelperFab() {
     setTalkResult(null);
     setProcessing(false);
     setTranscribing(false);
+    setTranscriptionProgress(null);
     setProcessError("");
     discardRecordingRef.current = false;
   };
 
   const transcribeAudio = async (file: File) => {
-    if (!user?.id || transcribing) return;
+    if (transcribing) return;
 
     setTranscribing(true);
+    setTranscriptionProgress(0);
     setProcessError("");
 
     try {
-      const transcript = await healthJournalService.transcribeTalkToSympto(file);
+      // Voice transcription runs entirely in the browser using the small
+      // Whisper model. No audio is uploaded to a paid transcription API.
+      const transcript = await transcribeLocalVoice(file, (progress) => {
+        setTranscriptionProgress(progress);
+      });
+
       setMessage((current) =>
         current.trim() ? `${current.trim()} ${transcript}` : transcript,
       );
       setTalkResult(null);
     } catch (error: any) {
       setProcessError(
-        error?.response?.data?.message ||
-          error?.message ||
+        error?.message ||
           "Sympto could not understand that recording. Please try again or type your update.",
       );
     } finally {
       setTranscribing(false);
+      setTranscriptionProgress(null);
     }
   };
 
@@ -363,7 +373,7 @@ export default function AIHealthHelperFab() {
                 </p>
                 <p className="mx-auto mt-2 max-w-sm text-sm leading-6 text-white/70">
                   {listening
-                    ? "Speak naturally. When you stop, Sympto will show you what it understood before anything clinical is saved."
+                    ? "Speak naturally. When you stop, Sympto will transcribe your voice on this device before anything clinical is saved."
                     : "Use your voice or type your update. Sympto will decide whether it belongs in your symptom record or general health journal."}
                 </p>
 
@@ -375,7 +385,9 @@ export default function AIHealthHelperFab() {
                 >
                   <Mic className="h-5 w-5" aria-hidden="true" />
                   {transcribing
-                    ? "Transcribing…"
+                    ? transcriptionProgress != null && transcriptionProgress < 100
+                      ? `Preparing voice model ${Math.round(transcriptionProgress)}%`
+                      : "Transcribing…"
                     : listening
                       ? "Stop listening"
                       : "Speak to Sympto"}
