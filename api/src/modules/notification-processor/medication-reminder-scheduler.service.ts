@@ -80,9 +80,23 @@ export class MedicationReminderSchedulerService {
     }
 
     const frequency = getMedicationReminderFrequency(schedule.patientMedication.frequency);
-    if (!frequency.doseCount || schedule.slots.length !== frequency.doseCount || (frequency.cadence === 'WEEKLY' && schedule.daysOfWeek.length !== 1) || schedule.daysOfWeek.length < 1 || schedule.daysOfWeek.some((day) => day < 1 || day > 7)) { await this.cancelSchedule(scheduleId); return; }
+    if (
+      !frequency.doseCount ||
+      (frequency.cadence === 'WEEKLY' && schedule.daysOfWeek.length !== 1) ||
+      schedule.daysOfWeek.length < 1 ||
+      schedule.daysOfWeek.some((day) => day < 1 || day > 7)
+    ) {
+      await this.cancelSchedule(scheduleId);
+      return;
+    }
 
-    const slotIds = schedule.slots.map((slot) => slot.id);
+    // The configuration endpoint enforces the exact dose count. The processor
+    // must remain tolerant of legacy schedules, however, so one malformed
+    // slot count cannot suppress every valid reminder for the medication.
+    const activeSlots = schedule.slots.slice(0, frequency.doseCount);
+    if (!activeSlots.length) return;
+
+    const slotIds = activeSlots.map((slot) => slot.id);
     const pending = await this.prisma.notification.findMany({
       where: {
         medicationReminderSlotId: { in: slotIds },
@@ -93,7 +107,7 @@ export class MedicationReminderSchedulerService {
     });
     const pendingKeys = new Set(pending.map((item) => `${item.medicationReminderSlotId}:${String(item.channel)}`));
 
-    for (const slot of schedule.slots) {
+    for (const slot of activeSlots) {
       const recent = recentMedicationReminderOccurrence({
         now,
         time: slot.time,
