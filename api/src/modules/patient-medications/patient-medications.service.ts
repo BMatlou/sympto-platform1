@@ -9,9 +9,6 @@ import { PrismaService } from '../../database/prisma.service';
 import { NotificationsService } from '../notifications/notifications.service';
 import { NotificationQueueService } from '../notification-queue/notification-queue.service';
 import { HealthGoalsService } from '../health-goals/health-goals.service';
-import { MedicationReminderSchedulerService } from '../notification-processor/medication-reminder-scheduler.service';
-import { ConfigureMedicationReminderDto } from './dto/configure-medication-reminder.dto';
-import { assertReminderTimezone, getMedicationReminderFrequency } from './medication-reminder.util';
 import { CreatePatientMedicationDto } from './dto/create-patient-medication.dto';
 import { UpdatePatientMedicationDto } from './dto/update-patient-medication.dto';
 import { QueryPatientMedicationDto } from './dto/query-patient-medication.dto';
@@ -26,7 +23,6 @@ export class PatientMedicationsService {
     private readonly notificationsService: NotificationsService,
     private readonly notificationQueueService: NotificationQueueService,
     private readonly healthGoalsService: HealthGoalsService,
-    private readonly reminderScheduler: MedicationReminderSchedulerService,
   ) {}
 
   async create(dto: CreatePatientMedicationDto) {
@@ -157,7 +153,7 @@ export class PatientMedicationsService {
     if (dto.medicationId && !(await this.prisma.medication.findUnique({ where: { id: dto.medicationId } }))) throw new NotFoundException('Medication not found.');
     const duplicate = await this.prisma.patientMedication.findFirst({ where: { id: { not: id }, healthPassportId, medicationId } });
     if (duplicate) throw new ConflictException('This medication has already been added to the health passport.');
-    const updatedMedication = await this.prisma.patientMedication.update({
+    return this.prisma.patientMedication.update({
       where: { id },
       data: {
         healthPassportId,
@@ -178,8 +174,6 @@ export class PatientMedicationsService {
       },
       include: { medication: true, healthPassport: { include: { patient: { include: { person: true } } } } },
     });
-    await this.reminderScheduler.syncMedication(id);
-    return updatedMedication;
   }
 
   async recordAdherence(id: string, dto: RecordMedicationAdherenceDto, authenticatedUserId: string) {
@@ -223,28 +217,21 @@ export class PatientMedicationsService {
       LIMIT 1
     `;
 
-    const adherenceEventMetadata = {
-      action: dto.action,
-      patientMedicationId: id,
-      source: 'medication-adherence',
-    };
-
     if (existingEvent.length) {
       await this.prisma.$executeRaw`
         UPDATE "HealthGoalMetricEvent"
         SET "metricType" = 'MEDICATION',
             "metricKey" = 'medication.adherence',
             "loggedValue" = ${adherencePercentage},
-            "occurredAt" = ${effectiveMeasuredAt},
-            "metadata" = ${JSON.stringify(adherenceEventMetadata)}::jsonb
+            "occurredAt" = ${effectiveMeasuredAt}
         WHERE "id" = ${existingEvent[0].id}::uuid
       `;
     } else {
       await this.prisma.$executeRaw`
         INSERT INTO "HealthGoalMetricEvent"
-          ("id", "patientId", "metricType", "metricKey", "loggedValue", "occurredAt", "source", "sourceId", "metadata")
+          ("id", "patientId", "metricType", "metricKey", "loggedValue", "occurredAt", "source", "sourceId")
         VALUES
-          (gen_random_uuid(), ${patientId}, 'MEDICATION', 'medication.adherence', ${adherencePercentage}, ${effectiveMeasuredAt}, ${source}, ${sourceId}, ${JSON.stringify(adherenceEventMetadata)}::jsonb)
+          (gen_random_uuid(), ${patientId}, 'MEDICATION', 'medication.adherence', ${adherencePercentage}, ${effectiveMeasuredAt}, ${source}, ${sourceId})
     `;
     }
 
@@ -308,155 +295,6 @@ export class PatientMedicationsService {
       missedDoses,
       affectedGoals: [],
       journal: { updated: journalUpdated, title: journalTitle, dayKey },
-    };
-  }
-
-
-  async getReminderSchedule(id: string, authenticatedUserId: string) {
-    const medication = await this.findOne(id);
-    const ownerUserId = medication.healthPassport.patient.userId;
-    if (!authenticatedUserId || ownerUserId !== authenticatedUserId) {
-      throw new NotFoundException('Patient medication not found.');
-    }
-
-    const frequency = getMedicationReminderFrequency(medication.frequency);
-    const schedule = await this.prisma.medicationReminderSchedule.findUnique({
-      where: { patientMedicationId: id },
-      include: { slots: { orderBy: { doseIndex: 'asc' } } },
-    });
-
-    return {
-      supported: frequency.doseCount > 0,
-      doseCount: frequency.doseCount,
-      cadence: frequency.cadence,
-      schedule: schedule
-        ? {
-            id: schedule.id,
-            enabled: schedule.enabled,
-            daysOfWeek: schedule.daysOfWeek,
-            timezone: schedule.timezone,
-            times: schedule.slots.map((slot) => slot.time),
-          }
-        : null,
-    };
-  }
-
-  async configureReminderSchedule(
-    id: string,
-    dto: ConfigureMedicationReminderDto,
-    authenticatedUserId: string,
-  ) {
-    const medication = await this.findOne(id);
-    const ownerUserId = medication.healthPassport.patient.userId;
-    if (!authenticatedUserId || ownerUserId !== authenticatedUserId) {
-      throw new NotFoundException('Patient medication not found.');
-    }
-
-    const existing = await this.prisma.medicationReminderSchedule.findUnique({
-      where: { patientMedicationId: id },
-      select: { id: true },
-    });
-
-    if (!dto.enabled) {
-      if (existing) {
-        await this.reminderScheduler.cancelSchedule(existing.id);
-        await this.prisma.medicationReminderSchedule.update({
-          where: { id: existing.id },
-          data: { enabled: false },
-        });
-      }
-      return {
-        enabled: false,
-        doseCount: getMedicationReminderFrequency(medication.frequency).doseCount,
-        message: 'Medication reminders are off.',
-      };
-    }
-
-    const frequency = getMedicationReminderFrequency(medication.frequency);
-    if (!frequency.doseCount || frequency.cadence === 'UNSUPPORTED') {
-      throw new BadRequestException(
-        'This medication frequency does not define a fixed reminder schedule. Set the medication to once, twice, three or four times daily (or once weekly) before enabling reminders.',
-      );
-    }
-
-    const days = [...new Set((dto.daysOfWeek ?? []).map(Number))].sort((a, b) => a - b);
-    if (frequency.cadence === 'WEEKLY' && days.length !== 1) {
-      throw new BadRequestException('A weekly medication reminder must use exactly one day of the week.');
-    }
-    if (frequency.cadence === 'DAILY' && (days.length < 1 || days.length > 7)) {
-      throw new BadRequestException('Choose at least one day for the medication reminder.');
-    }
-    if (days.some((day) => day < 1 || day > 7)) {
-      throw new BadRequestException('Reminder days must be Monday through Sunday.');
-    }
-
-    const times = (dto.times ?? []).map((time) => String(time).trim());
-    if (times.length !== frequency.doseCount) {
-      throw new BadRequestException(
-        `This medication is scheduled for ${frequency.doseCount} dose${frequency.doseCount === 1 ? '' : 's'} ${frequency.cadence === 'WEEKLY' ? 'per week' : 'per day'}. Set exactly ${frequency.doseCount} reminder time${frequency.doseCount === 1 ? '' : 's'}.`,
-      );
-    }
-    const timePattern = /^([01]\d|2[0-3]):[0-5]\d$/;
-    if (times.some((time) => !timePattern.test(time))) {
-      throw new BadRequestException('Reminder times must use 24-hour HH:mm format.');
-    }
-    if (new Set(times).size !== times.length) {
-      throw new BadRequestException('Each dose must have its own reminder time.');
-    }
-
-    const timezone = dto.timezone?.trim() || 'UTC';
-    try {
-      assertReminderTimezone(timezone);
-    } catch {
-      throw new BadRequestException('The reminder timezone is invalid.');
-    }
-
-    if (existing) {
-      await this.reminderScheduler.cancelSchedule(existing.id);
-    }
-
-    const schedule = await this.prisma.$transaction(async (tx) => {
-      const saved = existing
-        ? await tx.medicationReminderSchedule.update({
-            where: { id: existing.id },
-            data: { enabled: true, daysOfWeek: days, timezone },
-          })
-        : await tx.medicationReminderSchedule.create({
-            data: {
-              patientMedicationId: id,
-              enabled: true,
-              daysOfWeek: days,
-              timezone,
-            },
-          });
-
-      await tx.medicationReminderSlot.deleteMany({
-        where: { scheduleId: saved.id },
-      });
-
-      await tx.medicationReminderSlot.createMany({
-        data: times.map((time, index) => ({
-          scheduleId: saved.id,
-          doseIndex: index + 1,
-          time,
-        })),
-      });
-
-      return saved;
-    });
-
-    await this.reminderScheduler.syncMedication(id);
-
-    return {
-      enabled: true,
-      doseCount: frequency.doseCount,
-      cadence: frequency.cadence,
-      schedule: {
-        id: schedule.id,
-        daysOfWeek: days,
-        timezone,
-        times,
-      },
     };
   }
 
@@ -615,8 +453,6 @@ export class PatientMedicationsService {
     if (!authenticatedUserId || ownerUserId !== authenticatedUserId) {
       throw new NotFoundException('Patient medication not found.');
     }
-    const reminderSchedule = await this.prisma.medicationReminderSchedule.findUnique({ where: { patientMedicationId: id }, select: { id: true } });
-    if (reminderSchedule) await this.reminderScheduler.cancelSchedule(reminderSchedule.id);
     await this.prisma.patientMedication.delete({ where: { id } });
     return { message: 'Patient medication deleted successfully.' };
   }
