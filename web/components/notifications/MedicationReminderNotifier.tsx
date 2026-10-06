@@ -69,22 +69,7 @@ export default function MedicationReminderNotifier() {
             toast(raw.title, {
               description: raw.body,
               duration: 10_000,
-              style: {
-                background: "#16A34A",
-                border: "1px solid #16A34A",
-                color: "#FFFFFF",
-                boxShadow: "0 10px 30px rgba(22, 163, 74, 0.24)",
-              },
-              classNames: {
-                toast: "text-white",
-                title: "font-bold text-white",
-                description: "text-white/90",
-                icon: "text-white",
-                actionButton: "bg-[#0b2d54] text-white hover:bg-[#0b2d54]/90",
-                closeButton:
-                  "border-white/30 bg-white/10 text-white hover:bg-white/20",
-              },
-              icon: <Bell className="h-4 w-4 text-white" />,
+              icon: <Bell className="h-4 w-4" />,
               action: {
                 label: "View medication",
                 onClick: () => window.location.assign(String(raw.actionUrl || "/medications")),
