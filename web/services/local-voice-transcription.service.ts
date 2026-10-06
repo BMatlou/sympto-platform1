@@ -1,6 +1,6 @@
 "use client";
 
-const MODEL_ID = "Xenova/whisper-tiny.en";
+const MODEL_ID = "onnx-community/whisper-tiny.en";
 const SAMPLE_RATE = 16_000;
 const MAX_SECONDS = 60;
 
@@ -109,7 +109,7 @@ async function createTranscriber(
   const { pipeline, env } = await import("@huggingface/transformers");
 
   // Keep provider diagnostics quiet in development without hiding real
-  // application errors. WASM is the compatibility path for mobile devices.
+  // application errors.
   env.logLevel = 40;
   env.backends.onnx?.setLogLevel?.(40);
 
@@ -128,11 +128,17 @@ async function createTranscriber(
     }
   };
 
+  const dtype =
+    device === "webgpu"
+      ? { encoder_model: "fp32", decoder_model_merged: "q4" as const }
+      : "q8";
+
   return (await pipeline(
     "automatic-speech-recognition",
     MODEL_ID,
     {
       device,
+      dtype,
       progress_callback,
     },
   )) as unknown as Transcriber;
@@ -191,10 +197,9 @@ export async function transcribeLocalVoice(
     // exact Float32Array + 16 kHz input it expects.
     const audio = await decodeForWhisper(file);
 
-    // WebGPU inference is still experimental on some mobile devices. Use the
-    // more compatible WASM backend on phones/tablets instead.
-    const device: "webgpu" | "wasm" =
-      !isLikelyMobileDevice() && hasWebGpu() ? "webgpu" : "wasm";
+    // Transformers.js v4 ships a substantially newer WebGPU runtime. Use it
+    // whenever the browser exposes WebGPU; fall back to WASM otherwise.
+    const device: "webgpu" | "wasm" = hasWebGpu() ? "webgpu" : "wasm";
 
     const transcriber = await getTranscriber(device, onProgress);
 
