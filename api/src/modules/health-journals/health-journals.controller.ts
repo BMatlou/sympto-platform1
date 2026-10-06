@@ -85,27 +85,23 @@ export class HealthJournalsController {
       dto.message,
     );
 
-    // Every Talk to Sympto message belongs in the patient's Health Journal
-    // as their original narrative. A symptom or urgent concern is still NOT
-    // silently converted into a structured clinical symptom record; that
-    // structured record remains in the explicit review/save workflow.
-    const journal = await this.healthJournalsService.create(
-      req.user.sub,
-      {
-        title:
-          intelligence.inputType === 'SYMPTOM'
-            ? 'Talk to Sympto — symptom update'
-            : intelligence.inputType === 'URGENT_CONCERN'
-              ? 'Talk to Sympto — urgent health update'
-              : 'Talk to Sympto — health update',
-        journal: dto.message.trim(),
-        notes:
-          intelligence.inputType === 'SYMPTOM' ||
-          intelligence.inputType === 'URGENT_CONCERN'
-            ? 'Captured through Talk to Sympto. Structured symptom/urgent review remains separate and requires explicit user action.'
-            : 'Captured through Talk to Sympto.',
-      },
-    );
+    // A recognised symptom belongs in the structured symptom record, not as a
+    // second free-text journal entry. Urgent concerns are also symptom-related
+    // and must not create a duplicate journal narrative.
+    //
+    // Only updates that are not understood as a symptom are stored directly
+    // in Health Journal.
+    const journal =
+      intelligence.inputType === 'GENERAL_HEALTH'
+        ? await this.healthJournalsService.create(
+            req.user.sub,
+            {
+              title: 'Talk to Sympto — health update',
+              journal: dto.message.trim(),
+              notes: 'Captured through Talk to Sympto.',
+            },
+          )
+        : null;
 
     return {
       journal,
