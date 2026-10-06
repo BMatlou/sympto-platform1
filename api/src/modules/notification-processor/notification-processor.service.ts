@@ -72,7 +72,7 @@ export class NotificationProcessorService
         include: {
           notification: true,
         },
-        orderBy: { scheduledFor: 'asc' },
+        orderBy: [{ scheduledFor: 'asc' }, { channel: 'asc' }],
         take: 50,
       });
 
