@@ -85,24 +85,25 @@ export class HealthJournalsController {
       dto.message,
     );
 
-    // Symptom and urgent messages must enter the structured symptom workflow.
-    // Do not silently save inferred clinical data as an unstructured journal entry.
-    if (
-      intelligence.inputType === 'SYMPTOM' ||
-      intelligence.inputType === 'URGENT_CONCERN'
-    ) {
-      return {
-        journal: null,
-        intelligence,
-      };
-    }
-
+    // Every Talk to Sympto message belongs in the patient's Health Journal
+    // as their original narrative. A symptom or urgent concern is still NOT
+    // silently converted into a structured clinical symptom record; that
+    // structured record remains in the explicit review/save workflow.
     const journal = await this.healthJournalsService.create(
       req.user.sub,
       {
-        title: 'Talk to Sympto — health update',
+        title:
+          intelligence.inputType === 'SYMPTOM'
+            ? 'Talk to Sympto — symptom update'
+            : intelligence.inputType === 'URGENT_CONCERN'
+              ? 'Talk to Sympto — urgent health update'
+              : 'Talk to Sympto — health update',
         journal: dto.message.trim(),
-        notes: 'Captured through Talk to Sympto.',
+        notes:
+          intelligence.inputType === 'SYMPTOM' ||
+          intelligence.inputType === 'URGENT_CONCERN'
+            ? 'Captured through Talk to Sympto. Structured symptom/urgent review remains separate and requires explicit user action.'
+            : 'Captured through Talk to Sympto.',
       },
     );
 
