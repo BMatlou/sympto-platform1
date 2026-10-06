@@ -5,7 +5,11 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { ClipboardPlus, Mic, Save, Sparkles, X } from "lucide-react";
 import { useAuth } from "@/hooks/use-auth";
 import { healthJournalService, type TalkToSymptoResult } from "@/services/health-journal.service";
-import { transcribeLocalVoice } from "@/services/local-voice-transcription.service";
+import {
+  createBrowserSpeechRecognition,
+  isBrowserSpeechRecognitionSupported,
+  type BrowserSpeechRecognition,
+} from "@/services/browser-speech-recognition.service";
 
 function human(value: string | null | undefined) {
   return String(value ?? "").replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
@@ -18,13 +22,9 @@ export default function AIHealthHelperFab() {
   const [message, setMessage] = useState("");
   const [talkResult, setTalkResult] = useState<TalkToSymptoResult | null>(null);
   const [processing, setProcessing] = useState(false);
-  const [transcribing, setTranscribing] = useState(false);
-  const [transcriptionProgress, setTranscriptionProgress] = useState<number | null>(null);
   const [processError, setProcessError] = useState("");
-  const recorderRef = useRef<MediaRecorder | null>(null);
-  const streamRef = useRef<MediaStream | null>(null);
-  const audioChunksRef = useRef<Blob[]>([]);
-  const discardRecordingRef = useRef(false);
+  const speechRecognitionRef = useRef<BrowserSpeechRecognition | null>(null);
+  const speechBaseRef = useRef("");
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -37,12 +37,8 @@ export default function AIHealthHelperFab() {
 
     return () => {
       window.removeEventListener("keydown", onKeyDown);
-      discardRecordingRef.current = true;
-      recorderRef.current?.stop();
-      recorderRef.current = null;
-      streamRef.current?.getTracks().forEach((track) => track.stop());
-      streamRef.current = null;
-      audioChunksRef.current = [];
+      speechRecognitionRef.current?.abort();
+      speechRecognitionRef.current = null;
     };
   }, []);
 
@@ -54,15 +50,9 @@ export default function AIHealthHelperFab() {
   }, [open]);
 
   const closeHelper = () => {
-    discardRecordingRef.current = true;
-    recorderRef.current?.stop();
-    recorderRef.current = null;
-    streamRef.current?.getTracks().forEach((track) => track.stop());
-    streamRef.current = null;
-    audioChunksRef.current = [];
+    speechRecognitionRef.current?.abort();
+    speechRecognitionRef.current = null;
     setListening(false);
-    setTranscribing(false);
-    setTranscriptionProgress(null);
     setOpen(false);
   };
 
@@ -71,183 +61,87 @@ export default function AIHealthHelperFab() {
     setMessage("");
     setTalkResult(null);
     setProcessing(false);
-    setTranscribing(false);
-    setTranscriptionProgress(null);
     setProcessError("");
-    discardRecordingRef.current = false;
-  };
-
-  const transcribeAudio = async (file: File) => {
-    if (transcribing) return;
-
-    setTranscribing(true);
-    setTranscriptionProgress(0);
-    setProcessError("");
-
-    try {
-      // Voice transcription runs entirely in the browser using the small
-      // Whisper model. No audio is uploaded to a paid transcription API.
-      const transcript = await transcribeLocalVoice(file, (progress) => {
-        setTranscriptionProgress(progress);
-      });
-
-      setMessage((current) =>
-        current.trim() ? `${current.trim()} ${transcript}` : transcript,
-      );
-      setTalkResult(null);
-    } catch (error: any) {
-      setProcessError(
-        error?.message ||
-          "Sympto could not understand that recording. Please try again or type your update.",
-      );
-    } finally {
-      setTranscribing(false);
-      setTranscriptionProgress(null);
-    }
+    speechBaseRef.current = "";
   };
 
   const stopListening = () => {
-    const recorder = recorderRef.current;
-
-    if (!recorder || recorder.state === "inactive") {
-      setListening(false);
-      return;
-    }
-
-    recorder.stop();
+    speechRecognitionRef.current?.stop();
   };
 
-  const startListening = async () => {
-    if (typeof window === "undefined" || processing || transcribing) return;
+  const startListening = () => {
+    if (typeof window === "undefined" || processing || listening) return;
 
     setProcessError("");
 
-    // Browser microphone capture requires a secure context on mobile.
-    // Never fall back to the phone's native recorder: Talk to Sympto should
-    // keep the entire voice flow inside the Sympto page.
     if (!window.isSecureContext) {
       setProcessError(
-        "Voice recording needs a secure HTTPS connection. Open Sympto using its HTTPS address and try again.",
+        "Voice input needs a secure HTTPS connection. Open Sympto using its HTTPS address and try again.",
       );
       return;
     }
 
-    if (
-      !navigator.mediaDevices?.getUserMedia ||
-      typeof MediaRecorder === "undefined"
-    ) {
+    if (!isBrowserSpeechRecognitionSupported()) {
       setProcessError(
-        "This browser does not support in-page microphone recording. Please use a current Chrome or Safari browser.",
+        "Voice input is not supported by this browser. Please use the latest Chrome or Safari.",
       );
       return;
     }
+
+    const recognition = createBrowserSpeechRecognition({
+      onStart: () => {
+        setListening(true);
+        setProcessError("");
+      },
+      onResult: (finalTranscript, interimTranscript) => {
+        const pieces = [
+          speechBaseRef.current,
+          finalTranscript,
+          interimTranscript,
+        ].filter(Boolean);
+        const nextMessage = pieces.join(" ").replace(/\\s+/g, " ").trim();
+
+        setMessage(nextMessage);
+        setTalkResult(null);
+      },
+      onError: (message, code) => {
+        setListening(false);
+        speechRecognitionRef.current = null;
+
+        if (code === "not-allowed" || code === "service-not-allowed") {
+          setProcessError(message);
+        } else if (code === "no-speech") {
+          setProcessError(message);
+        } else {
+          setProcessError(message);
+        }
+      },
+      onEnd: () => {
+        setListening(false);
+        speechRecognitionRef.current = null;
+      },
+    });
+
+    if (!recognition) {
+      setProcessError(
+        "Voice input is not supported by this browser. Please use the latest Chrome or Safari.",
+      );
+      return;
+    }
+
+    speechBaseRef.current = message.trim();
+    recognition.processLocally = false;
+    speechRecognitionRef.current = recognition;
 
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({
-        audio: {
-          echoCancellation: true,
-          noiseSuppression: true,
-          autoGainControl: true,
-        },
-      });
-
-      streamRef.current = stream;
-      audioChunksRef.current = [];
-
-      const mimeTypes = [
-        "audio/webm;codecs=opus",
-        "audio/webm",
-        "audio/mp4",
-        "audio/ogg;codecs=opus",
-      ];
-
-      const mimeType = mimeTypes.find((type) =>
-        MediaRecorder.isTypeSupported(type),
-      );
-
-      const recorder = mimeType
-        ? new MediaRecorder(stream, { mimeType })
-        : new MediaRecorder(stream);
-
-      recorderRef.current = recorder;
-      discardRecordingRef.current = false;
-
-      recorder.ondataavailable = (event) => {
-        if (event.data.size > 0) {
-          audioChunksRef.current.push(event.data);
-        }
-      };
-
-      recorder.onerror = () => {
-        setListening(false);
-        setProcessError("I couldn't record your voice. Please try again.");
-        stream.getTracks().forEach((track) => track.stop());
-        recorderRef.current = null;
-        streamRef.current = null;
-        audioChunksRef.current = [];
-      };
-
-      recorder.onstop = () => {
-        const shouldDiscard = discardRecordingRef.current;
-        discardRecordingRef.current = false;
-
-        if (shouldDiscard) {
-          stream.getTracks().forEach((track) => track.stop());
-          recorderRef.current = null;
-          streamRef.current = null;
-          audioChunksRef.current = [];
-          setListening(false);
-          return;
-        }
-
-        const blob = new Blob(audioChunksRef.current, {
-          type: recorder.mimeType || "audio/webm",
-        });
-
-        const extension =
-          blob.type.includes("mp4") ? "m4a" :
-          blob.type.includes("ogg") ? "ogg" :
-          "webm";
-
-        const file = new File(
-          [blob],
-          `sympto-voice-${Date.now()}.${extension}`,
-          { type: blob.type || "audio/webm" },
-        );
-
-        stream.getTracks().forEach((track) => track.stop());
-        recorderRef.current = null;
-        streamRef.current = null;
-        audioChunksRef.current = [];
-
-        setListening(false);
-        if (file.size > 0) {
-          void transcribeAudio(file);
-        }
-      };
-
-      recorder.start();
-      setListening(true);
-
-      window.setTimeout(() => {
-        if (recorderRef.current === recorder && recorder.state === "recording") {
-          recorder.stop();
-        }
-      }, 60_000);
+      recognition.start();
     } catch (error: any) {
+      speechRecognitionRef.current = null;
       setListening(false);
-
-      if (error?.name === "NotAllowedError") {
-        setProcessError(
-          "Microphone access was blocked. Allow microphone access for Sympto and try again.",
-        );
-      } else if (error?.name === "NotFoundError") {
-        setProcessError("No microphone was found on this device.");
-      } else {
-        setProcessError(
-          "Sympto could not start the microphone. Check microphone permission for this site and try again.",
-        );
-      }
+      setProcessError(
+        error?.message ||
+          "Sympto could not start speech recognition. Please try again.",
+      );
     }
   };
 
@@ -363,24 +257,20 @@ export default function AIHealthHelperFab() {
                 </p>
                 <p className="mx-auto mt-2 max-w-sm text-sm leading-6 text-white/70">
                   {listening
-                    ? "Speak naturally. When you stop, Sympto will transcribe your voice on this device before anything clinical is saved."
+                    ? "Speak naturally. Your browser is turning your speech into text. Stop when you’re finished."
                     : "Use your voice or type your update. Sympto will decide whether it belongs in your symptom record or general health journal."}
                 </p>
 
                 <button
                   type="button"
+,
                   onClick={listening ? stopListening : startListening}
-                  disabled={processing || transcribing}
+                  disabled={processing}
+
                   className="mt-5 inline-flex min-h-14 min-w-44 items-center justify-center gap-2 rounded-full bg-[#24c1c4] px-6 text-sm font-extrabold text-slate-950 shadow-lg transition hover:bg-[#5edadd] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-white/40 disabled:cursor-not-allowed disabled:opacity-60"
                 >
                   <Mic className="h-5 w-5" aria-hidden="true" />
-                  {transcribing
-                    ? transcriptionProgress != null && transcriptionProgress < 100
-                      ? `Preparing voice model ${Math.round(transcriptionProgress)}%`
-                      : "Transcribing…"
-                    : listening
-                      ? "Stop listening"
-                      : "Speak to Sympto"}
+                  {listening ? "Stop listening" : "Speak to Sympto"}
                 </button>
               </div>
 
@@ -418,7 +308,9 @@ export default function AIHealthHelperFab() {
                 <button
                   type="button"
                   onClick={analyzeWithSympto}
-                  disabled={processing || transcribing || !user?.id}
+,
+                  disabled={processing || listening || !user?.id}
+
                   className="mt-4 flex min-h-14 w-full items-center justify-center gap-2 rounded-2xl bg-[#0b2d54] px-5 text-base font-extrabold text-white transition hover:bg-[#082544] disabled:cursor-not-allowed disabled:opacity-60 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[#24c1c4]/30"
                 >
                   <Sparkles className="h-5 w-5" aria-hidden="true" />
