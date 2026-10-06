@@ -93,6 +93,12 @@ export class NotificationProcessorService
           await this.recordFailure(item.id, item.notification, error);
         }
       }
+    } catch (error) {
+      const message =
+        error instanceof Error ? error.message : 'Unknown notification processor error';
+      this.logger.error(
+        `Notification processor cycle failed: ${message}`,
+      );
     } finally {
       this.processing = false;
     }
