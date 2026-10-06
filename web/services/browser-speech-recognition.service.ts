@@ -69,10 +69,10 @@ export function isBrowserSpeechRecognitionSupported() {
 
 function normalizeWords(value: string) {
   return value
-    .replace(/[^\\p{L}\\p{N}']+/gu, " ")
+    .replace(/[^\p{L}\p{N}']+/gu, " ")
     .trim()
     .toLowerCase()
-    .split(/\\s+/)
+    .split(/\s+/)
     .filter(Boolean);
 }
 
