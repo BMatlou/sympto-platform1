@@ -45,6 +45,37 @@ function defaultTimes(count: number) {
   return ["08:00", "12:00", "16:00", "20:00"].slice(0, count);
 }
 
+function inferReminderFrequency(value?: string | null) {
+  const normalized = String(value ?? "").trim().toLowerCase().replace(/[_-]+/g, " ");
+  if (!normalized || /as needed|when needed|prn/.test(normalized)) {
+    return { doseCount: 0, cadence: "UNSUPPORTED" };
+  }
+  if (/weekly|once a week|once per week/.test(normalized)) {
+    return { doseCount: 1, cadence: "WEEKLY" };
+  }
+  const everyHours = normalized.match(/every\s+(\d+(?:\.\d+)?)\s*hours?/);
+  if (everyHours) {
+    const hours = Number(everyHours[1]);
+    if (hours > 0 && 24 % hours === 0) {
+      const count = 24 / hours;
+      if (count >= 1 && count <= 4) return { doseCount: count, cadence: "DAILY" };
+    }
+  }
+  if (/once\s+(a|per)\s+day|once\s+daily|daily/.test(normalized)) {
+    return { doseCount: 1, cadence: "DAILY" };
+  }
+  if (/twice\s+(a|per)\s+day|twice\s+daily/.test(normalized)) {
+    return { doseCount: 2, cadence: "DAILY" };
+  }
+  if (/three\s+times?\s+(a|per)?\s*day|three\s+times?\s+daily/.test(normalized)) {
+    return { doseCount: 3, cadence: "DAILY" };
+  }
+  if (/four\s+times?\s+(a|per)?\s*day|four\s+times?\s+daily/.test(normalized)) {
+    return { doseCount: 4, cadence: "DAILY" };
+  }
+  return { doseCount: 0, cadence: "UNSUPPORTED" };
+}
+
 function currentWeekday() {
   const day = new Date().getDay();
   return day === 0 ? 7 : day;
@@ -71,9 +102,10 @@ export function MedicationReminderButton({
 }: MedicationReminderButtonProps) {
   const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(false);
-  const [doseCount, setDoseCount] = useState(0);
-  const [cadence, setCadence] = useState("UNSUPPORTED");
-  const [supported, setSupported] = useState(true);
+  const inferredFrequency = useMemo(() => inferReminderFrequency(frequency), [frequency]);
+  const [doseCount, setDoseCount] = useState(inferredFrequency.doseCount);
+  const [cadence, setCadence] = useState(inferredFrequency.cadence);
+  const [supported, setSupported] = useState(inferredFrequency.doseCount > 0);
   const [state, setState] = useState<ReminderState>({
     enabled: false,
     daysOfWeek: [1, 2, 3, 4, 5, 6, 7],
@@ -93,9 +125,11 @@ export function MedicationReminderButton({
     try {
       const response = await api.get("/patient-medications/" + medicationId + "/reminder-schedule");
       const payload = response.data?.data ?? response.data;
-      const nextDoseCount = Number(payload?.doseCount ?? 0);
-      const nextCadence = String(payload?.cadence ?? "UNSUPPORTED").toUpperCase();
-      const nextSupported = Boolean(payload?.supported && nextDoseCount > 0);
+      const nextDoseCount = Number(payload?.doseCount ?? 0) || inferredFrequency.doseCount;
+      const nextCadence = String(payload?.cadence ?? inferredFrequency.cadence).toUpperCase();
+      const nextSupported = payload?.supported == null
+        ? inferredFrequency.doseCount > 0
+        : Boolean(payload.supported && nextDoseCount > 0);
 
       setDoseCount(nextDoseCount);
       setCadence(nextCadence);
@@ -115,6 +149,15 @@ export function MedicationReminderButton({
         timezone,
       });
     } catch (error) {
+      setDoseCount(inferredFrequency.doseCount);
+      setCadence(inferredFrequency.cadence);
+      setSupported(inferredFrequency.doseCount > 0);
+      setState((current) => ({
+        ...current,
+        enabled: false,
+        times: defaultTimes(inferredFrequency.doseCount || 1),
+        daysOfWeek: inferredFrequency.cadence === "WEEKLY" ? [currentWeekday()] : [1, 2, 3, 4, 5, 6, 7],
+      }));
       toast.error("Could not load reminder settings", { description: getErrorMessage(error) });
     } finally {
       setLoading(false);
@@ -276,29 +319,37 @@ export function MedicationReminderButton({
 
                 <div>
                   <div className="flex items-center justify-between gap-3">
-                    <p className="text-xs font-black text-[#0b2d54]">Reminder times</p>
-                    <span className="rounded-full bg-[#24c1c4]/10 px-2.5 py-1 text-[9px] font-black text-[#0b7b80]">
+                    <div>
+                      <p className="text-xs font-black text-[#0b2d54]">Reminder times</p>
+                      <p className="mt-1 text-[10px] text-slate-400">
+                        Set one reminder time for each scheduled dose.
+                      </p>
+                    </div>
+                    <span className="shrink-0 rounded-full bg-[#24c1c4]/10 px-2.5 py-1 text-[9px] font-black text-[#0b7b80]">
                       {doseCount} {doseCount === 1 ? "time" : "times"}
                     </span>
                   </div>
 
                   <div className="mt-2 space-y-2">
-                    {state.times.map((time, index) => (
-                      <label key={index} className="flex items-center gap-3 rounded-2xl border border-slate-200 bg-white px-3.5 py-3">
-                        <span className="grid h-8 w-8 place-items-center rounded-xl bg-[#e8f8f7] text-[#0b7b80]">
-                          <Clock3 className="h-4 w-4" />
-                        </span>
-                        <span className="min-w-0 flex-1">
-                          <span className="block text-[10px] font-black uppercase tracking-[0.14em] text-slate-400">Dose {index + 1}</span>
-                          <input
-                            type="time"
-                            value={time}
-                            onChange={(event) => updateTime(index, event.target.value)}
-                            className="mt-0.5 w-full bg-transparent text-sm font-black text-[#0b2d54] outline-none"
-                          />
-                        </span>
-                      </label>
-                    ))}
+                    {Array.from({ length: doseCount }, (_, index) => {
+                      const time = state.times[index] ?? defaultTimes(doseCount)[index] ?? "08:00";
+                      return (
+                        <label key={index} className="flex items-center gap-3 rounded-2xl border border-slate-200 bg-white px-3.5 py-3">
+                          <span className="grid h-8 w-8 place-items-center rounded-xl bg-[#e8f8f7] text-[#0b7b80]">
+                            <Clock3 className="h-4 w-4" />
+                          </span>
+                          <span className="min-w-0 flex-1">
+                            <span className="block text-[10px] font-black uppercase tracking-[0.14em] text-slate-400">Dose {index + 1}</span>
+                            <input
+                              type="time"
+                              value={time}
+                              onChange={(event) => updateTime(index, event.target.value)}
+                              className="mt-0.5 w-full bg-transparent text-sm font-black text-[#0b2d54] outline-none"
+                            />
+                          </span>
+                        </label>
+                      );
+                    })}
                   </div>
                 </div>
 
