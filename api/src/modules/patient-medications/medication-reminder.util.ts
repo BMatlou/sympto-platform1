@@ -134,3 +134,53 @@ export function nextMedicationReminderOccurrence(args: {
   }
   return null;
 }
+
+export function recentMedicationReminderOccurrence(args: {
+  now: Date;
+  time: string;
+  daysOfWeek: number[];
+  timezone: string;
+  notBefore?: Date | null;
+  notAfter?: Date | null;
+  graceMs?: number;
+}) {
+  const [hourText, minuteText] = String(args.time).split(":");
+  const hour = Number(hourText);
+  const minute = Number(minuteText);
+  if (
+    !Number.isInteger(hour) ||
+    !Number.isInteger(minute) ||
+    hour < 0 ||
+    hour > 23 ||
+    minute < 0 ||
+    minute > 59
+  ) {
+    return null;
+  }
+
+  const allowedDays = new Set(args.daysOfWeek);
+  if (!allowedDays.size) return null;
+
+  const effectiveNow =
+    args.notBefore && args.notBefore > args.now ? args.notBefore : args.now;
+  const local = localParts(effectiveNow, args.timezone);
+
+  if (!allowedDays.has(local.weekday)) return null;
+
+  const candidate = localClockToUtc(
+    local.year,
+    local.month,
+    local.day,
+    hour,
+    minute,
+    args.timezone,
+  );
+
+  const age = effectiveNow.getTime() - candidate.getTime();
+  const graceMs = args.graceMs ?? 60_000;
+
+  if (age < 0 || age > graceMs) return null;
+  if (args.notAfter && candidate >= args.notAfter) return null;
+
+  return candidate;
+}
