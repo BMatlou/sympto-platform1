@@ -4,16 +4,23 @@ import { toast } from "sonner";
 function getApiBaseUrl() {
   const configured = process.env.NEXT_PUBLIC_API_URL?.trim();
 
+  // In the HTTPS development build, keep browser requests same-origin.
+  // Next.js proxies /api/* to the local NestJS API, avoiding mixed content.
+  if (
+    typeof window !== "undefined" &&
+    window.location.protocol === "https:"
+  ) {
+    return `${window.location.origin}/api`;
+  }
+
   if (!configured) {
     return "http://localhost:3001/api";
   }
 
-  // NestJS is configured with a global `/api` prefix. Accept either
-  // `https://api.example.com` or `https://api.example.com/api` so the
-  // frontend cannot accidentally call the unprefixed route and receive 404.
+  // NestJS is configured with a global /api prefix. Accept either
+  // https://api.example.com or https://api.example.com/api.
   return configured.replace(/\/+$/, "").replace(/\/api$/i, "") + "/api";
 }
-
 export const api = axios.create({
   baseURL: getApiBaseUrl(),
 });
