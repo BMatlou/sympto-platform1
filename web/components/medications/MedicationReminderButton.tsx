@@ -61,17 +61,26 @@ function inferReminderFrequency(value?: string | null) {
       if (count >= 1 && count <= 4) return { doseCount: count, cadence: "DAILY" };
     }
   }
-  if (/once\s+(a|per)\s+day|once\s+daily|daily/.test(normalized)) {
-    return { doseCount: 1, cadence: "DAILY" };
-  }
-  if (/twice\s+(a|per)\s+day|twice\s+daily/.test(normalized)) {
-    return { doseCount: 2, cadence: "DAILY" };
+  // Check explicit multi-dose schedules before the generic "daily" match.
+  if (/four\s+times?\s+(a|per)?\s*day|four\s+times?\s+daily/.test(normalized)) {
+    return { doseCount: 4, cadence: "DAILY" };
   }
   if (/three\s+times?\s+(a|per)?\s*day|three\s+times?\s+daily/.test(normalized)) {
     return { doseCount: 3, cadence: "DAILY" };
   }
-  if (/four\s+times?\s+(a|per)?\s*day|four\s+times?\s+daily/.test(normalized)) {
-    return { doseCount: 4, cadence: "DAILY" };
+  if (/twice\s+(a|per)\s+day|twice\s+daily/.test(normalized)) {
+    return { doseCount: 2, cadence: "DAILY" };
+  }
+  if (/once\s+(a|per)\s+day|once\s+daily/.test(normalized)) {
+    return { doseCount: 1, cadence: "DAILY" };
+  }
+  const timesPerDay = normalized.match(/\b([1-9]|one|two|three|four)\s+times?\s+(?:a|per)\s+day\b/i);
+  if (timesPerDay) {
+    const count = Number(timesPerDay[1]) || { one: 1, two: 2, three: 3, four: 4 }[timesPerDay[1].toLowerCase()] || 0;
+    if (count >= 1 && count <= 4) return { doseCount: count, cadence: "DAILY" };
+  }
+  if (/\bdaily\b/.test(normalized)) {
+    return { doseCount: 1, cadence: "DAILY" };
   }
   return { doseCount: 0, cadence: "UNSUPPORTED" };
 }
