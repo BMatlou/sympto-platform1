@@ -164,6 +164,7 @@ export function MedicationReminderButton({
       });
       const payload = response.data?.data ?? response.data;
       setState((current) => ({ ...current, enabled: Boolean(payload?.enabled) }));
+      setOpen(false);
       toast.success(enabled ? "Medication reminders turned on" : "Medication reminders turned off", {
         description: enabled
           ? medicationName + " will remind you " + cadenceLabel.toLowerCase() + " on your selected days."
