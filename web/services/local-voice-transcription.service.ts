@@ -22,7 +22,67 @@ type VoiceDevice = "webgpu" | "wasm";
 let webGpuTranscriberPromise: Promise<Transcriber> | null = null;
 let wasmTranscriberPromise: Promise<Transcriber> | null = null;
 
-function isLikelyMobileDevice() {
+
+async function decodeForWhisper(file: File): Promise<Float32Array> {
+  const AudioContextCtor =
+    typeof window !== "undefined"
+      ? window.AudioContext ||
+        (window as typeof window & { webkitAudioContext?: typeof AudioContext })
+          .webkitAudioContext
+      : undefined;
+
+  if (!AudioContextCtor) {
+    throw new Error("This browser cannot decode the phone recording.");
+  }
+
+  const context = new AudioContextCtor();
+  try {
+    const sourceBuffer = await context.decodeAudioData(
+      await file.arrayBuffer(),
+    );
+
+    if (!Number.isFinite(sourceBuffer.duration) || sourceBuffer.duration <= 0) {
+      throw new Error("The phone recording has no usable audio.");
+    }
+
+    if (sourceBuffer.duration > MAX_SECONDS) {
+      throw new Error("Please keep the voice recording under 60 seconds.");
+    }
+
+    // Whisper expects mono 16 kHz PCM. OfflineAudioContext performs the
+    // browser-native resampling/downmixing, avoiding file-format-specific
+    // decoding inside the Transformers.js pipeline.
+    const targetLength = Math.max(
+      1,
+      Math.ceil(sourceBuffer.duration * SAMPLE_RATE),
+    );
+    const offline = new OfflineAudioContext(1, targetLength, SAMPLE_RATE);
+    const source = offline.createBufferSource();
+    source.buffer = sourceBuffer;
+    source.connect(offline.destination);
+    source.start(0);
+
+    const rendered = await offline.startRendering();
+    const samples = rendered.getChannelData(0);
+
+    // Copy before the AudioContext is closed so the model owns a stable buffer.
+    return new Float32Array(samples);
+  } catch (error) {
+    if (
+      error instanceof Error &&
+      error.message.startsWith("Please keep the voice recording")
+    ) {
+      throw error;
+    }
+
+    throw new Error(
+      "Sympto could not decode this phone recording. Please try recording again.",
+    );
+  } finally {
+    await context.close().catch(() => undefined);
+  }
+}
+\nfunction isLikelyMobileDevice() {
   if (typeof navigator === "undefined") return false;
 
   const userAgent = navigator.userAgent || "";
@@ -124,14 +184,14 @@ export async function transcribeLocalVoice(
   const objectUrl = URL.createObjectURL(file);
 
   try {
-    // Transformers.js can decode a browser-supported audio URL directly.
-    // This avoids depending on an internal audio helper that is not part of
-    // the installed package's public TypeScript exports.
-    //
-    // WebGPU inference is still experimental on some mobile devices. Those
-    // browsers can successfully load the model and then fail only when the
-    // first inference runs (the exact "Inputs given to model: {}" failure).
-    // Use the more compatible WASM backend on phones/tablets instead.
+    // Phone capture can produce formats such as M4A/MP4 that are fine for
+    // the browser but unreliable when passed through the Transformers.js URL
+    // decoder. Decode the recording with Web Audio first and give Whisper the
+    // exact Float32Array + 16 kHz input it expects.
+    const audio = await decodeForWhisper(file);
+
+    // WebGPU inference is still experimental on some mobile devices. Use the
+    // more compatible WASM backend on phones/tablets instead.
     const device: "webgpu" | "wasm" =
       !isLikelyMobileDevice() && hasWebGpu() ? "webgpu" : "wasm";
 
@@ -140,9 +200,10 @@ export async function transcribeLocalVoice(
     // whisper-tiny.en is English-only. Do not pass language/task generation
     // arguments; Transformers.js derives the correct generation settings from
     // the model configuration.
-    const result = await transcriber(objectUrl, {
-      // Larger chunks reduce repeated Whisper work for ordinary short health updates.
-      chunk_length_s: 30,
+    const result = await transcriber(audio, {
+      // 29-second chunks avoid an edge case in Whisper chunk handling around
+      // the exact 30-second model window.
+      chunk_length_s: 29,
       stride_length_s: 5,
     });
 
