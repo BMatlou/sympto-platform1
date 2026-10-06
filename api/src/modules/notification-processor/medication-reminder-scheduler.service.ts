@@ -232,7 +232,8 @@ export class MedicationReminderSchedulerService {
       where: { userId_notificationType_channel: { userId, notificationType: 'REMINDER', channel: NotificationChannel.PUSH } },
       select: { enabled: true },
     });
-    if (!preference?.enabled) return false;
+    if (preference && !preference.enabled) return false;
+
     const token = await this.prisma.deviceToken.findFirst({
       where: { userId, platform: 'WEB_PUSH', active: true },
       select: { id: true },
