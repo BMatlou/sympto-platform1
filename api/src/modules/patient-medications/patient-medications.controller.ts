@@ -83,7 +83,7 @@ export class PatientMedicationsController {
     );
   }
 
-  @Permissions('patient-medications.read')
+  @Permissions('patient-medications.update')
   @Post(':id/reminder-schedule')
   configureReminderSchedule(
     @Param('id') id: string,
