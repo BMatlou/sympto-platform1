@@ -83,18 +83,6 @@ async function decodeForWhisper(file: File): Promise<Float32Array> {
   }
 }
 
-function isLikelyMobileDevice() {
-  if (typeof navigator === "undefined") return false;
-
-  const userAgent = navigator.userAgent || "";
-  if (/Android|iPhone|iPad|iPod/i.test(userAgent)) return true;
-
-  // Catch mobile/tablet browsers whose UA does not identify the platform.
-  return navigator.maxTouchPoints > 1 &&
-    typeof window !== "undefined" &&
-    Math.min(window.innerWidth, window.innerHeight) <= 1024;
-}
-
 function hasWebGpu() {
   return (
     typeof navigator !== "undefined" &&
@@ -130,7 +118,7 @@ async function createTranscriber(
 
   const dtype =
     device === "webgpu"
-      ? { encoder_model: "fp32", decoder_model_merged: "q4" as const }
+      ? ({ encoder_model: "fp32", decoder_model_merged: "q4" } as const)
       : "q8";
 
   return (await pipeline(
