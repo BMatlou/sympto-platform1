@@ -49,7 +49,17 @@ export class NotificationProcessorService
     try {
       const now = new Date();
 
-      await this.medicationReminderScheduler.syncAll(now);
+      try {
+        await this.medicationReminderScheduler.syncAll(now);
+      } catch (error) {
+        const message =
+          error instanceof Error ? error.message : 'Unknown medication reminder sync error';
+        // Reminder generation must not prevent already-queued notifications
+        // from being delivered.
+        this.logger.error(
+          `Medication reminder sync failed; continuing notification delivery: ${message}`,
+        );
+      }
 
       const dueItems = await this.prisma.notificationQueue.findMany({
         where: {
