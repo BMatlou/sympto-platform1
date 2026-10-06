@@ -25,7 +25,6 @@ export default function AIHealthHelperFab() {
   const streamRef = useRef<MediaStream | null>(null);
   const audioChunksRef = useRef<Blob[]>([]);
   const discardRecordingRef = useRef(false);
-  const fileInputRef = useRef<HTMLInputElement | null>(null);
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -139,15 +138,23 @@ export default function AIHealthHelperFab() {
 
     setProcessError("");
 
-    // Native mobile capture is the fallback for LAN HTTP testing and browsers
-    // that do not expose getUserMedia/MediaRecorder. The resulting audio file
-    // still goes through the same local transcription + Talk to Sympto pipeline.
+    // Browser microphone capture requires a secure context on mobile.
+    // Never fall back to the phone's native recorder: Talk to Sympto should
+    // keep the entire voice flow inside the Sympto page.
+    if (!window.isSecureContext) {
+      setProcessError(
+        "Voice recording needs a secure HTTPS connection. Open Sympto using its HTTPS address and try again.",
+      );
+      return;
+    }
+
     if (
-      !window.isSecureContext ||
       !navigator.mediaDevices?.getUserMedia ||
       typeof MediaRecorder === "undefined"
     ) {
-      fileInputRef.current?.click();
+      setProcessError(
+        "This browser does not support in-page microphone recording. Please use a current Chrome or Safari browser.",
+      );
       return;
     }
 
@@ -254,9 +261,8 @@ export default function AIHealthHelperFab() {
         setProcessError("No microphone was found on this device.");
       } else {
         setProcessError(
-          "Sympto could not start the microphone. You can use your phone's audio recorder instead.",
+          "Sympto could not start the microphone. Check microphone permission for this site and try again.",
         );
-        fileInputRef.current?.click();
       }
     }
   };
@@ -392,18 +398,6 @@ export default function AIHealthHelperFab() {
                       ? "Stop listening"
                       : "Speak to Sympto"}
                 </button>
-                <input
-                  ref={fileInputRef}
-                  type="file"
-                  accept="audio/*"
-                  capture="user"
-                  className="hidden"
-                  onChange={(event) => {
-                    const file = event.target.files?.[0];
-                    event.target.value = "";
-                    handleAudioFile(file);
-                  }}
-                />
               </div>
 
               <div className="mt-4">
