@@ -17,60 +17,88 @@ type Transcriber = (
   },
 ) => Promise<{ text?: string } | Array<{ text?: string }>>;
 
-let transcriberPromise: Promise<Transcriber> | null = null;
+type VoiceDevice = "webgpu" | "wasm";
 
-async function getTranscriber(
+let webGpuTranscriberPromise: Promise<Transcriber> | null = null;
+let wasmTranscriberPromise: Promise<Transcriber> | null = null;
+
+function isLikelyMobileDevice() {
+  if (typeof navigator === "undefined") return false;
+
+  const userAgent = navigator.userAgent || "";
+  if (/Android|iPhone|iPad|iPod/i.test(userAgent)) return true;
+
+  // Catch mobile/tablet browsers whose UA does not identify the platform.
+  return navigator.maxTouchPoints > 1 &&
+    typeof window !== "undefined" &&
+    Math.min(window.innerWidth, window.innerHeight) <= 1024;
+}
+
+function hasWebGpu() {
+  return (
+    typeof navigator !== "undefined" &&
+    Boolean((navigator as Navigator & { gpu?: unknown }).gpu)
+  );
+}
+
+async function createTranscriber(
+  device: VoiceDevice,
   onProgress?: (progress: number) => void,
 ): Promise<Transcriber> {
-  if (!transcriberPromise) {
-    transcriberPromise = (async () => {
-      const { pipeline, env } = await import("@huggingface/transformers");
+  const { pipeline, env } = await import("@huggingface/transformers");
 
-      // ONNX Runtime may legitimately assign a few graph operations to CPU
-      // while the preferred WebGPU provider handles the rest. Keep that
-      // non-fatal provider warning out of the app's console-error overlay,
-      // while preserving real errors.
-      env.logLevel = 40;
-      env.backends.onnx?.setLogLevel?.(40);
+  // Keep provider diagnostics quiet in development without hiding real
+  // application errors. WASM is the compatibility path for mobile devices.
+  env.logLevel = 40;
+  env.backends.onnx?.setLogLevel?.(40);
 
-      const hasWebGpu =
-        typeof navigator !== "undefined" &&
-        Boolean((navigator as Navigator & { gpu?: unknown }).gpu);
+  // Single-threaded WASM is the safest browser configuration, especially on
+  // Android/mobile browsers where worker/shared-memory support varies.
+  if (device === "wasm" && env.backends.onnx?.wasm) {
+    env.backends.onnx.wasm.numThreads = 1;
+  }
 
-      const progress_callback = (info: ProgressInfo) => {
-        if (
-          (info.status === "progress_total" || info.status === "progress") &&
-          Number.isFinite(info.progress)
-        ) {
-          onProgress?.(Math.max(0, Math.min(100, Number(info.progress))));
-        }
-      };
+  const progress_callback = (info: ProgressInfo) => {
+    if (
+      (info.status === "progress_total" || info.status === "progress") &&
+      Number.isFinite(info.progress)
+    ) {
+      onProgress?.(Math.max(0, Math.min(100, Number(info.progress))));
+    }
+  };
 
-      const load = (device?: "webgpu") =>
-        pipeline(
-          "automatic-speech-recognition",
-          MODEL_ID,
-          {
-            ...(device ? { device } : {}),
-            progress_callback,
-          },
-        );
+  return (await pipeline(
+    "automatic-speech-recognition",
+    MODEL_ID,
+    {
+      device,
+      progress_callback,
+    },
+  )) as unknown as Transcriber;
+}
 
-      try {
-        return (await load(hasWebGpu ? "webgpu" : undefined)) as unknown as Transcriber;
-      } catch (error) {
-        // Some browsers expose navigator.gpu but cannot initialize this model
-        // with WebGPU. Fall back to the normal browser runtime instead of failing voice.
-        if (!hasWebGpu) throw error;
-        return (await load()) as unknown as Transcriber;
-      }
-    })().catch((error) => {
-      transcriberPromise = null;
+async function getTranscriber(
+  device: VoiceDevice,
+  onProgress?: (progress: number) => void,
+): Promise<Transcriber> {
+  if (device === "webgpu") {
+    if (!webGpuTranscriberPromise) {
+      webGpuTranscriberPromise = createTranscriber(device, onProgress).catch((error) => {
+        webGpuTranscriberPromise = null;
+        throw error;
+      });
+    }
+    return webGpuTranscriberPromise;
+  }
+
+  if (!wasmTranscriberPromise) {
+    wasmTranscriberPromise = createTranscriber(device, onProgress).catch((error) => {
+      wasmTranscriberPromise = null;
       throw error;
     });
   }
 
-  return transcriberPromise;
+  return wasmTranscriberPromise;
 }
 
 export function isLocalVoiceTranscriptionSupported() {
@@ -99,9 +127,15 @@ export async function transcribeLocalVoice(
     // Transformers.js can decode a browser-supported audio URL directly.
     // This avoids depending on an internal audio helper that is not part of
     // the installed package's public TypeScript exports.
-    onProgress?.(100);
+    //
+    // WebGPU inference is still experimental on some mobile devices. Those
+    // browsers can successfully load the model and then fail only when the
+    // first inference runs (the exact "Inputs given to model: {}" failure).
+    // Use the more compatible WASM backend on phones/tablets instead.
+    const device: "webgpu" | "wasm" =
+      !isLikelyMobileDevice() && hasWebGpu() ? "webgpu" : "wasm";
 
-    const transcriber = await getTranscriber(onProgress);
+    const transcriber = await getTranscriber(device, onProgress);
 
     // whisper-tiny.en is English-only. Do not pass language/task generation
     // arguments; Transformers.js derives the correct generation settings from
