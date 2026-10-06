@@ -37,10 +37,10 @@ export function getMedicationReminderFrequency(frequency: string | null | undefi
     }
   }
 
+  if (/once\s+(a|per)\s+day|once\s+daily|daily/.test(value)) return { doseCount: 1, cadence: "DAILY" };
   if (/twice\s+(a|per)\s+day|twice\s+daily/.test(value)) return { doseCount: 2, cadence: "DAILY" };
   if (/three\s+times?\s+(a|per)?\s*day|three\s+times?\s+daily/.test(value)) return { doseCount: 3, cadence: "DAILY" };
   if (/four\s+times?\s+(a|per)?\s*day|four\s+times?\s+daily/.test(value)) return { doseCount: 4, cadence: "DAILY" };
-  if (/once\s+(a|per)\s+day|once\s+daily|daily/.test(value)) return { doseCount: 1, cadence: "DAILY" };
 
   if (/times?\s*(a|per)?\s*day|daily/.test(value)) {
     const count = parseCount(value);
@@ -128,59 +128,4 @@ export function nextMedicationReminderOccurrence(args: {
     return candidate;
   }
   return null;
-}
-
-/**
- * Returns the occurrence scheduled for the current local minute when it has
- * just passed. This prevents a reminder configured at its scheduled minute
- * from being silently deferred until the following day.
- */
-export function recentMedicationReminderOccurrence(args: {
-  now: Date;
-  time: string;
-  daysOfWeek: number[];
-  timezone: string;
-  notBefore?: Date | null;
-  notAfter?: Date | null;
-  graceMs?: number;
-}) {
-  const [hourText, minuteText] = String(args.time).split(":");
-  const hour = Number(hourText);
-  const minute = Number(minuteText);
-  if (
-    !Number.isInteger(hour) ||
-    !Number.isInteger(minute) ||
-    hour < 0 ||
-    hour > 23 ||
-    minute < 0 ||
-    minute > 59
-  ) {
-    return null;
-  }
-
-  const allowedDays = new Set(args.daysOfWeek);
-  if (!allowedDays.size) return null;
-
-  const effectiveNow =
-    args.notBefore && args.notBefore > args.now ? args.notBefore : args.now;
-  const local = localParts(effectiveNow, args.timezone);
-
-  if (!allowedDays.has(local.weekday)) return null;
-
-  const candidate = localClockToUtc(
-    local.year,
-    local.month,
-    local.day,
-    hour,
-    minute,
-    args.timezone,
-  );
-
-  const age = effectiveNow.getTime() - candidate.getTime();
-  const graceMs = args.graceMs ?? 60_000;
-
-  if (age < 0 || age > graceMs) return null;
-  if (args.notAfter && candidate >= args.notAfter) return null;
-
-  return candidate;
 }
