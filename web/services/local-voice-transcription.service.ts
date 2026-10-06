@@ -83,6 +83,19 @@ async function decodeForWhisper(file: File): Promise<Float32Array> {
   }
 }
 
+function isLikelyMobileDevice() {
+  if (typeof navigator === "undefined") return false;
+
+  const userAgent = navigator.userAgent || "";
+  if (/Android|iPhone|iPad|iPod/i.test(userAgent)) return true;
+
+  return (
+    navigator.maxTouchPoints > 1 &&
+    typeof window !== "undefined" &&
+    Math.min(window.innerWidth, window.innerHeight) <= 1024
+  );
+}
+
 function hasWebGpu() {
   return (
     typeof navigator !== "undefined" &&
@@ -184,9 +197,12 @@ export async function transcribeLocalVoice(
     // exact Float32Array + 16 kHz input it expects.
     const audio = await decodeForWhisper(file);
 
-    // Transformers.js v4 ships a substantially newer WebGPU runtime. Use it
-    // whenever the browser exposes WebGPU; fall back to WASM otherwise.
-    const device: "webgpu" | "wasm" = hasWebGpu() ? "webgpu" : "wasm";
+    // WebGPU is still memory-fragile on some Android/iOS devices. In
+    // particular, ONNX Runtime can fail session creation while allocating a
+    // small GPU buffer even when navigator.gpu exists. Keep mobile on the
+    // single-threaded WASM backend and reserve WebGPU for desktops.
+    const device: "webgpu" | "wasm" =
+      !isLikelyMobileDevice() && hasWebGpu() ? "webgpu" : "wasm";
 
     const transcriber = await getTranscriber(device, onProgress);
 
