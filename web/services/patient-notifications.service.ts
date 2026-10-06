@@ -41,7 +41,10 @@ class PatientNotificationsService {
   }
 
   async getUnreadCount(): Promise<number> {
-    const response = await api.get("/patient-notifications/unread-count");
+    const response = await api.get("/patient-notifications/unread-count", {
+      params: { _: Date.now() },
+      headers: { "Cache-Control": "no-cache" },
+    });
     const payload = response.data?.data ?? response.data;
     return Number(payload?.count ?? 0);
   }
