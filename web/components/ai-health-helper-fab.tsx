@@ -106,22 +106,6 @@ export default function AIHealthHelperFab() {
     }
   };
 
-  const handleAudioFile = (file: File | undefined) => {
-    if (!file) return;
-
-    if (!file.type.startsWith("audio/")) {
-      setProcessError("Please choose or record an audio file.");
-      return;
-    }
-
-    if (file.size > 15 * 1024 * 1024) {
-      setProcessError("That recording is too large. Please keep the voice note under 15 MB.");
-      return;
-    }
-
-    void transcribeAudio(file);
-  };
-
   const stopListening = () => {
     const recorder = recorderRef.current;
 
