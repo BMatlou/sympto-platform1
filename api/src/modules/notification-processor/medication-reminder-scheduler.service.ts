@@ -18,17 +18,7 @@ export class MedicationReminderSchedulerService {
       where: { enabled: true },
       select: { id: true },
     });
-    for (const schedule of schedules) {
-      try {
-        await this.syncSchedule(schedule.id, now);
-      } catch (error) {
-        const message = error instanceof Error ? error.message : String(error);
-        this.logger.error(
-          `Medication reminder schedule ${schedule.id} failed to sync: ${message}`,
-          error instanceof Error ? error.stack : undefined,
-        );
-      }
-    }
+    for (const schedule of schedules) await this.syncSchedule(schedule.id, now);
   }
 
   async syncMedication(patientMedicationId: string, now = new Date()) {
