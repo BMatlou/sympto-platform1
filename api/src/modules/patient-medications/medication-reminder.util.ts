@@ -37,15 +37,20 @@ export function getMedicationReminderFrequency(frequency: string | null | undefi
     }
   }
 
-  if (/once\s+(a|per)\s+day|once\s+daily|daily/.test(value)) return { doseCount: 1, cadence: "DAILY" };
-  if (/twice\s+(a|per)\s+day|twice\s+daily/.test(value)) return { doseCount: 2, cadence: "DAILY" };
-  if (/three\s+times?\s+(a|per)?\s*day|three\s+times?\s+daily/.test(value)) return { doseCount: 3, cadence: "DAILY" };
+  // Check explicit multi-dose schedules before the generic "daily" match.
+  // Otherwise "three times daily" incorrectly matches the generic daily branch as 1 dose.
   if (/four\s+times?\s+(a|per)?\s*day|four\s+times?\s+daily/.test(value)) return { doseCount: 4, cadence: "DAILY" };
+  if (/three\s+times?\s+(a|per)?\s*day|three\s+times?\s+daily/.test(value)) return { doseCount: 3, cadence: "DAILY" };
+  if (/twice\s+(a|per)\s+day|twice\s+daily/.test(value)) return { doseCount: 2, cadence: "DAILY" };
+  if (/once\s+(a|per)\s+day|once\s+daily/.test(value)) return { doseCount: 1, cadence: "DAILY" };
 
-  if (/times?\s*(a|per)?\s*day|daily/.test(value)) {
-    const count = parseCount(value);
+  const timesPerDay = value.match(/\b([1-9]|one|two|three|four)\s+times?\s+(?:a|per)\s+day\b/i);
+  if (timesPerDay) {
+    const count = parseCount(timesPerDay[0]);
     if (count && count <= 4) return { doseCount: count, cadence: "DAILY" };
   }
+
+  if (/\bdaily\b/.test(value)) return { doseCount: 1, cadence: "DAILY" };
 
   return { doseCount: 0, cadence: "UNSUPPORTED" };
 }
