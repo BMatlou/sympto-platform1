@@ -67,6 +67,68 @@ export function isBrowserSpeechRecognitionSupported() {
   return Boolean(getConstructor());
 }
 
+function normalizeWords(value: string) {
+  return value
+    .replace(/[^\\p{L}\\p{N}']+/gu, " ")
+    .trim()
+    .toLowerCase()
+    .split(/\\s+/)
+    .filter(Boolean);
+}
+
+function mergeTranscriptParts(parts: string[]) {
+  let mergedWords: string[] = [];
+
+  for (const part of parts) {
+    const words = normalizeWords(part);
+    if (words.length === 0) continue;
+
+    if (mergedWords.length === 0) {
+      mergedWords = words;
+      continue;
+    }
+
+    const same = mergedWords.length === words.length &&
+      mergedWords.every((word, index) => word === words[index]);
+    if (same) continue;
+
+    // Some mobile speech services return cumulative results:
+    // "I have" -> "I have itching" -> "I have itching eyes".
+    // In that case, replace the shorter transcript with the longer one.
+    const mergedPrefixOfNew = mergedWords.every(
+      (word, index) => word === words[index],
+    );
+    if (mergedPrefixOfNew && words.length > mergedWords.length) {
+      mergedWords = words;
+      continue;
+    }
+
+    // Conversely, ignore an older/shorter result that is already contained
+    // in the transcript we have.
+    const newPrefixOfMerged = words.every(
+      (word, index) => word === mergedWords[index],
+    );
+    if (newPrefixOfMerged) continue;
+
+    // Normal streaming segmentation: append only the portion that does not
+    // overlap with the end of the transcript already collected.
+    let overlap = Math.min(mergedWords.length, words.length);
+    while (overlap > 0) {
+      const suffix = mergedWords.slice(-overlap);
+      const prefix = words.slice(0, overlap);
+
+      if (suffix.every((word, index) => word === prefix[index])) {
+        break;
+      }
+      overlap -= 1;
+    }
+
+    mergedWords.push(...words.slice(overlap));
+  }
+
+  return mergedWords.join(" ");
+}
+
 function errorMessage(code: string | undefined) {
   switch (code) {
     case "not-allowed":
@@ -108,10 +170,6 @@ export function createBrowserSpeechRecognition(
   };
 
   recognition.onresult = (event) => {
-    // SpeechRecognition keeps a result list for the whole recognition session.
-    // Rebuild the current final/interim transcript from that list instead of
-    // appending every event, otherwise browsers such as Chrome can repeat
-    // already-finalized phrases (for example: "I have I have itching").
     const finalParts: string[] = [];
     const interimParts: string[] = [];
 
@@ -128,10 +186,12 @@ export function createBrowserSpeechRecognition(
       }
     }
 
-    handlers.onResult?.(
-      finalParts.join(" ").trim(),
-      interimParts.join(" ").trim(),
-    );
+    const finalTranscript = mergeTranscriptParts(finalParts);
+    // Interim recognition can also be cumulative; the most recent interim
+    // result is the best representation while the user is still speaking.
+    const interimTranscript = interimParts.at(-1) ?? "";
+
+    handlers.onResult?.(finalTranscript, interimTranscript.trim());
   };
 
   recognition.onerror = (event) => {
