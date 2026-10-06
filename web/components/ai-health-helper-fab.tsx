@@ -141,7 +141,7 @@ export default function AIHealthHelperFab() {
 
     // Native mobile capture is the fallback for LAN HTTP testing and browsers
     // that do not expose getUserMedia/MediaRecorder. The resulting audio file
-    // still follows the same server transcription + Talk to Sympto pipeline.
+    // still goes through the same local transcription + Talk to Sympto pipeline.
     if (
       !window.isSecureContext ||
       !navigator.mediaDevices?.getUserMedia ||
