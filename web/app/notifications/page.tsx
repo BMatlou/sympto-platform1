@@ -66,14 +66,19 @@ export default function NotificationsPage() {
   const [busyId, setBusyId] = useState<string | null>(null);
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
+  const [serverUnreadCount, setServerUnreadCount] = useState(0);
 
   const load = useCallback(async () => {
     try {
       setLoading(true);
       setError("");
-      const payload = await patientNotificationsService.list({ page: 1, limit: 100 });
+      const [payload, unreadCount] = await Promise.all([
+        patientNotificationsService.list({ page: 1, limit: 100 }),
+        patientNotificationsService.getUnreadCount(),
+      ]);
       const rows = Array.isArray(payload) ? payload : Array.isArray(payload?.data) ? payload.data : [];
       setNotifications(rows as PatientNotification[]);
+      setServerUnreadCount(unreadCount);
     } catch {
       setError("We couldn't load your notifications. Please try again.");
     } finally {
@@ -85,10 +90,7 @@ export default function NotificationsPage() {
     void load();
   }, [load]);
 
-  const unreadCount = useMemo(
-    () => notifications.filter((notification) => !notification.readAt).length,
-    [notifications],
-  );
+  const unreadCount = serverUnreadCount;
 
   const visible = useMemo(
     () => filter === "unread" ? notifications.filter((notification) => !notification.readAt) : notifications,
@@ -100,6 +102,8 @@ export default function NotificationsPage() {
       setBusyId(id);
       setNotice("");
       await patientNotificationsService.markRead(id);
+      const nextUnreadCount = await patientNotificationsService.getUnreadCount();
+      setServerUnreadCount(nextUnreadCount);
       setNotifications((current) =>
         current.map((notification) =>
           notification.id === id
@@ -122,6 +126,7 @@ export default function NotificationsPage() {
       setNotice("");
       await patientNotificationsService.markAllRead();
       const now = new Date().toISOString();
+      setServerUnreadCount(0);
       setNotifications((current) =>
         current.map((notification) => ({
           ...notification,
