@@ -86,6 +86,12 @@ export class NotificationProcessorService
         take: 50,
       });
 
+      if (dueItems.length > 0) {
+        this.logger.log(
+          `Notification processor found ${dueItems.length} due notification queue item(s).`,
+        );
+      }
+
       for (const item of dueItems) {
         try {
           await this.deliverNotification(item.notification);
