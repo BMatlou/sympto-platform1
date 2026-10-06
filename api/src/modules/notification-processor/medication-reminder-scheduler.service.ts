@@ -184,8 +184,12 @@ export class MedicationReminderSchedulerService {
           });
           await this.prisma.notificationQueue.create({
             data: { notificationId: created.id, scheduledFor: occurrence },
-          });
+            });
           existingChannels.add(NotificationChannel.IN_APP);
+        } else if (created && 'skipped' in created) {
+          this.logger.warn(
+            `In-app medication reminder skipped for schedule ${scheduleId}, slot ${slot.doseIndex}: ${String(created.reason ?? 'unknown reason')}`,
+          );
         }
       }
 
