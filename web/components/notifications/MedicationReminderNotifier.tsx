@@ -9,16 +9,9 @@ const POLL_INTERVAL_MS = 15_000;
 const RECENT_DELIVERY_WINDOW_MS = 60_000;
 const STORAGE_KEY = "sympto:shown-medication-reminders";
 
-function isForegroundNotification(notification: PatientNotification) {
-  return (
-    notification.channel === "IN_APP" &&
-    Boolean(notification.sentAt) &&
-    !notification.readAt
-  );
-}
-
-function actionLabel(notification: PatientNotification) {
-  return String(notification.actionLabel || "Open notification");
+function isMedicationReminder(notification: PatientNotification) {
+  const title = String(notification.title ?? "").toLowerCase();
+  return notification.type === "REMINDER" && title.startsWith("medication reminder:");
 }
 
 function readShownIds() {
@@ -48,10 +41,6 @@ export default function MedicationReminderNotifier() {
     let active = true;
 
     const check = async () => {
-      // This component is mounted globally, including on public auth pages.
-      // Do not call authenticated notification endpoints before sign-in.
-      if (!localStorage.getItem("accessToken")) return;
-
       try {
         const payload = await patientNotificationsService.list({ page: 1, limit: 100 });
         const rows = Array.isArray(payload)
@@ -66,7 +55,7 @@ export default function MedicationReminderNotifier() {
         let changed = false;
 
         for (const raw of rows as PatientNotification[]) {
-          if (!isForegroundNotification(raw) || shownIds.current.has(raw.id)) continue;
+          if (!isMedicationReminder(raw) || !raw.sentAt || shownIds.current.has(raw.id)) continue;
 
           const sentAt = new Date(String(raw.sentAt)).getTime();
           if (!Number.isFinite(sentAt)) continue;
@@ -96,13 +85,10 @@ export default function MedicationReminderNotifier() {
                   "border-white/30 bg-white/10 text-white hover:bg-white/20",
               },
               icon: <Bell className="h-4 w-4 text-white" />,
-              action: raw.actionUrl
-                ? {
-                    label: actionLabel(raw),
-                    onClick: () =>
-                      window.location.assign(String(raw.actionUrl)),
-                  }
-                : undefined,
+              action: {
+                label: "View medication",
+                onClick: () => window.location.assign(String(raw.actionUrl || "/medications")),
+              },
             });
           } else if (age > RECENT_DELIVERY_WINDOW_MS) {
             shownIds.current.add(raw.id);
