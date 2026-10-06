@@ -313,13 +313,8 @@ export class PushNotificationService {
 
     const vapidToken = this.createVapidToken(new URL(endpoint).origin);
 
-    const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 15_000);
-
-    let response: Response | undefined;
-    try {
-      response = await fetch(endpoint, {
-        method: 'POST',
+    const response = await fetch(endpoint, {
+      method: 'POST',
       headers: {
         Authorization: `vapid t=${vapidToken}, k=${this.getPublicKey()}`,
         TTL: '300',
@@ -330,17 +325,9 @@ export class PushNotificationService {
           String(notification.priority).toUpperCase() === 'HIGH'
             ? 'high'
             : 'normal',
-        },
-        body: encrypted as unknown as BodyInit,
-        signal: controller.signal,
-      });
-    } finally {
-      clearTimeout(timeout);
-    }
-
-    if (!response) {
-      throw new Error('PUSH_DELIVERY_FAILED: push endpoint did not return a response.');
-    }
+      },
+      body: encrypted as unknown as BodyInit,
+    });
 
     if (!response.ok) {
       const text = (await response.text()).slice(0, 500);
