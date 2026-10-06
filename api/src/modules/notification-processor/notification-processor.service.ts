@@ -49,17 +49,7 @@ export class NotificationProcessorService
     try {
       const now = new Date();
 
-      try {
-        await this.medicationReminderScheduler.syncAll(now);
-      } catch (error) {
-        const message =
-          error instanceof Error ? error.message : 'Unknown medication reminder sync error';
-        // Reminder generation must not prevent already-queued notifications
-        // from being delivered.
-        this.logger.error(
-          `Medication reminder sync failed; continuing notification delivery: ${message}`,
-        );
-      }
+      await this.medicationReminderScheduler.syncAll(now);
 
       const dueItems = await this.prisma.notificationQueue.findMany({
         where: {
@@ -86,12 +76,6 @@ export class NotificationProcessorService
         take: 50,
       });
 
-      if (dueItems.length > 0) {
-        this.logger.log(
-          `Notification processor found ${dueItems.length} due notification queue item(s).`,
-        );
-      }
-
       for (const item of dueItems) {
         try {
           await this.deliverNotification(item.notification);
@@ -99,12 +83,6 @@ export class NotificationProcessorService
           await this.recordFailure(item.id, item.notification, error);
         }
       }
-    } catch (error) {
-      const message =
-        error instanceof Error ? error.message : 'Unknown notification processor error';
-      this.logger.error(
-        `Notification processor cycle failed: ${message}`,
-      );
     } finally {
       this.processing = false;
     }
