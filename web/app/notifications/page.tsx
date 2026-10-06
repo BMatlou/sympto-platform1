@@ -61,6 +61,7 @@ function iconFor(notification: PatientNotification) {
 
 export default function NotificationsPage() {
   const [notifications, setNotifications] = useState<PatientNotification[]>([]);
+  const [serverUnreadCount, setServerUnreadCount] = useState(0);
   const [filter, setFilter] = useState<"all" | "unread">("all");
   const [loading, setLoading] = useState(true);
   const [busyId, setBusyId] = useState<string | null>(null);
@@ -71,9 +72,13 @@ export default function NotificationsPage() {
     try {
       setLoading(true);
       setError("");
-      const payload = await patientNotificationsService.list({ page: 1, limit: 100 });
+      const [payload, unreadCount] = await Promise.all([
+        patientNotificationsService.list({ page: 1, limit: 100 }),
+        patientNotificationsService.getUnreadCount(),
+      ]);
       const rows = Array.isArray(payload) ? payload : Array.isArray(payload?.data) ? payload.data : [];
       setNotifications(rows as PatientNotification[]);
+      setServerUnreadCount(Number.isFinite(unreadCount) ? Math.max(0, unreadCount) : 0);
     } catch {
       setError("We couldn't load your notifications. Please try again.");
     } finally {
@@ -83,12 +88,16 @@ export default function NotificationsPage() {
 
   useEffect(() => {
     void load();
+    const timer = window.setInterval(() => void load(), 15_000);
+    const refreshOnFocus = () => void load();
+    window.addEventListener("focus", refreshOnFocus);
+    return () => {
+      window.clearInterval(timer);
+      window.removeEventListener("focus", refreshOnFocus);
+    };
   }, [load]);
 
-  const unreadCount = useMemo(
-    () => notifications.filter((notification) => !notification.readAt).length,
-    [notifications],
-  );
+  const unreadCount = serverUnreadCount;
 
   const visible = useMemo(
     () => filter === "unread" ? notifications.filter((notification) => !notification.readAt) : notifications,
@@ -100,13 +109,15 @@ export default function NotificationsPage() {
       setBusyId(id);
       setNotice("");
       await patientNotificationsService.markRead(id);
+      const readAt = new Date().toISOString();
       setNotifications((current) =>
         current.map((notification) =>
           notification.id === id
-            ? { ...notification, readAt: new Date().toISOString(), status: "READ" }
+            ? { ...notification, readAt, status: "READ" }
             : notification,
         ),
       );
+      setServerUnreadCount((current) => Math.max(0, current - 1));
     } catch {
       setNotice("We couldn't update that notification.");
     } finally {
@@ -128,6 +139,7 @@ export default function NotificationsPage() {
           status: notification.readAt ? notification.status : "READ",
         })),
       );
+      setServerUnreadCount(0);
       setNotice("All notifications marked as read.");
     } catch {
       setNotice("We couldn't mark all notifications as read.");
