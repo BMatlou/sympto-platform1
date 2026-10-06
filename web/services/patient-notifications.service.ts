@@ -41,11 +41,7 @@ class PatientNotificationsService {
   }
 
   async getUnreadCount(): Promise<number> {
-    const response = await api.get("/patient-notifications/unread-count", {
-      // Cache-busting query parameter without a custom request header,
-      // so mobile cross-origin requests do not trigger an extra CORS preflight.
-      params: { _: Date.now() },
-    });
+    const response = await api.get("/patient-notifications/unread-count");
     const payload = response.data?.data ?? response.data;
     return Number(payload?.count ?? 0);
   }
