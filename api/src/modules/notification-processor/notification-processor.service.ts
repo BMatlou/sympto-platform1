@@ -6,8 +6,8 @@ import {
 } from '@nestjs/common';
 
 import { PrismaService } from '../../database/prisma.service';
+import { NotificationsModule } from '../notifications/notifications.module';
 import { PushNotificationService } from '../notifications/push-notification.service';
-import { MedicationReminderSchedulerService } from './medication-reminder-scheduler.service';
 
 /**
  * Processes due notifications created by the notification queue.
@@ -26,7 +26,6 @@ export class NotificationProcessorService
   constructor(
     private readonly prisma: PrismaService,
     private readonly pushNotificationService: PushNotificationService,
-    private readonly medicationReminderScheduler: MedicationReminderSchedulerService,
   ) {}
 
   onModuleInit() {
@@ -48,19 +47,6 @@ export class NotificationProcessorService
 
     try {
       const now = new Date();
-
-      // Scheduling must never prevent delivery of notifications that are
-      // already waiting in the queue. A malformed or stale medication
-      // schedule must be isolated from the delivery pipeline.
-      try {
-        await this.medicationReminderScheduler.syncAll(now);
-      } catch (error) {
-        const message = error instanceof Error ? error.message : String(error);
-        this.logger.error(
-          `Medication reminder scheduling cycle failed; continuing with queued notifications: ${message}`,
-          error instanceof Error ? error.stack : undefined,
-        );
-      }
 
       const dueItems = await this.prisma.notificationQueue.findMany({
         where: {
@@ -94,12 +80,6 @@ export class NotificationProcessorService
           await this.recordFailure(item.id, item.notification, error);
         }
       }
-    } catch (error) {
-      const message = error instanceof Error ? error.message : String(error);
-      this.logger.error(
-        `Notification processor cycle failed: ${message}`,
-        error instanceof Error ? error.stack : undefined,
-      );
     } finally {
       this.processing = false;
     }
