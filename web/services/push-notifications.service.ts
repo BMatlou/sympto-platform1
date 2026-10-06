@@ -63,7 +63,11 @@ export async function enablePushNotifications() {
 }
 
 export async function syncExistingPushSubscription() {
-  if (!supported() || window.Notification.permission !== "granted") {
+  if (
+    !supported() ||
+    window.Notification.permission !== "granted" ||
+    !localStorage.getItem("accessToken")
+  ) {
     return false;
   }
 
