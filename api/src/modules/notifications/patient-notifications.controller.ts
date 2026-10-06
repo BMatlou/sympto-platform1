@@ -3,6 +3,7 @@ import {
   Body,
   Controller,
   Get,
+  Header,
   Param,
   Patch,
   Post,
@@ -125,6 +126,7 @@ export class PatientNotificationsController {
   }
 
   @Get('unread-count')
+  @Header('Cache-Control', 'no-store, no-cache, must-revalidate')
   async unreadCount(@Req() req: any) {
     const count = await this.notificationsService.getUnreadCountForUser(
       req.user.sub,
