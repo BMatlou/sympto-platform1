@@ -5,7 +5,6 @@ import { NotificationsService } from '../notifications/notifications.service';
 import {
   getMedicationReminderFrequency,
   nextMedicationReminderOccurrence,
-  recentMedicationReminderOccurrence,
 } from '../patient-medications/medication-reminder.util';
 
 @Injectable()
@@ -102,14 +101,6 @@ export class MedicationReminderSchedulerService {
     const pendingKeys = new Set(pending.map((item) => `${item.medicationReminderSlotId}:${String(item.channel)}`));
 
     for (const slot of schedule.slots) {
-      const recent = recentMedicationReminderOccurrence({
-        now,
-        time: slot.time,
-        daysOfWeek: schedule.daysOfWeek,
-        timezone: schedule.timezone,
-        notBefore: schedule.patientMedication.startedAt,
-        notAfter: schedule.patientMedication.endedAt,
-      });
       const next = nextMedicationReminderOccurrence({
         now,
         time: slot.time,
@@ -118,8 +109,8 @@ export class MedicationReminderSchedulerService {
         notBefore: schedule.patientMedication.startedAt,
         notAfter: schedule.patientMedication.endedAt,
       });
-      const occurrence = recent ?? next;
-      if (!occurrence) continue;
+      if (!next) continue;
+      const occurrence = next;
 
       const medicationName = schedule.patientMedication.medication.name || schedule.patientMedication.medication.genericName || 'Medication';
       const body = `It is time to take ${medicationName}${schedule.patientMedication.dosage ? ` (${schedule.patientMedication.dosage})` : ''}. Follow the instructions provided by your healthcare professional.`;
