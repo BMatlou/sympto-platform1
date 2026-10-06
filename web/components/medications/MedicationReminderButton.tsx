@@ -50,6 +50,46 @@ function currentWeekday() {
   return day === 0 ? 7 : day;
 }
 
+function inferReminderFrequency(value?: string | null) {
+  const normalized = String(value ?? "").trim().toLowerCase().replace(/[_-]+/g, " ");
+  if (!normalized || /as needed|when needed|prn/.test(normalized)) {
+    return { doseCount: 0, cadence: "UNSUPPORTED" };
+  }
+  if (/weekly|once a week|once per week/.test(normalized)) {
+    return { doseCount: 1, cadence: "WEEKLY" };
+  }
+  const everyHours = normalized.match(/every\s+(\d+(?:\.\d+)?)\s*hours?/);
+  if (everyHours) {
+    const hours = Number(everyHours[1]);
+    if (hours > 0 && 24 % hours === 0) {
+      const count = 24 / hours;
+      if (count >= 1 && count <= 4) return { doseCount: count, cadence: "DAILY" };
+    }
+  }
+  if (/four\s+times?\s+(a|per)?\s*day|four\s+times?\s+daily/.test(normalized)) {
+    return { doseCount: 4, cadence: "DAILY" };
+  }
+  if (/three\s+times?\s+(a|per)?\s*day|three\s+times?\s+daily/.test(normalized)) {
+    return { doseCount: 3, cadence: "DAILY" };
+  }
+  if (/twice\s+(a|per)\s+day|twice\s+daily/.test(normalized)) {
+    return { doseCount: 2, cadence: "DAILY" };
+  }
+  if (/once\s+(a|per)\s+day|once\s+daily/.test(normalized)) {
+    return { doseCount: 1, cadence: "DAILY" };
+  }
+  const timesPerDay = normalized.match(/\b([1-9]|one|two|three|four)\s+times?\s+(?:a|per)\s+day\b/i);
+  if (timesPerDay) {
+    const raw = timesPerDay[1].toLowerCase();
+    const count = Number(raw) || ({ one: 1, two: 2, three: 3, four: 4 } as Record<string, number>)[raw] || 0;
+    if (count >= 1 && count <= 4) return { doseCount: count, cadence: "DAILY" };
+  }
+  if (/\bdaily\b/.test(normalized)) {
+    return { doseCount: 1, cadence: "DAILY" };
+  }
+  return { doseCount: 0, cadence: "UNSUPPORTED" };
+}
+
 function frequencyCopy(doseCount: number, cadence: string) {
   if (cadence === "WEEKLY") return doseCount === 1 ? "1 dose per week" : doseCount + " doses per week";
   return doseCount === 1 ? "1 dose per day" : doseCount + " doses per day";
@@ -71,9 +111,10 @@ export function MedicationReminderButton({
 }: MedicationReminderButtonProps) {
   const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(false);
-  const [doseCount, setDoseCount] = useState(0);
-  const [cadence, setCadence] = useState("UNSUPPORTED");
-  const [supported, setSupported] = useState(true);
+  const inferredFrequency = useMemo(() => inferReminderFrequency(frequency), [frequency]);
+  const [doseCount, setDoseCount] = useState(inferredFrequency.doseCount);
+  const [cadence, setCadence] = useState(inferredFrequency.cadence);
+  const [supported, setSupported] = useState(inferredFrequency.doseCount > 0);
   const [state, setState] = useState<ReminderState>({
     enabled: false,
     daysOfWeek: [1, 2, 3, 4, 5, 6, 7],
@@ -93,9 +134,11 @@ export function MedicationReminderButton({
     try {
       const response = await api.get("/patient-medications/" + medicationId + "/reminder-schedule");
       const payload = response.data?.data ?? response.data;
-      const nextDoseCount = Number(payload?.doseCount ?? 0);
-      const nextCadence = String(payload?.cadence ?? "UNSUPPORTED").toUpperCase();
-      const nextSupported = Boolean(payload?.supported && nextDoseCount > 0);
+      const nextDoseCount = Number(payload?.doseCount ?? 0) || inferredFrequency.doseCount;
+      const nextCadence = String(payload?.cadence ?? inferredFrequency.cadence).toUpperCase();
+      const nextSupported = payload?.supported == null
+        ? inferredFrequency.doseCount > 0
+        : Boolean(payload.supported && nextDoseCount > 0);
 
       setDoseCount(nextDoseCount);
       setCadence(nextCadence);
@@ -115,6 +158,15 @@ export function MedicationReminderButton({
         timezone,
       });
     } catch (error) {
+      setDoseCount(inferredFrequency.doseCount);
+      setCadence(inferredFrequency.cadence);
+      setSupported(inferredFrequency.doseCount > 0);
+      setState((current) => ({
+        ...current,
+        enabled: false,
+        times: defaultTimes(inferredFrequency.doseCount || 1),
+        daysOfWeek: inferredFrequency.cadence === "WEEKLY" ? [currentWeekday()] : [1, 2, 3, 4, 5, 6, 7],
+      }));
       toast.error("Could not load reminder settings", { description: getErrorMessage(error) });
     } finally {
       setLoading(false);
