@@ -5,6 +5,7 @@ import { NotificationsService } from '../notifications/notifications.service';
 import {
   getMedicationReminderFrequency,
   nextMedicationReminderOccurrence,
+  recentMedicationReminderOccurrence,
 } from '../patient-medications/medication-reminder.util';
 
 @Injectable()
@@ -101,6 +102,14 @@ export class MedicationReminderSchedulerService {
     const pendingKeys = new Set(pending.map((item) => `${item.medicationReminderSlotId}:${String(item.channel)}`));
 
     for (const slot of schedule.slots) {
+      const recent = recentMedicationReminderOccurrence({
+        now,
+        time: slot.time,
+        daysOfWeek: schedule.daysOfWeek,
+        timezone: schedule.timezone,
+        notBefore: schedule.patientMedication.startedAt,
+        notAfter: schedule.patientMedication.endedAt,
+      });
       const next = nextMedicationReminderOccurrence({
         now,
         time: slot.time,
@@ -109,14 +118,21 @@ export class MedicationReminderSchedulerService {
         notBefore: schedule.patientMedication.startedAt,
         notAfter: schedule.patientMedication.endedAt,
       });
-      if (!next) continue;
-      const occurrence = next;
+      const occurrence = recent ?? next;
+      if (!occurrence) continue;
 
       const medicationName = schedule.patientMedication.medication.name || schedule.patientMedication.medication.genericName || 'Medication';
       const body = `It is time to take ${medicationName}${schedule.patientMedication.dosage ? ` (${schedule.patientMedication.dosage})` : ''}. Follow the instructions provided by your healthcare professional.`;
 
       const createInApp = !pendingKeys.has(`${slot.id}:${NotificationChannel.IN_APP}`);
-      if (createInApp) {
+      const inAppOccurrenceAlreadyCreated = recent
+        ? await this.notificationExistsForOccurrence(
+            slot.id,
+            NotificationChannel.IN_APP,
+            occurrence,
+          )
+        : false;
+      if (createInApp && !inAppOccurrenceAlreadyCreated) {
         const created = await this.notificationsService.create({
           userId: await this.patientUserId(schedule.patientMedication.id),
           type: 'REMINDER' as any,
@@ -137,8 +153,16 @@ export class MedicationReminderSchedulerService {
         }
       }
 
-      const pushConfigured = await this.pushConfigured(await this.patientUserId(schedule.patientMedication.id));
-      if (pushConfigured && !pendingKeys.has(`${slot.id}:${NotificationChannel.PUSH}`)) {
+      const pushUserId = await this.patientUserId(schedule.patientMedication.id);
+      const pushConfigured = await this.pushConfigured(pushUserId);
+      const pushOccurrenceAlreadyCreated = recent
+        ? await this.notificationExistsForOccurrence(
+            slot.id,
+            NotificationChannel.PUSH,
+            occurrence,
+          )
+        : false;
+      if (pushConfigured && !pendingKeys.has(`${slot.id}:${NotificationChannel.PUSH}`) && !pushOccurrenceAlreadyCreated) {
         const created = await this.notificationsService.create({
           userId: await this.patientUserId(schedule.patientMedication.id),
           type: 'REMINDER' as any,
@@ -158,6 +182,26 @@ export class MedicationReminderSchedulerService {
         }
       }
     }
+  }
+
+  private async notificationExistsForOccurrence(
+    slotId: string,
+    channel: NotificationChannel,
+    occurrence: Date,
+  ) {
+    const windowEnd = new Date(occurrence.getTime() + 60_000);
+    const existing = await this.prisma.notification.findFirst({
+      where: {
+        medicationReminderSlotId: slotId,
+        channel,
+        createdAt: {
+          gte: occurrence,
+          lt: windowEnd,
+        },
+      },
+      select: { id: true },
+    });
+    return Boolean(existing);
   }
 
   private async patientUserId(patientMedicationId: string) {
