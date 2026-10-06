@@ -116,10 +116,9 @@ async function createTranscriber(
     }
   };
 
-  const dtype =
-    device === "webgpu"
-      ? ({ encoder_model: "fp32", decoder_model_merged: "q4" } as const)
-      : "q8";
+  // Use the fully quantized Q4 model to keep mobile session memory low.
+  // The Whisper model repository provides Q4 encoder and decoder weights.
+  const dtype = "q4" as const;
 
   return (await pipeline(
     "automatic-speech-recognition",
