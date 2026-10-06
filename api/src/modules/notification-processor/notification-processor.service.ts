@@ -49,18 +49,7 @@ export class NotificationProcessorService
     try {
       const now = new Date();
 
-      // Scheduling must never prevent delivery of notifications that are
-      // already waiting in the queue. A malformed or stale medication
-      // schedule must be isolated from the delivery pipeline.
-      try {
-        await this.medicationReminderScheduler.syncAll(now);
-      } catch (error) {
-        const message = error instanceof Error ? error.message : String(error);
-        this.logger.error(
-          `Medication reminder scheduling cycle failed; continuing with queued notifications: ${message}`,
-          error instanceof Error ? error.stack : undefined,
-        );
-      }
+      await this.medicationReminderScheduler.syncAll(now);
 
       const dueItems = await this.prisma.notificationQueue.findMany({
         where: {
@@ -83,7 +72,7 @@ export class NotificationProcessorService
         include: {
           notification: true,
         },
-        orderBy: [{ scheduledFor: 'asc' }, { channel: 'asc' }],
+        orderBy: { scheduledFor: 'asc' },
         take: 50,
       });
 
@@ -94,12 +83,6 @@ export class NotificationProcessorService
           await this.recordFailure(item.id, item.notification, error);
         }
       }
-    } catch (error) {
-      const message = error instanceof Error ? error.message : String(error);
-      this.logger.error(
-        `Notification processor cycle failed: ${message}`,
-        error instanceof Error ? error.stack : undefined,
-      );
     } finally {
       this.processing = false;
     }
