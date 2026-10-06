@@ -22,7 +22,6 @@ import { CreatePatientMedicationDto } from './dto/create-patient-medication.dto'
 import { UpdatePatientMedicationDto } from './dto/update-patient-medication.dto';
 import { QueryPatientMedicationDto } from './dto/query-patient-medication.dto';
 import { CreateMedicationReminderDto } from './dto/create-medication-reminder.dto';
-import { ConfigureMedicationReminderDto } from './dto/configure-medication-reminder.dto';
 import { RecordMedicationAdherenceDto } from '../medication-adherence/dto/record-medication-adherence.dto';
 
 interface AuthenticatedRequest {
@@ -64,34 +63,6 @@ export class PatientMedicationsController {
     const authenticatedUserId = request.user?.sub ?? request.user?.id ?? '';
 
     return this.patientMedicationsService.recordAdherence(
-      id,
-      dto,
-      authenticatedUserId,
-    );
-  }
-
-  @Permissions('patient-medications.read')
-  @Get(':id/reminder-schedule')
-  getReminderSchedule(
-    @Param('id') id: string,
-    @Req() request: AuthenticatedRequest,
-  ) {
-    const authenticatedUserId = request.user?.sub ?? request.user?.id ?? '';
-    return this.patientMedicationsService.getReminderSchedule(
-      id,
-      authenticatedUserId,
-    );
-  }
-
-  @Permissions('patient-medications.update')
-  @Post(':id/reminder-schedule')
-  configureReminderSchedule(
-    @Param('id') id: string,
-    @Body() dto: ConfigureMedicationReminderDto,
-    @Req() request: AuthenticatedRequest,
-  ) {
-    const authenticatedUserId = request.user?.sub ?? request.user?.id ?? '';
-    return this.patientMedicationsService.configureReminderSchedule(
       id,
       dto,
       authenticatedUserId,
