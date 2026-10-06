@@ -82,7 +82,8 @@ async function decodeForWhisper(file: File): Promise<Float32Array> {
     await context.close().catch(() => undefined);
   }
 }
-\nfunction isLikelyMobileDevice() {
+
+function isLikelyMobileDevice() {
   if (typeof navigator === "undefined") return false;
 
   const userAgent = navigator.userAgent || "";
