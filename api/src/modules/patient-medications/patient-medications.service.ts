@@ -438,6 +438,27 @@ export class PatientMedicationsService {
       return saved;
     });
 
+    // Enabling a medication reminder is an explicit opt-in to in-app
+    // medication reminders. Keep the global reminder channel enabled so the
+    // scheduler cannot silently suppress the schedule because of an older
+    // disabled preference.
+    await this.prisma.notificationPreference.upsert({
+      where: {
+        userId_notificationType_channel: {
+          userId: ownerUserId,
+          notificationType: NotificationType.REMINDER,
+          channel: NotificationChannel.IN_APP,
+        },
+      },
+      update: { enabled: true },
+      create: {
+        userId: ownerUserId,
+        notificationType: NotificationType.REMINDER,
+        channel: NotificationChannel.IN_APP,
+        enabled: true,
+      },
+    });
+
     await this.reminderScheduler.syncMedication(id);
 
     return {
