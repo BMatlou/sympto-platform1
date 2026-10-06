@@ -6,7 +6,8 @@
     "dev": "next dev --webpack",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "dev:https": "next dev --webpack --hostname 0.0.0.0 --experimental-https --experimental-https-key ./certificates/sympto-key.pem --experimental-https-cert ./certificates/sympto.pem"
   },
   "dependencies": {
     "@base-ui/react": "^1.6.0",
