@@ -107,27 +107,30 @@ export function createBrowserSpeechRecognition(
     handlers.onStart?.();
   };
 
-  let finalTranscript = "";
-
   recognition.onresult = (event) => {
-    let interimTranscript = "";
+    // SpeechRecognition keeps a result list for the whole recognition session.
+    // Rebuild the current final/interim transcript from that list instead of
+    // appending every event, otherwise browsers such as Chrome can repeat
+    // already-finalized phrases (for example: "I have I have itching").
+    const finalParts: string[] = [];
+    const interimParts: string[] = [];
 
-    for (let index = event.resultIndex; index < event.results.length; index += 1) {
+    for (let index = 0; index < event.results.length; index += 1) {
       const result = event.results[index];
       const transcript = result[0]?.transcript?.trim() ?? "";
 
       if (!transcript) continue;
 
       if (result.isFinal) {
-        finalTranscript += `${transcript} `;
+        finalParts.push(transcript);
       } else {
-        interimTranscript += `${transcript} `;
+        interimParts.push(transcript);
       }
     }
 
     handlers.onResult?.(
-      finalTranscript.trim(),
-      interimTranscript.trim(),
+      finalParts.join(" ").trim(),
+      interimParts.join(" ").trim(),
     );
   };
 
