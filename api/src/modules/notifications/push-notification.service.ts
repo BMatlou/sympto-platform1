@@ -316,7 +316,7 @@ export class PushNotificationService {
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), 15_000);
 
-    let response: Response;
+    let response: Response | undefined;
     try {
       response = await fetch(endpoint, {
         method: 'POST',
@@ -336,6 +336,10 @@ export class PushNotificationService {
       });
     } finally {
       clearTimeout(timeout);
+    }
+
+    if (!response) {
+      throw new Error('PUSH_DELIVERY_FAILED: push endpoint did not return a response.');
     }
 
     if (!response.ok) {
