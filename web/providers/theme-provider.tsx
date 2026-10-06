@@ -8,14 +8,17 @@ import { ThemeProvider as NextThemesProvider } from "next-themes";
 if (typeof window !== "undefined" && process.env.NODE_ENV === "development") {
   const originalConsoleError = console.error;
   console.error = (...args: unknown[]) => {
+    const firstArg = args[0];
+    const message = typeof firstArg === "string" ? firstArg : "";
+
     if (
-      typeof args[0] === "string" &&
-      args[0].includes("Encountered a script tag while rendering React component") ||
-      args[0].includes("VerifyEachNodeIsAssignedToAnEp") ||
-      args[0].includes("Rerunning with verbose output on a non-minimal build")
+      message.includes("Encountered a script tag while rendering React component") ||
+      message.includes("VerifyEachNodeIsAssignedToAnEp") ||
+      message.includes("Rerunning with verbose output on a non-minimal build")
     ) {
       return;
     }
+
     originalConsoleError(...args);
   };
 }
