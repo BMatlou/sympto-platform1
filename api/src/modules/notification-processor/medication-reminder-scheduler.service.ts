@@ -59,24 +59,61 @@ export class MedicationReminderSchedulerService {
     const schedule = await this.prisma.medicationReminderSchedule.findUnique({
       where: { id: scheduleId },
       include: {
-        patientMedication: { select: { id: true, status: true, ongoing: true, startedAt: true, endedAt: true, dosage: true, frequency: true, medication: { select: { name: true, genericName: true } } } },
+        patientMedication: {
+          select: {
+            id: true,
+            status: true,
+            ongoing: true,
+            startedAt: true,
+            endedAt: true,
+            dosage: true,
+            frequency: true,
+            healthPassport: {
+              select: {
+                patient: {
+                  select: { userId: true },
+                },
+              },
+            },
+            medication: {
+              select: { name: true, genericName: true },
+            },
+          },
+        },
         slots: { orderBy: { doseIndex: 'asc' } },
       },
     });
+
     if (!schedule) return;
 
-    const activeMedication = schedule.patientMedication.status === 'ACTIVE'
-      && schedule.patientMedication.ongoing !== false
-      && (!schedule.patientMedication.startedAt || schedule.patientMedication.startedAt <= now)
-      && (!schedule.patientMedication.endedAt || schedule.patientMedication.endedAt > now);
+    const medication = schedule.patientMedication;
+    const userId = medication.healthPassport.patient.userId;
+
+    const activeMedication =
+      medication.status === 'ACTIVE' &&
+      medication.ongoing !== false &&
+      (!medication.startedAt || medication.startedAt <= now) &&
+      (!medication.endedAt || medication.endedAt > now);
 
     if (!schedule.enabled || !activeMedication) {
       await this.cancelSchedule(scheduleId);
       return;
     }
 
-    const frequency = getMedicationReminderFrequency(schedule.patientMedication.frequency);
-    if (!frequency.doseCount || schedule.slots.length !== frequency.doseCount || (frequency.cadence === 'WEEKLY' && schedule.daysOfWeek.length !== 1) || schedule.daysOfWeek.length < 1 || schedule.daysOfWeek.some((day) => day < 1 || day > 7)) { await this.cancelSchedule(scheduleId); return; }
+    const frequency = getMedicationReminderFrequency(medication.frequency);
+    if (
+      !frequency.doseCount ||
+      schedule.slots.length !== frequency.doseCount ||
+      (frequency.cadence === 'WEEKLY' && schedule.daysOfWeek.length !== 1) ||
+      schedule.daysOfWeek.length < 1 ||
+      schedule.daysOfWeek.some((day) => day < 1 || day > 7)
+    ) {
+      await this.cancelSchedule(scheduleId);
+      this.logger.warn(
+        `Skipping medication reminder schedule ${scheduleId}: invalid schedule shape for ${medication.frequency ?? 'unknown'} frequency.`,
+      );
+      return;
+    }
 
     const slotIds = schedule.slots.map((slot) => slot.id);
     const pending = await this.prisma.notification.findMany({
@@ -87,7 +124,20 @@ export class MedicationReminderSchedulerService {
       },
       select: { medicationReminderSlotId: true, channel: true },
     });
-    const pendingKeys = new Set(pending.map((item) => `${item.medicationReminderSlotId}:${String(item.channel)}`));
+    const pendingKeys = new Set(
+      pending.map(
+        (item) => `${item.medicationReminderSlotId}:${String(item.channel)}`,
+      ),
+    );
+
+    const medicationName =
+      medication.medication.name ||
+      medication.medication.genericName ||
+      'Medication';
+    const body =
+      `It is time to take ${medicationName}` +
+      (medication.dosage ? ` (${medication.dosage})` : '') +
+      '. Follow the instructions provided by your healthcare professional.';
 
     for (const slot of schedule.slots) {
       const next = nextMedicationReminderOccurrence({
@@ -95,56 +145,102 @@ export class MedicationReminderSchedulerService {
         time: slot.time,
         daysOfWeek: schedule.daysOfWeek,
         timezone: schedule.timezone,
-        notBefore: schedule.patientMedication.startedAt,
-        notAfter: schedule.patientMedication.endedAt,
+        notBefore: medication.startedAt,
+        notAfter: medication.endedAt,
       });
+
       if (!next) continue;
 
-      const medicationName = schedule.patientMedication.medication.name || schedule.patientMedication.medication.genericName || 'Medication';
-      const body = `It is time to take ${medicationName}${schedule.patientMedication.dosage ? ` (${schedule.patientMedication.dosage})` : ''}. Follow the instructions provided by your healthcare professional.`;
+      const inAppKey = `${slot.id}:${NotificationChannel.IN_APP}`;
+      if (!pendingKeys.has(inAppKey)) {
+        const inAppPreference =
+          await this.prisma.notificationPreference.findUnique({
+            where: {
+              userId_notificationType_channel: {
+                userId,
+                notificationType: 'REMINDER',
+                channel: NotificationChannel.IN_APP,
+              },
+            },
+            select: { enabled: true },
+          });
 
-      const createInApp = !pendingKeys.has(`${slot.id}:${NotificationChannel.IN_APP}`);
-      if (createInApp) {
-        const created = await this.notificationsService.create({
-          userId: await this.patientUserId(schedule.patientMedication.id),
-          type: 'REMINDER' as any,
-          title: `Medication reminder: ${medicationName}`,
-          body,
-          channel: NotificationChannel.IN_APP,
-          status: NotificationStatus.PENDING,
-          priority: NotificationPriority.NORMAL,
-          actionUrl: '/medications',
-          actionLabel: 'View medication',
-          scheduledFor: next.toISOString(),
-        });
-        if (created && !('skipped' in created)) {
-          await this.prisma.notification.update({ where: { id: created.id }, data: { medicationReminderSlotId: slot.id } });
-          const notificationId = created.id;
-          await this.prisma.notificationQueue.create({ data: { notificationId, scheduledFor: next } });
-          pendingKeys.add(`${slot.id}:${NotificationChannel.IN_APP}`);
+        if (!inAppPreference || inAppPreference.enabled) {
+          const created = await this.createQueuedReminder({
+            userId,
+            slotId: slot.id,
+            channel: NotificationChannel.IN_APP,
+            medicationName,
+            body,
+            scheduledFor: next,
+          });
+          if (created) pendingKeys.add(inAppKey);
         }
       }
 
-      const pushConfigured = await this.pushConfigured(await this.patientUserId(schedule.patientMedication.id));
-      if (pushConfigured && !pendingKeys.has(`${slot.id}:${NotificationChannel.PUSH}`)) {
-        const created = await this.notificationsService.create({
-          userId: await this.patientUserId(schedule.patientMedication.id),
-          type: 'REMINDER' as any,
-          title: `Medication reminder: ${medicationName}`,
-          body,
+      const pushKey = `${slot.id}:${NotificationChannel.PUSH}`;
+      if (!pendingKeys.has(pushKey) && (await this.pushConfigured(userId))) {
+        const created = await this.createQueuedReminder({
+          userId,
+          slotId: slot.id,
           channel: NotificationChannel.PUSH,
-          status: NotificationStatus.PENDING,
-          priority: NotificationPriority.NORMAL,
-          actionUrl: '/medications',
-          actionLabel: 'View medication',
-          scheduledFor: next.toISOString(),
+          medicationName,
+          body,
+          scheduledFor: next,
         });
-        if (created && !('skipped' in created)) {
-          await this.prisma.notification.update({ where: { id: created.id }, data: { medicationReminderSlotId: slot.id } });
-          await this.prisma.notificationQueue.create({ data: { notificationId: created.id, scheduledFor: next } });
-          pendingKeys.add(`${slot.id}:${NotificationChannel.PUSH}`);
-        }
+        if (created) pendingKeys.add(pushKey);
       }
+    }
+  }
+
+  private async createQueuedReminder(args: {
+    userId: string;
+    slotId: string;
+    channel: NotificationChannel;
+    medicationName: string;
+    body: string;
+    scheduledFor: Date;
+  }) {
+    try {
+      const created = await this.prisma.$transaction(async (tx) => {
+        const notification = await tx.notification.create({
+          data: {
+            userId: args.userId,
+            type: 'REMINDER' as any,
+            title: `Medication reminder: ${args.medicationName}`,
+            body: args.body,
+            channel: args.channel,
+            status: NotificationStatus.PENDING,
+            priority: NotificationPriority.NORMAL,
+            actionUrl: '/medications',
+            actionLabel: 'View medication',
+            scheduledFor: args.scheduledFor,
+            medicationReminderSlotId: args.slotId,
+          },
+          select: { id: true },
+        });
+
+        await tx.notificationQueue.create({
+          data: {
+            notificationId: notification.id,
+            scheduledFor: args.scheduledFor,
+          },
+        });
+
+        return notification;
+      });
+
+      this.logger.log(
+        `Scheduled medication reminder ${created.id} for ${args.channel} at ${args.scheduledFor.toISOString()}.`,
+      );
+      return created;
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      this.logger.error(
+        `Failed to queue medication reminder for ${args.medicationName} (${args.channel}): ${message}`,
+        error instanceof Error ? error.stack : undefined,
+      );
+      return null;
     }
   }
 
