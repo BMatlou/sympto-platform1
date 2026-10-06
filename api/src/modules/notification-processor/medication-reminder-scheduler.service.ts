@@ -1,7 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { NotificationChannel, NotificationPriority, NotificationStatus } from '@prisma/client';
 import { PrismaService } from '../../database/prisma.service';
-import { NotificationsService } from '../notifications/notifications.service';
 import { getMedicationReminderFrequency, nextMedicationReminderOccurrence } from '../patient-medications/medication-reminder.util';
 
 @Injectable()
@@ -10,7 +9,6 @@ export class MedicationReminderSchedulerService {
 
   constructor(
     private readonly prisma: PrismaService,
-    private readonly notificationsService: NotificationsService,
   ) {}
 
   async syncAll(now = new Date()) {
