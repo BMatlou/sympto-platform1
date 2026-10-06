@@ -616,26 +616,17 @@ export default function HealthHome({ patientId }: { patientId?: string }) {
 
     let active = true;
 
-    const snapshotNotifications = Array.isArray(data?.today?.notifications)
-      ? data.today.notifications
-      : [];
-
-    const snapshotUnread = snapshotNotifications.filter((notification: any) => {
-      if (notification?.readAt) return false;
-      if (!notification?.scheduledFor) return true;
-
-      const scheduledAt = new Date(String(notification.scheduledFor)).getTime();
-      return Number.isFinite(scheduledAt) && scheduledAt <= Date.now();
-    }).length;
-
-    setUnreadNotificationCount(snapshotUnread);
-
+    // The notification inbox endpoint is the single source of truth for the
+    // dashboard badge. Do not derive the badge from the broader dashboard
+    // snapshot because that can contain queued/pending notifications that are
+    // not yet visible in the patient's inbox.
     const refresh = async () => {
       try {
         const count = await patientNotificationsService.getUnreadCount();
         if (active) setUnreadNotificationCount(count);
       } catch {
-        // Keep the dashboard snapshot count when the live count cannot be loaded.
+        // Do not resurrect a stale badge from dashboard snapshot data.
+        if (active) setUnreadNotificationCount(0);
       }
     };
 
@@ -647,9 +638,11 @@ export default function HealthHome({ patientId }: { patientId?: string }) {
     const refreshOnVisibility = () => {
       if (document.visibilityState === "visible") void refresh();
     };
+    const refreshOnPageShow = () => void refresh();
     const refreshAfterNotificationChange = () => void refresh();
 
     window.addEventListener("focus", refreshOnFocus);
+    window.addEventListener("pageshow", refreshOnPageShow);
     document.addEventListener("visibilitychange", refreshOnVisibility);
     window.addEventListener("sympto:notifications-updated", refreshAfterNotificationChange);
 
@@ -657,6 +650,7 @@ export default function HealthHome({ patientId }: { patientId?: string }) {
       active = false;
       window.clearInterval(timer);
       window.removeEventListener("focus", refreshOnFocus);
+      window.removeEventListener("pageshow", refreshOnPageShow);
       document.removeEventListener("visibilitychange", refreshOnVisibility);
       window.removeEventListener("sympto:notifications-updated", refreshAfterNotificationChange);
     };
