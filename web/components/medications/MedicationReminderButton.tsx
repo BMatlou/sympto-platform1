@@ -195,8 +195,8 @@ export function MedicationReminderButton({
       </button>
 
       {open && (
-        <div className="absolute right-0 top-11 z-30 w-[min(24rem,calc(100vw-2rem))] overflow-hidden rounded-[24px] border border-slate-200 bg-white shadow-[0_24px_60px_rgba(11,45,84,0.16)]">
-          <div className="bg-[#0b2d54] px-5 py-5 text-white">
+        <div className="fixed inset-x-3 bottom-3 z-50 flex max-h-[calc(100dvh-1.5rem)] flex-col overflow-hidden rounded-[24px] border border-slate-200 bg-white shadow-[0_24px_60px_rgba(11,45,84,0.2)] sm:absolute sm:inset-x-auto sm:right-0 sm:top-11 sm:bottom-auto sm:z-30 sm:w-96 sm:max-h-[calc(100vh-6rem)]">
+          <div className="shrink-0 bg-[#0b2d54] px-4 py-4 text-white sm:px-5 sm:py-5">
             <div className="flex items-start justify-between gap-3">
               <div>
                 <p className="text-[10px] font-black uppercase tracking-[0.18em] text-[#24c1c4]">Medication reminders</p>
@@ -211,7 +211,7 @@ export function MedicationReminderButton({
             </div>
           </div>
 
-          <div className="space-y-5 p-5">
+          <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain p-4 space-y-5 sm:p-5">
             {!supported ? (
               <div className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-4 text-sm leading-6 text-amber-900">
                 Sympto needs a fixed dose frequency before it can schedule reminders. Update this medicine to once, twice, three or four times daily, or once weekly.
