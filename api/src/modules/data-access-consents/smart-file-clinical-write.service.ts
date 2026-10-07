@@ -807,8 +807,13 @@ export class SmartFileClinicalWriteService {
   }
 
   private async syncPatientMedication(tx: any, patientId: string, practitioner: any, prescription: any) {
+    const status = String(prescription.status ?? 'ACTIVE');
+    if (status === 'DRAFT') return;
+
     const passport = await this.ensureHealthPassport(tx, patientId);
-    const practitionerName = this.practitionerName(practitioner.person);
+    const practitionerName = this.practitionerName(practitioner.person, practitioner.practitionerType);
+    const active = status === 'ACTIVE';
+
     for (const item of prescription.items ?? []) {
       await tx.patientMedication.upsert({
         where: {
@@ -823,9 +828,10 @@ export class SmartFileClinicalWriteService {
           route: item.route,
           instructions: item.instructions,
           prescribedBy: practitionerName,
-          startedAt: prescription.issuedAt ?? new Date(),
-          ongoing: true,
-          status: prescription.status === 'ACTIVE' ? 'ACTIVE' : 'PAUSED',
+          startedAt: active ? (prescription.issuedAt ?? new Date()) : undefined,
+          endedAt: active ? null : (prescription.expiresAt ?? new Date()),
+          ongoing: active,
+          status: active ? 'ACTIVE' : status === 'COMPLETED' ? 'COMPLETED' : 'DISCONTINUED',
           notes: prescription.notes ?? undefined,
         },
         create: {
@@ -836,15 +842,15 @@ export class SmartFileClinicalWriteService {
           route: item.route,
           instructions: item.instructions,
           prescribedBy: practitionerName,
-          startedAt: prescription.issuedAt ?? new Date(),
-          ongoing: true,
-          status: prescription.status === 'ACTIVE' ? 'ACTIVE' : 'PAUSED',
+          startedAt: active ? (prescription.issuedAt ?? new Date()) : undefined,
+          endedAt: active ? null : (prescription.expiresAt ?? new Date()),
+          ongoing: active,
+          status: active ? 'ACTIVE' : status === 'COMPLETED' ? 'COMPLETED' : 'DISCONTINUED',
           notes: prescription.notes ?? undefined,
         },
       });
     }
   }
-
   private patientMedicationData(d: Data, practitioner: any) {
     return {
       dosage: this.string(d.dosage),
