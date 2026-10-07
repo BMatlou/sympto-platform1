@@ -492,45 +492,57 @@ export default function NotificationsPage() {
           </div>
 
           <div className="mb-5">
-            <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-slate-400">
-              Notifications
-            </p>
-            <h1 className="mt-1.5 text-3xl font-extrabold tracking-tight text-[#0b2d54] sm:text-4xl">
-              Your notifications
-            </h1>
-            <p className="mt-1.5 max-w-2xl text-sm leading-6 text-slate-500">
-              Review reminders, appointments, results, messages and other
-              important updates.
-            </p>
+            <div className="flex items-end justify-between gap-4">
+              <div>
+                <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-slate-400">
+                  Notifications
+                </p>
+                <h1 className="mt-1 text-3xl font-extrabold tracking-tight text-[#0b2d54] sm:text-4xl">
+                  Your notifications
+                </h1>
+                <p className="mt-1.5 max-w-2xl text-sm leading-6 text-slate-500">
+                  Stay on top of reminders, appointments, results, messages and
+                  important updates.
+                </p>
+              </div>
+
+              <Link
+                href="/notifications/preferences"
+                className="inline-flex min-h-10 items-center gap-2 rounded-xl px-2 text-xs font-bold text-[#0b2d54] hover:text-[#24c1c4]"
+              >
+                <Settings className="h-4 w-4" />
+                Preferences
+              </Link>
+            </div>
           </div>
 
-          <section className="overflow-hidden rounded-[30px] bg-gradient-to-br from-[#0b2d54] via-[#0f5261] to-[#24c1c4] text-white shadow-[0_20px_50px_rgba(11,45,84,0.16)]">
-            <div className="p-5 sm:p-6">
-              <div className="flex items-center justify-between gap-3">
+          <section className="overflow-hidden rounded-[30px] bg-[#24c1c4] shadow-[0_18px_45px_rgba(11,45,84,0.12)]">
+            <div className="p-5 sm:p-7">
+              <div className="flex items-start justify-between gap-4">
                 <div>
-                  <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-white/60">
+                  <p className="text-[10px] font-black uppercase tracking-[0.18em] text-[#0b2d54]/65">
                     {range === "DAY"
                       ? "Today"
                       : range === "WEEK"
                         ? "This week"
                         : "This month"}
                   </p>
-                  <h2 className="mt-1 text-xl font-extrabold tracking-tight sm:text-2xl">
+                  <h2 className="mt-1 text-2xl font-extrabold tracking-tight text-[#0b2d54] sm:text-3xl">
                     {categoryLabel(category)}
                   </h2>
                 </div>
 
-                <div className="rounded-2xl bg-white/10 px-3.5 py-2.5 text-right ring-1 ring-white/10">
-                  <p className="text-[9px] font-bold uppercase tracking-[0.15em] text-white/55">
+                <div className="rounded-2xl bg-white/35 px-4 py-3 text-right ring-1 ring-white/30">
+                  <p className="text-[9px] font-black uppercase tracking-[0.15em] text-[#0b2d54]/60">
                     Unread
                   </p>
-                  <p className="mt-0.5 text-xl font-extrabold">
+                  <p className="mt-0.5 text-2xl font-extrabold text-[#0b2d54]">
                     {unreadCount}
                   </p>
                 </div>
               </div>
 
-              <div className="mt-4 flex rounded-2xl bg-white/10 p-1 ring-1 ring-white/10">
+              <div className="mt-5 flex rounded-2xl bg-white/25 p-1 ring-1 ring-white/30">
                 {(["DAY", "WEEK", "MONTH"] as const).map((value) => (
                   <button
                     key={value}
@@ -541,7 +553,7 @@ export default function NotificationsPage() {
                       "flex min-h-10 flex-1 items-center justify-center rounded-xl text-xs font-black transition " +
                       (range === value
                         ? "bg-white text-[#0b2d54] shadow-sm"
-                        : "text-white/65 hover:bg-white/10 hover:text-white")
+                        : "text-[#0b2d54]/65 hover:bg-white/20 hover:text-[#0b2d54]")
                     }
                   >
                     {value === "DAY"
@@ -553,28 +565,36 @@ export default function NotificationsPage() {
                 ))}
               </div>
 
-              <div className="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-3">
-                <div className="rounded-2xl bg-white/10 p-3 ring-1 ring-white/10">
-                  <p className="text-[9px] font-bold uppercase tracking-wide text-white/55">
+              <div className="mt-5 grid grid-cols-2 gap-3 sm:grid-cols-3">
+                <div className="rounded-2xl bg-white/25 p-4 ring-1 ring-white/25">
+                  <p className="text-[9px] font-black uppercase tracking-wide text-[#0b2d54]/60">
                     Notifications
                   </p>
-                  <p className="mt-1 text-2xl font-extrabold">
+                  <p className="mt-1 text-3xl font-extrabold text-[#0b2d54]">
                     {visible.length}
                   </p>
+                  <p className="mt-0.5 text-[10px] font-semibold text-[#0b2d54]/55">
+                    in this period
+                  </p>
                 </div>
-                <div className="rounded-2xl bg-white/10 p-3 ring-1 ring-white/10">
-                  <p className="text-[9px] font-bold uppercase tracking-wide text-white/55">
+
+                <div className="rounded-2xl bg-white/25 p-4 ring-1 ring-white/25">
+                  <p className="text-[9px] font-black uppercase tracking-wide text-[#0b2d54]/60">
                     New
                   </p>
-                  <p className="mt-1 text-2xl font-extrabold">
+                  <p className="mt-1 text-3xl font-extrabold text-[#0b2d54]">
                     {visible.filter((item) => !item.readAt).length}
                   </p>
+                  <p className="mt-0.5 text-[10px] font-semibold text-[#0b2d54]/55">
+                    waiting for you
+                  </p>
                 </div>
-                <div className="col-span-2 rounded-2xl bg-white/10 p-3 ring-1 ring-white/10 sm:col-span-1">
-                  <p className="text-[9px] font-bold uppercase tracking-wide text-white/55">
+
+                <div className="col-span-2 rounded-2xl bg-white/25 p-4 ring-1 ring-white/25 sm:col-span-1">
+                  <p className="text-[9px] font-black uppercase tracking-wide text-[#0b2d54]/60">
                     Period
                   </p>
-                  <p className="mt-1 text-sm font-extrabold">
+                  <p className="mt-1 text-sm font-extrabold text-[#0b2d54]">
                     {range === "DAY"
                       ? new Intl.DateTimeFormat("en-ZA", {
                           day: "numeric",
@@ -593,8 +613,8 @@ export default function NotificationsPage() {
             </div>
           </section>
 
-          <section className="mt-5 rounded-[26px] border border-slate-200/80 bg-white p-4 shadow-[0_10px_35px_rgba(11,45,84,0.05)] sm:p-5">
-            <div className="flex items-center justify-between gap-3">
+          <section className="mt-5">
+            <div className="mb-3 flex items-center justify-between gap-3">
               <div>
                 <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-slate-400">
                   Categories
@@ -613,15 +633,10 @@ export default function NotificationsPage() {
                     "inline-flex min-h-9 items-center justify-center gap-2 rounded-xl px-3 py-2 text-[11px] font-bold transition " +
                     (unreadOnly
                       ? "bg-[#0b2d54] text-white"
-                      : "bg-slate-100 text-slate-600 hover:bg-[#24c1c4]/10 hover:text-[#0b2d54]")
+                      : "border border-slate-200 bg-white text-slate-600 hover:border-[#24c1c4]/40 hover:text-[#0b2d54]")
                   }
                 >
-                  <span
-                    className={
-                      "h-2 w-2 rounded-full " +
-                      (unreadOnly ? "bg-[#24c1c4]" : "bg-slate-400")
-                    }
-                  />
+                  <span className={"h-2 w-2 rounded-full " + (unreadOnly ? "bg-[#24c1c4]" : "bg-slate-400")} />
                   Unread only
                 </button>
 
@@ -639,25 +654,18 @@ export default function NotificationsPage() {
               </div>
             </div>
 
-            <div className="mt-3 grid grid-cols-2 gap-1.5 sm:grid-cols-3 lg:grid-cols-5 xl:grid-cols-9">
+            <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-5 xl:grid-cols-9">
               <button
                 type="button"
                 onClick={() => setCategory("ALL")}
                 className={
-                  "flex min-h-10 items-center gap-2 rounded-xl border px-3 py-2 text-left transition " +
+                  "flex min-h-11 items-center gap-2.5 rounded-2xl border px-3 py-2.5 text-left transition " +
                   (category === "ALL"
                     ? "border-[#0b2d54] bg-[#0b2d54] text-white shadow-sm"
                     : "border-slate-200 bg-white text-slate-600 hover:border-[#24c1c4]/40 hover:bg-[#24c1c4]/5")
                 }
               >
-                <span
-                  className={
-                    "grid h-8 w-8 shrink-0 place-items-center rounded-lg " +
-                    (category === "ALL"
-                      ? "bg-white/10 text-[#24c1c4]"
-                      : "bg-[#f4fbfb] text-[#0b2d54]")
-                  }
-                >
+                <span className={"grid h-8 w-8 shrink-0 place-items-center rounded-lg " + (category === "ALL" ? "bg-white/10 text-[#24c1c4]" : "bg-[#f4fbfb] text-[#0b2d54]")}>
                   <Bell className="h-4 w-4" />
                 </span>
                 <span className="min-w-0">
@@ -679,26 +687,17 @@ export default function NotificationsPage() {
                     type="button"
                     onClick={() => setCategory(tab.key)}
                     className={
-                      "flex min-h-10 items-center gap-2 rounded-xl border px-3 py-2 text-left transition " +
+                      "flex min-h-11 items-center gap-2.5 rounded-2xl border px-3 py-2.5 text-left transition " +
                       (active
                         ? "border-[#0b2d54] bg-[#0b2d54] text-white shadow-sm"
                         : "border-slate-200 bg-white text-slate-600 hover:border-[#24c1c4]/40 hover:bg-[#24c1c4]/5")
                     }
                   >
-                    <span
-                      className={
-                        "grid h-8 w-8 shrink-0 place-items-center rounded-lg " +
-                        (active
-                          ? "bg-white/10 text-[#24c1c4]"
-                          : "bg-[#f4fbfb] text-[#0b2d54]")
-                      }
-                    >
+                    <span className={"grid h-8 w-8 shrink-0 place-items-center rounded-lg " + (active ? "bg-white/10 text-[#24c1c4]" : "bg-[#f4fbfb] text-[#0b2d54]")}>
                       <Icon className="h-4 w-4" />
                     </span>
                     <span className="min-w-0 flex-1">
-                      <span className="block truncate text-[10px] font-black">
-                        {tab.label}
-                      </span>
+                      <span className="block truncate text-[10px] font-black">{tab.label}</span>
                       <span className={"mt-0.5 block text-[9px] font-semibold " + (active ? "text-white/60" : "text-slate-400")}>
                         {count.unread > 0 ? count.unread + " new" : count.total + " total"}
                       </span>
