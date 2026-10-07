@@ -413,7 +413,7 @@ export function HealthJournalSettingsStep({
                   "weeklySummary",
                   !(
                     values.weeklySummary ??
-                    false
+                    true
                   ),
                 )
               }
