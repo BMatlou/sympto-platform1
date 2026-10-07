@@ -43,6 +43,29 @@ export class ClinicCardService {
     if (!patient) throw new NotFoundException('Patient profile not found for the authenticated user.');
 
     const passport = patient.healthPassport;
+    const clinicalPassportAudits = passport
+      ? await this.prisma.auditLog.findMany({
+          where: {
+            entityType: 'SmartFileClinical/HEALTH_PASSPORT',
+            entityId: passport.id,
+            action: { in: ['CREATE', 'UPDATE'] },
+            success: true,
+          },
+          orderBy: { createdAt: 'desc' },
+          take: 50,
+          select: { newValues: true },
+        })
+      : [];
+
+    const clinicalPassportFields = new Set<string>();
+    for (const audit of clinicalPassportAudits) {
+      const values = audit.newValues && typeof audit.newValues === 'object' && !Array.isArray(audit.newValues)
+        ? audit.newValues as Record<string, unknown>
+        : null;
+      for (const field of ['bloodType', 'rhesusFactor', 'organDonor', 'emergencyNotes']) {
+        if (values && Object.prototype.hasOwnProperty.call(values, field)) clinicalPassportFields.add(field);
+      }
+    }
 
     // Prescription-backed medication records are authoritative clinical records.
     // A patient may still have self-entered medication information, so do not
@@ -77,6 +100,21 @@ export class ClinicCardService {
           .join(' '),
       ]),
     );
+    const practitioners = await this.prisma.practitioner.findMany({
+      where: { status: { in: ['ACTIVE', 'PENDING'] } },
+      select: {
+        person: { select: { firstName: true, lastName: true, preferredName: true } },
+      },
+    });
+    const normaliseName = (value: unknown) =>
+      String(value ?? '').trim().toLowerCase().replace(/[^a-z0-9]+/g, ' ').replace(/\s+/g, ' ').trim();
+    const practitionerNames = new Set(
+      practitioners.flatMap((practitioner) => [
+        normaliseName(practitioner.person.preferredName),
+        normaliseName([practitioner.person.preferredName ?? practitioner.person.firstName, practitioner.person.lastName].filter(Boolean).join(' ')),
+        normaliseName([practitioner.person.firstName, practitioner.person.lastName].filter(Boolean).join(' ')),
+      ]).filter(Boolean),
+    );
 
     const activeAllergies = (passport?.allergies ?? []).filter((item) => String(item.status) === 'ACTIVE');
     const activeConditions = (passport?.conditions ?? []).filter((item) => String(item.status) === 'ACTIVE');
@@ -108,6 +146,12 @@ export class ClinicCardService {
     return {
       generatedAt: new Date().toISOString(),
       lastUpdatedAt: updatedDates.length ? new Date(Math.max(...updatedDates.map((value) => value.getTime()))).toISOString() : null,
+      clinicalLocks: {
+        bloodType: clinicalPassportFields.has('bloodType'),
+        rhesusFactor: clinicalPassportFields.has('rhesusFactor'),
+        organDonor: clinicalPassportFields.has('organDonor'),
+        emergencyNotes: clinicalPassportFields.has('emergencyNotes'),
+      },
       patient: {
         id: patient.id,
         patientNumber: patient.patientNumber,
@@ -120,6 +164,7 @@ export class ClinicCardService {
         profileImageUrl: patient.person.profileImageUrl,
       },
       emergency: {
+        clinicalLockedFields: Array.from(clinicalPassportFields),
         bloodType: passport?.bloodType ?? patient.medicalRecord?.bloodType ?? null,
         rhesusFactor: passport?.rhesusFactor ?? null,
         organDonor: passport?.organDonor ?? patient.medicalRecord?.organDonor ?? false,
@@ -233,7 +278,8 @@ export class ClinicCardService {
         updatedAt: item.updatedAt,
       })),
       medications: activeMedications.map((item) => {
-        const clinical = clinicalMedicationIds.has(item.medicationId);
+        const clinicianNamed = practitionerNames.has(normaliseName(item.prescribedBy));
+        const clinical = clinicalMedicationIds.has(item.medicationId) || clinicianNamed;
         return {
           id: item.id,
           medicationId: item.medicationId,
@@ -258,7 +304,7 @@ export class ClinicCardService {
           notes: item.notes,
           source: clinical ? 'CLINICAL' : 'PATIENT',
           sourceLabel: clinical ? 'Clinical · view only' : 'Patient entered · editable',
-          clinicalBy: clinicalMedicationById.get(item.medicationId) ?? null,
+          clinicalBy: clinicalMedicationById.get(item.medicationId) ?? (clinicianNamed ? item.prescribedBy : null),
           updatedAt: item.updatedAt,
         };
       }),
