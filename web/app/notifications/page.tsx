@@ -25,7 +25,6 @@ import {
 } from "@/services/patient-notifications.service";
 
 type NotificationCategory =
-  | "ALL"
   | "MEDICATIONS"
   | "APPOINTMENTS"
   | "RESULTS"
@@ -35,24 +34,7 @@ type NotificationCategory =
   | "ACCOUNT"
   | "CARE";
 
-type CategoryTab = {
-  key: Exclude<NotificationCategory, "ALL">;
-  label: string;
-  icon: typeof Pill;
-};
-
 type NotificationRange = "DAY" | "WEEK" | "MONTH";
-
-const categoryTabs: CategoryTab[] = [
-  { key: "MEDICATIONS", label: "Medications", icon: Pill },
-  { key: "APPOINTMENTS", label: "Appointments", icon: CalendarDays },
-  { key: "RESULTS", label: "Results", icon: FileText },
-  { key: "MESSAGES", label: "Messages", icon: MessageCircle },
-  { key: "TELEMEDICINE", label: "Telemedicine", icon: Smartphone },
-  { key: "BILLING", label: "Billing & claims", icon: FileText },
-  { key: "ACCOUNT", label: "Account", icon: ShieldCheck },
-  { key: "CARE", label: "Care", icon: Stethoscope },
-];
 
 function isMedicationReminder(notification: PatientNotification) {
   const title = String(notification.title ?? "").toLowerCase();
@@ -90,17 +72,6 @@ function getCategory(notification: PatientNotification): NotificationCategory {
   }
 }
 
-function formatDate(value: unknown) {
-  if (!value) return "—";
-  const date = new Date(String(value));
-  if (Number.isNaN(date.getTime())) return "—";
-
-  return new Intl.DateTimeFormat("en-ZA", {
-    dateStyle: "medium",
-    timeStyle: "short",
-  }).format(date);
-}
-
 function formatReminderTime(value: unknown) {
   if (!value) return "—";
   const date = new Date(String(value));
@@ -109,18 +80,6 @@ function formatReminderTime(value: unknown) {
   return new Intl.DateTimeFormat("en-ZA", {
     hour: "numeric",
     minute: "2-digit",
-  }).format(date);
-}
-
-function formatReminderDate(value: unknown) {
-  if (!value) return "—";
-  const date = new Date(String(value));
-  if (Number.isNaN(date.getTime())) return "—";
-
-  return new Intl.DateTimeFormat("en-ZA", {
-    day: "numeric",
-    month: "short",
-    year: "numeric",
   }).format(date);
 }
 
@@ -150,15 +109,6 @@ function dateGroup(value: unknown): "TODAY" | "YESTERDAY" | "OLDER" {
   if (timestamp === startToday) return "TODAY";
   if (timestamp === startToday - 24 * 60 * 60 * 1000) return "YESTERDAY";
   return "OLDER";
-}
-
-function label(value: unknown) {
-  return value
-    ? String(value)
-        .replace(/_/g, " ")
-        .toLowerCase()
-        .replace(/\b\w/g, (letter) => letter.toUpperCase())
-    : "Notification";
 }
 
 function categoryLabel(notification: PatientNotification) {
@@ -304,7 +254,7 @@ export default function NotificationsPage() {
   const grouped = useMemo(() => {
     const groups: Record<string, PatientNotification[]> = {};
 
-    for (const notification of visible) {
+    for (const notification of rangeFiltered) {
       const date = new Date(String(relevantDate(notification)));
       if (Number.isNaN(date.getTime())) continue;
 
@@ -328,7 +278,7 @@ export default function NotificationsPage() {
     }
 
     return groups;
-  }, [visible, range]);
+  }, [rangeFiltered, range]);
 
   async function markRead(id: string) {
     try {
@@ -513,7 +463,7 @@ export default function NotificationsPage() {
             </div>
           )}
 
-          {!loading && !error && visible.length === 0 && (
+          {!loading && !error && rangeFiltered.length === 0 && (
             <div className="py-16 text-center">
               <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-white text-[#0b2d54] shadow-sm ring-1 ring-slate-200">
                 <Bell className="h-5 w-5" aria-hidden="true" />
@@ -527,7 +477,7 @@ export default function NotificationsPage() {
             </div>
           )}
 
-          {!loading && !error && visible.length > 0 && (
+          {!loading && !error && rangeFiltered.length > 0 && (
             <div className="mt-2">
               {renderedGroups.map((group) => (
                 <section key={group}>
@@ -616,22 +566,6 @@ export default function NotificationsPage() {
                                         minute: "2-digit",
                                       }).format(new Date(relevantDate(notification)))}
                                 </span>
-                              </div>
-
-                              <div className="mt-2 flex items-center gap-2 text-[10px] font-bold text-slate-400">
-                                <span>{categoryLabel(notification)}</span>
-                                {medicationReminder && notification.scheduledFor && (
-                                  <>
-                                    <span aria-hidden="true">·</span>
-                                    <span>{formatReminderDate(notification.scheduledFor)}</span>
-                                  </>
-                                )}
-                                {notification.priority === "URGENT" && (
-                                  <span className="inline-flex items-center gap-1 font-black text-red-700">
-                                    <TriangleAlert className="h-3 w-3" />
-                                    Urgent
-                                  </span>
-                                )}
                               </div>
 
                               {(notification.actionUrl || fallbackUrl || unread) && (
