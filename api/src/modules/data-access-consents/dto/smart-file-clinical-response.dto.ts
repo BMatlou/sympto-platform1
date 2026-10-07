@@ -31,7 +31,9 @@ export type SmartFileClinicalResponse = {
   diagnoses: unknown[];
   procedures: unknown[];
   labResults: unknown[];
+  labOrders: unknown[];
   imaging: unknown[];
+  imagingOrders: unknown[];
   carePlans: unknown[];
   referrals: unknown[];
   clinicalDocuments: unknown[];
