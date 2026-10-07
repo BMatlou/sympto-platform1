@@ -23,7 +23,6 @@ export type SmartFileClinicalResponse = {
   immunisations: unknown[];
   medications: unknown[];
   prescriptions: unknown[];
-  appointments: unknown[];
   encounters: unknown[];
   episodes: unknown[];
   vitals: unknown[];
