@@ -202,7 +202,7 @@ export default function ClinicalSmartFilePage() {
             {!file.patientMeasurements.length && !file.wearableWellnessMetrics.length && <Empty label="connected health data"/>}
           </div>
         </Section>
-        <Section icon={FileText} title="Care plans & referrals" count={file.carePlans.length + file.referrals.length}><div className="space-y-3">{file.carePlans.map((x: any, i: number) => <div key={x.id || i} className="rounded-2xl bg-slate-50 p-4"><p className="font-semibold text-[#0b2d54]">{text(x.name || x.title, "Care plan")}</p><p className="mt-1 text-xs text-slate-500">{text(x.status)}</p></div>)}{file.referrals.map((x: any, i: number) => <div key={x.id || i} className="rounded-2xl bg-slate-50 p-4"><p className="font-semibold text-[#0b2d54]">Referral</p><p className="mt-1 text-xs text-slate-500">{text(x.reason || x.notes || x.specialty)}</p></div>)}{!file.carePlans.length && !file.referrals.length && <Empty label="care plans or referrals"/>}</div></Section>
+        
       </div>
       <div className="mt-5 grid gap-4 md:grid-cols-2">
         <Section icon={FileText} title="Medical background" count={file.medicalRecord ? 1 : 0}>
@@ -224,6 +224,15 @@ export default function ClinicalSmartFilePage() {
           {file.carePlans.length === 0 && file.referrals.length === 0 && <Empty label="care plans or referrals"/>}
         </Section>
       </div>
+        <Section icon={ClipboardList} title="Immunisations" count={file.immunisations.length}>
+          <div className="space-y-2">{file.immunisations.map((item: any, i: number) => <div key={item.id || i} className="rounded-2xl bg-slate-50 p-4"><div className="flex flex-wrap items-center gap-2"><span className="rounded-full bg-emerald-50 px-2 py-1 text-[9px] font-black uppercase tracking-wide text-emerald-700">Clinical</span><p className="font-semibold text-[#0b2d54]">{text(item.immunization?.name || item.name, "Immunisation")}</p></div><p className="mt-1 text-xs text-slate-500">{item.administeredAt ? "Administered · " + date(item.administeredAt) : "Date not recorded"}{item.nextDueDate ? " · Next due " + date(item.nextDueDate) : ""}</p>{item.facility && <p className="mt-1 text-xs text-slate-500">Facility · {item.facility}</p>}{item.adverseReactionNotes && <p className="mt-2 text-sm leading-5 text-slate-600">Adverse reaction · {item.adverseReactionNotes}</p>}</div>)}{!file.immunisations.length && <Empty label="immunisations"/>}</div>
+        </Section>
+        <Section icon={ClipboardList} title="Procedures" count={file.procedures.length}>
+          <div className="space-y-2">{file.procedures.map((item: any, i: number) => <div key={item.id || i} className="rounded-2xl bg-slate-50 p-4"><div className="flex flex-wrap items-center gap-2"><span className="rounded-full bg-emerald-50 px-2 py-1 text-[9px] font-black uppercase tracking-wide text-emerald-700">Clinical</span><p className="font-semibold text-[#0b2d54]">{text(item.procedure?.name || item.name, "Procedure")}</p></div><p className="mt-1 text-xs text-slate-500">{item.performedAt ? "Performed · " + date(item.performedAt) : "Date not recorded"}{item.facility ? " · " + item.facility : ""}</p>{item.outcome && <p className="mt-2 text-sm leading-5 text-slate-600"><strong>Outcome:</strong> {item.outcome}</p>}{item.complications && <p className="mt-2 text-sm leading-5 text-slate-600"><strong>Complications:</strong> {item.complications}</p>}{item.followUpDate && <p className="mt-2 text-xs font-semibold text-[#0b2d54]">Follow-up · {date(item.followUpDate)}</p>}</div>)}{!file.procedures.length && <Empty label="procedures"/>}</div>
+        </Section>
+        <Section icon={FileText} title="Clinical documents & notes" count={file.clinicalDocuments.length}>
+          <div className="space-y-2">{file.clinicalDocuments.map((item: any, i: number) => <div key={item.id || i} className="rounded-2xl bg-slate-50 p-4"><div className="flex flex-wrap items-center gap-2"><span className="rounded-full bg-emerald-50 px-2 py-1 text-[9px] font-black uppercase tracking-wide text-emerald-700">Clinical</span><span className="text-xs text-slate-400">{date(item.createdAt || item.uploadedAt || item.date)}</span></div><p className="mt-1 font-semibold text-[#0b2d54]">{text(item.title || item.fileName || item.name, "Clinical document")}</p>{item.note && <p className="mt-1 whitespace-pre-wrap text-sm leading-5 text-slate-600">{item.note}</p>}{item.documentType && <p className="mt-1 text-xs text-slate-500">{item.documentType}</p>}</div>)}{!file.clinicalDocuments.length && <Empty label="clinical documents or notes"/>}</div>
+        </Section>
       <p className="mt-5 text-center text-xs text-slate-400">Smart File generated {date(file.generatedAt)} · Access is controlled by the patient's consent.</p>
     </>}
   </div></main></ProtectedRoute>;
