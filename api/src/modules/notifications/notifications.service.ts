@@ -285,7 +285,9 @@ export class NotificationsService {
           AND "channel" = 'IN_APP'
           AND "status" IN ('SENT', 'DELIVERED', 'READ')
           AND ("scheduledFor" IS NULL OR "scheduledFor" <= NOW())
-          ${unreadOnly ? Prisma.sql`AND "readAt" IS NULL` : Prisma.empty}
+          ${unreadOnly
+            ? Prisma.sql`AND "readAt" IS NULL`
+            : Prisma.sql`AND ("readAt" IS NULL OR "readAt" >= NOW() - INTERVAL '30 days')`}
       `;
 
       const total = Number(totalRows[0]?.total ?? 0);
