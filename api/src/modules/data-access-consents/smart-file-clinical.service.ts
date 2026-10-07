@@ -79,7 +79,7 @@ export class SmartFileClinicalService {
                       include: { medication: true, prescription: true },
                     },
                     observations: true,
-                    attachments: true,
+                    attachments: { include: { attachment: true } },
                   },
                 },
                 diagnoses: { include: { diagnosis: true } },
