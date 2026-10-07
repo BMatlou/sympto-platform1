@@ -36,7 +36,7 @@ function ClinicalMarker({ item, label, clinical: clinicalOverride }: { item?: an
   </span>;
 }
 function DetailGrid({ items }: { items: Array<[string, ReactNode]> }) {
-  const recordedItems = items.filter(([, value]) => value !== null && value !== undefined && value !== "");
+  const recordedItems = items.filter(([, value]) => value !== null && value !== undefined && value !== "" && value !== "Not recorded");
   if (!recordedItems.length) return null;
 
   return <div className="mt-3 grid gap-2.5 sm:grid-cols-2">
@@ -202,92 +202,6 @@ export default function HealthPassportPremium() {
       </Panel>
     </div>
 
-    <div className="mt-5 grid gap-5 md:grid-cols-2">
-      <Panel title="Allergies" icon={<HeartPulse className="h-5 w-5" />}>
-        {computed.allergies?.length ? <div className="space-y-3">{computed.allergies.map((item:any) => <article key={item.id} className="rounded-2xl bg-rose-50/55 p-4">
-          <div className="flex items-start justify-between gap-3"><div><p className="font-semibold text-[#0b2d54]">{text(item.name,"Allergy")}</p><ClinicalMarker item={item} /></div><Badge tone="rose">{human(item.severity)}</Badge></div>
-          <DetailGrid items={[
-            ["Category", item.category], ["Reaction", item.reaction], ["Reaction details", item.reactionNotes],
-            ["Onset", date(item.onsetDate)], ["Last reaction", date(item.lastReaction)], ["Verified", yesNo(item.verified)],
-            ["Verified by", item.verifiedBy], ["Status", human(item.status)], ["Notes", item.notes], ["Updated", date(item.updatedAt)],
-          ]} />
-        </article>)}</div> : <Empty>No active allergies recorded.</Empty>}
-        <Link href="/allergies" className="mt-4 inline-flex items-center gap-1 text-xs font-bold text-[#0b2d54]">View allergies <ChevronRight className="h-3.5 w-3.5" /></Link>
-      </Panel>
-      <Panel title="Active conditions" icon={<Activity className="h-5 w-5" />}>
-        {computed.conditions?.length ? <div className="space-y-3">{computed.conditions.map((item:any) => <article key={item.id} className="rounded-2xl bg-blue-50/55 p-4">
-          <div className="flex items-start justify-between gap-3"><div><p className="font-semibold text-[#0b2d54]">{text(item.name,"Condition")}</p><ClinicalMarker item={item} /></div><Badge tone="blue">{human(item.status)}</Badge></div>
-          <DetailGrid items={[
-            ["Category", item.category], ["Body system", item.bodySystem], ["Severity", item.severity ? human(item.severity) : null],
-            ["Stage", item.stage], ["Chronic", yesNo(item.chronic)], ["Primary condition", yesNo(item.primaryCondition)],
-            ["Diagnosed / recorded", date(item.diagnosedAt)], ["Resolved", date(item.resolvedAt)], ["Diagnosed by", item.diagnosedBy],
-            ["Treatment plan", item.treatmentPlan], ["Outcome", item.outcome], ["Notes", item.notes], ["Updated", date(item.updatedAt)],
-          ]} />
-        </article>)}</div> : <Empty>No active health conditions recorded.</Empty>}
-        <Link href="/health-conditions" className="mt-4 inline-flex items-center gap-1 text-xs font-bold text-[#0b2d54]">View health records <ChevronRight className="h-3.5 w-3.5" /></Link>
-      </Panel>
-      <Panel title="Practitioner diagnoses" icon={<ShieldCheck className="h-5 w-5" />}>
-        {computed.diagnoses?.length ? <div className="space-y-3">{computed.diagnoses.map((item:any) => <article key={item.id} className="rounded-2xl bg-slate-50 p-4">
-          <div className="flex items-start justify-between gap-3"><div><p className="font-semibold text-[#0b2d54]">{text(item.name,"Clinical diagnosis")}</p><ClinicalMarker item={item} /></div><Badge tone="green">{human(item.status)}</Badge></div>
-          <DetailGrid items={[
-            ["Description", item.description], ["Category", item.category], ["Body system", item.bodySystem], ["Chronic", yesNo(item.chronic)],
-            ["Diagnosed", date(item.diagnosedAt)], ["Resolved", date(item.resolvedAt)], ["Severity", item.severity ? human(item.severity) : null],
-            ["Stage", item.stage], ["Primary diagnosis", yesNo(item.primaryDiagnosis)], ["Confirmed", yesNo(item.confirmed)],
-            ["Diagnosed by", item.diagnosedBy || item.practitionerName], ["Treatment plan", item.treatmentPlan], ["Outcome", item.outcome],
-            ["Clinical notes", item.notes], ["Updated", date(item.updatedAt)],
-          ]} />
-        </article>)}</div> : <Empty>No practitioner diagnoses are available yet.</Empty>}
-        <Link href="/health-conditions" className="mt-4 inline-flex items-center gap-1 text-xs font-bold text-[#0b2d54]">View clinical diagnoses <ChevronRight className="h-3.5 w-3.5" /></Link>
-      </Panel>
-      <Panel title="Procedures & surgical history" icon={<Activity className="h-5 w-5" />}>
-        {computed.procedures?.length ? <div className="space-y-3">{computed.procedures.map((item:any) => <article key={item.id} className="rounded-2xl bg-slate-50 p-4">
-          <div className="flex items-start justify-between gap-3"><div><p className="font-semibold text-[#0b2d54]">{text(item.name,"Procedure")}</p><ClinicalMarker item={item} /></div><Badge>{human(item.status)}</Badge></div>
-          <DetailGrid items={[
-            ["Description", item.description], ["Category", item.category], ["Body system", item.bodySystem], ["Invasive", yesNo(item.invasive)], ["Surgical", yesNo(item.surgical)],
-            ["Performed", date(item.performedAt)], ["Outcome", item.outcome], ["Performed by", item.performer || item.practitionerName], ["Facility", item.facility],
-            ["Complications", item.complications], ["Follow-up required", yesNo(item.followUpRequired)], ["Follow-up date", date(item.followUpDate)],
-            ["Clinical notes", item.notes], ["Updated", date(item.updatedAt)],
-          ]} />
-        </article>)}</div> : <Empty>No procedures or surgical history recorded.</Empty>}
-      </Panel>
-      <Panel title="Current medications" icon={<HeartPulse className="h-5 w-5" />}>
-        {computed.medications?.length ? <div className="space-y-3">{computed.medications.map((item:any) => <article key={item.id} className="rounded-2xl bg-slate-50 p-4">
-          <div className="flex items-start justify-between gap-3"><div><p className="font-semibold text-[#0b2d54]">{text(item.name,"Medication")}</p><ClinicalMarker item={item} /></div><Badge tone="green">{human(item.status)}</Badge></div>
-          <DetailGrid items={[
-            ["Generic name", item.genericName], ["Brand name", item.brandName], ["Category", item.category], ["Dose", item.dosage],
-            ["Frequency", item.frequency], ["Route", item.route], ["Indication", item.indication], ["Instructions", item.instructions],
-            ["Prescribed by", item.prescribedBy || item.clinicalBy], ["Started", date(item.startedAt)], ["Ended", date(item.endedAt)],
-            ["Ongoing", yesNo(item.ongoing)], ["Adherence", item.adherencePercentage != null ? String(item.adherencePercentage) + "%" : null],
-            ["Missed doses", item.missedDoses], ["Side effects", item.sideEffects], ["Effectiveness", item.effectiveness],
-            ["Notes", item.notes], ["Updated", date(item.updatedAt)],
-          ]} />
-        </article>)}</div> : <Empty>No active medications recorded.</Empty>}
-        <Link href="/medications" className="mt-4 inline-flex items-center gap-1 text-xs font-bold text-[#0b2d54]">View medications <ChevronRight className="h-3.5 w-3.5" /></Link>
-      </Panel>
-      <Panel title="Immunizations" icon={<Syringe className="h-5 w-5" />}>
-        {computed.immunizations?.length ? <div className="space-y-3">{computed.immunizations.map((item:any) => <article key={item.id} className="rounded-2xl bg-emerald-50/55 p-4">
-          <div className="flex items-start justify-between gap-3"><div><p className="font-semibold text-[#0b2d54]">{text(item.name,"Immunization")}</p><ClinicalMarker item={item} /></div><Badge tone="green">{human(item.status)}</Badge></div>
-          <DetailGrid items={[
-            ["Category", item.category], ["Disease protected", item.diseaseProtected], ["Administered", date(item.administeredAt)], ["Dose number", item.doseNumber],
-            ["Batch number", item.batchNumber], ["Manufacturer", item.manufacturer], ["Administered by", item.administeredBy], ["Facility", item.facility],
-            ["Route", item.route], ["Site", item.site], ["Adverse reaction", yesNo(item.adverseReaction)], ["Reaction details", item.adverseReactionNotes],
-            ["Next due", date(item.nextDueDate)], ["Notes", item.notes], ["Updated", date(item.updatedAt)],
-          ]} />
-        </article>)}</div> : <Empty>No immunizations recorded yet.</Empty>}
-        <Link href="/immunizations" className="mt-4 inline-flex items-center gap-1 text-xs font-bold text-[#0b2d54]">View immunizations <ChevronRight className="h-3.5 w-3.5" /></Link>
-      </Panel>
-    </div>
-    <div className="mt-5">
-      <Panel title="Lifestyle & personal health" icon={<UserRound className="h-5 w-5" />}>
-        <div className="mb-3"><ClinicalMarker label="Patient information · editable in My Health" /></div>
-        {computed.lifestyle ? <DetailGrid items={[
-          ["Occupation", computed.lifestyle.occupation], ["Dominant hand", computed.lifestyle.dominantHand ? human(computed.lifestyle.dominantHand) : null],
-          ["Smoking status", computed.lifestyle.smokingStatus ? human(computed.lifestyle.smokingStatus) : null],
-          ["Alcohol consumption", computed.lifestyle.alcoholConsumption ? human(computed.lifestyle.alcoholConsumption) : null],
-          ["Exercise frequency", computed.lifestyle.exerciseFrequency ? human(computed.lifestyle.exerciseFrequency) : null],
-        ]} /> : <Empty>No lifestyle information has been recorded.</Empty>}
-      </Panel>
-    </div>
     <div className="mt-5">
       <Panel title="Medical history" icon={<CalendarDays className="h-5 w-5" />}>
         <ClinicalMarker clinical label="Clinical record · view only" />
@@ -403,6 +317,278 @@ export default function HealthPassportPremium() {
     </div>
     <div className="mt-5 grid gap-5 md:grid-cols-2">
     </div>
+
+    <div className="mt-5 grid gap-5 md:grid-cols-2">
+      <Panel title="Allergies" icon={<HeartPulse className="h-5 w-5" />}>
+        {computed.allergies?.length ? <div className="space-y-3">{computed.allergies.map((item:any) => <article key={item.id} className="rounded-2xl bg-rose-50/55 p-4">
+          <div className="flex items-start justify-between gap-3"><div><p className="font-semibold text-[#0b2d54]">{text(item.name,"Allergy")}</p><ClinicalMarker item={item} /></div><Badge tone="rose">{human(item.severity)}</Badge></div>
+          <DetailGrid items={[
+            ["Category", item.category], ["Reaction", item.reaction], ["Reaction details", item.reactionNotes],
+            ["Onset", date(item.onsetDate)], ["Last reaction", date(item.lastReaction)], ["Verified", yesNo(item.verified)],
+            ["Verified by", item.verifiedBy], ["Status", human(item.status)], ["Notes", item.notes], ["Updated", date(item.updatedAt)],
+          ]} />
+        </article>)}</div> : <Empty>No active allergies recorded.</Empty>}
+        <Link href="/allergies" className="mt-4 inline-flex items-center gap-1 text-xs font-bold text-[#0b2d54]">View allergies <ChevronRight className="h-3.5 w-3.5" /></Link>
+      </Panel>
+      <Panel title="Active conditions" icon={<Activity className="h-5 w-5" />}>
+        {computed.conditions?.length ? <div className="space-y-3">{computed.conditions.map((item:any) => <article key={item.id} className="rounded-2xl bg-blue-50/55 p-4">
+          <div className="flex items-start justify-between gap-3"><div><p className="font-semibold text-[#0b2d54]">{text(item.name,"Condition")}</p><ClinicalMarker item={item} /></div><Badge tone="blue">{human(item.status)}</Badge></div>
+          <DetailGrid items={[
+            ["Category", item.category], ["Body system", item.bodySystem], ["Severity", item.severity ? human(item.severity) : null],
+            ["Stage", item.stage], ["Chronic", yesNo(item.chronic)], ["Primary condition", yesNo(item.primaryCondition)],
+            ["Diagnosed / recorded", date(item.diagnosedAt)], ["Resolved", date(item.resolvedAt)], ["Diagnosed by", item.diagnosedBy],
+            ["Treatment plan", item.treatmentPlan], ["Outcome", item.outcome], ["Notes", item.notes], ["Updated", date(item.updatedAt)],
+          ]} />
+        </article>)}</div> : <Empty>No active health conditions recorded.</Empty>}
+        <Link href="/health-conditions" className="mt-4 inline-flex items-center gap-1 text-xs font-bold text-[#0b2d54]">View health records <ChevronRight className="h-3.5 w-3.5" /></Link>
+      </Panel>
+      <Panel title="Practitioner diagnoses" icon={<ShieldCheck className="h-5 w-5" />}>
+        {computed.diagnoses?.length ? <div className="space-y-3">{computed.diagnoses.map((item:any) => <article key={item.id} className="rounded-2xl bg-slate-50 p-4">
+          <div className="flex items-start justify-between gap-3"><div><p className="font-semibold text-[#0b2d54]">{text(item.name,"Clinical diagnosis")}</p><ClinicalMarker item={item} /></div><Badge tone="green">{human(item.status)}</Badge></div>
+          <DetailGrid items={[
+            ["Description", item.description], ["Category", item.category], ["Body system", item.bodySystem], ["Chronic", yesNo(item.chronic)],
+            ["Diagnosed", date(item.diagnosedAt)], ["Resolved", date(item.resolvedAt)], ["Severity", item.severity ? human(item.severity) : null],
+            ["Stage", item.stage], ["Primary diagnosis", yesNo(item.primaryDiagnosis)], ["Confirmed", yesNo(item.confirmed)],
+            ["Diagnosed by", item.diagnosedBy || item.practitionerName], ["Treatment plan", item.treatmentPlan], ["Outcome", item.outcome],
+            ["Clinical notes", item.notes], ["Updated", date(item.updatedAt)],
+          ]} />
+        </article>)}</div> : <Empty>No practitioner diagnoses are available yet.</Empty>}
+        <Link href="/health-conditions" className="mt-4 inline-flex items-center gap-1 text-xs font-bold text-[#0b2d54]">View clinical diagnoses <ChevronRight className="h-3.5 w-3.5" /></Link>
+      </Panel>
+      <Panel title="Procedures & surgical history" icon={<Activity className="h-5 w-5" />}>
+        {computed.procedures?.length ? <div className="space-y-3">{computed.procedures.map((item:any) => <article key={item.id} className="rounded-2xl bg-slate-50 p-4">
+          <div className="flex items-start justify-between gap-3"><div><p className="font-semibold text-[#0b2d54]">{text(item.name,"Procedure")}</p><ClinicalMarker item={item} /></div><Badge>{human(item.status)}</Badge></div>
+          <DetailGrid items={[
+            ["Description", item.description], ["Category", item.category], ["Body system", item.bodySystem], ["Invasive", yesNo(item.invasive)], ["Surgical", yesNo(item.surgical)],
+            ["Performed", date(item.performedAt)], ["Outcome", item.outcome], ["Performed by", item.performer || item.practitionerName], ["Facility", item.facility],
+            ["Complications", item.complications], ["Follow-up required", yesNo(item.followUpRequired)], ["Follow-up date", date(item.followUpDate)],
+            ["Clinical notes", item.notes], ["Updated", date(item.updatedAt)],
+          ]} />
+        </article>)}</div> : <Empty>No procedures or surgical history recorded.</Empty>}
+      </Panel>
+      <Panel title="Current medications" icon={<HeartPulse className="h-5 w-5" />}>
+        {computed.medications?.length ? <div className="space-y-3">{computed.medications.map((item:any) => <article key={item.id} className="rounded-2xl bg-slate-50 p-4">
+          <div className="flex items-start justify-between gap-3"><div><p className="font-semibold text-[#0b2d54]">{text(item.name,"Medication")}</p><ClinicalMarker item={item} /></div><Badge tone="green">{human(item.status)}</Badge></div>
+          <DetailGrid items={[
+            ["Generic name", item.genericName], ["Brand name", item.brandName], ["Category", item.category], ["Dose", item.dosage],
+            ["Frequency", item.frequency], ["Route", item.route], ["Indication", item.indication], ["Instructions", item.instructions],
+            ["Prescribed by", item.prescribedBy || item.clinicalBy], ["Started", date(item.startedAt)], ["Ended", date(item.endedAt)],
+            ["Ongoing", yesNo(item.ongoing)], ["Adherence", item.adherencePercentage != null ? String(item.adherencePercentage) + "%" : null],
+            ["Missed doses", item.missedDoses], ["Side effects", item.sideEffects], ["Effectiveness", item.effectiveness],
+            ["Notes", item.notes], ["Updated", date(item.updatedAt)],
+          ]} />
+        </article>)}</div> : <Empty>No active medications recorded.</Empty>}
+        <Link href="/medications" className="mt-4 inline-flex items-center gap-1 text-xs font-bold text-[#0b2d54]">View medications <ChevronRight className="h-3.5 w-3.5" /></Link>
+      </Panel>
+      <Panel title="Immunizations" icon={<Syringe className="h-5 w-5" />}>
+        {computed.immunizations?.length ? <div className="space-y-3">{computed.immunizations.map((item:any) => <article key={item.id} className="rounded-2xl bg-emerald-50/55 p-4">
+          <div className="flex items-start justify-between gap-3"><div><p className="font-semibold text-[#0b2d54]">{text(item.name,"Immunization")}</p><ClinicalMarker item={item} /></div><Badge tone="green">{human(item.status)}</Badge></div>
+          <DetailGrid items={[
+            ["Category", item.category], ["Disease protected", item.diseaseProtected], ["Administered", date(item.administeredAt)], ["Dose number", item.doseNumber],
+            ["Batch number", item.batchNumber], ["Manufacturer", item.manufacturer], ["Administered by", item.administeredBy], ["Facility", item.facility],
+            ["Route", item.route], ["Site", item.site], ["Adverse reaction", yesNo(item.adverseReaction)], ["Reaction details", item.adverseReactionNotes],
+            ["Next due", date(item.nextDueDate)], ["Notes", item.notes], ["Updated", date(item.updatedAt)],
+          ]} />
+        </article>)}</div> : <Empty>No immunizations recorded yet.</Empty>}
+        <Link href="/immunizations" className="mt-4 inline-flex items-center gap-1 text-xs font-bold text-[#0b2d54]">View immunizations <ChevronRight className="h-3.5 w-3.5" /></Link>
+      </Panel>
+    </div>
+    <div className="mt-5">
+      <Panel title="Lifestyle & personal health" icon={<UserRound className="h-5 w-5" />}>
+        <div className="mb-3"><ClinicalMarker label="Patient information · editable in My Health" /></div>
+        {computed.lifestyle ? <DetailGrid items={[
+          ["Occupation", computed.lifestyle.occupation], ["Dominant hand", computed.lifestyle.dominantHand ? human(computed.lifestyle.dominantHand) : null],
+          ["Smoking status", computed.lifestyle.smokingStatus ? human(computed.lifestyle.smokingStatus) : null],
+          ["Alcohol consumption", computed.lifestyle.alcoholConsumption ? human(computed.lifestyle.alcoholConsumption) : null],
+          ["Exercise frequency", computed.lifestyle.exerciseFrequency ? human(computed.lifestyle.exerciseFrequency) : null],
+        ]} /> : <Empty>No lifestyle information has been recorded.</Empty>}
+      </Panel>
+    </div>
+    {computed.clinicalEncounters?.length > 0 && (
+      <div className="mt-5">
+        <Panel title="Clinical visits & notes" icon={<CalendarDays className="h-5 w-5" />}>
+          <ClinicalMarker clinical />
+          <div className="mt-4 space-y-3">
+            {computed.clinicalEncounters.map((item: any) => (
+              <details key={item.id} className="rounded-2xl bg-slate-50 p-4">
+                <summary className="cursor-pointer list-none">
+                  <div className="flex items-start justify-between gap-3">
+                    <div>
+                      <p className="font-semibold text-[#0b2d54]">{text(item.type, "Clinical visit")}</p>
+                      <p className="mt-1 text-xs text-slate-500">
+                        {date(item.startedAt)}{item.practitionerName ? ` · ${item.practitionerName}` : ""}
+                      </p>
+                    </div>
+                    <Badge tone="blue">Clinical</Badge>
+                  </div>
+                </summary>
+                <DetailGrid items={[
+                  ["Chief complaint", item.chiefComplaint],
+                  ["Assessment", item.assessment],
+                  ["Plan", item.plan],
+                  ["Clinical notes", item.notes],
+                  ["Diagnoses", item.diagnoses?.length ? item.diagnoses.join(", ") : null],
+                  ["Procedures", item.procedures?.length ? item.procedures.join(", ") : null],
+                ]} />
+                {item.clinicalNotes?.length > 0 && (
+                  <div className="mt-3 space-y-2">
+                    {item.clinicalNotes.map((note: any) => (
+                      <div key={note.id} className="rounded-xl bg-white px-3 py-2.5 ring-1 ring-slate-100">
+                        <p className="text-[10px] font-bold uppercase tracking-wide text-slate-400">{text(note.title, "Clinical note")}</p>
+                        <p className="mt-1 text-xs leading-5 text-slate-700">{note.note}</p>
+                      </div>
+                    ))}
+                  </div>
+                )}
+                {item.vitals?.length > 0 && (
+                  <DetailGrid items={item.vitals.map((v: any) => [
+                    v.type,
+                    v.unit ? `${v.value} ${v.unit}` : v.value,
+                  ])} />
+                )}
+              </details>
+            ))}
+          </div>
+        </Panel>
+      </div>
+    )}
+
+    {(clinicalRecords.carePlans?.length || clinicalRecords.referrals?.length || clinicalRecords.labResults?.length || clinicalRecords.imagingStudies?.length || clinicalRecords.riskAssessments?.length) ? (
+      <div className="mt-5 grid gap-5 md:grid-cols-2">
+        {clinicalRecords.carePlans?.length > 0 && (
+          <Panel title="Care plans" icon={<Activity className="h-5 w-5" />}>
+            <ClinicalMarker clinical />
+            <div className="mt-4 space-y-3">
+              {clinicalRecords.carePlans.map((item: any) => (
+                <details key={item.id} className="rounded-2xl bg-slate-50 p-4">
+                  <summary className="cursor-pointer list-none">
+                    <div className="flex items-start justify-between gap-3">
+                      <div><p className="font-semibold text-[#0b2d54]">{text(item.title, "Care plan")}</p><p className="mt-1 text-xs text-slate-500">{human(item.status)} · {date(item.startDate)}</p></div>
+                      <Badge tone="blue">Clinical</Badge>
+                    </div>
+                  </summary>
+                  <DetailGrid items={[
+                    ["Description", item.description],
+                    ["Start date", date(item.startDate)],
+                    ["End date", date(item.endDate)],
+                    ["Practitioner", item.practitioner?.person ? [item.practitioner.person.preferredName ?? item.practitioner.person.firstName, item.practitioner.person.lastName].filter(Boolean).join(" ") : null],
+                    ["Goals", item.goals?.length ? item.goals.map((g:any)=>g.title).join(", ") : null],
+                    ["Tasks", item.tasks?.length ? item.tasks.map((t:any)=>t.title).join(", ") : null],
+                    ["Notes", item.notes?.length ? item.notes.map((n:any)=>n.note).join(" · ") : null],
+                  ]} />
+                </details>
+              ))}
+            </div>
+          </Panel>
+        )}
+
+        {clinicalRecords.referrals?.length > 0 && (
+          <Panel title="Referrals" icon={<ShieldCheck className="h-5 w-5" />}>
+            <ClinicalMarker clinical />
+            <div className="mt-4 space-y-3">
+              {clinicalRecords.referrals.map((item: any) => (
+                <details key={item.id} className="rounded-2xl bg-slate-50 p-4">
+                  <summary className="cursor-pointer list-none">
+                    <div className="flex items-start justify-between gap-3">
+                      <div><p className="font-semibold text-[#0b2d54]">{text(item.specialty, text(item.type, "Referral"))}</p><p className="mt-1 text-xs text-slate-500">{human(item.status)} · {human(item.priority)}</p></div>
+                      <Badge tone="blue">Clinical</Badge>
+                    </div>
+                  </summary>
+                  <DetailGrid items={[
+                    ["Referral number", item.referralNumber],
+                    ["Reason", item.reason],
+                    ["Clinical summary", item.clinicalSummary],
+                    ["Requested", date(item.requestedDate)],
+                    ["Accepted", date(item.acceptedDate)],
+                    ["Completed", date(item.completedDate)],
+                  ]} />
+                </details>
+              ))}
+            </div>
+          </Panel>
+        )}
+
+        {clinicalRecords.labResults?.length > 0 && (
+          <Panel title="Laboratory results" icon={<Activity className="h-5 w-5" />}>
+            <ClinicalMarker clinical />
+            <div className="mt-4 space-y-3">
+              {clinicalRecords.labResults.map((item: any) => (
+                <details key={item.id} className="rounded-2xl bg-slate-50 p-4">
+                  <summary className="cursor-pointer list-none">
+                    <div className="flex items-start justify-between gap-3">
+                      <div><p className="font-semibold text-[#0b2d54]">{text(item.orderItem?.test?.name, "Lab result")}</p><p className="mt-1 text-xs text-slate-500">{human(item.status)}{item.reportedAt ? ` · ${date(item.reportedAt)}` : ""}</p></div>
+                      <Badge tone="blue">Clinical</Badge>
+                    </div>
+                  </summary>
+                  <div className="mt-3 space-y-2">
+                    {item.items?.map((result: any) => (
+                      <DetailGrid key={result.id} items={[
+                        ["Test", result.test?.name],
+                        ["Result", result.numericValue ?? result.textValue ?? result.booleanValue],
+                        ["Abnormal", yesNo(result.abnormal)],
+                        ["Critical", yesNo(result.critical)],
+                        ["Comments", result.comments],
+                      ]} />
+                    ))}
+                  </div>
+                </details>
+              ))}
+            </div>
+          </Panel>
+        )}
+
+        {clinicalRecords.imagingStudies?.length > 0 && (
+          <Panel title="Imaging" icon={<Activity className="h-5 w-5" />}>
+            <ClinicalMarker clinical />
+            <div className="mt-4 space-y-3">
+              {clinicalRecords.imagingStudies.map((item: any) => (
+                <details key={item.id} className="rounded-2xl bg-slate-50 p-4">
+                  <summary className="cursor-pointer list-none">
+                    <div className="flex items-start justify-between gap-3">
+                      <div><p className="font-semibold text-[#0b2d54]">{text(item.order?.items?.[0]?.procedure?.name, "Imaging study")}</p><p className="mt-1 text-xs text-slate-500">{human(item.status)}{item.performedAt ? ` · ${date(item.performedAt)}` : ""}</p></div>
+                      <Badge tone="blue">Clinical</Badge>
+                    </div>
+                  </summary>
+                  <DetailGrid items={[
+                    ["Accession number", item.accessionNumber],
+                    ["Performed", date(item.performedAt)],
+                    ["Reported", date(item.reportedAt)],
+                    ["Imaging centre", item.imagingCenter?.name],
+                    ["Findings", item.reports?.map((r:any)=>r.findings).filter(Boolean).join(" · ")],
+                    ["Impression", item.reports?.map((r:any)=>r.impression).filter(Boolean).join(" · ")],
+                    ["Recommendations", item.reports?.map((r:any)=>r.recommendations).filter(Boolean).join(" · ")],
+                  ]} />
+                </details>
+              ))}
+            </div>
+          </Panel>
+        )}
+
+        {clinicalRecords.riskAssessments?.length > 0 && (
+          <Panel title="Clinical risk assessments" icon={<ShieldCheck className="h-5 w-5" />}>
+            <ClinicalMarker clinical />
+            <div className="mt-4 space-y-3">
+              {clinicalRecords.riskAssessments.map((item: any) => (
+                <details key={item.id} className="rounded-2xl bg-slate-50 p-4">
+                  <summary className="cursor-pointer list-none">
+                    <div className="flex items-start justify-between gap-3">
+                      <div><p className="font-semibold text-[#0b2d54]">{human(item.assessmentType)}</p><p className="mt-1 text-xs text-slate-500">{human(item.overallRisk)} · {date(item.assessedAt)}</p></div>
+                      <Badge tone="blue">Clinical</Badge>
+                    </div>
+                  </summary>
+                  <DetailGrid items={[
+                    ["Score", item.score],
+                    ["Notes", item.notes],
+                    ["Practitioner", item.practitioner?.person ? [item.practitioner.person.preferredName ?? item.practitioner.person.firstName, item.practitioner.person.lastName].filter(Boolean).join(" ") : null],
+                    ["Factors", item.results?.map((r:any)=>`${r.factor}: ${r.value ?? r.score ?? "—"}`).join(" · ")],
+                  ]} />
+                </details>
+              ))}
+            </div>
+          </Panel>
+        )}
+      </div>
+    ) : null}
     <div className="mt-5 grid gap-5 md:grid-cols-2"><Panel title="Emergency contacts" icon={<Phone className="h-5 w-5" />}>{computed.emergency?.emergencyNotes && <div className="mb-3 rounded-2xl bg-amber-50 p-4 text-sm text-amber-900"><span className="font-bold">Emergency notes:</span> {computed.emergency.emergencyNotes}</div>}{computed.emergency?.contacts?.length ? <div className="space-y-3">{computed.emergency.contacts.map((item:any)=><div key={item.id} className="rounded-2xl bg-slate-50 p-4"><div className="flex items-center justify-between gap-3"><p className="font-semibold text-[#0b2d54]">{text(item.fullName,"Emergency contact")}</p>{item.isPrimary && <Badge tone="rose">Primary</Badge>}</div><DetailGrid items={[[ "Relationship", item.relationship ? human(item.relationship) : null],["Phone", item.phoneNumber],["Email", item.email],["Primary contact", yesNo(item.isPrimary)],["Updated", date(item.updatedAt)]]} /></div>)}</div>:<Empty>No emergency contacts recorded.</Empty>}<Link href="/emergency-contacts" className="mt-4 inline-flex items-center gap-1 text-xs font-bold text-[#0b2d54]">Manage contacts <ChevronRight className="h-3.5 w-3.5" /></Link></Panel><Panel title="Coverage" icon={<ShieldCheck className="h-5 w-5" />}>{computed.coverage?.length ? <div className="space-y-3">{computed.coverage.map((item:any)=><div key={item.id} className="rounded-2xl bg-slate-50 p-4"><div className="flex items-start justify-between gap-3"><div><p className="font-semibold text-[#0b2d54]">{text(item.providerName,"Insurance provider")}</p><p className="mt-1 text-xs text-slate-500">{text(item.planName)} · {text(item.membershipNumber)}</p></div><Badge tone={String(item.planStatus ?? "ACTIVE").toUpperCase() === "ACTIVE" ? "green" : "slate"}>{human(item.planStatus)}</Badge></div><DetailGrid items={[[ "Provider phone", item.providerPhone],["Provider email", item.providerEmail],["Provider website", item.providerWebsite],["Plan code", item.planCode],["Plan description", item.planDescription],["Membership number", item.membershipNumber],["Dependant code", item.dependantCode],["Principal member", item.principalMemberName],["Relationship", item.relationship ? human(item.relationship) : null],["Effective from", date(item.effectiveFrom)],["Effective to", date(item.effectiveTo)],["Annual limit", item.annualLimit],["Deductible", item.deductible],["Co-payment", item.coPayment],["Active", yesNo(item.active)],["Updated", date(item.updatedAt)]]} /></div>)}</div>:<Empty>No active coverage recorded.</Empty>}<Link href="/health-finance" className="mt-4 inline-flex items-center gap-1 text-xs font-bold text-[#0b2d54]">View coverage <ChevronRight className="h-3.5 w-3.5" /></Link></Panel></div>
     <div className="mt-5 rounded-[26px] border border-slate-200 bg-white p-5 shadow-sm sm:p-6"><div className="flex items-start gap-3"><div className="grid h-10 w-10 shrink-0 place-items-center rounded-2xl bg-[#0b2d54] text-white"><UserRound className="h-5 w-5" /></div><div><h2 className="font-bold text-[#0b2d54]">Your record has two sources</h2><p className="mt-1 text-sm leading-6 text-slate-500">Patient-entered information can be managed by you. Practitioner diagnoses, procedures, treatments and administered vaccines are brought into the same view and remain clinically controlled.</p>{computed.lastUpdatedAt && <p className="mt-2 text-xs font-semibold text-slate-400">Last updated · {date(computed.lastUpdatedAt)}</p>}</div></div></div>
     <p className="mt-5 flex items-center justify-center gap-2 text-center text-[11px] text-slate-400"><CalendarDays className="h-3.5 w-3.5" />Your Clinic Card is connected to your authenticated patient record.</p>
