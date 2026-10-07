@@ -9,15 +9,23 @@ export type SmartFileClinicalResponse = {
     dateOfBirth: Date | null;
     gender: string | null;
   };
+  clinicalAccess: {
+    canView: boolean;
+    canUpdate: boolean;
+    consentExpiresAt: Date | null;
+  };
   healthPassport: unknown;
+  medicalRecord: unknown;
   conditions: unknown[];
   allergies: unknown[];
   immunisations: unknown[];
   medications: unknown[];
   prescriptions: unknown[];
+  appointments: unknown[];
   encounters: unknown[];
   episodes: unknown[];
   vitals: unknown[];
+  patientVitals: unknown[];
   symptoms: unknown[];
   diagnoses: unknown[];
   procedures: unknown[];
@@ -26,5 +34,9 @@ export type SmartFileClinicalResponse = {
   carePlans: unknown[];
   referrals: unknown[];
   clinicalDocuments: unknown[];
+  healthJournalEntries: unknown[];
+  patientMeasurements: unknown[];
+  wearableWellnessMetrics: unknown[];
+  wearableDevices: unknown[];
   generatedAt: Date;
 };
