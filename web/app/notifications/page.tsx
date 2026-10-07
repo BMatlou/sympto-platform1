@@ -22,6 +22,7 @@ import {
 import ProtectedRoute from "@/components/auth/protected-route";
 import {
   patientNotificationsService,
+  type NotificationPreference,
   type PatientNotification,
 } from "@/services/patient-notifications.service";
 
@@ -52,6 +53,24 @@ const categoryTabs: CategoryTab[] = [
   { key: "ACCOUNT", label: "Account", icon: ShieldCheck },
   { key: "CARE", label: "Care", icon: Stethoscope },
 ];
+
+// A notification-center category is visible when at least one of its
+// underlying notification types is enabled for the In-app channel.
+// Missing preferences intentionally follow the preferences page default:
+// In-app is enabled unless the user has explicitly switched it off.
+const categoryPreferenceTypes: Record<
+  Exclude<NotificationCategory, "ALL">,
+  string[]
+> = {
+  MEDICATIONS: ["PRESCRIPTION", "REMINDER"],
+  APPOINTMENTS: ["APPOINTMENT"],
+  RESULTS: ["LAB_RESULT", "IMAGING_RESULT"],
+  MESSAGES: ["MESSAGE"],
+  TELEMEDICINE: ["TELEMEDICINE"],
+  BILLING: ["PAYMENT", "CLAIM"],
+  ACCOUNT: ["SECURITY", "SYSTEM"],
+  CARE: ["REMINDER"],
+};
 
 function isMedicationReminder(notification: PatientNotification) {
   const title = String(notification.title ?? "").toLowerCase();
@@ -215,6 +234,7 @@ function categoryLabel(category: NotificationCategory) {
 
 export default function NotificationsPage() {
   const [notifications, setNotifications] = useState<PatientNotification[]>([]);
+  const [preferences, setPreferences] = useState<NotificationPreference[]>([]);
   const [serverUnreadCount, setServerUnreadCount] = useState(0);
   const [category, setCategory] = useState<NotificationCategory>("ALL");
   const [unreadOnly, setUnreadOnly] = useState(false);
@@ -228,9 +248,10 @@ export default function NotificationsPage() {
       setLoading(true);
       setError("");
 
-      const [payload, unreadCount] = await Promise.all([
+      const [payload, unreadCount, savedPreferences] = await Promise.all([
         patientNotificationsService.list({ page: 1, limit: 100 }),
         patientNotificationsService.getUnreadCount(),
+        patientNotificationsService.getPreferences(),
       ]);
 
       const rows = Array.isArray(payload)
@@ -240,6 +261,7 @@ export default function NotificationsPage() {
           : [];
 
       setNotifications(rows as PatientNotification[]);
+      setPreferences(savedPreferences);
       setServerUnreadCount(
         Number.isFinite(unreadCount) ? Math.max(0, unreadCount) : 0,
       );
@@ -265,6 +287,43 @@ export default function NotificationsPage() {
   }, [load]);
 
   const unreadCount = serverUnreadCount;
+
+  const enabledInAppTypes = useMemo(() => {
+    const enabled = new Set<string>();
+
+    for (const preference of preferences) {
+      if (preference.channel === "IN_APP" && preference.enabled) {
+        enabled.add(preference.notificationType);
+      }
+    }
+
+    return enabled;
+  }, [preferences]);
+
+  const visibleCategoryTabs = useMemo(
+    () =>
+      categoryTabs.filter((tab) =>
+        categoryPreferenceTypes[tab.key].some((type) => {
+          const preference = preferences.find(
+            (item) => item.notificationType === type && item.channel === "IN_APP",
+          );
+
+          // Keep parity with Notification Preferences: an absent In-app
+          // preference means ON until the user explicitly turns it off.
+          return preference ? preference.enabled : true;
+        }),
+      ),
+    [preferences],
+  );
+
+  useEffect(() => {
+    if (
+      category !== "ALL" &&
+      !visibleCategoryTabs.some((tab) => tab.key === category)
+    ) {
+      setCategory("ALL");
+    }
+  }, [category, visibleCategoryTabs]);
 
   const visible = useMemo(
     () =>
@@ -520,7 +579,7 @@ export default function NotificationsPage() {
                 </span>
               </button>
 
-              {categoryTabs.map((tab) => {
+              {visibleCategoryTabs.map((tab) => {
                 const Icon = tab.icon;
                 const active = category === tab.key;
                 const count = counts[tab.key];
