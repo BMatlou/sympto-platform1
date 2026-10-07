@@ -31,10 +31,6 @@ export class CreateDataAccessConsentDto {
 
   @IsOptional()
   @IsBoolean()
-  canUpdateClinicalRecords?: boolean;
-
-  @IsOptional()
-  @IsBoolean()
   canViewLabResults?: boolean;
 
   @IsOptional()
