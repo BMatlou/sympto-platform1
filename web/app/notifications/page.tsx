@@ -6,6 +6,7 @@ import {
   ArrowLeft,
   Bell,
   CalendarDays,
+  Clock,
   Check,
   CheckCheck,
   FileText,
@@ -28,6 +29,32 @@ function formatDate(value: unknown) {
   return new Intl.DateTimeFormat("en-ZA", {
     dateStyle: "medium",
     timeStyle: "short",
+  }).format(date);
+}
+
+function isMedicationReminder(notification: PatientNotification) {
+  const title = String(notification.title ?? "").toLowerCase();
+  return notification.type === "REMINDER" && title.startsWith("medication reminder:");
+}
+
+function formatReminderTime(value: unknown) {
+  if (!value) return "—";
+  const date = new Date(String(value));
+  if (Number.isNaN(date.getTime())) return "—";
+  return new Intl.DateTimeFormat("en-ZA", {
+    hour: "numeric",
+    minute: "2-digit",
+  }).format(date);
+}
+
+function formatReminderDate(value: unknown) {
+  if (!value) return "—";
+  const date = new Date(String(value));
+  if (Number.isNaN(date.getTime())) return "—";
+  return new Intl.DateTimeFormat("en-ZA", {
+    day: "numeric",
+    month: "short",
+    year: "numeric",
   }).format(date);
 }
 
@@ -229,7 +256,17 @@ export default function NotificationsPage() {
                         </div>
                         <p className="mt-2 text-sm leading-6 text-slate-600">{notification.body}</p>
                         <div className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-slate-400">
-                          <span>{formatDate(notification.scheduledFor ?? notification.createdAt)}</span>
+                          {isMedicationReminder(notification) && notification.scheduledFor ? (
+                            <>
+                              <span className="inline-flex items-center gap-1.5 font-semibold text-[#0b2d54]">
+                                <Clock className="h-3.5 w-3.5" aria-hidden="true" />
+                                Reminder time · {formatReminderTime(notification.scheduledFor)}
+                              </span>
+                              <span>{formatReminderDate(notification.scheduledFor)}</span>
+                            </>
+                          ) : (
+                            <span>{formatDate(notification.scheduledFor ?? notification.createdAt)}</span>
+                          )}
                           <span>{label(notification.channel)}</span>
                           {notification.readAt && <span>Read · {formatDate(notification.readAt)}</span>}
                         </div>
