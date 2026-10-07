@@ -166,7 +166,18 @@ export class MedicationReminderSchedulerService {
       if (!occurrence) continue;
 
       const inAppKey = `${slot.id}:${NotificationChannel.IN_APP}:${occurrence.toISOString()}`;
-      if (!pendingKeys.has(inAppKey) && (!inAppPreference || inAppPreference.enabled)) {
+      const inAppOccurrenceAlreadyCreated = recent
+        ? await this.notificationExistsForOccurrence(
+            slot.id,
+            NotificationChannel.IN_APP,
+            occurrence,
+          )
+        : false;
+      if (
+        !pendingKeys.has(inAppKey) &&
+        !inAppOccurrenceAlreadyCreated &&
+        (!inAppPreference || inAppPreference.enabled)
+      ) {
         const created = await this.createQueuedReminder({
           userId,
           slotId: slot.id,
@@ -180,7 +191,18 @@ export class MedicationReminderSchedulerService {
 
       const pushConfigured = await this.pushConfigured(userId);
       const pushKey = `${slot.id}:${NotificationChannel.PUSH}:${occurrence.toISOString()}`;
-      if (pushConfigured && !pendingKeys.has(pushKey)) {
+      const pushOccurrenceAlreadyCreated = recent
+        ? await this.notificationExistsForOccurrence(
+            slot.id,
+            NotificationChannel.PUSH,
+            occurrence,
+          )
+        : false;
+      if (
+        pushConfigured &&
+        !pendingKeys.has(pushKey) &&
+        !pushOccurrenceAlreadyCreated
+      ) {
         const created = await this.createQueuedReminder({
           userId,
           slotId: slot.id,
@@ -258,6 +280,30 @@ export class MedicationReminderSchedulerService {
       );
       return null;
     }
+  }
+
+  private async notificationExistsForOccurrence(
+    slotId: string,
+    channel: NotificationChannel,
+    occurrence: Date,
+  ) {
+    const start = new Date(occurrence.getTime() - 60_000);
+    const end = new Date(occurrence.getTime() + 60_000);
+
+    const existing = await this.prisma.notification.findFirst({
+      where: {
+        medicationReminderSlotId: slotId,
+        channel,
+        OR: [
+          { scheduledFor: { gte: start, lte: end } },
+          { sentAt: { gte: start, lte: end } },
+          { createdAt: { gte: start, lte: end } },
+        ],
+      },
+      select: { id: true },
+    });
+
+    return Boolean(existing);
   }
 
   private async patientUserId(patientMedicationId: string) {
