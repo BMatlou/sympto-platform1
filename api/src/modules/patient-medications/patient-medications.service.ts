@@ -160,7 +160,12 @@ export class PatientMedicationsService {
   async findOne(id: string) {
     const patientMedication = await this.prisma.patientMedication.findUnique({ where: { id }, include: { medication: true, healthPassport: { include: { patient: { include: { person: true } } } } } });
     if (!patientMedication) throw new NotFoundException('Patient medication not found.');
-    return patientMedication;
+    const clinicalState = await this.getClinicalMedicationState(id);
+    return {
+      ...patientMedication,
+      source: clinicalState.clinical ? 'CLINICAL' : 'PATIENT',
+      sourceLabel: clinicalState.clinical ? 'Clinical · view only' : 'Patient entered · editable',
+    };
   }
 
   async getClinicalReference(id: string, authenticatedUserId: string) {
