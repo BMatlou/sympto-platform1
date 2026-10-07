@@ -141,16 +141,16 @@ export default function NotificationPreferencesPage() {
                   <p className="text-[10px] font-black uppercase tracking-[0.16em] text-white/65">
                     Notifications
                   </p>
-                  <h1 className="mt-1 text-3xl font-black tracking-tight sm:text-4xl">
+                  <h1 className="mt-1 max-w-[calc(100vw-120px)] text-2xl font-black tracking-tight sm:max-w-2xl sm:text-4xl">
                     Notification preferences
                   </h1>
-                  <p className="mt-2 max-w-2xl text-sm leading-6 text-white/75">
+                  <p className="mt-2 max-w-[calc(100vw-120px)] text-sm leading-6 text-white/75 sm:max-w-2xl">
                     Choose how you want Sympto to keep you informed about the things that matter to your health.
                   </p>
                 </div>
 
-                <span className="hidden h-14 w-14 shrink-0 place-items-center rounded-2xl bg-white/10 text-white/85 ring-1 ring-white/15 sm:grid sm:h-16 sm:w-16">
-                  <Bell className="h-7 w-7" />
+                <span className="grid h-11 w-11 shrink-0 place-items-center rounded-2xl bg-white/10 text-white/85 ring-1 ring-white/15 sm:h-16 sm:w-16">
+                  <Bell className="h-5 w-5 sm:h-7 sm:w-7" />
                 </span>
               </div>
 
