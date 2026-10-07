@@ -345,28 +345,46 @@ export class SmartFileClinicalService {
       imaging,
       carePlans,
       referrals,
+      episodes: episodes.map((episode) => ({
+        id: episode.id,
+        title: episode.title,
+        description: episode.description,
+        type: episode.type,
+        status: episode.status,
+        priority: episode.priority,
+        startedAt: episode.startedAt,
+        endedAt: episode.endedAt,
+        resolvedAt: episode.resolvedAt,
+        practitionerId: episode.practitionerId,
+        encounterId: episode.encounterId,
+        appointmentId: episode.appointmentId,
+      })),
       clinicalDocuments: consent.canViewMedicalRecords
-        ? [
-            ...encounters.flatMap((encounter) => [
-              ...encounter.clinicalNotes.map((note) => ({
-                ...note,
-                source: 'CLINICAL' as const,
-              })),
-              ...encounter.attachments.map((attachment) => ({
-                ...attachment,
-                source: 'CLINICAL' as const,
-              })),
-            ]),
-            ...labResults.flatMap((result) =>
-              result.attachments.map((attachment) => ({
-                ...attachment,
-                source: 'CLINICAL' as const,
-              })),
-            ),
-          ]
+        ? encounters.flatMap((encounter) => [
+            ...encounter.clinicalNotes.map((note) => ({
+              ...note,
+              source: 'CLINICAL' as const,
+            })),
+            ...encounter.attachments.map((attachment) => ({
+              ...attachment,
+              source: 'CLINICAL' as const,
+            })),
+          ])
         : [],
       healthJournalEntries: healthJournals.map((entry) => ({
-        ...entry,
+        id: entry.id,
+        title: entry.title,
+        journal: entry.journal,
+        mood: entry.mood,
+        sleepQuality: entry.sleepQuality,
+        sleepHours: entry.sleepHours,
+        energyLevel: entry.energyLevel,
+        stressLevel: entry.stressLevel,
+        exerciseMinutes: entry.exerciseMinutes,
+        waterIntakeMl: entry.waterIntakeMl,
+        notes: entry.notes,
+        createdAt: entry.createdAt,
+        updatedAt: entry.updatedAt,
         source: entry.practitionerId ? 'CLINICAL' : 'PATIENT',
       })),
       patientMeasurements,
