@@ -448,7 +448,7 @@ export function HealthJournalSettingsStep({
               <Toggle
                 checked={
                   values.weeklySummary ??
-                  false
+                  true
                 }
               />
             </button>
@@ -460,7 +460,7 @@ export function HealthJournalSettingsStep({
                   "monthlySummary",
                   !(
                     values.monthlySummary ??
-                    false
+                    true
                   ),
                 )
               }
@@ -495,7 +495,7 @@ export function HealthJournalSettingsStep({
               <Toggle
                 checked={
                   values.monthlySummary ??
-                  false
+                  true
                 }
               />
             </button>
