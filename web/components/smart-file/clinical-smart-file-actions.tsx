@@ -1,7 +1,7 @@
 "use client";
 
-import { useEffect, useMemo, useState, type ReactNode } from "react";
-import { Check, ClipboardList, FileText, FlaskConical, HeartPulse, Pill, Plus, Save, Search, Stethoscope } from "lucide-react";
+import { useEffect, useMemo, useState, type InputHTMLAttributes, type ReactNode, type TextareaHTMLAttributes } from "react";
+import { Check, Plus, Save, Search, Stethoscope } from "lucide-react";
 import { api } from "@/lib/api";
 
 type Action = string;
@@ -72,11 +72,11 @@ function asDateInput(value: unknown) {
 function Field({ label, children, hint }: { label: string; children: ReactNode; hint?: string }) {
   return <label className="block"><span className="mb-1.5 block text-xs font-bold text-slate-500">{label}</span>{children}{hint ? <span className="mt-1 block text-[11px] text-slate-400">{hint}</span> : null}</label>;
 }
-function Input(props: React.InputHTMLAttributes<HTMLInputElement>) {
-  return <input {...props} className="w-full rounded-xl border border-slate-200 bg-white px-3.5 py-3 text-sm text-[#0b2d54] outline-none focus:border-[#24c1c4] focus:ring-4 focus:ring-[#24c1c4]/10" />;
+function Input({ className = "", ...props }: InputHTMLAttributes<HTMLInputElement>) {
+  return <input {...props} className={`w-full rounded-xl border border-slate-200 bg-white px-3.5 py-3 text-sm text-[#0b2d54] outline-none focus:border-[#24c1c4] focus:ring-4 focus:ring-[#24c1c4]/10 ${className}`} />;
 }
-function Area(props: React.TextareaHTMLAttributes<HTMLTextAreaElement>) {
-  return <textarea {...props} className="w-full rounded-xl border border-slate-200 bg-white px-3.5 py-3 text-sm text-[#0b2d54] outline-none focus:border-[#24c1c4] focus:ring-4 focus:ring-[#24c1c4]/10" />;
+function Area({ className = "", ...props }: TextareaHTMLAttributes<HTMLTextAreaElement>) {
+  return <textarea {...props} className={`w-full rounded-xl border border-slate-200 bg-white px-3.5 py-3 text-sm text-[#0b2d54] outline-none focus:border-[#24c1c4] focus:ring-4 focus:ring-[#24c1c4]/10 ${className}`} />;
 }
 function Select(props: React.SelectHTMLAttributes<HTMLSelectElement>) {
   return <select {...props} className="w-full rounded-xl border border-slate-200 bg-white px-3.5 py-3 text-sm text-[#0b2d54] outline-none focus:border-[#24c1c4] focus:ring-4 focus:ring-[#24c1c4]/10" />;
