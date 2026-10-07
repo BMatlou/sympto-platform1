@@ -310,11 +310,9 @@ export default function HealthPassportPremium() {
     <div className="mt-5 grid gap-5 md:grid-cols-2">
       <Panel title="Allergies" icon={<HeartPulse className="h-5 w-5" />}>
         {computed.allergies?.length ? <div className="space-y-3">{computed.allergies.map((item:any) => <article key={item.id} className="rounded-2xl bg-rose-50/55 p-4">
-          <div className="flex items-start justify-between gap-3"><div><p className="font-semibold text-[#0b2d54]">{text(item.name,"Allergy")}</p><ClinicalMarker item={item} /></div><Badge tone="rose">{human(item.severity)}</Badge></div>
+          <div className="flex items-start justify-between gap-3"><div><p className="font-semibold text-[#0b2d54]">{text(item.name,"Allergy")}</p><ClinicalMarker item={item} /></div>{item.severity && <Badge tone="rose">{human(item.severity)}</Badge>}</div>
           <div className="mt-3 flex flex-wrap gap-2">
-            <Badge tone="rose">{human(item.severity)}</Badge>
             {item.reaction && <Badge>{text(item.reaction)}</Badge>}
-            {item.status && <Badge>{human(item.status)}</Badge>}
           </div>
           <RecordedDetails items={[
             ["Category", item.category], ["Reaction details", item.reactionNotes],
@@ -328,7 +326,6 @@ export default function HealthPassportPremium() {
         {computed.conditions?.length ? <div className="space-y-3">{computed.conditions.map((item:any) => <article key={item.id} className="rounded-2xl bg-blue-50/55 p-4">
           <div className="flex items-start justify-between gap-3"><div><p className="font-semibold text-[#0b2d54]">{text(item.name,"Condition")}</p><ClinicalMarker item={item} /></div><Badge tone="blue">{human(item.status)}</Badge></div>
           <div className="mt-3 flex flex-wrap gap-2">
-            <Badge tone="blue">{human(item.status)}</Badge>
             {item.chronic && <Badge>Chronic</Badge>}
             {item.severity && <Badge>{human(item.severity)}</Badge>}
             {item.diagnosedAt && <Badge>{date(item.diagnosedAt)}</Badge>}
@@ -346,7 +343,6 @@ export default function HealthPassportPremium() {
         {computed.diagnoses?.length ? <div className="space-y-3">{computed.diagnoses.map((item:any) => <article key={item.id} className="rounded-2xl bg-slate-50 p-4">
           <div className="flex items-start justify-between gap-3"><div><p className="font-semibold text-[#0b2d54]">{text(item.name,"Clinical diagnosis")}</p><ClinicalMarker item={item} /></div><Badge tone="green">{human(item.status)}</Badge></div>
           <div className="mt-3 flex flex-wrap gap-2">
-            <Badge tone="green">{human(item.status)}</Badge>
             {item.primaryDiagnosis && <Badge>Primary</Badge>}
             {item.confirmed && <Badge>Confirmed</Badge>}
             {(item.diagnosedBy || item.practitionerName) && <Badge>{text(item.diagnosedBy || item.practitionerName)}</Badge>}
@@ -364,7 +360,6 @@ export default function HealthPassportPremium() {
         {computed.procedures?.length ? <div className="space-y-3">{computed.procedures.map((item:any) => <article key={item.id} className="rounded-2xl bg-slate-50 p-4">
           <div className="flex items-start justify-between gap-3"><div><p className="font-semibold text-[#0b2d54]">{text(item.name,"Procedure")}</p><ClinicalMarker item={item} /></div><Badge>{human(item.status)}</Badge></div>
           <div className="mt-3 flex flex-wrap gap-2">
-            <Badge>{human(item.status)}</Badge>
             {item.performedAt && <Badge>{date(item.performedAt)}</Badge>}
             {item.outcome && <Badge tone="green">{text(item.outcome)}</Badge>}
           </div>
@@ -401,7 +396,6 @@ export default function HealthPassportPremium() {
         {computed.immunizations?.length ? <div className="space-y-3">{computed.immunizations.map((item:any) => <article key={item.id} className="rounded-2xl bg-emerald-50/55 p-4">
           <div className="flex items-start justify-between gap-3"><div><p className="font-semibold text-[#0b2d54]">{text(item.name,"Immunization")}</p><ClinicalMarker item={item} /></div><Badge tone="green">{human(item.status)}</Badge></div>
           <div className="mt-3 flex flex-wrap gap-2">
-            <Badge tone="green">{human(item.status)}</Badge>
             {item.administeredAt && <Badge>{date(item.administeredAt)}</Badge>}
             {item.doseNumber != null && <Badge>Dose {item.doseNumber}</Badge>}
             {(item.administeredBy || item.facility) && <Badge>{text(item.administeredBy || item.facility)}</Badge>}
