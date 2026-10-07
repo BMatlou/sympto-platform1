@@ -218,10 +218,68 @@ export default function ClinicalSmartFilePage() {
             {file.healthJournalEntries.length === 0 && file.patientVitals.length === 0 && file.patientMeasurements.length === 0 && <Empty label="patient health activity"/>}
           </div>
         </Section>
-        <Section icon={FileText} title="Care plans & referrals" count={file.carePlans.length + file.referrals.length}>
-          <div className="space-y-3">{file.carePlans.map((x: any) => <div key={x.id} className="rounded-2xl bg-slate-50 p-4"><div className="flex flex-wrap items-center gap-2"><span className="rounded-full bg-emerald-50 px-2 py-1 text-[9px] font-black uppercase tracking-wide text-emerald-700">Clinical</span><p className="font-semibold text-[#0b2d54]">{text(x.title, "Care plan")}</p></div><p className="mt-1 text-xs text-slate-500">{text(x.status)}{x.practitioner?.person ? " · " + x.practitioner.person.firstName + " " + x.practitioner.person.lastName : ""}</p>{x.description && <p className="mt-2 whitespace-pre-wrap text-sm leading-5 text-slate-600">{x.description}</p>}</div>)}
-          {file.referrals.map((x: any) => <div key={x.id} className="rounded-2xl bg-slate-50 p-4"><div className="flex flex-wrap items-center gap-2"><span className="rounded-full bg-emerald-50 px-2 py-1 text-[9px] font-black uppercase tracking-wide text-emerald-700">Clinical</span><p className="font-semibold text-[#0b2d54]">Referral {x.specialty ? "· " + x.specialty : ""}</p></div><p className="mt-1 text-xs text-slate-500">{text(x.status)} · {date(x.requestedDate)}</p><p className="mt-2 whitespace-pre-wrap text-sm leading-5 text-slate-600">{text(x.reason)}</p>{x.clinicalSummary && <p className="mt-2 whitespace-pre-wrap text-sm leading-5 text-slate-600"><strong>Clinical summary:</strong> {x.clinicalSummary}</p>}</div>)}
-          {file.carePlans.length === 0 && file.referrals.length === 0 && <Empty label="care plans or referrals"/>}
+        <Section
+          icon={FileText}
+          title="Care plans & referrals"
+          count={file.carePlans.length + file.referrals.length}
+        >
+          <div className="space-y-3">
+            {file.carePlans.map((x: any) => (
+              <div key={x.id} className="rounded-2xl bg-slate-50 p-4">
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className="rounded-full bg-emerald-50 px-2 py-1 text-[9px] font-black uppercase tracking-wide text-emerald-700">
+                    Clinical
+                  </span>
+                  <p className="font-semibold text-[#0b2d54]">
+                    {text(x.title, "Care plan")}
+                  </p>
+                </div>
+                <p className="mt-1 text-xs text-slate-500">
+                  {text(x.status)}
+                  {x.practitioner?.person
+                    ? " · " +
+                      x.practitioner.person.firstName +
+                      " " +
+                      x.practitioner.person.lastName
+                    : ""}
+                </p>
+                {x.description && (
+                  <p className="mt-2 whitespace-pre-wrap text-sm leading-5 text-slate-600">
+                    {x.description}
+                  </p>
+                )}
+              </div>
+            ))}
+
+            {file.referrals.map((x: any) => (
+              <div key={x.id} className="rounded-2xl bg-slate-50 p-4">
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className="rounded-full bg-emerald-50 px-2 py-1 text-[9px] font-black uppercase tracking-wide text-emerald-700">
+                    Clinical
+                  </span>
+                  <p className="font-semibold text-[#0b2d54]">
+                    Referral {x.specialty ? "· " + x.specialty : ""}
+                  </p>
+                </div>
+                <p className="mt-1 text-xs text-slate-500">
+                  {text(x.status)} · {date(x.requestedDate)}
+                </p>
+                <p className="mt-2 whitespace-pre-wrap text-sm leading-5 text-slate-600">
+                  {text(x.reason)}
+                </p>
+                {x.clinicalSummary && (
+                  <p className="mt-2 whitespace-pre-wrap text-sm leading-5 text-slate-600">
+                    <strong>Clinical summary:</strong> {x.clinicalSummary}
+                  </p>
+                )}
+              </div>
+            ))}
+
+            {file.carePlans.length === 0 &&
+              file.referrals.length === 0 && (
+                <Empty label="care plans or referrals" />
+              )}
+          </div>
         </Section>
       </div>
         <Section icon={ClipboardList} title="Immunisations" count={file.immunisations.length}>
