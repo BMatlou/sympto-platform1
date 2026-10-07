@@ -2,6 +2,7 @@ import {
   Body,
   Controller,
   Post,
+  Param,
   Req,
   UnauthorizedException,
   UseGuards,
@@ -30,6 +31,17 @@ export class SmartFileConsentController {
   @Post('share')
   createClinicalShare(@Req() req: AuthenticatedRequest) {
     return this.smartFileConsentService.createClinicalShareSession(this.userId(req));
+  }
+
+  @Post('appointment-share/:appointmentId')
+  createAppointmentClinicalShare(
+    @Req() req: AuthenticatedRequest,
+    @Param('appointmentId') appointmentId: string,
+  ) {
+    return this.smartFileConsentService.createClinicalShareSession(
+      this.userId(req),
+      appointmentId,
+    );
   }
 
   @Post('prescription-share')
