@@ -124,6 +124,13 @@ export class PatientNotificationsController {
     );
   }
 
+  @Get('due-reminders')
+  async dueReminders(@Req() req: any) {
+    return this.notificationsService.getDueMedicationRemindersForUser(
+      req.user.sub,
+    );
+  }
+
   @Get('unread-count')
   async unreadCount(@Req() req: any) {
     const count = await this.notificationsService.getUnreadCountForUser(
