@@ -6,6 +6,10 @@ import {
 } from '@nestjs/common';
 import {
   AuditAction,
+  NotificationChannel,
+  NotificationPriority,
+  NotificationStatus,
+  NotificationType,
   Prisma,
 } from '@prisma/client';
 import { randomUUID } from 'node:crypto';
@@ -113,9 +117,9 @@ export class SmartFileClinicalWriteService {
         type: notice.type,
         title: notice.title,
         body: notice.body,
-        channel: 'IN_APP',
-        status: 'SENT',
-        priority: 'NORMAL',
+        channel: NotificationChannel.IN_APP,
+        status: NotificationStatus.SENT,
+        priority: NotificationPriority.NORMAL,
         actionUrl: notice.actionUrl,
         actionLabel: notice.actionLabel,
       });
@@ -1410,7 +1414,7 @@ export class SmartFileClinicalWriteService {
       const names = items.map((x: any) => x.medication?.name || x.medication?.genericName).filter(Boolean);
       const label = names.length === 1 ? `1 prescription for ${names[0]}` : `${names.length || 1} prescription medication${names.length === 1 ? '' : 's'}`;
       return {
-        type: 'PRESCRIPTION',
+        type: NotificationType.PRESCRIPTION,
         title: `${practitionerName} ${verb} a prescription`,
         body: `${practitionerName} ${verb} ${label}. Your medications have been updated.`,
         actionUrl: '/medications',
@@ -1432,7 +1436,7 @@ export class SmartFileClinicalWriteService {
     };
     const noun = sectionLabel[section] || 'clinical information';
     return {
-      type: 'MESSAGE',
+      type: NotificationType.MESSAGE,
       title: `${practitionerName} ${verb} ${noun}`,
       body: `${practitionerName} ${verb} ${noun} in your Sympto clinical record. The update is now visible in your account.`,
       actionUrl: '/health-passport',
