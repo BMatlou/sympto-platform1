@@ -14,6 +14,7 @@ import {
   Pill,
   ShieldCheck,
   Smartphone,
+  TrendingUp,
 } from "lucide-react";
 import ProtectedRoute from "@/components/auth/protected-route";
 import { patientNotificationsService } from "@/services/patient-notifications.service";
@@ -27,6 +28,8 @@ const types = [
   { key: "MESSAGE", label: "Care team messages", description: "Messages from practitioners and your care team.", icon: MessageCircle },
   { key: "TELEMEDICINE", label: "Telemedicine", description: "Telemedicine session updates and related reminders.", icon: Smartphone },
   { key: "REMINDER", label: "Health reminders", description: "Medication reminders and other scheduled health reminders.", icon: Bell },
+  { key: "WEEKLY_HEALTH_REPORT", label: "Weekly health report", description: "A weekly overview of your recorded health activity and progress.", icon: CalendarDays },
+  { key: "MONTHLY_HEALTH_REPORT", label: "Monthly health report", description: "A monthly overview of your recorded health activity and progress.", icon: TrendingUp },
   { key: "PAYMENT", label: "Payments", description: "Healthcare payment and invoice activity.", icon: FileText },
   { key: "CLAIM", label: "Medical aid claims", description: "Claim status and related updates.", icon: FileText },
   { key: "SECURITY", label: "Security", description: "Important account and health-data security notices.", icon: ShieldCheck },
