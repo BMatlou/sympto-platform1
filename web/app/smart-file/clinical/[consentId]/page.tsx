@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { ArrowLeft, CalendarDays, ClipboardList, FileText, FlaskConical, HeartPulse, Pill, ShieldCheck, Stethoscope } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useParams } from "next/navigation";
 import ProtectedRoute from "@/components/auth/protected-route";
 import { api } from "@/lib/api";
@@ -68,7 +68,7 @@ export default function ClinicalSmartFilePage() {
   });
   const [medications, setMedications] = useState<any[]>([]);
 
-  const loadFile = async () => {
+  const loadFile = useCallback(async () => {
     if (!params.consentId) return;
     setLoading(true);
     setError("");
@@ -80,11 +80,11 @@ export default function ClinicalSmartFilePage() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [params.consentId]);
 
   useEffect(() => {
     void loadFile();
-  }, [params.consentId]);
+  }, [loadFile]);
 
   useEffect(() => {
     let active = true;
