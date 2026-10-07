@@ -180,13 +180,6 @@ return auth;
 }
 
   async refreshToken(refreshToken: string): Promise<AuthResponse> {
-  console.log('==========================');
-  console.log('Refresh token received:');
-  console.log(refreshToken);
-  console.log('typeof =', typeof refreshToken);
-  console.log('length =', refreshToken?.length);
-  console.log('==========================');
-
   const payload = await this.jwtService.verifyAsync(refreshToken);
 
   if (payload.type !== 'refresh') {
