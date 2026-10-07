@@ -482,11 +482,46 @@ export default function NotificationsPage() {
             </div>
           </div>
 
-          <div className="mt-8">
-            <h1 className="text-3xl font-extrabold tracking-tight text-[#0b2d54] sm:text-4xl">
-              Notifications
-            </h1>
-          </div>
+          <section className="mb-6 rounded-[30px] border border-[#0b2d54]/10 bg-white p-6 shadow-sm sm:p-8">
+            <div className="flex flex-col gap-6 lg:flex-row lg:items-end lg:justify-between">
+              <div>
+                <div className="mb-3 inline-flex items-center gap-2 rounded-full bg-[#24c1c4]/10 px-3 py-1.5 text-[11px] font-black uppercase tracking-[0.14em] text-[#0b2d54]">
+                  <Bell className="h-3.5 w-3.5" />
+                  Notifications
+                </div>
+                <h1 className="text-3xl font-black tracking-tight text-[#0b2d54] sm:text-4xl">
+                  Your notifications
+                </h1>
+                <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-500">
+                  Medication reminders, appointments, results, care-team
+                  messages and important updates—kept together in one place.
+                </p>
+              </div>
+
+              <div className="flex items-center gap-3">
+                <div className="rounded-2xl bg-[#f4fbfb] px-4 py-3 ring-1 ring-[#24c1c4]/15">
+                  <p className="text-[10px] font-black uppercase tracking-[0.15em] text-slate-400">
+                    Unread
+                  </p>
+                  <p className="mt-1 text-2xl font-black text-[#0b2d54]">
+                    {unreadCount}
+                  </p>
+                </div>
+
+                {unreadCount > 0 && (
+                  <button
+                    type="button"
+                    onClick={() => void markAllRead()}
+                    disabled={busyId === "all"}
+                    className="inline-flex min-h-12 items-center justify-center gap-2 rounded-2xl bg-[#0b2d54] px-4 py-3 text-xs font-black text-white shadow-sm transition hover:bg-[#123f70] disabled:opacity-50"
+                  >
+                    <CheckCheck className="h-4 w-4" />
+                    {busyId === "all" ? "Updating…" : "Mark all read"}
+                  </button>
+                )}
+              </div>
+            </div>
+          </section>
 
           <div className="mt-7 border-b border-slate-200">
             <div className="flex items-center gap-7 overflow-x-auto">
