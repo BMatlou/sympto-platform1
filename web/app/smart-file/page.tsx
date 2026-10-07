@@ -2,11 +2,10 @@
 
 import Link from "next/link";
 import { ArrowLeft, Check, Clock3, Copy, Loader2, Pill, QrCode, RefreshCw, ShieldCheck, Stethoscope } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
+import { QRCodeSVG } from "qrcode.react";
+import { useEffect, useState } from "react";
 import ProtectedRoute from "@/components/auth/protected-route";
 import { api } from "@/lib/api";
-
-const QR_BASE = "https://quickchart.io/qr";
 
 type Share = { qrToken: string; shortCode: string; expiresAt: string };
 type ShareKind = "clinical" | "prescription";
@@ -55,12 +54,6 @@ export default function SmartFilePage() {
 
   const remaining = share ? new Date(share.expiresAt).getTime() - now : 0;
   const expired = Boolean(share && remaining <= 0);
-  const qrContent = share?.qrToken ?? "";
-  const qrUrl = useMemo(
-    () => `${QR_BASE}?text=${encodeURIComponent(qrContent)}&size=420&margin=2&ecLevel=M`,
-    [qrContent],
-  );
-
   const copyCode = async () => {
     if (!share || expired) return;
     try {
@@ -137,8 +130,8 @@ export default function SmartFilePage() {
                 <div className="grid gap-4 lg:grid-cols-[minmax(0,1.4fr)_minmax(300px,0.6fr)] lg:items-stretch">
                   <section className="rounded-[28px] border border-slate-200 bg-slate-50 p-3 text-center sm:p-4">
                     <div className="flex items-center justify-between gap-3 text-left"><div><p className="text-[9px] font-black uppercase tracking-[0.16em] text-slate-400">QR code</p><h2 className="mt-0.5 text-lg font-black text-[#0b2d54]">{scopeTitle} access</h2></div><span className="rounded-full bg-emerald-100 px-3 py-1.5 text-[10px] font-black uppercase tracking-wide text-emerald-800">Temporary</span></div>
-                    <div className="mx-auto mt-3 w-fit rounded-[22px] border border-slate-200 bg-white p-2 shadow-sm"><img src={qrUrl} alt={`Temporary ${scopeTitle} Smart File QR code`} className="h-60 w-60 sm:h-64 sm:w-64 lg:h-72 lg:w-72" /></div>
-                    <p className="mt-2 text-[11px] font-semibold leading-4 text-slate-500">The QR contains only a secure temporary token.</p>
+                    <div className="mx-auto mt-3 w-fit rounded-[22px] border border-slate-200 bg-white p-3 shadow-sm"><QRCodeSVG value={share.qrToken} size={288} level="M" marginSize={2} aria-label={`Temporary ${scopeTitle} Smart File QR code`} /></div>
+                    <p className="mt-2 text-[11px] font-semibold leading-4 text-slate-500">The QR is generated on this device. The secure temporary token is not sent to a third-party QR service.</p>
                   </section>
 
                   <div className="flex flex-col gap-3">
@@ -152,7 +145,7 @@ export default function SmartFilePage() {
 
                     <div className="flex flex-1 items-start gap-2.5 rounded-2xl border border-amber-200 bg-amber-50 px-3.5 py-3 text-left text-[10px] font-semibold leading-4 text-amber-900">
                       <ShieldCheck className="mt-0.5 h-4 w-4 shrink-0" />
-                      <p>Temporary, one-time share. Only give the QR or code to the person you intend to access your information.</p>
+                      <p>Temporary, one-time walk-in share. Clinical access is read-only; it does not allow the clinician to edit your medical record, issue a prescription or access financial information.</p>
                     </div>
 
                     <button type="button" onClick={resetChoice} className="min-h-10 rounded-xl text-xs font-bold text-[#0b2d54] underline underline-offset-2 hover:text-[#24c1c4]">Choose a different sharing type</button>
