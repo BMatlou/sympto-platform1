@@ -335,7 +335,6 @@ export class SmartFileClinicalService {
       prescriptions,
       appointments,
       encounters,
-      episodes,
       vitals: clinicalVitals,
       patientVitals,
       symptoms,
