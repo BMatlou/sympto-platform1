@@ -116,10 +116,12 @@ export class NotificationProcessorService
     priority: any;
     actionUrl: string | null;
     actionLabel: string | null;
+    scheduledFor: Date | null;
+    medicationReminderSlotId: string | null;
   }) {
     switch (String(notification.channel).toUpperCase()) {
       case 'IN_APP':
-        await this.deliverInApp(notification.id);
+        await this.deliverInApp(notification.id, notification.scheduledFor, notification.medicationReminderSlotId);
         return;
 
       case 'PUSH':
@@ -133,7 +135,11 @@ export class NotificationProcessorService
     }
   }
 
-  private async deliverInApp(notificationId: string) {
+  private async deliverInApp(
+    notificationId: string,
+    scheduledFor: Date | null,
+    medicationReminderSlotId: string | null,
+  ) {
     const notification = await this.prisma.notification.findUnique({
       where: { id: notificationId },
     });
@@ -150,7 +156,9 @@ export class NotificationProcessorService
         where: { id: notificationId },
         data: {
           status: 'SENT' as any,
-          scheduledFor: null,
+          // Keep the original occurrence time for medication reminders so the
+          // notification centre can show "8:00 AM" instead of delivery time.
+          scheduledFor: medicationReminderSlotId ? scheduledFor : null,
           sentAt: new Date(),
           deliveredAt: new Date(),
         },
@@ -181,6 +189,8 @@ export class NotificationProcessorService
     priority: string;
     actionUrl?: string | null;
     actionLabel?: string | null;
+    scheduledFor?: Date | null;
+    medicationReminderSlotId?: string | null;
   }) {
     const result = await this.pushNotificationService.send(notification);
 
@@ -189,7 +199,9 @@ export class NotificationProcessorService
         where: { id: notification.id },
         data: {
           status: 'SENT' as any,
-          scheduledFor: null,
+          scheduledFor: notification.medicationReminderSlotId
+            ? notification.scheduledFor ?? null
+            : null,
           sentAt: new Date(),
           deliveredAt: null,
         },
