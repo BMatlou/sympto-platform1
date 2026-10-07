@@ -220,7 +220,7 @@ export class NotificationsService {
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
       const stack = error instanceof Error ? error.stack : undefined;
-      console.error(`[NotificationsService] findForUser ORM read failed: \${message}`, stack);
+      console.error(`[NotificationsService] findForUser ORM read failed: ${message}`, stack);
 
       type PatientNotificationRow = {
         id: string;
@@ -256,11 +256,11 @@ export class NotificationsService {
           "readAt",
           "createdAt"
         FROM "Notification"
-        WHERE "userId" = \${userId}
+        WHERE "userId" = ${userId}
           AND "channel" = 'IN_APP'
           AND "status" IN ('SENT', 'DELIVERED', 'READ')
           AND ("scheduledFor" IS NULL OR "scheduledFor" <= NOW())
-          \${unreadOnly ? Prisma.sql`AND "readAt" IS NULL` : Prisma.empty}
+          ${unreadOnly ? Prisma.sql`AND "readAt" IS NULL` : Prisma.empty}
         ORDER BY
           ("readAt" IS NOT NULL) ASC,
           CASE "priority"
@@ -271,18 +271,18 @@ export class NotificationsService {
             ELSE 0
           END DESC,
           "createdAt" DESC
-        OFFSET \${(page - 1) * limit}
-        LIMIT \${limit}
+        OFFSET ${(page - 1) * limit}
+        LIMIT ${limit}
       `;
 
       const totalRows = await this.prisma.$queryRaw<Array<{ total: number }>>`
         SELECT COUNT(*)::int AS "total"
         FROM "Notification"
-        WHERE "userId" = \${userId}
+        WHERE "userId" = ${userId}
           AND "channel" = 'IN_APP'
           AND "status" IN ('SENT', 'DELIVERED', 'READ')
           AND ("scheduledFor" IS NULL OR "scheduledFor" <= NOW())
-          \${unreadOnly ? Prisma.sql`AND "readAt" IS NULL` : Prisma.empty}
+          ${unreadOnly ? Prisma.sql`AND "readAt" IS NULL` : Prisma.empty}
       `;
 
       const total = Number(totalRows[0]?.total ?? 0);
@@ -315,12 +315,12 @@ export class NotificationsService {
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
       const stack = error instanceof Error ? error.stack : undefined;
-      console.error(`[NotificationsService] unread-count ORM read failed: \${message}`, stack);
+      console.error(`[NotificationsService] unread-count ORM read failed: ${message}`, stack);
 
       const rows = await this.prisma.$queryRaw<Array<{ count: number }>>`
         SELECT COUNT(*)::int AS "count"
         FROM "Notification"
-        WHERE "userId" = \${userId}
+        WHERE "userId" = ${userId}
           AND "channel" = 'IN_APP'
           AND "readAt" IS NULL
           AND "status" IN ('SENT', 'DELIVERED')
