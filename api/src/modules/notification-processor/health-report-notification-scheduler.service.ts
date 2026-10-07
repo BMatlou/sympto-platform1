@@ -625,6 +625,14 @@ export class HealthReportNotificationSchedulerService
               medications: { include: { medication: true } },
             },
           },
+          healthGoals: {
+            where: { status: 'ACTIVE' as any },
+            orderBy: { createdAt: 'asc' },
+            include: {
+              practitioner: { include: { person: true } },
+              progress: { orderBy: { measuredAt: 'desc' } },
+            },
+          },
         },
       }),
     ]);
@@ -635,12 +643,14 @@ export class HealthReportNotificationSchedulerService
           conditions: currentRecord.healthPassport?.conditions ?? [],
           allergies: currentRecord.healthPassport?.allergies ?? [],
           medications: currentRecord.healthPassport?.medications ?? [],
+          activeGoals: currentRecord.healthGoals ?? [],
         }
       : {
           medicalRecord: null,
           conditions: [],
           allergies: [],
           medications: [],
+          activeGoals: [],
         };
 
     return {
