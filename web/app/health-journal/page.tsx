@@ -159,6 +159,35 @@ function HealthJournalPageContent() {
       });
     });
 
+    (data.encounters ?? []).forEach((encounter: any) => {
+      const at = encounter.startedAt || encounter.createdAt;
+      if (!at) return;
+      all.push({
+        id: `encounter-${encounter.id}`,
+        type: "journal",
+        title: encounter.chiefComplaint || "Clinical visit",
+        detail: [encounter.assessment, encounter.plan].filter(Boolean).join(" · ") || "Clinical encounter recorded.",
+        at: String(at),
+        href: "/health-records",
+        source: "Clinical record",
+        clinical: true,
+      });
+    });
+    (data.prescriptions ?? []).forEach((prescription: any) => {
+      const at = prescription.issuedAt || prescription.createdAt;
+      if (!at) return;
+      all.push({
+        id: `prescription-${prescription.id}`,
+        type: "journal",
+        title: "Doctor's prescription",
+        detail: prescription.notes || "Prescription recorded by a clinician.",
+        at: String(at),
+        href: "/health-records",
+        source: "Clinical record",
+        clinical: true,
+      });
+    });
+
     (data.healthSnapshot?.latestMeasurements ?? []).forEach((v: any, i: number) => {
       if (!v.measuredAt) return;
       all.push({ id: `d-${v.id ?? i}`, type: "measurement", title: v.name || v.type || "Measurement", detail: `${v.value ?? "—"}${v.unit ? ` ${v.unit}` : ""}`, at: String(v.measuredAt), href: "/health-vitals", source: v.source ? human(v.source) : "Connected device" });
