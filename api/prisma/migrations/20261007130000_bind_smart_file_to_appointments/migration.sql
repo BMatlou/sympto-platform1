@@ -14,7 +14,7 @@ ON "SmartFileShareSession"("patientId");
 CREATE INDEX IF NOT EXISTS "SmartFileShareSession_appointmentId_idx"
 ON "SmartFileShareSession"("appointmentId");
 
-DO $
+DO $$
 BEGIN
   IF NOT EXISTS (
     SELECT 1
@@ -29,9 +29,9 @@ BEGIN
     ON UPDATE CASCADE;
   END IF;
 END
-$;
+$$;
 
-DO $
+DO $$
 BEGIN
   IF NOT EXISTS (
     SELECT 1
