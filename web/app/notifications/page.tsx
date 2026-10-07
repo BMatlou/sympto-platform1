@@ -129,6 +129,7 @@ function relevantDate(notification: PatientNotification) {
 
 function dateGroup(value: unknown): "TODAY" | "YESTERDAY" | "OLDER" {
   if (!value) return "OLDER";
+
   const date = new Date(String(value));
   if (Number.isNaN(date.getTime())) return "OLDER";
 
@@ -139,7 +140,6 @@ function dateGroup(value: unknown): "TODAY" | "YESTERDAY" | "OLDER" {
     today.getDate(),
   ).getTime();
 
-  const yesterday = startToday - 24 * 60 * 60 * 1000;
   const timestamp = new Date(
     date.getFullYear(),
     date.getMonth(),
@@ -147,7 +147,7 @@ function dateGroup(value: unknown): "TODAY" | "YESTERDAY" | "OLDER" {
   ).getTime();
 
   if (timestamp === startToday) return "TODAY";
-  if (timestamp === yesterday) return "YESTERDAY";
+  if (timestamp === startToday - 24 * 60 * 60 * 1000) return "YESTERDAY";
   return "OLDER";
 }
 
@@ -167,9 +167,7 @@ function label(value: unknown) {
 }
 
 function iconFor(notification: PatientNotification) {
-  const category = getCategory(notification);
-
-  switch (category) {
+  switch (getCategory(notification)) {
     case "MEDICATIONS":
       return <Pill className="h-5 w-5" aria-hidden="true" />;
     case "APPOINTMENTS":
@@ -191,15 +189,14 @@ function iconFor(notification: PatientNotification) {
   }
 }
 
-function iconShell(notification: PatientNotification, unread: boolean) {
+function iconClasses(notification: PatientNotification, unread: boolean) {
   const category = getCategory(notification);
+  if (!unread) return "bg-slate-100 text-slate-400";
 
-  const categoryClasses: Record<NotificationCategory, string> = {
-    ALL: unread
-      ? "bg-[#24c1c4]/10 text-[#0b2d54]"
-      : "bg-slate-100 text-slate-500",
-    MEDICATIONS: "bg-[#0b2d54]/[0.07] text-[#0b2d54]",
-    APPOINTMENTS: "bg-[#24c1c4]/10 text-[#0b2d54]",
+  const classes: Record<NotificationCategory, string> = {
+    ALL: "bg-[#24c1c4]/10 text-[#0b2d54]",
+    MEDICATIONS: "bg-[#0b2d54]/[0.08] text-[#0b2d54]",
+    APPOINTMENTS: "bg-[#24c1c4]/12 text-[#0b2d54]",
     RESULTS: "bg-sky-50 text-sky-700",
     MESSAGES: "bg-violet-50 text-violet-700",
     TELEMEDICINE: "bg-indigo-50 text-indigo-700",
@@ -208,7 +205,12 @@ function iconShell(notification: PatientNotification, unread: boolean) {
     CARE: "bg-emerald-50 text-emerald-700",
   };
 
-  return categoryClasses[category];
+  return classes[category];
+}
+
+function categoryLabel(category: NotificationCategory) {
+  if (category === "ALL") return "Everything";
+  return categoryTabs.find((tab) => tab.key === category)?.label ?? "Notifications";
 }
 
 export default function NotificationsPage() {
@@ -264,18 +266,12 @@ export default function NotificationsPage() {
 
   const unreadCount = serverUnreadCount;
 
-  // Keep every notification category available so users can browse to
-  // categories that are currently empty. Counts show activity; the empty
-  // state explains when there is nothing to display.
-  const availableCategories = categoryTabs;
-
   const visible = useMemo(
     () =>
       notifications.filter((notification) => {
         const categoryMatch =
           category === "ALL" || getCategory(notification) === category;
         const unreadMatch = !unreadOnly || !notification.readAt;
-
         return categoryMatch && unreadMatch;
       }),
     [category, notifications, unreadOnly],
@@ -298,18 +294,27 @@ export default function NotificationsPage() {
     return groups;
   }, [visible]);
 
-  const activeTabCount = (tab: NotificationCategory) =>
-    notifications.filter(
-      (notification) =>
-        tab === "ALL" || getCategory(notification) === tab,
-    ).length;
+  const counts = useMemo(() => {
+    const result: Record<NotificationCategory, { total: number; unread: number }> = {
+      ALL: { total: notifications.length, unread: unreadCount },
+      MEDICATIONS: { total: 0, unread: 0 },
+      APPOINTMENTS: { total: 0, unread: 0 },
+      RESULTS: { total: 0, unread: 0 },
+      MESSAGES: { total: 0, unread: 0 },
+      TELEMEDICINE: { total: 0, unread: 0 },
+      BILLING: { total: 0, unread: 0 },
+      ACCOUNT: { total: 0, unread: 0 },
+      CARE: { total: 0, unread: 0 },
+    };
 
-  const activeTabUnread = (tab: NotificationCategory) =>
-    notifications.filter(
-      (notification) =>
-        !notification.readAt &&
-        (tab === "ALL" || getCategory(notification) === tab),
-    ).length;
+    for (const notification of notifications) {
+      const key = getCategory(notification);
+      counts[key].total += 1;
+      if (!notification.readAt) counts[key].unread += 1;
+    }
+
+    return result;
+  }, [notifications, unreadCount]);
 
   async function markRead(id: string) {
     try {
@@ -318,12 +323,14 @@ export default function NotificationsPage() {
 
       await patientNotificationsService.markRead(id);
 
-      const readAt = new Date().toISOString();
-
       setNotifications((current) =>
         current.map((notification) =>
           notification.id === id
-            ? { ...notification, readAt, status: "READ" }
+            ? {
+                ...notification,
+                readAt: new Date().toISOString(),
+                status: "READ",
+              }
             : notification,
         ),
       );
@@ -370,12 +377,12 @@ export default function NotificationsPage() {
 
   return (
     <ProtectedRoute>
-      <main className="min-h-screen bg-slate-50">
-        <header className="border-b border-slate-200 bg-white">
-          <div className="mx-auto flex h-16 max-w-6xl items-center justify-between gap-3 px-4 sm:px-6 lg:px-8">
+      <main className="min-h-screen bg-[#f4fbfb]">
+        <header className="border-b border-[#0b2d54]/10 bg-white/95 backdrop-blur">
+          <div className="mx-auto flex h-16 max-w-7xl items-center justify-between gap-4 px-5 sm:px-8 lg:px-10">
             <Link
               href="/dashboard"
-              className="inline-flex items-center gap-2 text-sm font-semibold text-[#0b2d54] hover:text-[#24c1c4]"
+              className="inline-flex items-center gap-2 text-sm font-semibold text-[#0b2d54] transition hover:text-[#24c1c4]"
             >
               <ArrowLeft className="h-4 w-4" />
               Back to Health Home
@@ -383,7 +390,7 @@ export default function NotificationsPage() {
 
             <Link
               href="/notifications/preferences"
-              className="inline-flex min-h-10 items-center gap-2 rounded-xl border border-slate-200 bg-white px-3.5 py-2 text-xs font-bold text-[#0b2d54] hover:border-[#24c1c4]"
+              className="inline-flex min-h-10 items-center gap-2 rounded-xl border border-slate-200 bg-white px-3.5 py-2 text-xs font-bold text-[#0b2d54] transition hover:border-[#24c1c4] hover:bg-[#f4fbfb]"
             >
               <Settings className="h-4 w-4" />
               Notification preferences
@@ -391,171 +398,200 @@ export default function NotificationsPage() {
           </div>
         </header>
 
-        <div className="mx-auto max-w-5xl px-4 py-8 sm:px-6 lg:px-8">
-          <section className="mb-6">
-            <div className="mb-3 inline-flex items-center gap-2 rounded-full bg-[#24c1c4]/10 px-3 py-1 text-xs font-semibold text-[#0b2d54]">
-              <Bell className="h-3.5 w-3.5" />
-              Notifications
-            </div>
-
-            <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+        <div className="mx-auto max-w-7xl px-5 py-8 sm:px-8 lg:px-10">
+          <section className="mb-6 rounded-[30px] border border-[#0b2d54]/10 bg-white p-6 shadow-sm sm:p-8">
+            <div className="flex flex-col gap-6 lg:flex-row lg:items-end lg:justify-between">
               <div>
-                <h1 className="text-3xl font-black tracking-tight text-[#0b2d54]">
+                <div className="mb-3 inline-flex items-center gap-2 rounded-full bg-[#24c1c4]/10 px-3 py-1.5 text-[11px] font-black uppercase tracking-[0.14em] text-[#0b2d54]">
+                  <Bell className="h-3.5 w-3.5" />
+                  Notifications
+                </div>
+                <h1 className="text-3xl font-black tracking-tight text-[#0b2d54] sm:text-4xl">
                   Your notifications
                 </h1>
-                <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-500">
-                  One place for medication reminders, appointments, results,
-                  messages and important health updates.
+                <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-500">
+                  Medication reminders, appointments, results, care-team
+                  messages and important updates—kept together in one place.
                 </p>
               </div>
 
-              {unreadCount > 0 && (
-                <button
-                  type="button"
-                  onClick={() => void markAllRead()}
-                  disabled={busyId === "all"}
-                  className="inline-flex min-h-10 items-center justify-center gap-2 rounded-xl bg-[#0b2d54] px-4 py-2.5 text-xs font-bold text-white disabled:opacity-50"
-                >
-                  <CheckCheck className="h-4 w-4" />
-                  {busyId === "all"
-                    ? "Updating…"
-                    : "Mark all read · " + unreadCount}
-                </button>
-              )}
+              <div className="flex items-center gap-3">
+                <div className="rounded-2xl bg-[#f4fbfb] px-4 py-3 ring-1 ring-[#24c1c4]/15">
+                  <p className="text-[10px] font-black uppercase tracking-[0.15em] text-slate-400">
+                    Unread
+                  </p>
+                  <p className="mt-1 text-2xl font-black text-[#0b2d54]">
+                    {unreadCount}
+                  </p>
+                </div>
+
+                {unreadCount > 0 && (
+                  <button
+                    type="button"
+                    onClick={() => void markAllRead()}
+                    disabled={busyId === "all"}
+                    className="inline-flex min-h-12 items-center justify-center gap-2 rounded-2xl bg-[#0b2d54] px-4 py-3 text-xs font-black text-white shadow-sm transition hover:bg-[#123f70] disabled:opacity-50"
+                  >
+                    <CheckCheck className="h-4 w-4" />
+                    {busyId === "all" ? "Updating…" : "Mark all read"}
+                  </button>
+                )}
+              </div>
             </div>
           </section>
 
-          <section className="mb-5 overflow-hidden rounded-[24px] border border-slate-200 bg-white shadow-sm">
-            <div className="flex items-center justify-between gap-3 border-b border-slate-100 px-4 py-3 sm:px-5">
-              <div className="flex min-w-0 items-center gap-2">
-                <span className="text-[10px] font-black uppercase tracking-[0.16em] text-slate-400">
+          <section className="mb-7 rounded-[28px] border border-slate-200 bg-white p-4 shadow-sm sm:p-5">
+            <div className="mb-4 flex flex-col gap-3 border-b border-slate-100 pb-4 sm:flex-row sm:items-center sm:justify-between">
+              <div>
+                <p className="text-[10px] font-black uppercase tracking-[0.16em] text-slate-400">
                   Browse by
-                </span>
-                <span className="hidden text-xs font-semibold text-slate-300 sm:inline">
-                  ·
-                </span>
-                <span className="truncate text-xs font-semibold text-slate-500">
-                  {category === "ALL"
-                    ? "Everything"
-                    : categoryTabs.find((tab) => tab.key === category)?.label}
-                </span>
+                </p>
+                <p className="mt-1 text-sm font-bold text-[#0b2d54]">
+                  {categoryLabel(category)}
+                </p>
               </div>
 
               <button
                 type="button"
                 onClick={() => setUnreadOnly((current) => !current)}
+                aria-pressed={unreadOnly}
                 className={
-                  "inline-flex shrink-0 items-center gap-2 rounded-full px-3 py-2 text-[11px] font-black transition " +
+                  "inline-flex min-h-10 items-center justify-center gap-2 rounded-xl px-3.5 py-2 text-xs font-black transition " +
                   (unreadOnly
-                    ? "bg-[#0b2d54] text-white"
+                    ? "bg-[#0b2d54] text-white shadow-sm"
                     : "bg-slate-100 text-slate-600 hover:bg-slate-200")
                 }
-                aria-pressed={unreadOnly}
               >
                 <span
                   className={
-                    "h-1.5 w-1.5 rounded-full " +
+                    "h-2 w-2 rounded-full " +
                     (unreadOnly ? "bg-[#24c1c4]" : "bg-slate-400")
                   }
                 />
                 Unread only
                 {unreadCount > 0 && (
-                  <span className={unreadOnly ? "text-[#24c1c4]" : "text-[#0b2d54]"}>
+                  <span
+                    className={
+                      unreadOnly ? "text-[#24c1c4]" : "text-[#0b2d54]"
+                    }
+                  >
                     {unreadCount}
                   </span>
                 )}
               </button>
             </div>
 
-            <div className="overflow-x-auto">
-              <div className="flex min-w-max items-center gap-1.5 p-2">
-                <button
-                  type="button"
-                  onClick={() => setCategory("ALL")}
+            <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-5 xl:grid-cols-9">
+              <button
+                type="button"
+                onClick={() => setCategory("ALL")}
+                className={
+                  "group flex min-h-14 items-center gap-2.5 rounded-2xl border px-3.5 py-3 text-left transition " +
+                  (category === "ALL"
+                    ? "border-[#0b2d54] bg-[#0b2d54] text-white shadow-sm"
+                    : "border-slate-200 bg-white text-slate-600 hover:border-[#24c1c4]/40 hover:bg-[#f4fbfb]")
+                }
+              >
+                <span
                   className={
-                    "inline-flex min-h-10 items-center gap-2 rounded-xl px-3.5 py-2 text-xs font-black transition " +
+                    "grid h-9 w-9 shrink-0 place-items-center rounded-xl " +
                     (category === "ALL"
-                      ? "bg-[#0b2d54] text-white shadow-sm"
-                      : "text-slate-600 hover:bg-slate-100")
+                      ? "bg-white/10 text-[#24c1c4]"
+                      : "bg-[#f4fbfb] text-[#0b2d54]")
                   }
                 >
                   <Bell className="h-4 w-4" />
-                  All
+                </span>
+                <span className="min-w-0 flex-1">
+                  <span className="block truncate text-[11px] font-black">
+                    All
+                  </span>
                   <span
                     className={
-                      "rounded-full px-1.5 py-0.5 text-[10px] " +
-                      (category === "ALL"
-                        ? "bg-white/10 text-white"
-                        : "bg-slate-100 text-slate-500")
+                      "mt-0.5 block text-[10px] font-semibold " +
+                      (category === "ALL" ? "text-white/60" : "text-slate-400")
                     }
                   >
-                    {notifications.length}
+                    {counts.ALL.total} total
                   </span>
-                </button>
+                </span>
+              </button>
 
-                {availableCategories.map((tab) => {
-                  const Icon = tab.icon;
-                  const active = category === tab.key;
-                  const count = activeTabCount(tab.key);
-                  const newCount = activeTabUnread(tab.key);
+              {categoryTabs.map((tab) => {
+                const Icon = tab.icon;
+                const active = category === tab.key;
+                const count = counts[tab.key];
 
-                  return (
-                    <button
-                      key={tab.key}
-                      type="button"
-                      onClick={() => setCategory(tab.key)}
+                return (
+                  <button
+                    key={tab.key}
+                    type="button"
+                    onClick={() => setCategory(tab.key)}
+                    className={
+                      "group flex min-h-14 items-center gap-2.5 rounded-2xl border px-3.5 py-3 text-left transition " +
+                      (active
+                        ? "border-[#0b2d54] bg-[#0b2d54] text-white shadow-sm"
+                        : "border-slate-200 bg-white text-slate-600 hover:border-[#24c1c4]/40 hover:bg-[#f4fbfb]")
+                    }
+                  >
+                    <span
                       className={
-                        "inline-flex min-h-10 items-center gap-2 rounded-xl px-3.5 py-2 text-xs font-black transition " +
+                        "grid h-9 w-9 shrink-0 place-items-center rounded-xl " +
                         (active
-                          ? "bg-[#0b2d54] text-white shadow-sm"
-                          : "text-slate-600 hover:bg-slate-100")
+                          ? "bg-white/10 text-[#24c1c4]"
+                          : "bg-[#f4fbfb] text-[#0b2d54]")
                       }
                     >
                       <Icon className="h-4 w-4" />
-                      {tab.label}
+                    </span>
+
+                    <span className="min-w-0 flex-1">
+                      <span className="block truncate text-[11px] font-black">
+                        {tab.label}
+                      </span>
                       <span
                         className={
-                          "rounded-full px-1.5 py-0.5 text-[10px] " +
-                          (active
-                            ? "bg-white/10 text-white"
-                            : newCount > 0
-                              ? "bg-[#24c1c4]/10 text-[#0b2d54]"
-                              : "bg-slate-100 text-slate-500")
+                          "mt-0.5 block text-[10px] font-semibold " +
+                          (active ? "text-white/60" : "text-slate-400")
                         }
                       >
-                        {newCount > 0 ? newCount : count}
+                        {count.unread > 0
+                          ? count.unread + " new"
+                          : count.total + " total"}
                       </span>
-                    </button>
-                  );
-                })}
-              </div>
+                    </span>
+                  </button>
+                );
+              })}
             </div>
           </section>
 
           {notice && (
-            <div className="mb-4 rounded-2xl border border-[#24c1c4]/20 bg-[#24c1c4]/5 px-4 py-3 text-sm font-semibold text-[#0b2d54]">
+            <div className="mb-5 rounded-2xl border border-[#24c1c4]/20 bg-white px-4 py-3 text-sm font-semibold text-[#0b2d54] shadow-sm">
               {notice}
             </div>
           )}
 
           {loading && (
-            <div className="space-y-3">
-              {Array.from({ length: 5 }).map((_, index) => (
+            <div className="grid gap-4 lg:grid-cols-2">
+              {Array.from({ length: 6 }).map((_, index) => (
                 <div
                   key={index}
-                  className="h-28 animate-pulse rounded-[24px] bg-white"
+                  className="h-32 animate-pulse rounded-[24px] bg-white ring-1 ring-slate-100"
                 />
               ))}
             </div>
           )}
 
           {!loading && error && (
-            <div className="rounded-[28px] border border-red-200 bg-white p-7">
+            <div className="rounded-[28px] border border-red-200 bg-white p-8 shadow-sm">
               <ShieldCheck className="h-6 w-6 text-red-600" />
               <h2 className="mt-4 font-semibold text-[#0b2d54]">
                 Your notifications are temporarily unavailable
               </h2>
-              <p className="mt-2 text-sm text-slate-500">{error}</p>
+              <p className="mt-2 text-sm leading-6 text-slate-500">
+                {error}
+              </p>
               <button
                 type="button"
                 onClick={() => void load()}
@@ -567,18 +603,30 @@ export default function NotificationsPage() {
           )}
 
           {!loading && !error && visible.length === 0 && (
-            <div className="rounded-[28px] border border-slate-200 bg-white p-10 text-center shadow-sm">
-              <div className="mx-auto grid h-14 w-14 place-items-center rounded-2xl bg-[#24c1c4]/10 text-[#0b2d54]">
-                <Bell className="h-7 w-7" />
+            <div className="rounded-[30px] border border-slate-200 bg-white p-12 text-center shadow-sm">
+              <div className="mx-auto grid h-16 w-16 place-items-center rounded-2xl bg-[#24c1c4]/10 text-[#0b2d54]">
+                {iconFor(
+                  notifications.find((item) => getCategory(item) === category) ??
+                    ({
+                      id: "empty",
+                      type: category === "MEDICATIONS" ? "PRESCRIPTION" : "SYSTEM",
+                      title: "",
+                      body: "",
+                      channel: "IN_APP",
+                      status: "READ",
+                      priority: "NORMAL",
+                      createdAt: new Date().toISOString(),
+                    } as PatientNotification),
+                )}
               </div>
-              <h2 className="mt-4 font-semibold text-[#0b2d54]">
+              <h2 className="mt-5 text-lg font-black text-[#0b2d54]">
                 {unreadOnly
                   ? "You're all caught up"
                   : category === "ALL"
                     ? "No notifications yet"
                     : "Nothing in this category yet"}
               </h2>
-              <p className="mt-2 text-sm leading-6 text-slate-500">
+              <p className="mx-auto mt-2 max-w-md text-sm leading-6 text-slate-500">
                 {unreadOnly
                   ? "There are no unread notifications waiting for you."
                   : "New activity for this category will appear here when Sympto has something to share."}
@@ -589,12 +637,9 @@ export default function NotificationsPage() {
           {!loading && !error && visible.length > 0 && (
             <div className="space-y-8">
               {renderedGroups.map((group) => (
-                <section key={group} aria-labelledby={"notifications-" + group.toLowerCase()}>
+                <section key={group}>
                   <div className="mb-3 flex items-center gap-3">
-                    <h2
-                      id={"notifications-" + group.toLowerCase()}
-                      className="text-xs font-black uppercase tracking-[0.16em] text-slate-400"
-                    >
+                    <h2 className="text-xs font-black uppercase tracking-[0.16em] text-slate-400">
                       {groupLabel(group)}
                     </h2>
                     <div className="h-px flex-1 bg-slate-200" />
@@ -603,11 +648,12 @@ export default function NotificationsPage() {
                     </span>
                   </div>
 
-                  <div className="space-y-3">
+                  <div className="grid gap-4 xl:grid-cols-2">
                     {grouped[group].map((notification) => {
                       const unread = !notification.readAt;
                       const medicationReminder =
                         isMedicationReminder(notification);
+
                       const fallbackUrl =
                         notification.type === "PRESCRIPTION"
                           ? "/medications"
@@ -619,128 +665,152 @@ export default function NotificationsPage() {
                         <article
                           key={notification.id}
                           className={
-                            "rounded-[24px] border bg-white p-5 shadow-sm transition " +
+                            "relative overflow-hidden rounded-[26px] border bg-white shadow-sm transition " +
                             (unread
-                              ? "border-[#24c1c4]/30 ring-1 ring-[#24c1c4]/10"
+                              ? "border-[#24c1c4]/30 bg-[#f4fbfb] shadow-[0_10px_35px_rgba(11,45,84,0.06)]"
                               : "border-slate-200")
                           }
                         >
-                          <div className="flex items-start gap-4">
+                          {unread && (
                             <span
-                              className={
-                                "flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl " +
-                                (unread
-                                  ? iconShell(notification, true)
-                                  : "bg-slate-100 text-slate-500")
-                              }
-                            >
-                              {iconFor(notification)}
-                            </span>
+                              className="absolute inset-y-0 left-0 w-1 bg-[#24c1c4]"
+                              aria-hidden="true"
+                            />
+                          )}
 
-                            <div className="min-w-0 flex-1">
-                              <div className="flex flex-wrap items-start justify-between gap-3">
-                                <div className="min-w-0">
-                                  <div className="flex flex-wrap items-center gap-2">
-                                    <h3 className="font-semibold text-[#0b2d54]">
-                                      {notification.title}
-                                    </h3>
+                          <div className="p-5 sm:p-6">
+                            <div className="flex items-start gap-4">
+                              <span
+                                className={
+                                  "grid h-12 w-12 shrink-0 place-items-center rounded-2xl " +
+                                  iconClasses(notification, unread)
+                                }
+                              >
+                                {iconFor(notification)}
+                              </span>
 
-                                    {unread && (
-                                      <span className="rounded-full bg-[#24c1c4]/10 px-2.5 py-1 text-[10px] font-black text-[#0b2d54]">
-                                        New
-                                      </span>
-                                    )}
+                              <div className="min-w-0 flex-1">
+                                <div className="flex items-start justify-between gap-3">
+                                  <div className="min-w-0">
+                                    <div className="flex flex-wrap items-center gap-2">
+                                      <h3
+                                        className={
+                                          "font-bold " +
+                                          (unread
+                                            ? "text-[#0b2d54]"
+                                            : "text-slate-700")
+                                        }
+                                      >
+                                        {notification.title}
+                                      </h3>
+
+                                      {unread && (
+                                        <span className="inline-flex items-center gap-1.5 rounded-full bg-[#24c1c4]/12 px-2.5 py-1 text-[10px] font-black text-[#0b2d54]">
+                                          <span className="h-1.5 w-1.5 rounded-full bg-[#24c1c4]" />
+                                          New
+                                        </span>
+                                      )}
+                                    </div>
+
+                                    <p className="mt-2 text-sm leading-6 text-slate-600">
+                                      {notification.body}
+                                    </p>
                                   </div>
 
-                                  <p className="mt-2 text-sm leading-6 text-slate-600">
-                                    {notification.body}
-                                  </p>
-                                </div>
-
-                                <span className="inline-flex shrink-0 items-center gap-1.5 rounded-full bg-slate-100 px-2.5 py-1 text-[10px] font-bold text-slate-500">
-                                  {label(notification.type)}
-                                </span>
-                              </div>
-
-                              <div className="mt-4 flex flex-wrap items-center gap-x-4 gap-y-2 text-xs text-slate-400">
-                                {medicationReminder &&
-                                notification.scheduledFor ? (
-                                  <>
-                                    <span className="inline-flex items-center gap-1.5 font-bold text-[#0b2d54]">
-                                      <Clock
-                                        className="h-3.5 w-3.5"
-                                        aria-hidden="true"
-                                      />
-                                      Reminder time ·{" "}
-                                      {formatReminderTime(
-                                        notification.scheduledFor,
-                                      )}
-                                    </span>
-                                    <span>
-                                      {formatReminderDate(
-                                        notification.scheduledFor,
-                                      )}
-                                    </span>
-                                  </>
-                                ) : (
-                                  <span>{formatDate(relevantDate(notification))}</span>
-                                )}
-
-                                <span>
-                                  Delivered via {label(notification.channel)}
-                                </span>
-
-                                {notification.readAt && (
-                                  <span>
-                                    Read · {formatDate(notification.readAt)}
+                                  <span
+                                    className={
+                                      "hidden shrink-0 rounded-full px-2.5 py-1 text-[10px] font-bold sm:inline-flex " +
+                                      (unread
+                                        ? "bg-white text-[#0b2d54] ring-1 ring-[#24c1c4]/20"
+                                        : "bg-slate-100 text-slate-500")
+                                    }
+                                  >
+                                    {label(notification.type)}
                                   </span>
-                                )}
-                              </div>
-
-                              <div className="mt-4 flex flex-wrap items-center gap-2">
-                                {(notification.actionUrl || fallbackUrl) && (
-                                  <Link
-                                    href={String(
-                                      notification.actionUrl || fallbackUrl,
-                                    )}
-                                    onClick={() => {
-                                      if (unread) void markRead(notification.id);
-                                    }}
-                                    className="inline-flex min-h-10 items-center justify-center gap-2 rounded-xl bg-[#0b2d54] px-3.5 py-2.5 text-xs font-bold text-white"
-                                  >
-                                    {String(
-                                      notification.actionLabel ||
-                                        (notification.type === "PRESCRIPTION"
-                                          ? "View medications"
-                                          : notification.type === "APPOINTMENT"
-                                            ? "View appointments"
-                                            : "Open"),
-                                    )}
-                                    <ChevronRight className="h-3.5 w-3.5" />
-                                  </Link>
-                                )}
-
-                                {unread && (
-                                  <button
-                                    type="button"
-                                    onClick={() => void markRead(notification.id)}
-                                    disabled={busyId === notification.id}
-                                    className="inline-flex min-h-10 items-center justify-center gap-1.5 rounded-xl border border-slate-200 px-3.5 py-2.5 text-xs font-bold text-[#0b2d54] disabled:opacity-50"
-                                  >
-                                    <Check className="h-3.5 w-3.5" />
-                                    {busyId === notification.id
-                                      ? "Saving…"
-                                      : "Mark as read"}
-                                  </button>
-                                )}
-                              </div>
-
-                              {notification.priority === "URGENT" && (
-                                <div className="mt-3 inline-flex items-center gap-1.5 text-[11px] font-black text-red-700">
-                                  <TriangleAlert className="h-3.5 w-3.5" />
-                                  Urgent
                                 </div>
-                              )}
+
+                                <div className="mt-4 flex flex-wrap items-center gap-x-4 gap-y-2 text-xs">
+                                  {medicationReminder &&
+                                  notification.scheduledFor ? (
+                                    <>
+                                      <span className="inline-flex items-center gap-1.5 font-black text-[#0b2d54]">
+                                        <Clock className="h-3.5 w-3.5 text-[#24c1c4]" />
+                                        Reminder time ·{" "}
+                                        {formatReminderTime(
+                                          notification.scheduledFor,
+                                        )}
+                                      </span>
+                                      <span className="text-slate-400">
+                                        {formatReminderDate(
+                                          notification.scheduledFor,
+                                        )}
+                                      </span>
+                                    </>
+                                  ) : (
+                                    <span className="text-slate-400">
+                                      {formatDate(relevantDate(notification))}
+                                    </span>
+                                  )}
+
+                                  <span className="text-slate-400">
+                                    {label(notification.channel)}
+                                  </span>
+
+                                  {notification.readAt && (
+                                    <span className="text-slate-400">
+                                      Read · {formatDate(notification.readAt)}
+                                    </span>
+                                  )}
+                                </div>
+
+                                <div className="mt-5 flex flex-wrap items-center gap-2">
+                                  {(notification.actionUrl || fallbackUrl) && (
+                                    <Link
+                                      href={String(
+                                        notification.actionUrl || fallbackUrl,
+                                      )}
+                                      onClick={() => {
+                                        if (unread)
+                                          void markRead(notification.id);
+                                      }}
+                                      className="inline-flex min-h-10 items-center justify-center gap-2 rounded-xl bg-[#0b2d54] px-3.5 py-2.5 text-xs font-black text-white transition hover:bg-[#123f70]"
+                                    >
+                                      {String(
+                                        notification.actionLabel ||
+                                          (notification.type === "PRESCRIPTION"
+                                            ? "View medications"
+                                            : notification.type === "APPOINTMENT"
+                                              ? "View appointments"
+                                              : "Open"),
+                                      )}
+                                      <ChevronRight className="h-3.5 w-3.5" />
+                                    </Link>
+                                  )}
+
+                                  {unread && (
+                                    <button
+                                      type="button"
+                                      onClick={() =>
+                                        void markRead(notification.id)
+                                      }
+                                      disabled={busyId === notification.id}
+                                      className="inline-flex min-h-10 items-center justify-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3.5 py-2.5 text-xs font-bold text-[#0b2d54] transition hover:border-[#24c1c4]/30 hover:bg-[#f4fbfb] disabled:opacity-50"
+                                    >
+                                      <Check className="h-3.5 w-3.5" />
+                                      {busyId === notification.id
+                                        ? "Saving…"
+                                        : "Mark as read"}
+                                    </button>
+                                  )}
+                                </div>
+
+                                {notification.priority === "URGENT" && (
+                                  <div className="mt-3 inline-flex items-center gap-1.5 text-[11px] font-black text-red-700">
+                                    <TriangleAlert className="h-3.5 w-3.5" />
+                                    Urgent
+                                  </div>
+                                )}
+                              </div>
                             </div>
                           </div>
                         </article>
@@ -752,7 +822,7 @@ export default function NotificationsPage() {
             </div>
           )}
 
-          <section className="mt-8 rounded-2xl border border-[#24c1c4]/20 bg-[#24c1c4]/5 p-5">
+          <section className="mt-8 rounded-2xl border border-[#24c1c4]/20 bg-white p-5 shadow-sm">
             <div className="flex items-start gap-3">
               <Bell className="mt-0.5 h-5 w-5 shrink-0 text-[#0b2d54]" />
               <div>
@@ -760,16 +830,17 @@ export default function NotificationsPage() {
                   Choose how Sympto keeps you informed
                 </h3>
                 <p className="mt-1 text-sm leading-6 text-slate-600">
-                  Notification preferences are separate from your clinical
-                  record. Turning a channel off does not delete your health
-                  information.
+                  Your notification preferences are separate from your
+                  clinical record. Turning a channel off does not delete your
+                  health information.
                 </p>
                 <Link
                   href="/notifications/preferences"
-                  className="mt-3 inline-flex items-center gap-2 rounded-xl bg-white px-3.5 py-2.5 text-xs font-bold text-[#0b2d54] ring-1 ring-[#24c1c4]/20"
+                  className="mt-3 inline-flex items-center gap-2 text-xs font-black text-[#0b2d54] hover:text-[#24c1c4]"
                 >
                   <Settings className="h-3.5 w-3.5" />
                   Manage preferences
+                  <ChevronRight className="h-3.5 w-3.5" />
                 </Link>
               </div>
             </div>
