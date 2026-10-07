@@ -510,47 +510,9 @@ export default function NotificationsPage() {
                 </div>
               </div>
 
-              <div className="mt-7 grid grid-cols-2 gap-3 sm:grid-cols-3">
-                <div className="rounded-2xl bg-white/10 p-3.5 ring-1 ring-white/10">
-                  <p className="text-[10px] font-semibold uppercase tracking-wide text-white/55">
-                    Unread
-                  </p>
-                  <p className="mt-1.5 text-2xl font-extrabold text-white">
-                    {periodCounts.ALL.unread}
-                  </p>
-                </div>
-
-                <div className="rounded-2xl bg-white/10 p-3.5 ring-1 ring-white/10">
-                  <p className="text-[10px] font-semibold uppercase tracking-wide text-white/55">
-                    {range === "DAY" ? "Today" : range === "WEEK" ? "This week" : "This month"}
-                  </p>
-                  <p className="mt-1.5 text-2xl font-extrabold text-white">
-                    {rangeFiltered.length}
-                  </p>
-                </div>
-
-                <div className="col-span-2 flex items-end sm:col-span-1">
-                  {unreadCount > 0 ? (
-                    <button
-                      type="button"
-                      onClick={() => void markAllRead()}
-                      disabled={busyId === "all"}
-                      className="inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-xl bg-white px-4 py-2.5 text-xs font-bold text-[#0b2d54] shadow-sm transition hover:bg-white/90 disabled:opacity-50"
-                    >
-                      <CheckCheck className="h-4 w-4" />
-                      {busyId === "all" ? "Updating…" : "Mark all read"}
-                    </button>
-                  ) : (
-                    <div className="flex min-h-11 w-full items-center justify-center rounded-xl bg-white/10 px-4 py-2.5 text-[11px] font-bold text-white/70 ring-1 ring-white/10">
-                      All caught up
-                    </div>
-                  )}
-                </div>
-              </div>
-
-              <div className="mt-6 border-t border-white/15 pt-5">
+              <div className="mt-7 border-t border-white/15 pt-5">
                 <div className="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
-                  <div className="flex items-center gap-3 overflow-x-auto">
+                  <div className="flex min-w-0 items-center gap-4 overflow-x-auto">
                     <span className="shrink-0 text-[10px] font-black uppercase tracking-[0.16em] text-white/50">
                       View
                     </span>
@@ -577,9 +539,16 @@ export default function NotificationsPage() {
                         </button>
                       ))}
                     </div>
+
+                    <span className="hidden text-white/25 sm:inline">•</span>
+                    <span className="shrink-0 text-xs font-bold text-white/75">
+                      {category === "ALL"
+                        ? "All notifications"
+                        : categoryTabs.find((tab) => tab.key === category)?.label}
+                    </span>
                   </div>
 
-                  <div className="flex shrink-0 items-center gap-3">
+                  <div className="flex shrink-0 items-center gap-4">
                     <button
                       type="button"
                       onClick={() => setUnreadOnly((current) => !current)}
@@ -667,18 +636,6 @@ export default function NotificationsPage() {
                       </button>
                     );
                   })}
-                </div>
-
-                <div className="mt-3 text-[10px] font-medium text-white/45">
-                  {category === "ALL"
-                    ? "All notifications"
-                    : categoryTabs.find((tab) => tab.key === category)?.label}
-                  {" · "}
-                  {range === "DAY"
-                    ? "Today"
-                    : range === "WEEK"
-                      ? "This week"
-                      : "This month"}
                 </div>
               </div>
             </div>
