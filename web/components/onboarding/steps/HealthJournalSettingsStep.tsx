@@ -401,7 +401,7 @@ export function HealthJournalSettingsStep({
         <section className="border-t border-slate-100 pt-6">
           <div className="mb-3">
             <h3 className="text-xs font-bold uppercase tracking-wider text-slate-400">
-              Health Summaries
+              Health reports
             </h3>
           </div>
 
@@ -436,11 +436,11 @@ export function HealthJournalSettingsStep({
 
                 <div>
                   <h4 className="text-sm font-bold text-slate-800">
-                    Weekly summary
+                    Weekly health report
                   </h4>
 
                   <p className="mt-0.5 text-xs leading-relaxed text-slate-500">
-                    Get a weekly overview of your health journal.
+                    Receive a weekly overview of your recorded health activity and progress.
                   </p>
                 </div>
               </div>
@@ -483,11 +483,11 @@ export function HealthJournalSettingsStep({
 
                 <div>
                   <h4 className="text-sm font-bold text-slate-800">
-                    Monthly summary
+                    Monthly health report
                   </h4>
 
                   <p className="mt-0.5 text-xs leading-relaxed text-slate-500">
-                    Get a monthly overview of your health progress.
+                    Receive a monthly overview of your recorded health activity and progress.
                   </p>
                 </div>
               </div>
