@@ -136,10 +136,7 @@ export default function NotificationPreferencesPage() {
             </div>
 
             <div className="relative p-6 sm:p-8">
-              <div className="flex items-start gap-4">
-                <span className="grid h-12 w-12 shrink-0 place-items-center rounded-2xl bg-white/10 ring-1 ring-white/15">
-                  <Bell className="h-6 w-6" />
-                </span>
+              <div className="flex items-start justify-between gap-6">
                 <div className="min-w-0">
                   <p className="text-[10px] font-black uppercase tracking-[0.16em] text-white/65">
                     Notifications
@@ -151,6 +148,10 @@ export default function NotificationPreferencesPage() {
                     Choose how you want Sympto to keep you informed about the things that matter to your health.
                   </p>
                 </div>
+
+                <span className="hidden h-14 w-14 shrink-0 place-items-center rounded-2xl bg-white/10 text-white/85 ring-1 ring-white/15 sm:grid sm:h-16 sm:w-16">
+                  <Bell className="h-7 w-7" />
+                </span>
               </div>
 
               <div className="mt-6 flex flex-wrap gap-2">
