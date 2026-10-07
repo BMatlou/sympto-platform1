@@ -4,6 +4,7 @@ import Link from "next/link";
 import { ArrowLeft, Check, Clock3, Copy, Loader2, Pill, QrCode, RefreshCw, ShieldCheck, Stethoscope } from "lucide-react";
 import { QRCodeSVG } from "qrcode.react";
 import { useEffect, useState } from "react";
+import { useSearchParams } from "next/navigation";
 import ProtectedRoute from "@/components/auth/protected-route";
 import { api } from "@/lib/api";
 
@@ -25,6 +26,9 @@ export default function SmartFilePage() {
   const [error, setError] = useState("");
   const [copied, setCopied] = useState(false);
   const [now, setNow] = useState(Date.now());
+  const searchParams = useSearchParams();
+  const appointmentId = searchParams.get("appointmentId");
+  const isAppointmentShare = kind === "clinical" && Boolean(appointmentId);
 
   const createShare = async (nextKind: ShareKind) => {
     setLoading(true);
@@ -33,7 +37,13 @@ export default function SmartFilePage() {
     setKind(nextKind);
     setShare(null);
     try {
-      const response = await api.post(nextKind === "clinical" ? "/smart-file/share" : "/smart-file/prescription-share");
+      const response = await api.post(
+        nextKind === "clinical"
+          ? appointmentId
+            ? `/smart-file/appointment-share/${appointmentId}`
+            : "/smart-file/share"
+          : "/smart-file/prescription-share",
+      );
       const nextShare = unwrap<Share>(response.data);
       setShare(nextShare);
       setNow(Date.now());
@@ -112,7 +122,7 @@ export default function SmartFilePage() {
                   <div className="grid gap-3 sm:grid-cols-2" aria-label="Choose Smart File sharing scope">
                     <button type="button" onClick={() => void createShare("clinical")} className="min-h-24 rounded-2xl border border-slate-200 bg-white px-5 py-4 text-left transition hover:border-[#24c1c4]/50 hover:bg-[#24c1c4]/5 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#24c1c4]">
                       <span className="flex items-center gap-3 text-base font-black text-[#0b2d54]"><Stethoscope className="h-6 w-6" /> Clinic / Doctor</span>
-                      <span className="mt-1.5 block text-xs font-semibold leading-5 text-slate-500">Share your clinical Smart File with an authorised clinician.</span>
+                      <span className="mt-1.5 block text-xs font-semibold leading-5 text-slate-500">{appointmentId ? "Share the same clinical Smart File for your booked appointment. Your appointed clinician can update the file." : "Share your clinical Smart File with an authorised clinician as a read-only walk-in share."}</span>
                     </button>
                     <button type="button" onClick={() => void createShare("prescription")} className="min-h-24 rounded-2xl border border-slate-200 bg-white px-5 py-4 text-left transition hover:border-[#24c1c4]/50 hover:bg-[#24c1c4]/5 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#24c1c4]">
                       <span className="flex items-center gap-3 text-base font-black text-[#0b2d54]"><Pill className="h-6 w-6" /> Pharmacy</span>
@@ -142,6 +152,12 @@ export default function SmartFilePage() {
                     </section>
 
                     <div className="flex min-h-12 items-center justify-center gap-2 rounded-2xl bg-[#0b2d54]/5 px-4 py-2.5 text-xs font-black text-[#0b2d54]"><Clock3 className="h-4 w-4" />Expires in {formatTime(remaining)}</div>
+                    {isAppointmentShare ? (
+                      <div className="flex items-start gap-2.5 rounded-2xl border border-emerald-200 bg-emerald-50 px-3.5 py-3 text-left text-[10px] font-semibold leading-4 text-emerald-900">
+                        <ShieldCheck className="mt-0.5 h-4 w-4 shrink-0" />
+                        <p>This share is linked to your appointment. The appointed clinician can view the same Smart File and update the clinical record during the consent period.</p>
+                      </div>
+                    ) : null}
 
                     <div className="flex flex-1 items-start gap-2.5 rounded-2xl border border-amber-200 bg-amber-50 px-3.5 py-3 text-left text-[10px] font-semibold leading-4 text-amber-900">
                       <ShieldCheck className="mt-0.5 h-4 w-4 shrink-0" />
