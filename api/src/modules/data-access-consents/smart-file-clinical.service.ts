@@ -168,12 +168,13 @@ export class SmartFileClinicalService {
     }
 
     const passport = patient.healthPassport;
-    const prescriptions = consent.canViewPrescriptions ? patient.prescriptions ?? [] : [];
-    const appointments = consent.canViewAppointments ? patient.appointments ?? [] : [];
-    const episodes = consent.canViewMedicalRecords ? patient.clinicalEpisodes ?? [] : [];
-    const carePlans = consent.canViewMedicalRecords ? patient.carePlans ?? [] : [];
-    const referrals = consent.canViewMedicalRecords ? patient.referrals ?? [] : [];
-    const healthJournals = consent.canViewMedicalRecords ? patient.healthJournals ?? [] : [];
+    const prescriptions = Array.isArray(patient.prescriptions) ? patient.prescriptions : [];
+    const appointments = Array.isArray(patient.appointments) ? patient.appointments : [];
+    const episodes = Array.isArray(patient.clinicalEpisodes) ? patient.clinicalEpisodes : [];
+    const carePlans = Array.isArray(patient.carePlans) ? patient.carePlans : [];
+    const referrals = Array.isArray(patient.referrals) ? patient.referrals : [];
+    const healthJournals = Array.isArray(patient.healthJournals) ? patient.healthJournals : [];
+    const wearableDevices = Array.isArray(patient.wearableDevices) ? patient.wearableDevices : [];
 
     const encounters = consent.canViewMedicalRecords
       ? await this.prisma.encounter.findMany({
@@ -455,7 +456,7 @@ export class SmartFileClinicalService {
       })),
       patientMeasurements,
       wearableWellnessMetrics,
-      wearableDevices: patient.wearableDevices ?? [],
+      wearableDevices,
       generatedAt: new Date(),
     };
   }
