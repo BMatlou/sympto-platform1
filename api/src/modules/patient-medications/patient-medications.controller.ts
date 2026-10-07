@@ -139,8 +139,10 @@ export class PatientMedicationsController {
   update(
     @Param('id') id: string,
     @Body() dto: UpdatePatientMedicationDto,
+    @Req() request: AuthenticatedRequest,
   ) {
-    return this.patientMedicationsService.update(id, dto);
+    const authenticatedUserId = request.user?.sub ?? request.user?.id ?? '';
+    return this.patientMedicationsService.update(id, dto, authenticatedUserId);
   }
 
   @Permissions('patient-medications.delete')
