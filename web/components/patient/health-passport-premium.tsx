@@ -25,6 +25,22 @@ const age = (value: unknown) => {
 function Panel({ title, icon, children }: { title: string; icon: ReactNode; children: ReactNode }) { return <section className="rounded-[26px] border border-slate-200/80 bg-white p-5 shadow-[0_10px_35px_rgba(11,45,84,0.06)] sm:p-6"><div className="mb-4 flex items-center gap-3"><div className="grid h-10 w-10 place-items-center rounded-2xl bg-slate-50 text-[#0b2d54]">{icon}</div><h2 className="text-base font-bold text-[#0b2d54]">{title}</h2></div>{children}</section>; }
 function Empty({ children }: { children: ReactNode }) { return <p className="rounded-2xl border border-dashed border-slate-200 bg-slate-50 p-4 text-sm text-slate-500">{children}</p>; }
 function Badge({ children, tone = "slate" }: { children: ReactNode; tone?: "slate" | "blue" | "rose" | "green" }) { const styles = { slate: "bg-slate-100 text-slate-600", blue: "bg-blue-50 text-blue-700", rose: "bg-rose-50 text-rose-700", green: "bg-emerald-50 text-emerald-700" }; return <span className={`rounded-full px-2.5 py-1 text-[10px] font-bold ${styles[tone]}`}>{children}</span>; }
+function ClinicalMarker({ item, label }: { item?: any; label?: string }) {
+  const clinical = item?.source === "CLINICAL";
+  return <span className={"mt-2 inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[10px] font-bold " + (clinical ? "bg-blue-50 text-blue-700" : "bg-slate-100 text-slate-600")}>
+    {clinical ? <ShieldCheck className="h-3 w-3" /> : null}
+    {label ?? (clinical ? "Clinical · view only" : "Patient entered · editable")}
+  </span>;
+}
+function DetailGrid({ items }: { items: Array<[string, ReactNode]> }) {
+  return <div className="mt-3 grid gap-2.5 sm:grid-cols-2">
+    {items.map(([label, value]) => <div key={label} className="rounded-xl bg-white/80 px-3 py-2.5 ring-1 ring-slate-100">
+      <p className="text-[10px] font-bold uppercase tracking-wide text-slate-400">{label}</p>
+      <p className="mt-1 text-xs font-semibold leading-5 text-slate-700">{value === null || value === undefined || value === "" ? "Not recorded" : value}</p>
+    </div>)}
+  </div>;
+}
+function yesNo(value: unknown) { return value === null || value === undefined ? "Not recorded" : value ? "Yes" : "No"; }
 const genderOptions = ["MALE", "FEMALE", "OTHER"];
 
 export default function HealthPassportPremium() {
@@ -56,6 +72,7 @@ export default function HealthPassportPremium() {
   return <ProtectedRoute><main className="min-h-screen bg-[#f5f8fb] pb-10 text-slate-800"><div className="mx-auto max-w-5xl px-4 py-5 sm:px-6 sm:py-7">
     <div className="mb-4 flex items-center justify-between gap-3"><Link href="/dashboard" className="inline-flex items-center gap-2 text-sm font-semibold text-[#0b2d54]"><ArrowLeft className="h-4 w-4" />Back to My Health</Link><Link href="/health-conditions" className="text-xs font-bold text-[#0b2d54] hover:underline">Manage health records</Link></div>
     {message && <div className="mb-4 flex items-center gap-2 rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-semibold text-emerald-800"><Check className="h-4 w-4" />{message}</div>}{errorMessage && <div className="mb-4 rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-semibold text-red-800">{errorMessage}</div>}
+    <div className="mb-5 rounded-[22px] border border-blue-100 bg-blue-50/70 px-4 py-4 sm:px-5"><div className="flex items-start gap-3"><ShieldCheck className="mt-0.5 h-5 w-5 shrink-0 text-blue-700" /><div><p className="text-sm font-bold text-[#0b2d54]">Clinical records are protected</p><p className="mt-1 text-xs leading-5 text-slate-600">Records entered or updated by a doctor, nurse, clinic or other authorised practitioner are marked <span className="font-bold text-blue-700">Clinical</span> and are view-only from your patient account.</p></div></div></div>
     <section className="relative overflow-hidden rounded-[32px] bg-gradient-to-br from-rose-700 via-rose-600 to-[#a61b42] p-6 text-white shadow-[0_24px_60px_rgba(159,32,67,0.24)] sm:p-8"><div className="absolute -right-16 -top-20 h-48 w-48 rounded-full bg-white/10 blur-2xl" /><div className="absolute -bottom-24 -left-12 h-56 w-56 rounded-full bg-black/10 blur-2xl" /><div className="relative"><div className="flex items-start justify-between gap-4"><div><div className="inline-flex items-center gap-2 rounded-full bg-white/12 px-3 py-1.5 text-[11px] font-bold uppercase tracking-[0.16em] text-white/80"><ShieldCheck className="h-3.5 w-3.5" />My Clinic Card</div><h1 className="mt-4 text-3xl font-extrabold tracking-tight sm:text-4xl">{computed.fullName}</h1><p className="mt-2 text-sm text-white/75">Patient number · {text(computed.patient?.patientNumber)}</p></div><div className="grid h-14 w-14 place-items-center rounded-2xl bg-white/12 ring-1 ring-white/15"><HeartPulse className="h-7 w-7" /></div></div><div className="mt-7 grid grid-cols-2 gap-3 sm:grid-cols-4">{[["Age", age(computed.patient?.dateOfBirth)], ["Gender", human(computed.patient?.gender)], ["Blood group", human(computed.emergency?.bloodType)], ["Rhesus", human(computed.emergency?.rhesusFactor)]].map(([name, value]) => <div key={name} className="rounded-2xl bg-white/10 p-3.5 ring-1 ring-white/10"><p className="text-[10px] font-semibold uppercase tracking-wide text-white/55">{name}</p><p className="mt-1.5 text-sm font-bold text-white">{value}</p></div>)}</div><button onClick={() => { setEditing(true); setMessage(""); setErrorMessage(""); }} className="mt-6 inline-flex items-center gap-2 rounded-xl bg-white px-4 py-2.5 text-sm font-bold text-[#0b2d54] shadow-sm"><Edit3 className="h-4 w-4" />Edit my information</button></div></section>
 
     {editing && <section className="mt-5 rounded-[26px] border border-rose-100 bg-white p-5 shadow-sm sm:p-6"><div className="flex items-start justify-between"><div><h2 className="text-lg font-bold text-[#0b2d54]">Update your Clinic Card</h2><p className="mt-1 text-sm text-slate-500">Only your own patient information is editable here.</p></div><button onClick={() => setEditing(false)} className="rounded-xl p-2 text-slate-400"><X className="h-5 w-5" /></button></div><div className="mt-5 grid gap-4 sm:grid-cols-2">
@@ -87,11 +104,95 @@ export default function HealthPassportPremium() {
           </div>
         </div>
       </section>
-      <Panel title="Current measurements" icon={<Activity className="h-5 w-5" />}><div className="grid grid-cols-3 gap-3">{[["Height", computed.vitals?.heightCm != null ? `${computed.vitals.heightCm} cm` : "—"],["Weight",computed.vitals?.weightKg != null ? `${computed.vitals.weightKg} kg` : "—"],["BMI",computed.bmi != null ? String(computed.bmi) : "—"]].map(([label,value]) => <div key={label} className="rounded-2xl bg-slate-50 p-4"><p className="text-[10px] font-bold uppercase text-slate-500">{label}</p><p className="mt-1 text-lg font-extrabold text-[#0b2d54]">{value}</p></div>)}</div><Link href="/health-vitals" className="mt-4 inline-flex items-center gap-1 text-xs font-bold text-[#0b2d54]">Open detailed vitals <ChevronRight className="h-3.5 w-3.5" /></Link></Panel>
+      <Panel title="Current measurements" icon={<Activity className="h-5 w-5" />}><div className="grid grid-cols-3 gap-3">{[["Height", computed.vitals?.heightCm != null ? String(computed.vitals.heightCm) + " cm" : "—"],["Weight",computed.vitals?.weightKg != null ? String(computed.vitals.weightKg) + " kg" : "—"],["BMI",computed.bmi != null ? String(computed.bmi) : "—"]].map(([label,value]) => <div key={label} className="rounded-2xl bg-slate-50 p-4"><p className="text-[10px] font-bold uppercase text-slate-500">{label}</p><p className="mt-1 text-lg font-extrabold text-[#0b2d54]">{value}</p></div>)}</div>{computed.baseline && <DetailGrid items={[[ "Baseline established", date(computed.baseline.establishedAt)],["Baseline blood pressure", computed.baseline.systolicPressure != null || computed.baseline.diastolicPressure != null ? String(computed.baseline.systolicPressure ?? "—") + " / " + String(computed.baseline.diastolicPressure ?? "—") + " mmHg" : null],["Resting heart rate", computed.baseline.restingHeartRate != null ? String(computed.baseline.restingHeartRate) + " bpm" : null],["Respiratory rate", computed.baseline.respiratoryRate != null ? String(computed.baseline.respiratoryRate) + " /min" : null],["Oxygen saturation", computed.baseline.oxygenSaturation != null ? String(computed.baseline.oxygenSaturation) + "%" : null],["Body temperature", computed.baseline.bodyTemperature != null ? String(computed.baseline.bodyTemperature) + " °C" : null],["Blood glucose", computed.baseline.bloodGlucose],["Cholesterol", computed.baseline.cholesterol],["Baseline notes", computed.baseline.notes]]} />}</div><Link href="/health-vitals" className="mt-4 inline-flex items-center gap-1 text-xs font-bold text-[#0b2d54]">Open detailed vitals <ChevronRight className="h-3.5 w-3.5" /></Link></Panel>
     </div>
 
-    <div className="mt-5 grid gap-5 md:grid-cols-2"><Panel title="Allergies" icon={<HeartPulse className="h-5 w-5" />}>{computed.allergies?.length ? <div className="space-y-2.5">{computed.allergies.slice(0,5).map((item:any)=><div key={item.id} className="rounded-2xl bg-rose-50/70 px-4 py-3"><div className="flex items-start justify-between gap-3"><div><p className="font-semibold text-[#0b2d54]">{text(item.name,"Allergy")}</p><p className="mt-1 text-xs text-slate-500">{item.reaction ? `Reaction · ${item.reaction}` : "Reaction not recorded"}</p></div><Badge tone="rose">{item.source === "PRACTITIONER" ? "Clinician verified" : "Patient record"}</Badge></div></div>)}</div>:<Empty>No active allergies recorded.</Empty>}<Link href="/allergies" className="mt-4 inline-flex items-center gap-1 text-xs font-bold text-[#0b2d54]">Manage allergies <ChevronRight className="h-3.5 w-3.5" /></Link></Panel><Panel title="Active conditions" icon={<Activity className="h-5 w-5" />}>{computed.conditions?.length ? <div className="space-y-2.5">{computed.conditions.slice(0,5).map((item:any)=><div key={item.id} className="rounded-2xl bg-blue-50/70 px-4 py-3"><div className="flex items-start justify-between gap-3"><div><p className="font-semibold text-[#0b2d54]">{text(item.name,"Condition")}</p><p className="mt-1 text-xs text-slate-500">{item.severity ? `Severity · ${human(item.severity)}` : item.chronic ? "Long-term condition" : "Active condition"}</p></div><Badge tone="blue">{item.source === "PRACTITIONER" ? "Clinical" : "Patient record"}</Badge></div></div>)}</div>:<Empty>No active health conditions recorded.</Empty>}<Link href="/health-conditions" className="mt-4 inline-flex items-center gap-1 text-xs font-bold text-[#0b2d54]">Manage conditions <ChevronRight className="h-3.5 w-3.5" /></Link></Panel><Panel title="Practitioner diagnoses" icon={<ShieldCheck className="h-5 w-5" />}>{computed.diagnoses?.length ? <div className="space-y-2.5">{computed.diagnoses.slice(0,5).map((item:any)=><div key={item.id} className="rounded-2xl bg-slate-50 px-4 py-3"><div className="flex items-start justify-between gap-3"><div><p className="font-semibold text-[#0b2d54]">{text(item.name,"Clinical diagnosis")}</p><p className="mt-1 text-xs text-slate-500">{item.diagnosedAt ? `Diagnosed · ${date(item.diagnosedAt)}` : item.practitionerName ? `By ${item.practitionerName}` : "Practitioner record"}</p></div><Badge tone="green">Practitioner record</Badge></div></div>)}</div>:<Empty>No practitioner diagnoses are available yet.</Empty>}<Link href="/health-conditions" className="mt-4 inline-flex items-center gap-1 text-xs font-bold text-[#0b2d54]">View clinical diagnoses <ChevronRight className="h-3.5 w-3.5" /></Link></Panel><Panel title="Procedures & surgical history" icon={<Activity className="h-5 w-5" />}>{computed.procedures?.length ? <div className="space-y-2.5">{computed.procedures.slice(0,5).map((item:any)=><div key={item.id} className="rounded-2xl bg-slate-50 px-4 py-3"><div className="flex items-start justify-between gap-3"><div><p className="font-semibold text-[#0b2d54]">{text(item.name,"Procedure")}</p><p className="mt-1 text-xs text-slate-500">{item.performedAt ? `Performed · ${date(item.performedAt)}` : item.facility || "Clinical procedure"}{item.surgical ? " · Surgical" : ""}</p></div><Badge>{human(item.status)}</Badge></div></div>)}</div>:<Empty>No procedures or surgical history recorded.</Empty>}</Panel><Panel title="Current medications" icon={<HeartPulse className="h-5 w-5" />}>{computed.medications?.length ? <div className="space-y-2.5">{computed.medications.slice(0,5).map((item:any)=><div key={item.id} className="rounded-2xl bg-slate-50 px-4 py-3"><p className="font-semibold text-[#0b2d54]">{text(item.name,"Medication")}</p><p className="mt-1 text-xs text-slate-500">{[item.dosage,item.frequency,item.route].filter(Boolean).join(" · ") || "Dosage not recorded"}</p></div>)}</div>:<Empty>No active medications recorded.</Empty>}<Link href="/medications" className="mt-4 inline-flex items-center gap-1 text-xs font-bold text-[#0b2d54]">View medications <ChevronRight className="h-3.5 w-3.5" /></Link></Panel><Panel title="Immunizations" icon={<Syringe className="h-5 w-5" />}>{computed.immunizations?.length ? <div className="space-y-2.5">{computed.immunizations.slice(0,5).map((item:any)=><div key={item.id} className="rounded-2xl bg-emerald-50/70 px-4 py-3"><div className="flex items-start justify-between gap-3"><div><p className="font-semibold text-[#0b2d54]">{text(item.name,"Immunization")}</p><p className="mt-1 text-xs text-slate-500">{item.administeredAt ? `Administered · ${date(item.administeredAt)}` : "Date not recorded"}{item.nextDueDate ? ` · Next due ${date(item.nextDueDate)}` : ""}</p></div><Badge tone="green">{item.source === "PRACTITIONER" ? "Clinical" : "Patient record"}</Badge></div></div>)}</div>:<Empty>No immunizations recorded yet.</Empty>}<Link href="/immunizations" className="mt-4 inline-flex items-center gap-1 text-xs font-bold text-[#0b2d54]">View immunizations <ChevronRight className="h-3.5 w-3.5" /></Link></Panel></div>
-
+    <div className="mt-5 grid gap-5 md:grid-cols-2">
+      <Panel title="Allergies" icon={<HeartPulse className="h-5 w-5" />}>
+        {computed.allergies?.length ? <div className="space-y-3">{computed.allergies.map((item:any) => <article key={item.id} className="rounded-2xl bg-rose-50/55 p-4">
+          <div className="flex items-start justify-between gap-3"><div><p className="font-semibold text-[#0b2d54]">{text(item.name,"Allergy")}</p><ClinicalMarker item={item} /></div><Badge tone="rose">{human(item.severity)}</Badge></div>
+          <DetailGrid items={[
+            ["Category", item.category], ["Reaction", item.reaction], ["Reaction details", item.reactionNotes],
+            ["Onset", date(item.onsetDate)], ["Last reaction", date(item.lastReaction)], ["Verified", yesNo(item.verified)],
+            ["Verified by", item.verifiedBy], ["Status", human(item.status)], ["Notes", item.notes], ["Updated", date(item.updatedAt)],
+          ]} />
+        </article>)}</div> : <Empty>No active allergies recorded.</Empty>}
+        <Link href="/allergies" className="mt-4 inline-flex items-center gap-1 text-xs font-bold text-[#0b2d54]">View allergies <ChevronRight className="h-3.5 w-3.5" /></Link>
+      </Panel>
+      <Panel title="Active conditions" icon={<Activity className="h-5 w-5" />}>
+        {computed.conditions?.length ? <div className="space-y-3">{computed.conditions.map((item:any) => <article key={item.id} className="rounded-2xl bg-blue-50/55 p-4">
+          <div className="flex items-start justify-between gap-3"><div><p className="font-semibold text-[#0b2d54]">{text(item.name,"Condition")}</p><ClinicalMarker item={item} /></div><Badge tone="blue">{human(item.status)}</Badge></div>
+          <DetailGrid items={[
+            ["Category", item.category], ["Body system", item.bodySystem], ["Severity", item.severity ? human(item.severity) : null],
+            ["Stage", item.stage], ["Chronic", yesNo(item.chronic)], ["Primary condition", yesNo(item.primaryCondition)],
+            ["Diagnosed / recorded", date(item.diagnosedAt)], ["Resolved", date(item.resolvedAt)], ["Diagnosed by", item.diagnosedBy],
+            ["Treatment plan", item.treatmentPlan], ["Outcome", item.outcome], ["Notes", item.notes], ["Updated", date(item.updatedAt)],
+          ]} />
+        </article>)}</div> : <Empty>No active health conditions recorded.</Empty>}
+        <Link href="/health-conditions" className="mt-4 inline-flex items-center gap-1 text-xs font-bold text-[#0b2d54]">View health records <ChevronRight className="h-3.5 w-3.5" /></Link>
+      </Panel>
+      <Panel title="Practitioner diagnoses" icon={<ShieldCheck className="h-5 w-5" />}>
+        {computed.diagnoses?.length ? <div className="space-y-3">{computed.diagnoses.map((item:any) => <article key={item.id} className="rounded-2xl bg-slate-50 p-4">
+          <div className="flex items-start justify-between gap-3"><div><p className="font-semibold text-[#0b2d54]">{text(item.name,"Clinical diagnosis")}</p><ClinicalMarker item={item} /></div><Badge tone="green">{human(item.status)}</Badge></div>
+          <DetailGrid items={[
+            ["Description", item.description], ["Category", item.category], ["Body system", item.bodySystem], ["Chronic", yesNo(item.chronic)],
+            ["Diagnosed", date(item.diagnosedAt)], ["Resolved", date(item.resolvedAt)], ["Severity", item.severity ? human(item.severity) : null],
+            ["Stage", item.stage], ["Primary diagnosis", yesNo(item.primaryDiagnosis)], ["Confirmed", yesNo(item.confirmed)],
+            ["Diagnosed by", item.diagnosedBy || item.practitionerName], ["Treatment plan", item.treatmentPlan], ["Outcome", item.outcome],
+            ["Clinical notes", item.notes], ["Updated", date(item.updatedAt)],
+          ]} />
+        </article>)}</div> : <Empty>No practitioner diagnoses are available yet.</Empty>}
+        <Link href="/health-conditions" className="mt-4 inline-flex items-center gap-1 text-xs font-bold text-[#0b2d54]">View clinical diagnoses <ChevronRight className="h-3.5 w-3.5" /></Link>
+      </Panel>
+      <Panel title="Procedures & surgical history" icon={<Activity className="h-5 w-5" />}>
+        {computed.procedures?.length ? <div className="space-y-3">{computed.procedures.map((item:any) => <article key={item.id} className="rounded-2xl bg-slate-50 p-4">
+          <div className="flex items-start justify-between gap-3"><div><p className="font-semibold text-[#0b2d54]">{text(item.name,"Procedure")}</p><ClinicalMarker item={item} /></div><Badge>{human(item.status)}</Badge></div>
+          <DetailGrid items={[
+            ["Description", item.description], ["Category", item.category], ["Body system", item.bodySystem], ["Invasive", yesNo(item.invasive)], ["Surgical", yesNo(item.surgical)],
+            ["Performed", date(item.performedAt)], ["Outcome", item.outcome], ["Performed by", item.performer || item.practitionerName], ["Facility", item.facility],
+            ["Complications", item.complications], ["Follow-up required", yesNo(item.followUpRequired)], ["Follow-up date", date(item.followUpDate)],
+            ["Clinical notes", item.notes], ["Updated", date(item.updatedAt)],
+          ]} />
+        </article>)}</div> : <Empty>No procedures or surgical history recorded.</Empty>}
+      </Panel>
+      <Panel title="Current medications" icon={<HeartPulse className="h-5 w-5" />}>
+        {computed.medications?.length ? <div className="space-y-3">{computed.medications.map((item:any) => <article key={item.id} className="rounded-2xl bg-slate-50 p-4">
+          <div className="flex items-start justify-between gap-3"><div><p className="font-semibold text-[#0b2d54]">{text(item.name,"Medication")}</p><ClinicalMarker item={item} /></div><Badge tone="green">{human(item.status)}</Badge></div>
+          <DetailGrid items={[
+            ["Generic name", item.genericName], ["Brand name", item.brandName], ["Category", item.category], ["Dose", item.dosage],
+            ["Frequency", item.frequency], ["Route", item.route], ["Indication", item.indication], ["Instructions", item.instructions],
+            ["Prescribed by", item.prescribedBy || item.clinicalBy], ["Started", date(item.startedAt)], ["Ended", date(item.endedAt)],
+            ["Ongoing", yesNo(item.ongoing)], ["Adherence", item.adherencePercentage != null ? String(item.adherencePercentage) + "%" : null],
+            ["Missed doses", item.missedDoses], ["Side effects", item.sideEffects], ["Effectiveness", item.effectiveness],
+            ["Notes", item.notes], ["Updated", date(item.updatedAt)],
+          ]} />
+        </article>)}</div> : <Empty>No active medications recorded.</Empty>}
+        <Link href="/medications" className="mt-4 inline-flex items-center gap-1 text-xs font-bold text-[#0b2d54]">View medications <ChevronRight className="h-3.5 w-3.5" /></Link>
+      </Panel>
+      <Panel title="Immunizations" icon={<Syringe className="h-5 w-5" />}>
+        {computed.immunizations?.length ? <div className="space-y-3">{computed.immunizations.map((item:any) => <article key={item.id} className="rounded-2xl bg-emerald-50/55 p-4">
+          <div className="flex items-start justify-between gap-3"><div><p className="font-semibold text-[#0b2d54]">{text(item.name,"Immunization")}</p><ClinicalMarker item={item} /></div><Badge tone="green">{human(item.status)}</Badge></div>
+          <DetailGrid items={[
+            ["Category", item.category], ["Disease protected", item.diseaseProtected], ["Administered", date(item.administeredAt)], ["Dose number", item.doseNumber],
+            ["Batch number", item.batchNumber], ["Manufacturer", item.manufacturer], ["Administered by", item.administeredBy], ["Facility", item.facility],
+            ["Route", item.route], ["Site", item.site], ["Adverse reaction", yesNo(item.adverseReaction)], ["Reaction details", item.adverseReactionNotes],
+            ["Next due", date(item.nextDueDate)], ["Notes", item.notes], ["Updated", date(item.updatedAt)],
+          ]} />
+        </article>)}</div> : <Empty>No immunizations recorded yet.</Empty>}
+        <Link href="/immunizations" className="mt-4 inline-flex items-center gap-1 text-xs font-bold text-[#0b2d54]">View immunizations <ChevronRight className="h-3.5 w-3.5" /></Link>
+      </Panel>
+    </div>
+    <div className="mt-5">
+      <Panel title="Medical history" icon={<CalendarDays className="h-5 w-5" />}>
+        <div className="mb-3"><ClinicalMarker label="Clinical record · view only" /></div>
+        {computed.medicalHistory ? <DetailGrid items={[
+          ["Past medical history", computed.medicalHistory.pastMedicalHistory], ["Family history", computed.medicalHistory.familyHistory],
+          ["Social history", computed.medicalHistory.socialHistory], ["Surgical history", computed.medicalHistory.surgicalHistory],
+          ["Recorded allergies", computed.medicalHistory.allergies], ["Chronic conditions", computed.medicalHistory.chronicConditions],
+          ["Recorded medications", computed.medicalHistory.currentMedications], ["Immunization notes", computed.medicalHistory.immunizationNotes],
+        ]} /> : <Empty>No additional medical history has been recorded.</Empty>}
+      </Panel>
+    </div>
     <div className="mt-5 grid gap-5 md:grid-cols-2"><Panel title="Emergency contacts" icon={<Phone className="h-5 w-5" />}>{computed.emergency?.emergencyNotes && <div className="mb-3 rounded-2xl bg-amber-50 p-4 text-sm text-amber-900"><span className="font-bold">Emergency notes:</span> {computed.emergency.emergencyNotes}</div>}{computed.emergency?.contacts?.length ? <div className="space-y-2">{computed.emergency.contacts.slice(0,2).map((item:any)=><div key={item.id} className="rounded-2xl bg-slate-50 p-3"><p className="font-semibold text-[#0b2d54]">{text(item.fullName,"Emergency contact")}</p><p className="mt-1 text-xs text-slate-500">{text(item.phoneNumber)}</p></div>)}</div>:<Empty>No emergency contacts recorded.</Empty>}<Link href="/emergency-contacts" className="mt-4 inline-flex items-center gap-1 text-xs font-bold text-[#0b2d54]">Manage contacts <ChevronRight className="h-3.5 w-3.5" /></Link></Panel><Panel title="Coverage" icon={<ShieldCheck className="h-5 w-5" />}>{computed.coverage?.length ? <div className="space-y-2">{computed.coverage.slice(0,2).map((item:any)=><div key={item.id} className="rounded-2xl bg-slate-50 p-3"><p className="font-semibold text-[#0b2d54]">{text(item.providerName,"Insurance provider")}</p><p className="mt-1 text-xs text-slate-500">{text(item.planName)} · {text(item.membershipNumber)}</p></div>)}</div>:<Empty>No active coverage recorded.</Empty>}<Link href="/health-finance" className="mt-4 inline-flex items-center gap-1 text-xs font-bold text-[#0b2d54]">View coverage <ChevronRight className="h-3.5 w-3.5" /></Link></Panel></div>
     <div className="mt-5 rounded-[26px] border border-slate-200 bg-white p-5 shadow-sm sm:p-6"><div className="flex items-start gap-3"><div className="grid h-10 w-10 shrink-0 place-items-center rounded-2xl bg-[#0b2d54] text-white"><UserRound className="h-5 w-5" /></div><div><h2 className="font-bold text-[#0b2d54]">Your record has two sources</h2><p className="mt-1 text-sm leading-6 text-slate-500">Patient-entered information can be managed by you. Practitioner diagnoses, procedures, treatments and administered vaccines are brought into the same view and remain clinically controlled.</p>{computed.lastUpdatedAt && <p className="mt-2 text-xs font-semibold text-slate-400">Last updated · {date(computed.lastUpdatedAt)}</p>}</div></div></div>
     <p className="mt-5 flex items-center justify-center gap-2 text-center text-[11px] text-slate-400"><CalendarDays className="h-3.5 w-3.5" />Your Clinic Card is connected to your authenticated patient record.</p>
