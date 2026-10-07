@@ -56,6 +56,7 @@ export class SmartFileConsentService {
       purpose: 'Clinical Smart File access',
       expiresAt: this.hoursFromNow(CLINICAL_CONSENT_HOURS),
       canViewMedicalRecords: true,
+      canUpdateClinicalRecords: true,
       canViewLabResults: true,
       canViewImaging: true,
       canViewPrescriptions: true,
@@ -90,6 +91,7 @@ export class SmartFileConsentService {
       purpose: 'Prescription access for pharmacy dispensing',
       expiresAt: this.minutesFromNow(PHARMACY_CONSENT_MINUTES),
       canViewMedicalRecords: false,
+      canUpdateClinicalRecords: false,
       canViewLabResults: false,
       canViewImaging: false,
       canViewPrescriptions: true,
@@ -207,6 +209,7 @@ export class SmartFileConsentService {
     purpose: string;
     expiresAt: Date;
     canViewMedicalRecords: boolean;
+    canUpdateClinicalRecords: boolean;
     canViewLabResults: boolean;
     canViewImaging: boolean;
     canViewPrescriptions: boolean;
