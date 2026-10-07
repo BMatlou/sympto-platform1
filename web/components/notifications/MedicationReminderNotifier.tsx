@@ -6,7 +6,7 @@ import { toast } from "sonner";
 import { patientNotificationsService, type PatientNotification } from "@/services/patient-notifications.service";
 
 const POLL_INTERVAL_MS = 15_000;
-const RECENT_DELIVERY_WINDOW_MS = 60_000;
+const RECENT_DELIVERY_WINDOW_MS = 2 * 60_000;
 const STORAGE_KEY = "sympto:shown-medication-reminders";
 
 function isMedicationReminder(notification: PatientNotification) {
@@ -46,12 +46,7 @@ export default function MedicationReminderNotifier() {
       if (!localStorage.getItem("accessToken")) return;
 
       try {
-        const payload = await patientNotificationsService.list({ page: 1, limit: 100 });
-        const rows = Array.isArray(payload)
-          ? payload
-          : Array.isArray(payload?.data)
-            ? payload.data
-            : [];
+        const rows = await patientNotificationsService.getDueReminders();
 
         if (!active) return;
 
@@ -59,12 +54,13 @@ export default function MedicationReminderNotifier() {
         let changed = false;
 
         for (const raw of rows as PatientNotification[]) {
-          if (!isMedicationReminder(raw) || !raw.sentAt || shownIds.current.has(raw.id)) continue;
+          if (!isMedicationReminder(raw) || shownIds.current.has(raw.id)) continue;
 
-          const sentAt = new Date(String(raw.sentAt)).getTime();
-          if (!Number.isFinite(sentAt)) continue;
+          const dueAt = raw.scheduledFor ?? raw.sentAt ?? raw.deliveredAt ?? raw.createdAt;
+          const dueTimestamp = new Date(String(dueAt)).getTime();
+          if (!Number.isFinite(dueTimestamp)) continue;
 
-          const age = now - sentAt;
+          const age = now - dueTimestamp;
 
           if (age >= 0 && age <= RECENT_DELIVERY_WINDOW_MS) {
             shownIds.current.add(raw.id);
