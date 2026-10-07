@@ -26,6 +26,7 @@ import {
 type NotificationCategory =
   | "MEDICATIONS"
   | "APPOINTMENTS"
+  | "HEALTH_REPORTS"
   | "RESULTS"
   | "MESSAGES"
   | "TELEMEDICINE"
@@ -46,6 +47,13 @@ function getCategory(notification: PatientNotification): NotificationCategory {
     isMedicationReminder(notification)
   ) {
     return "MEDICATIONS";
+  }
+
+  if (
+    notification.type === "WEEKLY_HEALTH_REPORT" ||
+    notification.type === "MONTHLY_HEALTH_REPORT"
+  ) {
+    return "HEALTH_REPORTS";
   }
 
   switch (notification.type) {
@@ -116,6 +124,8 @@ function categoryLabel(notification: PatientNotification) {
       return "Medication";
     case "APPOINTMENTS":
       return "Appointment";
+    case "HEALTH_REPORTS":
+      return "Health report";
     case "RESULTS":
       return "Result";
     case "MESSAGES":
@@ -139,6 +149,8 @@ function iconFor(notification: PatientNotification) {
       return <Pill className="h-5 w-5" aria-hidden="true" />;
     case "APPOINTMENTS":
       return <CalendarDays className="h-5 w-5" aria-hidden="true" />;
+    case "HEALTH_REPORTS":
+      return <FileText className="h-5 w-5" aria-hidden="true" />;
     case "RESULTS":
       return <FileText className="h-5 w-5" aria-hidden="true" />;
     case "MESSAGES":
