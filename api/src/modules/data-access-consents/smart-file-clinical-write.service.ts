@@ -96,7 +96,7 @@ export class SmartFileClinicalWriteService {
               : AuditAction.CREATE,
           entityType: `SmartFileClinical/${dto.section}`,
           entityId: String(dto.id ?? value?.id ?? randomUUID()),
-          newValues: this.sanitizeForAudit(dto.data),
+          newValues: this.sanitizeForAudit(dto.data) as any,
           success: true,
         },
       });
