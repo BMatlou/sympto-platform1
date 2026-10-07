@@ -56,10 +56,10 @@ const categoryTabs: CategoryTab[] = [
   { key: "CARE", label: "Care", icon: Stethoscope },
 ];
 
-// A notification-center category is visible when at least one of its
-// underlying notification types is enabled for the In-app channel.
-// Missing preferences intentionally follow the preferences page default:
-// In-app is enabled unless the user has explicitly switched it off.
+// Category visibility is intentionally stricter than the preferences page
+// default. A category belongs in this page only when the user has explicitly
+// enabled at least one underlying notification type for In-app delivery AND
+// there is an actual notification message in that category.
 const categoryPreferenceTypes: Record<
   Exclude<NotificationCategory, "ALL">,
   string[]
@@ -287,18 +287,24 @@ export default function NotificationsPage() {
 
   const visibleCategoryTabs = useMemo(
     () =>
-      categoryTabs.filter((tab) =>
-        categoryPreferenceTypes[tab.key].some((type) => {
-          const preference = preferences.find(
-            (item) => item.notificationType === type && item.channel === "IN_APP",
-          );
+      categoryTabs.filter((tab) => {
+        const hasExplicitInAppPreference = categoryPreferenceTypes[tab.key].some(
+          (type) =>
+            preferences.some(
+              (item) =>
+                item.notificationType === type &&
+                item.channel === "IN_APP" &&
+                item.enabled,
+            ),
+        );
 
-          // Keep parity with Notification Preferences: an absent In-app
-          // preference means ON until the user explicitly turns it off.
-          return preference ? preference.enabled : true;
-        }),
-      ),
-    [preferences],
+        const hasNotification = notifications.some(
+          (notification) => getCategory(notification) === tab.key,
+        );
+
+        return hasExplicitInAppPreference && hasNotification;
+      }),
+    [notifications, preferences],
   );
 
   useEffect(() => {
@@ -496,41 +502,54 @@ export default function NotificationsPage() {
               Notifications
             </p>
             <h1 className="mt-1 text-3xl font-extrabold tracking-tight text-[#0b2d54] sm:text-4xl">
-              Your notifications
+              Notifications
             </h1>
             <p className="mt-1.5 max-w-2xl text-sm leading-6 text-slate-500">
-              Stay on top of reminders, appointments, results, messages and
-              important updates.
+              Your reminders, care updates and important health messages.
             </p>
           </div>
 
-          <section className="overflow-hidden rounded-[30px] bg-[#24c1c4] shadow-[0_18px_45px_rgba(11,45,84,0.12)]">
+          <section className="overflow-hidden rounded-[30px] bg-[#0b2d54] shadow-[0_18px_45px_rgba(11,45,84,0.14)]">
             <div className="p-5 sm:p-7">
-              <div className="flex items-start justify-between gap-4">
-                <div>
-                  <p className="text-[10px] font-black uppercase tracking-[0.18em] text-[#0b2d54]/65">
+              <div className="flex flex-col gap-5 sm:flex-row sm:items-center sm:justify-between">
+                <div className="min-w-0">
+                  <p className="text-[10px] font-black uppercase tracking-[0.18em] text-[#24c1c4]">
                     {range === "DAY"
                       ? "Today"
                       : range === "WEEK"
                         ? "This week"
                         : "This month"}
                   </p>
-                  <h2 className="mt-1 text-2xl font-extrabold tracking-tight text-[#0b2d54] sm:text-3xl">
+                  <h2 className="mt-1 text-2xl font-extrabold tracking-tight text-white sm:text-3xl">
                     {categoryLabel(category)}
                   </h2>
+                  <p className="mt-1 text-xs font-medium text-white/55">
+                    {range === "DAY"
+                      ? new Intl.DateTimeFormat("en-ZA", {
+                          day: "numeric",
+                          month: "long",
+                          year: "numeric",
+                        }).format(new Date())
+                      : range === "WEEK"
+                        ? "Monday to today"
+                        : new Intl.DateTimeFormat("en-ZA", {
+                            month: "long",
+                            year: "numeric",
+                          }).format(new Date())}
+                  </p>
                 </div>
 
-                <div className="rounded-2xl bg-white/35 px-4 py-3 text-right ring-1 ring-white/30">
-                  <p className="text-[9px] font-black uppercase tracking-[0.15em] text-[#0b2d54]/60">
+                <div className="flex shrink-0 items-center gap-2">
+                  <span className="text-[10px] font-black uppercase tracking-[0.15em] text-white/45">
                     Unread
-                  </p>
-                  <p className="mt-0.5 text-2xl font-extrabold text-[#0b2d54]">
+                  </span>
+                  <span className="grid h-10 min-w-10 place-items-center rounded-2xl bg-[#24c1c4] px-3 text-sm font-extrabold text-[#0b2d54]">
                     {unreadCount}
-                  </p>
+                  </span>
                 </div>
               </div>
 
-              <div className="mt-5 flex rounded-2xl bg-white/25 p-1 ring-1 ring-white/30">
+              <div className="mt-5 flex max-w-md rounded-2xl bg-white/[0.08] p-1 ring-1 ring-white/10">
                 {(["DAY", "WEEK", "MONTH"] as const).map((value) => (
                   <button
                     key={value}
@@ -541,7 +560,7 @@ export default function NotificationsPage() {
                       "flex min-h-10 flex-1 items-center justify-center rounded-xl text-xs font-black transition " +
                       (range === value
                         ? "bg-white text-[#0b2d54] shadow-sm"
-                        : "text-[#0b2d54]/65 hover:bg-white/20 hover:text-[#0b2d54]")
+                        : "text-white/55 hover:bg-white/[0.06] hover:text-white")
                     }
                   >
                     {value === "DAY"
@@ -552,63 +571,15 @@ export default function NotificationsPage() {
                   </button>
                 ))}
               </div>
-
-              <div className="mt-5 grid grid-cols-2 gap-3 sm:grid-cols-3">
-                <div className="rounded-2xl bg-white/25 p-4 ring-1 ring-white/25">
-                  <p className="text-[9px] font-black uppercase tracking-wide text-[#0b2d54]/60">
-                    Notifications
-                  </p>
-                  <p className="mt-1 text-3xl font-extrabold text-[#0b2d54]">
-                    {visible.length}
-                  </p>
-                  <p className="mt-0.5 text-[10px] font-semibold text-[#0b2d54]/55">
-                    in this period
-                  </p>
-                </div>
-
-                <div className="rounded-2xl bg-white/25 p-4 ring-1 ring-white/25">
-                  <p className="text-[9px] font-black uppercase tracking-wide text-[#0b2d54]/60">
-                    New
-                  </p>
-                  <p className="mt-1 text-3xl font-extrabold text-[#0b2d54]">
-                    {visible.filter((item) => !item.readAt).length}
-                  </p>
-                  <p className="mt-0.5 text-[10px] font-semibold text-[#0b2d54]/55">
-                    waiting for you
-                  </p>
-                </div>
-
-                <div className="col-span-2 rounded-2xl bg-white/25 p-4 ring-1 ring-white/25 sm:col-span-1">
-                  <p className="text-[9px] font-black uppercase tracking-wide text-[#0b2d54]/60">
-                    Period
-                  </p>
-                  <p className="mt-1 text-sm font-extrabold text-[#0b2d54]">
-                    {range === "DAY"
-                      ? new Intl.DateTimeFormat("en-ZA", {
-                          day: "numeric",
-                          month: "short",
-                          year: "numeric",
-                        }).format(new Date())
-                      : range === "WEEK"
-                        ? "Monday – today"
-                        : new Intl.DateTimeFormat("en-ZA", {
-                            month: "long",
-                            year: "numeric",
-                          }).format(new Date())}
-                  </p>
-                </div>
-              </div>
             </div>
-          </section>
-
-          <section className="mt-5">
+          </section><section className="mt-5">
             <div className="mb-3 flex items-center justify-between gap-3">
               <div>
                 <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-slate-400">
                   Categories
                 </p>
                 <p className="mt-1 text-sm font-bold text-[#0b2d54]">
-                  {categoryLabel(category)}
+                  Available notifications
                 </p>
               </div>
 
