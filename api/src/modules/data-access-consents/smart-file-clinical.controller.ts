@@ -16,6 +16,8 @@ import { SmartFileClinicalService } from './smart-file-clinical.service';
 import { SmartFileClinicalWriteService } from './smart-file-clinical-write.service';
 import { CreateSmartFileClinicalUpdateDto } from './dto/create-smart-file-clinical-update.dto';
 import { SmartFileClinicalWriteDto } from './dto/smart-file-clinical-write.dto';
+import { SmartFileClinicalWriteService } from './smart-file-clinical-write.service';
+import { SmartFileClinicalWriteDto } from './dto/smart-file-clinical-write.dto';
 
 type AuthenticatedRequest = {
   user?: {
@@ -68,6 +70,34 @@ export class SmartFileClinicalController {
       this.userId(req),
       consentId,
       dto,
+    );
+  }
+
+  @Post('clinical/:consentId/write')
+  writeClinicalRecord(
+    @Req() req: AuthenticatedRequest,
+    @Param('consentId') consentId: string,
+    @Body() dto: SmartFileClinicalWriteDto,
+  ) {
+    return this.smartFileClinicalWriteService.write(
+      this.userId(req),
+      consentId,
+      dto,
+    );
+  }
+
+  @Get('clinical/:consentId/references')
+  searchClinicalReferences(
+    @Req() req: AuthenticatedRequest,
+    @Param('consentId') consentId: string,
+    @Query('type') type: string,
+    @Query('search') search?: string,
+  ) {
+    return this.smartFileClinicalWriteService.searchReferences(
+      this.userId(req),
+      consentId,
+      type,
+      search,
     );
   }
 
