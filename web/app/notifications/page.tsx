@@ -292,7 +292,7 @@ export default function NotificationsPage() {
     }
   }, [category, visibleCategoryTabs]);
 
-  const visible = useMemo(() => {
+  const rangeFiltered = useMemo(() => {
     const now = new Date();
     const startOfToday = new Date(
       now.getFullYear(),
@@ -315,20 +315,16 @@ export default function NotificationsPage() {
     return notifications
       .filter((notification) => {
         const date = new Date(String(relevantDate(notification)));
-        const categoryMatch =
-          category === "ALL" || getCategory(notification) === category;
-        const unreadMatch = !unreadOnly || !notification.readAt;
-        const inRange =
-          !Number.isNaN(date.getTime()) && date >= rangeStart && date <= now;
-
-        return categoryMatch && unreadMatch && inRange;
+        return (
+          !Number.isNaN(date.getTime()) &&
+          date >= rangeStart &&
+          date <= now
+        );
       })
       .sort((a, b) => {
         const aUnread = !a.readAt;
         const bUnread = !b.readAt;
 
-        // "New" means unread in the Notification Center. Surface unread
-        // notifications first, then keep each group newest-first.
         if (aUnread !== bUnread) return aUnread ? -1 : 1;
 
         return (
@@ -336,7 +332,19 @@ export default function NotificationsPage() {
           new Date(String(a.createdAt)).getTime()
         );
       });
-  }, [category, notifications, unreadOnly, range]);
+  }, [notifications, range]);
+
+  const visible = useMemo(
+    () =>
+      rangeFiltered.filter((notification) => {
+        const categoryMatch =
+          category === "ALL" || getCategory(notification) === category;
+        const unreadMatch = !unreadOnly || !notification.readAt;
+
+        return categoryMatch && unreadMatch;
+      }),
+    [category, rangeFiltered, unreadOnly],
+  );
 
   const grouped = useMemo(() => {
     const groups: Record<string, PatientNotification[]> = {};
@@ -367,12 +375,12 @@ export default function NotificationsPage() {
     return groups;
   }, [visible, range]);
 
-  const counts = useMemo(() => {
+  const periodCounts = useMemo(() => {
     const result: Record<
       NotificationCategory,
       { total: number; unread: number }
     > = {
-      ALL: { total: notifications.length, unread: unreadCount },
+      ALL: { total: rangeFiltered.length, unread: 0 },
       MEDICATIONS: { total: 0, unread: 0 },
       APPOINTMENTS: { total: 0, unread: 0 },
       RESULTS: { total: 0, unread: 0 },
@@ -383,14 +391,17 @@ export default function NotificationsPage() {
       CARE: { total: 0, unread: 0 },
     };
 
-    for (const notification of notifications) {
+    for (const notification of rangeFiltered) {
       const key = getCategory(notification);
       result[key].total += 1;
-      if (!notification.readAt) result[key].unread += 1;
+      if (!notification.readAt) {
+        result.ALL.unread += 1;
+        result[key].unread += 1;
+      }
     }
 
     return result;
-  }, [notifications, unreadCount]);
+  }, [rangeFiltered]);
 
   async function markRead(id: string) {
     try {
@@ -454,8 +465,8 @@ export default function NotificationsPage() {
   return (
     <ProtectedRoute>
       <main className="min-h-screen bg-[#f4fbfb] text-slate-800">
-        <div className="mx-auto max-w-5xl px-4 py-6 sm:px-6 sm:py-8">
-          <div className="flex items-center justify-between gap-4">
+        <div className="mx-auto max-w-7xl px-4 py-6 sm:px-6 sm:py-8 lg:px-8">
+          <div className="mb-4 flex items-center justify-between gap-4">
             <Link
               href="/dashboard"
               className="inline-flex items-center gap-2 text-sm font-semibold text-[#0b2d54] transition hover:text-[#24c1c4]"
@@ -464,22 +475,14 @@ export default function NotificationsPage() {
               Back to Health Home
             </Link>
 
-            <div className="flex items-center gap-4">
-              {unreadCount > 0 && (
-                <span className="inline-flex items-center gap-1.5 text-xs font-bold text-[#0b2d54]">
-                  <span className="h-2 w-2 rounded-full bg-[#24c1c4]" />
-                  {unreadCount} unread
-                </span>
-              )}
-              <Link
-                href="/notifications/preferences"
-                aria-label="Notification preferences"
-                className="text-[#0b2d54] transition hover:text-[#24c1c4]"
-                title="Preferences"
-              >
-                <Settings className="h-4 w-4" />
-              </Link>
-            </div>
+            <Link
+              href="/notifications/preferences"
+              aria-label="Notification preferences"
+              className="text-[#0b2d54] transition hover:text-[#24c1c4]"
+              title="Preferences"
+            >
+              <Settings className="h-4 w-4" />
+            </Link>
           </div>
 
           <section className="relative mb-6 overflow-hidden rounded-[32px] bg-gradient-to-br from-[#0b2d54] via-[#0f5261] to-[#24c1c4] p-6 text-white shadow-[0_24px_60px_rgba(11,45,84,0.20)] sm:p-8">
@@ -496,7 +499,7 @@ export default function NotificationsPage() {
                   <h1 className="mt-4 text-3xl font-extrabold tracking-tight sm:text-4xl">
                     Your notifications
                   </h1>
-                  <p className="mt-2 max-w-2xl text-sm leading-6 text-white/75">
+                  <p className="mt-2 max-w-3xl text-sm leading-6 text-white/75">
                     Keep track of medication reminders, appointments, results,
                     care-team messages and important account updates.
                   </p>
@@ -513,16 +516,16 @@ export default function NotificationsPage() {
                     Unread
                   </p>
                   <p className="mt-1.5 text-2xl font-extrabold text-white">
-                    {unreadCount}
+                    {periodCounts.ALL.unread}
                   </p>
                 </div>
 
                 <div className="rounded-2xl bg-white/10 p-3.5 ring-1 ring-white/10">
                   <p className="text-[10px] font-semibold uppercase tracking-wide text-white/55">
-                    Showing
+                    {range === "DAY" ? "Today" : range === "WEEK" ? "This week" : "This month"}
                   </p>
                   <p className="mt-1.5 text-2xl font-extrabold text-white">
-                    {notifications.length}
+                    {rangeFiltered.length}
                   </p>
                 </div>
 
@@ -544,141 +547,139 @@ export default function NotificationsPage() {
                   )}
                 </div>
               </div>
-            </div>
-          </section>
 
-          <section className="mb-6 rounded-[26px] border border-slate-200/80 bg-white p-4 shadow-[0_10px_35px_rgba(11,45,84,0.06)] sm:p-5">
-            <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-              <div className="flex min-w-0 flex-col gap-2 sm:flex-row sm:items-center sm:gap-4">
-                <span className="shrink-0 text-[10px] font-black uppercase tracking-[0.16em] text-slate-400">
-                  View
-                </span>
+              <div className="mt-6 border-t border-white/15 pt-5">
+                <div className="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
+                  <div className="flex items-center gap-3 overflow-x-auto">
+                    <span className="shrink-0 text-[10px] font-black uppercase tracking-[0.16em] text-white/50">
+                      View
+                    </span>
 
-                <div className="inline-flex w-fit rounded-xl bg-[#f4fbfb] p-1 ring-1 ring-[#24c1c4]/15">
-                  {(["DAY", "WEEK", "MONTH"] as const).map((value) => (
+                    <div className="inline-flex shrink-0 rounded-xl bg-white/10 p-1 ring-1 ring-white/10">
+                      {(["DAY", "WEEK", "MONTH"] as const).map((value) => (
+                        <button
+                          key={value}
+                          type="button"
+                          onClick={() => setRange(value)}
+                          aria-pressed={range === value}
+                          className={
+                            "min-h-9 min-w-16 rounded-lg px-3 text-xs font-black transition " +
+                            (range === value
+                              ? "bg-white text-[#0b2d54] shadow-sm"
+                              : "text-white/65 hover:text-white")
+                          }
+                        >
+                          {value === "DAY"
+                            ? "Day"
+                            : value === "WEEK"
+                              ? "Week"
+                              : "Month"}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  <div className="flex shrink-0 items-center gap-3">
                     <button
-                      key={value}
                       type="button"
-                      onClick={() => setRange(value)}
-                      aria-pressed={range === value}
+                      onClick={() => setUnreadOnly((current) => !current)}
+                      aria-pressed={unreadOnly}
                       className={
-                        "min-h-9 min-w-16 rounded-lg px-3 text-xs font-black transition " +
-                        (range === value
-                          ? "bg-[#0b2d54] text-white shadow-sm"
-                          : "text-slate-500 hover:text-[#0b2d54]")
+                        "text-[11px] font-bold transition " +
+                        (unreadOnly
+                          ? "text-white"
+                          : "text-white/65 hover:text-white")
                       }
                     >
-                      {value === "DAY"
-                        ? "Day"
-                        : value === "WEEK"
-                          ? "Week"
-                          : "Month"}
+                      {unreadOnly ? "Unread" : "Unread only"}
+                      {periodCounts.ALL.unread > 0 && (
+                        <span className="ml-1.5 font-black text-[#24c1c4]">
+                          {periodCounts.ALL.unread}
+                        </span>
+                      )}
                     </button>
-                  ))}
+
+                    {unreadCount > 0 && (
+                      <button
+                        type="button"
+                        onClick={() => void markAllRead()}
+                        disabled={busyId === "all"}
+                        className="inline-flex items-center gap-1.5 rounded-xl bg-white px-3.5 py-2.5 text-[11px] font-bold text-[#0b2d54] shadow-sm transition hover:bg-white/90 disabled:opacity-50"
+                      >
+                        <CheckCheck className="h-3.5 w-3.5" />
+                        {busyId === "all" ? "Updating…" : "Mark all read"}
+                      </button>
+                    )}
+                  </div>
                 </div>
 
-                <span className="hidden text-xs text-slate-300 sm:inline">•</span>
-
-                <span className="shrink-0 text-xs font-semibold text-slate-500">
-                  {category === "ALL"
-                    ? "All notifications"
-                    : categoryTabs.find((tab) => tab.key === category)?.label}
-                </span>
-              </div>
-
-              <div className="flex shrink-0 items-center gap-3">
-                <button
-                  type="button"
-                  onClick={() => setUnreadOnly((current) => !current)}
-                  aria-pressed={unreadOnly}
-                  className={
-                    "text-[11px] font-bold transition " +
-                    (unreadOnly
-                      ? "text-[#0b2d54]"
-                      : "text-slate-500 hover:text-[#0b2d54]")
-                  }
-                >
-                  {unreadOnly ? "Unread" : "Unread only"}
-                  {unreadCount > 0 && (
-                    <span className="ml-1.5 font-black text-[#24c1c4]">
-                      {unreadCount}
-                    </span>
-                  )}
-                </button>
-
-                {unreadCount > 0 && (
+                <div className="mt-4 flex items-center gap-2 overflow-x-auto pb-0.5">
                   <button
                     type="button"
-                    onClick={() => void markAllRead()}
-                    disabled={busyId === "all"}
-                    className="inline-flex items-center gap-1.5 rounded-xl bg-[#0b2d54] px-3.5 py-2.5 text-[11px] font-bold text-white shadow-sm transition hover:bg-[#123f70] disabled:opacity-50"
+                    onClick={() => setCategory("ALL")}
+                    className={
+                      "inline-flex min-h-9 shrink-0 items-center gap-2 rounded-full px-3.5 py-2 text-xs font-bold transition " +
+                      (category === "ALL"
+                        ? "bg-white text-[#0b2d54] shadow-sm"
+                        : "bg-white/10 text-white hover:bg-white/15")
+                    }
                   >
-                    <CheckCheck className="h-3.5 w-3.5" />
-                    {busyId === "all" ? "Updating…" : "Mark all read"}
-                  </button>
-                )}
-              </div>
-            </div>
-
-            <div className="mt-4 border-t border-slate-100 pt-4">
-              <div className="flex items-center gap-2 overflow-x-auto pb-0.5">
-                <button
-                  type="button"
-                  onClick={() => setCategory("ALL")}
-                  className={
-                    "inline-flex min-h-9 shrink-0 items-center gap-2 rounded-full px-3.5 py-2 text-xs font-bold transition " +
-                    (category === "ALL"
-                      ? "bg-[#0b2d54] text-white shadow-sm"
-                      : "bg-slate-100 text-slate-600 hover:bg-[#24c1c4]/10 hover:text-[#0b2d54]")
-                  }
-                >
-                  All
-                  {counts.ALL.unread > 0 && (
+                    All
                     <span
                       className={
                         "grid min-w-5 place-items-center rounded-full px-1.5 py-0.5 text-[9px] font-black " +
                         (category === "ALL"
                           ? "bg-[#24c1c4] text-[#0b2d54]"
-                          : "bg-white text-[#0b2d54]")
+                          : "bg-white/10 text-white/80")
                       }
                     >
-                      {counts.ALL.unread}
+                      {periodCounts.ALL.total}
                     </span>
-                  )}
-                </button>
+                  </button>
 
-                {visibleCategoryTabs.map((tab) => {
-                  const active = category === tab.key;
-                  const count = counts[tab.key];
+                  {visibleCategoryTabs.map((tab) => {
+                    const active = category === tab.key;
+                    const count = periodCounts[tab.key];
 
-                  return (
-                    <button
-                      key={tab.key}
-                      type="button"
-                      onClick={() => setCategory(tab.key)}
-                      className={
-                        "inline-flex min-h-9 shrink-0 items-center gap-2 rounded-full px-3.5 py-2 text-xs font-bold transition " +
-                        (active
-                          ? "bg-[#0b2d54] text-white shadow-sm"
-                          : "bg-slate-100 text-slate-600 hover:bg-[#24c1c4]/10 hover:text-[#0b2d54]")
-                      }
-                    >
-                      {tab.label}
-                      {count.unread > 0 && (
+                    return (
+                      <button
+                        key={tab.key}
+                        type="button"
+                        onClick={() => setCategory(tab.key)}
+                        className={
+                          "inline-flex min-h-9 shrink-0 items-center gap-2 rounded-full px-3.5 py-2 text-xs font-bold transition " +
+                          (active
+                            ? "bg-white text-[#0b2d54] shadow-sm"
+                            : "bg-white/10 text-white hover:bg-white/15")
+                        }
+                      >
+                        {tab.label}
                         <span
                           className={
                             "grid min-w-5 place-items-center rounded-full px-1.5 py-0.5 text-[9px] font-black " +
                             (active
                               ? "bg-[#24c1c4] text-[#0b2d54]"
-                              : "bg-white text-[#0b2d54]")
+                              : "bg-white/10 text-white/80")
                           }
                         >
-                          {count.unread}
+                          {count.total}
                         </span>
-                      )}
-                    </button>
-                  );
-                })}
+                      </button>
+                    );
+                  })}
+                </div>
+
+                <div className="mt-3 text-[10px] font-medium text-white/45">
+                  {category === "ALL"
+                    ? "All notifications"
+                    : categoryTabs.find((tab) => tab.key === category)?.label}
+                  {" · "}
+                  {range === "DAY"
+                    ? "Today"
+                    : range === "WEEK"
+                      ? "This week"
+                      : "This month"}
+                </div>
               </div>
             </div>
           </section>
