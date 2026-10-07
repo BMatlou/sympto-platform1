@@ -41,14 +41,12 @@ export class SmartFileClinicalService {
           },
         },
         medicalRecord: true,
-        identityDocuments: true,
         appointments: consent.canViewAppointments
           ? {
               orderBy: { scheduledStart: 'desc' },
               include: {
                 practitioner: { include: { person: true } },
                 practice: true,
-                encounter: true,
               },
             }
           : false,
@@ -58,7 +56,6 @@ export class SmartFileClinicalService {
               include: {
                 items: { include: { medication: true } },
                 practitioner: { include: { person: true } },
-                encounter: { include: { encounterType: true } },
               },
             }
           : false,
@@ -66,55 +63,16 @@ export class SmartFileClinicalService {
           ? {
               orderBy: { startedAt: 'desc' },
               include: {
-                practitioner: { include: { person: true } },
-                encounter: {
-                  include: {
-                    practitioner: { include: { person: true } },
-                    encounterType: true,
-                  },
-                },
                 symptomLogs: {
                   orderBy: { startedAt: 'desc' },
                   include: {
                     symptoms: { include: { symptom: true } },
                     triggers: true,
                     medicationEffects: {
-                      include: { medication: true, prescription: true },
-                    },
-                    observations: true,
-                    attachments: { include: { attachment: true } },
-                  },
-                },
-                diagnoses: true,
-                clinicalNotes: true,
-                clinicalVitals: { include: { vitalType: true } },
-                prescriptions: {
-                  include: {
-                    items: { include: { medication: true } },
-                    practitioner: { include: { person: true } },
-                  },
-                },
-                labOrders: { include: { items: { include: { test: true } } } },
-                labResults: {
-                  include: { items: { include: { test: true } } },
-                },
-                imagingOrders: {
-                  include: { items: { include: { procedure: true } } },
-                },
-                imagingStudies: {
-                  include: {
-                    reports: {
-                      include: {
-                        practitioner: { include: { person: true } },
-                      },
+                      include: { medication: true },
                     },
                   },
                 },
-                carePlans: {
-                  include: { goals: true, notes: true, tasks: true },
-                },
-                referrals: true,
-                attachments: true,
               },
             }
           : false,
@@ -123,33 +81,17 @@ export class SmartFileClinicalService {
               orderBy: { createdAt: 'desc' },
               include: {
                 practitioner: { include: { person: true } },
-                goals: true,
-                notes: true,
-                tasks: true,
               },
             }
           : false,
         referrals: consent.canViewMedicalRecords
           ? {
               orderBy: { createdAt: 'desc' },
-              include: {
-                referringPractitioner: { include: { person: true } },
-                receivingPractitioner: { include: { person: true } },
-                referringPractice: true,
-                receivingPractice: true,
-                documents: true,
-                notes: true,
-                statusHistory: true,
-              },
             }
           : false,
         healthJournals: consent.canViewMedicalRecords
           ? {
               orderBy: { createdAt: 'desc' },
-              include: {
-                practitioner: { include: { person: true } },
-                encounter: true,
-              },
             }
           : false,
         wearableDevices: consent.canViewWearables
@@ -208,25 +150,6 @@ export class SmartFileClinicalService {
             procedures: { include: { procedure: true } },
             clinicalNotes: true,
             vitals: { include: { vitalType: true } },
-            prescriptions: {
-              include: {
-                items: { include: { medication: true } },
-                practitioner: { include: { person: true } },
-              },
-            },
-            labOrders: { include: { items: { include: { test: true } } } },
-            imagingOrders: {
-              include: { items: { include: { procedure: true } } },
-            },
-            imagingStudies: {
-              include: {
-                reports: {
-                  include: { practitioner: { include: { person: true } } },
-                },
-              },
-            },
-            carePlans: { include: { goals: true, notes: true, tasks: true } },
-            referrals: true,
           },
         })
       : [];
@@ -246,30 +169,13 @@ export class SmartFileClinicalService {
             },
             orderBy: { reportedAt: 'desc' },
             include: {
-              specimen: true,
               orderItem: {
                 include: {
                   test: true,
-                  order: {
-                    include: {
-                      laboratory: true,
-                      practitioner: { include: { person: true } },
-                      appointment: true,
-                    },
-                  },
                 },
               },
               items: { include: { test: true } },
               attachments: true,
-              verifications: {
-                include: { practitioner: { include: { person: true } } },
-              },
-              amendments: {
-                include: { practitioner: { include: { person: true } } },
-              },
-              criticalResults: {
-                include: { practitioner: { include: { person: true } } },
-              },
             },
           })
         : [];
@@ -279,22 +185,8 @@ export class SmartFileClinicalService {
           where: { patientId: patient.id },
           orderBy: { performedAt: 'desc' },
           include: {
-            order: {
-              include: {
-                practitioner: { include: { person: true } },
-                appointment: true,
-                imagingCenter: true,
-                items: { include: { procedure: true } },
-              },
-            },
             imagingCenter: true,
-            practitioner: { include: { person: true } },
-            encounter: true,
-            reports: {
-              include: {
-                practitioner: { include: { person: true } },
-              },
-            },
+            reports: true,
             series: {
               include: { images: true },
             },
@@ -435,7 +327,15 @@ export class SmartFileClinicalService {
         canUpdate: consent.canUpdateClinicalRecords,
         consentExpiresAt: consent.expiresAt,
       },
-      healthPassport: consent.canViewHealthPassport ? passport : null,
+      healthPassport: consent.canViewHealthPassport && passport
+        ? {
+            id: passport.id,
+            bloodType: passport.bloodType,
+            rhesusFactor: passport.rhesusFactor,
+            organDonor: passport.organDonor,
+            emergencyNotes: passport.emergencyNotes,
+          }
+        : null,
       medicalRecord: consent.canViewMedicalRecords ? patient.medicalRecord : null,
       conditions: consent.canViewHealthPassport ? passport?.conditions ?? [] : [],
       allergies: consent.canViewHealthPassport ? passport?.allergies ?? [] : [],
@@ -456,10 +356,6 @@ export class SmartFileClinicalService {
       referrals,
       clinicalDocuments: consent.canViewMedicalRecords
         ? [
-            ...patient.identityDocuments.map((document) => ({
-              ...document,
-              source: 'CLINICAL' as const,
-            })),
             ...encounters.flatMap((encounter) => [
               ...encounter.clinicalNotes.map((note) => ({
                 ...note,
@@ -470,21 +366,9 @@ export class SmartFileClinicalService {
                 source: 'CLINICAL' as const,
               })),
             ]),
-            ...episodes.flatMap((episode) =>
-              episode.attachments.map((attachment) => ({
-                ...attachment,
-                source: 'CLINICAL' as const,
-              })),
-            ),
             ...labResults.flatMap((result) =>
               result.attachments.map((attachment) => ({
                 ...attachment,
-                source: 'CLINICAL' as const,
-              })),
-            ),
-            ...referrals.flatMap((referral) =>
-              referral.documents.map((document) => ({
-                ...document,
                 source: 'CLINICAL' as const,
               })),
             ),
