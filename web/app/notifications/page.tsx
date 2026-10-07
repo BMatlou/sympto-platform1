@@ -204,30 +204,6 @@ function iconFor(notification: PatientNotification) {
   }
 }
 
-function iconClasses(notification: PatientNotification, unread: boolean) {
-  const category = getCategory(notification);
-  if (!unread) return "bg-slate-100 text-slate-400";
-
-  const classes: Record<NotificationCategory, string> = {
-    ALL: "bg-[#24c1c4]/10 text-[#0b2d54]",
-    MEDICATIONS: "bg-[#0b2d54]/[0.08] text-[#0b2d54]",
-    APPOINTMENTS: "bg-[#24c1c4]/12 text-[#0b2d54]",
-    RESULTS: "bg-sky-50 text-sky-700",
-    MESSAGES: "bg-violet-50 text-violet-700",
-    TELEMEDICINE: "bg-indigo-50 text-indigo-700",
-    BILLING: "bg-amber-50 text-amber-700",
-    ACCOUNT: "bg-slate-100 text-slate-600",
-    CARE: "bg-emerald-50 text-emerald-700",
-  };
-
-  return classes[category];
-}
-
-function categoryLabel(category: NotificationCategory) {
-  if (category === "ALL") return "Everything";
-  return categoryTabs.find((tab) => tab.key === category)?.label ?? "Notifications";
-}
-
 export default function NotificationsPage() {
   const [notifications, setNotifications] = useState<PatientNotification[]>([]);
   const [preferences, setPreferences] = useState<NotificationPreference[]>([]);
