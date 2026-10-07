@@ -6,6 +6,7 @@ import { api } from "@/lib/api";
 
 type Action = string;
 type ActionOption = { value: Action; label: string; group: string };
+type ExistingOption = { id: string; label: string };
 
 type Props = {
   consentId: string;
@@ -97,7 +98,7 @@ export default function ClinicalSmartFileActions({ consentId, file, onSaved }: P
   const set = (key: string, value: any) => setData((current) => ({ ...current, [key]: value }));
 
   const currentAction = ACTIONS.find((item) => item.value === action) ?? ACTIONS[0];
-  const existingOptions = useMemo(() => {
+  const existingOptions: ExistingOption[] = useMemo(() => {
     switch (action) {
       case "ENCOUNTER": return (file?.encounters ?? []).map((x: any) => ({ id: x.id, label: `${x.encounterType?.name || "Encounter"} · ${new Date(x.startedAt).toLocaleDateString("en-ZA")}` }));
       case "CLINICAL_NOTE": return (file?.clinicalDocuments ?? []).filter((x: any) => x.note).map((x: any) => ({ id: x.id, label: text(x.title || "Clinical note") }));
@@ -273,7 +274,7 @@ export default function ClinicalSmartFileActions({ consentId, file, onSaved }: P
           <button type="button" onClick={() => { setMode("CREATE"); setExistingId(""); }} className={`rounded-lg px-3 py-2 text-xs font-bold ${mode === "CREATE" ? "bg-white text-[#0b2d54] shadow-sm" : "text-slate-500"}`}><Plus className="mr-1 inline h-3.5 w-3.5"/>Add</button>
           <button type="button" onClick={() => setMode("UPDATE")} className={`rounded-lg px-3 py-2 text-xs font-bold ${mode === "UPDATE" ? "bg-white text-[#0b2d54] shadow-sm" : "text-slate-500"}`}>Update</button>
         </div>
-        {mode === "UPDATE" && <Field label="Record to update"><Select value={existingId} onChange={(e) => setExistingId(e.target.value)}><option value="">Choose a record</option>{existingOptions.map((option: { id: string; label: string }) => <option key={option.id} value={option.id}>{option.label}</option>)}</Select></Field>}
+        {mode === "UPDATE" && <Field label="Record to update"><Select value={existingId} onChange={(e) => setExistingId(e.target.value)}><option value="">Choose a record</option>{existingOptions.map((option: ExistingOption) => <option key={option.id} value={option.id}>{option.label}</option>)}</Select></Field>}
         {message && <div className="rounded-xl border border-[#24c1c4]/20 bg-[#24c1c4]/5 px-3 py-3 text-xs font-semibold text-[#0b2d54]">{message}</div>}
         <div className="rounded-2xl border border-slate-200 bg-white p-4 text-xs leading-5 text-slate-500">
           <p className="font-bold text-[#0b2d54]">Shared record rule</p>
