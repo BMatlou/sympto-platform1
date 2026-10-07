@@ -52,10 +52,30 @@ const genderOptions = ["MALE", "FEMALE", "OTHER"];
 export default function HealthPassportPremium() {
   const { data, loading: dashboardLoading, error: dashboardError, reload: reloadDashboard } = useDashboard();
   const [card, setCard] = useState<any>(null); const [cardLoading, setCardLoading] = useState(true); const [cardError, setCardError] = useState("");
+  const [clinicalRecords, setClinicalRecords] = useState<any>({});
   const [editing, setEditing] = useState(false); const [saving, setSaving] = useState(false); const [message, setMessage] = useState(""); const [errorMessage, setErrorMessage] = useState("");
   const [form, setForm] = useState({ preferredName: "", dateOfBirth: "", gender: "", heightCm: "", weightKg: "", bloodType: "", rhesusFactor: "", organDonor: "", emergencyNotes: "" });
 
-  const loadCard = async () => { setCardLoading(true); setCardError(""); try { const response = await api.get("/clinic-card"); const payload: any = response.data; const clinicCard = payload?.data ?? payload; if (!clinicCard?.patient?.id) throw new Error("Clinic Card returned an invalid response."); setCard(clinicCard); } catch (error: any) { setCardError(error?.response?.data?.message || error?.message || "We couldn't load your Clinic Card."); } finally { setCardLoading(false); } };
+  const loadCard = async () => {
+    setCardLoading(true);
+    setCardError("");
+    try {
+      const [response, recordsResponse] = await Promise.all([
+        api.get("/clinic-card"),
+        api.get("/health-home/records").catch(() => ({ data: {} })),
+      ]);
+      const payload: any = response.data;
+      const clinicCard = payload?.data ?? payload;
+      if (!clinicCard?.patient?.id) throw new Error("Clinic Card returned an invalid response.");
+      const recordsPayload: any = recordsResponse.data;
+      setCard(clinicCard);
+      setClinicalRecords(recordsPayload?.data ?? recordsPayload ?? {});
+    } catch (error: any) {
+      setCardError(error?.response?.data?.message || error?.message || "We couldn't load your Clinic Card.");
+    } finally {
+      setCardLoading(false);
+    }
+  };
   useEffect(() => { void loadCard(); }, []);
   useEffect(() => { if (!card) return; setForm({ preferredName: text(card.patient?.preferredName, ""), dateOfBirth: card.patient?.dateOfBirth ? String(card.patient.dateOfBirth).slice(0, 10) : "", gender: text(card.patient?.gender, ""), heightCm: card.vitals?.heightCm != null ? String(card.vitals.heightCm) : "", weightKg: card.vitals?.weightKg != null ? String(card.vitals.weightKg) : "", bloodType: text(card.emergency?.bloodType, ""), rhesusFactor: text(card.emergency?.rhesusFactor, ""), organDonor: card.emergency?.organDonorRecorded ? (card.emergency?.organDonor ? "true" : "false") : "", emergencyNotes: text(card.emergency?.emergencyNotes, "") }); }, [card]);
 
@@ -270,14 +290,118 @@ export default function HealthPassportPremium() {
     </div>
     <div className="mt-5">
       <Panel title="Medical history" icon={<CalendarDays className="h-5 w-5" />}>
-        <div className="mb-3"><ClinicalMarker label="Clinical record · view only" /></div>
-        {computed.medicalHistory ? <DetailGrid items={[
-          ["Past medical history", computed.medicalHistory.pastMedicalHistory], ["Family history", computed.medicalHistory.familyHistory],
-          ["Social history", computed.medicalHistory.socialHistory], ["Surgical history", computed.medicalHistory.surgicalHistory],
-          ["Recorded allergies", computed.medicalHistory.allergies], ["Chronic conditions", computed.medicalHistory.chronicConditions],
-          ["Recorded medications", computed.medicalHistory.currentMedications], ["Immunization notes", computed.medicalHistory.immunizationNotes],
-        ]} /> : <Empty>No additional medical history has been recorded.</Empty>}
+        <ClinicalMarker clinical label="Clinical record · view only" />
+        {computed.medicalHistory?.medicalRecord && (
+          <div className="mt-4 rounded-2xl bg-slate-50 p-4">
+            <div className="flex items-center justify-between gap-3">
+              <p className="font-semibold text-[#0b2d54]">Medical record</p>
+              <Badge tone="blue">Clinical</Badge>
+            </div>
+            <DetailGrid items={[
+              ["Past medical history", computed.medicalHistory.medicalRecord.pastMedicalHistory],
+              ["Chronic conditions", computed.medicalHistory.medicalRecord.chronicConditions],
+              ["Surgical history", computed.medicalHistory.medicalRecord.surgicalHistory],
+              ["Family history", computed.medicalHistory.medicalRecord.familyHistory],
+              ["Social history", computed.medicalHistory.medicalRecord.socialHistory],
+              ["Current medications", computed.medicalHistory.medicalRecord.currentMedications],
+              ["Recorded allergies", computed.medicalHistory.medicalRecord.allergies],
+              ["Immunisation notes", computed.medicalHistory.medicalRecord.immunizationNotes],
+              ["Blood type", human(computed.medicalHistory.medicalRecord.bloodType)],
+              ["Organ donor", yesNo(computed.medicalHistory.medicalRecord.organDonor)],
+              ["Last updated", date(computed.medicalHistory.medicalRecord.updatedAt)],
+            ]} />
+          </div>
+        )}
+
+        {(computed.medicalHistory?.previousConditions?.length ||
+          computed.medicalHistory?.previousMedications?.length ||
+          computed.medicalHistory?.clinicalDiagnoses?.length ||
+          computed.medicalHistory?.procedures?.length) ? (
+          <div className="mt-4 space-y-3">
+            <p className="text-xs font-bold uppercase tracking-[0.14em] text-slate-400">Longitudinal history</p>
+
+            {computed.medicalHistory.previousConditions?.map((item: any) => (
+              <div key={`condition-${item.id}`} className="rounded-2xl bg-white p-4 ring-1 ring-slate-100">
+                <div className="flex items-center justify-between gap-3">
+                  <div>
+                    <p className="font-semibold text-[#0b2d54]">{text(item.name, "Condition")}</p>
+                    <ClinicalMarker item={item} clinical={item.source === "CLINICAL"} />
+                  </div>
+                  <Badge tone="blue">{human(item.status)}</Badge>
+                </div>
+                <DetailGrid items={[
+                  ["Severity", item.severity ? human(item.severity) : null],
+                  ["Recorded", date(item.diagnosedAt)],
+                  ["Resolved", date(item.resolvedAt)],
+                  ["Recorded by", item.diagnosedBy],
+                  ["Outcome", item.outcome],
+                  ["Notes", item.notes],
+                ]} />
+              </div>
+            ))}
+
+            {computed.medicalHistory.previousMedications?.map((item: any) => (
+              <div key={`medication-${item.id}`} className="rounded-2xl bg-white p-4 ring-1 ring-slate-100">
+                <div className="flex items-center justify-between gap-3">
+                  <div>
+                    <p className="font-semibold text-[#0b2d54]">{text(item.name, "Medication")}</p>
+                    <ClinicalMarker item={item} clinical={item.source === "CLINICAL"} />
+                  </div>
+                  <Badge>{human(item.status)}</Badge>
+                </div>
+                <DetailGrid items={[
+                  ["Dose", item.dosage],
+                  ["Frequency", item.frequency],
+                  ["Route", item.route],
+                  ["Started", date(item.startedAt)],
+                  ["Ended", date(item.endedAt)],
+                  ["Prescribed by", item.prescribedBy],
+                ]} />
+              </div>
+            ))}
+
+            {computed.medicalHistory.clinicalDiagnoses?.map((item: any) => (
+              <div key={`diagnosis-${item.id}`} className="rounded-2xl bg-white p-4 ring-1 ring-slate-100">
+                <div className="flex items-center justify-between gap-3">
+                  <div>
+                    <p className="font-semibold text-[#0b2d54]">{text(item.name, "Diagnosis")}</p>
+                    <ClinicalMarker clinical />
+                  </div>
+                  <Badge tone="green">{human(item.status)}</Badge>
+                </div>
+                <DetailGrid items={[
+                  ["Diagnosed", date(item.diagnosedAt)],
+                  ["Resolved", date(item.resolvedAt)],
+                  ["Diagnosed by", item.diagnosedBy || item.practitionerName],
+                  ["Outcome", item.outcome],
+                ]} />
+              </div>
+            ))}
+
+            {computed.medicalHistory.procedures?.map((item: any) => (
+              <div key={`procedure-${item.id}`} className="rounded-2xl bg-white p-4 ring-1 ring-slate-100">
+                <div className="flex items-center justify-between gap-3">
+                  <div>
+                    <p className="font-semibold text-[#0b2d54]">{text(item.name, "Procedure")}</p>
+                    <ClinicalMarker clinical />
+                  </div>
+                  <Badge>{human(item.status)}</Badge>
+                </div>
+                <DetailGrid items={[
+                  ["Performed", date(item.performedAt)],
+                  ["Outcome", item.outcome],
+                  ["Performed by", item.performer],
+                  ["Facility", item.facility],
+                ]} />
+              </div>
+            ))}
+          </div>
+        ) : !computed.medicalHistory?.medicalRecord ? (
+          <Empty>No medical history has been recorded.</Empty>
+        ) : null}
       </Panel>
+    </div>
+    <div className="mt-5 grid gap-5 md:grid-cols-2">
     </div>
     <div className="mt-5 grid gap-5 md:grid-cols-2"><Panel title="Emergency contacts" icon={<Phone className="h-5 w-5" />}>{computed.emergency?.emergencyNotes && <div className="mb-3 rounded-2xl bg-amber-50 p-4 text-sm text-amber-900"><span className="font-bold">Emergency notes:</span> {computed.emergency.emergencyNotes}</div>}{computed.emergency?.contacts?.length ? <div className="space-y-3">{computed.emergency.contacts.map((item:any)=><div key={item.id} className="rounded-2xl bg-slate-50 p-4"><div className="flex items-center justify-between gap-3"><p className="font-semibold text-[#0b2d54]">{text(item.fullName,"Emergency contact")}</p>{item.isPrimary && <Badge tone="rose">Primary</Badge>}</div><DetailGrid items={[[ "Relationship", item.relationship ? human(item.relationship) : null],["Phone", item.phoneNumber],["Email", item.email],["Primary contact", yesNo(item.isPrimary)],["Updated", date(item.updatedAt)]]} /></div>)}</div>:<Empty>No emergency contacts recorded.</Empty>}<Link href="/emergency-contacts" className="mt-4 inline-flex items-center gap-1 text-xs font-bold text-[#0b2d54]">Manage contacts <ChevronRight className="h-3.5 w-3.5" /></Link></Panel><Panel title="Coverage" icon={<ShieldCheck className="h-5 w-5" />}>{computed.coverage?.length ? <div className="space-y-3">{computed.coverage.map((item:any)=><div key={item.id} className="rounded-2xl bg-slate-50 p-4"><div className="flex items-start justify-between gap-3"><div><p className="font-semibold text-[#0b2d54]">{text(item.providerName,"Insurance provider")}</p><p className="mt-1 text-xs text-slate-500">{text(item.planName)} · {text(item.membershipNumber)}</p></div><Badge tone={String(item.planStatus ?? "ACTIVE").toUpperCase() === "ACTIVE" ? "green" : "slate"}>{human(item.planStatus)}</Badge></div><DetailGrid items={[[ "Provider phone", item.providerPhone],["Provider email", item.providerEmail],["Provider website", item.providerWebsite],["Plan code", item.planCode],["Plan description", item.planDescription],["Membership number", item.membershipNumber],["Dependant code", item.dependantCode],["Principal member", item.principalMemberName],["Relationship", item.relationship ? human(item.relationship) : null],["Effective from", date(item.effectiveFrom)],["Effective to", date(item.effectiveTo)],["Annual limit", item.annualLimit],["Deductible", item.deductible],["Co-payment", item.coPayment],["Active", yesNo(item.active)],["Updated", date(item.updatedAt)]]} /></div>)}</div>:<Empty>No active coverage recorded.</Empty>}<Link href="/health-finance" className="mt-4 inline-flex items-center gap-1 text-xs font-bold text-[#0b2d54]">View coverage <ChevronRight className="h-3.5 w-3.5" /></Link></Panel></div>
     <div className="mt-5 rounded-[26px] border border-slate-200 bg-white p-5 shadow-sm sm:p-6"><div className="flex items-start gap-3"><div className="grid h-10 w-10 shrink-0 place-items-center rounded-2xl bg-[#0b2d54] text-white"><UserRound className="h-5 w-5" /></div><div><h2 className="font-bold text-[#0b2d54]">Your record has two sources</h2><p className="mt-1 text-sm leading-6 text-slate-500">Patient-entered information can be managed by you. Practitioner diagnoses, procedures, treatments and administered vaccines are brought into the same view and remain clinically controlled.</p>{computed.lastUpdatedAt && <p className="mt-2 text-xs font-semibold text-slate-400">Last updated · {date(computed.lastUpdatedAt)}</p>}</div></div></div>
