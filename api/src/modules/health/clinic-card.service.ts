@@ -43,6 +43,41 @@ export class ClinicCardService {
     if (!patient) throw new NotFoundException('Patient profile not found for the authenticated user.');
 
     const passport = patient.healthPassport;
+
+    // Prescription-backed medication records are authoritative clinical records.
+    // A patient may still have self-entered medication information, so do not
+    // infer "clinical" from the presence of a free-text prescriber alone.
+    const medicationIds = (passport?.medications ?? []).map((item) => item.medicationId);
+    const prescriptionItems = medicationIds.length
+      ? await this.prisma.prescriptionItem.findMany({
+          where: {
+            medicationId: { in: medicationIds },
+            prescription: {
+              patientId: patient.id,
+              status: { not: 'DRAFT' },
+            },
+          },
+          include: {
+            prescription: {
+              include: {
+                practitioner: { include: { person: true } },
+              },
+            },
+          },
+          orderBy: { prescription: { issuedAt: 'desc' } },
+        })
+      : [];
+
+    const clinicalMedicationIds = new Set(prescriptionItems.map((item) => item.medicationId));
+    const clinicalMedicationById = new Map(
+      prescriptionItems.map((item) => [
+        item.medicationId,
+        [item.prescription.practitioner.person.preferredName ?? item.prescription.practitioner.person.firstName, item.prescription.practitioner.person.lastName]
+          .filter(Boolean)
+          .join(' '),
+      ]),
+    );
+
     const activeAllergies = (passport?.allergies ?? []).filter((item) => String(item.status) === 'ACTIVE');
     const activeConditions = (passport?.conditions ?? []).filter((item) => String(item.status) === 'ACTIVE');
     const activeMedications = (passport?.medications ?? []).filter((item) => String(item.status) === 'ACTIVE' && item.ongoing);
@@ -58,7 +93,17 @@ export class ClinicCardService {
     const weightKg = patient.weightKg != null ? Number(patient.weightKg) : patient.baseline?.weightKg != null ? Number(patient.baseline.weightKg) : null;
     const calculatedBmi = heightCm && weightKg && heightCm > 0 && weightKg > 0 ? Number((weightKg / Math.pow(heightCm / 100, 2)).toFixed(2)) : null;
 
-    const updatedDates = [passport?.updatedAt, ...activeAllergies.map((item) => item.updatedAt), ...activeConditions.map((item) => item.updatedAt), ...activeMedications.map((item) => item.updatedAt), ...activeDiagnoses.map((item) => item.updatedAt), ...completedProcedures.map((item) => item.updatedAt)].filter(Boolean) as Date[];
+    const updatedDates = [
+      passport?.updatedAt,
+      patient.medicalRecord?.updatedAt,
+      patient.baseline?.updatedAt,
+      ...activeAllergies.map((item) => item.updatedAt),
+      ...activeConditions.map((item) => item.updatedAt),
+      ...activeMedications.map((item) => item.updatedAt),
+      ...(passport?.immunizations ?? []).map((item) => item.updatedAt),
+      ...activeDiagnoses.map((item) => item.updatedAt),
+      ...completedProcedures.map((item) => item.updatedAt),
+    ].filter(Boolean) as Date[];
 
     return {
       generatedAt: new Date().toISOString(),
@@ -87,12 +132,186 @@ export class ClinicCardService {
         weightKg,
         bmi: calculatedBmi ?? (patient.baseline?.bmi != null ? Number(patient.baseline.bmi) : null),
       },
-      allergies: activeAllergies.map((item) => ({ id: item.id, name: item.allergy.name, severity: item.severity, reaction: item.reaction, reactionNotes: item.reactionNotes, onsetDate: item.onsetDate, verified: item.verified, verifiedBy: item.verifiedBy, source: item.verified || item.verifiedBy ? 'PRACTITIONER' : 'PATIENT', status: item.status })),
-      conditions: activeConditions.map((item) => ({ id: item.id, name: item.condition.name, severity: item.severity, stage: item.stage, chronic: item.chronic, primaryCondition: item.primaryCondition, diagnosedAt: item.diagnosedAt, diagnosedBy: item.diagnosedBy, treatmentPlan: item.treatmentPlan, source: item.diagnosedBy || item.treatmentPlan ? 'PRACTITIONER' : 'PATIENT', status: item.status })),
-      diagnoses: activeDiagnoses.map((item) => ({ id: item.id, name: item.diagnosis.name, category: item.diagnosis.category, bodySystem: item.diagnosis.bodySystem, diagnosedAt: item.diagnosedAt, resolvedAt: item.resolvedAt, status: item.status, severity: item.severity, stage: item.stage, primaryDiagnosis: item.primaryDiagnosis, confirmed: item.confirmed, diagnosedBy: item.diagnosedBy, practitionerName: practitionerName(item), treatmentPlan: item.treatmentPlan, outcome: item.outcome, notes: item.notes })),
-      medications: activeMedications.map((item) => ({ id: item.id, name: item.medication.name, genericName: item.medication.genericName, dosage: item.dosage, frequency: item.frequency, route: item.route, indication: item.indication, instructions: item.instructions, prescribedBy: item.prescribedBy, startedAt: item.startedAt })),
-      immunizations: (passport?.immunizations ?? []).map((item) => ({ id: item.id, name: item.immunization.name, administeredAt: item.administeredAt, doseNumber: item.doseNumber, administeredBy: item.administeredBy, facility: item.facility, nextDueDate: item.nextDueDate, status: item.status, source: item.administeredBy || item.facility ? 'PRACTITIONER' : 'PATIENT' })),
-      procedures: completedProcedures.map((item) => ({ id: item.id, name: item.procedure.name, category: item.procedure.category, bodySystem: item.procedure.bodySystem, surgical: item.procedure.surgical, performedAt: item.performedAt, status: item.status, outcome: item.outcome, performer: item.performer, facility: item.facility, followUpRequired: item.followUpRequired, followUpDate: item.followUpDate, practitionerName: practitionerName(item), notes: item.notes })),
+      baseline: patient.baseline
+        ? {
+            weightKg: patient.baseline.weightKg != null ? Number(patient.baseline.weightKg) : null,
+            heightCm: patient.baseline.heightCm != null ? Number(patient.baseline.heightCm) : null,
+            bmi: patient.baseline.bmi != null ? Number(patient.baseline.bmi) : null,
+            systolicPressure: patient.baseline.systolicPressure,
+            diastolicPressure: patient.baseline.diastolicPressure,
+            restingHeartRate: patient.baseline.restingHeartRate,
+            respiratoryRate: patient.baseline.respiratoryRate,
+            oxygenSaturation: patient.baseline.oxygenSaturation != null ? Number(patient.baseline.oxygenSaturation) : null,
+            bodyTemperature: patient.baseline.bodyTemperature != null ? Number(patient.baseline.bodyTemperature) : null,
+            bloodGlucose: patient.baseline.bloodGlucose != null ? Number(patient.baseline.bloodGlucose) : null,
+            cholesterol: patient.baseline.cholesterol != null ? Number(patient.baseline.cholesterol) : null,
+            notes: patient.baseline.notes,
+            establishedAt: patient.baseline.establishedAt,
+          }
+        : null,
+      medicalHistory: patient.medicalRecord
+        ? {
+            pastMedicalHistory: patient.medicalRecord.pastMedicalHistory,
+            familyHistory: patient.medicalRecord.familyHistory,
+            socialHistory: patient.medicalRecord.socialHistory,
+            surgicalHistory: patient.medicalRecord.surgicalHistory,
+            allergies: patient.medicalRecord.allergies,
+            chronicConditions: patient.medicalRecord.chronicConditions,
+            currentMedications: patient.medicalRecord.currentMedications,
+            immunizationNotes: patient.medicalRecord.immunizationNotes,
+          }
+        : null,
+      allergies: activeAllergies.map((item) => {
+        const clinical = Boolean(item.verified || item.verifiedBy);
+        return {
+          id: item.id,
+          name: item.allergy.name,
+          category: item.allergy.category,
+          description: item.allergy.description,
+          severity: item.severity,
+          reaction: item.reaction,
+          reactionNotes: item.reactionNotes,
+          onsetDate: item.onsetDate,
+          lastReaction: item.lastReaction,
+          verified: item.verified,
+          verifiedBy: item.verifiedBy,
+          notes: item.notes,
+          source: clinical ? 'CLINICAL' : 'PATIENT',
+          sourceLabel: clinical ? 'Clinical · view only' : 'Patient entered · editable',
+          clinicalBy: item.verifiedBy ?? null,
+          status: item.status,
+          updatedAt: item.updatedAt,
+        };
+      }),
+      conditions: activeConditions.map((item) => {
+        const clinical = Boolean(item.diagnosedBy || item.treatmentPlan);
+        return {
+          id: item.id,
+          name: item.condition.name,
+          category: item.condition.category,
+          bodySystem: item.condition.bodySystem,
+          description: item.condition.description,
+          severity: item.severity,
+          stage: item.stage,
+          chronic: item.chronic,
+          primaryCondition: item.primaryCondition,
+          diagnosedAt: item.diagnosedAt,
+          resolvedAt: item.resolvedAt,
+          diagnosedBy: item.diagnosedBy,
+          treatmentPlan: item.treatmentPlan,
+          outcome: item.outcome,
+          notes: item.notes,
+          source: clinical ? 'CLINICAL' : 'PATIENT',
+          sourceLabel: clinical ? 'Clinical · view only' : 'Patient entered · editable',
+          clinicalBy: item.diagnosedBy ?? null,
+          status: item.status,
+          updatedAt: item.updatedAt,
+        };
+      }),
+      diagnoses: activeDiagnoses.map((item) => ({
+        id: item.id,
+        name: item.diagnosis.name,
+        description: item.diagnosis.description,
+        category: item.diagnosis.category,
+        bodySystem: item.diagnosis.bodySystem,
+        chronic: item.diagnosis.chronic,
+        diagnosedAt: item.diagnosedAt,
+        resolvedAt: item.resolvedAt,
+        status: item.status,
+        severity: item.severity,
+        stage: item.stage,
+        primaryDiagnosis: item.primaryDiagnosis,
+        confirmed: item.confirmed,
+        diagnosedBy: item.diagnosedBy,
+        practitionerName: practitionerName(item),
+        treatmentPlan: item.treatmentPlan,
+        outcome: item.outcome,
+        notes: item.notes,
+        source: 'CLINICAL',
+        sourceLabel: 'Clinical · view only',
+        clinicalBy: practitionerName(item),
+        updatedAt: item.updatedAt,
+      })),
+      medications: activeMedications.map((item) => {
+        const clinical = clinicalMedicationIds.has(item.medicationId);
+        return {
+          id: item.id,
+          medicationId: item.medicationId,
+          name: item.medication.name,
+          genericName: item.medication.genericName,
+          brandName: item.medication.brandName,
+          category: item.medication.category,
+          dosage: item.dosage,
+          frequency: item.frequency,
+          route: item.route,
+          indication: item.indication,
+          instructions: item.instructions,
+          prescribedBy: item.prescribedBy,
+          startedAt: item.startedAt,
+          endedAt: item.endedAt,
+          ongoing: item.ongoing,
+          adherencePercentage: item.adherencePercentage,
+          missedDoses: item.missedDoses,
+          sideEffects: item.sideEffects,
+          effectiveness: item.effectiveness,
+          status: item.status,
+          notes: item.notes,
+          source: clinical ? 'CLINICAL' : 'PATIENT',
+          sourceLabel: clinical ? 'Clinical · view only' : 'Patient entered · editable',
+          clinicalBy: clinicalMedicationById.get(item.medicationId) ?? null,
+          updatedAt: item.updatedAt,
+        };
+      }),
+      immunizations: (passport?.immunizations ?? []).map((item) => {
+        const clinical = Boolean(item.administeredBy || item.facility);
+        return {
+          id: item.id,
+          name: item.immunization.name,
+          category: item.immunization.category,
+          diseaseProtected: item.immunization.diseaseProtected,
+          description: item.immunization.description,
+          administeredAt: item.administeredAt,
+          doseNumber: item.doseNumber,
+          batchNumber: item.batchNumber,
+          manufacturer: item.manufacturer,
+          administeredBy: item.administeredBy,
+          facility: item.facility,
+          route: item.route,
+          site: item.site,
+          adverseReaction: item.adverseReaction,
+          adverseReactionNotes: item.adverseReactionNotes,
+          nextDueDate: item.nextDueDate,
+          status: item.status,
+          notes: item.notes,
+          source: clinical ? 'CLINICAL' : 'PATIENT',
+          sourceLabel: clinical ? 'Clinical · view only' : 'Patient entered · editable',
+          clinicalBy: item.administeredBy ?? null,
+          updatedAt: item.updatedAt,
+        };
+      }),
+      procedures: completedProcedures.map((item) => ({
+        id: item.id,
+        name: item.procedure.name,
+        description: item.procedure.description,
+        category: item.procedure.category,
+        bodySystem: item.procedure.bodySystem,
+        invasive: item.procedure.invasive,
+        surgical: item.procedure.surgical,
+        performedAt: item.performedAt,
+        status: item.status,
+        outcome: item.outcome,
+        performer: item.performer,
+        facility: item.facility,
+        complications: item.complications,
+        followUpRequired: item.followUpRequired,
+        followUpDate: item.followUpDate,
+        practitionerName: practitionerName(item),
+        notes: item.notes,
+        source: 'CLINICAL',
+        sourceLabel: 'Clinical · view only',
+        clinicalBy: practitionerName(item),
+        updatedAt: item.updatedAt,
+      })),
       coverage: patient.patientInsurances.map((item) => ({ id: item.id, providerName: item.insurancePolicy.provider.name, planName: item.insurancePolicy.name, membershipNumber: item.membershipNumber, effectiveFrom: item.effectiveFrom, effectiveTo: item.effectiveTo })),
     };
   }
