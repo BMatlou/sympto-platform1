@@ -25,11 +25,14 @@ const age = (value: unknown) => {
 function Panel({ title, icon, children }: { title: string; icon: ReactNode; children: ReactNode }) { return <section className="rounded-[26px] border border-slate-200/80 bg-white p-5 shadow-[0_10px_35px_rgba(11,45,84,0.06)] sm:p-6"><div className="mb-4 flex items-center gap-3"><div className="grid h-10 w-10 place-items-center rounded-2xl bg-slate-50 text-[#0b2d54]">{icon}</div><h2 className="text-base font-bold text-[#0b2d54]">{title}</h2></div>{children}</section>; }
 function Empty({ children }: { children: ReactNode }) { return <p className="rounded-2xl border border-dashed border-slate-200 bg-slate-50 p-4 text-sm text-slate-500">{children}</p>; }
 function Badge({ children, tone = "slate" }: { children: ReactNode; tone?: "slate" | "blue" | "rose" | "green" }) { const styles = { slate: "bg-slate-100 text-slate-600", blue: "bg-blue-50 text-blue-700", rose: "bg-rose-50 text-rose-700", green: "bg-emerald-50 text-emerald-700" }; return <span className={`rounded-full px-2.5 py-1 text-[10px] font-bold ${styles[tone]}`}>{children}</span>; }
-function ClinicalMarker({ item, label }: { item?: any; label?: string }) {
-  const clinical = item?.source === "CLINICAL";
-  return <span className={"mt-2 inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[10px] font-bold " + (clinical ? "bg-blue-50 text-blue-700" : "bg-slate-100 text-slate-600")}>
-    {clinical ? <ShieldCheck className="h-3 w-3" /> : null}
-    {label ?? (clinical ? "Clinical · view only" : "Patient entered · editable")}
+function ClinicalMarker({ item, label, clinical: clinicalOverride }: { item?: any; label?: string; clinical?: boolean }) {
+  const clinical = clinicalOverride ?? item?.source === "CLINICAL" ?? false;
+  const isClinicalLabel = label?.toLowerCase().startsWith("clinical");
+  const protectedRecord = clinical || isClinicalLabel;
+
+  return <span className={"mt-2 inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[10px] font-bold " + (protectedRecord ? "bg-blue-50 text-blue-700" : "bg-slate-100 text-slate-600")}>
+    {protectedRecord ? <ShieldCheck className="h-3 w-3" /> : null}
+    {label ?? (protectedRecord ? "Clinical · view only" : "Patient entered · editable")}
   </span>;
 }
 function DetailGrid({ items }: { items: Array<[string, ReactNode]> }) {
