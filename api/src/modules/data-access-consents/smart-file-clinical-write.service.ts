@@ -107,7 +107,7 @@ export class SmartFileClinicalWriteService {
     const notice = this.buildPatientNotice(
       dto.section,
       dto.action,
-      this.practitionerName(practitioner),
+      this.practitionerName(practitioner.person, practitioner.practitionerType),
       result,
     );
 
@@ -1487,8 +1487,25 @@ export class SmartFileClinicalWriteService {
     };
   }
 
-  private practitionerName(practitionerPerson: { firstName: string; lastName: string }) {
-    return `Dr ${practitionerPerson.firstName} ${practitionerPerson.lastName}`.replace(/\\s+/g, ' ').trim();
+  private practitionerName(
+    practitionerPerson: { firstName: string; lastName: string },
+    practitionerType?: string,
+  ) {
+    const prefixByType: Record<string, string> = {
+      DOCTOR: 'Dr',
+      NURSE: 'Nurse',
+      PHARMACIST: 'Pharmacist',
+      DENTIST: 'Dentist',
+      PSYCHOLOGIST: 'Psychologist',
+      PHYSIOTHERAPIST: 'Physiotherapist',
+      OCCUPATIONAL_THERAPIST: 'Occupational therapist',
+      DIETITIAN: 'Dietitian',
+    };
+    return [
+      prefixByType[practitionerType ?? ''] ?? '',
+      practitionerPerson.firstName,
+      practitionerPerson.lastName,
+    ].filter(Boolean).join(' ').replace(/\s+/g, ' ').trim();
   }
 
   private required(value: unknown, field: string) {
