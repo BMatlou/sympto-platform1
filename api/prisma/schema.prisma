@@ -2087,6 +2087,7 @@ model DataAccessConsent {
   canViewInvoices       Boolean   @default(false)
   canViewLabResults     Boolean   @default(true)
   canViewMedicalRecords Boolean   @default(true)
+  canUpdateClinicalRecords Boolean @default(false)
   canViewPrescriptions  Boolean   @default(true)
   canViewWearables      Boolean   @default(true)
   grantedTo             User      @relation(fields: [grantedToUserId], references: [id], onDelete: Cascade)
