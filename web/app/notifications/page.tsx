@@ -172,12 +172,6 @@ function dateGroup(value: unknown): "TODAY" | "YESTERDAY" | "OLDER" {
   return "OLDER";
 }
 
-function groupLabel(group: "TODAY" | "YESTERDAY" | "OLDER") {
-  if (group === "TODAY") return "Today";
-  if (group === "YESTERDAY") return "Yesterday";
-  return "Earlier";
-}
-
 function label(value: unknown) {
   return value
     ? String(value)
@@ -338,9 +332,7 @@ export default function NotificationsPage() {
 
     return notifications
       .filter((notification) => {
-        const date = new Date(
-          String(notification.createdAt),
-        );
+        const date = new Date(String(relevantDate(notification)));
         const categoryMatch =
           category === "ALL" || getCategory(notification) === category;
         const unreadMatch = !unreadOnly || !notification.readAt;
@@ -368,7 +360,7 @@ export default function NotificationsPage() {
     const groups: Record<string, PatientNotification[]> = {};
 
     for (const notification of visible) {
-      const date = new Date(String(notification.createdAt));
+      const date = new Date(String(relevantDate(notification)));
       if (Number.isNaN(date.getTime())) continue;
 
       let key = "";
