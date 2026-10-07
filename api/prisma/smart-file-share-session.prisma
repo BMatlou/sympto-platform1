@@ -1,7 +1,13 @@
 model SmartFileShareSession {
-  id        String   @id @default(uuid())
-  patientId String
-  qrToken   String   @unique
-  shortCode String   @unique
-  expiresAt DateTime
+  id            String       @id @default(uuid())
+  patientId     String
+  appointmentId String?
+  qrToken       String       @unique
+  shortCode     String       @unique
+  expiresAt     DateTime
+  patient       Patient      @relation(fields: [patientId], references: [id], onDelete: Cascade)
+  appointment   Appointment? @relation(fields: [appointmentId], references: [id], onDelete: SetNull)
+
+  @@index([patientId])
+  @@index([appointmentId])
 }
