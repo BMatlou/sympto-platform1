@@ -440,7 +440,7 @@ export default function NotificationsPage() {
   return (
     <ProtectedRoute>
       <main className="min-h-screen bg-[#f5f8fb] pb-10 text-slate-800">
-        <div className="mx-auto max-w-5xl px-4 py-5 sm:px-6 sm:py-7">
+        <div className="mx-auto max-w-7xl px-4 py-5 sm:px-6 sm:py-7 lg:px-8">
           <div className="mb-4 flex items-center justify-between gap-3">
             <Link
               href="/dashboard"
@@ -473,7 +473,7 @@ export default function NotificationsPage() {
                   <h1 className="mt-4 text-3xl font-extrabold tracking-tight sm:text-4xl">
                     Your notifications
                   </h1>
-                  <p className="mt-2 max-w-2xl text-sm leading-6 text-white/75">
+                  <p className="mt-2 max-w-3xl text-sm leading-6 text-white/75">
                     Keep track of medication reminders, appointments, results,
                     care-team messages and important account updates.
                   </p>
@@ -521,129 +521,129 @@ export default function NotificationsPage() {
                   )}
                 </div>
               </div>
-            </div>
-          </section>
 
-          <section className="mt-5 rounded-[26px] border border-slate-200/80 bg-white p-5 shadow-[0_10px_35px_rgba(11,45,84,0.06)] sm:p-6">
-            <div className="mb-4 flex items-start justify-between gap-4">
-              <div>
-                <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-slate-400">
-                  Browse by
-                </p>
-                <h2 className="mt-1 text-base font-bold text-[#0b2d54]">
-                  {categoryLabel(category)}
-                </h2>
-              </div>
+              <div className="mt-7 border-t border-white/15 pt-5">
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                  <div>
+                    <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-white/55">
+                      Browse by
+                    </p>
+                    <h2 className="mt-1 text-base font-bold text-white">
+                      {categoryLabel(category)}
+                    </h2>
+                  </div>
 
-              <button
-                type="button"
-                onClick={() => setUnreadOnly((current) => !current)}
-                aria-pressed={unreadOnly}
-                className={
-                  "inline-flex min-h-10 items-center justify-center gap-2 rounded-xl px-3.5 py-2 text-xs font-bold transition " +
-                  (unreadOnly
-                    ? "bg-[#0b2d54] text-white shadow-sm"
-                    : "bg-slate-100 text-slate-600 hover:bg-[#24c1c4]/10 hover:text-[#0b2d54]")
-                }
-              >
-                <span
-                  className={
-                    "h-2.5 w-2.5 rounded-full " +
-                    (unreadOnly ? "bg-[#24c1c4]" : "bg-slate-400")
-                  }
-                />
-                Unread only
-                {unreadCount > 0 && (
-                  <span
-                    className={
-                      unreadOnly ? "text-[#24c1c4]" : "text-[#0b2d54]"
-                    }
-                  >
-                    {unreadCount}
-                  </span>
-                )}
-              </button>
-            </div>
-
-            <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-5 xl:grid-cols-9">
-              <button
-                type="button"
-                onClick={() => setCategory("ALL")}
-                className={
-                  "flex min-h-12 items-center gap-3 rounded-2xl border px-3.5 py-3 text-left transition " +
-                  (category === "ALL"
-                    ? "border-[#0b2d54] bg-[#0b2d54] text-white shadow-sm"
-                    : "border-slate-200 bg-white text-slate-600 hover:border-[#24c1c4]/40 hover:bg-[#24c1c4]/5")
-                }
-              >
-                <span
-                  className={
-                    "grid h-9 w-9 shrink-0 place-items-center rounded-xl " +
-                    (category === "ALL"
-                      ? "bg-white/10 text-[#24c1c4]"
-                      : "bg-slate-50 text-[#0b2d54]")
-                  }
-                >
-                  <Bell className="h-4 w-4" />
-                </span>
-                <span className="min-w-0">
-                  <span className="block text-[11px] font-black">All</span>
-                  <span
-                    className={
-                      "mt-0.5 block text-[10px] font-semibold " +
-                      (category === "ALL" ? "text-white/60" : "text-slate-400")
-                    }
-                  >
-                    {counts.ALL.total} total
-                  </span>
-                </span>
-              </button>
-
-              {visibleCategoryTabs.map((tab) => {
-                const Icon = tab.icon;
-                const active = category === tab.key;
-                const count = counts[tab.key];
-
-                return (
                   <button
-                    key={tab.key}
                     type="button"
-                    onClick={() => setCategory(tab.key)}
+                    onClick={() => setUnreadOnly((current) => !current)}
+                    aria-pressed={unreadOnly}
+                    className={
+                      "inline-flex min-h-10 items-center justify-center gap-2 rounded-xl px-3.5 py-2 text-xs font-bold transition " +
+                      (unreadOnly
+                        ? "bg-white text-[#0b2d54] shadow-sm"
+                        : "bg-white/10 text-white ring-1 ring-white/15 hover:bg-white/15")
+                    }
+                  >
+                    <span
+                      className={
+                        "h-2.5 w-2.5 rounded-full " +
+                        (unreadOnly ? "bg-[#24c1c4]" : "bg-white/50")
+                      }
+                    />
+                    Unread only
+                    {unreadCount > 0 && (
+                      <span
+                        className={
+                          unreadOnly ? "text-[#0b2d54]" : "text-[#24c1c4]"
+                        }
+                      >
+                        {unreadCount}
+                      </span>
+                    )}
+                  </button>
+                </div>
+
+                <div className="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-5 xl:grid-cols-9">
+                  <button
+                    type="button"
+                    onClick={() => setCategory("ALL")}
                     className={
                       "flex min-h-12 items-center gap-3 rounded-2xl border px-3.5 py-3 text-left transition " +
-                      (active
-                        ? "border-[#0b2d54] bg-[#0b2d54] text-white shadow-sm"
-                        : "border-slate-200 bg-white text-slate-600 hover:border-[#24c1c4]/40 hover:bg-[#24c1c4]/5")
+                      (category === "ALL"
+                        ? "border-white bg-white text-[#0b2d54] shadow-sm"
+                        : "border-white/15 bg-white/10 text-white hover:border-white/30 hover:bg-white/15")
                     }
                   >
                     <span
                       className={
                         "grid h-9 w-9 shrink-0 place-items-center rounded-xl " +
-                        (active
-                          ? "bg-white/10 text-[#24c1c4]"
-                          : "bg-slate-50 text-[#0b2d54]")
+                        (category === "ALL"
+                          ? "bg-[#0b2d54]/10 text-[#0b2d54]"
+                          : "bg-white/10 text-[#24c1c4]")
                       }
                     >
-                      <Icon className="h-4 w-4" />
+                      <Bell className="h-4 w-4" />
                     </span>
-                    <span className="min-w-0 flex-1">
-                      <span className="block truncate text-[11px] font-black">
-                        {tab.label}
-                      </span>
+                    <span className="min-w-0">
+                      <span className="block text-[11px] font-black">All</span>
                       <span
                         className={
                           "mt-0.5 block text-[10px] font-semibold " +
-                          (active ? "text-white/60" : "text-slate-400")
+                          (category === "ALL" ? "text-slate-500" : "text-white/55")
                         }
                       >
-                        {count.unread > 0
-                          ? count.unread + " new"
-                          : count.total + " total"}
+                        {counts.ALL.total} total
                       </span>
                     </span>
                   </button>
-                );
-              })}
+
+                  {visibleCategoryTabs.map((tab) => {
+                    const Icon = tab.icon;
+                    const active = category === tab.key;
+                    const count = counts[tab.key];
+
+                    return (
+                      <button
+                        key={tab.key}
+                        type="button"
+                        onClick={() => setCategory(tab.key)}
+                        className={
+                          "flex min-h-12 items-center gap-3 rounded-2xl border px-3.5 py-3 text-left transition " +
+                          (active
+                            ? "border-white bg-white text-[#0b2d54] shadow-sm"
+                            : "border-white/15 bg-white/10 text-white hover:border-white/30 hover:bg-white/15")
+                        }
+                      >
+                        <span
+                          className={
+                            "grid h-9 w-9 shrink-0 place-items-center rounded-xl " +
+                            (active
+                              ? "bg-[#0b2d54]/10 text-[#0b2d54]"
+                              : "bg-white/10 text-[#24c1c4]")
+                          }
+                        >
+                          <Icon className="h-4 w-4" />
+                        </span>
+                        <span className="min-w-0 flex-1">
+                          <span className="block truncate text-[11px] font-black">
+                            {tab.label}
+                          </span>
+                          <span
+                            className={
+                              "mt-0.5 block text-[10px] font-semibold " +
+                              (active ? "text-slate-500" : "text-white/55")
+                            }
+                          >
+                            {count.unread > 0
+                              ? count.unread + " new"
+                              : count.total + " total"}
+                          </span>
+                        </span>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
             </div>
           </section>
 
