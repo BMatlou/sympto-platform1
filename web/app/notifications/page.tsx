@@ -485,76 +485,68 @@ export default function NotificationsPage() {
             </Link>
           </div>
 
-          <section className="relative mb-6 overflow-hidden rounded-[32px] bg-gradient-to-br from-[#0b2d54] via-[#0f5261] to-[#24c1c4] p-6 text-white shadow-[0_24px_60px_rgba(11,45,84,0.20)] sm:p-8">
-            <div className="absolute -right-16 -top-20 h-48 w-48 rounded-full bg-white/10 blur-2xl" />
+          <section className="relative mb-6 overflow-hidden rounded-[32px] bg-gradient-to-br from-[#0b2d54] via-[#0f5261] to-[#24c1c4] text-white shadow-[0_24px_60px_rgba(11,45,84,0.20)]">
+            <div className="absolute -right-16 -top-20 h-52 w-52 rounded-full bg-white/10 blur-2xl" />
             <div className="absolute -bottom-24 -left-12 h-56 w-56 rounded-full bg-black/10 blur-2xl" />
 
-            <div className="relative">
-              <div className="flex items-start justify-between gap-4">
+            <div className="relative p-6 sm:p-8">
+              <div className="flex items-start justify-between gap-5">
                 <div className="min-w-0">
                   <div className="inline-flex items-center gap-2 rounded-full bg-white/10 px-3 py-1.5 text-[10px] font-bold uppercase tracking-[0.16em] text-white/80 ring-1 ring-white/10">
                     <Bell className="h-3.5 w-3.5" />
                     Notifications
                   </div>
+
                   <h1 className="mt-4 text-3xl font-extrabold tracking-tight sm:text-4xl">
                     Your notifications
                   </h1>
-                  <p className="mt-2 max-w-3xl text-sm leading-6 text-white/75">
-                    Keep track of medication reminders, appointments, results,
-                    care-team messages and important account updates.
+                  <p className="mt-2 max-w-2xl text-sm leading-6 text-white/70">
+                    Medication reminders, appointments, results and important health updates.
                   </p>
                 </div>
 
-                <div className="grid h-14 w-14 shrink-0 place-items-center rounded-2xl bg-white/10 ring-1 ring-white/15">
-                  <Bell className="h-7 w-7" />
+                <div className="hidden shrink-0 items-center gap-2 sm:flex">
+                  <span className="text-[10px] font-bold uppercase tracking-[0.15em] text-white/45">
+                    Unread
+                  </span>
+                  <span className="grid h-10 min-w-10 place-items-center rounded-xl bg-white/10 px-3 text-sm font-black text-white ring-1 ring-white/10">
+                    {periodCounts.ALL.unread}
+                  </span>
                 </div>
               </div>
 
               <div className="mt-7 border-t border-white/15 pt-5">
                 <div className="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
-                  <div className="flex min-w-0 items-center gap-4 overflow-x-auto">
-                    <span className="shrink-0 text-[10px] font-black uppercase tracking-[0.16em] text-white/50">
-                      View
-                    </span>
-
-                    <div className="inline-flex shrink-0 rounded-xl bg-white/10 p-1 ring-1 ring-white/10">
-                      {(["DAY", "WEEK", "MONTH"] as const).map((value) => (
-                        <button
-                          key={value}
-                          type="button"
-                          onClick={() => setRange(value)}
-                          aria-pressed={range === value}
-                          className={
-                            "min-h-9 min-w-16 rounded-lg px-3 text-xs font-black transition " +
-                            (range === value
-                              ? "bg-white text-[#0b2d54] shadow-sm"
-                              : "text-white/65 hover:text-white")
-                          }
-                        >
-                          {value === "DAY"
-                            ? "Day"
-                            : value === "WEEK"
-                              ? "Week"
-                              : "Month"}
-                        </button>
-                      ))}
-                    </div>
-
-                    <span className="hidden text-white/25 sm:inline">•</span>
-                    <span className="shrink-0 text-xs font-bold text-white/75">
-                      {category === "ALL"
-                        ? "All notifications"
-                        : categoryTabs.find((tab) => tab.key === category)?.label}
-                    </span>
+                  <div className="inline-flex w-fit rounded-xl bg-white/10 p-1 ring-1 ring-white/10">
+                    {(["DAY", "WEEK", "MONTH"] as const).map((value) => (
+                      <button
+                        key={value}
+                        type="button"
+                        onClick={() => setRange(value)}
+                        aria-pressed={range === value}
+                        className={
+                          "min-h-10 min-w-20 rounded-lg px-4 text-xs font-black transition " +
+                          (range === value
+                            ? "bg-white text-[#0b2d54] shadow-sm"
+                            : "text-white/60 hover:text-white")
+                        }
+                      >
+                        {value === "DAY"
+                          ? "Day"
+                          : value === "WEEK"
+                            ? "Week"
+                            : "Month"}
+                      </button>
+                    ))}
                   </div>
 
-                  <div className="flex shrink-0 items-center gap-4">
+                  <div className="flex items-center gap-4">
                     <button
                       type="button"
                       onClick={() => setUnreadOnly((current) => !current)}
                       aria-pressed={unreadOnly}
                       className={
-                        "text-[11px] font-bold transition " +
+                        "text-xs font-bold transition " +
                         (unreadOnly
                           ? "text-white"
                           : "text-white/65 hover:text-white")
@@ -573,7 +565,7 @@ export default function NotificationsPage() {
                         type="button"
                         onClick={() => void markAllRead()}
                         disabled={busyId === "all"}
-                        className="inline-flex items-center gap-1.5 rounded-xl bg-white px-3.5 py-2.5 text-[11px] font-bold text-[#0b2d54] shadow-sm transition hover:bg-white/90 disabled:opacity-50"
+                        className="inline-flex min-h-10 items-center gap-2 rounded-xl bg-white px-4 py-2.5 text-xs font-black text-[#0b2d54] shadow-sm transition hover:bg-white/90 disabled:opacity-50"
                       >
                         <CheckCheck className="h-3.5 w-3.5" />
                         {busyId === "all" ? "Updating…" : "Mark all read"}
@@ -582,24 +574,24 @@ export default function NotificationsPage() {
                   </div>
                 </div>
 
-                <div className="mt-4 flex items-center gap-2 overflow-x-auto pb-0.5">
+                <div className="mt-5 flex items-center gap-2 overflow-x-auto">
                   <button
                     type="button"
                     onClick={() => setCategory("ALL")}
                     className={
-                      "inline-flex min-h-9 shrink-0 items-center gap-2 rounded-full px-3.5 py-2 text-xs font-bold transition " +
+                      "inline-flex min-h-10 shrink-0 items-center gap-2 rounded-xl px-4 py-2.5 text-xs font-bold transition " +
                       (category === "ALL"
                         ? "bg-white text-[#0b2d54] shadow-sm"
-                        : "bg-white/10 text-white hover:bg-white/15")
+                        : "bg-white/10 text-white/75 hover:bg-white/15 hover:text-white")
                     }
                   >
                     All
                     <span
                       className={
-                        "grid min-w-5 place-items-center rounded-full px-1.5 py-0.5 text-[9px] font-black " +
+                        "rounded-full px-2 py-0.5 text-[9px] font-black " +
                         (category === "ALL"
                           ? "bg-[#24c1c4] text-[#0b2d54]"
-                          : "bg-white/10 text-white/80")
+                          : "bg-white/10 text-white/75")
                       }
                     >
                       {periodCounts.ALL.total}
@@ -616,19 +608,19 @@ export default function NotificationsPage() {
                         type="button"
                         onClick={() => setCategory(tab.key)}
                         className={
-                          "inline-flex min-h-9 shrink-0 items-center gap-2 rounded-full px-3.5 py-2 text-xs font-bold transition " +
+                          "inline-flex min-h-10 shrink-0 items-center gap-2 rounded-xl px-4 py-2.5 text-xs font-bold transition " +
                           (active
                             ? "bg-white text-[#0b2d54] shadow-sm"
-                            : "bg-white/10 text-white hover:bg-white/15")
+                            : "bg-white/10 text-white/75 hover:bg-white/15 hover:text-white")
                         }
                       >
                         {tab.label}
                         <span
                           className={
-                            "grid min-w-5 place-items-center rounded-full px-1.5 py-0.5 text-[9px] font-black " +
+                            "rounded-full px-2 py-0.5 text-[9px] font-black " +
                             (active
                               ? "bg-[#24c1c4] text-[#0b2d54]"
-                              : "bg-white/10 text-white/80")
+                              : "bg-white/10 text-white/75")
                           }
                         >
                           {count.total}
