@@ -66,8 +66,7 @@ export class SmartFileConsentService {
     const session = await this.consumeSession(credential, 'CLINICAL');
 
     let appointmentId: string | null = null;
-    let canUpdateClinicalRecords = false;
-    let purpose = 'Walk-in Clinical Smart File access (read-only)';
+    let purpose = 'Walk-in Clinical Smart File access';
 
     if (session.appointmentId) {
       const appointment = await this.requireAppointmentForPractitioner(
@@ -76,7 +75,6 @@ export class SmartFileConsentService {
         practitioner.id,
       );
       appointmentId = appointment.id;
-      canUpdateClinicalRecords = true;
       purpose = 'Appointment Clinical Smart File access';
     }
 
@@ -87,7 +85,7 @@ export class SmartFileConsentService {
       purpose,
       expiresAt: this.hoursFromNow(CLINICAL_CONSENT_HOURS),
       canViewMedicalRecords: true,
-      canUpdateClinicalRecords,
+      canUpdateClinicalRecords: true,
       canViewLabResults: true,
       canViewImaging: true,
       canViewPrescriptions: true,
