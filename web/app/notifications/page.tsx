@@ -6,7 +6,6 @@ import {
   ArrowLeft,
   Bell,
   CalendarDays,
-  Check,
   CheckCheck,
   ChevronRight,
   FileText,
@@ -375,7 +374,7 @@ export default function NotificationsPage() {
                     Your notifications
                   </h1>
                   <p className="mt-2 max-w-2xl text-sm leading-6 text-white/70">
-                    Medication reminders, appointments, results and important health updates.
+                    Stay on top of medicines, appointments, results and messages that matter to you.
                   </p>
                 </div>
 
