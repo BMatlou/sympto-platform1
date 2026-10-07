@@ -872,12 +872,12 @@ export class SmartFileClinicalWriteService {
   private async writeHealthPassport(tx: any, patientId: string, dto: SmartFileClinicalWriteDto) {
     const d = dto.data;
     const existing = await tx.healthPassport.findUnique({ where: { patientId } });
-    const data = {
-      bloodType: this.string(d.bloodType),
-      rhesusFactor: this.string(d.rhesusFactor),
-      organDonor: this.bool(d.organDonor),
-      emergencyNotes: this.string(d.emergencyNotes),
-    };
+    const data: Record<string, unknown> = {};
+    if (Object.prototype.hasOwnProperty.call(d, 'bloodType')) data.bloodType = this.string(d.bloodType);
+    if (Object.prototype.hasOwnProperty.call(d, 'rhesusFactor')) data.rhesusFactor = this.string(d.rhesusFactor);
+    if (Object.prototype.hasOwnProperty.call(d, 'organDonor')) data.organDonor = this.bool(d.organDonor);
+    if (Object.prototype.hasOwnProperty.call(d, 'emergencyNotes')) data.emergencyNotes = this.string(d.emergencyNotes);
+
     if (existing) return tx.healthPassport.update({ where: { id: existing.id }, data });
     return tx.healthPassport.create({ data: { patientId, ...data } });
   }
