@@ -18,7 +18,7 @@ function personName(user: any) {
   return person?.preferredName || [person?.firstName, person?.lastName].filter(Boolean).join(" ") || user?.email || "Authorised user";
 }
 
-const permissions = [["canViewMedicalRecords", "Medical records"], ["canViewLabResults", "Lab results"], ["canViewImaging", "Imaging"], ["canViewPrescriptions", "Prescriptions"], ["canViewAppointments", "Appointments"], ["canViewAIReports", "AI health reports"], ["canViewHealthPassport", "Health Passport"], ["canViewWearables", "Wearable data"], ["canViewInsurance", "Insurance"], ["canViewInvoices", "Invoices"]] as const;
+const permissions = [["canViewMedicalRecords", "Medical records"], ["canUpdateClinicalRecords", "Can update clinical records"], ["canViewLabResults", "Lab results"], ["canViewImaging", "Imaging"], ["canViewPrescriptions", "Prescriptions"], ["canViewAppointments", "Appointments"], ["canViewAIReports", "AI health reports"], ["canViewHealthPassport", "Health Passport"], ["canViewWearables", "Wearable data"], ["canViewInsurance", "Insurance"], ["canViewInvoices", "Invoices"]] as const;
 
 function PrivacyPageContent() {
   const [consents, setConsents] = useState<any[]>([]);
