@@ -383,7 +383,7 @@ export class HealthReportNotificationSchedulerService
         where: {
           patientId,
           scheduledStart: { gte: period.start, lt: period.end },
-          status: { notIn: ['CANCELLED', 'DECLINED'] as any },
+          status: { notIn: ['CANCELLED', 'NO_SHOW'] as const },
         },
         orderBy: { scheduledStart: 'asc' },
         include: {
@@ -732,7 +732,7 @@ export class HealthReportNotificationSchedulerService
         where: {
           patientId,
           scheduledStart: { gte: period.start, lt: period.end },
-          status: { notIn: ['CANCELLED', 'DECLINED'] as any },
+          status: { notIn: ['CANCELLED', 'NO_SHOW'] as const },
         },
       }),
       this.prisma.deviceMeasurement.count({
