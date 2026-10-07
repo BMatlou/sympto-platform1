@@ -1,6 +1,7 @@
 import {
   BadRequestException,
   ConflictException,
+  ForbiddenException,
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
@@ -28,6 +29,57 @@ export class PatientMedicationsService {
     private readonly healthGoalsService: HealthGoalsService,
     private readonly reminderScheduler: MedicationReminderSchedulerService,
   ) {}
+
+  private normalisePersonName(value: unknown) {
+    return String(value ?? '').trim().toLowerCase().replace(/[^a-z0-9]+/g, ' ').replace(/\s+/g, ' ').trim();
+  }
+
+  private async getClinicalMedicationState(id: string) {
+    const record = await this.prisma.patientMedication.findUnique({
+      where: { id },
+      select: {
+        id: true,
+        prescribedBy: true,
+        healthPassport: { select: { patientId: true } },
+        medicationId: true,
+      },
+    });
+    if (!record) throw new NotFoundException('Patient medication not found.');
+
+    const prescription = await this.prisma.prescriptionItem.findFirst({
+      where: {
+        medicationId: record.medicationId,
+        prescription: {
+          patientId: record.healthPassport.patientId,
+          status: { not: 'DRAFT' },
+        },
+      },
+      select: { id: true },
+    });
+
+    let namedClinically = false;
+    if (record.prescribedBy) {
+      const practitioners = await this.prisma.practitioner.findMany({
+        where: { status: { in: ['ACTIVE', 'PENDING'] } },
+        select: {
+          person: { select: { firstName: true, lastName: true, preferredName: true } },
+        },
+      });
+      const prescribedBy = this.normalisePersonName(record.prescribedBy);
+      namedClinically = practitioners.some((practitioner) =>
+        [
+          practitioner.person.preferredName,
+          [practitioner.person.preferredName ?? practitioner.person.firstName, practitioner.person.lastName].filter(Boolean).join(' '),
+          [practitioner.person.firstName, practitioner.person.lastName].filter(Boolean).join(' '),
+        ].some((name) => this.normalisePersonName(name) === prescribedBy),
+      );
+    }
+
+    return {
+      patientId: record.healthPassport.patientId,
+      clinical: Boolean(prescription || namedClinically),
+    };
+  }
 
   async create(dto: CreatePatientMedicationDto) {
     const healthPassport = await this.prisma.healthPassport.findUnique({ where: { id: dto.healthPassportId } });
@@ -65,7 +117,44 @@ export class PatientMedicationsService {
       this.prisma.patientMedication.findMany({ where, include: { medication: true, healthPassport: { include: { patient: { include: { person: true } } } } }, orderBy: { startedAt: 'desc' }, skip: (page - 1) * limit, take: limit }),
       this.prisma.patientMedication.count({ where }),
     ]);
-    return { data, pagination: { page, limit, total, totalPages: Math.ceil(total / limit) } };
+    const practitionerNames = await this.prisma.practitioner.findMany({
+      where: { status: { in: ['ACTIVE', 'PENDING'] } },
+      select: { person: { select: { firstName: true, lastName: true, preferredName: true } } },
+    });
+    const practitionerNameSet = new Set(
+      practitionerNames.flatMap((practitioner) => [
+        practitioner.person.preferredName,
+        [practitioner.person.preferredName ?? practitioner.person.firstName, practitioner.person.lastName].filter(Boolean).join(' '),
+        [practitioner.person.firstName, practitioner.person.lastName].filter(Boolean).join(' '),
+      ]).map((name) => this.normalisePersonName(name)).filter(Boolean),
+    );
+    const medicationIds = data.map((item) => item.medicationId);
+    const prescriptionItems = medicationIds.length
+      ? await this.prisma.prescriptionItem.findMany({
+          where: {
+            medicationId: { in: medicationIds },
+            prescription: {
+              patientId: { in: data.map((item) => item.healthPassport.patient.id) },
+              status: { not: 'DRAFT' },
+            },
+          },
+          select: { medicationId: true, prescription: { select: { patientId: true } } },
+        })
+      : [];
+    const clinicalKeys = new Set(
+      prescriptionItems.map((item) => `${item.prescription.patientId}:${item.medicationId}`),
+    );
+    const mapped = data.map((item) => {
+      const key = `${item.healthPassport.patient.id}:${item.medicationId}`;
+      const clinicianNamed = practitionerNameSet.has(this.normalisePersonName(item.prescribedBy));
+      const clinical = clinicalKeys.has(key) || clinicianNamed;
+      return {
+        ...item,
+        source: clinical ? 'CLINICAL' : 'PATIENT',
+        sourceLabel: clinical ? 'Clinical · view only' : 'Patient entered · editable',
+      };
+    });
+    return { data: mapped, pagination: { page, limit, total, totalPages: Math.ceil(total / limit) } };
   }
 
   async findOne(id: string) {
@@ -149,8 +238,16 @@ export class PatientMedicationsService {
     };
   }
 
-  async update(id: string, dto: UpdatePatientMedicationDto) {
+  async update(id: string, dto: UpdatePatientMedicationDto, authenticatedUserId?: string) {
     const existing = await this.findOne(id);
+    const ownerUserId = existing.healthPassport.patient.userId;
+    if (!authenticatedUserId || ownerUserId !== authenticatedUserId) {
+      throw new NotFoundException('Patient medication not found.');
+    }
+    const clinicalState = await this.getClinicalMedicationState(id);
+    if (clinicalState.clinical) {
+      throw new ForbiddenException('Clinical medication records are view-only from the patient account. Ask your doctor or clinic to update this medication.');
+    }
     const healthPassportId = dto.healthPassportId ?? existing.healthPassportId;
     const medicationId = dto.medicationId ?? existing.medicationId;
     if (dto.healthPassportId && !(await this.prisma.healthPassport.findUnique({ where: { id: dto.healthPassportId } }))) throw new NotFoundException('Health passport not found.');
@@ -628,6 +725,10 @@ export class PatientMedicationsService {
     const ownerUserId = medication.healthPassport.patient.userId;
     if (!authenticatedUserId || ownerUserId !== authenticatedUserId) {
       throw new NotFoundException('Patient medication not found.');
+    }
+    const clinicalState = await this.getClinicalMedicationState(id);
+    if (clinicalState.clinical) {
+      throw new ForbiddenException('Clinical medication records cannot be deleted from the patient account. Ask your doctor or clinic to update this medication.');
     }
     const reminderSchedule = await this.prisma.medicationReminderSchedule.findUnique({ where: { patientMedicationId: id }, select: { id: true } });
     if (reminderSchedule) await this.reminderScheduler.cancelSchedule(reminderSchedule.id);
