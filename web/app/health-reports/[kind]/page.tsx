@@ -220,6 +220,21 @@ export default function HealthReportPage() {
                   <div className="space-y-2">{report.activity.appointments.map((a: any) => <div key={a.id} className="rounded-2xl bg-slate-50 p-4"><p className="font-semibold text-[#0b2d54]">{human(a.appointmentType)}</p><p className="mt-1 text-xs text-slate-500">{date(a.scheduledStart)} · {text(a.practitioner?.person ? a.practitioner.person.firstName + " " + a.practitioner.person.lastName : null)}</p>{a.reason && <p className="mt-1 text-sm text-slate-600">{a.reason}</p>}</div>)}</div>
                 </Section>
               )}
+              {report.activity.sleepSessions.length > 0 && (
+                <Section icon={HeartPulse} title="Sleep" count={report.activity.sleepSessions.length}>
+                  <div className="space-y-2">{report.activity.sleepSessions.map((s: any) => <div key={s.id} className="rounded-2xl bg-slate-50 p-4"><p className="text-xs text-slate-400">{date(s.startedAt)}</p><p className="mt-1 font-semibold text-[#0b2d54]">{s.durationMinutes != null ? "Sleep · " + s.durationMinutes + " min" : "Sleep session"}</p>{s.sleepScore != null && <p className="mt-1 text-xs text-slate-500">Sleep score · {s.sleepScore}</p>}</div>)}</div>
+                </Section>
+              )}
+              {report.activity.workouts.length > 0 && (
+                <Section icon={Activity} title="Exercise" count={report.activity.workouts.length}>
+                  <div className="space-y-2">{report.activity.workouts.map((w: any) => <div key={w.id} className="rounded-2xl bg-slate-50 p-4"><p className="text-xs text-slate-400">{date(w.startedAt)}</p><p className="mt-1 font-semibold text-[#0b2d54]">{human(w.activityType || "Workout")}</p>{w.durationSeconds != null && <p className="mt-1 text-xs text-slate-500">Duration · {Math.round(Number(w.durationSeconds) / 60)} min</p>}{w.calories != null && <p className="mt-1 text-xs text-slate-500">Calories · {w.calories}</p>}{w.averageHeartRate != null && <p className="mt-1 text-xs text-slate-500">Average heart rate · {w.averageHeartRate} bpm</p>}</div>)}</div>
+                </Section>
+              )}
+              {report.activity.deviceMeasurements.length > 0 && (
+                <Section icon={HeartPulse} title="Connected measurements" count={report.activity.deviceMeasurements.length}>
+                  <div className="space-y-2">{report.activity.deviceMeasurements.map((m: any) => <div key={m.id} className="flex flex-wrap justify-between gap-2 rounded-xl bg-slate-50 p-3"><div><p className="text-sm font-semibold text-[#0b2d54]">{human(m.measurementType || m.metricKey || "Measurement")}</p><p className="text-xs text-slate-400">{date(m.measuredAt)} · {text(m.device ? [m.device.manufacturer, m.device.model].filter(Boolean).join(" · ") : null, "Connected device")}</p></div><strong className="text-sm text-[#0b2d54]">{m.value} {m.unit}</strong></div>)}</div>
+                </Section>
+              )}
             </div>
           )}
 
