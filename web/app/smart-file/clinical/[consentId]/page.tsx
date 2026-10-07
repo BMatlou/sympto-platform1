@@ -8,8 +8,10 @@ import ProtectedRoute from "@/components/auth/protected-route";
 import { api } from "@/lib/api";
 
 type SmartFile = {
-  patient: { id: string; patientNumber: string; firstName: string; middleName?: string | null; lastName: string; preferredName?: string | null; dateOfBirth?: string | null; gender?: string | null };
+  patient: { id: string; patientNumber: string | null; firstName: string; middleName?: string | null; lastName: string; preferredName?: string | null; dateOfBirth?: string | null; gender?: string | null };
+  clinicalAccess: { canView: boolean; canUpdate: boolean; consentExpiresAt: string | null };
   healthPassport: any;
+  medicalRecord: any;
   conditions: any[];
   allergies: any[];
   immunisations: any[];
@@ -19,6 +21,7 @@ type SmartFile = {
   episodes: any[];
   vitals: any[];
   symptoms: any[];
+  patientVitals: any[];
   diagnoses: any[];
   procedures: any[];
   labResults: any[];
@@ -26,6 +29,11 @@ type SmartFile = {
   carePlans: any[];
   referrals: any[];
   clinicalDocuments: any[];
+  appointments: any[];
+  healthJournalEntries: any[];
+  patientMeasurements: any[];
+  wearableWellnessMetrics: any[];
+  wearableDevices: any[];
   generatedAt: string;
 };
 
@@ -44,11 +52,98 @@ export default function ClinicalSmartFilePage() {
   const [file, setFile] = useState<SmartFile | null>(null);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(true);
+  const [message, setMessage] = useState("");
+  const [saving, setSaving] = useState(false);
+  const [form, setForm] = useState({
+    chiefComplaint: "",
+    assessment: "",
+    plan: "",
+    notes: "",
+    medicationQuery: "",
+    medicationId: "",
+    dosage: "",
+    frequency: "ONCE_DAILY",
+    route: "ORAL",
+    instructions: "",
+  });
+  const [medications, setMedications] = useState<any[]>([]);
+
+  const loadFile = async () => {
+    if (!params.consentId) return;
+    setLoading(true);
+    setError("");
+    try {
+      const response = await api.get(`/smart-file/clinical/${params.consentId}`);
+      setFile(unwrap<SmartFile>(response.data));
+    } catch (err: any) {
+      setError(err?.response?.data?.message || "This clinical Smart File is no longer available.");
+    } finally {
+      setLoading(false);
+    }
+  };
 
   useEffect(() => {
-    if (!params.consentId) return;
-    api.get(`/smart-file/clinical/${params.consentId}`).then((response) => setFile(unwrap<SmartFile>(response.data))).catch((err) => setError(err?.response?.data?.message || "This clinical Smart File is no longer available.")).finally(() => setLoading(false));
+    void loadFile();
   }, [params.consentId]);
+
+  useEffect(() => {
+    let active = true;
+    const query = form.medicationQuery.trim();
+    if (!file?.clinicalAccess.canUpdate || query.length < 2) {
+      setMedications([]);
+      return;
+    }
+    api.get(`/smart-file/clinical/${params.consentId}/medications`, { params: { search: query } })
+      .then((response) => { if (active) setMedications(unwrap<any[]>(response.data) ?? []); })
+      .catch(() => { if (active) setMedications([]); });
+    return () => { active = false; };
+  }, [file?.clinicalAccess.canUpdate, form.medicationQuery, params.consentId]);
+
+  const saveClinicalUpdate = async () => {
+    if (!file?.clinicalAccess.canUpdate || !params.consentId) return;
+    const hasRecord = [form.chiefComplaint, form.assessment, form.plan, form.notes].some((value) => value.trim());
+    const hasPrescription = Boolean(form.medicationId && form.dosage.trim());
+    if (!hasRecord && !hasPrescription) {
+      setMessage("Add a clinical note, assessment, plan or prescription before saving.");
+      return;
+    }
+    setSaving(true);
+    setMessage("");
+    try {
+      await api.post(`/smart-file/clinical/${params.consentId}/updates`, {
+        chiefComplaint: form.chiefComplaint.trim() || undefined,
+        assessment: form.assessment.trim() || undefined,
+        plan: form.plan.trim() || undefined,
+        notes: form.notes.trim() || undefined,
+        prescription: hasPrescription ? {
+          medicationId: form.medicationId,
+          dosage: form.dosage.trim(),
+          frequency: form.frequency,
+          route: form.route,
+          instructions: form.instructions.trim() || undefined,
+        } : undefined,
+      });
+      setForm({
+        chiefComplaint: "",
+        assessment: "",
+        plan: "",
+        notes: "",
+        medicationQuery: "",
+        medicationId: "",
+        dosage: "",
+        frequency: "ONCE_DAILY",
+        route: "ORAL",
+        instructions: "",
+      });
+      setMedications([]);
+      setMessage("Clinical Smart File updated. The new record is now part of the patient’s longitudinal file.");
+      await loadFile();
+    } catch (err: any) {
+      setMessage(err?.response?.data?.message || "The clinical update could not be saved.");
+    } finally {
+      setSaving(false);
+    }
+  };
 
   return <ProtectedRoute><main className="min-h-screen bg-[#f5f8fb] text-slate-800"><div className="mx-auto max-w-5xl px-4 py-6 sm:px-6 sm:py-8">
     <Link href="/smart-file/authorize" className="mb-5 inline-flex items-center gap-2 text-sm font-semibold text-[#0b2d54]"><ArrowLeft className="h-4 w-4" />Back to Smart File access</Link>
