@@ -60,6 +60,7 @@ type Report = {
     conditions: any[];
     allergies: any[];
     medications: any[];
+    activeGoals: any[];
   };
   generatedAt: string;
 };
@@ -237,7 +238,12 @@ export default function HealthReportPage() {
             </div>
           )}
 
-          {(report.currentSnapshot.conditions.length > 0 || report.currentSnapshot.allergies.length > 0 || report.currentSnapshot.medications.length > 0) && (
+          {(report.currentSnapshot.conditions.length > 0 || report.currentSnapshot.allergies.length > 0 || report.currentSnapshot.medications.length > 0 || report.currentSnapshot.activeGoals.length > 0 || report.currentSnapshot.medicalRecord) && (
+            <>
+              {report.currentSnapshot.medicalRecord && <Section icon={FileText} title="Medical background" count={1}><div className="space-y-3">{["pastMedicalHistory","surgicalHistory","familyHistory","socialHistory","chronicConditions","currentMedications","immunizationNotes"].map((key) => report.currentSnapshot.medicalRecord?.[key] ? <div key={key}><p className="text-[10px] font-black uppercase tracking-wide text-slate-400">{key.replace(/([A-Z])/g, " $1")}</p><p className="mt-1 whitespace-pre-wrap text-sm leading-6 text-slate-700">{report.currentSnapshot.medicalRecord[key]}</p></div> : null)}</div></Section>}
+              {report.currentSnapshot.activeGoals.length > 0 && <Section icon={Activity} title="Active health goals" count={report.currentSnapshot.activeGoals.length}><div className="space-y-2">{report.currentSnapshot.activeGoals.map((goal: any) => <div key={goal.id} className="rounded-2xl bg-slate-50 p-4"><p className="font-semibold text-[#0b2d54]">{text(goal.title, "Health goal")}</p><p className="mt-1 text-xs text-slate-500">{human(goal.category)} · {human(goal.status)}</p>{goal.targetValue != null && <p className="mt-1 text-sm text-slate-600">Target · {goal.targetValue}{goal.unit ? " " + goal.unit : ""}</p>}{goal.progress?.[0] && <p className="mt-1 text-xs font-semibold text-[#0b2d54]">Latest progress · {text(goal.progress[0].progressPercent, "—")}%</p>}</div>)}</div></Section>}
+              <div className="grid gap-4 md:grid-cols-3">
+
             <Section icon={ShieldCheck} title="Current clinical snapshot" count={report.currentSnapshot.conditions.length + report.currentSnapshot.allergies.length + report.currentSnapshot.medications.length}>
               <div className="grid gap-4 md:grid-cols-3">
                 {report.currentSnapshot.conditions.length > 0 && <div><p className="text-xs font-black uppercase tracking-wide text-slate-400">Active conditions</p><div className="mt-2 space-y-2">{report.currentSnapshot.conditions.map((item: any) => <div key={item.id} className="rounded-xl bg-blue-50 p-3"><span className="rounded-full bg-emerald-50 px-2 py-1 text-[9px] font-black uppercase text-emerald-700">Clinical</span><p className="mt-2 text-sm font-semibold text-[#0b2d54]">{text(item.condition?.name || item.name)}</p></div>)}</div></div>}
@@ -245,6 +251,7 @@ export default function HealthReportPage() {
                 {report.currentSnapshot.medications.length > 0 && <div><p className="text-xs font-black uppercase tracking-wide text-slate-400">Current medications</p><div className="mt-2 space-y-2">{report.currentSnapshot.medications.map((item: any) => <div key={item.id} className="rounded-xl bg-slate-50 p-3"><span className="rounded-full bg-emerald-50 px-2 py-1 text-[9px] font-black uppercase text-emerald-700">Clinical</span><p className="mt-2 text-sm font-semibold text-[#0b2d54]">{text(item.medication?.name || item.name)}</p><p className="mt-1 text-xs text-slate-500">{[item.dosage, item.frequency, item.route].filter(Boolean).join(" · ")}</p></div>)}</div></div>}
               </div>
             </Section>
+            </>
           )}
 
           <p className="mt-5 text-center text-xs text-slate-400">Report generated {date(report.generatedAt)}. Sections appear only when records are available.</p>
