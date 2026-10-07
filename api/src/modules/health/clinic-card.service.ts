@@ -149,6 +149,50 @@ export class ClinicCardService {
     const weightKg = patient.weightKg != null ? Number(patient.weightKg) : patient.baseline?.weightKg != null ? Number(patient.baseline.weightKg) : null;
     const calculatedBmi = heightCm && weightKg && heightCm > 0 && weightKg > 0 ? Number((weightKg / Math.pow(heightCm / 100, 2)).toFixed(2)) : null;
 
+    const encounterRows = await this.prisma.encounter.findMany({
+      where: { medicalRecord: { patientId: patient.id } },
+      orderBy: { startedAt: 'desc' },
+      take: 100,
+      include: {
+        encounterType: true,
+        practitioner: { include: { person: true } },
+        clinicalNotes: true,
+        diagnoses: { include: { diagnosis: true } },
+        procedures: { include: { procedure: true } },
+        vitals: { include: { vitalType: true } },
+      },
+    });
+    const clinicalEncounters = encounterRows.map((encounter) => ({
+      id: encounter.id,
+      type: encounter.encounterType.name,
+      startedAt: encounter.startedAt,
+      endedAt: encounter.endedAt,
+      chiefComplaint: encounter.chiefComplaint,
+      assessment: encounter.assessment,
+      plan: encounter.plan,
+      notes: encounter.notes,
+      practitionerName: encounter.practitioner
+        ? [encounter.practitioner.person.preferredName ?? encounter.practitioner.person.firstName, encounter.practitioner.person.lastName].filter(Boolean).join(' ')
+        : null,
+      diagnoses: encounter.diagnoses.map((item) => item.diagnosis.name),
+      procedures: encounter.procedures.map((item) => item.procedure.name),
+      clinicalNotes: encounter.clinicalNotes.map((note) => ({
+        id: note.id,
+        title: note.title,
+        note: note.note,
+        createdAt: note.createdAt,
+      })),
+      vitals: encounter.vitals.map((vital) => ({
+        id: vital.id,
+        type: vital.vitalType.name,
+        unit: vital.vitalType.unit,
+        value: Number(vital.value),
+        measuredAt: vital.measuredAt,
+      })),
+      source: 'CLINICAL',
+      sourceLabel: 'Clinical · view only',
+    }));
+
     const updatedDates = [
       passport?.updatedAt,
       patient.medicalRecord?.updatedAt,
@@ -212,6 +256,7 @@ export class ClinicCardService {
             establishedAt: patient.baseline.establishedAt,
           }
         : null,
+      clinicalEncounters,
       medicalHistory: {
         medicalRecord: patient.medicalRecord
           ? {
