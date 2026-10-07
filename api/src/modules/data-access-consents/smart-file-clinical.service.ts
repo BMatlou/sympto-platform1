@@ -121,20 +121,11 @@ export class SmartFileClinicalService {
       Prisma.ClinicalEpisodeGetPayload<{
         include: {
           symptomLogs: true;
-          attachments: true;
         };
       }>
     >;
     const carePlans = Array.isArray(patient.carePlans) ? patient.carePlans : [];
-    const referrals = (
-      Array.isArray(patient.referrals) ? patient.referrals : []
-    ) as Array<
-      Prisma.ReferralGetPayload<{
-        include: {
-          documents: true;
-        };
-      }>
-    >;
+    const referrals = Array.isArray(patient.referrals) ? patient.referrals : [];
     const healthJournals = Array.isArray(patient.healthJournals) ? patient.healthJournals : [];
     const wearableDevices = Array.isArray(patient.wearableDevices) ? patient.wearableDevices : [];
 
