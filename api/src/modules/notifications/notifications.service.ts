@@ -177,60 +177,158 @@ export class NotificationsService {
       ...(unreadOnly ? { readAt: null } : {}),
     };
 
-    const [data, total] = await this.prisma.$transaction([
-      this.prisma.notification.findMany({
-        where,
-        select: {
-          id: true,
-          type: true,
-          title: true,
-          body: true,
-          channel: true,
-          status: true,
-          priority: true,
-          actionUrl: true,
-          actionLabel: true,
-          scheduledFor: true,
-          sentAt: true,
-          deliveredAt: true,
-          readAt: true,
-          createdAt: true,
-        },
-        orderBy: [
-          { readAt: 'asc' },
-          { priority: 'desc' },
-          { createdAt: 'desc' },
-        ],
-        skip: (page - 1) * limit,
-        take: limit,
-      }),
-      this.prisma.notification.count({ where }),
-    ]);
+    try {
+      const [data, total] = await Promise.all([
+        this.prisma.notification.findMany({
+          where,
+          select: {
+            id: true,
+            type: true,
+            title: true,
+            body: true,
+            channel: true,
+            status: true,
+            priority: true,
+            actionUrl: true,
+            actionLabel: true,
+            scheduledFor: true,
+            sentAt: true,
+            deliveredAt: true,
+            readAt: true,
+            createdAt: true,
+          },
+          orderBy: [
+            { readAt: 'asc' },
+            { priority: 'desc' },
+            { createdAt: 'desc' },
+          ],
+          skip: (page - 1) * limit,
+          take: limit,
+        }),
+        this.prisma.notification.count({ where }),
+      ]);
 
-    return {
-      data,
-      pagination: {
-        page,
-        limit,
-        total,
-        totalPages: Math.ceil(total / limit),
-      },
-    };
+      return {
+        data,
+        pagination: {
+          page,
+          limit,
+          total,
+          totalPages: Math.ceil(total / limit),
+        },
+      };
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      const stack = error instanceof Error ? error.stack : undefined;
+      console.error(`[NotificationsService] findForUser ORM read failed: \${message}`, stack);
+
+      type PatientNotificationRow = {
+        id: string;
+        type: string;
+        title: string;
+        body: string;
+        channel: string;
+        status: string;
+        priority: string;
+        actionUrl: string | null;
+        actionLabel: string | null;
+        scheduledFor: Date | null;
+        sentAt: Date | null;
+        deliveredAt: Date | null;
+        readAt: Date | null;
+        createdAt: Date;
+      };
+
+      const rows = await this.prisma.$queryRaw<PatientNotificationRow[]>`
+        SELECT
+          "id",
+          "type"::text AS "type",
+          "title",
+          "body",
+          "channel"::text AS "channel",
+          "status"::text AS "status",
+          "priority"::text AS "priority",
+          "actionUrl",
+          "actionLabel",
+          "scheduledFor",
+          "sentAt",
+          "deliveredAt",
+          "readAt",
+          "createdAt"
+        FROM "Notification"
+        WHERE "userId" = \${userId}
+          AND "channel" = 'IN_APP'
+          AND "status" IN ('SENT', 'DELIVERED', 'READ')
+          AND ("scheduledFor" IS NULL OR "scheduledFor" <= NOW())
+          \${unreadOnly ? Prisma.sql`AND "readAt" IS NULL` : Prisma.empty}
+        ORDER BY
+          ("readAt" IS NOT NULL) ASC,
+          CASE "priority"
+            WHEN 'URGENT' THEN 4
+            WHEN 'HIGH' THEN 3
+            WHEN 'NORMAL' THEN 2
+            WHEN 'LOW' THEN 1
+            ELSE 0
+          END DESC,
+          "createdAt" DESC
+        OFFSET \${(page - 1) * limit}
+        LIMIT \${limit}
+      `;
+
+      const totalRows = await this.prisma.$queryRaw<Array<{ total: number }>>`
+        SELECT COUNT(*)::int AS "total"
+        FROM "Notification"
+        WHERE "userId" = \${userId}
+          AND "channel" = 'IN_APP'
+          AND "status" IN ('SENT', 'DELIVERED', 'READ')
+          AND ("scheduledFor" IS NULL OR "scheduledFor" <= NOW())
+          \${unreadOnly ? Prisma.sql`AND "readAt" IS NULL` : Prisma.empty}
+      `;
+
+      const total = Number(totalRows[0]?.total ?? 0);
+      return {
+        data: rows,
+        pagination: {
+          page,
+          limit,
+          total,
+          totalPages: Math.ceil(total / limit),
+        },
+      };
+    }
   }
 
   async getUnreadCountForUser(userId: string): Promise<number> {
-    return this.prisma.notification.count({
-      where: {
-        userId,
-        channel: 'IN_APP',
-        readAt: null,
-        status: { in: ['SENT', 'DELIVERED'] },
-        OR: [
-          { scheduledFor: null },
-          { scheduledFor: { lte: new Date() } },
-        ],
-      },
-    });
+    const where: Prisma.NotificationWhereInput = {
+      userId,
+      channel: 'IN_APP',
+      readAt: null,
+      status: { in: ['SENT', 'DELIVERED'] },
+      OR: [
+        { scheduledFor: null },
+        { scheduledFor: { lte: new Date() } },
+      ],
+    };
+
+    try {
+      return await this.prisma.notification.count({ where });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      const stack = error instanceof Error ? error.stack : undefined;
+      console.error(`[NotificationsService] unread-count ORM read failed: \${message}`, stack);
+
+      const rows = await this.prisma.$queryRaw<Array<{ count: number }>>`
+        SELECT COUNT(*)::int AS "count"
+        FROM "Notification"
+        WHERE "userId" = \${userId}
+          AND "channel" = 'IN_APP'
+          AND "readAt" IS NULL
+          AND "status" IN ('SENT', 'DELIVERED')
+          AND ("scheduledFor" IS NULL OR "scheduledFor" <= NOW())
+      `;
+
+      return Number(rows[0]?.count ?? 0);
+    }
   }
 
   async markReadForUser(userId: string, notificationId: string) {
