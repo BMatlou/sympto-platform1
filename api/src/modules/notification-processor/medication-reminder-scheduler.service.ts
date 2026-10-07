@@ -145,15 +145,16 @@ export class MedicationReminderSchedulerService {
       // If the user saves a reminder during its scheduled minute, the "next" occurrence
       // is already in the past by a few seconds. Reuse the existing grace-window helper
       // so that occurrence is still queued and delivered once.
+      const recent = recentMedicationReminderOccurrence({
+        now,
+        time: slot.time,
+        daysOfWeek: schedule.daysOfWeek,
+        timezone: schedule.timezone,
+        notBefore: medication.startedAt,
+        notAfter: medication.endedAt,
+      });
       const occurrence =
-        recentMedicationReminderOccurrence({
-          now,
-          time: slot.time,
-          daysOfWeek: schedule.daysOfWeek,
-          timezone: schedule.timezone,
-          notBefore: medication.startedAt,
-          notAfter: medication.endedAt,
-        }) ??
+        recent ??
         nextMedicationReminderOccurrence({
           now,
           time: slot.time,
