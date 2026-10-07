@@ -16,18 +16,33 @@ const PHARMACY_CONSENT_MINUTES = 30;
 export class SmartFileConsentService {
   constructor(private readonly prisma: PrismaService) {}
 
-  async createClinicalShareSession(patientUserId: string) {
+  async createClinicalShareSession(
+    patientUserId: string,
+    appointmentId?: string,
+  ) {
     const patient = await this.requirePatient(patientUserId);
+
+    if (appointmentId) {
+      await this.requirePatientAppointment(patient.id, appointmentId);
+    }
+
     const credentials = await this.createSessionCredentials('sf_');
 
     return this.prisma.smartFileShareSession.create({
       data: {
         patientId: patient.id,
+        appointmentId: appointmentId || undefined,
         qrToken: credentials.qrToken,
         shortCode: credentials.shortCode,
         expiresAt: this.minutesFromNow(SHARE_WINDOW_MINUTES),
       },
-      select: { id: true, qrToken: true, shortCode: true, expiresAt: true },
+      select: {
+        id: true,
+        qrToken: true,
+        shortCode: true,
+        appointmentId: true,
+        expiresAt: true,
+      },
     });
   }
 
@@ -50,13 +65,29 @@ export class SmartFileConsentService {
     const practitioner = await this.requirePractitioner(practitionerUserId);
     const session = await this.consumeSession(credential, 'CLINICAL');
 
+    let appointmentId: string | null = null;
+    let canUpdateClinicalRecords = false;
+    let purpose = 'Walk-in Clinical Smart File access (read-only)';
+
+    if (session.appointmentId) {
+      const appointment = await this.requireAppointmentForPractitioner(
+        session.patientId,
+        session.appointmentId,
+        practitioner.id,
+      );
+      appointmentId = appointment.id;
+      canUpdateClinicalRecords = true;
+      purpose = 'Appointment Clinical Smart File access';
+    }
+
     const consent = await this.grantConsent({
       patientId: session.patientId,
       grantedToUserId: practitioner.userId,
-      purpose: 'Walk-in Clinical Smart File access (read-only)',
+      appointmentId,
+      purpose,
       expiresAt: this.hoursFromNow(CLINICAL_CONSENT_HOURS),
       canViewMedicalRecords: true,
-      canUpdateClinicalRecords: false,
+      canUpdateClinicalRecords,
       canViewLabResults: true,
       canViewImaging: true,
       canViewPrescriptions: true,
@@ -112,6 +143,67 @@ export class SmartFileConsentService {
       expiresAt: consent.expiresAt,
       prescriptions,
     };
+  }
+
+  private async requirePatientAppointment(
+    patientId: string,
+    appointmentId: string,
+  ) {
+    const appointment = await this.prisma.appointment.findUnique({
+      where: { id: appointmentId },
+      select: {
+        id: true,
+        patientId: true,
+        practitionerId: true,
+        status: true,
+      },
+    });
+
+    if (!appointment || appointment.patientId !== patientId) {
+      throw new NotFoundException('Appointment not found for this patient.');
+    }
+
+    if (appointment.status === 'CANCELLED' || appointment.status === 'NO_SHOW') {
+      throw new BadRequestException(
+        'Smart File access cannot be granted for a cancelled or no-show appointment.',
+      );
+    }
+
+    return appointment;
+  }
+
+  private async requireAppointmentForPractitioner(
+    patientId: string,
+    appointmentId: string,
+    practitionerId: string,
+  ) {
+    const appointment = await this.prisma.appointment.findUnique({
+      where: { id: appointmentId },
+      select: {
+        id: true,
+        patientId: true,
+        practitionerId: true,
+        status: true,
+      },
+    });
+
+    if (
+      !appointment ||
+      appointment.patientId !== patientId ||
+      appointment.practitionerId !== practitionerId
+    ) {
+      throw new ForbiddenException(
+        'This appointment Smart File share is not assigned to this clinician.',
+      );
+    }
+
+    if (appointment.status === 'CANCELLED' || appointment.status === 'NO_SHOW') {
+      throw new ForbiddenException(
+        'This appointment is no longer eligible for Smart File access.',
+      );
+    }
+
+    return appointment;
   }
 
   private async requirePatient(userId: string) {
@@ -210,6 +302,7 @@ export class SmartFileConsentService {
     expiresAt: Date;
     canViewMedicalRecords: boolean;
     canUpdateClinicalRecords: boolean;
+    appointmentId?: string | null;
     canViewLabResults: boolean;
     canViewImaging: boolean;
     canViewPrescriptions: boolean;
