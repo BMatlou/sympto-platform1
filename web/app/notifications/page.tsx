@@ -492,22 +492,16 @@ export default function NotificationsPage() {
           </div>
 
           <div className="mb-5">
-            <div className="flex items-end justify-between gap-4">
-              <div>
-                <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-slate-400">
-                  Notifications
-                </p>
-                <h1 className="mt-1 text-3xl font-extrabold tracking-tight text-[#0b2d54] sm:text-4xl">
-                  Your notifications
-                </h1>
-                <p className="mt-1.5 max-w-2xl text-sm leading-6 text-slate-500">
-                  Stay on top of reminders, appointments, results, messages and
-                  important updates.
-                </p>
-              </div>
-
-              </div>
-            </div>
+            <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-slate-400">
+              Notifications
+            </p>
+            <h1 className="mt-1 text-3xl font-extrabold tracking-tight text-[#0b2d54] sm:text-4xl">
+              Your notifications
+            </h1>
+            <p className="mt-1.5 max-w-2xl text-sm leading-6 text-slate-500">
+              Stay on top of reminders, appointments, results, messages and
+              important updates.
+            </p>
           </div>
 
           <section className="overflow-hidden rounded-[30px] bg-[#24c1c4] shadow-[0_18px_45px_rgba(11,45,84,0.12)]">
