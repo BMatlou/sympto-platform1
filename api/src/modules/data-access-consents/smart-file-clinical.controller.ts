@@ -13,7 +13,9 @@ import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { SmartFileClinicalService } from './smart-file-clinical.service';
+import { SmartFileClinicalWriteService } from './smart-file-clinical-write.service';
 import { CreateSmartFileClinicalUpdateDto } from './dto/create-smart-file-clinical-update.dto';
+import { SmartFileClinicalWriteDto } from './dto/smart-file-clinical-write.dto';
 
 type AuthenticatedRequest = {
   user?: {
@@ -29,6 +31,7 @@ type AuthenticatedRequest = {
 export class SmartFileClinicalController {
   constructor(
     private readonly smartFileClinicalService: SmartFileClinicalService,
+    private readonly smartFileClinicalWriteService: SmartFileClinicalWriteService,
   ) {}
 
   @Get('clinical/:consentId')
@@ -52,6 +55,19 @@ export class SmartFileClinicalController {
       this.userId(req),
       consentId,
       search,
+    );
+  }
+
+  @Post('clinical/:consentId/write')
+  writeClinicalRecord(
+    @Req() req: AuthenticatedRequest,
+    @Param('consentId') consentId: string,
+    @Body() dto: SmartFileClinicalWriteDto,
+  ) {
+    return this.smartFileClinicalWriteService.write(
+      this.userId(req),
+      consentId,
+      dto,
     );
   }
 
