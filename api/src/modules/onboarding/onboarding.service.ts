@@ -66,8 +66,29 @@ export class OnboardingService {
       if(!healthPassport||healthPassport.patientId!==patient.id)throw new BadRequestException('Health Passport not found for this patient.');
       const healthPassportId=healthPassport.id;
 
-      const existing=await tx.patientMedication.findMany({where:{healthPassportId},select:{id:true,medicationId:true}});
+      const existing=await tx.patientMedication.findMany({where:{healthPassportId},select:{id:true,medicationId:true,prescribedBy:true}});
       const existingById=new Map(existing.map((item)=>[item.id,item]));
+      const medicationIds = existing.map((item) => item.medicationId);
+      const clinicalPrescriptionItems = medicationIds.length
+        ? await tx.prescriptionItem.findMany({
+            where: { medicationId: { in: medicationIds }, prescription: { patientId: patient.id, status: { not: 'DRAFT' } } },
+            select: { medicationId: true },
+          })
+        : [];
+      const clinicalMedicationCatalogIds = new Set(clinicalPrescriptionItems.map((item) => item.medicationId));
+      const practitioners = await tx.practitioner.findMany({
+        where: { status: { in: ['ACTIVE', 'PENDING'] } },
+        select: { person: { select: { firstName: true, lastName: true, preferredName: true } } },
+      });
+      const normalise = (value: unknown) => String(value ?? '').trim().toLowerCase().replace(/[^a-z0-9]+/g, ' ').replace(/\s+/g, ' ').trim();
+      const practitionerNames = new Set(practitioners.flatMap((p) => [
+        p.person.preferredName,
+        [p.person.preferredName ?? p.person.firstName, p.person.lastName].filter(Boolean).join(' '),
+        [p.person.firstName, p.person.lastName].filter(Boolean).join(' '),
+      ]).map(normalise).filter(Boolean));
+      const clinicalMedicationIds = new Set(
+        existing.filter((item) => clinicalMedicationCatalogIds.has(item.medicationId) || practitionerNames.has(normalise(item.prescribedBy))).map((item) => item.id),
+      );
       const processedMedications=await Promise.all(dto.medications.map(async (item)=>{
         if(item.patientMedicationId&&(!item.medicationId||item.medicationId.trim()==='')){
           const existingMedication=existingById.get(item.patientMedicationId) ?? await tx.patientMedication.findUnique({where:{id:item.patientMedicationId},select:{id:true,medicationId:true}});
@@ -75,6 +96,9 @@ export class OnboardingService {
           return {...item,medicationId:existingMedication.medicationId};
         }
         if(item.patientMedicationId&&!existingById.has(item.patientMedicationId))throw new BadRequestException('One or more medication records do not belong to this patient.');
+        if(item.patientMedicationId && clinicalMedicationIds.has(item.patientMedicationId)) {
+          throw new ForbiddenException('Clinical medication records are view-only. Ask your doctor or clinic to update this medication.');
+        }
         return item;
       }));
       const finalMedications=processedMedications.filter((item)=>Boolean(item.medicationId&&item.medicationId.trim()!==''));
@@ -125,6 +149,9 @@ export class OnboardingService {
           });
 
           if (existingMedication) {
+            if (clinicalMedicationCatalogIds.has(existingMedication.medicationId) || clinicalMedicationIds.has(existingMedication.id)) {
+              throw new ForbiddenException('Clinical medication records are view-only. Ask your doctor or clinic to update this medication.');
+            }
             const existingStatus = String(existingMedication.status).toUpperCase();
 
             // Lifecycle Reactivation Rule:
@@ -181,7 +208,7 @@ export class OnboardingService {
           }
         }
       }
-      const idsToDelete=existing.map((item)=>item.id).filter((id)=>!submittedExistingIds.has(id));
+      const idsToDelete=existing.map((item)=>item.id).filter((id)=>!submittedExistingIds.has(id) && !clinicalMedicationIds.has(id));
       if(idsToDelete.length>0)await tx.patientMedication.deleteMany({where:{healthPassportId,id:{in:idsToDelete}}});
       return tx.patientMedication.findMany({where:{healthPassportId},include:{medication:true},orderBy:{createdAt:'desc'}});
     });
