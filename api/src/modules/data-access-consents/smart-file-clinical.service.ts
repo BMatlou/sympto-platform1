@@ -512,6 +512,7 @@ export class SmartFileClinicalService {
       dto.startedAt,
       dto.endedAt,
       dto.encounterTypeId,
+      dto.clinicalNote,
     ].some(
       (value) => value !== undefined && String(value).trim() !== '',
     );
@@ -571,6 +572,16 @@ export class SmartFileClinicalService {
         },
       });
 
+      const clinicalNote = dto.clinicalNote?.trim()
+        ? await tx.clinicalNote.create({
+            data: {
+              encounterId: encounter.id,
+              title: dto.clinicalNoteTitle?.trim() || null,
+              note: dto.clinicalNote.trim(),
+            },
+          })
+        : null;
+
       const prescription = dto.prescription
         ? await this.createPrescriptionInTransaction(
             tx,
@@ -593,6 +604,7 @@ export class SmartFileClinicalService {
             consentId,
             patientId: patient.id,
             prescriptionId,
+            clinicalNoteId: clinicalNote?.id ?? null,
           },
           success: true,
         },
@@ -617,6 +629,7 @@ export class SmartFileClinicalService {
 
       return {
         encounter,
+        clinicalNote,
         prescription,
         recordedBy: {
           practitionerId: practitioner.id,
