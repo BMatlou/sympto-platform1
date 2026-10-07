@@ -166,6 +166,7 @@ export class NotificationsService {
     limit = 50,
     unreadOnly = false,
   ) {
+    const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
     const where: Prisma.NotificationWhereInput = {
       userId,
       channel: 'IN_APP',
@@ -174,7 +175,18 @@ export class NotificationsService {
         { scheduledFor: null },
         { scheduledFor: { lte: new Date() } },
       ],
-      ...(unreadOnly ? { readAt: null } : {}),
+      ...(unreadOnly
+        ? { readAt: null }
+        : {
+            AND: [
+              {
+                OR: [
+                  { readAt: null },
+                  { readAt: { gte: thirtyDaysAgo } },
+                ],
+              },
+            ],
+          }),
     };
 
     try {
@@ -197,11 +209,9 @@ export class NotificationsService {
             readAt: true,
             createdAt: true,
           },
-          orderBy: [
-            { readAt: 'asc' },
-            { priority: 'desc' },
-            { createdAt: 'desc' },
-          ],
+          orderBy: {
+            createdAt: 'desc',
+          },
           skip: (page - 1) * limit,
           take: limit,
         }),
@@ -260,17 +270,10 @@ export class NotificationsService {
           AND "channel" = 'IN_APP'
           AND "status" IN ('SENT', 'DELIVERED', 'READ')
           AND ("scheduledFor" IS NULL OR "scheduledFor" <= NOW())
-          ${unreadOnly ? Prisma.sql`AND "readAt" IS NULL` : Prisma.empty}
-        ORDER BY
-          ("readAt" IS NOT NULL) ASC,
-          CASE "priority"
-            WHEN 'URGENT' THEN 4
-            WHEN 'HIGH' THEN 3
-            WHEN 'NORMAL' THEN 2
-            WHEN 'LOW' THEN 1
-            ELSE 0
-          END DESC,
-          "createdAt" DESC
+          ${unreadOnly
+            ? Prisma.sql`AND "readAt" IS NULL`
+            : Prisma.sql`AND ("readAt" IS NULL OR "readAt" >= NOW() - INTERVAL '30 days')`}
+        ORDER BY "createdAt" DESC
         OFFSET ${(page - 1) * limit}
         LIMIT ${limit}
       `;
