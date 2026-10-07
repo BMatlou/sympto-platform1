@@ -5,6 +5,7 @@ import { Check, Plus, Save, Search, Stethoscope } from "lucide-react";
 import { api } from "@/lib/api";
 
 type Action = string;
+type ActionOption = { value: Action; label: string; group: string };
 
 type Props = {
   consentId: string;
@@ -12,7 +13,7 @@ type Props = {
   onSaved: () => Promise<void> | void;
 };
 
-const ACTIONS: Array<{ value: Action; label: string; group: string }> = [
+const ACTIONS: ActionOption[] = [
   { value: "ENCOUNTER", label: "Clinical encounter", group: "Consultation" },
   { value: "CLINICAL_NOTE", label: "Clinical note", group: "Consultation" },
   { value: "DIAGNOSIS", label: "Diagnosis", group: "Clinical record" },
@@ -246,7 +247,9 @@ export default function ClinicalSmartFileActions({ consentId, file, onSaved }: P
   };
 
   const referenceRequired = Boolean(REF_TYPES[action]);
-  const groupedOptions = GROUPS.map((group) => ({ group, options: ACTIONS.filter((x) => x.group === group) })).filter((x) => x.options.length);
+  const groupedOptions: Array<{ group: string; options: ActionOption[] }> = GROUPS
+    .map((group) => ({ group, options: ACTIONS.filter((x) => x.group === group) }))
+    .filter((x) => x.options.length);
 
   return <section className="mt-5 overflow-hidden rounded-3xl border border-[#24c1c4]/25 bg-white shadow-sm">
     <div className="border-b border-slate-200 bg-slate-50 px-5 py-5 sm:px-6">
@@ -263,7 +266,7 @@ export default function ClinicalSmartFileActions({ consentId, file, onSaved }: P
       <div className="space-y-4">
         <Field label="Clinical action">
           <Select value={action} onChange={(e) => setAction(e.target.value)}>
-            {groupedOptions.map(({ group, options }) => <optgroup key={group} label={group}>{options.map((option: { value: Action; label: string; group: string }) => <option key={option.value} value={option.value}>{option.label}</option>)}</optgroup>)}
+            {groupedOptions.map(({ group, options }) => <optgroup key={group} label={group}>{options.map((option: ActionOption) => <option key={option.value} value={option.value}>{option.label}</option>)}</optgroup>)}
           </Select>
         </Field>
         <div className="grid grid-cols-2 gap-2 rounded-xl bg-slate-100 p-1">
