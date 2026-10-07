@@ -316,9 +316,6 @@ export default function HealthPassportPremium() {
       </Panel>
     </div>
     <div className="mt-5 grid gap-5 md:grid-cols-2">
-    </div>
-
-    <div className="mt-5 grid gap-5 md:grid-cols-2">
       <Panel title="Allergies" icon={<HeartPulse className="h-5 w-5" />}>
         {computed.allergies?.length ? <div className="space-y-3">{computed.allergies.map((item:any) => <article key={item.id} className="rounded-2xl bg-rose-50/55 p-4">
           <div className="flex items-start justify-between gap-3"><div><p className="font-semibold text-[#0b2d54]">{text(item.name,"Allergy")}</p><ClinicalMarker item={item} /></div><Badge tone="rose">{human(item.severity)}</Badge></div>
