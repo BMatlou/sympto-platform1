@@ -72,12 +72,24 @@ export class SmartFileClinicalService {
               orderBy: { createdAt: 'desc' },
               include: {
                 practitioner: { include: { person: true } },
+                goals: true,
+                tasks: { include: { assignedTo: true } },
+                notes: { include: { author: true } },
               },
             }
           : false,
         referrals: consent.canViewMedicalRecords
           ? {
               orderBy: { createdAt: 'desc' },
+              include: {
+                referringPractitioner: { include: { person: true } },
+                receivingPractitioner: { include: { person: true } },
+                referringPractice: true,
+                receivingPractice: true,
+                notes: true,
+                documents: true,
+                statusHistory: true,
+              },
             }
           : false,
         healthJournals: consent.canViewMedicalRecords
@@ -116,6 +128,30 @@ export class SmartFileClinicalService {
     >;
     const carePlans = Array.isArray(patient.carePlans) ? patient.carePlans : [];
     const referrals = Array.isArray(patient.referrals) ? patient.referrals : [];
+    const labOrders = consent.canViewLabResults
+      ? await this.prisma.labOrder.findMany({
+          where: { patientId: patient.id },
+          orderBy: { orderedAt: 'desc' },
+          include: {
+            practitioner: { include: { person: true } },
+            laboratory: true,
+            items: { include: { test: true } },
+          },
+        })
+      : [];
+
+    const imagingOrders = consent.canViewImaging
+      ? await this.prisma.imagingOrder.findMany({
+          where: { patientId: patient.id },
+          orderBy: { createdAt: 'desc' },
+          include: {
+            practitioner: { include: { person: true } },
+            imagingCenter: true,
+            items: { include: { procedure: true } },
+          },
+        })
+      : [];
+
     const healthJournals = Array.isArray(patient.healthJournals) ? patient.healthJournals : [];
     const wearableDevices = Array.isArray(patient.wearableDevices) ? patient.wearableDevices : [];
 
@@ -332,7 +368,9 @@ export class SmartFileClinicalService {
       diagnoses,
       procedures,
       labResults,
+      labOrders,
       imaging,
+      imagingOrders,
       carePlans,
       referrals,
       episodes: episodes.map((episode) => ({
