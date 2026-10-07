@@ -44,6 +44,7 @@ type CategoryTab = {
 };
 
 type NotificationRange = "DAY" | "WEEK" | "MONTH";
+type NotificationReadFilter = "ALL" | "UNREAD" | "READ";
 
 const categoryTabs: CategoryTab[] = [
   { key: "MEDICATIONS", label: "Medications", icon: Pill },
@@ -210,7 +211,7 @@ export default function NotificationsPage() {
   const [serverUnreadCount, setServerUnreadCount] = useState(0);
   const [category, setCategory] = useState<NotificationCategory>("ALL");
   const [range, setRange] = useState<NotificationRange>("DAY");
-  const [unreadOnly, setUnreadOnly] = useState(false);
+  const [readFilter, setReadFilter] = useState<NotificationReadFilter>("ALL");
   const [loading, setLoading] = useState(true);
   const [busyId, setBusyId] = useState<string | null>(null);
   const [error, setError] = useState("");
@@ -339,11 +340,14 @@ export default function NotificationsPage() {
       rangeFiltered.filter((notification) => {
         const categoryMatch =
           category === "ALL" || getCategory(notification) === category;
-        const unreadMatch = !unreadOnly || !notification.readAt;
+        const readStateMatch =
+          readFilter === "ALL" ||
+          (readFilter === "UNREAD" && !notification.readAt) ||
+          (readFilter === "READ" && Boolean(notification.readAt));
 
-        return categoryMatch && unreadMatch;
+        return categoryMatch && readStateMatch;
       }),
-    [category, rangeFiltered, unreadOnly],
+    [category, rangeFiltered, readFilter],
   );
 
   const grouped = useMemo(() => {
@@ -506,9 +510,8 @@ export default function NotificationsPage() {
                 </div>
 
                 {periodCounts.ALL.unread > 0 && (
-                  <div className="hidden shrink-0 items-center gap-2 rounded-xl bg-white/10 px-3 py-2 text-xs font-bold text-white ring-1 ring-white/10 sm:flex">
-                    <span className="h-2 w-2 rounded-full bg-[#24c1c4]" />
-                    {periodCounts.ALL.unread} unread notifications
+                  <div className="shrink-0 rounded-full bg-white/10 px-3 py-1.5 text-[11px] font-extrabold text-white ring-1 ring-white/10">
+                    {periodCounts.ALL.unread} unread
                   </div>
                 )}
               </div>
@@ -538,27 +541,36 @@ export default function NotificationsPage() {
                     ))}
                   </div>
 
-                  <div className="flex items-center gap-4">
-                    <button
-                      type="button"
-                      onClick={() => setUnreadOnly((current) => !current)}
-                      aria-pressed={unreadOnly}
-                      className={
-                        "text-xs font-bold transition " +
-                        (unreadOnly
-                          ? "text-white"
-                          : "text-white/65 hover:text-white")
-                      }
-                    >
-                      {unreadOnly ? "Showing unread" : "Unread only"}
-                    </button>
+                  <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:gap-4">
+                    <div className="inline-flex w-full rounded-xl bg-white/10 p-1 ring-1 ring-white/10 sm:w-auto">
+                      {([
+                        ["ALL", "All"],
+                        ["UNREAD", "Unread"],
+                        ["READ", "Read"],
+                      ] as const).map(([value, text]) => (
+                        <button
+                          key={value}
+                          type="button"
+                          onClick={() => setReadFilter(value)}
+                          aria-pressed={readFilter === value}
+                          className={
+                            "min-h-10 flex-1 rounded-lg px-4 text-xs font-black transition sm:flex-none " +
+                            (readFilter === value
+                              ? "bg-white text-[#0b2d54] shadow-sm"
+                              : "text-white/65 hover:text-white")
+                          }
+                        >
+                          {text}
+                        </button>
+                      ))}
+                    </div>
 
                     {unreadCount > 0 && (
                       <button
                         type="button"
                         onClick={() => void markAllRead()}
                         disabled={busyId === "all"}
-                        className="inline-flex min-h-10 items-center gap-2 rounded-xl bg-white px-4 py-2.5 text-xs font-black text-[#0b2d54] shadow-sm transition hover:bg-white/90 disabled:opacity-50"
+                        className="inline-flex min-h-10 w-full items-center justify-center gap-2 rounded-xl bg-white px-4 py-2.5 text-xs font-black text-[#0b2d54] shadow-sm transition hover:bg-white/90 disabled:opacity-50 sm:w-auto"
                       >
                         <CheckCheck className="h-3.5 w-3.5" />
                         {busyId === "all" ? "Updating…" : "Mark all read"}
@@ -682,16 +694,22 @@ export default function NotificationsPage() {
                 )}
               </div>
               <h2 className="mt-4 text-base font-extrabold text-[#0b2d54]">
-                {unreadOnly
+                {readFilter === "UNREAD"
                   ? "You're all caught up"
-                  : category === "ALL"
-                    ? "No notifications yet"
-                    : "Nothing in this category yet"}
+                  : readFilter === "READ"
+                    ? category === "ALL"
+                      ? "No read notifications yet"
+                      : "Nothing read in this category yet"
+                    : category === "ALL"
+                      ? "No notifications yet"
+                      : "Nothing in this category yet"}
               </h2>
               <p className="mx-auto mt-2 max-w-md text-sm text-slate-500">
-                {unreadOnly
+                {readFilter === "UNREAD"
                   ? "There are no unread notifications waiting for you."
-                  : "New activity will appear here when Sympto has something to share."}
+                  : readFilter === "READ"
+                    ? "Notifications you have already read will appear here."
+                    : "New activity will appear here when Sympto has something to share."}
               </p>
             </div>
           )}
