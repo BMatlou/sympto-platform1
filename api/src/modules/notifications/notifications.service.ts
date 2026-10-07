@@ -298,6 +298,61 @@ export class NotificationsService {
     }
   }
 
+  async getDueMedicationRemindersForUser(userId: string) {
+    const rows = await this.prisma.$queryRaw<Array<{
+      id: string;
+      type: string;
+      title: string;
+      body: string;
+      channel: string;
+      status: string;
+      priority: string;
+      actionUrl: string | null;
+      actionLabel: string | null;
+      scheduledFor: Date | null;
+      sentAt: Date | null;
+      deliveredAt: Date | null;
+      readAt: Date | null;
+      createdAt: Date;
+    }>>`
+      SELECT
+        "id",
+        "type"::text AS "type",
+        "title",
+        "body",
+        "channel"::text AS "channel",
+        "status"::text AS "status",
+        "priority"::text AS "priority",
+        "actionUrl",
+        "actionLabel",
+        "scheduledFor",
+        "sentAt",
+        "deliveredAt",
+        "readAt",
+        "createdAt"
+      FROM "Notification"
+      WHERE "userId" = ${userId}
+        AND "type" = 'REMINDER'
+        AND "channel" = 'IN_APP'
+        AND "title" ILIKE 'Medication reminder:%'
+        AND "status" IN ('PENDING', 'QUEUED', 'SENT', 'DELIVERED', 'READ')
+        AND (
+          ("scheduledFor" IS NOT NULL
+            AND "scheduledFor" BETWEEN NOW() - INTERVAL '2 minutes' AND NOW())
+          OR
+          ("sentAt" IS NOT NULL
+            AND "sentAt" BETWEEN NOW() - INTERVAL '2 minutes' AND NOW())
+          OR
+          ("deliveredAt" IS NOT NULL
+            AND "deliveredAt" BETWEEN NOW() - INTERVAL '2 minutes' AND NOW())
+        )
+      ORDER BY COALESCE("sentAt", "scheduledFor", "deliveredAt", "createdAt") DESC
+      LIMIT 25
+    `;
+
+    return rows;
+  }
+
   async getUnreadCountForUser(userId: string): Promise<number> {
     const where: Prisma.NotificationWhereInput = {
       userId,
