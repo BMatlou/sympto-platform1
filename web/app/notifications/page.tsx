@@ -629,9 +629,11 @@ export default function NotificationsPage() {
                 </span>
                 <span className="min-w-0">
                   <span className="block text-[10px] font-black">All</span>
-                  <span className={"mt-0.5 block text-[9px] font-semibold " + (category === "ALL" ? "text-white/60" : "text-slate-400")}>
-                    {counts.ALL.total} total
-                  </span>
+                  {counts.ALL.unread > 0 && (
+                    <span className={"mt-0.5 block text-[9px] font-semibold " + (category === "ALL" ? "text-white/60" : "text-slate-400")}>
+                      {counts.ALL.unread} new
+                    </span>
+                  )}
                 </span>
               </button>
 
@@ -657,9 +659,11 @@ export default function NotificationsPage() {
                     </span>
                     <span className="min-w-0 flex-1">
                       <span className="block truncate text-[10px] font-black">{tab.label}</span>
-                      <span className={"mt-0.5 block text-[9px] font-semibold " + (active ? "text-white/60" : "text-slate-400")}>
-                        {count.unread > 0 ? count.unread + " new" : count.total + " total"}
-                      </span>
+                      {count.unread > 0 && (
+                        <span className={"mt-0.5 block text-[9px] font-semibold " + (active ? "text-white/60" : "text-slate-400")}>
+                          {count.unread} new
+                        </span>
+                      )}
                     </span>
                   </button>
                 );
