@@ -14,7 +14,24 @@ ON "SmartFileShareSession"("patientId");
 CREATE INDEX IF NOT EXISTS "SmartFileShareSession_appointmentId_idx"
 ON "SmartFileShareSession"("appointmentId");
 
-DO $$
+DO $
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1
+    FROM pg_constraint
+    WHERE conname = 'SmartFileShareSession_patientId_fkey'
+  ) THEN
+    ALTER TABLE "SmartFileShareSession"
+    ADD CONSTRAINT "SmartFileShareSession_patientId_fkey"
+    FOREIGN KEY ("patientId")
+    REFERENCES "Patient"("id")
+    ON DELETE CASCADE
+    ON UPDATE CASCADE;
+  END IF;
+END
+$;
+
+DO $
 BEGIN
   IF NOT EXISTS (
     SELECT 1
