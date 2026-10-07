@@ -40,9 +40,9 @@ const VALUES = {
   diagnosisStatus: ['ACTIVE','RESOLVED','REMISSION','RECURRENT'],
   diagnosisSeverity: ['MILD','MODERATE','SEVERE','CRITICAL'],
   conditionStatus: ['ACTIVE','RESOLVED','REMISSION','RECURRENT'],
-  allergyStatus: ['ACTIVE','RESOLVED','RECURRENT','INACTIVE'],
+  allergyStatus: ['ACTIVE','INACTIVE','RESOLVED'],
   allergySeverity: ['MILD','MODERATE','SEVERE'],
-  immunizationStatus: ['SCHEDULED','COMPLETED','CANCELLED'],
+  immunizationStatus: ['SCHEDULED','COMPLETED','MISSED','DECLINED'],
   medicationStatus: ['ACTIVE','PAUSED','COMPLETED','DISCONTINUED'],
   procedureStatus: ['SCHEDULED','IN_PROGRESS','COMPLETED','CANCELLED'],
   carePlanStatus: ['DRAFT','ACTIVE','ON_HOLD','COMPLETED','CANCELLED'],
@@ -705,7 +705,7 @@ export class SmartFileClinicalWriteService {
       const id = this.requiredId(dto.id, 'prescription id');
       const found = await tx.prescription.findFirst({ where: { id, patientId }, select: { id: true } });
       if (!found) throw new NotFoundException('Prescription not found for this patient.');
-      return tx.prescription.update({
+      const updated = await tx.prescription.update({
         where: { id },
         data: {
           status: this.enum(d.status, VALUES.prescriptionStatus, 'prescription status'),
@@ -714,6 +714,8 @@ export class SmartFileClinicalWriteService {
         },
         include: { items: { include: { medication: true } }, practitioner: { include: { person: true } }, encounter: true },
       });
+      await this.syncPatientMedication(tx, patientId, updated.practitioner, updated);
+      return updated;
     }
 
     const medicationId = this.requiredId(d.medicationId, 'medicationId');
