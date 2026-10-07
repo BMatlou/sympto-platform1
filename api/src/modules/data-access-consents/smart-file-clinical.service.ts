@@ -316,6 +316,8 @@ export class SmartFileClinicalService {
       clinicalAccess: {
         canView: true,
         canUpdate: consent.canUpdateClinicalRecords,
+        accessType: consent.appointmentId ? 'APPOINTMENT' as const : 'WALK_IN' as const,
+        appointmentId: consent.appointmentId,
         consentExpiresAt: consent.expiresAt,
       },
       healthPassport: consent.canViewHealthPassport && passport
