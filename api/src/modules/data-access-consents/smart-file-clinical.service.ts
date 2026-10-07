@@ -173,9 +173,26 @@ export class SmartFileClinicalService {
     const passport = patient.healthPassport;
     const prescriptions = Array.isArray(patient.prescriptions) ? patient.prescriptions : [];
     const appointments = Array.isArray(patient.appointments) ? patient.appointments : [];
-    const episodes = Array.isArray(patient.clinicalEpisodes) ? patient.clinicalEpisodes : [];
+    const episodes = (
+      Array.isArray(patient.clinicalEpisodes) ? patient.clinicalEpisodes : []
+    ) as Array<
+      Prisma.ClinicalEpisodeGetPayload<{
+        include: {
+          symptomLogs: true;
+          attachments: true;
+        };
+      }>
+    >;
     const carePlans = Array.isArray(patient.carePlans) ? patient.carePlans : [];
-    const referrals = Array.isArray(patient.referrals) ? patient.referrals : [];
+    const referrals = (
+      Array.isArray(patient.referrals) ? patient.referrals : []
+    ) as Array<
+      Prisma.ReferralGetPayload<{
+        include: {
+          documents: true;
+        };
+      }>
+    >;
     const healthJournals = Array.isArray(patient.healthJournals) ? patient.healthJournals : [];
     const wearableDevices = Array.isArray(patient.wearableDevices) ? patient.wearableDevices : [];
 
