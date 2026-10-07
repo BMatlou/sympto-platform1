@@ -49,7 +49,6 @@ function preferenceKey(type: string, channel: string) {
 
 export default function NotificationPreferencesPage() {
   const [preferences, setPreferences] = useState<PreferenceState>({});
-  const [savedCount, setSavedCount] = useState(0);
   const [loading, setLoading] = useState(true);
   const [savingKey, setSavingKey] = useState<string | null>(null);
   const [notice, setNotice] = useState("");
@@ -60,7 +59,6 @@ export default function NotificationPreferencesPage() {
       setLoading(true);
       setError("");
       const saved = await patientNotificationsService.getPreferences();
-      setSavedCount(saved.length);
       const next: PreferenceState = {};
       for (const preference of saved) {
         next[preferenceKey(preference.notificationType, preference.channel)] = preference.enabled;
@@ -102,7 +100,6 @@ export default function NotificationPreferencesPage() {
 
       setPreferences((current) => ({ ...current, [key]: next }));
 
-      if (!existingPreference) setSavedCount((count) => count + 1);
 
       setNotice(
         `${channel === "IN_APP" ? "In-app" : "Push"} notifications for this category are now ${next ? "on" : "off"}.`,
@@ -122,11 +119,11 @@ export default function NotificationPreferencesPage() {
     <ProtectedRoute>
       <main className="min-h-screen bg-slate-50">
         <header className="border-b border-slate-200 bg-white">
-          <div className="mx-auto flex h-16 max-w-6xl items-center justify-between gap-3 px-4 sm:px-6 lg:px-8">
+          <div className="mx-auto flex min-h-14 max-w-6xl items-center justify-between gap-3 px-4 py-3 sm:min-h-16 sm:px-6 lg:px-8">
             <Link href="/notifications" className="inline-flex items-center gap-2 text-sm font-semibold text-[#0b2d54] hover:text-[#24c1c4]">
               <ArrowLeft className="h-4 w-4" />Back to Notifications
             </Link>
-            <span className="text-xs font-bold text-slate-400">{savedCount} saved preference{savedCount === 1 ? "" : "s"}</span>
+            <span className="text-xs font-bold text-slate-400">Manage notifications</span>
           </div>
         </header>
 
@@ -165,11 +162,6 @@ export default function NotificationPreferencesPage() {
                   <Smartphone className="h-3.5 w-3.5" />
                   Push
                 </span>
-                {savedCount > 0 && (
-                  <span className="inline-flex items-center rounded-full bg-white/10 px-3 py-2 text-[11px] font-bold text-white/65 ring-1 ring-white/10">
-                    {savedCount} saved
-                  </span>
-                )}
               </div>
             </div>
           </section>
@@ -188,10 +180,10 @@ export default function NotificationPreferencesPage() {
           <section className="mt-5 overflow-hidden rounded-[24px] border border-slate-200 bg-white shadow-sm">
             <div className="border-b border-slate-100 px-5 py-4 sm:px-6">
               <h2 className="text-sm font-black text-[#0b2d54]">
-                What would you like to hear about?
+                Choose your notifications
               </h2>
               <p className="mt-1 text-xs leading-5 text-slate-500">
-                Turn In-app or Push notifications on or off for each type of update.
+                Turn notifications on or off for each type of update.
               </p>
             </div>
 
@@ -223,7 +215,7 @@ export default function NotificationPreferencesPage() {
                       </div>
                     </div>
 
-                    <div className="mt-4 grid grid-cols-2 gap-2 sm:max-w-sm">
+                    <div className="mt-4 flex flex-col gap-2 sm:max-w-md sm:flex-row">
                       {channels
                         .filter(({ supported }) => supported)
                         .map(({ key: channel, label: channelLabel, icon: ChannelIcon }) => {
@@ -237,7 +229,8 @@ export default function NotificationPreferencesPage() {
                               type="button"
                               onClick={() => void toggle(type, channel, true)}
                               disabled={saving}
-                              aria-pressed={enabled}
+                              role="switch"
+                              aria-checked={enabled}
                               aria-label={
                                 label +
                                 ": " +
@@ -246,19 +239,47 @@ export default function NotificationPreferencesPage() {
                                 (enabled ? "on" : "off")
                               }
                               className={
-                                "flex min-h-12 items-center justify-between gap-3 rounded-xl border px-3.5 py-2.5 text-left transition " +
+                                "flex min-h-11 flex-1 items-center justify-between gap-3 rounded-xl border px-3.5 py-2.5 transition " +
                                 (enabled
-                                  ? "border-[#24c1c4]/35 bg-[#24c1c4]/10 text-[#0b2d54]"
-                                  : "border-slate-200 bg-slate-50 text-slate-500 hover:bg-slate-100") +
+                                  ? "border-[#24c1c4]/35 bg-[#24c1c4]/10"
+                                  : "border-slate-200 bg-white") +
                                 " disabled:opacity-60"
                               }
                             >
-                              <span className="flex min-w-0 items-center gap-2">
-                                <ChannelIcon className="h-4 w-4 shrink-0" />
-                                <span className="truncate text-xs font-extrabold">{channelLabel}</span>
+                              <span className="flex min-w-0 items-center gap-2 text-left">
+                                <span
+                                  className={
+                                    "grid h-8 w-8 shrink-0 place-items-center rounded-lg " +
+                                    (enabled
+                                      ? "bg-[#24c1c4]/15 text-[#0b2d54]"
+                                      : "bg-slate-100 text-slate-400")
+                                  }
+                                >
+                                  <ChannelIcon className="h-4 w-4" />
+                                </span>
+                                <span>
+                                  <span className="block text-[11px] font-extrabold text-[#0b2d54]">
+                                    {channelLabel}
+                                  </span>
+                                  <span className="block text-[10px] font-semibold text-slate-400">
+                                    {saving ? "Saving…" : enabled ? "On" : "Off"}
+                                  </span>
+                                </span>
                               </span>
-                              <span className="shrink-0 text-[10px] font-black uppercase tracking-[0.08em]">
-                                {saving ? "Saving" : enabled ? "On" : "Off"}
+
+                              <span
+                                aria-hidden="true"
+                                className={
+                                  "relative h-6 w-10 shrink-0 rounded-full p-1 transition " +
+                                  (enabled ? "bg-[#24c1c4]" : "bg-slate-200")
+                                }
+                              >
+                                <span
+                                  className={
+                                    "block h-4 w-4 rounded-full bg-white shadow-sm transition-transform " +
+                                    (enabled ? "translate-x-4" : "translate-x-0")
+                                  }
+                                />
                               </span>
                             </button>
                           );
@@ -275,10 +296,10 @@ export default function NotificationPreferencesPage() {
               <ShieldCheck className="mt-0.5 h-5 w-5 shrink-0 text-[#0b2d54]" />
               <div className="min-w-0">
                 <h2 className="text-sm font-extrabold text-[#0b2d54]">
-                  About your notification choices
+                  About notification channels
                 </h2>
                 <p className="mt-1.5 text-sm leading-6 text-slate-500">
-                  In-app and Push are available now. Email, SMS and WhatsApp are not available yet and are kept off until those delivery services are connected. Changing a notification preference never deletes your clinical records.
+                  In-app and Push are available now. Email, SMS and WhatsApp are not available yet and stay off until those delivery services are connected. Changing a notification preference never deletes your clinical records.
                 </p>
               </div>
             </div>
