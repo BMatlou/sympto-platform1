@@ -122,7 +122,7 @@ export default function SmartFilePage() {
                   <div className="grid gap-3 sm:grid-cols-2" aria-label="Choose Smart File sharing scope">
                     <button type="button" onClick={() => void createShare("clinical")} className="min-h-24 rounded-2xl border border-slate-200 bg-white px-5 py-4 text-left transition hover:border-[#24c1c4]/50 hover:bg-[#24c1c4]/5 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#24c1c4]">
                       <span className="flex items-center gap-3 text-base font-black text-[#0b2d54]"><Stethoscope className="h-6 w-6" /> Clinic / Doctor</span>
-                      <span className="mt-1.5 block text-xs font-semibold leading-5 text-slate-500">{appointmentId ? "Share the same clinical Smart File for your booked appointment. Your appointed clinician can update the file." : "Share your clinical Smart File with an authorised clinician as a read-only walk-in share."}</span>
+                      <span className="mt-1.5 block text-xs font-semibold leading-5 text-slate-500">{appointmentId ? "Share the same clinical Smart File for your booked appointment. Your appointed clinician can view and update the file." : "Share your clinical Smart File with an authorised clinician when you walk into a clinic or doctor's premises. They can view and update the file."}</span>
                     </button>
                     <button type="button" onClick={() => void createShare("prescription")} className="min-h-24 rounded-2xl border border-slate-200 bg-white px-5 py-4 text-left transition hover:border-[#24c1c4]/50 hover:bg-[#24c1c4]/5 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#24c1c4]">
                       <span className="flex items-center gap-3 text-base font-black text-[#0b2d54]"><Pill className="h-6 w-6" /> Pharmacy</span>
@@ -155,13 +155,13 @@ export default function SmartFilePage() {
                     {isAppointmentShare ? (
                       <div className="flex items-start gap-2.5 rounded-2xl border border-emerald-200 bg-emerald-50 px-3.5 py-3 text-left text-[10px] font-semibold leading-4 text-emerald-900">
                         <ShieldCheck className="mt-0.5 h-4 w-4 shrink-0" />
-                        <p>This share is linked to your appointment. The appointed clinician can view the same Smart File and update the clinical record during the consent period.</p>
+                        <p>This share is linked to your appointment. The appointed clinician can open the same Smart File in Sympto and update the clinical record during the consent period.</p>
                       </div>
                     ) : null}
 
                     <div className="flex flex-1 items-start gap-2.5 rounded-2xl border border-amber-200 bg-amber-50 px-3.5 py-3 text-left text-[10px] font-semibold leading-4 text-amber-900">
                       <ShieldCheck className="mt-0.5 h-4 w-4 shrink-0" />
-                      <p>{isAppointmentShare ? "Temporary, one-time appointment share. The appointed clinician can update the clinical Smart File during the consent period. Financial information is not included." : "Temporary, one-time walk-in share. Clinical access is read-only and does not allow the clinician to edit your medical record, issue a prescription or access financial information."}</p>
+                      <p>{isAppointmentShare ? "Temporary, one-time appointment share. The appointed clinician can open the same Smart File in Sympto and update the clinical record during the consent period. Financial information is not included." : "Temporary, one-time walk-in share. The authorised clinician can open the same Smart File in Sympto and update the clinical record during the consent period. Financial information is not included."}</p>
                     </div>
 
                     <button type="button" onClick={resetChoice} className="min-h-10 rounded-xl text-xs font-bold text-[#0b2d54] underline underline-offset-2 hover:text-[#24c1c4]">Choose a different sharing type</button>
