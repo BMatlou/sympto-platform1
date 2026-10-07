@@ -506,13 +506,7 @@ export default function NotificationsPage() {
                 </p>
               </div>
 
-              <Link
-                href="/notifications/preferences"
-                className="inline-flex min-h-10 items-center gap-2 rounded-xl px-2 text-xs font-bold text-[#0b2d54] hover:text-[#24c1c4]"
-              >
-                <Settings className="h-4 w-4" />
-                Preferences
-              </Link>
+              </div>
             </div>
           </div>
 
