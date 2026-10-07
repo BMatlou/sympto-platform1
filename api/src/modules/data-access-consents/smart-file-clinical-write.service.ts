@@ -208,6 +208,17 @@ export class SmartFileClinicalWriteService {
           orderBy: { name: 'asc' },
           take: 30,
         });
+      case 'symptoms':
+        return db.symptom.findMany({
+          where: {
+            active: true,
+            searchable: true,
+            ...(q ? { name: { contains: q, mode: 'insensitive' } } : {}),
+          },
+          select: { id: true, name: true, description: true, category: true, bodySystem: true },
+          orderBy: { name: 'asc' },
+          take: 30,
+        });
       case 'immunisations':
         return db.immunization.findMany({
           where: {
@@ -343,6 +354,8 @@ export class SmartFileClinicalWriteService {
     switch (dto.section) {
       case SmartFileClinicalWriteSection.ENCOUNTER:
         return this.writeEncounter(tx, consent, patient.id, practitioner.id, dto);
+      case SmartFileClinicalWriteSection.CLINICAL_NOTE:
+        return this.writeClinicalNoteRecord(tx, patient.id, dto);
       case SmartFileClinicalWriteSection.DIAGNOSIS:
         return this.writeDiagnosis(tx, patient.id, practitioner, dto);
       case SmartFileClinicalWriteSection.PROCEDURE:
@@ -432,6 +445,28 @@ export class SmartFileClinicalWriteService {
     return tx.encounter.findUnique({
       where: { id: encounterId },
       include: { encounterType: true, practitioner: { include: { person: true } }, clinicalNotes: true },
+    });
+  }
+
+  private async writeClinicalNoteRecord(tx: any, patientId: string, dto: SmartFileClinicalWriteDto) {
+    const d = dto.data;
+    const encounterId = this.requiredId(d.encounterId, 'encounterId');
+    await this.assertPatientEncounter(tx, encounterId, patientId);
+    const note = this.required(d.note ?? d.clinicalNote, 'note');
+    if (dto.action === SmartFileClinicalWriteAction.UPDATE) {
+      const id = this.requiredId(dto.id, 'clinical note id');
+      const found = await tx.clinicalNote.findFirst({
+        where: { id, encounter: { medicalRecord: { patientId } } },
+        select: { id: true },
+      });
+      if (!found) throw new NotFoundException('Clinical note not found for this patient.');
+      return tx.clinicalNote.update({
+        where: { id },
+        data: { title: this.string(d.title ?? d.clinicalNoteTitle), note },
+      });
+    }
+    return tx.clinicalNote.create({
+      data: { encounterId, title: this.string(d.title ?? d.clinicalNoteTitle), note },
     });
   }
 
