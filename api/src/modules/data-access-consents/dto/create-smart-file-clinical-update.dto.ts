@@ -85,6 +85,14 @@ export class CreateSmartFileClinicalUpdateDto {
   notes?: string;
 
   @IsOptional()
+  @IsString()
+  clinicalNote?: string;
+
+  @IsOptional()
+  @IsString()
+  clinicalNoteTitle?: string;
+
+  @IsOptional()
   @ValidateNested()
   @Type(() => SmartFilePrescriptionDto)
   prescription?: SmartFilePrescriptionDto;
