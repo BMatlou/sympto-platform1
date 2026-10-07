@@ -41,15 +41,6 @@ export class SmartFileClinicalService {
           },
         },
         medicalRecord: true,
-        appointments: consent.canViewAppointments
-          ? {
-              orderBy: { scheduledStart: 'desc' },
-              include: {
-                practitioner: { include: { person: true } },
-                practice: true,
-              },
-            }
-          : false,
         prescriptions: consent.canViewPrescriptions
           ? {
               orderBy: { issuedAt: 'desc' },
@@ -114,7 +105,6 @@ export class SmartFileClinicalService {
 
     const passport = patient.healthPassport;
     const prescriptions = Array.isArray(patient.prescriptions) ? patient.prescriptions : [];
-    const appointments = Array.isArray(patient.appointments) ? patient.appointments : [];
     const episodes = (
       Array.isArray(patient.clinicalEpisodes) ? patient.clinicalEpisodes : []
     ) as Array<
@@ -335,7 +325,6 @@ export class SmartFileClinicalService {
       immunisations: consent.canViewHealthPassport ? passport?.immunizations ?? [] : [],
       medications: consent.canViewPrescriptions ? passport?.medications ?? [] : [],
       prescriptions,
-      appointments,
       encounters,
       vitals: clinicalVitals,
       patientVitals,
@@ -638,7 +627,7 @@ export class SmartFileClinicalService {
           },
         },
         patient: {
-          select: { id: true },
+          select: { id: true, userId: true },
         },
       },
     });
@@ -689,7 +678,7 @@ export class SmartFileClinicalService {
     };
   }
 
-  private async requireClinicalWriteAccess(
+  async requireClinicalWriteAccess(
     practitionerUserId: string,
     consentId: string,
   ) {
