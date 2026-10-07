@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState, type InputHTMLAttributes, type ReactNode, type TextareaHTMLAttributes } from "react";
+import { useEffect, useMemo, useState, type InputHTMLAttributes, type ReactNode, type SelectHTMLAttributes, type TextareaHTMLAttributes } from "react";
 import { Check, Plus, Save, Search, Stethoscope } from "lucide-react";
 import { api } from "@/lib/api";
 
@@ -78,7 +78,7 @@ function Input({ className = "", ...props }: InputHTMLAttributes<HTMLInputElemen
 function Area({ className = "", ...props }: TextareaHTMLAttributes<HTMLTextAreaElement>) {
   return <textarea {...props} className={`w-full rounded-xl border border-slate-200 bg-white px-3.5 py-3 text-sm text-[#0b2d54] outline-none focus:border-[#24c1c4] focus:ring-4 focus:ring-[#24c1c4]/10 ${className}`} />;
 }
-function Select(props: React.SelectHTMLAttributes<HTMLSelectElement>) {
+function Select({ className = "", ...props }: SelectHTMLAttributes<HTMLSelectElement>) {
   return <select {...props} className="w-full rounded-xl border border-slate-200 bg-white px-3.5 py-3 text-sm text-[#0b2d54] outline-none focus:border-[#24c1c4] focus:ring-4 focus:ring-[#24c1c4]/10" />;
 }
 
