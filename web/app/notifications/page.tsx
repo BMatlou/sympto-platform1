@@ -264,13 +264,10 @@ export default function NotificationsPage() {
 
   const unreadCount = serverUnreadCount;
 
-  const availableCategories = useMemo(() => {
-    const present = new Set(
-      notifications.map((notification) => getCategory(notification)),
-    );
-
-    return categoryTabs.filter((tab) => present.has(tab.key));
-  }, [notifications]);
+  // Keep every notification category available so users can browse to
+  // categories that are currently empty. Counts show activity; the empty
+  // state explains when there is nothing to display.
+  const availableCategories = categoryTabs;
 
   const visible = useMemo(
     () =>
