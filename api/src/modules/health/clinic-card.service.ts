@@ -116,7 +116,7 @@ export class ClinicCardService {
     const activeAllergies = (passport?.allergies ?? []).filter((item) => String(item.status) === 'ACTIVE');
     const activeConditions = (passport?.conditions ?? []).filter((item) => String(item.status) === 'ACTIVE');
     const activeMedications = (passport?.medications ?? []).filter((item) => String(item.status) === 'ACTIVE' && item.ongoing);
-    const activeDiagnoses = (passport?.patientDiagnoses ?? []).filter((item) => ['ACTIVE', 'RECURRENT', 'REMISSION'].includes(String(item.status)));
+    const activeDiagnoses = passport?.patientDiagnoses ?? [];
     const completedProcedures = (passport?.patientProcedures ?? []).filter((item) => String(item.status) !== 'CANCELLED');
 
     const auditIds = async (entityType: string, ids: string[]) => {
@@ -276,6 +276,16 @@ export class ClinicCardService {
               sourceLabel: 'Clinical · view only',
             }
           : null,
+        previousAllergies: (passport?.allergies ?? []).filter((item) => String(item.status) !== 'ACTIVE').map((item) => ({
+          id: item.id,
+          name: item.allergy.name,
+          status: item.status,
+          severity: item.severity,
+          reaction: item.reaction,
+          lastReaction: item.lastReaction,
+          verifiedBy: item.verifiedBy,
+          source: clinicalAllergyRecordIds.has(item.id) || Boolean(item.verifiedBy) ? 'CLINICAL' : 'PATIENT',
+        })),
         previousConditions: (passport?.conditions ?? []).filter((item) => String(item.status) !== 'ACTIVE').map((item) => ({
           id: item.id,
           name: item.condition.name,
@@ -299,37 +309,6 @@ export class ClinicCardService {
           status: item.status,
           prescribedBy: item.prescribedBy,
           source: clinicalMedicationIds.has(item.medicationId) || clinicalMedicationRecordIds.has(item.id) || practitionerNames.has(normaliseName(item.prescribedBy)) ? 'CLINICAL' : 'PATIENT',
-        })),
-        clinicalDiagnoses: (passport?.patientDiagnoses ?? []).map((item) => ({
-          id: item.id,
-          name: item.diagnosis.name,
-          status: item.status,
-          diagnosedAt: item.diagnosedAt,
-          resolvedAt: item.resolvedAt,
-          diagnosedBy: item.diagnosedBy,
-          practitionerName: practitionerName(item),
-          outcome: item.outcome,
-          source: 'CLINICAL',
-        })),
-        procedures: (passport?.patientProcedures ?? []).map((item) => ({
-          id: item.id,
-          name: item.procedure.name,
-          performedAt: item.performedAt,
-          status: item.status,
-          outcome: item.outcome,
-          performer: item.performer,
-          facility: item.facility,
-          source: 'CLINICAL',
-        })),
-        immunizations: (passport?.immunizations ?? []).map((item) => ({
-          id: item.id,
-          name: item.immunization.name,
-          administeredAt: item.administeredAt,
-          doseNumber: item.doseNumber,
-          status: item.status,
-          administeredBy: item.administeredBy,
-          facility: item.facility,
-          source: clinicalImmunizationRecordIds.has(item.id) || Boolean(item.administeredBy || item.facility) ? 'CLINICAL' : 'PATIENT',
         })),
       },
       allergies: activeAllergies.map((item) => {
