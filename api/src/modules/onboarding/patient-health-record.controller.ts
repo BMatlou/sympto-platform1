@@ -42,6 +42,19 @@ export class PatientHealthRecordController {
     }
   }
 
+  private async assertNotClinicallyLocked(entityType: string, entityId: string, message: string) {
+    const audit = await this.prisma.auditLog.findFirst({
+      where: {
+        entityType,
+        entityId,
+        action: { in: ['CREATE', 'UPDATE'] },
+        success: true,
+      },
+      select: { id: true },
+    });
+    if (audit) throw new ForbiddenException(message);
+  }
+
   @Get('clinical-diagnoses')
   async clinicalDiagnoses(@Req() req: any) {
     const patient = await this.patientContext(req.user.sub);
@@ -84,6 +97,11 @@ export class PatientHealthRecordController {
     const existing = await this.prisma.patientAllergy.findUnique({ where: { id } });
     if (!existing) throw new NotFoundException('Patient allergy not found.');
     this.assertPatientOwned(existing.healthPassportId, patient.healthPassport!.id);
+    await this.assertNotClinicallyLocked(
+      'SmartFileClinical/ALLERGY',
+      existing.id,
+      'Clinical allergies cannot be edited by the patient. Ask your doctor or clinic to update this record.',
+    );
     if (existing.verified || existing.verifiedBy) {
       throw new ForbiddenException('Clinician-verified allergies cannot be edited by the patient.');
     }
@@ -109,6 +127,11 @@ export class PatientHealthRecordController {
     const existing = await this.prisma.patientAllergy.findUnique({ where: { id } });
     if (!existing) throw new NotFoundException('Patient allergy not found.');
     this.assertPatientOwned(existing.healthPassportId, patient.healthPassport!.id);
+    await this.assertNotClinicallyLocked(
+      'SmartFileClinical/ALLERGY',
+      existing.id,
+      'Clinical allergies cannot be removed by the patient. Ask your doctor or clinic to update this record.',
+    );
     if (existing.verified || existing.verifiedBy) {
       throw new ForbiddenException('Clinician-verified allergies cannot be removed by the patient.');
     }
@@ -147,6 +170,11 @@ export class PatientHealthRecordController {
     const existing = await this.prisma.patientCondition.findUnique({ where: { id } });
     if (!existing) throw new NotFoundException('Patient condition not found.');
     this.assertPatientOwned(existing.healthPassportId, patient.healthPassport!.id);
+    await this.assertNotClinicallyLocked(
+      'SmartFileClinical/CONDITION',
+      existing.id,
+      'Clinical conditions cannot be edited by the patient. Ask your doctor or clinic to update this record.',
+    );
     if (existing.diagnosedBy || existing.treatmentPlan) {
       throw new ForbiddenException('Clinician-recorded conditions cannot be edited by the patient.');
     }
@@ -173,6 +201,11 @@ export class PatientHealthRecordController {
     const existing = await this.prisma.patientCondition.findUnique({ where: { id } });
     if (!existing) throw new NotFoundException('Patient condition not found.');
     this.assertPatientOwned(existing.healthPassportId, patient.healthPassport!.id);
+    await this.assertNotClinicallyLocked(
+      'SmartFileClinical/CONDITION',
+      existing.id,
+      'Clinical conditions cannot be removed by the patient. Ask your doctor or clinic to update this record.',
+    );
     if (existing.diagnosedBy || existing.treatmentPlan) {
       throw new ForbiddenException('Clinician-recorded conditions cannot be removed by the patient.');
     }
@@ -197,8 +230,8 @@ export class PatientHealthRecordController {
         doseNumber,
         batchNumber: dto.batchNumber?.trim(),
         manufacturer: dto.manufacturer?.trim(),
-        administeredBy: dto.administeredBy?.trim(),
-        facility: dto.facility?.trim(),
+        administeredBy: undefined,
+        facility: undefined,
         route: dto.route?.trim(),
         site: dto.site?.trim(),
         adverseReaction: dto.adverseReaction ?? false,
@@ -216,6 +249,11 @@ export class PatientHealthRecordController {
     const existing = await this.prisma.patientImmunization.findUnique({ where: { id } });
     if (!existing) throw new NotFoundException('Patient immunisation not found.');
     this.assertPatientOwned(existing.healthPassportId, patient.healthPassport!.id);
+    await this.assertNotClinicallyLocked(
+      'SmartFileClinical/IMMUNIZATION',
+      existing.id,
+      'Clinical vaccinations cannot be edited by the patient. Ask your doctor or clinic to update this record.',
+    );
     if (existing.administeredBy || existing.facility) {
       throw new ForbiddenException('Clinician-recorded vaccinations cannot be edited by the patient.');
     }
@@ -244,6 +282,11 @@ export class PatientHealthRecordController {
     const existing = await this.prisma.patientImmunization.findUnique({ where: { id } });
     if (!existing) throw new NotFoundException('Patient immunisation not found.');
     this.assertPatientOwned(existing.healthPassportId, patient.healthPassport!.id);
+    await this.assertNotClinicallyLocked(
+      'SmartFileClinical/IMMUNIZATION',
+      existing.id,
+      'Clinical vaccinations cannot be removed by the patient. Ask your doctor or clinic to update this record.',
+    );
     if (existing.administeredBy || existing.facility) {
       throw new ForbiddenException('Clinician-recorded vaccinations cannot be removed by the patient.');
     }
