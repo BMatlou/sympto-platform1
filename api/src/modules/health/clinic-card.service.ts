@@ -119,6 +119,27 @@ export class ClinicCardService {
     const activeDiagnoses = (passport?.patientDiagnoses ?? []).filter((item) => ['ACTIVE', 'RECURRENT', 'REMISSION'].includes(String(item.status)));
     const completedProcedures = (passport?.patientProcedures ?? []).filter((item) => String(item.status) !== 'CANCELLED');
 
+    const auditIds = async (entityType: string, ids: string[]) => {
+      if (!ids.length) return new Set<string>();
+      const audits = await this.prisma.auditLog.findMany({
+        where: {
+          entityType,
+          entityId: { in: ids },
+          action: { in: ['CREATE', 'UPDATE'] },
+          success: true,
+        },
+        select: { entityId: true },
+      });
+      return new Set(audits.map((audit) => audit.entityId));
+    };
+
+    const [clinicalAllergyRecordIds, clinicalConditionRecordIds, clinicalMedicationRecordIds, clinicalImmunizationRecordIds] = await Promise.all([
+      auditIds('SmartFileClinical/ALLERGY', (passport?.allergies ?? []).map((item) => item.id)),
+      auditIds('SmartFileClinical/CONDITION', (passport?.conditions ?? []).map((item) => item.id)),
+      auditIds('SmartFileClinical/PATIENT_MEDICATION', (passport?.medications ?? []).map((item) => item.id)),
+      auditIds('SmartFileClinical/IMMUNIZATION', (passport?.immunizations ?? []).map((item) => item.id)),
+    ]);
+
     const practitionerName = (value: any) => {
       const person = value?.encounter?.practitioner?.person;
       return person ? [person.preferredName ?? person.firstName, person.lastName].filter(Boolean).join(' ') : null;
@@ -204,7 +225,7 @@ export class ClinicCardService {
           }
         : null,
       allergies: activeAllergies.map((item) => {
-        const clinical = Boolean(item.verified || item.verifiedBy);
+        const clinical = clinicalAllergyRecordIds.has(item.id) || Boolean(item.verifiedBy);
         return {
           id: item.id,
           name: item.allergy.name,
@@ -226,7 +247,7 @@ export class ClinicCardService {
         };
       }),
       conditions: activeConditions.map((item) => {
-        const clinical = Boolean(item.diagnosedBy || item.treatmentPlan);
+        const clinical = clinicalConditionRecordIds.has(item.id) || Boolean(item.diagnosedBy || item.treatmentPlan);
         return {
           id: item.id,
           name: item.condition.name,
@@ -276,7 +297,7 @@ export class ClinicCardService {
       })),
       medications: activeMedications.map((item) => {
         const clinicianNamed = practitionerNames.has(normaliseName(item.prescribedBy));
-        const clinical = clinicalMedicationIds.has(item.medicationId) || clinicianNamed;
+        const clinical = clinicalMedicationIds.has(item.medicationId) || clinicalMedicationRecordIds.has(item.id) || clinicianNamed;
         return {
           id: item.id,
           medicationId: item.medicationId,
@@ -306,7 +327,7 @@ export class ClinicCardService {
         };
       }),
       immunizations: (passport?.immunizations ?? []).map((item) => {
-        const clinical = Boolean(item.administeredBy || item.facility);
+        const clinical = clinicalImmunizationRecordIds.has(item.id) || Boolean(item.administeredBy || item.facility);
         return {
           id: item.id,
           name: item.immunization.name,
