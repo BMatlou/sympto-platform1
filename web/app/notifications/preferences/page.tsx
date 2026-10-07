@@ -7,7 +7,6 @@ import {
   Bell,
   CalendarDays,
   Check,
-  ChevronDown,
   FileText,
   Mail,
   MessageCircle,
@@ -131,107 +130,163 @@ export default function NotificationPreferencesPage() {
           </div>
         </header>
 
-        <div className="mx-auto max-w-5xl px-4 py-8 sm:px-6 lg:px-8">
-          <section className="rounded-[30px] border border-[#24c1c4]/20 bg-gradient-to-br from-[#24c1c4]/10 via-white to-white p-6 shadow-sm sm:p-8">
-            <div className="flex items-start gap-4">
-              <span className="grid h-12 w-12 shrink-0 place-items-center rounded-2xl bg-[#0b2d54] text-white"><Bell className="h-6 w-6" /></span>
-              <div>
-                <p className="text-xs font-black uppercase tracking-[0.16em] text-[#24c1c4]">Communication</p>
-                <h1 className="mt-1 text-3xl font-black tracking-tight text-[#0b2d54]">Notification preferences</h1>
-                <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-600">Choose which channels Sympto may use for different types of health and account updates. Your clinical records stay intact when you turn a channel off.</p>
+
+        <div className="mx-auto max-w-4xl px-4 py-6 sm:px-6 sm:py-8 lg:px-8">
+          <section className="relative overflow-hidden rounded-[30px] bg-gradient-to-br from-[#0b2d54] via-[#0f5261] to-[#24c1c4] text-white shadow-[0_24px_60px_rgba(11,45,84,0.18)]">
+            <div className="pointer-events-none absolute inset-0 overflow-hidden rounded-[30px]" aria-hidden="true">
+              <div className="absolute -right-16 -top-20 h-52 w-52 rounded-full bg-white/10 blur-2xl" />
+              <div className="absolute -bottom-24 -left-12 h-56 w-56 rounded-full bg-black/10 blur-2xl" />
+            </div>
+
+            <div className="relative p-6 sm:p-8">
+              <div className="flex items-start gap-4">
+                <span className="grid h-12 w-12 shrink-0 place-items-center rounded-2xl bg-white/10 ring-1 ring-white/15">
+                  <Bell className="h-6 w-6" />
+                </span>
+                <div className="min-w-0">
+                  <p className="text-[10px] font-black uppercase tracking-[0.16em] text-white/65">
+                    Notifications
+                  </p>
+                  <h1 className="mt-1 text-3xl font-black tracking-tight sm:text-4xl">
+                    Notification preferences
+                  </h1>
+                  <p className="mt-2 max-w-2xl text-sm leading-6 text-white/75">
+                    Choose how you want Sympto to keep you informed about the things that matter to your health.
+                  </p>
+                </div>
+              </div>
+
+              <div className="mt-6 flex flex-wrap gap-2">
+                <span className="inline-flex items-center gap-2 rounded-full bg-white/10 px-3 py-2 text-[11px] font-extrabold text-white ring-1 ring-white/10">
+                  <Bell className="h-3.5 w-3.5" />
+                  In-app
+                </span>
+                <span className="inline-flex items-center gap-2 rounded-full bg-white/10 px-3 py-2 text-[11px] font-extrabold text-white ring-1 ring-white/10">
+                  <Smartphone className="h-3.5 w-3.5" />
+                  Push
+                </span>
+                {savedCount > 0 && (
+                  <span className="inline-flex items-center rounded-full bg-white/10 px-3 py-2 text-[11px] font-bold text-white/65 ring-1 ring-white/10">
+                    {savedCount} saved
+                  </span>
+                )}
               </div>
             </div>
           </section>
 
-          {notice && <div className="mt-5 rounded-2xl border border-[#24c1c4]/20 bg-[#24c1c4]/5 px-4 py-3 text-sm font-semibold text-[#0b2d54]">{notice}</div>}
-          {error && <div className="mt-5 rounded-2xl border border-red-200 bg-white px-4 py-3 text-sm font-semibold text-red-700">{error}</div>}
+          {notice && (
+            <div className="mt-5 rounded-2xl border border-[#24c1c4]/20 bg-white px-4 py-3 text-sm font-semibold text-[#0b2d54] shadow-sm">
+              {notice}
+            </div>
+          )}
+          {error && (
+            <div className="mt-5 rounded-2xl border border-red-200 bg-white px-4 py-3 text-sm font-semibold text-red-700 shadow-sm">
+              {error}
+            </div>
+          )}
 
-          <section className="mt-6 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
-            <div className="grid grid-cols-[1fr_repeat(5,56px)] gap-2 border-b border-slate-100 pb-3">
-              <div><span className="text-[10px] font-black uppercase tracking-[0.15em] text-slate-400">Update type</span></div>
-              {channels.map(({ key, label, icon: Icon, supported }) => (
-                <div
-                  key={key}
-                  className={`flex flex-col items-center gap-1 text-center ${supported ? "text-[#24c1c4]" : "text-slate-300"}`}
-                  title={supported ? label : `${label} notifications are coming soon`}
-                >
-                  <Icon className="h-4 w-4" />
-                  <span className={`text-[9px] font-black ${supported ? "text-slate-500" : "text-slate-300"}`}>{label}</span>
-                </div>
-              ))}
+          <section className="mt-5 overflow-hidden rounded-[24px] border border-slate-200 bg-white shadow-sm">
+            <div className="border-b border-slate-100 px-5 py-4 sm:px-6">
+              <h2 className="text-sm font-black text-[#0b2d54]">
+                What would you like to hear about?
+              </h2>
+              <p className="mt-1 text-xs leading-5 text-slate-500">
+                Turn In-app or Push notifications on or off for each type of update.
+              </p>
             </div>
 
             {loading ? (
-              <div className="space-y-3 pt-4">{Array.from({ length: 6 }).map((_, index) => <div key={index} className="h-20 animate-pulse rounded-2xl bg-slate-50" />)}</div>
+              <div className="divide-y divide-slate-100">
+                {Array.from({ length: 7 }).map((_, index) => (
+                  <div key={index} className="px-5 py-5 sm:px-6">
+                    <div className="h-4 w-40 animate-pulse rounded bg-slate-100" />
+                    <div className="mt-2 h-3 w-full max-w-md animate-pulse rounded bg-slate-100" />
+                    <div className="mt-4 h-10 w-full animate-pulse rounded-xl bg-slate-100 sm:w-72" />
+                  </div>
+                ))}
+              </div>
             ) : (
               <div className="divide-y divide-slate-100">
                 {types.map(({ key: type, label, description, icon: Icon }) => (
-                  <article key={type} className="grid grid-cols-[1fr_repeat(5,56px)] items-center gap-2 py-5">
-                    <div className="min-w-0 pr-2">
-                      <div className="flex items-start gap-3">
-                        <span className="mt-0.5 hidden h-9 w-9 shrink-0 place-items-center rounded-xl bg-[#0b2d54]/[0.05] text-[#0b2d54] sm:grid"><Icon className="h-4 w-4" /></span>
-                        <div>
-                          <h2 className="text-sm font-bold text-[#0b2d54]">{label}</h2>
-                          <p className="mt-1 text-xs leading-5 text-slate-500">{description}</p>
-                        </div>
+                  <article key={type} className="px-5 py-5 sm:px-6 sm:py-6">
+                    <div className="flex items-start gap-3">
+                      <span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-[#0b2d54]/[0.06] text-[#0b2d54]">
+                        <Icon className="h-[18px] w-[18px]" />
+                      </span>
+                      <div className="min-w-0">
+                        <h3 className="text-sm font-extrabold text-[#0b2d54]">
+                          {label}
+                        </h3>
+                        <p className="mt-1 text-xs leading-5 text-slate-500">
+                          {description}
+                        </p>
                       </div>
                     </div>
-                    {channels.map(({ key: channel, supported }) => {
-                      const settingKey = preferenceKey(type, channel);
-                      const enabled = preferences[settingKey] ?? (channel === "IN_APP");
-                      const saving = savingKey === settingKey;
-                      return (
-                        <button
-                          key={channel}
-                          type="button"
-                          onClick={() => void toggle(type, channel, supported)}
-                          disabled={saving || !supported}
-                          aria-pressed={supported ? enabled : false}
-                          aria-label={
-                            supported
-                              ? `${label}: ${channel} notifications ${enabled ? "on" : "off"}`
-                              : `${label}: ${channel} notifications coming soon`
-                          }
-                          title={!supported ? `${channel} notifications are coming soon` : undefined}
-                          className={`mx-auto flex h-10 w-10 items-center justify-center rounded-xl border text-xs font-black transition ${
-                            !supported
-                              ? "cursor-not-allowed border-slate-100 bg-slate-50 text-slate-300 opacity-60"
-                              : enabled
-                                ? "border-[#24c1c4]/35 bg-[#24c1c4]/10 text-[#0b2d54]"
-                                : "border-slate-200 bg-slate-50 text-slate-400"
-                          } disabled:opacity-60`}
-                        >
-                          {saving ? (
-                            <span className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-current border-t-transparent" aria-hidden="true" />
-                          ) : !supported ? (
-                            <span className="text-[8px] font-black uppercase tracking-tight">Soon</span>
-                          ) : enabled ? (
-                            <Check className="h-4 w-4" />
-                          ) : (
-                            <span className="text-[10px]">Off</span>
-                          )}
-                        </button>
-                      );
-                    })}
+
+                    <div className="mt-4 grid grid-cols-2 gap-2 sm:max-w-sm">
+                      {channels
+                        .filter(({ supported }) => supported)
+                        .map(({ key: channel, label: channelLabel, icon: ChannelIcon }) => {
+                          const settingKey = preferenceKey(type, channel);
+                          const enabled = preferences[settingKey] ?? (channel === "IN_APP");
+                          const saving = savingKey === settingKey;
+
+                          return (
+                            <button
+                              key={channel}
+                              type="button"
+                              onClick={() => void toggle(type, channel, true)}
+                              disabled={saving}
+                              aria-pressed={enabled}
+                              aria-label={
+                                label +
+                                ": " +
+                                channelLabel +
+                                " notifications " +
+                                (enabled ? "on" : "off")
+                              }
+                              className={
+                                "flex min-h-12 items-center justify-between gap-3 rounded-xl border px-3.5 py-2.5 text-left transition " +
+                                (enabled
+                                  ? "border-[#24c1c4]/35 bg-[#24c1c4]/10 text-[#0b2d54]"
+                                  : "border-slate-200 bg-slate-50 text-slate-500 hover:bg-slate-100") +
+                                " disabled:opacity-60"
+                              }
+                            >
+                              <span className="flex min-w-0 items-center gap-2">
+                                <ChannelIcon className="h-4 w-4 shrink-0" />
+                                <span className="truncate text-xs font-extrabold">{channelLabel}</span>
+                              </span>
+                              <span className="shrink-0 text-[10px] font-black uppercase tracking-[0.08em]">
+                                {saving ? "Saving" : enabled ? "On" : "Off"}
+                              </span>
+                            </button>
+                          );
+                        })}
+                    </div>
                   </article>
                 ))}
               </div>
             )}
           </section>
 
-          <section className="mt-5 rounded-2xl border border-slate-200 bg-white p-5 sm:p-6">
+          <section className="mt-5 rounded-[24px] border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
             <div className="flex items-start gap-3">
               <ShieldCheck className="mt-0.5 h-5 w-5 shrink-0 text-[#0b2d54]" />
-              <div>
-                <h2 className="font-semibold text-[#0b2d54]">A note about channels</h2>
-                <p className="mt-1 text-sm leading-6 text-slate-500">In-app and Push notifications are available now. Email, SMS and WhatsApp are muted until their delivery services are connected. Turning a channel off never deletes your clinical records.</p>
+              <div className="min-w-0">
+                <h2 className="text-sm font-extrabold text-[#0b2d54]">
+                  About your notification choices
+                </h2>
+                <p className="mt-1.5 text-sm leading-6 text-slate-500">
+                  In-app and Push are available now. Email, SMS and WhatsApp are not available yet and are kept off until those delivery services are connected. Changing a notification preference never deletes your clinical records.
+                </p>
               </div>
             </div>
           </section>
 
-          <div className="mt-6 flex items-center justify-center text-[11px] text-slate-400">
-            <ChevronDown className="mr-1 h-3.5 w-3.5" />Changes are saved as you make them
-          </div>
+          <p className="mt-4 text-center text-[11px] font-semibold text-slate-400">
+            Changes are saved automatically.
+          </p>
         </div>
       </main>
     </ProtectedRoute>
