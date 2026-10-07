@@ -183,6 +183,7 @@ export class SmartFileClinicalService {
           include: {
             encounterType: true,
             practitioner: { include: { person: true } },
+            attachments: true,
             diagnoses: { include: { diagnosis: true } },
             procedures: { include: { procedure: true } },
             clinicalNotes: true,
@@ -273,6 +274,9 @@ export class SmartFileClinicalService {
               include: {
                 practitioner: { include: { person: true } },
               },
+            },
+            series: {
+              include: { images: true },
             },
           },
         })
