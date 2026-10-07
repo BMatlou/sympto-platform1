@@ -313,16 +313,20 @@ export default function NotificationsPage() {
     }
   }, [category, visibleCategoryTabs]);
 
-  const visible = useMemo(
-    () =>
-      notifications.filter((notification) => {
+  const visible = useMemo(() => {
+    return notifications
+      .filter((notification) => {
         const categoryMatch =
           category === "ALL" || getCategory(notification) === category;
         const unreadMatch = !unreadOnly || !notification.readAt;
         return categoryMatch && unreadMatch;
-      }),
-    [category, notifications, unreadOnly],
-  );
+      })
+      .sort(
+        (a, b) =>
+          new Date(String(b.createdAt)).getTime() -
+          new Date(String(a.createdAt)).getTime(),
+      );
+  }, [category, notifications, unreadOnly]);
 
   const grouped = useMemo(() => {
     const groups: Record<
