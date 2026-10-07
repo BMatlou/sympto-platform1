@@ -436,15 +436,31 @@ export class SmartFileClinicalService {
               ...document,
               source: 'CLINICAL' as const,
             })),
-            ...encounters.flatMap((encounter) =>
-              encounter.clinicalNotes.map((note) => ({
+            ...encounters.flatMap((encounter) => [
+              ...encounter.clinicalNotes.map((note) => ({
                 ...note,
                 source: 'CLINICAL' as const,
               })),
-            ),
+              ...encounter.attachments.map((attachment) => ({
+                ...attachment,
+                source: 'CLINICAL' as const,
+              })),
+            ]),
             ...episodes.flatMap((episode) =>
               episode.attachments.map((attachment) => ({
                 ...attachment,
+                source: 'CLINICAL' as const,
+              })),
+            ),
+            ...labResults.flatMap((result) =>
+              result.attachments.map((attachment) => ({
+                ...attachment,
+                source: 'CLINICAL' as const,
+              })),
+            ),
+            ...referrals.flatMap((referral) =>
+              referral.documents.map((document) => ({
+                ...document,
                 source: 'CLINICAL' as const,
               })),
             ),
