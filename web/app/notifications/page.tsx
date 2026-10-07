@@ -505,14 +505,12 @@ export default function NotificationsPage() {
                   </p>
                 </div>
 
-                <div className="hidden shrink-0 items-center gap-2 sm:flex">
-                  <span className="text-[10px] font-bold uppercase tracking-[0.15em] text-white/45">
-                    Unread
-                  </span>
-                  <span className="grid h-10 min-w-10 place-items-center rounded-xl bg-white/10 px-3 text-sm font-black text-white ring-1 ring-white/10">
-                    {periodCounts.ALL.unread}
-                  </span>
-                </div>
+                {periodCounts.ALL.unread > 0 && (
+                  <div className="hidden shrink-0 items-center gap-2 rounded-xl bg-white/10 px-3 py-2 text-xs font-bold text-white ring-1 ring-white/10 sm:flex">
+                    <span className="h-2 w-2 rounded-full bg-[#24c1c4]" />
+                    {periodCounts.ALL.unread} unread notifications
+                  </div>
+                )}
               </div>
 
               <div className="mt-7 border-t border-white/15 pt-5">
@@ -552,12 +550,7 @@ export default function NotificationsPage() {
                           : "text-white/65 hover:text-white")
                       }
                     >
-                      {unreadOnly ? "Unread" : "Unread only"}
-                      {periodCounts.ALL.unread > 0 && (
-                        <span className="ml-1.5 font-black text-[#24c1c4]">
-                          {periodCounts.ALL.unread}
-                        </span>
-                      )}
+                      {unreadOnly ? "Showing unread" : "Unread only"}
                     </button>
 
                     {unreadCount > 0 && (
