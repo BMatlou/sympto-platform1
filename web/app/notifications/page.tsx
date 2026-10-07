@@ -212,6 +212,7 @@ export default function NotificationsPage() {
   const [category, setCategory] = useState<NotificationCategory>("ALL");
   const [range, setRange] = useState<NotificationRange>("DAY");
   const [readFilter, setReadFilter] = useState<NotificationReadFilter>("ALL");
+  const [filterOpen, setFilterOpen] = useState(false);
   const [loading, setLoading] = useState(true);
   const [busyId, setBusyId] = useState<string | null>(null);
   const [error, setError] = useState("");
@@ -517,50 +518,27 @@ export default function NotificationsPage() {
               </div>
 
               <div className="mt-7 border-t border-white/15 pt-5">
-                <div className="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
-                  <div className="inline-flex w-fit rounded-xl bg-white/10 p-1 ring-1 ring-white/10">
-                    {(["DAY", "WEEK", "MONTH"] as const).map((value) => (
-                      <button
-                        key={value}
-                        type="button"
-                        onClick={() => setRange(value)}
-                        aria-pressed={range === value}
-                        className={
-                          "min-h-10 min-w-20 rounded-lg px-4 text-xs font-black transition " +
-                          (range === value
-                            ? "bg-white text-[#0b2d54] shadow-sm"
-                            : "text-white/60 hover:text-white")
-                        }
-                      >
-                        {value === "DAY"
-                          ? "Day"
-                          : value === "WEEK"
-                            ? "Week"
-                            : "Month"}
-                      </button>
-                    ))}
-                  </div>
-
-                  <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:gap-4">
+                <div className="flex flex-col gap-4">
+                  <div className="flex items-center justify-between gap-3">
                     <div className="inline-flex w-full rounded-xl bg-white/10 p-1 ring-1 ring-white/10 sm:w-auto">
-                      {([
-                        ["ALL", "All"],
-                        ["UNREAD", "Unread"],
-                        ["READ", "Read"],
-                      ] as const).map(([value, text]) => (
+                      {(["DAY", "WEEK", "MONTH"] as const).map((value) => (
                         <button
                           key={value}
                           type="button"
-                          onClick={() => setReadFilter(value)}
-                          aria-pressed={readFilter === value}
+                          onClick={() => setRange(value)}
+                          aria-pressed={range === value}
                           className={
-                            "min-h-10 flex-1 rounded-lg px-4 text-xs font-black transition sm:flex-none " +
-                            (readFilter === value
+                            "min-h-10 flex-1 rounded-lg px-4 text-xs font-black transition sm:min-w-20 sm:flex-none " +
+                            (range === value
                               ? "bg-white text-[#0b2d54] shadow-sm"
-                              : "text-white/65 hover:text-white")
+                              : "text-white/60 hover:text-white")
                           }
                         >
-                          {text}
+                          {value === "DAY"
+                            ? "Day"
+                            : value === "WEEK"
+                              ? "Week"
+                              : "Month"}
                         </button>
                       ))}
                     </div>
@@ -570,69 +548,118 @@ export default function NotificationsPage() {
                         type="button"
                         onClick={() => void markAllRead()}
                         disabled={busyId === "all"}
-                        className="inline-flex min-h-10 w-full items-center justify-center gap-2 rounded-xl bg-white px-4 py-2.5 text-xs font-black text-[#0b2d54] shadow-sm transition hover:bg-white/90 disabled:opacity-50 sm:w-auto"
+                        className="shrink-0 text-xs font-bold text-white/80 transition hover:text-white disabled:opacity-50"
                       >
-                        <CheckCheck className="h-3.5 w-3.5" />
                         {busyId === "all" ? "Updating…" : "Mark all read"}
                       </button>
                     )}
                   </div>
-                </div>
 
-                <div className="mt-5 flex items-center gap-2 overflow-x-auto">
-                  <button
-                    type="button"
-                    onClick={() => setCategory("ALL")}
-                    className={
-                      "inline-flex min-h-10 shrink-0 items-center gap-2 rounded-xl px-4 py-2.5 text-xs font-bold transition " +
-                      (category === "ALL"
-                        ? "bg-white text-[#0b2d54] shadow-sm"
-                        : "bg-white/10 text-white/75 hover:bg-white/15 hover:text-white")
-                    }
-                  >
-                    All
-                    <span
-                      className={
-                        "rounded-full px-2 py-0.5 text-[9px] font-black " +
-                        (category === "ALL"
-                          ? "bg-[#24c1c4] text-[#0b2d54]"
-                          : "bg-white/10 text-white/75")
-                      }
+                  <div className="relative">
+                    <button
+                      type="button"
+                      onClick={() => setFilterOpen((current) => !current)}
+                      aria-expanded={filterOpen}
+                      className="inline-flex min-h-10 w-full items-center justify-between gap-3 rounded-xl bg-white/10 px-4 py-2.5 text-xs font-black text-white ring-1 ring-white/10 transition hover:bg-white/15"
                     >
-                      {periodCounts.ALL.total}
-                    </span>
-                  </button>
-
-                  {visibleCategoryTabs.map((tab) => {
-                    const active = category === tab.key;
-                    const count = periodCounts[tab.key];
-
-                    return (
-                      <button
-                        key={tab.key}
-                        type="button"
-                        onClick={() => setCategory(tab.key)}
-                        className={
-                          "inline-flex min-h-10 shrink-0 items-center gap-2 rounded-xl px-4 py-2.5 text-xs font-bold transition " +
-                          (active
-                            ? "bg-white text-[#0b2d54] shadow-sm"
-                            : "bg-white/10 text-white/75 hover:bg-white/15 hover:text-white")
-                        }
-                      >
-                        {tab.label}
-                        <span
-                          className={
-                            "rounded-full px-2 py-0.5 text-[9px] font-black " +
-                            (active
-                              ? "bg-[#24c1c4] text-[#0b2d54]"
-                              : "bg-white/10 text-white/75")
-                          }
-                        >
-                          {count.total}
+                      <span className="flex min-w-0 items-center gap-2">
+                        <span className="truncate">
+                          {readFilter === "UNREAD"
+                            ? "Unread notifications"
+                            : readFilter === "READ"
+                              ? "Read notifications"
+                              : category === "ALL"
+                                ? "All notifications"
+                                : categoryTabs.find((tab) => tab.key === category)?.label ??
+                                  "All notifications"}
                         </span>
-                      </button>
-                    );
-                  })}
+                        {(readFilter !== "ALL" || category !== "ALL") && (
+                          <span className="rounded-full bg-white/15 px-2 py-0.5 text-[9px] font-black">
+                            Filtered
+                          </span>
+                        )}
+                      </span>
+                      <ChevronRight
+                        className={
+                          "h-4 w-4 shrink-0 transition-transform " +
+                          (filterOpen ? "rotate-90" : "")
+                        }
+                      />
+                    </button>
+
+                    {filterOpen && (
+                      <div className="absolute left-0 right-0 top-full z-20 mt-2 overflow-hidden rounded-2xl bg-white text-[#0b2d54] shadow-[0_18px_45px_rgba(11,45,84,0.22)] ring-1 ring-slate-200">
+                        <div className="border-b border-slate-100 p-3">
+                          <p className="px-2 pb-2 text-[10px] font-black uppercase tracking-[0.14em] text-slate-400">
+                            Show
+                          </p>
+                          <div className="grid grid-cols-3 gap-1">
+                            {([
+                              ["ALL", "All"],
+                              ["UNREAD", "Unread"],
+                              ["READ", "Read"],
+                            ] as const).map(([value, text]) => (
+                              <button
+                                key={value}
+                                type="button"
+                                onClick={() => { setReadFilter(value); setFilterOpen(false); }}
+                                className={
+                                  "min-h-10 rounded-lg px-2 text-xs font-black transition " +
+                                  (readFilter === value
+                                    ? "bg-[#0b2d54] text-white"
+                                    : "bg-slate-50 text-slate-600 hover:bg-slate-100")
+                                }
+                              >
+                                {text}
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+
+                        <div className="max-h-64 overflow-y-auto p-3">
+                          <p className="px-2 pb-2 text-[10px] font-black uppercase tracking-[0.14em] text-slate-400">
+                            Category
+                          </p>
+                          <div className="space-y-1">
+                            <button
+                              type="button"
+                              onClick={() => { setCategory("ALL"); setFilterOpen(false); }}
+                              className={
+                                "flex w-full items-center justify-between rounded-lg px-3 py-2.5 text-left text-xs font-bold transition " +
+                                (category === "ALL"
+                                  ? "bg-[#24c1c4]/10 text-[#0b2d54]"
+                                  : "hover:bg-slate-50")
+                              }
+                            >
+                              <span>All notifications</span>
+                              <span className="text-[10px] font-black text-slate-400">
+                                {periodCounts.ALL.total}
+                              </span>
+                            </button>
+
+                            {visibleCategoryTabs.map((tab) => (
+                              <button
+                                key={tab.key}
+                                type="button"
+                                onClick={() => { setCategory(tab.key); setFilterOpen(false); }}
+                                className={
+                                  "flex w-full items-center justify-between rounded-lg px-3 py-2.5 text-left text-xs font-bold transition " +
+                                  (category === tab.key
+                                    ? "bg-[#24c1c4]/10 text-[#0b2d54]"
+                                    : "hover:bg-slate-50")
+                                }
+                              >
+                                <span>{tab.label}</span>
+                                <span className="text-[10px] font-black text-slate-400">
+                                  {periodCounts[tab.key].total}
+                                </span>
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+                      </div>
+                    )}
+                  </div>
                 </div>
               </div>
             </div>
