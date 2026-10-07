@@ -1,4 +1,5 @@
 import {
+  ForbiddenException,
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
@@ -83,11 +84,41 @@ export class OnboardingRepository {
         },
       });
 
-      await tx.healthPassport.upsert({
+      const existingPassport = await tx.healthPassport.findUnique({
         where: { patientId: patient.id },
-        update: { bloodType: dto.bloodType, rhesusFactor: dto.rhesusFactor, organDonor: dto.organDonor ?? false, emergencyNotes: dto.emergencyNotes, shareByDefault: dto.shareByDefault ?? false },
-        create: { patientId: patient.id, bloodType: dto.bloodType, rhesusFactor: dto.rhesusFactor, organDonor: dto.organDonor ?? false, emergencyNotes: dto.emergencyNotes, shareByDefault: dto.shareByDefault ?? false },
+        select: { id: true },
       });
+      const audits = existingPassport
+        ? await tx.auditLog.findMany({
+            where: {
+              entityType: 'SmartFileClinical/HEALTH_PASSPORT',
+              entityId: existingPassport.id,
+              action: { in: ['CREATE', 'UPDATE'] },
+              success: true,
+            },
+            orderBy: { createdAt: 'desc' },
+            take: 50,
+            select: { newValues: true },
+          })
+        : [];
+      const locked = new Set<string>();
+      for (const audit of audits) {
+        const values = audit.newValues && typeof audit.newValues === 'object' && !Array.isArray(audit.newValues)
+          ? audit.newValues as Record<string, unknown>
+          : null;
+        for (const field of ['bloodType', 'rhesusFactor', 'organDonor', 'emergencyNotes']) {
+          if (values && Object.prototype.hasOwnProperty.call(values, field)) locked.add(field);
+        }
+      }
+
+      const passportData: Record<string, unknown> = { shareByDefault: dto.shareByDefault ?? false };
+      if (!locked.has('bloodType')) passportData.bloodType = dto.bloodType;
+      if (!locked.has('rhesusFactor')) passportData.rhesusFactor = dto.rhesusFactor;
+      if (!locked.has('organDonor')) passportData.organDonor = dto.organDonor ?? false;
+      if (!locked.has('emergencyNotes')) passportData.emergencyNotes = dto.emergencyNotes;
+
+      if (existingPassport) await tx.healthPassport.update({ where: { patientId: patient.id }, data: passportData as any });
+      else await tx.healthPassport.create({ data: { patientId: patient.id, ...passportData } as any });
 
       return this.updateOnboardingStep(tx, userId, 3, 20);
     });
@@ -110,8 +141,22 @@ export class OnboardingRepository {
   async savePatientAllergies(userId: string, dto: UpdatePatientAllergiesDto) {
     return this.prisma.$transaction(async (tx) => {
       const patient = await this.getPatientWithPassport(tx, userId); const healthPassportId = patient.healthPassport!.id;
-      await tx.patientAllergy.deleteMany({ where: { healthPassportId } });
-      for (const allergy of dto.allergies) await tx.patientAllergy.create({ data: { healthPassportId, allergyId: allergy.allergyId, severity: allergy.severity, reaction: allergy.reaction, reactionNotes: allergy.reactionNotes, onsetDate: allergy.onsetDate ? new Date(allergy.onsetDate) : undefined, lastReaction: allergy.lastReaction ? new Date(allergy.lastReaction) : undefined, verified: allergy.verified ?? false, verifiedBy: allergy.verifiedBy, status: allergy.status ?? AllergyStatus.ACTIVE, notes: allergy.notes } });
+      const existing = await tx.patientAllergy.findMany({ where: { healthPassportId }, select: { id: true, allergyId: true, verified: true, verifiedBy: true } });
+      const clinical = existing.filter((item) => item.verified || item.verifiedBy);
+      const clinicalIds = new Set(clinical.map((item) => item.id));
+      const clinicalAllergyIds = new Set(clinical.map((item) => item.allergyId));
+      await tx.patientAllergy.deleteMany({ where: { healthPassportId, id: { notIn: Array.from(clinicalIds) } } });
+      for (const allergy of dto.allergies) {
+        if (clinicalAllergyIds.has(allergy.allergyId)) continue;
+        await tx.patientAllergy.create({
+          data: {
+            healthPassportId, allergyId: allergy.allergyId, severity: allergy.severity, reaction: allergy.reaction,
+            reactionNotes: allergy.reactionNotes, onsetDate: allergy.onsetDate ? new Date(allergy.onsetDate) : undefined,
+            lastReaction: allergy.lastReaction ? new Date(allergy.lastReaction) : undefined,
+            verified: false, status: allergy.status ?? AllergyStatus.ACTIVE, notes: allergy.notes,
+          },
+        });
+      }
       return this.updateOnboardingStep(tx, userId, 5, 40);
     });
   }
@@ -119,8 +164,24 @@ export class OnboardingRepository {
   async savePatientConditions(userId: string, dto: UpdatePatientConditionsDto) {
     return this.prisma.$transaction(async (tx) => {
       const patient = await this.getPatientWithPassport(tx, userId); const healthPassportId = patient.healthPassport!.id;
-      await tx.patientCondition.deleteMany({ where: { healthPassportId } });
-      for (const condition of dto.conditions) await tx.patientCondition.create({ data: { healthPassportId, conditionId: condition.conditionId, diagnosedAt: condition.diagnosedAt ? new Date(condition.diagnosedAt) : undefined, resolvedAt: condition.resolvedAt ? new Date(condition.resolvedAt) : undefined, status: condition.status ?? ConditionStatus.ACTIVE, severity: condition.severity, stage: condition.stage, chronic: condition.chronic ?? false, primaryCondition: condition.primaryCondition ?? false, diagnosedBy: condition.diagnosedBy, treatmentPlan: condition.treatmentPlan, outcome: condition.outcome, notes: condition.notes } });
+      const existing = await tx.patientCondition.findMany({ where: { healthPassportId }, select: { id: true, conditionId: true, diagnosedBy: true, treatmentPlan: true } });
+      const clinical = existing.filter((item) => item.diagnosedBy || item.treatmentPlan);
+      const clinicalIds = new Set(clinical.map((item) => item.id));
+      const clinicalConditionIds = new Set(clinical.map((item) => item.conditionId));
+      await tx.patientCondition.deleteMany({ where: { healthPassportId, id: { notIn: Array.from(clinicalIds) } } });
+      for (const condition of dto.conditions) {
+        if (clinicalConditionIds.has(condition.conditionId)) continue;
+        await tx.patientCondition.create({
+          data: {
+            healthPassportId, conditionId: condition.conditionId,
+            diagnosedAt: condition.diagnosedAt ? new Date(condition.diagnosedAt) : undefined,
+            resolvedAt: condition.resolvedAt ? new Date(condition.resolvedAt) : undefined,
+            status: condition.status ?? ConditionStatus.ACTIVE, severity: condition.severity, stage: condition.stage,
+            chronic: condition.chronic ?? false, primaryCondition: condition.primaryCondition ?? false,
+            diagnosedBy: undefined, treatmentPlan: undefined, outcome: condition.outcome, notes: condition.notes,
+          },
+        });
+      }
       return this.updateOnboardingStep(tx, userId, 6, 50);
     });
   }
@@ -128,8 +189,41 @@ export class OnboardingRepository {
   async savePatientMedications(userId: string, dto: UpdatePatientMedicationsDto) {
     return this.prisma.$transaction(async (tx) => {
       const patient = await this.getPatientWithPassport(tx, userId); const healthPassportId = patient.healthPassport!.id;
-      await tx.patientMedication.deleteMany({ where: { healthPassportId } });
-      for (const medication of dto.medications) await tx.patientMedication.create({ data: { healthPassportId, medicationId: medication.medicationId, dosage: medication.dosage, frequency: medication.frequency, route: medication.route, indication: medication.indication, instructions: medication.instructions, prescribedBy: medication.prescribedBy, startedAt: medication.startedAt ? new Date(medication.startedAt) : undefined, endedAt: medication.endedAt ? new Date(medication.endedAt) : undefined, ongoing: medication.ongoing ?? false, adherencePercentage: medication.adherencePercentage, missedDoses: medication.missedDoses, sideEffects: medication.sideEffects, effectiveness: medication.effectiveness, status: medication.status ?? MedicationStatus.ACTIVE, notes: medication.notes } });
+      const existing = await tx.patientMedication.findMany({ where: { healthPassportId }, select: { id: true, medicationId: true, prescribedBy: true } });
+      const medicationIds = existing.map((item) => item.medicationId);
+      const prescriptions = medicationIds.length
+        ? await tx.prescriptionItem.findMany({
+            where: { medicationId: { in: medicationIds }, prescription: { patientId: patient.id, status: { not: 'DRAFT' } } },
+            select: { medicationId: true },
+          })
+        : [];
+      const clinicalMedicationIds = new Set(prescriptions.map((item) => item.medicationId));
+      const practitioners = await tx.practitioner.findMany({
+        where: { status: { in: ['ACTIVE', 'PENDING'] } },
+        select: { person: { select: { firstName: true, lastName: true, preferredName: true } } },
+      });
+      const normalise = (value: unknown) => String(value ?? '').trim().toLowerCase().replace(/[^a-z0-9]+/g, ' ').replace(/\s+/g, ' ').trim();
+      const practitionerNames = new Set(practitioners.flatMap((p) => [
+        p.person.preferredName,
+        [p.person.preferredName ?? p.person.firstName, p.person.lastName].filter(Boolean).join(' '),
+        [p.person.firstName, p.person.lastName].filter(Boolean).join(' '),
+      ]).map(normalise).filter(Boolean));
+      const clinicalIds = new Set(existing.filter((item) => clinicalMedicationIds.has(item.medicationId) || practitionerNames.has(normalise(item.prescribedBy))).map((item) => item.id));
+
+      await tx.patientMedication.deleteMany({ where: { healthPassportId, id: { notIn: Array.from(clinicalIds) } } });
+      for (const medication of dto.medications) {
+        const medicationId = String(medication.medicationId);
+        if (clinicalMedicationIds.has(medicationId)) continue;
+        await tx.patientMedication.create({
+          data: {
+            healthPassportId, medicationId: medication.medicationId, dosage: medication.dosage, frequency: medication.frequency,
+            route: medication.route, indication: medication.indication, instructions: medication.instructions, prescribedBy: medication.prescribedBy,
+            startedAt: medication.startedAt ? new Date(medication.startedAt) : undefined, endedAt: medication.endedAt ? new Date(medication.endedAt) : undefined,
+            ongoing: medication.ongoing ?? false, adherencePercentage: medication.adherencePercentage, missedDoses: medication.missedDoses,
+            sideEffects: medication.sideEffects, effectiveness: medication.effectiveness, status: medication.status ?? MedicationStatus.ACTIVE, notes: medication.notes,
+          },
+        });
+      }
       return this.updateOnboardingStep(tx, userId, 7, 60);
     });
   }
@@ -137,8 +231,24 @@ export class OnboardingRepository {
   async savePatientImmunizations(userId: string, dto: UpdatePatientImmunizationsDto) {
     return this.prisma.$transaction(async (tx) => {
       const patient = await this.getPatientWithPassport(tx, userId); const healthPassportId = patient.healthPassport!.id;
-      await tx.patientImmunization.deleteMany({ where: { healthPassportId } });
-      for (const immunization of dto.immunizations) await tx.patientImmunization.create({ data: { healthPassportId, immunizationId: immunization.immunizationId, administeredAt: immunization.administeredAt ? new Date(immunization.administeredAt) : undefined, doseNumber: immunization.doseNumber, batchNumber: immunization.batchNumber, manufacturer: immunization.manufacturer, administeredBy: immunization.administeredBy, facility: immunization.facility, route: immunization.route, site: immunization.site, adverseReaction: immunization.adverseReaction ?? false, adverseReactionNotes: immunization.adverseReactionNotes, nextDueDate: immunization.nextDueDate ? new Date(immunization.nextDueDate) : undefined, notes: immunization.notes } });
+      const existing = await tx.patientImmunization.findMany({ where: { healthPassportId }, select: { id: true, immunizationId: true, doseNumber: true, administeredBy: true, facility: true } });
+      const clinical = existing.filter((item) => item.administeredBy || item.facility);
+      const clinicalIds = new Set(clinical.map((item) => item.id));
+      const clinicalKeys = new Set(clinical.map((item) => `${item.immunizationId}:${item.doseNumber ?? 1}`));
+      await tx.patientImmunization.deleteMany({ where: { healthPassportId, id: { notIn: Array.from(clinicalIds) } } });
+      for (const immunization of dto.immunizations) {
+        const key = `${immunization.immunizationId}:${immunization.doseNumber ?? 1}`;
+        if (clinicalKeys.has(key)) continue;
+        await tx.patientImmunization.create({
+          data: {
+            healthPassportId, immunizationId: immunization.immunizationId, administeredAt: immunization.administeredAt ? new Date(immunization.administeredAt) : undefined,
+            doseNumber: immunization.doseNumber, batchNumber: immunization.batchNumber, manufacturer: immunization.manufacturer,
+            administeredBy: undefined, facility: undefined, route: immunization.route, site: immunization.site,
+            adverseReaction: immunization.adverseReaction ?? false, adverseReactionNotes: immunization.adverseReactionNotes,
+            nextDueDate: immunization.nextDueDate ? new Date(immunization.nextDueDate) : undefined, notes: immunization.notes,
+          },
+        });
+      }
       return this.updateOnboardingStep(tx, userId, 8, 70);
     });
   }
