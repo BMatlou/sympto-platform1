@@ -459,46 +459,46 @@ export default function NotificationsPage() {
             </Link>
           </div>
 
-          <section className="relative overflow-hidden rounded-[32px] bg-gradient-to-br from-[#0b2d54] via-[#0f5261] to-[#24c1c4] p-6 text-white shadow-[0_24px_60px_rgba(11,45,84,0.20)] sm:p-8">
+          <section className="relative overflow-hidden rounded-[32px] bg-gradient-to-br from-[#0b2d54] via-[#0f5261] to-[#24c1c4] p-4 text-white shadow-[0_18px_45px_rgba(11,45,84,0.16)] sm:p-5">
             <div className="absolute -right-16 -top-20 h-48 w-48 rounded-full bg-white/10 blur-2xl" />
             <div className="absolute -bottom-24 -left-12 h-56 w-56 rounded-full bg-black/10 blur-2xl" />
 
             <div className="relative">
               <div className="flex items-start justify-between gap-4">
                 <div className="min-w-0">
-                  <div className="inline-flex items-center gap-2 rounded-full bg-white/10 px-3 py-1.5 text-[10px] font-bold uppercase tracking-[0.16em] text-white/80 ring-1 ring-white/10">
-                    <Bell className="h-3.5 w-3.5" />
+                  <div className="inline-flex items-center gap-2 rounded-full bg-white/10 px-2.5 py-1 text-[9px] font-bold uppercase tracking-[0.16em] text-white/80 ring-1 ring-white/10">
+                    <Bell className="h-3 w-3" />
                     Notifications
                   </div>
-                  <h1 className="mt-4 text-3xl font-extrabold tracking-tight sm:text-4xl">
+                  <h1 className="mt-2.5 text-2xl font-extrabold tracking-tight sm:text-3xl">
                     Your notifications
                   </h1>
-                  <p className="mt-2 max-w-3xl text-sm leading-6 text-white/75">
+                  <p className="mt-1.5 max-w-3xl text-xs leading-5 text-white/75">
                     Keep track of medication reminders, appointments, results,
                     care-team messages and important account updates.
                   </p>
                 </div>
 
-                <div className="grid h-14 w-14 shrink-0 place-items-center rounded-2xl bg-white/10 ring-1 ring-white/15">
-                  <Bell className="h-7 w-7" />
+                <div className="grid h-11 w-11 shrink-0 place-items-center rounded-xl bg-white/10 ring-1 ring-white/15">
+                  <Bell className="h-5 w-5" />
                 </div>
               </div>
 
-              <div className="mt-7 grid grid-cols-2 gap-3 sm:grid-cols-3">
-                <div className="rounded-2xl bg-white/10 p-3.5 ring-1 ring-white/10">
-                  <p className="text-[10px] font-semibold uppercase tracking-wide text-white/55">
+              <div className="mt-4 grid grid-cols-2 gap-2.5 sm:grid-cols-3">
+                <div className="rounded-xl bg-white/10 p-2.5 ring-1 ring-white/10">
+                  <p className="text-[9px] font-semibold uppercase tracking-wide text-white/55">
                     Unread
                   </p>
-                  <p className="mt-1.5 text-2xl font-extrabold text-white">
+                  <p className="mt-0.5 text-xl font-extrabold text-white">
                     {unreadCount}
                   </p>
                 </div>
 
-                <div className="rounded-2xl bg-white/10 p-3.5 ring-1 ring-white/10">
-                  <p className="text-[10px] font-semibold uppercase tracking-wide text-white/55">
+                <div className="rounded-xl bg-white/10 p-2.5 ring-1 ring-white/10">
+                  <p className="text-[9px] font-semibold uppercase tracking-wide text-white/55">
                     Showing
                   </p>
-                  <p className="mt-1.5 text-2xl font-extrabold text-white">
+                  <p className="mt-0.5 text-xl font-extrabold text-white">
                     {notifications.length}
                   </p>
                 </div>
@@ -522,7 +522,7 @@ export default function NotificationsPage() {
                 </div>
               </div>
 
-              <div className="mt-7 border-t border-white/15 pt-5">
+              <div className="mt-4 border-t border-white/15 pt-3.5">
                 <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                   <div>
                     <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-white/55">
@@ -563,12 +563,12 @@ export default function NotificationsPage() {
                   </button>
                 </div>
 
-                <div className="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-5 xl:grid-cols-9">
+                <div className="mt-3 grid grid-cols-2 gap-1.5 sm:grid-cols-3 lg:grid-cols-5 xl:grid-cols-9">
                   <button
                     type="button"
                     onClick={() => setCategory("ALL")}
                     className={
-                      "flex min-h-12 items-center gap-3 rounded-2xl border px-3.5 py-3 text-left transition " +
+                      "flex min-h-10 items-center gap-2.5 rounded-xl border px-3 py-2 text-left transition " +
                       (category === "ALL"
                         ? "border-white bg-white text-[#0b2d54] shadow-sm"
                         : "border-white/15 bg-white/10 text-white hover:border-white/30 hover:bg-white/15")
@@ -576,7 +576,7 @@ export default function NotificationsPage() {
                   >
                     <span
                       className={
-                        "grid h-9 w-9 shrink-0 place-items-center rounded-xl " +
+                        "grid h-8 w-8 shrink-0 place-items-center rounded-lg " +
                         (category === "ALL"
                           ? "bg-[#0b2d54]/10 text-[#0b2d54]"
                           : "bg-white/10 text-[#24c1c4]")
@@ -585,10 +585,10 @@ export default function NotificationsPage() {
                       <Bell className="h-4 w-4" />
                     </span>
                     <span className="min-w-0">
-                      <span className="block text-[11px] font-black">All</span>
+                      <span className="block text-[10px] font-black">All</span>
                       <span
                         className={
-                          "mt-0.5 block text-[10px] font-semibold " +
+                          "mt-0.5 block text-[9px] font-semibold " +
                           (category === "ALL" ? "text-slate-500" : "text-white/55")
                         }
                       >
@@ -608,7 +608,7 @@ export default function NotificationsPage() {
                         type="button"
                         onClick={() => setCategory(tab.key)}
                         className={
-                          "flex min-h-12 items-center gap-3 rounded-2xl border px-3.5 py-3 text-left transition " +
+                          "flex min-h-10 items-center gap-2.5 rounded-xl border px-3 py-2 text-left transition " +
                           (active
                             ? "border-white bg-white text-[#0b2d54] shadow-sm"
                             : "border-white/15 bg-white/10 text-white hover:border-white/30 hover:bg-white/15")
@@ -616,7 +616,7 @@ export default function NotificationsPage() {
                       >
                         <span
                           className={
-                            "grid h-9 w-9 shrink-0 place-items-center rounded-xl " +
+                            "grid h-8 w-8 shrink-0 place-items-center rounded-lg " +
                             (active
                               ? "bg-[#0b2d54]/10 text-[#0b2d54]"
                               : "bg-white/10 text-[#24c1c4]")
@@ -625,12 +625,12 @@ export default function NotificationsPage() {
                           <Icon className="h-4 w-4" />
                         </span>
                         <span className="min-w-0 flex-1">
-                          <span className="block truncate text-[11px] font-black">
+                          <span className="block truncate text-[10px] font-black">
                             {tab.label}
                           </span>
                           <span
                             className={
-                              "mt-0.5 block text-[10px] font-semibold " +
+                              "mt-0.5 block text-[9px] font-semibold " +
                               (active ? "text-slate-500" : "text-white/55")
                             }
                           >
@@ -813,24 +813,24 @@ export default function NotificationsPage() {
                                         notification.scheduledFor,
                                       )}
                                     </span>
-                                    <span className="rounded-full bg-slate-100 px-2.5 py-1.5 text-[10px] font-semibold text-slate-500">
+                                    <span className="rounded-full bg-slate-100 px-2.5 py-1.5 text-[9px] font-semibold text-slate-500">
                                       {formatReminderDate(
                                         notification.scheduledFor,
                                       )}
                                     </span>
                                   </>
                                 ) : (
-                                  <span className="rounded-full bg-slate-100 px-2.5 py-1.5 text-[10px] font-semibold text-slate-500">
+                                  <span className="rounded-full bg-slate-100 px-2.5 py-1.5 text-[9px] font-semibold text-slate-500">
                                     {formatDate(relevantDate(notification))}
                                   </span>
                                 )}
 
-                                <span className="rounded-full bg-slate-100 px-2.5 py-1.5 text-[10px] font-semibold text-slate-500">
+                                <span className="rounded-full bg-slate-100 px-2.5 py-1.5 text-[9px] font-semibold text-slate-500">
                                   {label(notification.channel)}
                                 </span>
 
                                 {notification.readAt && (
-                                  <span className="inline-flex items-center gap-1 rounded-full bg-slate-100 px-2.5 py-1.5 text-[10px] font-semibold text-slate-500">
+                                  <span className="inline-flex items-center gap-1 rounded-full bg-slate-100 px-2.5 py-1.5 text-[9px] font-semibold text-slate-500">
                                     <Check className="h-3 w-3" />
                                     Read · {formatDate(notification.readAt)}
                                   </span>
