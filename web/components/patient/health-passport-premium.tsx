@@ -237,12 +237,29 @@ export default function HealthPassportPremium() {
           </div>
         )}
 
-        {(computed.medicalHistory?.previousConditions?.length ||
-          computed.medicalHistory?.previousMedications?.length ||
-          computed.medicalHistory?.clinicalDiagnoses?.length ||
-          computed.medicalHistory?.procedures?.length) ? (
+        {(computed.medicalHistory?.previousAllergies?.length ||
+          computed.medicalHistory?.previousConditions?.length ||
+          computed.medicalHistory?.previousMedications?.length) ? (
           <div className="mt-4 space-y-3">
             <p className="text-xs font-bold uppercase tracking-[0.14em] text-slate-400">Longitudinal history</p>
+
+            {computed.medicalHistory.previousAllergies?.map((item: any) => (
+              <div key={`allergy-${item.id}`} className="rounded-2xl bg-white p-4 ring-1 ring-slate-100">
+                <div className="flex items-center justify-between gap-3">
+                  <div>
+                    <p className="font-semibold text-[#0b2d54]">{text(item.name, "Allergy")}</p>
+                    <ClinicalMarker clinical={item.source === "CLINICAL"} />
+                  </div>
+                  <Badge tone="rose">{human(item.status)}</Badge>
+                </div>
+                <DetailGrid items={[
+                  ["Severity", item.severity ? human(item.severity) : null],
+                  ["Reaction", item.reaction],
+                  ["Last reaction", date(item.lastReaction)],
+                  ["Verified by", item.verifiedBy],
+                ]} />
+              </div>
+            ))}
 
             {computed.medicalHistory.previousConditions?.map((item: any) => (
               <div key={`condition-${item.id}`} className="rounded-2xl bg-white p-4 ring-1 ring-slate-100">
@@ -284,41 +301,6 @@ export default function HealthPassportPremium() {
               </div>
             ))}
 
-            {computed.medicalHistory.clinicalDiagnoses?.map((item: any) => (
-              <div key={`diagnosis-${item.id}`} className="rounded-2xl bg-white p-4 ring-1 ring-slate-100">
-                <div className="flex items-center justify-between gap-3">
-                  <div>
-                    <p className="font-semibold text-[#0b2d54]">{text(item.name, "Diagnosis")}</p>
-                    <ClinicalMarker clinical />
-                  </div>
-                  <Badge tone="green">{human(item.status)}</Badge>
-                </div>
-                <DetailGrid items={[
-                  ["Diagnosed", date(item.diagnosedAt)],
-                  ["Resolved", date(item.resolvedAt)],
-                  ["Diagnosed by", item.diagnosedBy || item.practitionerName],
-                  ["Outcome", item.outcome],
-                ]} />
-              </div>
-            ))}
-
-            {computed.medicalHistory.procedures?.map((item: any) => (
-              <div key={`procedure-${item.id}`} className="rounded-2xl bg-white p-4 ring-1 ring-slate-100">
-                <div className="flex items-center justify-between gap-3">
-                  <div>
-                    <p className="font-semibold text-[#0b2d54]">{text(item.name, "Procedure")}</p>
-                    <ClinicalMarker clinical />
-                  </div>
-                  <Badge>{human(item.status)}</Badge>
-                </div>
-                <DetailGrid items={[
-                  ["Performed", date(item.performedAt)],
-                  ["Outcome", item.outcome],
-                  ["Performed by", item.performer],
-                  ["Facility", item.facility],
-                ]} />
-              </div>
-            ))}
           </div>
         ) : !computed.medicalHistory?.medicalRecord ? (
           <Empty>No medical history has been recorded.</Empty>
