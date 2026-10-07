@@ -8,7 +8,7 @@ import { useSearchParams } from "next/navigation";
 import ProtectedRoute from "@/components/auth/protected-route";
 import { api } from "@/lib/api";
 
-type Share = { qrToken: string; shortCode: string; expiresAt: string };
+type Share = { qrToken: string; shortCode: string; appointmentId?: string | null; expiresAt: string };
 type ShareKind = "clinical" | "prescription";
 const unwrap = <T,>(value: any): T => value?.data ?? value;
 
@@ -103,7 +103,7 @@ export default function SmartFilePage() {
                 <div className="min-w-0">
                   <div className="flex items-center gap-2 text-[9px] font-black uppercase tracking-[0.18em] text-white/70">
                     <ShieldCheck className="h-3 w-3" />
-                    Walk-In / Quick Share
+                    {appointmentId ? "Appointment Smart File" : "Walk-In / Quick Share"}
                   </div>
                   <h1 className="mt-1 text-xl font-black sm:text-2xl">Share Smart File</h1>
                   {!share && <p className="mt-1 text-xs leading-5 text-white/85">Choose who you want to share with.</p>}
@@ -161,7 +161,7 @@ export default function SmartFilePage() {
 
                     <div className="flex flex-1 items-start gap-2.5 rounded-2xl border border-amber-200 bg-amber-50 px-3.5 py-3 text-left text-[10px] font-semibold leading-4 text-amber-900">
                       <ShieldCheck className="mt-0.5 h-4 w-4 shrink-0" />
-                      <p>Temporary, one-time walk-in share. Clinical access is read-only; it does not allow the clinician to edit your medical record, issue a prescription or access financial information.</p>
+                      <p>{isAppointmentShare ? "Temporary, one-time appointment share. The appointed clinician can update the clinical Smart File during the consent period. Financial information is not included." : "Temporary, one-time walk-in share. Clinical access is read-only and does not allow the clinician to edit your medical record, issue a prescription or access financial information."}</p>
                     </div>
 
                     <button type="button" onClick={resetChoice} className="min-h-10 rounded-xl text-xs font-bold text-[#0b2d54] underline underline-offset-2 hover:text-[#24c1c4]">Choose a different sharing type</button>
