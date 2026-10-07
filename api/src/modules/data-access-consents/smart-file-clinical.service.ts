@@ -612,7 +612,7 @@ export class SmartFileClinicalService {
     });
   }
 
-  private async requireClinicalConsent(
+  public async requireClinicalConsent(
     practitionerUserId: string,
     consentId: string,
   ) {
