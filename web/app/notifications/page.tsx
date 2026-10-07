@@ -484,42 +484,22 @@ export default function NotificationsPage() {
                 </div>
               </div>
 
-              <div className="mt-4 grid grid-cols-2 gap-2.5 sm:grid-cols-3">
-                <div className="rounded-xl bg-white/10 p-2.5 ring-1 ring-white/10">
-                  <p className="text-[9px] font-semibold uppercase tracking-wide text-white/55">
-                    Unread
-                  </p>
-                  <p className="mt-0.5 text-xl font-extrabold text-white">
-                    {unreadCount}
-                  </p>
-                </div>
-
-                <div className="rounded-xl bg-white/10 p-2.5 ring-1 ring-white/10">
-                  <p className="text-[9px] font-semibold uppercase tracking-wide text-white/55">
-                    Showing
-                  </p>
-                  <p className="mt-0.5 text-xl font-extrabold text-white">
-                    {notifications.length}
-                  </p>
-                </div>
-
-                <div className="col-span-2 flex items-end sm:col-span-1">
-                  {unreadCount > 0 ? (
-                    <button
-                      type="button"
-                      onClick={() => void markAllRead()}
-                      disabled={busyId === "all"}
-                      className="inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-xl bg-white px-4 py-2.5 text-xs font-bold text-[#0b2d54] shadow-sm transition hover:bg-white/90 disabled:opacity-50"
-                    >
-                      <CheckCheck className="h-4 w-4" />
-                      {busyId === "all" ? "Updating…" : "Mark all read"}
-                    </button>
-                  ) : (
-                    <div className="flex min-h-11 w-full items-center justify-center rounded-xl bg-white/10 px-4 py-2.5 text-[11px] font-bold text-white/70 ring-1 ring-white/10">
-                      All caught up
-                    </div>
-                  )}
-                </div>
+              <div className="flex justify-end">
+                {unreadCount > 0 ? (
+                  <button
+                    type="button"
+                    onClick={() => void markAllRead()}
+                    disabled={busyId === "all"}
+                    className="inline-flex min-h-10 items-center justify-center gap-2 rounded-xl bg-white px-4 py-2.5 text-xs font-bold text-[#0b2d54] shadow-sm transition hover:bg-white/90 disabled:opacity-50"
+                  >
+                    <CheckCheck className="h-4 w-4" />
+                    {busyId === "all" ? "Updating…" : "Mark all read"}
+                  </button>
+                ) : (
+                  <div className="inline-flex min-h-10 items-center justify-center rounded-xl bg-white/10 px-4 py-2.5 text-[11px] font-bold text-white/70 ring-1 ring-white/10">
+                    All caught up
+                  </div>
+                )}
               </div>
 
               <div className="mt-4 border-t border-white/15 pt-3.5">
