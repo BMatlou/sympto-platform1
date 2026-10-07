@@ -124,10 +124,7 @@ export class MedicationReminderSchedulerService {
 
     const medicationName =
       medication.medication.name || medication.medication.genericName || 'Medication';
-    const body =
-      `It is time to take ${medicationName}` +
-      (medication.dosage ? ` (${medication.dosage})` : '') +
-      '. Follow the instructions provided by your healthcare professional.';
+    const totalDosesToday = schedule.slots.length;
 
     const inAppPreference = await this.prisma.notificationPreference.findUnique({
       where: {
@@ -184,7 +181,12 @@ export class MedicationReminderSchedulerService {
           slotId: slot.id,
           channel: NotificationChannel.IN_APP,
           medicationName,
-          body,
+          body: this.buildReminderBody({
+            medicationName,
+            doseIndex: slot.doseIndex,
+            totalDosesToday,
+            dosage: medication.dosage,
+          }),
           scheduledFor: occurrence,
         });
         if (created) pendingKeys.add(inAppKey);
@@ -209,12 +211,36 @@ export class MedicationReminderSchedulerService {
           slotId: slot.id,
           channel: NotificationChannel.PUSH,
           medicationName,
-          body,
+          body: this.buildReminderBody({
+            medicationName,
+            doseIndex: slot.doseIndex,
+            totalDosesToday,
+            dosage: medication.dosage,
+          }),
           scheduledFor: occurrence,
         });
         if (created) pendingKeys.add(pushKey);
       }
     }
+  }
+
+  private buildReminderBody(args: {
+    medicationName: string;
+    doseIndex: number;
+    totalDosesToday: number;
+    dosage?: string | null;
+  }) {
+    const doseNumber = Math.max(1, args.doseIndex + 1);
+    const totalDoses = Math.max(1, args.totalDosesToday);
+    const remainingDoses = Math.max(0, totalDoses - doseNumber);
+    const doseLine =
+      `Dose ${doseNumber} of ${totalDoses} today · ${remainingDoses} ${remainingDoses === 1 ? 'dose' : 'doses'} remaining.`;
+
+    return [
+      `It's time to take your ${args.medicationName}${args.dosage ? ` (${args.dosage})` : ''}.`,
+      doseLine,
+      'Take as prescribed by your doctor or healthcare professional.',
+    ].join(' ');
   }
 
   private async createQueuedReminder(args: {
