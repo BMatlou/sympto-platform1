@@ -477,42 +477,47 @@ export default function NotificationsPage() {
 
   return (
     <ProtectedRoute>
-      <main className="min-h-screen bg-[#f5f8fb] pb-10 text-slate-800">
-        <div className="mx-auto max-w-7xl px-4 py-5 sm:px-6 sm:py-7 lg:px-8">
-          <div className="mb-5 flex items-center justify-between gap-3">
+      <main className="min-h-screen bg-[#f4fbfb] text-slate-800">
+        <div className="mx-auto max-w-6xl px-4 py-5 sm:px-6 sm:py-7 lg:px-8">
+          <div className="mb-7 flex items-center justify-between gap-4">
             <Link
               href="/dashboard"
-              className="inline-flex items-center gap-2 text-sm font-semibold text-[#0b2d54] hover:text-[#24c1c4]"
+              className="inline-flex items-center gap-2 text-sm font-semibold text-[#0b2d54] transition hover:text-[#24c1c4]"
             >
               <ArrowLeft className="h-4 w-4" />
               Back to Health Home
             </Link>
 
-            <Link
-              href="/notifications/preferences"
-              className="inline-flex min-h-10 items-center gap-2 rounded-xl px-2 text-xs font-bold text-[#0b2d54] hover:text-[#24c1c4]"
-            >
-              <Settings className="h-4 w-4" />
-              Preferences
-            </Link>
+            <div className="flex items-center gap-4">
+              {unreadCount > 0 && (
+                <span className="inline-flex items-center gap-2 text-xs font-bold text-[#0b2d54]">
+                  <span className="h-2 w-2 rounded-full bg-[#24c1c4]" />
+                  {unreadCount} unread
+                </span>
+              )}
+              <Link
+                href="/notifications/preferences"
+                className="inline-flex items-center gap-2 text-xs font-bold text-[#0b2d54] transition hover:text-[#24c1c4]"
+              >
+                <Settings className="h-4 w-4" />
+                Preferences
+              </Link>
+            </div>
           </div>
 
-          <div className="mb-5">
-            <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-slate-400">
-              Notifications
-            </p>
-            <h1 className="mt-1 text-3xl font-extrabold tracking-tight text-[#0b2d54] sm:text-4xl">
+          <div className="mb-6">
+            <h1 className="text-3xl font-extrabold tracking-tight text-[#0b2d54] sm:text-4xl">
               Notifications
             </h1>
-            <p className="mt-1.5 max-w-2xl text-sm leading-6 text-slate-500">
-              Your reminders, care updates and important health messages.
+            <p className="mt-1 text-sm text-slate-500">
+              Your health reminders and important updates.
             </p>
           </div>
 
-          <section className="overflow-hidden rounded-[30px] bg-[#0b2d54] shadow-[0_18px_45px_rgba(11,45,84,0.14)]">
-            <div className="p-5 sm:p-7">
-              <div className="flex flex-col gap-5 sm:flex-row sm:items-center sm:justify-between">
-                <div className="min-w-0">
+          <section className="overflow-hidden rounded-[28px] border border-[#0b2d54]/10 bg-white shadow-[0_12px_35px_rgba(11,45,84,0.07)]">
+            <div className="bg-[#0b2d54] px-5 pt-5 sm:px-7 sm:pt-6">
+              <div className="flex items-end justify-between gap-4">
+                <div>
                   <p className="text-[10px] font-black uppercase tracking-[0.18em] text-[#24c1c4]">
                     {range === "DAY"
                       ? "Today"
@@ -520,36 +525,27 @@ export default function NotificationsPage() {
                         ? "This week"
                         : "This month"}
                   </p>
-                  <h2 className="mt-1 text-2xl font-extrabold tracking-tight text-white sm:text-3xl">
+                  <h2 className="mt-1 text-2xl font-extrabold tracking-tight text-white">
                     {categoryLabel(category)}
                   </h2>
-                  <p className="mt-1 text-xs font-medium text-white/55">
-                    {range === "DAY"
-                      ? new Intl.DateTimeFormat("en-ZA", {
-                          day: "numeric",
+                </div>
+                <p className="hidden pb-0.5 text-xs font-medium text-white/55 sm:block">
+                  {range === "DAY"
+                    ? new Intl.DateTimeFormat("en-ZA", {
+                        day: "numeric",
+                        month: "long",
+                        year: "numeric",
+                      }).format(new Date())
+                    : range === "WEEK"
+                      ? "Monday to today"
+                      : new Intl.DateTimeFormat("en-ZA", {
                           month: "long",
                           year: "numeric",
-                        }).format(new Date())
-                      : range === "WEEK"
-                        ? "Monday to today"
-                        : new Intl.DateTimeFormat("en-ZA", {
-                            month: "long",
-                            year: "numeric",
-                          }).format(new Date())}
-                  </p>
-                </div>
-
-                <div className="flex shrink-0 items-center gap-2">
-                  <span className="text-[10px] font-black uppercase tracking-[0.15em] text-white/45">
-                    Unread
-                  </span>
-                  <span className="grid h-10 min-w-10 place-items-center rounded-2xl bg-[#24c1c4] px-3 text-sm font-extrabold text-[#0b2d54]">
-                    {unreadCount}
-                  </span>
-                </div>
+                        }).format(new Date())}
+                </p>
               </div>
 
-              <div className="mt-5 flex max-w-md rounded-2xl bg-white/[0.08] p-1 ring-1 ring-white/10">
+              <div className="mt-5 flex gap-6 overflow-x-auto">
                 {(["DAY", "WEEK", "MONTH"] as const).map((value) => (
                   <button
                     key={value}
@@ -557,10 +553,10 @@ export default function NotificationsPage() {
                     onClick={() => setRange(value)}
                     aria-pressed={range === value}
                     className={
-                      "flex min-h-10 flex-1 items-center justify-center rounded-xl text-xs font-black transition " +
+                      "relative min-h-11 shrink-0 px-0.5 text-xs font-black transition " +
                       (range === value
-                        ? "bg-white text-[#0b2d54] shadow-sm"
-                        : "text-white/55 hover:bg-white/[0.06] hover:text-white")
+                        ? "text-white"
+                        : "text-white/45 hover:text-white/80")
                     }
                   >
                     {value === "DAY"
@@ -568,193 +564,183 @@ export default function NotificationsPage() {
                       : value === "WEEK"
                         ? "Week"
                         : "Month"}
+                    {range === value && (
+                      <span className="absolute inset-x-0 -bottom-px h-0.5 rounded-full bg-[#24c1c4]" />
+                    )}
                   </button>
                 ))}
               </div>
             </div>
-          </section><section className="mt-5">
-            <div className="mb-3 flex items-center justify-between gap-3">
-              <div>
-                <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-slate-400">
-                  Categories
-                </p>
-                <p className="mt-1 text-sm font-bold text-[#0b2d54]">
-                  Available notifications
-                </p>
-              </div>
 
-              <div className="flex items-center gap-2">
-                <button
-                  type="button"
-                  onClick={() => setUnreadOnly((current) => !current)}
-                  aria-pressed={unreadOnly}
-                  className={
-                    "inline-flex min-h-9 items-center justify-center gap-2 rounded-xl px-3 py-2 text-[11px] font-bold transition " +
-                    (unreadOnly
-                      ? "bg-[#0b2d54] text-white"
-                      : "border border-slate-200 bg-white text-slate-600 hover:border-[#24c1c4]/40 hover:text-[#0b2d54]")
-                  }
-                >
-                  <span className={"h-2 w-2 rounded-full " + (unreadOnly ? "bg-[#24c1c4]" : "bg-slate-400")} />
-                  Unread only
-                </button>
-
-                {unreadCount > 0 && (
+            <div className="border-b border-slate-200 bg-white px-5 sm:px-7">
+              <div className="flex items-center justify-between gap-4 overflow-x-auto">
+                <div className="flex min-w-0 items-center gap-5">
                   <button
                     type="button"
-                    onClick={() => void markAllRead()}
-                    disabled={busyId === "all"}
-                    className="inline-flex min-h-9 items-center justify-center gap-2 rounded-xl bg-[#0b2d54] px-3 py-2 text-[11px] font-bold text-white transition hover:bg-[#123f70] disabled:opacity-50"
-                  >
-                    <CheckCheck className="h-3.5 w-3.5" />
-                    {busyId === "all" ? "Updating…" : "Mark all read"}
-                  </button>
-                )}
-              </div>
-            </div>
-
-            <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-5 xl:grid-cols-9">
-              <button
-                type="button"
-                onClick={() => setCategory("ALL")}
-                className={
-                  "flex min-h-11 items-center gap-2.5 rounded-2xl border px-3 py-2.5 text-left transition " +
-                  (category === "ALL"
-                    ? "border-[#0b2d54] bg-[#0b2d54] text-white shadow-sm"
-                    : "border-slate-200 bg-white text-slate-600 hover:border-[#24c1c4]/40 hover:bg-[#24c1c4]/5")
-                }
-              >
-                <span className={"grid h-8 w-8 shrink-0 place-items-center rounded-lg " + (category === "ALL" ? "bg-white/10 text-[#24c1c4]" : "bg-[#f4fbfb] text-[#0b2d54]")}>
-                  <Bell className="h-4 w-4" />
-                </span>
-                <span className="min-w-0">
-                  <span className="block text-[10px] font-black">All</span>
-                  {counts.ALL.unread > 0 && (
-                    <span className={"mt-0.5 block text-[9px] font-semibold " + (category === "ALL" ? "text-white/60" : "text-slate-400")}>
-                      {counts.ALL.unread} new
-                    </span>
-                  )}
-                </span>
-              </button>
-
-              {visibleCategoryTabs.map((tab) => {
-                const Icon = tab.icon;
-                const active = category === tab.key;
-                const count = counts[tab.key];
-
-                return (
-                  <button
-                    key={tab.key}
-                    type="button"
-                    onClick={() => setCategory(tab.key)}
+                    onClick={() => setCategory("ALL")}
                     className={
-                      "flex min-h-11 items-center gap-2.5 rounded-2xl border px-3 py-2.5 text-left transition " +
-                      (active
-                        ? "border-[#0b2d54] bg-[#0b2d54] text-white shadow-sm"
-                        : "border-slate-200 bg-white text-slate-600 hover:border-[#24c1c4]/40 hover:bg-[#24c1c4]/5")
+                      "relative min-h-12 shrink-0 text-xs font-bold transition " +
+                      (category === "ALL"
+                        ? "text-[#0b2d54]"
+                        : "text-slate-400 hover:text-[#0b2d54]")
                     }
                   >
-                    <span className={"grid h-8 w-8 shrink-0 place-items-center rounded-lg " + (active ? "bg-white/10 text-[#24c1c4]" : "bg-[#f4fbfb] text-[#0b2d54]")}>
-                      <Icon className="h-4 w-4" />
-                    </span>
-                    <span className="min-w-0 flex-1">
-                      <span className="block truncate text-[10px] font-black">{tab.label}</span>
-                      {count.unread > 0 && (
-                        <span className={"mt-0.5 block text-[9px] font-semibold " + (active ? "text-white/60" : "text-slate-400")}>
-                          {count.unread} new
-                        </span>
-                      )}
-                    </span>
+                    All
+                    {counts.ALL.unread > 0 && (
+                      <span className="ml-1.5 text-[10px] font-black text-[#24c1c4]">
+                        {counts.ALL.unread}
+                      </span>
+                    )}
+                    {category === "ALL" && (
+                      <span className="absolute inset-x-0 -bottom-px h-0.5 bg-[#24c1c4]" />
+                    )}
                   </button>
-                );
-              })}
-            </div>
-          </section>
 
-          {notice && (
-            <div className="mt-5 flex items-center gap-2 rounded-2xl border border-[#24c1c4]/20 bg-[#24c1c4]/5 px-4 py-3 text-sm font-semibold text-[#0b2d54]">
-              <Check className="h-4 w-4 text-[#24c1c4]" />
-              {notice}
-            </div>
-          )}
+                  {visibleCategoryTabs.map((tab) => {
+                    const active = category === tab.key;
+                    const count = counts[tab.key];
 
-          {loading && (
-            <div className="mt-5 grid gap-4 md:grid-cols-2">
-              {Array.from({ length: 6 }).map((_, index) => (
-                <div
-                  key={index}
-                  className="h-36 animate-pulse rounded-[26px] bg-white ring-1 ring-slate-200"
-                />
-              ))}
-            </div>
-          )}
+                    return (
+                      <button
+                        key={tab.key}
+                        type="button"
+                        onClick={() => setCategory(tab.key)}
+                        className={
+                          "relative min-h-12 shrink-0 text-xs font-bold transition " +
+                          (active
+                            ? "text-[#0b2d54]"
+                            : "text-slate-400 hover:text-[#0b2d54]")
+                        }
+                      >
+                        {tab.label}
+                        {count.unread > 0 && (
+                          <span className="ml-1.5 text-[10px] font-black text-[#24c1c4]">
+                            {count.unread}
+                          </span>
+                        )}
+                        {active && (
+                          <span className="absolute inset-x-0 -bottom-px h-0.5 bg-[#24c1c4]" />
+                        )}
+                      </button>
+                    );
+                  })}
+                </div>
 
-          {!loading && error && (
-            <section className="mt-5 rounded-[26px] border border-red-200 bg-white p-7 shadow-sm">
-              <TriangleAlert className="h-6 w-6 text-red-600" />
-              <h2 className="mt-4 font-bold text-[#0b2d54]">
-                Your notifications are temporarily unavailable
-              </h2>
-              <p className="mt-2 text-sm leading-6 text-slate-500">
-                {error}
-              </p>
-              <button
-                type="button"
-                onClick={() => void load()}
-                className="mt-5 rounded-xl bg-[#0b2d54] px-5 py-2.5 text-sm font-bold text-white"
-              >
-                Try again
-              </button>
-            </section>
-          )}
+                <div className="flex shrink-0 items-center gap-3">
+                  <button
+                    type="button"
+                    onClick={() => setUnreadOnly((current) => !current)}
+                    aria-pressed={unreadOnly}
+                    className={
+                      "text-[11px] font-bold transition " +
+                      (unreadOnly
+                        ? "text-[#0b2d54]"
+                        : "text-slate-400 hover:text-[#0b2d54]")
+                    }
+                  >
+                    {unreadOnly ? "Showing unread" : "Unread only"}
+                  </button>
 
-          {!loading && !error && visible.length === 0 && (
-            <section className="mt-5 rounded-[26px] border border-slate-200/80 bg-white p-10 text-center shadow-[0_10px_35px_rgba(11,45,84,0.06)]">
-              <div className="mx-auto grid h-14 w-14 place-items-center rounded-2xl bg-[#24c1c4]/10 text-[#0b2d54]">
-                {iconFor(
-                  notifications.find((item) => getCategory(item) === category) ??
-                    ({
-                      id: "empty",
-                      type: category === "MEDICATIONS" ? "PRESCRIPTION" : "SYSTEM",
-                      title: "",
-                      body: "",
-                      channel: "IN_APP",
-                      status: "READ",
-                      priority: "NORMAL",
-                      createdAt: new Date().toISOString(),
-                    } as PatientNotification),
-                )}
+                  {unreadCount > 0 && (
+                    <button
+                      type="button"
+                      onClick={() => void markAllRead()}
+                      disabled={busyId === "all"}
+                      className="inline-flex items-center gap-1.5 text-[11px] font-bold text-[#0b2d54] transition hover:text-[#24c1c4] disabled:opacity-50"
+                    >
+                      <CheckCheck className="h-3.5 w-3.5" />
+                      {busyId === "all" ? "Updating…" : "Mark all read"}
+                    </button>
+                  )}
+                </div>
               </div>
-              <h2 className="mt-4 text-lg font-black text-[#0b2d54]">
-                {unreadOnly
-                  ? "You're all caught up"
-                  : category === "ALL"
-                    ? "No notifications yet"
-                    : "Nothing in this category yet"}
-              </h2>
-              <p className="mx-auto mt-2 max-w-md text-sm leading-6 text-slate-500">
-                {unreadOnly
-                  ? "There are no unread notifications waiting for you."
-                  : "New activity for this category will appear here when Sympto has something to share."}
-              </p>
-            </section>
-          )}
+            </div>
 
-          {!loading && !error && visible.length > 0 && (
-            <div className="mt-5 space-y-7">
-              {renderedGroups.map((group) => (
-                <section key={group}>
-                  <div className="mb-3 flex items-center gap-3">
-                    <h2 className="text-xs font-bold uppercase tracking-[0.18em] text-slate-400">
-                      {group}
-                    </h2>
-                    <div className="h-px flex-1 bg-slate-200" />
-                    <span className="rounded-full bg-slate-100 px-2.5 py-1 text-[10px] font-bold text-slate-500">
-                      {grouped[group].length}
-                    </span>
+            {notice && (
+              <div className="border-b border-[#24c1c4]/20 bg-[#24c1c4]/5 px-5 py-3 text-sm font-semibold text-[#0b2d54] sm:px-7">
+                {notice}
+              </div>
+            )}
+
+            {loading && (
+              <div className="divide-y divide-slate-100">
+                {Array.from({ length: 5 }).map((_, index) => (
+                  <div key={index} className="flex gap-4 px-5 py-5 sm:px-7">
+                    <div className="h-10 w-10 animate-pulse rounded-xl bg-slate-100" />
+                    <div className="flex-1 space-y-2">
+                      <div className="h-3 w-40 animate-pulse rounded bg-slate-100" />
+                      <div className="h-3 w-3/4 animate-pulse rounded bg-slate-100" />
+                    </div>
                   </div>
+                ))}
+              </div>
+            )}
 
-                  <div className="grid gap-4 md:grid-cols-2">
+            {!loading && error && (
+              <div className="px-5 py-12 text-center sm:px-7">
+                <TriangleAlert className="mx-auto h-6 w-6 text-red-600" />
+                <h2 className="mt-3 font-bold text-[#0b2d54]">
+                  Your notifications are temporarily unavailable
+                </h2>
+                <p className="mt-2 text-sm leading-6 text-slate-500">{error}</p>
+                <button
+                  type="button"
+                  onClick={() => void load()}
+                  className="mt-5 rounded-xl bg-[#0b2d54] px-4 py-2.5 text-xs font-bold text-white"
+                >
+                  Try again
+                </button>
+              </div>
+            )}
+
+            {!loading && !error && visible.length === 0 && (
+              <div className="px-5 py-14 text-center sm:px-7">
+                <div className="mx-auto grid h-12 w-12 place-items-center rounded-2xl bg-[#f4fbfb] text-[#0b2d54]">
+                  {iconFor(
+                    notifications.find((item) => getCategory(item) === category) ??
+                      ({
+                        id: "empty",
+                        type:
+                          category === "MEDICATIONS"
+                            ? "PRESCRIPTION"
+                            : "SYSTEM",
+                        title: "",
+                        body: "",
+                        channel: "IN_APP",
+                        status: "READ",
+                        priority: "NORMAL",
+                        createdAt: new Date().toISOString(),
+                      } as PatientNotification),
+                  )}
+                </div>
+                <h2 className="mt-4 text-base font-extrabold text-[#0b2d54]">
+                  {unreadOnly
+                    ? "You're all caught up"
+                    : category === "ALL"
+                      ? "No notifications yet"
+                      : "Nothing in this category yet"}
+                </h2>
+                <p className="mx-auto mt-2 max-w-md text-sm leading-6 text-slate-500">
+                  {unreadOnly
+                    ? "There are no unread notifications waiting for you."
+                    : "New activity will appear here when Sympto has something to share."}
+                </p>
+              </div>
+            )}
+
+            {!loading && !error && visible.length > 0 && (
+              <div className="divide-y divide-slate-100">
+                {renderedGroups.map((group) => (
+                  <div key={group}>
+                    <div className="flex items-center gap-3 bg-[#f8fafc] px-5 py-2.5 sm:px-7">
+                      <span className="text-[10px] font-black uppercase tracking-[0.16em] text-slate-400">
+                        {group}
+                      </span>
+                      <span className="text-[10px] font-bold text-slate-300">
+                        {grouped[group].length}
+                      </span>
+                    </div>
+
                     {grouped[group].map((notification) => {
                       const unread = !notification.readAt;
                       const medicationReminder =
@@ -771,17 +757,17 @@ export default function NotificationsPage() {
                         <article
                           key={notification.id}
                           className={
-                            "rounded-[26px] border bg-white p-5 shadow-[0_10px_35px_rgba(11,45,84,0.06)] transition " +
-                            (unread
-                              ? "border-[#24c1c4]/35 bg-[#fbffff] ring-1 ring-[#24c1c4]/10"
-                              : "border-slate-200/80")
+                            "px-5 py-5 transition sm:px-7 " +
+                            (unread ? "bg-[#fbffff]" : "bg-white")
                           }
                         >
                           <div className="flex items-start gap-3.5">
                             <span
                               className={
-                                "grid h-11 w-11 shrink-0 place-items-center rounded-2xl " +
-                                iconClasses(notification, unread)
+                                "grid h-10 w-10 shrink-0 place-items-center rounded-xl " +
+                                (unread
+                                  ? "bg-[#24c1c4]/10 text-[#0b2d54]"
+                                  : "bg-slate-100 text-slate-400")
                               }
                             >
                               {iconFor(notification)}
@@ -801,110 +787,83 @@ export default function NotificationsPage() {
                                     >
                                       {notification.title}
                                     </h3>
-
                                     {unread && (
-                                      <span className="inline-flex items-center gap-1.5 rounded-full bg-[#24c1c4]/10 px-2 py-1 text-[9px] font-black uppercase tracking-wide text-[#0b2d54]">
-                                        <span className="h-1.5 w-1.5 rounded-full bg-[#24c1c4]" />
+                                      <span className="text-[9px] font-black uppercase tracking-wide text-[#24c1c4]">
                                         New
                                       </span>
                                     )}
                                   </div>
+                                  <p className="mt-1.5 max-w-3xl text-xs leading-5 text-slate-500">
+                                    {notification.body}
+                                  </p>
                                 </div>
 
-                                <span
-                                  className={
-                                    "hidden shrink-0 rounded-full px-2.5 py-1 text-[9px] font-bold sm:inline-flex " +
-                                    (unread
-                                      ? "bg-[#24c1c4]/10 text-[#0b2d54]"
-                                      : "bg-slate-100 text-slate-500")
-                                  }
-                                >
-                                  {label(notification.type)}
+                                <span className="hidden shrink-0 text-[10px] font-semibold text-slate-400 sm:block">
+                                  {medicationReminder && notification.scheduledFor
+                                    ? formatReminderTime(notification.scheduledFor)
+                                    : formatDate(relevantDate(notification))}
                                 </span>
                               </div>
 
-                              <p className="mt-2 text-xs leading-5 text-slate-500">
-                                {notification.body}
-                              </p>
-
-                              <div className="mt-3 flex flex-wrap items-center gap-2">
-                                {medicationReminder &&
-                                notification.scheduledFor ? (
-                                  <>
-                                    <span className="inline-flex items-center gap-1.5 rounded-full bg-[#24c1c4]/8 px-2.5 py-1.5 text-[10px] font-bold text-[#0b2d54]">
-                                      <Clock className="h-3.5 w-3.5 text-[#24c1c4]" />
-                                      {formatReminderTime(
-                                        notification.scheduledFor,
-                                      )}
-                                    </span>
-                                    <span className="rounded-full bg-slate-100 px-2.5 py-1.5 text-[9px] font-semibold text-slate-500">
-                                      {formatReminderDate(
-                                        notification.scheduledFor,
-                                      )}
-                                    </span>
-                                  </>
-                                ) : (
-                                  <span className="rounded-full bg-slate-100 px-2.5 py-1.5 text-[9px] font-semibold text-slate-500">
-                                    {formatDate(relevantDate(notification))}
+                              <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-[10px] font-semibold text-slate-400">
+                                {medicationReminder && notification.scheduledFor && (
+                                  <span>
+                                    {formatReminderDate(notification.scheduledFor)}
                                   </span>
                                 )}
-
-                                <span className="rounded-full bg-slate-100 px-2.5 py-1.5 text-[9px] font-semibold text-slate-500">
-                                  {label(notification.channel)}
-                                </span>
-
+                                <span>{label(notification.channel)}</span>
                                 {notification.readAt && (
-                                  <span className="inline-flex items-center gap-1 rounded-full bg-slate-100 px-2.5 py-1.5 text-[9px] font-semibold text-slate-500">
+                                  <span className="inline-flex items-center gap-1">
                                     <Check className="h-3 w-3" />
-                                    Read · {formatDate(notification.readAt)}
+                                    Read
+                                  </span>
+                                )}
+                                {notification.priority === "URGENT" && (
+                                  <span className="inline-flex items-center gap-1 font-black text-red-700">
+                                    <TriangleAlert className="h-3 w-3" />
+                                    Urgent
                                   </span>
                                 )}
                               </div>
 
-                              <div className="mt-4 flex flex-wrap items-center gap-2">
-                                {(notification.actionUrl || fallbackUrl) && (
-                                  <Link
-                                    href={String(
-                                      notification.actionUrl || fallbackUrl,
-                                    )}
-                                    onClick={() => {
-                                      if (unread) void markRead(notification.id);
-                                    }}
-                                    className="inline-flex min-h-9 items-center justify-center gap-2 rounded-xl bg-[#0b2d54] px-3.5 py-2 text-[11px] font-bold text-white transition hover:bg-[#123f70]"
-                                  >
-                                    {String(
-                                      notification.actionLabel ||
-                                        (notification.type === "PRESCRIPTION"
-                                          ? "View medications"
-                                          : notification.type === "APPOINTMENT"
-                                            ? "View appointments"
-                                            : "Open"),
-                                    )}
-                                    <ChevronRight className="h-3.5 w-3.5" />
-                                  </Link>
-                                )}
+                              {(notification.actionUrl || fallbackUrl || unread) && (
+                                <div className="mt-3 flex items-center gap-3">
+                                  {(notification.actionUrl || fallbackUrl) && (
+                                    <Link
+                                      href={String(
+                                        notification.actionUrl || fallbackUrl,
+                                      )}
+                                      onClick={() => {
+                                        if (unread) void markRead(notification.id);
+                                      }}
+                                      className="inline-flex items-center gap-1 text-[11px] font-bold text-[#0b2d54] hover:text-[#24c1c4]"
+                                    >
+                                      {String(
+                                        notification.actionLabel ||
+                                          (notification.type === "PRESCRIPTION"
+                                            ? "View medications"
+                                            : notification.type === "APPOINTMENT"
+                                              ? "View appointments"
+                                              : "Open"),
+                                      )}
+                                      <ChevronRight className="h-3.5 w-3.5" />
+                                    </Link>
+                                  )}
 
-                                {unread && (
-                                  <button
-                                    type="button"
-                                    onClick={() =>
-                                      void markRead(notification.id)
-                                    }
-                                    disabled={busyId === notification.id}
-                                    className="inline-flex min-h-9 items-center justify-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3.5 py-2 text-[11px] font-bold text-[#0b2d54] transition hover:border-[#24c1c4]/30 hover:bg-[#24c1c4]/5 disabled:opacity-50"
-                                  >
-                                    <Check className="h-3.5 w-3.5" />
-                                    {busyId === notification.id
-                                      ? "Saving…"
-                                      : "Mark as read"}
-                                  </button>
-                                )}
-                              </div>
-
-                              {notification.priority === "URGENT" && (
-                                <div className="mt-3 inline-flex items-center gap-1.5 rounded-full bg-red-50 px-2.5 py-1.5 text-[10px] font-black text-red-700">
-                                  <TriangleAlert className="h-3.5 w-3.5" />
-                                  Urgent
+                                  {unread && (
+                                    <button
+                                      type="button"
+                                      onClick={() =>
+                                        void markRead(notification.id)
+                                      }
+                                      disabled={busyId === notification.id}
+                                      className="text-[11px] font-bold text-slate-400 hover:text-[#0b2d54] disabled:opacity-50"
+                                    >
+                                      {busyId === notification.id
+                                        ? "Saving…"
+                                        : "Mark as read"}
+                                    </button>
+                                  )}
                                 </div>
                               )}
                             </div>
@@ -913,34 +872,9 @@ export default function NotificationsPage() {
                       );
                     })}
                   </div>
-                </section>
-              ))}
-            </div>
-          )}
-
-          <section className="mt-7 rounded-[26px] border border-slate-200/80 bg-white p-5 shadow-sm sm:p-6">
-            <div className="flex items-start gap-3">
-              <div className="grid h-10 w-10 shrink-0 place-items-center rounded-2xl bg-[#0b2d54] text-white">
-                <Bell className="h-5 w-5" />
+                ))}
               </div>
-              <div>
-                <h3 className="font-bold text-[#0b2d54]">
-                  Choose how Sympto keeps you informed
-                </h3>
-                <p className="mt-1 text-sm leading-6 text-slate-500">
-                  Your notification preferences control which in-app categories
-                  are available here. Turning a channel off does not delete
-                  your health information.
-                </p>
-                <Link
-                  href="/notifications/preferences"
-                  className="mt-3 inline-flex items-center gap-1 text-xs font-bold text-[#0b2d54] hover:text-[#24c1c4]"
-                >
-                  Manage preferences
-                  <ChevronRight className="h-3.5 w-3.5" />
-                </Link>
-              </div>
-            </div>
+            )}
           </section>
         </div>
       </main>
