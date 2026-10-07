@@ -21,10 +21,13 @@ export class SmartFileClinicalService {
     practitionerUserId: string,
     consentId: string,
   ): Promise<SmartFileClinicalResponse> {
-    const consent = await this.requireClinicalConsent(practitionerUserId, consentId);
+    const { consent, patient: consentPatient } = await this.requireClinicalConsent(
+      practitionerUserId,
+      consentId,
+    );
 
     const patient = await this.prisma.patient.findUnique({
-      where: { id: consent.patientId },
+      where: { id: consentPatient.id },
       include: {
         person: true,
         healthPassport: {
@@ -82,7 +85,7 @@ export class SmartFileClinicalService {
                     attachments: { include: { attachment: true } },
                   },
                 },
-                diagnoses: { include: { diagnosis: true } },
+                diagnoses: true,
                 clinicalNotes: true,
                 clinicalVitals: { include: { vitalType: true } },
                 prescriptions: {
