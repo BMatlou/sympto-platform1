@@ -8,7 +8,6 @@ import {
 import { PrismaService } from '../../database/prisma.service';
 import { PushNotificationService } from '../notifications/push-notification.service';
 import { MedicationReminderSchedulerService } from './medication-reminder-scheduler.service';
-import { HealthReportNotificationSchedulerService } from './health-report-notification-scheduler.service';
 
 /**
  * Processes due notifications created by the notification queue.
@@ -28,7 +27,6 @@ export class NotificationProcessorService
     private readonly prisma: PrismaService,
     private readonly pushNotificationService: PushNotificationService,
     private readonly medicationReminderScheduler: MedicationReminderSchedulerService,
-    private readonly healthReportNotificationScheduler: HealthReportNotificationSchedulerService,
   ) {}
 
   onModuleInit() {
@@ -60,16 +58,6 @@ export class NotificationProcessorService
         const message = error instanceof Error ? error.message : String(error);
         this.logger.error(
           `Medication reminder scheduling cycle failed; continuing with queued notifications: ${message}`,
-          error instanceof Error ? error.stack : undefined,
-        );
-      }
-
-      try {
-        await this.healthReportNotificationScheduler.syncAll(now);
-      } catch (error) {
-        const message = error instanceof Error ? error.message : String(error);
-        this.logger.error(
-          `Health report scheduling cycle failed; continuing with queued notifications: ${message}`,
           error instanceof Error ? error.stack : undefined,
         );
       }
