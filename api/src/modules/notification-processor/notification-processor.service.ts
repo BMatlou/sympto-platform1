@@ -8,6 +8,7 @@ import {
 import { PrismaService } from '../../database/prisma.service';
 import { PushNotificationService } from '../notifications/push-notification.service';
 import { MedicationReminderSchedulerService } from './medication-reminder-scheduler.service';
+import { HealthReportNotificationSchedulerService } from './health-report-notification-scheduler.service';
 
 /**
  * Processes due notifications created by the notification queue.
@@ -27,6 +28,7 @@ export class NotificationProcessorService
     private readonly prisma: PrismaService,
     private readonly pushNotificationService: PushNotificationService,
     private readonly medicationReminderScheduler: MedicationReminderSchedulerService,
+    private readonly healthReportNotificationScheduler: HealthReportNotificationSchedulerService,
   ) {}
 
   onModuleInit() {
@@ -58,6 +60,16 @@ export class NotificationProcessorService
         const message = error instanceof Error ? error.message : String(error);
         this.logger.error(
           `Medication reminder scheduling cycle failed; continuing with queued notifications: ${message}`,
+          error instanceof Error ? error.stack : undefined,
+        );
+      }
+
+      try {
+        await this.healthReportNotificationScheduler.syncAll(now);
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+        this.logger.error(
+          `Health report scheduling cycle failed; continuing with queued notifications: ${message}`,
           error instanceof Error ? error.stack : undefined,
         );
       }
@@ -156,9 +168,9 @@ export class NotificationProcessorService
         where: { id: notificationId },
         data: {
           status: 'SENT' as any,
-          // Keep the original occurrence time for medication reminders so the
-          // notification centre can show "8:00 AM" instead of delivery time.
-          scheduledFor: medicationReminderSlotId ? scheduledFor : null,
+          // Keep the original scheduled occurrence so the notification centre
+          // can group health reports and other scheduled updates by occurrence time.
+          scheduledFor: scheduledFor ?? null,
           sentAt: new Date(),
           deliveredAt: new Date(),
         },
@@ -199,9 +211,7 @@ export class NotificationProcessorService
         where: { id: notification.id },
         data: {
           status: 'SENT' as any,
-          scheduledFor: notification.medicationReminderSlotId
-            ? notification.scheduledFor ?? null
-            : null,
+          scheduledFor: notification.scheduledFor ?? null,
           sentAt: new Date(),
           deliveredAt: null,
         },
