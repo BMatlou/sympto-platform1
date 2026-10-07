@@ -9,7 +9,6 @@ import {
   Check,
   CheckCheck,
   ChevronRight,
-  Clock,
   FileText,
   MessageCircle,
   Pill,
@@ -22,7 +21,6 @@ import {
 import ProtectedRoute from "@/components/auth/protected-route";
 import {
   patientNotificationsService,
-  type NotificationPreference,
   type PatientNotification,
 } from "@/services/patient-notifications.service";
 
@@ -44,7 +42,6 @@ type CategoryTab = {
 };
 
 type NotificationRange = "DAY" | "WEEK" | "MONTH";
-type NotificationReadFilter = "ALL" | "UNREAD" | "READ";
 
 const categoryTabs: CategoryTab[] = [
   { key: "MEDICATIONS", label: "Medications", icon: Pill },
@@ -56,24 +53,6 @@ const categoryTabs: CategoryTab[] = [
   { key: "ACCOUNT", label: "Account", icon: ShieldCheck },
   { key: "CARE", label: "Care", icon: Stethoscope },
 ];
-
-// Category visibility is intentionally stricter than the preferences page
-// default. A category belongs in this page only when the user has explicitly
-// enabled at least one underlying notification type for In-app delivery AND
-// there is an actual notification message in that category.
-const categoryPreferenceTypes: Record<
-  Exclude<NotificationCategory, "ALL">,
-  string[]
-> = {
-  MEDICATIONS: ["PRESCRIPTION", "REMINDER"],
-  APPOINTMENTS: ["APPOINTMENT"],
-  RESULTS: ["LAB_RESULT", "IMAGING_RESULT"],
-  MESSAGES: ["MESSAGE"],
-  TELEMEDICINE: ["TELEMEDICINE"],
-  BILLING: ["PAYMENT", "CLAIM"],
-  ACCOUNT: ["SECURITY", "SYSTEM"],
-  CARE: ["REMINDER"],
-};
 
 function isMedicationReminder(notification: PatientNotification) {
   const title = String(notification.title ?? "").toLowerCase();
@@ -182,6 +161,29 @@ function label(value: unknown) {
     : "Notification";
 }
 
+function categoryLabel(notification: PatientNotification) {
+  switch (getCategory(notification)) {
+    case "MEDICATIONS":
+      return "Medication";
+    case "APPOINTMENTS":
+      return "Appointment";
+    case "RESULTS":
+      return "Result";
+    case "MESSAGES":
+      return "Message";
+    case "TELEMEDICINE":
+      return "Telemedicine";
+    case "BILLING":
+      return "Billing";
+    case "ACCOUNT":
+      return "Account";
+    case "CARE":
+      return "Care";
+    default:
+      return "Notification";
+  }
+}
+
 function iconFor(notification: PatientNotification) {
   switch (getCategory(notification)) {
     case "MEDICATIONS":
@@ -207,12 +209,8 @@ function iconFor(notification: PatientNotification) {
 
 export default function NotificationsPage() {
   const [notifications, setNotifications] = useState<PatientNotification[]>([]);
-  const [preferences, setPreferences] = useState<NotificationPreference[]>([]);
   const [serverUnreadCount, setServerUnreadCount] = useState(0);
-  const [category, setCategory] = useState<NotificationCategory>("ALL");
   const [range, setRange] = useState<NotificationRange>("DAY");
-  const [readFilter, setReadFilter] = useState<NotificationReadFilter>("ALL");
-  const [filterOpen, setFilterOpen] = useState(false);
   const [loading, setLoading] = useState(true);
   const [busyId, setBusyId] = useState<string | null>(null);
   const [error, setError] = useState("");
@@ -223,10 +221,9 @@ export default function NotificationsPage() {
       setLoading(true);
       setError("");
 
-      const [payload, unreadCount, savedPreferences] = await Promise.all([
+      const [payload, unreadCount] = await Promise.all([
         patientNotificationsService.list({ page: 1, limit: 100 }),
         patientNotificationsService.getUnreadCount(),
-        patientNotificationsService.getPreferences(),
       ]);
 
       const rows = Array.isArray(payload)
@@ -236,7 +233,6 @@ export default function NotificationsPage() {
           : [];
 
       setNotifications(rows as PatientNotification[]);
-      setPreferences(savedPreferences);
       setServerUnreadCount(
         Number.isFinite(unreadCount) ? Math.max(0, unreadCount) : 0,
       );
@@ -262,37 +258,6 @@ export default function NotificationsPage() {
   }, [load]);
 
   const unreadCount = serverUnreadCount;
-
-  const visibleCategoryTabs = useMemo(
-    () =>
-      categoryTabs.filter((tab) => {
-        const hasExplicitInAppPreference = categoryPreferenceTypes[tab.key].some(
-          (type) =>
-            preferences.some(
-              (item) =>
-                item.notificationType === type &&
-                item.channel === "IN_APP" &&
-                item.enabled,
-            ),
-        );
-
-        const hasNotification = notifications.some(
-          (notification) => getCategory(notification) === tab.key,
-        );
-
-        return hasExplicitInAppPreference && hasNotification;
-      }),
-    [notifications, preferences],
-  );
-
-  useEffect(() => {
-    if (
-      category !== "ALL" &&
-      !visibleCategoryTabs.some((tab) => tab.key === category)
-    ) {
-      setCategory("ALL");
-    }
-  }, [category, visibleCategoryTabs]);
 
   const rangeFiltered = useMemo(() => {
     const now = new Date();
@@ -336,21 +301,6 @@ export default function NotificationsPage() {
       });
   }, [notifications, range]);
 
-  const visible = useMemo(
-    () =>
-      rangeFiltered.filter((notification) => {
-        const categoryMatch =
-          category === "ALL" || getCategory(notification) === category;
-        const readStateMatch =
-          readFilter === "ALL" ||
-          (readFilter === "UNREAD" && !notification.readAt) ||
-          (readFilter === "READ" && Boolean(notification.readAt));
-
-        return categoryMatch && readStateMatch;
-      }),
-    [category, rangeFiltered, readFilter],
-  );
-
   const grouped = useMemo(() => {
     const groups: Record<string, PatientNotification[]> = {};
 
@@ -379,34 +329,6 @@ export default function NotificationsPage() {
 
     return groups;
   }, [visible, range]);
-
-  const periodCounts = useMemo(() => {
-    const result: Record<
-      NotificationCategory,
-      { total: number; unread: number }
-    > = {
-      ALL: { total: rangeFiltered.length, unread: 0 },
-      MEDICATIONS: { total: 0, unread: 0 },
-      APPOINTMENTS: { total: 0, unread: 0 },
-      RESULTS: { total: 0, unread: 0 },
-      MESSAGES: { total: 0, unread: 0 },
-      TELEMEDICINE: { total: 0, unread: 0 },
-      BILLING: { total: 0, unread: 0 },
-      ACCOUNT: { total: 0, unread: 0 },
-      CARE: { total: 0, unread: 0 },
-    };
-
-    for (const notification of rangeFiltered) {
-      const key = getCategory(notification);
-      result[key].total += 1;
-      if (!notification.readAt) {
-        result.ALL.unread += 1;
-        result[key].unread += 1;
-      }
-    }
-
-    return result;
-  }, [rangeFiltered]);
 
   async function markRead(id: string) {
     try {
@@ -507,152 +429,48 @@ export default function NotificationsPage() {
                   </p>
                 </div>
 
-                {periodCounts.ALL.unread > 0 && (
+                {unreadCount > 0 && (
                   <div className="w-fit shrink-0 rounded-full bg-white/10 px-3 py-1.5 text-[11px] font-extrabold text-white ring-1 ring-white/10">
-                    {periodCounts.ALL.unread} unread
+                    {unreadCount} unread
                   </div>
                 )}
               </div>
 
               <div className="mt-7 border-t border-white/15 pt-5">
-                <div className="flex flex-col gap-4">
-                  <div className="flex items-center justify-between gap-3">
-                    <div className="inline-flex w-full rounded-xl bg-white/10 p-1 ring-1 ring-white/10 sm:w-auto">
-                      {(["DAY", "WEEK", "MONTH"] as const).map((value) => (
-                        <button
-                          key={value}
-                          type="button"
-                          onClick={() => setRange(value)}
-                          aria-pressed={range === value}
-                          className={
-                            "min-h-10 flex-1 rounded-lg px-4 text-xs font-black transition sm:min-w-20 sm:flex-none " +
-                            (range === value
-                              ? "bg-white text-[#0b2d54] shadow-sm"
-                              : "text-white/60 hover:text-white")
-                          }
-                        >
-                          {value === "DAY"
-                            ? "Day"
-                            : value === "WEEK"
-                              ? "Week"
-                              : "Month"}
-                        </button>
-                      ))}
-                    </div>
-
-                    {unreadCount > 0 && (
+                <div className="flex items-center justify-between gap-3">
+                  <div className="inline-flex w-full rounded-xl bg-white/10 p-1 ring-1 ring-white/10 sm:w-auto">
+                    {(["DAY", "WEEK", "MONTH"] as const).map((value) => (
                       <button
+                        key={value}
                         type="button"
-                        onClick={() => void markAllRead()}
-                        disabled={busyId === "all"}
-                        className="shrink-0 text-xs font-bold text-white/80 transition hover:text-white disabled:opacity-50"
+                        onClick={() => setRange(value)}
+                        aria-pressed={range === value}
+                        className={
+                          "min-h-10 flex-1 rounded-lg px-4 text-xs font-black transition sm:min-w-20 sm:flex-none " +
+                          (range === value
+                            ? "bg-white text-[#0b2d54] shadow-sm"
+                            : "text-white/60 hover:text-white")
+                        }
                       >
-                        {busyId === "all" ? "Updating…" : "Mark all read"}
+                        {value === "DAY"
+                          ? "Day"
+                          : value === "WEEK"
+                            ? "Week"
+                            : "Month"}
                       </button>
-                    )}
+                    ))}
                   </div>
 
-                  <div className="relative">
+                  {unreadCount > 0 && (
                     <button
                       type="button"
-                      onClick={() => setFilterOpen((current) => !current)}
-                      aria-expanded={filterOpen}
-                      className="inline-flex min-h-10 w-full items-center justify-between gap-3 rounded-xl bg-white/10 px-4 py-2.5 text-xs font-black text-white ring-1 ring-white/10 transition hover:bg-white/15"
+                      onClick={() => void markAllRead()}
+                      disabled={busyId === "all"}
+                      className="shrink-0 text-xs font-bold text-white/80 transition hover:text-white disabled:opacity-50"
                     >
-                      <span className="flex min-w-0 items-center gap-2">
-                        <span className="truncate">
-                          {readFilter === "UNREAD"
-                            ? "Unread"
-                            : readFilter === "READ"
-                              ? "Read"
-                              : category === "ALL"
-                                ? "Filter"
-                                : categoryTabs.find((tab) => tab.key === category)?.label ??
-                                  "Filter"}
-                        </span>
-
-                      </span>
-                      <ChevronRight
-                        className={
-                          "h-4 w-4 shrink-0 transition-transform " +
-                          (filterOpen ? "rotate-90" : "")
-                        }
-                      />
+                      {busyId === "all" ? "Updating…" : "Mark all read"}
                     </button>
-
-                    {filterOpen && (
-                      <div className="absolute left-0 right-0 top-full z-20 mt-2 overflow-hidden rounded-2xl bg-white text-[#0b2d54] shadow-[0_18px_45px_rgba(11,45,84,0.22)] ring-1 ring-slate-200">
-                        <div className="border-b border-slate-100 p-3">
-                          <p className="px-2 pb-2 text-[10px] font-black uppercase tracking-[0.14em] text-slate-400">
-                            Show
-                          </p>
-                          <div className="grid grid-cols-3 gap-1">
-                            {([
-                              ["ALL", "All"],
-                              ["UNREAD", "Unread"],
-                              ["READ", "Read"],
-                            ] as const).map(([value, text]) => (
-                              <button
-                                key={value}
-                                type="button"
-                                onClick={() => { setReadFilter(value); setFilterOpen(false); }}
-                                className={
-                                  "min-h-10 rounded-lg px-2 text-xs font-black transition " +
-                                  (readFilter === value
-                                    ? "bg-[#0b2d54] text-white"
-                                    : "bg-slate-50 text-slate-600 hover:bg-slate-100")
-                                }
-                              >
-                                {text}
-                              </button>
-                            ))}
-                          </div>
-                        </div>
-
-                        <div className="max-h-64 overflow-y-auto p-3">
-                          <p className="px-2 pb-2 text-[10px] font-black uppercase tracking-[0.14em] text-slate-400">
-                            Category
-                          </p>
-                          <div className="space-y-1">
-                            <button
-                              type="button"
-                              onClick={() => { setCategory("ALL"); setFilterOpen(false); }}
-                              className={
-                                "flex w-full items-center justify-between rounded-lg px-3 py-2.5 text-left text-xs font-bold transition " +
-                                (category === "ALL"
-                                  ? "bg-[#24c1c4]/10 text-[#0b2d54]"
-                                  : "hover:bg-slate-50")
-                              }
-                            >
-                              <span>All notifications</span>
-                              <span className="text-[10px] font-black text-slate-400">
-                                {periodCounts.ALL.total}
-                              </span>
-                            </button>
-
-                            {visibleCategoryTabs.map((tab) => (
-                              <button
-                                key={tab.key}
-                                type="button"
-                                onClick={() => { setCategory(tab.key); setFilterOpen(false); }}
-                                className={
-                                  "flex w-full items-center justify-between rounded-lg px-3 py-2.5 text-left text-xs font-bold transition " +
-                                  (category === tab.key
-                                    ? "bg-[#24c1c4]/10 text-[#0b2d54]"
-                                    : "hover:bg-slate-50")
-                                }
-                              >
-                                <span>{tab.label}</span>
-                                <span className="text-[10px] font-black text-slate-400">
-                                  {periodCounts[tab.key].total}
-                                </span>
-                              </button>
-                            ))}
-                          </div>
-                        </div>
-                      </div>
-                    )}
-                  </div>
+                  )}
                 </div>
               </div>
             </div>
@@ -698,38 +516,13 @@ export default function NotificationsPage() {
           {!loading && !error && visible.length === 0 && (
             <div className="py-16 text-center">
               <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-white text-[#0b2d54] shadow-sm ring-1 ring-slate-200">
-                {iconFor(
-                  notifications.find((item) => getCategory(item) === category) ??
-                    ({
-                      id: "empty",
-                      type:
-                        category === "MEDICATIONS" ? "PRESCRIPTION" : "SYSTEM",
-                      title: "",
-                      body: "",
-                      channel: "IN_APP",
-                      status: "READ",
-                      priority: "NORMAL",
-                      createdAt: new Date().toISOString(),
-                    } as PatientNotification),
-                )}
+                <Bell className="h-5 w-5" aria-hidden="true" />
               </div>
               <h2 className="mt-4 text-base font-extrabold text-[#0b2d54]">
-                {readFilter === "UNREAD"
-                  ? "You're all caught up"
-                  : readFilter === "READ"
-                    ? category === "ALL"
-                      ? "No read notifications yet"
-                      : "Nothing read in this category yet"
-                    : category === "ALL"
-                      ? "No notifications yet"
-                      : "Nothing in this category yet"}
+                No notifications yet
               </h2>
               <p className="mx-auto mt-2 max-w-md text-sm text-slate-500">
-                {readFilter === "UNREAD"
-                  ? "There are no unread notifications waiting for you."
-                  : readFilter === "READ"
-                    ? "Notifications you have already read will appear here."
-                    : "New activity will appear here when Sympto has something to share."}
+                New medication reminders, appointments, results and other important updates will appear here.
               </p>
             </div>
           )}
@@ -790,6 +583,14 @@ export default function NotificationsPage() {
                             <div className="min-w-0 flex-1">
                               <div className="flex items-start justify-between gap-4">
                                 <div className="min-w-0">
+                                  <div className="mb-1 flex items-center gap-2">
+                                    <span className="text-[10px] font-black uppercase tracking-[0.12em] text-[#177e89]">
+                                      {categoryLabel(notification)}
+                                    </span>
+                                    {unread && (
+                                      <span className="h-1.5 w-1.5 rounded-full bg-[#24c1c4]" aria-label="Unread" />
+                                    )}
+                                  </div>
                                   <div className="flex flex-wrap items-center gap-2">
                                     <h3
                                       className={
@@ -801,11 +602,6 @@ export default function NotificationsPage() {
                                     >
                                       {notification.title}
                                     </h3>
-                                    {unread && (
-                                      <span className="text-[9px] font-black uppercase tracking-wide text-[#24c1c4]">
-                                        New
-                                      </span>
-                                    )}
                                   </div>
                                   <p className="mt-1.5 max-w-3xl text-xs leading-5 text-slate-500">
                                     {notification.body}
@@ -813,30 +609,22 @@ export default function NotificationsPage() {
                                 </div>
 
                                 <span className="shrink-0 text-[10px] font-semibold text-slate-400">
-                                  {medicationReminder &&
-                                  notification.scheduledFor
-                                    ? formatReminderTime(
-                                        notification.scheduledFor,
-                                      )
-                                    : formatDate(relevantDate(notification))}
+                                  {medicationReminder && notification.scheduledFor
+                                    ? formatReminderTime(notification.scheduledFor)
+                                    : new Intl.DateTimeFormat("en-ZA", {
+                                        hour: "numeric",
+                                        minute: "2-digit",
+                                      }).format(new Date(relevantDate(notification)))}
                                 </span>
                               </div>
 
-                              <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-[10px] font-semibold text-slate-400">
-                                {medicationReminder &&
-                                  notification.scheduledFor && (
-                                    <span>
-                                      {formatReminderDate(
-                                        notification.scheduledFor,
-                                      )}
-                                    </span>
-                                  )}
-                                <span>{label(notification.channel)}</span>
-                                {notification.readAt && (
-                                  <span className="inline-flex items-center gap-1">
-                                    <Check className="h-3 w-3" />
-                                    Read
-                                  </span>
+                              <div className="mt-2 flex items-center gap-2 text-[10px] font-bold text-slate-400">
+                                <span>{categoryLabel(notification)}</span>
+                                {medicationReminder && notification.scheduledFor && (
+                                  <>
+                                    <span aria-hidden="true">·</span>
+                                    <span>{formatReminderDate(notification.scheduledFor)}</span>
+                                  </>
                                 )}
                                 {notification.priority === "URGENT" && (
                                   <span className="inline-flex items-center gap-1 font-black text-red-700">
