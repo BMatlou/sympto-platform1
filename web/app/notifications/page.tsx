@@ -495,14 +495,9 @@ export default function NotificationsPage() {
             <div className="absolute -bottom-24 -left-12 h-56 w-56 rounded-full bg-black/10 blur-2xl" />
 
             <div className="relative p-6 sm:p-8">
-              <div className="flex items-start justify-between gap-5">
+              <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
                 <div className="min-w-0">
-                  <div className="inline-flex items-center gap-2 rounded-full bg-white/10 px-3 py-1.5 text-[10px] font-bold uppercase tracking-[0.16em] text-white/80 ring-1 ring-white/10">
-                    <Bell className="h-3.5 w-3.5" />
-                    Notifications
-                  </div>
-
-                  <h1 className="mt-4 text-3xl font-extrabold tracking-tight sm:text-4xl">
+                  <h1 className="text-3xl font-extrabold tracking-tight sm:text-4xl">
                     Your notifications
                   </h1>
                   <p className="mt-2 max-w-2xl text-sm leading-6 text-white/70">
@@ -511,7 +506,7 @@ export default function NotificationsPage() {
                 </div>
 
                 {periodCounts.ALL.unread > 0 && (
-                  <div className="shrink-0 rounded-full bg-white/10 px-3 py-1.5 text-[11px] font-extrabold text-white ring-1 ring-white/10">
+                  <div className="w-fit shrink-0 rounded-full bg-white/10 px-3 py-1.5 text-[11px] font-extrabold text-white ring-1 ring-white/10">
                     {periodCounts.ALL.unread} unread
                   </div>
                 )}
@@ -565,19 +560,15 @@ export default function NotificationsPage() {
                       <span className="flex min-w-0 items-center gap-2">
                         <span className="truncate">
                           {readFilter === "UNREAD"
-                            ? "Unread notifications"
+                            ? "Unread"
                             : readFilter === "READ"
-                              ? "Read notifications"
+                              ? "Read"
                               : category === "ALL"
-                                ? "All notifications"
+                                ? "Filter"
                                 : categoryTabs.find((tab) => tab.key === category)?.label ??
-                                  "All notifications"}
+                                  "Filter"}
                         </span>
-                        {(readFilter !== "ALL" || category !== "ALL") && (
-                          <span className="rounded-full bg-white/15 px-2 py-0.5 text-[9px] font-black">
-                            Filtered
-                          </span>
-                        )}
+
                       </span>
                       <ChevronRight
                         className={
