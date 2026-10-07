@@ -350,7 +350,8 @@ model Patient {
   riskAssessments         RiskAssessment[]
   healthGoals             HealthGoal[]
   healthJournalSettings   HealthJournalSettings?
-
+  smartFileShareSessions SmartFileShareSession[]
+  
   heightCm Decimal? @db.Decimal(5, 2)
   weightKg Decimal? @db.Decimal(5, 2)
 
@@ -1186,6 +1187,8 @@ model Appointment {
   referrals           Referral[]
   clinicalEpisodes    ClinicalEpisode[]
   telemedicineSession TelemedicineSession?
+  smartFileShareSessions SmartFileShareSession[]
+  smartFileConsents DataAccessConsent[]
 
   @@index([scheduledStart])
   @@index([status])
@@ -2075,6 +2078,7 @@ model DataAccessConsent {
   id                    String    @id @default(uuid())
   patientId             String
   grantedToUserId       String
+  appointmentId         String?
   purpose               String?
   grantedAt             DateTime  @default(now())
   expiresAt             DateTime?
@@ -2092,10 +2096,12 @@ model DataAccessConsent {
   canViewWearables      Boolean   @default(true)
   grantedTo             User      @relation(fields: [grantedToUserId], references: [id], onDelete: Cascade)
   patient               Patient   @relation(fields: [patientId], references: [id], onDelete: Cascade)
+  appointment           Appointment? @relation(fields: [appointmentId], references: [id], onDelete: SetNull)
 
   @@index([patientId])
   @@index([grantedToUserId])
   @@index([expiresAt])
+  @@index([appointmentId])
 }
 
 model WearableDevice {
