@@ -379,15 +379,16 @@ export default function NotificationsPage() {
                 </div>
 
                 {unreadCount > 0 && (
-                  <div className="w-fit shrink-0 rounded-full bg-white/10 px-3 py-1.5 text-[11px] font-extrabold text-white ring-1 ring-white/10">
+                  <div className="inline-flex w-fit shrink-0 items-center gap-2 rounded-full bg-white/12 px-3.5 py-2 text-[11px] font-extrabold text-white ring-1 ring-white/15 shadow-sm">
+                    <span className="h-2 w-2 rounded-full bg-[#24c1c4] shadow-[0_0_0_4px_rgba(36,193,196,0.14)]" />
                     {unreadCount} unread
                   </div>
                 )}
               </div>
 
               <div className="mt-7 border-t border-white/15 pt-5">
-                <div className="flex items-center justify-between gap-3">
-                  <div className="inline-flex w-full rounded-xl bg-white/10 p-1 ring-1 ring-white/10 sm:w-auto">
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                  <div className="inline-flex w-full rounded-2xl bg-white/10 p-1.5 ring-1 ring-white/10 sm:w-auto">
                     {(["DAY", "WEEK", "MONTH"] as const).map((value) => (
                       <button
                         key={value}
@@ -395,10 +396,10 @@ export default function NotificationsPage() {
                         onClick={() => setRange(value)}
                         aria-pressed={range === value}
                         className={
-                          "min-h-10 flex-1 rounded-lg px-4 text-xs font-black transition sm:min-w-20 sm:flex-none " +
+                          "min-h-10 flex-1 rounded-xl px-4 text-xs font-black transition sm:min-w-20 sm:flex-none " +
                           (range === value
-                            ? "bg-white text-[#0b2d54] shadow-sm"
-                            : "text-white/60 hover:text-white")
+                            ? "bg-white text-[#0b2d54] shadow-md"
+                            : "text-white/60 hover:bg-white/5 hover:text-white")
                         }
                       >
                         {value === "DAY"
@@ -415,8 +416,9 @@ export default function NotificationsPage() {
                       type="button"
                       onClick={() => void markAllRead()}
                       disabled={busyId === "all"}
-                      className="shrink-0 text-xs font-bold text-white/80 transition hover:text-white disabled:opacity-50"
+                      className="inline-flex min-h-10 w-full items-center justify-center gap-2 rounded-xl border border-white/20 bg-white/5 px-4 text-xs font-extrabold text-white transition hover:bg-white/10 disabled:opacity-50 sm:w-auto"
                     >
+                      <CheckCheck className="h-3.5 w-3.5" />
                       {busyId === "all" ? "Updating…" : "Mark all read"}
                     </button>
                   )}
@@ -481,7 +483,7 @@ export default function NotificationsPage() {
               {renderedGroups.map((group) => (
                 <section key={group}>
                   <div className="flex items-center gap-3 border-b border-slate-200 py-4">
-                    <h2 className="text-sm font-extrabold text-[#0b2d54]">
+                    <h2 className="text-[13px] font-black uppercase tracking-[0.12em] text-[#0b2d54]">
                       {range === "DAY"
                         ? new Intl.DateTimeFormat("en-ZA", {
                             day: "numeric",
@@ -513,17 +515,19 @@ export default function NotificationsPage() {
                         <article
                           key={notification.id}
                           className={
-                            "py-5 transition " +
-                            (unread ? "bg-white/60" : "")
+                            "group rounded-2xl px-1 py-5 transition sm:px-2 " +
+                            (unread
+                              ? "bg-white/75 shadow-[0_10px_30px_rgba(11,45,84,0.05)]"
+                              : "hover:bg-white/45")
                           }
                         >
                           <div className="flex items-start gap-4">
                             <span
                               className={
-                                "mt-0.5 grid h-10 w-10 shrink-0 place-items-center rounded-full " +
+                                "mt-0.5 grid h-11 w-11 shrink-0 place-items-center rounded-2xl ring-1 " +
                                 (unread
-                                  ? "bg-[#24c1c4]/10 text-[#0b2d54]"
-                                  : "bg-slate-100 text-slate-400")
+                                  ? "bg-[#24c1c4]/10 text-[#0b2d54] ring-[#24c1c4]/15"
+                                  : "bg-slate-100 text-slate-400 ring-slate-200")
                               }
                             >
                               {iconFor(notification)}
@@ -537,13 +541,15 @@ export default function NotificationsPage() {
                                       {categoryLabel(notification)}
                                     </span>
                                     {unread && (
-                                      <span className="h-1.5 w-1.5 rounded-full bg-[#24c1c4]" aria-label="Unread" />
+                                      <span className="inline-flex items-center rounded-full bg-[#24c1c4]/10 px-2 py-0.5 text-[9px] font-black uppercase tracking-[0.12em] text-[#0f5a62]">
+                                        New
+                                      </span>
                                     )}
                                   </div>
                                   <div className="flex flex-wrap items-center gap-2">
                                     <h3
                                       className={
-                                        "text-sm font-bold leading-5 " +
+                                        "text-[14px] leading-5 " +
                                         (unread
                                           ? "text-[#0b2d54]"
                                           : "text-slate-700")
@@ -552,7 +558,7 @@ export default function NotificationsPage() {
                                       {notification.title}
                                     </h3>
                                   </div>
-                                  <p className="mt-1.5 max-w-3xl text-xs leading-5 text-slate-500">
+                                  <p className="mt-2 max-w-3xl text-[13px] leading-5.5 text-slate-500">
                                     {notification.body}
                                   </p>
                                 </div>
@@ -577,7 +583,7 @@ export default function NotificationsPage() {
                                       onClick={() => {
                                         if (unread) void markRead(notification.id);
                                       }}
-                                      className="inline-flex items-center gap-1 text-[11px] font-bold text-[#0b2d54] hover:text-[#24c1c4]"
+                                      className="inline-flex min-h-9 items-center gap-1 rounded-lg bg-[#0b2d54]/5 px-3 text-[11px] font-extrabold text-[#0b2d54] transition hover:bg-[#24c1c4]/10 hover:text-[#0b2d54]"
                                     >
                                       {String(
                                         notification.actionLabel ||
@@ -598,7 +604,7 @@ export default function NotificationsPage() {
                                         void markRead(notification.id)
                                       }
                                       disabled={busyId === notification.id}
-                                      className="text-[11px] font-bold text-slate-400 hover:text-[#0b2d54] disabled:opacity-50"
+                                      className="min-h-9 rounded-lg px-2.5 text-[11px] font-bold text-slate-400 transition hover:bg-slate-100 hover:text-[#0b2d54] disabled:opacity-50"
                                     >
                                       {busyId === notification.id
                                         ? "Saving…"
