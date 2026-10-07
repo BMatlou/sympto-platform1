@@ -89,7 +89,7 @@ export class SmartFileConsentService {
       canViewLabResults: true,
       canViewImaging: true,
       canViewPrescriptions: true,
-      canViewAppointments: true,
+      canViewAppointments: false,
       canViewAIReports: false,
       canViewHealthPassport: true,
       canViewWearables: false,
