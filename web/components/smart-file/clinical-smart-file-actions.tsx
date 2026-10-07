@@ -263,7 +263,7 @@ export default function ClinicalSmartFileActions({ consentId, file, onSaved }: P
       <div className="space-y-4">
         <Field label="Clinical action">
           <Select value={action} onChange={(e) => setAction(e.target.value)}>
-            {groupedOptions.map(({ group, options }) => <optgroup key={group} label={group}>{options.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}</optgroup>)}
+            {groupedOptions.map(({ group, options }) => <optgroup key={group} label={group}>{options.map((option: { value: Action; label: string; group: string }) => <option key={option.value} value={option.value}>{option.label}</option>)}</optgroup>)}
           </Select>
         </Field>
         <div className="grid grid-cols-2 gap-2 rounded-xl bg-slate-100 p-1">
