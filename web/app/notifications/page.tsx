@@ -288,18 +288,6 @@ export default function NotificationsPage() {
 
   const unreadCount = serverUnreadCount;
 
-  const enabledInAppTypes = useMemo(() => {
-    const enabled = new Set<string>();
-
-    for (const preference of preferences) {
-      if (preference.channel === "IN_APP" && preference.enabled) {
-        enabled.add(preference.notificationType);
-      }
-    }
-
-    return enabled;
-  }, [preferences]);
-
   const visibleCategoryTabs = useMemo(
     () =>
       categoryTabs.filter((tab) =>
