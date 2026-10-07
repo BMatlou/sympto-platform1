@@ -295,7 +295,10 @@ export default function NotificationsPage() {
   }, [visible]);
 
   const counts = useMemo(() => {
-    const result: Record<NotificationCategory, { total: number; unread: number }> = {
+    const result: Record<
+      NotificationCategory,
+      { total: number; unread: number }
+    > = {
       ALL: { total: notifications.length, unread: unreadCount },
       MEDICATIONS: { total: 0, unread: 0 },
       APPOINTMENTS: { total: 0, unread: 0 },
@@ -309,8 +312,8 @@ export default function NotificationsPage() {
 
     for (const notification of notifications) {
       const key = getCategory(notification);
-      counts[key].total += 1;
-      if (!notification.readAt) counts[key].unread += 1;
+      result[key].total += 1;
+      if (!notification.readAt) result[key].unread += 1;
     }
 
     return result;
