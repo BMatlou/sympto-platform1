@@ -95,9 +95,9 @@ function PreviewDocument({ document }: { document: HealthDocument }) {
         <div className="mt-2 h-1.5 w-32 rounded bg-slate-200" />
         <div className="mt-1.5 h-1.5 w-20 rounded bg-slate-200" />
       </div>
-      <div className="absolute bottom-3 left-4 right-4 flex items-center justify-between">
+      <div className="absolute bottom-3 left-4 right-4 flex items-center justify-between gap-2">
         <span className="text-[10px] font-extrabold tracking-[0.16em] text-[#0b2d54]/60">{config.eyebrow}</span>
-        <span className="rounded-full bg-white/90 px-2 py-1 text-[10px] font-bold text-slate-500">OPEN</span>
+        <span className="flex items-center gap-1.5"><span className="rounded-full bg-emerald-50 px-2 py-1 text-[9px] font-black uppercase tracking-wide text-emerald-700">Clinical</span><span className="rounded-full bg-white/90 px-2 py-1 text-[10px] font-bold text-slate-500">OPEN</span></span>
       </div>
     </div>
   );
