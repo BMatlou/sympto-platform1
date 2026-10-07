@@ -1,7 +1,11 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { NotificationChannel, NotificationPriority, NotificationStatus } from '@prisma/client';
 import { PrismaService } from '../../database/prisma.service';
-import { getMedicationReminderFrequency, nextMedicationReminderOccurrence } from '../patient-medications/medication-reminder.util';
+import {
+  getMedicationReminderFrequency,
+  nextMedicationReminderOccurrence,
+  recentMedicationReminderOccurrence,
+} from '../patient-medications/medication-reminder.util';
 
 @Injectable()
 export class MedicationReminderSchedulerService {
@@ -137,18 +141,31 @@ export class MedicationReminderSchedulerService {
     });
 
     for (const slot of schedule.slots) {
-      const next = nextMedicationReminderOccurrence({
-        now,
-        time: slot.time,
-        daysOfWeek: schedule.daysOfWeek,
-        timezone: schedule.timezone,
-        notBefore: medication.startedAt,
-        notAfter: medication.endedAt,
-      });
+      // A schedule is synced immediately after it is saved and then every 15 seconds.
+      // If the user saves a reminder during its scheduled minute, the "next" occurrence
+      // is already in the past by a few seconds. Reuse the existing grace-window helper
+      // so that occurrence is still queued and delivered once.
+      const occurrence =
+        recentMedicationReminderOccurrence({
+          now,
+          time: slot.time,
+          daysOfWeek: schedule.daysOfWeek,
+          timezone: schedule.timezone,
+          notBefore: medication.startedAt,
+          notAfter: medication.endedAt,
+        }) ??
+        nextMedicationReminderOccurrence({
+          now,
+          time: slot.time,
+          daysOfWeek: schedule.daysOfWeek,
+          timezone: schedule.timezone,
+          notBefore: medication.startedAt,
+          notAfter: medication.endedAt,
+        });
 
-      if (!next) continue;
+      if (!occurrence) continue;
 
-      const inAppKey = `${slot.id}:${NotificationChannel.IN_APP}:${next.toISOString()}`;
+      const inAppKey = `${slot.id}:${NotificationChannel.IN_APP}:${occurrence.toISOString()}`;
       if (!pendingKeys.has(inAppKey) && (!inAppPreference || inAppPreference.enabled)) {
         const created = await this.createQueuedReminder({
           userId,
@@ -156,13 +173,13 @@ export class MedicationReminderSchedulerService {
           channel: NotificationChannel.IN_APP,
           medicationName,
           body,
-          scheduledFor: next,
+          scheduledFor: occurrence,
         });
         if (created) pendingKeys.add(inAppKey);
       }
 
       const pushConfigured = await this.pushConfigured(userId);
-      const pushKey = `${slot.id}:${NotificationChannel.PUSH}:${next.toISOString()}`;
+      const pushKey = `${slot.id}:${NotificationChannel.PUSH}:${occurrence.toISOString()}`;
       if (pushConfigured && !pendingKeys.has(pushKey)) {
         const created = await this.createQueuedReminder({
           userId,
@@ -170,7 +187,7 @@ export class MedicationReminderSchedulerService {
           channel: NotificationChannel.PUSH,
           medicationName,
           body,
-          scheduledFor: next,
+          scheduledFor: occurrence,
         });
         if (created) pendingKeys.add(pushKey);
       }
