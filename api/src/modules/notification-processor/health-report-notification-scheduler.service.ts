@@ -1,4 +1,9 @@
-import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
+import {
+  Injectable,
+  Logger,
+  OnModuleDestroy,
+  OnModuleInit,
+} from '@nestjs/common';
 import {
   NotificationChannel,
   NotificationPriority,
@@ -20,19 +25,25 @@ type Period = {
 };
 
 @Injectable()
-export class HealthReportNotificationSchedulerService implements OnModuleInit {
+export class HealthReportNotificationSchedulerService
+  implements OnModuleInit, OnModuleDestroy {
   private readonly logger = new Logger(
     HealthReportNotificationSchedulerService.name,
   );
+  private timer?: NodeJS.Timeout;
 
   constructor(private readonly prisma: PrismaService) {}
 
   onModuleInit() {
     void this.syncAll(new Date());
 
-    setInterval(() => {
+    this.timer = setInterval(() => {
       void this.syncAll(new Date());
     }, 60_000);
+  }
+
+  onModuleDestroy() {
+    if (this.timer) clearInterval(this.timer);
   }
 
   async syncAll(now = new Date()) {
@@ -181,17 +192,6 @@ export class HealthReportNotificationSchedulerService implements OnModuleInit {
       kind === 'WEEKLY'
         ? 'Your weekly health report is ready'
         : 'Your monthly health report is ready';
-
-    const existing = await this.prisma.notification.findFirst({
-      where: {
-        userId: patient.userId,
-        type: notificationType,
-        scheduledFor: period.scheduledFor,
-      },
-      select: { id: true },
-    });
-
-    if (existing) return;
 
     const summary = await this.buildSummary(patient.id, kind, period);
     const body = \`Your health overview for \${period.label} is ready. \${summary} Open your Health Journal to review your activity and progress.\`;
