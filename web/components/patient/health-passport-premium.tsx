@@ -105,7 +105,75 @@ export default function HealthPassportPremium() {
           </div>
         </div>
       </section>
-      <Panel title="Current measurements" icon={<Activity className="h-5 w-5" />}><div className="grid grid-cols-3 gap-3">{[["Height", computed.vitals?.heightCm != null ? String(computed.vitals.heightCm) + " cm" : "—"],["Weight",computed.vitals?.weightKg != null ? String(computed.vitals.weightKg) + " kg" : "—"],["BMI",computed.bmi != null ? String(computed.bmi) : "—"]].map(([label,value]) => <div key={label} className="rounded-2xl bg-slate-50 p-4"><p className="text-[10px] font-bold uppercase text-slate-500">{label}</p><p className="mt-1 text-lg font-extrabold text-[#0b2d54]">{value}</p></div>)}</div>{computed.baseline && <DetailGrid items={[[ "Baseline established", date(computed.baseline.establishedAt)],["Baseline blood pressure", computed.baseline.systolicPressure != null || computed.baseline.diastolicPressure != null ? String(computed.baseline.systolicPressure ?? "—") + " / " + String(computed.baseline.diastolicPressure ?? "—") + " mmHg" : null],["Resting heart rate", computed.baseline.restingHeartRate != null ? String(computed.baseline.restingHeartRate) + " bpm" : null],["Respiratory rate", computed.baseline.respiratoryRate != null ? String(computed.baseline.respiratoryRate) + " /min" : null],["Oxygen saturation", computed.baseline.oxygenSaturation != null ? String(computed.baseline.oxygenSaturation) + "%" : null],["Body temperature", computed.baseline.bodyTemperature != null ? String(computed.baseline.bodyTemperature) + " °C" : null],["Blood glucose", computed.baseline.bloodGlucose],["Cholesterol", computed.baseline.cholesterol],["Baseline notes", computed.baseline.notes]]} />}</div><Link href="/health-vitals" className="mt-4 inline-flex items-center gap-1 text-xs font-bold text-[#0b2d54]">Open detailed vitals <ChevronRight className="h-3.5 w-3.5" /></Link></Panel>
+      <Panel title="Current measurements" icon={<Activity className="h-5 w-5" />}>
+        <div className="grid grid-cols-3 gap-3">
+          {[
+            [
+              "Height",
+              computed.vitals?.heightCm != null ? `${computed.vitals.heightCm} cm` : "—",
+            ],
+            [
+              "Weight",
+              computed.vitals?.weightKg != null ? `${computed.vitals.weightKg} kg` : "—",
+            ],
+            ["BMI", computed.bmi != null ? String(computed.bmi) : "—"],
+          ].map(([label, value]) => (
+            <div key={label} className="rounded-2xl bg-slate-50 p-4">
+              <p className="text-[10px] font-bold uppercase text-slate-500">{label}</p>
+              <p className="mt-1 text-lg font-extrabold text-[#0b2d54]">{value}</p>
+            </div>
+          ))}
+        </div>
+
+        {computed.baseline && (
+          <DetailGrid
+            items={[
+              ["Baseline established", date(computed.baseline.establishedAt)],
+              [
+                "Baseline blood pressure",
+                computed.baseline.systolicPressure != null ||
+                computed.baseline.diastolicPressure != null
+                  ? `${computed.baseline.systolicPressure ?? "—"} / ${computed.baseline.diastolicPressure ?? "—"} mmHg`
+                  : null,
+              ],
+              [
+                "Resting heart rate",
+                computed.baseline.restingHeartRate != null
+                  ? `${computed.baseline.restingHeartRate} bpm`
+                  : null,
+              ],
+              [
+                "Respiratory rate",
+                computed.baseline.respiratoryRate != null
+                  ? `${computed.baseline.respiratoryRate} /min`
+                  : null,
+              ],
+              [
+                "Oxygen saturation",
+                computed.baseline.oxygenSaturation != null
+                  ? `${computed.baseline.oxygenSaturation}%`
+                  : null,
+              ],
+              [
+                "Body temperature",
+                computed.baseline.bodyTemperature != null
+                  ? `${computed.baseline.bodyTemperature} °C`
+                  : null,
+              ],
+              ["Blood glucose", computed.baseline.bloodGlucose],
+              ["Cholesterol", computed.baseline.cholesterol],
+              ["Baseline notes", computed.baseline.notes],
+            ]}
+          />
+        )}
+
+        <Link
+          href="/health-vitals"
+          className="mt-4 inline-flex items-center gap-1 text-xs font-bold text-[#0b2d54]"
+        >
+          Open detailed vitals <ChevronRight className="h-3.5 w-3.5" />
+        </Link>
+      </Panel>
     </div>
 
     <div className="mt-5 grid gap-5 md:grid-cols-2">
