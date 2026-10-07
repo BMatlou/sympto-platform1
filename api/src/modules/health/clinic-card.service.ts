@@ -10,12 +10,11 @@ export class ClinicCardService {
       where: { userId },
       include: {
         person: true,
-        emergencyContacts: { orderBy: [{ isPrimary: 'desc' }, { createdAt: 'asc' }], take: 5 },
+        emergencyContacts: { orderBy: [{ isPrimary: 'desc' }, { createdAt: 'asc' }] },
         patientInsurances: {
           where: { active: true },
           include: { insurancePolicy: { include: { provider: true } } },
           orderBy: { createdAt: 'desc' },
-          take: 3,
         },
         medicalRecord: true,
         baseline: true,
@@ -24,16 +23,14 @@ export class ClinicCardService {
             allergies: { include: { allergy: true } },
             conditions: { include: { condition: true } },
             medications: { include: { medication: true } },
-            immunizations: { include: { immunization: true }, orderBy: { administeredAt: 'desc' }, take: 10 },
+            immunizations: { include: { immunization: true }, orderBy: { administeredAt: 'desc' } },
             patientDiagnoses: {
               include: { diagnosis: true, encounter: { include: { practitioner: { include: { person: true } } } } },
               orderBy: { diagnosedAt: 'desc' },
-              take: 10,
             },
             patientProcedures: {
               include: { procedure: true, encounter: { include: { practitioner: { include: { person: true } } } } },
               orderBy: { performedAt: 'desc' },
-              take: 10,
             },
           },
         },
@@ -67,9 +64,9 @@ export class ClinicCardService {
       }
     }
 
-    // Prescription-backed medication records are authoritative clinical records.
-    // A patient may still have self-entered medication information, so do not
-    // infer "clinical" from the presence of a free-text prescriber alone.
+    // Prescription-backed medications are authoritative clinical records.
+    // Direct Smart File medication writes are also treated as clinical when the
+    // stored prescriber matches an authorised practitioner.
     const medicationIds = (passport?.medications ?? []).map((item) => item.medicationId);
     const prescriptionItems = medicationIds.length
       ? await this.prisma.prescriptionItem.findMany({
@@ -358,7 +355,36 @@ export class ClinicCardService {
         clinicalBy: practitionerName(item),
         updatedAt: item.updatedAt,
       })),
-      coverage: patient.patientInsurances.map((item) => ({ id: item.id, providerName: item.insurancePolicy.provider.name, planName: item.insurancePolicy.name, membershipNumber: item.membershipNumber, effectiveFrom: item.effectiveFrom, effectiveTo: item.effectiveTo })),
+      lifestyle: {
+        occupation: patient.occupation,
+        dominantHand: patient.dominantHand,
+        smokingStatus: patient.smokingStatus,
+        alcoholConsumption: patient.alcoholConsumption,
+        exerciseFrequency: patient.exerciseFrequency,
+      },
+      coverage: patient.patientInsurances.map((item) => ({
+        id: item.id,
+        providerName: item.insurancePolicy.provider.name,
+        providerShortName: item.insurancePolicy.provider.shortName,
+        providerPhone: item.insurancePolicy.provider.phone,
+        providerEmail: item.insurancePolicy.provider.email,
+        providerWebsite: item.insurancePolicy.provider.website,
+        planCode: item.insurancePolicy.code,
+        planName: item.insurancePolicy.name,
+        planDescription: item.insurancePolicy.description,
+        planStatus: item.insurancePolicy.status,
+        membershipNumber: item.membershipNumber,
+        dependantCode: item.dependantCode,
+        principalMemberName: item.principalMemberName,
+        relationship: item.relationship,
+        effectiveFrom: item.effectiveFrom,
+        effectiveTo: item.effectiveTo,
+        annualLimit: item.insurancePolicy.annualLimit != null ? Number(item.insurancePolicy.annualLimit) : null,
+        deductible: item.insurancePolicy.deductible != null ? Number(item.insurancePolicy.deductible) : null,
+        coPayment: item.insurancePolicy.coPayment != null ? Number(item.insurancePolicy.coPayment) : null,
+        active: item.active,
+        updatedAt: item.updatedAt,
+      })),
     };
   }
 }
