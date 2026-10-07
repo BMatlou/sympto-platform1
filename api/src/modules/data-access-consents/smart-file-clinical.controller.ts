@@ -1,14 +1,19 @@
 import {
+  Body,
   Controller,
   Get,
   Param,
+  Post,
+  Query,
   Req,
   UnauthorizedException,
   UseGuards,
 } from '@nestjs/common';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
+
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { SmartFileClinicalService } from './smart-file-clinical.service';
+import { CreateSmartFileClinicalUpdateDto } from './dto/create-smart-file-clinical-update.dto';
 
 type AuthenticatedRequest = {
   user?: {
@@ -22,18 +27,54 @@ type AuthenticatedRequest = {
 @Controller('smart-file')
 @UseGuards(JwtAuthGuard)
 export class SmartFileClinicalController {
-  constructor(private readonly smartFileClinicalService: SmartFileClinicalService) {}
+  constructor(
+    private readonly smartFileClinicalService: SmartFileClinicalService,
+  ) {}
 
   @Get('clinical/:consentId')
   getClinicalFile(
     @Req() req: AuthenticatedRequest,
     @Param('consentId') consentId: string,
   ) {
+    return this.smartFileClinicalService.getClinicalFile(
+      this.userId(req),
+      consentId,
+    );
+  }
+
+  @Get('clinical/:consentId/medications')
+  searchMedications(
+    @Req() req: AuthenticatedRequest,
+    @Param('consentId') consentId: string,
+    @Query('search') search?: string,
+  ) {
+    return this.smartFileClinicalService.searchMedications(
+      this.userId(req),
+      consentId,
+      search,
+    );
+  }
+
+  @Post('clinical/:consentId/updates')
+  createClinicalUpdate(
+    @Req() req: AuthenticatedRequest,
+    @Param('consentId') consentId: string,
+    @Body() dto: CreateSmartFileClinicalUpdateDto,
+  ) {
+    return this.smartFileClinicalService.createClinicalUpdate(
+      this.userId(req),
+      consentId,
+      dto,
+    );
+  }
+
+  private userId(req: AuthenticatedRequest) {
     const userId = req.user?.id ?? req.user?.sub;
+
     if (!userId) {
       throw new UnauthorizedException('Authenticated user ID is missing.');
     }
 
-    return this.smartFileClinicalService.getClinicalFile(userId, consentId);
+    return userId;
   }
 }
