@@ -321,11 +321,19 @@ export default function NotificationsPage() {
         const unreadMatch = !unreadOnly || !notification.readAt;
         return categoryMatch && unreadMatch;
       })
-      .sort(
-        (a, b) =>
+      .sort((a, b) => {
+        const aUnread = !a.readAt;
+        const bUnread = !b.readAt;
+
+        // "New" means unread in the Notification Center. Surface unread
+        // notifications first, then keep each group newest-first.
+        if (aUnread !== bUnread) return aUnread ? -1 : 1;
+
+        return (
           new Date(String(b.createdAt)).getTime() -
-          new Date(String(a.createdAt)).getTime(),
-      );
+          new Date(String(a.createdAt)).getTime()
+        );
+      });
   }, [category, notifications, unreadOnly]);
 
   const grouped = useMemo(() => {
