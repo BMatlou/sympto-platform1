@@ -22,6 +22,7 @@ export default function HealthConditionsPage() {
   const [draft, setDraft] = useState<any>({});
   const [saving, setSaving] = useState(false);
   const [notice, setNotice] = useState("");
+  const [clinicRecords, setClinicRecords] = useState<Record<string, any>>({});
 
   const allergies = useMemo(() => Array.isArray(data?.allergies) ? data.allergies.filter((x: any) => x?.status === "ACTIVE" || !x?.status) : [], [data?.allergies]);
   const conditions = useMemo(() => Array.isArray(data?.conditions) ? data.conditions.filter((x: any) => x?.status === "ACTIVE" && !x?.resolvedAt) : [], [data?.conditions]);
@@ -33,11 +34,20 @@ export default function HealthConditionsPage() {
         api.get("/allergies?page=1&limit=100"),
         api.get("/conditions?page=1&limit=100"),
         api.get("/patient-health-records/clinical-diagnoses"),
+        api.get("/clinic-card"),
       ]);
       if (cancelled) return;
       if (results[0].status === "fulfilled") setAllergiesCatalog(unwrap(results[0].value.data));
       if (results[1].status === "fulfilled") setConditionsCatalog(unwrap(results[1].value.data));
       if (results[2].status === "fulfilled") setDiagnoses(Array.isArray(results[2].value.data) ? results[2].value.data : unwrap(results[2].value.data));
+      if (results[3]?.status === "fulfilled") {
+        const payload: any = results[3].value.data;
+        const clinicCard: any = payload?.data ?? payload;
+        const map: Record<string, any> = {};
+        for (const item of clinicCard?.allergies ?? []) map[item.id] = item;
+        for (const item of clinicCard?.conditions ?? []) map[item.id] = item;
+        setClinicRecords(map);
+      }
     })();
     return () => { cancelled = true; };
   }, []);
@@ -50,7 +60,8 @@ export default function HealthConditionsPage() {
   };
 
   const openEdit = (kind: "allergy" | "condition", record: any) => {
-    const clinician = kind === "allergy" ? Boolean(record.verified || record.verifiedBy) : Boolean(record.diagnosedBy || record.treatmentPlan);
+    const clinicRecord = clinicRecords[record.id];
+    const clinician = clinicRecord?.source === "CLINICAL" || (kind === "allergy" ? Boolean(record.verified || record.verifiedBy) : Boolean(record.diagnosedBy || record.treatmentPlan));
     if (clinician) return;
     setModal(kind);
     setEditing(record);
