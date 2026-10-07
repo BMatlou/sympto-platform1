@@ -46,6 +46,16 @@ function DetailGrid({ items }: { items: Array<[string, ReactNode]> }) {
     </div>)}
   </div>;
 }
+function RecordedDetails({ items, label = "More details" }: { items: Array<[string, ReactNode]>; label?: string }) {
+  const recordedItems = items.filter(([, value]) => value !== null && value !== undefined && value !== "" && value !== "Not recorded");
+  if (!recordedItems.length) return null;
+  return (
+    <details className="mt-3 rounded-2xl bg-white/70 p-3 ring-1 ring-slate-100">
+      <summary className="cursor-pointer list-none text-xs font-bold text-[#0b2d54]">{label}</summary>
+      <DetailGrid items={recordedItems} />
+    </details>
+  );
+}
 function yesNo(value: unknown) { return value === null || value === undefined ? "Not recorded" : value ? "Yes" : "No"; }
 const genderOptions = ["MALE", "FEMALE", "OTHER"];
 
@@ -319,10 +329,15 @@ export default function HealthPassportPremium() {
       <Panel title="Allergies" icon={<HeartPulse className="h-5 w-5" />}>
         {computed.allergies?.length ? <div className="space-y-3">{computed.allergies.map((item:any) => <article key={item.id} className="rounded-2xl bg-rose-50/55 p-4">
           <div className="flex items-start justify-between gap-3"><div><p className="font-semibold text-[#0b2d54]">{text(item.name,"Allergy")}</p><ClinicalMarker item={item} /></div><Badge tone="rose">{human(item.severity)}</Badge></div>
-          <DetailGrid items={[
-            ["Category", item.category], ["Reaction", item.reaction], ["Reaction details", item.reactionNotes],
+          <div className="mt-3 flex flex-wrap gap-2">
+            <Badge tone="rose">{human(item.severity)}</Badge>
+            {item.reaction && <Badge>{text(item.reaction)}</Badge>}
+            {item.status && <Badge>{human(item.status)}</Badge>}
+          </div>
+          <RecordedDetails items={[
+            ["Category", item.category], ["Reaction details", item.reactionNotes],
             ["Onset", date(item.onsetDate)], ["Last reaction", date(item.lastReaction)], ["Verified", yesNo(item.verified)],
-            ["Verified by", item.verifiedBy], ["Status", human(item.status)], ["Notes", item.notes], ["Updated", date(item.updatedAt)],
+            ["Verified by", item.verifiedBy], ["Notes", item.notes], ["Updated", date(item.updatedAt)],
           ]} />
         </article>)}</div> : <Empty>No active allergies recorded.</Empty>}
         <Link href="/allergies" className="mt-4 inline-flex items-center gap-1 text-xs font-bold text-[#0b2d54]">View allergies <ChevronRight className="h-3.5 w-3.5" /></Link>
@@ -330,11 +345,17 @@ export default function HealthPassportPremium() {
       <Panel title="Active conditions" icon={<Activity className="h-5 w-5" />}>
         {computed.conditions?.length ? <div className="space-y-3">{computed.conditions.map((item:any) => <article key={item.id} className="rounded-2xl bg-blue-50/55 p-4">
           <div className="flex items-start justify-between gap-3"><div><p className="font-semibold text-[#0b2d54]">{text(item.name,"Condition")}</p><ClinicalMarker item={item} /></div><Badge tone="blue">{human(item.status)}</Badge></div>
-          <DetailGrid items={[
-            ["Category", item.category], ["Body system", item.bodySystem], ["Severity", item.severity ? human(item.severity) : null],
-            ["Stage", item.stage], ["Chronic", yesNo(item.chronic)], ["Primary condition", yesNo(item.primaryCondition)],
-            ["Diagnosed / recorded", date(item.diagnosedAt)], ["Resolved", date(item.resolvedAt)], ["Diagnosed by", item.diagnosedBy],
-            ["Treatment plan", item.treatmentPlan], ["Outcome", item.outcome], ["Notes", item.notes], ["Updated", date(item.updatedAt)],
+          <div className="mt-3 flex flex-wrap gap-2">
+            <Badge tone="blue">{human(item.status)}</Badge>
+            {item.chronic && <Badge>Chronic</Badge>}
+            {item.severity && <Badge>{human(item.severity)}</Badge>}
+            {item.diagnosedAt && <Badge>{date(item.diagnosedAt)}</Badge>}
+          </div>
+          <RecordedDetails items={[
+            ["Category", item.category], ["Body system", item.bodySystem], ["Stage", item.stage],
+            ["Primary condition", yesNo(item.primaryCondition)], ["Resolved", date(item.resolvedAt)],
+            ["Diagnosed by", item.diagnosedBy], ["Treatment plan", item.treatmentPlan], ["Outcome", item.outcome],
+            ["Notes", item.notes], ["Updated", date(item.updatedAt)],
           ]} />
         </article>)}</div> : <Empty>No active health conditions recorded.</Empty>}
         <Link href="/health-conditions" className="mt-4 inline-flex items-center gap-1 text-xs font-bold text-[#0b2d54]">View health records <ChevronRight className="h-3.5 w-3.5" /></Link>
@@ -342,12 +363,17 @@ export default function HealthPassportPremium() {
       <Panel title="Practitioner diagnoses" icon={<ShieldCheck className="h-5 w-5" />}>
         {computed.diagnoses?.length ? <div className="space-y-3">{computed.diagnoses.map((item:any) => <article key={item.id} className="rounded-2xl bg-slate-50 p-4">
           <div className="flex items-start justify-between gap-3"><div><p className="font-semibold text-[#0b2d54]">{text(item.name,"Clinical diagnosis")}</p><ClinicalMarker item={item} /></div><Badge tone="green">{human(item.status)}</Badge></div>
-          <DetailGrid items={[
+          <div className="mt-3 flex flex-wrap gap-2">
+            <Badge tone="green">{human(item.status)}</Badge>
+            {item.primaryDiagnosis && <Badge>Primary</Badge>}
+            {item.confirmed && <Badge>Confirmed</Badge>}
+            {(item.diagnosedBy || item.practitionerName) && <Badge>{text(item.diagnosedBy || item.practitionerName)}</Badge>}
+          </div>
+          <RecordedDetails items={[
             ["Description", item.description], ["Category", item.category], ["Body system", item.bodySystem], ["Chronic", yesNo(item.chronic)],
             ["Diagnosed", date(item.diagnosedAt)], ["Resolved", date(item.resolvedAt)], ["Severity", item.severity ? human(item.severity) : null],
-            ["Stage", item.stage], ["Primary diagnosis", yesNo(item.primaryDiagnosis)], ["Confirmed", yesNo(item.confirmed)],
-            ["Diagnosed by", item.diagnosedBy || item.practitionerName], ["Treatment plan", item.treatmentPlan], ["Outcome", item.outcome],
-            ["Clinical notes", item.notes], ["Updated", date(item.updatedAt)],
+            ["Stage", item.stage], ["Diagnosed by", item.diagnosedBy || item.practitionerName], ["Treatment plan", item.treatmentPlan],
+            ["Outcome", item.outcome], ["Clinical notes", item.notes], ["Updated", date(item.updatedAt)],
           ]} />
         </article>)}</div> : <Empty>No practitioner diagnoses are available yet.</Empty>}
         <Link href="/health-conditions" className="mt-4 inline-flex items-center gap-1 text-xs font-bold text-[#0b2d54]">View clinical diagnoses <ChevronRight className="h-3.5 w-3.5" /></Link>
@@ -355,22 +381,34 @@ export default function HealthPassportPremium() {
       <Panel title="Procedures & surgical history" icon={<Activity className="h-5 w-5" />}>
         {computed.procedures?.length ? <div className="space-y-3">{computed.procedures.map((item:any) => <article key={item.id} className="rounded-2xl bg-slate-50 p-4">
           <div className="flex items-start justify-between gap-3"><div><p className="font-semibold text-[#0b2d54]">{text(item.name,"Procedure")}</p><ClinicalMarker item={item} /></div><Badge>{human(item.status)}</Badge></div>
-          <DetailGrid items={[
-            ["Description", item.description], ["Category", item.category], ["Body system", item.bodySystem], ["Invasive", yesNo(item.invasive)], ["Surgical", yesNo(item.surgical)],
-            ["Performed", date(item.performedAt)], ["Outcome", item.outcome], ["Performed by", item.performer || item.practitionerName], ["Facility", item.facility],
-            ["Complications", item.complications], ["Follow-up required", yesNo(item.followUpRequired)], ["Follow-up date", date(item.followUpDate)],
-            ["Clinical notes", item.notes], ["Updated", date(item.updatedAt)],
+          <div className="mt-3 flex flex-wrap gap-2">
+            <Badge>{human(item.status)}</Badge>
+            {item.performedAt && <Badge>{date(item.performedAt)}</Badge>}
+            {item.outcome && <Badge tone="green">{text(item.outcome)}</Badge>}
+          </div>
+          <RecordedDetails items={[
+            ["Description", item.description], ["Category", item.category], ["Body system", item.bodySystem],
+            ["Invasive", yesNo(item.invasive)], ["Surgical", yesNo(item.surgical)], ["Performed by", item.performer || item.practitionerName],
+            ["Facility", item.facility], ["Complications", item.complications], ["Follow-up required", yesNo(item.followUpRequired)],
+            ["Follow-up date", date(item.followUpDate)], ["Clinical notes", item.notes], ["Updated", date(item.updatedAt)],
           ]} />
         </article>)}</div> : <Empty>No procedures or surgical history recorded.</Empty>}
       </Panel>
       <Panel title="Current medications" icon={<HeartPulse className="h-5 w-5" />}>
         {computed.medications?.length ? <div className="space-y-3">{computed.medications.map((item:any) => <article key={item.id} className="rounded-2xl bg-slate-50 p-4">
           <div className="flex items-start justify-between gap-3"><div><p className="font-semibold text-[#0b2d54]">{text(item.name,"Medication")}</p><ClinicalMarker item={item} /></div><Badge tone="green">{human(item.status)}</Badge></div>
-          <DetailGrid items={[
-            ["Generic name", item.genericName], ["Brand name", item.brandName], ["Category", item.category], ["Dose", item.dosage],
-            ["Frequency", item.frequency], ["Route", item.route], ["Indication", item.indication], ["Instructions", item.instructions],
+          <div className="mt-3 flex flex-wrap gap-2">
+            {item.dosage && <Badge tone="blue">{text(item.dosage)}</Badge>}
+            {item.frequency && <Badge>{human(item.frequency)}</Badge>}
+            {item.route && <Badge>{human(item.route)}</Badge>}
+            {item.ongoing && <Badge tone="green">Ongoing</Badge>}
+          </div>
+          {item.indication && <p className="mt-3 text-sm leading-6 text-slate-600">{item.indication}</p>}
+          {item.instructions && <p className="mt-2 text-xs leading-5 text-slate-500">{item.instructions}</p>}
+          <RecordedDetails items={[
+            ["Generic name", item.genericName], ["Brand name", item.brandName], ["Category", item.category],
             ["Prescribed by", item.prescribedBy || item.clinicalBy], ["Started", date(item.startedAt)], ["Ended", date(item.endedAt)],
-            ["Ongoing", yesNo(item.ongoing)], ["Adherence", item.adherencePercentage != null ? String(item.adherencePercentage) + "%" : null],
+            ["Adherence", item.adherencePercentage != null ? String(item.adherencePercentage) + "%" : null],
             ["Missed doses", item.missedDoses], ["Side effects", item.sideEffects], ["Effectiveness", item.effectiveness],
             ["Notes", item.notes], ["Updated", date(item.updatedAt)],
           ]} />
@@ -380,11 +418,17 @@ export default function HealthPassportPremium() {
       <Panel title="Immunizations" icon={<Syringe className="h-5 w-5" />}>
         {computed.immunizations?.length ? <div className="space-y-3">{computed.immunizations.map((item:any) => <article key={item.id} className="rounded-2xl bg-emerald-50/55 p-4">
           <div className="flex items-start justify-between gap-3"><div><p className="font-semibold text-[#0b2d54]">{text(item.name,"Immunization")}</p><ClinicalMarker item={item} /></div><Badge tone="green">{human(item.status)}</Badge></div>
-          <DetailGrid items={[
-            ["Category", item.category], ["Disease protected", item.diseaseProtected], ["Administered", date(item.administeredAt)], ["Dose number", item.doseNumber],
-            ["Batch number", item.batchNumber], ["Manufacturer", item.manufacturer], ["Administered by", item.administeredBy], ["Facility", item.facility],
-            ["Route", item.route], ["Site", item.site], ["Adverse reaction", yesNo(item.adverseReaction)], ["Reaction details", item.adverseReactionNotes],
-            ["Next due", date(item.nextDueDate)], ["Notes", item.notes], ["Updated", date(item.updatedAt)],
+          <div className="mt-3 flex flex-wrap gap-2">
+            <Badge tone="green">{human(item.status)}</Badge>
+            {item.administeredAt && <Badge>{date(item.administeredAt)}</Badge>}
+            {item.doseNumber != null && <Badge>Dose {item.doseNumber}</Badge>}
+            {(item.administeredBy || item.facility) && <Badge>{text(item.administeredBy || item.facility)}</Badge>}
+          </div>
+          <RecordedDetails items={[
+            ["Category", item.category], ["Disease protected", item.diseaseProtected], ["Batch number", item.batchNumber],
+            ["Manufacturer", item.manufacturer], ["Administered by", item.administeredBy], ["Facility", item.facility],
+            ["Route", item.route], ["Site", item.site], ["Adverse reaction", yesNo(item.adverseReaction)],
+            ["Reaction details", item.adverseReactionNotes], ["Next due", date(item.nextDueDate)], ["Notes", item.notes], ["Updated", date(item.updatedAt)],
           ]} />
         </article>)}</div> : <Empty>No immunizations recorded yet.</Empty>}
         <Link href="/immunizations" className="mt-4 inline-flex items-center gap-1 text-xs font-bold text-[#0b2d54]">View immunizations <ChevronRight className="h-3.5 w-3.5" /></Link>
