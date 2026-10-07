@@ -92,11 +92,32 @@ function localParts(date: Date, timezone: string) {
   };
 }
 
-function localClockToUtc(year: number, month: number, day: number, hour: number, minute: number, timezone: string) {
-  let guess = new Date(Date.UTC(year, month - 1, day, hour, minute));
+function localClockToUtc(
+  year: number,
+  month: number,
+  day: number,
+  hour: number,
+  minute: number,
+  timezone: string,
+) {
+  // Treat the requested local wall-clock time as a UTC-looking timestamp,
+  // then apply the timezone offset to that fixed wall-clock value. Recompute
+  // from the same base value on each iteration so the offset is never
+  // subtracted repeatedly.
+  const wallClockMs = Date.UTC(year, month - 1, day, hour, minute);
+  let guess = new Date(wallClockMs);
+
   for (let i = 0; i < 3; i += 1) {
-    guess = new Date(guess.getTime() - offsetMinutesAt(guess, timezone) * 60_000);
+    const offsetMs = offsetMinutesAt(guess, timezone) * 60_000;
+    const next = new Date(wallClockMs - offsetMs);
+
+    if (next.getTime() === guess.getTime()) {
+      break;
+    }
+
+    guess = next;
   }
+
   return guess;
 }
 
