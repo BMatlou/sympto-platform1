@@ -12,6 +12,8 @@ export type SmartFileClinicalResponse = {
   clinicalAccess: {
     canView: boolean;
     canUpdate: boolean;
+    accessType: 'APPOINTMENT' | 'WALK_IN';
+    appointmentId: string | null;
     consentExpiresAt: Date | null;
   };
   healthPassport: unknown;
