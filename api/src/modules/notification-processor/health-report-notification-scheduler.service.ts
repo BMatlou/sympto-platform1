@@ -1,6 +1,8 @@
 import {
+  BadRequestException,
   Injectable,
   Logger,
+  NotFoundException,
   OnModuleDestroy,
   OnModuleInit,
 } from '@nestjs/common';
@@ -51,6 +53,33 @@ export class HealthReportNotificationSchedulerService
       this.syncKind('WEEKLY', now),
       this.syncKind('MONTHLY', now),
     ]);
+  }
+
+  async getPatientReport(
+    patientUserId: string,
+    kind: ReportKind,
+    scheduledDate?: string,
+  ) {
+    const patient = await this.prisma.patient.findUnique({
+      where: { userId: patientUserId },
+      select: { id: true },
+    });
+
+    if (!patient) {
+      throw new NotFoundException('Patient profile not found.');
+    }
+
+    const anchor = scheduledDate
+      ? new Date(scheduledDate + 'T09:00:00+02:00')
+      : new Date();
+
+    const period = this.getPeriod(kind, anchor);
+
+    if (!period) {
+      throw new BadRequestException('The requested health report period is not available yet.');
+    }
+
+    return this.buildDetailedReport(patient.id, kind, period);
   }
 
   private async syncKind(kind: ReportKind, now: Date) {
@@ -216,7 +245,7 @@ export class HealthReportNotificationSchedulerService
         channel: NotificationChannel.IN_APP,
         title,
         body,
-        actionUrl: '/health-journal',
+        actionUrl: '/health-reports/' + kind.toLowerCase() + '?date=' + period.scheduledFor.toISOString().slice(0, 10),
         actionLabel: 'View health journal',
         scheduledFor: period.scheduledFor,
       });
@@ -229,7 +258,7 @@ export class HealthReportNotificationSchedulerService
         channel: NotificationChannel.PUSH,
         title,
         body: 'Your health report is ready to review.',
-        actionUrl: '/health-journal',
+        actionUrl: '/health-reports/' + kind.toLowerCase() + '?date=' + period.scheduledFor.toISOString().slice(0, 10),
         actionLabel: 'View health journal',
         scheduledFor: period.scheduledFor,
       });
@@ -300,6 +329,366 @@ export class HealthReportNotificationSchedulerService
         scheduledFor: input.scheduledFor,
       },
     });
+  }
+
+  private async buildDetailedReport(
+    patientId: string,
+    kind: ReportKind,
+    period: Period,
+  ) {
+    const [
+      healthJournalEntries,
+      symptomLogs,
+      appointments,
+      patientVitals,
+      deviceMeasurements,
+      sleepSessions,
+      workouts,
+      encounters,
+      diagnoses,
+      prescriptions,
+      clinicalNotes,
+      clinicalVitals,
+      labResults,
+      imaging,
+      procedures,
+      carePlans,
+      referrals,
+      currentRecord,
+    ] = await Promise.all([
+      this.prisma.healthJournal.findMany({
+        where: { patientId, createdAt: { gte: period.start, lt: period.end } },
+        orderBy: { createdAt: 'asc' },
+        include: { practitioner: { include: { person: true } }, encounter: true },
+      }),
+      this.prisma.symptomLog.findMany({
+        where: {
+          clinicalEpisode: { patientId },
+          startedAt: { gte: period.start, lt: period.end },
+        },
+        orderBy: { startedAt: 'asc' },
+        include: {
+          clinicalEpisode: {
+            include: {
+              practitioner: { include: { person: true } },
+            },
+          },
+          symptoms: { include: { symptom: true } },
+          triggers: true,
+          observations: true,
+          medicationEffects: { include: { medication: true } },
+        },
+      }),
+      this.prisma.appointment.findMany({
+        where: {
+          patientId,
+          scheduledStart: { gte: period.start, lt: period.end },
+          status: { notIn: ['CANCELLED', 'DECLINED'] as any },
+        },
+        orderBy: { scheduledStart: 'asc' },
+        include: {
+          practitioner: { include: { person: true } },
+          practice: true,
+          encounter: true,
+        },
+      }),
+      this.prisma.healthJournal.findMany({
+        where: {
+          patientId,
+          createdAt: { gte: period.start, lt: period.end },
+          OR: [
+            { temperature: { not: null } },
+            { bloodPressureSystolic: { not: null } },
+            { bloodPressureDiastolic: { not: null } },
+            { heartRate: { not: null } },
+            { oxygenSaturation: { not: null } },
+            { respiratoryRate: { not: null } },
+            { weightKg: { not: null } },
+          ],
+        },
+        orderBy: { createdAt: 'asc' },
+      }),
+      this.prisma.deviceMeasurement.findMany({
+        where: {
+          device: { patientId },
+          measuredAt: { gte: period.start, lt: period.end },
+        },
+        orderBy: { measuredAt: 'asc' },
+        include: {
+          device: {
+            select: {
+              manufacturer: true,
+              model: true,
+              deviceType: true,
+            },
+          },
+        },
+      }),
+      this.prisma.sleepSession.findMany({
+        where: { patientId, startedAt: { gte: period.start, lt: period.end } },
+        orderBy: { startedAt: 'asc' },
+      }),
+      this.prisma.workoutSession.findMany({
+        where: { patientId, startedAt: { gte: period.start, lt: period.end } },
+        orderBy: { startedAt: 'asc' },
+      }),
+      this.prisma.encounter.findMany({
+        where: {
+          medicalRecord: { patientId },
+          startedAt: { gte: period.start, lt: period.end },
+        },
+        orderBy: { startedAt: 'asc' },
+        include: {
+          encounterType: true,
+          practitioner: { include: { person: true } },
+          diagnoses: { include: { diagnosis: true } },
+          procedures: { include: { procedure: true } },
+          clinicalNotes: true,
+          vitals: { include: { vitalType: true } },
+          prescriptions: {
+            include: {
+              items: { include: { medication: true } },
+              practitioner: { include: { person: true } },
+            },
+          },
+        },
+      }),
+      this.prisma.patientDiagnosis.findMany({
+        where: {
+          healthPassport: { patientId },
+          OR: [
+            { diagnosedAt: { gte: period.start, lt: period.end } },
+            { encounter: { startedAt: { gte: period.start, lt: period.end } } },
+          ],
+        },
+        orderBy: { diagnosedAt: 'asc' },
+        include: {
+          diagnosis: true,
+          encounter: {
+            include: {
+              practitioner: { include: { person: true } },
+            },
+          },
+        },
+      }),
+      this.prisma.prescription.findMany({
+        where: {
+          patientId,
+          issuedAt: { gte: period.start, lt: period.end },
+        },
+        orderBy: { issuedAt: 'asc' },
+        include: {
+          items: { include: { medication: true } },
+          practitioner: { include: { person: true } },
+          encounter: { include: { encounterType: true } },
+        },
+      }),
+      this.prisma.clinicalNote.findMany({
+        where: {
+          encounter: {
+            medicalRecord: { patientId },
+            startedAt: { gte: period.start, lt: period.end },
+          },
+        },
+        orderBy: { createdAt: 'asc' },
+        include: {
+          encounter: {
+            include: {
+              practitioner: { include: { person: true } },
+              encounterType: true,
+            },
+          },
+        },
+      }),
+      this.prisma.clinicalVital.findMany({
+        where: {
+          encounter: {
+            medicalRecord: { patientId },
+            startedAt: { gte: period.start, lt: period.end },
+          },
+        },
+        orderBy: { measuredAt: 'asc' },
+        include: { vitalType: true },
+      }),
+      this.prisma.labResult.findMany({
+        where: {
+          OR: [
+            { reportedAt: { gte: period.start, lt: period.end } },
+            { releasedAt: { gte: period.start, lt: period.end } },
+          ],
+          orderItem: { order: { patientId } },
+        },
+        orderBy: { reportedAt: 'asc' },
+        include: {
+          orderItem: {
+            include: {
+              test: true,
+              order: {
+                include: {
+                  laboratory: true,
+                  practitioner: { include: { person: true } },
+                },
+              },
+            },
+          },
+          items: { include: { test: true } },
+          specimen: true,
+          criticalResults: true,
+        },
+      }),
+      this.prisma.imagingStudy.findMany({
+        where: {
+          patientId,
+          OR: [
+            { performedAt: { gte: period.start, lt: period.end } },
+            { reportedAt: { gte: period.start, lt: period.end } },
+          ],
+        },
+        orderBy: { performedAt: 'asc' },
+        include: {
+          order: {
+            include: {
+              imagingCenter: true,
+              practitioner: { include: { person: true } },
+              items: { include: { procedure: true } },
+            },
+          },
+          imagingCenter: true,
+          practitioner: { include: { person: true } },
+          reports: {
+            include: { practitioner: { include: { person: true } } },
+          },
+        },
+      }),
+      this.prisma.patientProcedure.findMany({
+        where: {
+          healthPassport: { patientId },
+          OR: [
+            { performedAt: { gte: period.start, lt: period.end } },
+            { createdAt: { gte: period.start, lt: period.end } },
+          ],
+        },
+        orderBy: { performedAt: 'asc' },
+        include: {
+          procedure: true,
+          encounter: {
+            include: {
+              practitioner: { include: { person: true } },
+            },
+          },
+        },
+      }),
+      this.prisma.carePlan.findMany({
+        where: {
+          patientId,
+          OR: [
+            { createdAt: { gte: period.start, lt: period.end } },
+            { updatedAt: { gte: period.start, lt: period.end } },
+          ],
+        },
+        orderBy: { createdAt: 'asc' },
+        include: {
+          practitioner: { include: { person: true } },
+          goals: true,
+          notes: true,
+          tasks: true,
+        },
+      }),
+      this.prisma.referral.findMany({
+        where: {
+          patientId,
+          OR: [
+            { requestedDate: { gte: period.start, lt: period.end } },
+            { acceptedDate: { gte: period.start, lt: period.end } },
+            { completedDate: { gte: period.start, lt: period.end } },
+            { updatedAt: { gte: period.start, lt: period.end } },
+          ],
+        },
+        orderBy: { requestedDate: 'asc' },
+        include: {
+          referringPractitioner: { include: { person: true } },
+          receivingPractitioner: { include: { person: true } },
+          referringPractice: true,
+          receivingPractice: true,
+          notes: true,
+        },
+      }),
+      this.prisma.patient.findUnique({
+        where: { id: patientId },
+        include: {
+          person: true,
+          medicalRecord: true,
+          healthPassport: {
+            include: {
+              conditions: { include: { condition: true } },
+              allergies: { include: { allergy: true } },
+              medications: { include: { medication: true } },
+            },
+          },
+        },
+      }),
+    ]);
+
+    const currentSnapshot = currentRecord
+      ? {
+          medicalRecord: currentRecord.medicalRecord,
+          conditions: currentRecord.healthPassport?.conditions ?? [],
+          allergies: currentRecord.healthPassport?.allergies ?? [],
+          medications: currentRecord.healthPassport?.medications ?? [],
+        }
+      : {
+          medicalRecord: null,
+          conditions: [],
+          allergies: [],
+          medications: [],
+        };
+
+    return {
+      type: kind,
+      period: {
+        start: period.start,
+        end: period.end,
+        label: period.label,
+        scheduledFor: period.scheduledFor,
+      },
+      activity: {
+        journalEntries: healthJournalEntries,
+        symptoms: symptomLogs.map((item) => ({
+          ...item,
+          source: item.clinicalEpisode?.practitionerId ? 'CLINICAL' : 'PATIENT',
+        })),
+        appointments,
+        patientVitals: patientVitals.map((entry) => ({
+          id: entry.id,
+          recordedAt: entry.createdAt,
+          source: entry.practitionerId ? 'CLINICAL' : 'PATIENT',
+          temperature: entry.temperature,
+          bloodPressureSystolic: entry.bloodPressureSystolic,
+          bloodPressureDiastolic: entry.bloodPressureDiastolic,
+          heartRate: entry.heartRate,
+          oxygenSaturation: entry.oxygenSaturation,
+          respiratoryRate: entry.respiratoryRate,
+          weightKg: entry.weightKg,
+        })),
+        deviceMeasurements,
+        sleepSessions,
+        workouts,
+      },
+      clinical: {
+        encounters,
+        diagnoses,
+        prescriptions,
+        notes: clinicalNotes,
+        vitals: clinicalVitals,
+        labResults,
+        imaging,
+        procedures,
+        carePlans,
+        referrals,
+      },
+      currentSnapshot,
+      generatedAt: new Date(),
+    };
   }
 
   private async buildSummary(
