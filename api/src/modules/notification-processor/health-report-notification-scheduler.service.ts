@@ -115,7 +115,7 @@ export class HealthReportNotificationSchedulerService
         const message =
           error instanceof Error ? error.message : String(error);
         this.logger.error(
-          \`Failed to prepare \${kind.toLowerCase()} health report for \${patient.userId}: \${message}\`,
+          `Failed to prepare ${kind.toLowerCase()} health report for ${patient.userId}: ${message}`,
           error instanceof Error ? error.stack : undefined,
         );
       }
@@ -161,7 +161,7 @@ export class HealthReportNotificationSchedulerService
           monday.getDate(),
           REPORT_HOUR,
         ),
-        label: \`\${this.formatDay(previousMonday)} – \${this.formatDay(previousSunday)}\`,
+        label: `${this.formatDay(previousMonday)} – ${this.formatDay(previousSunday)}`,
       };
     }
 
@@ -223,7 +223,7 @@ export class HealthReportNotificationSchedulerService
         : 'Your monthly health report is ready';
 
     const summary = await this.buildSummary(patient.id, kind, period);
-    const body = \`Your health overview for \${period.label} is ready. \${summary} Open your Health Journal to review your activity and progress.\`;
+    const body = `Your health overview for ${period.label} is ready. ${summary} Open your Health Journal to review your activity and progress.`;
 
     const inAppEnabled = await this.isEnabled(
       patient.userId,
@@ -767,14 +767,14 @@ export class HealthReportNotificationSchedulerService
       }),
     ]);
 
-    const activity = \`\${journalEntries} journal \${journalEntries === 1 ? 'entry' : 'entries'}, \${symptomLogs} symptom \${symptomLogs === 1 ? 'record' : 'records'}, \${appointments} appointment\${appointments === 1 ? '' : 's'}, and \${measurements} health measurement\${measurements === 1 ? '' : 's'}\`;
+    const activity = `${journalEntries} journal ${journalEntries === 1 ? 'entry' : 'entries'}, ${symptomLogs} symptom ${symptomLogs === 1 ? 'record' : 'records'}, ${appointments} appointment${appointments === 1 ? '' : 's'}, and ${measurements} health measurement${measurements === 1 ? '' : 's'}`;
 
     const connectedData =
-      \`\${sleepSessions} sleep record\${sleepSessions === 1 ? '' : 's'}, \${workouts} workout\${workouts === 1 ? '' : 's'}, \${activeMedications} active medication\${activeMedications === 1 ? '' : 's'}, and \${activeGoals} active health goal\${activeGoals === 1 ? '' : 's'}\`;
+      `${sleepSessions} sleep record${sleepSessions === 1 ? '' : 's'}, ${workouts} workout${workouts === 1 ? '' : 's'}, ${activeMedications} active medication${activeMedications === 1 ? '' : 's'}, and ${activeGoals} active health goal${activeGoals === 1 ? '' : 's'}`;
 
     return kind === 'WEEKLY'
-      ? \`This week you recorded \${activity}; \${connectedData} are also available in your health record.\`
-      : \`This month you recorded \${activity}; \${connectedData} are also available in your health record.\`;
+      ? `This week you recorded ${activity}; ${connectedData} are also available in your health record.`
+      : `This month you recorded ${activity}; ${connectedData} are also available in your health record.`;
   }
 
   private withJhbTime(
@@ -788,7 +788,7 @@ export class HealthReportNotificationSchedulerService
     const hourText = String(hour).padStart(2, '0');
 
     return new Date(
-      \`\${year}-\${monthText}-\${dayText}T\${hourText}:00:00+02:00\`,
+      `${year}-${monthText}-${dayText}T${hourText}:00:00+02:00`,
     );
   }
 
