@@ -26,7 +26,7 @@ function Panel({ title, icon, children }: { title: string; icon: ReactNode; chil
 function Empty({ children }: { children: ReactNode }) { return <p className="rounded-2xl border border-dashed border-slate-200 bg-slate-50 p-4 text-sm text-slate-500">{children}</p>; }
 function Badge({ children, tone = "slate" }: { children: ReactNode; tone?: "slate" | "blue" | "rose" | "green" }) { const styles = { slate: "bg-slate-100 text-slate-600", blue: "bg-blue-50 text-blue-700", rose: "bg-rose-50 text-rose-700", green: "bg-emerald-50 text-emerald-700" }; return <span className={`rounded-full px-2.5 py-1 text-[10px] font-bold ${styles[tone]}`}>{children}</span>; }
 function ClinicalMarker({ item, label, clinical: clinicalOverride }: { item?: any; label?: string; clinical?: boolean }) {
-  const clinical = clinicalOverride ?? item?.source === "CLINICAL" ?? false;
+  const clinical = clinicalOverride ?? (item?.source === "CLINICAL");
   const isClinicalLabel = label?.toLowerCase().startsWith("clinical");
   const protectedRecord = clinical || isClinicalLabel;
 
