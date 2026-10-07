@@ -230,7 +230,10 @@ export class MedicationReminderSchedulerService {
     totalDosesToday: number;
     dosage?: string | null;
   }) {
-    const doseNumber = Math.max(1, args.doseIndex + 1);
+    const doseNumber = Math.min(
+      Math.max(1, args.doseIndex),
+      Math.max(1, args.totalDosesToday),
+    );
     const totalDoses = Math.max(1, args.totalDosesToday);
     const remainingDoses = Math.max(0, totalDoses - doseNumber);
     const doseLine =
