@@ -171,6 +171,7 @@ export function MedicationsStep({
         {
           medicationId: medication.id,
           ongoing: true,
+          status: "ACTIVE",
           dosage: undefined,
           frequency: undefined,
           route: undefined,
