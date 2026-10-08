@@ -64,6 +64,10 @@ export default function HealthPassportPremium() {
   const [card, setCard] = useState<any>(null); const [cardLoading, setCardLoading] = useState(true); const [cardError, setCardError] = useState("");
   const [editing, setEditing] = useState(false); const [saving, setSaving] = useState(false); const [message, setMessage] = useState(""); const [errorMessage, setErrorMessage] = useState("");
   const [form, setForm] = useState({ preferredName: "", dateOfBirth: "", gender: "", heightCm: "", weightKg: "", bloodType: "", rhesusFactor: "", organDonor: "", emergencyNotes: "" });
+  const [historyEditing, setHistoryEditing] = useState(false);
+  const [historySaving, setHistorySaving] = useState(false);
+  const [historyError, setHistoryError] = useState("");
+  const [historyForm, setHistoryForm] = useState({ pastMedicalHistory: "", surgicalHistory: "", familyHistory: "", socialHistory: "" });
 
   const loadCard = async () => {
     setCardLoading(true);
@@ -82,6 +86,39 @@ export default function HealthPassportPremium() {
   };
   useEffect(() => { void loadCard(); }, []);
   useEffect(() => { if (!card) return; setForm({ preferredName: text(card.patient?.preferredName, ""), dateOfBirth: card.patient?.dateOfBirth ? String(card.patient.dateOfBirth).slice(0, 10) : "", gender: text(card.patient?.gender, ""), heightCm: card.vitals?.heightCm != null ? String(card.vitals.heightCm) : "", weightKg: card.vitals?.weightKg != null ? String(card.vitals.weightKg) : "", bloodType: text(card.emergency?.bloodType, ""), rhesusFactor: text(card.emergency?.rhesusFactor, ""), organDonor: card.emergency?.organDonorRecorded ? (card.emergency?.organDonor ? "true" : "false") : "", emergencyNotes: text(card.emergency?.emergencyNotes, "") }); }, [card]);
+  useEffect(() => {
+    if (!card?.medicalHistory?.medicalRecord) {
+      setHistoryForm({ pastMedicalHistory: "", surgicalHistory: "", familyHistory: "", socialHistory: "" });
+      return;
+    }
+    const record = card.medicalHistory.medicalRecord;
+    setHistoryForm({
+      pastMedicalHistory: text(record.pastMedicalHistory, ""),
+      surgicalHistory: text(record.surgicalHistory, ""),
+      familyHistory: text(record.familyHistory, ""),
+      socialHistory: text(record.socialHistory, ""),
+    });
+  }, [card]);
+
+  const saveMedicalHistory = async () => {
+    setHistorySaving(true);
+    setHistoryError("");
+    try {
+      await api.patch("/patient-health-records/medical-history", {
+        pastMedicalHistory: historyForm.pastMedicalHistory.trim() || undefined,
+        surgicalHistory: historyForm.surgicalHistory.trim() || undefined,
+        familyHistory: historyForm.familyHistory.trim() || undefined,
+        socialHistory: historyForm.socialHistory.trim() || undefined,
+      });
+      setHistoryEditing(false);
+      setMessage("Your reported medical history has been updated.");
+      await loadCard();
+    } catch (error: any) {
+      setHistoryError(error?.response?.data?.message || "We couldn't save your medical history. Please try again.");
+    } finally {
+      setHistorySaving(false);
+    }
+  };
 
   const save = async () => {
     setSaving(true); setMessage(""); setErrorMessage("");
@@ -180,20 +217,88 @@ export default function HealthPassportPremium() {
 
     <div className="mt-5">
       <Panel title="Medical history" icon={<CalendarDays className="h-5 w-5" />}>
-        <ClinicalMarker clinical label="Clinical record · view only" />
-        {computed.medicalHistory?.medicalRecord && (
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div>
+            {computed.medicalHistory?.medicalRecord ? (
+              <ClinicalMarker item={computed.medicalHistory.medicalRecord} />
+            ) : (
+              <ClinicalMarker label="Patient reported · editable" />
+            )}
+            <p className="mt-2 text-xs leading-5 text-slate-500">
+              Your pre-Sympto medical history can be recorded here. Conditions, medicines, allergies and vaccinations you entered during onboarding are also kept as structured health records below.
+            </p>
+          </div>
+          {!computed.medicalHistory?.medicalRecord || computed.medicalHistory.medicalRecord.source !== "CLINICAL" ? (
+            <button
+              type="button"
+              onClick={() => {
+                setHistoryEditing(true);
+                setHistoryError("");
+                setMessage("");
+              }}
+              className="inline-flex min-h-9 items-center gap-1.5 rounded-xl bg-[#0b2d54] px-3.5 py-2 text-[10px] font-bold text-white"
+            >
+              <Edit3 className="h-3.5 w-3.5" />
+              {computed.medicalHistory?.medicalRecord ? "Edit history" : "Add history"}
+            </button>
+          ) : null}
+        </div>
+
+        {historyError && (
+          <div className="mt-3 rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-xs font-semibold text-red-800">
+            {historyError}
+          </div>
+        )}
+
+        {historyEditing && computed.medicalHistory?.medicalRecord?.source !== "CLINICAL" && (
+          <div className="mt-4 rounded-2xl border border-[#24c1c4]/20 bg-[#f7fdfd] p-4">
+            <div>
+              <p className="font-semibold text-[#0b2d54]">Your history from before Sympto</p>
+              <p className="mt-1 text-xs leading-5 text-slate-500">Add what you remember from before you started using Sympto. These notes are marked as patient-reported until a healthcare professional records or confirms them.</p>
+            </div>
+            <div className="mt-4 grid gap-3">
+              {([
+                ["Past medical history", "pastMedicalHistory", "Diagnoses, illnesses or important health events from before Sympto."],
+                ["Surgical history", "surgicalHistory", "Operations or procedures you had before using Sympto."],
+                ["Family history", "familyHistory", "Important health conditions in close family members."],
+                ["Social history", "socialHistory", "Relevant background such as work, living situation or other health-related history."],
+              ] as const).map(([label, field, placeholder]) => (
+                <label key={field} className="block">
+                  <span className="mb-1.5 block text-xs font-semibold text-slate-600">{label}</span>
+                  <textarea
+                    rows={3}
+                    value={(historyForm as any)[field]}
+                    onChange={(event) => setHistoryForm((value) => ({ ...value, [field]: event.target.value }))}
+                    placeholder={placeholder}
+                    className="w-full rounded-xl border border-slate-200 bg-white px-3.5 py-3 text-xs leading-5 text-slate-700 outline-none focus:border-[#24c1c4]/50 focus:ring-2 focus:ring-[#24c1c4]/10"
+                  />
+                </label>
+              ))}
+            </div>
+            <div className="mt-4 flex justify-end gap-2">
+              <button type="button" onClick={() => setHistoryEditing(false)} disabled={historySaving} className="rounded-xl border border-slate-200 px-4 py-2.5 text-xs font-semibold text-slate-600">Cancel</button>
+              <button type="button" onClick={saveMedicalHistory} disabled={historySaving} className="rounded-xl bg-[#0b2d54] px-4 py-2.5 text-xs font-bold text-white disabled:opacity-50">
+                {historySaving ? "Saving…" : "Save history"}
+              </button>
+            </div>
+          </div>
+        )}
+
+        {computed.medicalHistory?.medicalRecord && !historyEditing && (
           <div className="mt-4 rounded-2xl bg-slate-50 p-4">
             <div className="flex items-center justify-between gap-3">
-              <p className="font-semibold text-[#0b2d54]">Medical record</p>
-              <Badge tone="blue">Clinical</Badge>
+              <p className="font-semibold text-[#0b2d54]">
+                {computed.medicalHistory.medicalRecord.source === "CLINICAL" ? "Clinical medical record" : "Your reported history"}
+              </p>
+              <Badge tone={computed.medicalHistory.medicalRecord.source === "CLINICAL" ? "blue" : "slate"}>
+                {computed.medicalHistory.medicalRecord.source === "CLINICAL" ? "Clinical" : "Patient reported"}
+              </Badge>
             </div>
             <DetailGrid items={[
               ["Past medical history", computed.medicalHistory.medicalRecord.pastMedicalHistory],
-              ["Chronic conditions", computed.medicalHistory.medicalRecord.chronicConditions],
               ["Surgical history", computed.medicalHistory.medicalRecord.surgicalHistory],
               ["Family history", computed.medicalHistory.medicalRecord.familyHistory],
               ["Social history", computed.medicalHistory.medicalRecord.socialHistory],
-              ["Immunisation history", computed.medicalHistory.medicalRecord.immunizationNotes],
               ["Last updated", date(computed.medicalHistory.medicalRecord.updatedAt)],
             ]} />
           </div>
@@ -203,7 +308,7 @@ export default function HealthPassportPremium() {
           computed.medicalHistory?.previousConditions?.length ||
           computed.medicalHistory?.previousMedications?.length) ? (
           <div className="mt-4 space-y-3">
-            <p className="text-xs font-bold uppercase tracking-[0.14em] text-slate-400">Longitudinal history</p>
+            <p className="text-xs font-bold uppercase tracking-[0.14em] text-slate-400">History from your structured records</p>
 
             {computed.medicalHistory.previousAllergies?.map((item: any) => (
               <div key={`allergy-${item.id}`} className="rounded-2xl bg-white p-4 ring-1 ring-slate-100">
@@ -263,9 +368,11 @@ export default function HealthPassportPremium() {
             ))}
 
           </div>
-        ) : !computed.medicalHistory?.medicalRecord ? (
-          <Empty>No medical history has been recorded.</Empty>
         ) : null}
+
+        {!computed.medicalHistory?.hasHistory && !computed.medicalHistory?.medicalRecord && (
+          <Empty>No medical history has been recorded yet. Add any important health history from before you joined Sympto.</Empty>
+        )}
       </Panel>
     </div>
     <div className="mt-5 grid gap-5 md:grid-cols-2">
