@@ -281,6 +281,57 @@ export class ClinicCardService {
       sourceLabel: 'Clinical · view only',
     }));
 
+    const previousAllergies = (passport?.allergies ?? [])
+      .filter((item) => String(item.status).toUpperCase() !== 'ACTIVE')
+      .map((item) => ({
+        id: item.id,
+        name: item.allergy.name,
+        status: item.status,
+        severity: item.severity,
+        reaction: item.reaction,
+        lastReaction: item.lastReaction,
+        verifiedBy: item.verifiedBy,
+        source: clinicalAllergyRecordIds.has(item.id) || Boolean(item.verifiedBy) ? 'CLINICAL' : 'PATIENT',
+      }));
+
+    const previousConditions = (passport?.conditions ?? [])
+      .filter((item) =>
+        String(item.status).toUpperCase() !== 'ACTIVE' ||
+        item.resolvedAt != null ||
+        (!clinicalConditionRecordIds.has(item.id) && item.chronic === false),
+      )
+      .map((item) => ({
+        id: item.id,
+        name: item.condition.name,
+        status: item.status,
+        severity: item.severity,
+        diagnosedAt: item.diagnosedAt,
+        resolvedAt: item.resolvedAt,
+        diagnosedBy: item.diagnosedBy,
+        outcome: item.outcome,
+        notes: item.notes,
+        source: clinicalConditionRecordIds.has(item.id) || Boolean(item.diagnosedBy || item.treatmentPlan) ? 'CLINICAL' : 'PATIENT',
+      }));
+
+    const previousMedications = (passport?.medications ?? [])
+      .filter((item) =>
+        String(item.status).toUpperCase() !== 'ACTIVE' ||
+        item.ongoing !== true ||
+        item.endedAt != null,
+      )
+      .map((item) => ({
+        id: item.id,
+        name: item.medication.name,
+        dosage: item.dosage,
+        frequency: item.frequency,
+        route: item.route,
+        startedAt: item.startedAt,
+        endedAt: item.endedAt,
+        status: item.status,
+        prescribedBy: item.prescribedBy,
+        source: clinicalMedicationIds.has(item.medicationId) || clinicalMedicationRecordIds.has(item.id) || practitionerNames.has(normaliseName(item.prescribedBy)) ? 'CLINICAL' : 'PATIENT',
+      }));
+
     const updatedDates = [
       passport?.updatedAt,
       patient.medicalRecord?.updatedAt,
@@ -374,58 +425,14 @@ export class ClinicCardService {
           patient.medicalRecord?.surgicalHistory ||
           patient.medicalRecord?.familyHistory ||
           patient.medicalRecord?.socialHistory ||
-          (passport?.allergies?.some((item) => String(item.status) !== 'ACTIVE') ?? false) ||
-          (passport?.conditions?.some((item) =>
-            String(item.status) !== 'ACTIVE' ||
-            (!clinicalConditionRecordIds.has(item.id) && item.chronic === false),
-          ) ?? false) ||
-          (passport?.medications?.some((item) => String(item.status) !== 'ACTIVE' || !item.ongoing) ?? false),
+          previousAllergies.length > 0 ||
+          previousConditions.length > 0 ||
+          previousMedications.length > 0,
         ),
-        hasStructuredOnboardingHistory: Boolean(
-          (passport?.allergies?.some((item) => String(item.status) !== 'ACTIVE') ?? false) ||
-          (passport?.conditions?.some((item) =>
-            String(item.status) !== 'ACTIVE' ||
-            (!clinicalConditionRecordIds.has(item.id) && item.chronic === false),
-          ) ?? false) ||
-          (passport?.medications?.some((item) => String(item.status) !== 'ACTIVE' || !item.ongoing) ?? false),
-        ),
-        previousAllergies: (passport?.allergies ?? []).filter((item) => String(item.status) !== 'ACTIVE').map((item) => ({
-          id: item.id,
-          name: item.allergy.name,
-          status: item.status,
-          severity: item.severity,
-          reaction: item.reaction,
-          lastReaction: item.lastReaction,
-          verifiedBy: item.verifiedBy,
-          source: clinicalAllergyRecordIds.has(item.id) || Boolean(item.verifiedBy) ? 'CLINICAL' : 'PATIENT',
-        })),
-        previousConditions: (passport?.conditions ?? []).filter((item) =>
-          String(item.status) !== 'ACTIVE' ||
-          (!clinicalConditionRecordIds.has(item.id) && item.chronic === false),
-        ).map((item) => ({
-          id: item.id,
-          name: item.condition.name,
-          status: item.status,
-          severity: item.severity,
-          diagnosedAt: item.diagnosedAt,
-          resolvedAt: item.resolvedAt,
-          diagnosedBy: item.diagnosedBy,
-          outcome: item.outcome,
-          notes: item.notes,
-          source: clinicalConditionRecordIds.has(item.id) || Boolean(item.diagnosedBy || item.treatmentPlan) ? 'CLINICAL' : 'PATIENT',
-        })),
-        previousMedications: (passport?.medications ?? []).filter((item) => String(item.status) !== 'ACTIVE' || !item.ongoing).map((item) => ({
-          id: item.id,
-          name: item.medication.name,
-          dosage: item.dosage,
-          frequency: item.frequency,
-          route: item.route,
-          startedAt: item.startedAt,
-          endedAt: item.endedAt,
-          status: item.status,
-          prescribedBy: item.prescribedBy,
-          source: clinicalMedicationIds.has(item.medicationId) || clinicalMedicationRecordIds.has(item.id) || practitionerNames.has(normaliseName(item.prescribedBy)) ? 'CLINICAL' : 'PATIENT',
-        })),
+        hasStructuredOnboardingHistory: previousAllergies.length > 0 || previousConditions.length > 0 || previousMedications.length > 0,
+        previousAllergies,
+        previousConditions,
+        previousMedications,
       },
       allergies: activeAllergies.map((item) => {
         const clinical = clinicalAllergyRecordIds.has(item.id) || Boolean(item.verifiedBy);
