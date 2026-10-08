@@ -208,8 +208,29 @@ export class HealthGoalsService {
     let eventId: string;
     if (existing.length) { eventId = String(existing[0].id); await this.prisma.$executeRaw`UPDATE "HealthGoalMetricEvent" SET "metricType" = ${metricType}, "metricKey" = ${metricKey}, "loggedValue" = ${loggedValue}, "occurredAt" = ${occurredAt}, "metadata" = ${payload?.metadata ? JSON.stringify(payload.metadata) : null}::jsonb WHERE "id" = ${eventId}::uuid`; }
     else { const inserted = await this.prisma.$queryRaw<Array<{ id: string }>>`INSERT INTO "HealthGoalMetricEvent" ("id", "patientId", "metricType", "metricKey", "loggedValue", "occurredAt", "source", "sourceId", "metadata") VALUES (gen_random_uuid(), ${patient.id}, ${metricType}, ${metricKey}, ${loggedValue}, ${occurredAt}, ${source}, ${sourceId}, ${payload?.metadata ? JSON.stringify(payload.metadata) : null}::jsonb) RETURNING "id"`; eventId = String(inserted[0].id); }
-    await this.healthGoalIntelligence.recomputeMetric(patient.id, metricType, metricKey, occurredAt);
-    const affectedGoals = await this.prisma.$queryRaw<Array<{ id: string; title: string; status: string }>>`SELECT DISTINCT hg."id", hg."title", hg."status"::text AS "status" FROM "HealthGoal" hg INNER JOIN "HealthGoalMetricConfig" hgm ON hgm."healthGoalId" = hg."id" WHERE hg."patientId" = ${patient.id} AND UPPER(hg."status"::text) IN ('ACTIVE', 'ON_HOLD') AND UPPER(hgm."metricType") = ${metricType} AND hgm."metricKey" = ${metricKey}`;
+    // The metric event is the source of truth. A goal-intelligence refresh must
+    // not turn a successfully persisted patient log into an HTTP 500; the event
+    // can be recomputed on the next normal refresh if an older relation/config
+    // row or a temporarily inconsistent goal causes the refresh to fail.
+    try {
+      await this.healthGoalIntelligence.recomputeMetric(patient.id, metricType, metricKey, occurredAt);
+    } catch (error) {
+      console.error(
+        `Health-goal metric recompute failed after saving ${metricType}/${metricKey} event:`,
+        error instanceof Error ? error.message : String(error),
+      );
+    }
+
+    let affectedGoals: Array<{ id: string; title: string; status: string }> = [];
+    try {
+      affectedGoals = await this.prisma.$queryRaw<Array<{ id: string; title: string; status: string }>>`SELECT DISTINCT hg."id", hg."title", hg."status"::text AS "status" FROM "HealthGoal" hg INNER JOIN "HealthGoalMetricConfig" hgm ON hgm."healthGoalId" = hg."id" WHERE hg."patientId" = ${patient.id} AND UPPER(hg."status"::text) IN ('ACTIVE', 'ON_HOLD') AND UPPER(hgm."metricType") = ${metricType} AND hgm."metricKey" = ${metricKey}`;
+    } catch (error) {
+      console.error(
+        `Health-goal affected-goal lookup failed after saving ${metricType}/${metricKey} event:`,
+        error instanceof Error ? error.message : String(error),
+      );
+    }
+
     return { success: true, eventId, affectedGoals };
   }
 
