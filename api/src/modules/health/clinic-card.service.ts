@@ -149,12 +149,12 @@ export class ClinicCardService {
       auditIds('SmartFileClinical/IMMUNIZATION', (passport?.immunizations ?? []).map((item) => item.id)),
     ]);
 
-    // An ongoing condition is ACTIVE when it was clinically recorded, or when
-    // the patient marked it as ongoing during onboarding. Older onboarding rows
-    // may still have status ACTIVE with chronic=false because the former Past
-    // toggle did not persist a resolved status.
+    // Lifecycle is determined from the resolved/end state first. A condition
+    // with a resolved date is historical even when an older row still carries
+    // status ACTIVE.
     const activeConditions = (passport?.conditions ?? []).filter((item) => {
-      if (String(item.status) !== 'ACTIVE') return false;
+      if (String(item.status).toUpperCase() !== 'ACTIVE') return false;
+      if (item.resolvedAt != null) return false;
       return clinicalConditionRecordIds.has(item.id) || item.chronic !== false;
     });
     const activeMedications = (passport?.medications ?? []).filter((item) => String(item.status) === 'ACTIVE' && item.ongoing);
@@ -295,23 +295,32 @@ export class ClinicCardService {
       }));
 
     const previousConditions = (passport?.conditions ?? [])
-      .filter((item) =>
-        String(item.status).toUpperCase() !== 'ACTIVE' ||
-        item.resolvedAt != null ||
-        (!clinicalConditionRecordIds.has(item.id) && item.chronic === false),
-      )
-      .map((item) => ({
-        id: item.id,
-        name: item.condition.name,
-        status: item.status,
-        severity: item.severity,
-        diagnosedAt: item.diagnosedAt,
-        resolvedAt: item.resolvedAt,
-        diagnosedBy: item.diagnosedBy,
-        outcome: item.outcome,
-        notes: item.notes,
-        source: clinicalConditionRecordIds.has(item.id) || Boolean(item.diagnosedBy || item.treatmentPlan) ? 'CLINICAL' : 'PATIENT',
-      }));
+      .filter((item) => {
+        if (item.resolvedAt != null) return true;
+        if (String(item.status).toUpperCase() !== 'ACTIVE') return true;
+        return !clinicalConditionRecordIds.has(item.id) && item.chronic === false;
+      })
+      .map((item) => {
+        const clinical = clinicalConditionRecordIds.has(item.id) || Boolean(item.diagnosedBy || item.treatmentPlan);
+        const resolved = item.resolvedAt != null;
+        return {
+          id: item.id,
+          name: item.condition.name,
+          // Never expose ACTIVE for a historical row. The resolved/end state wins.
+          status: resolved
+            ? 'RESOLVED'
+            : String(item.status).toUpperCase() === 'ACTIVE' && !clinical
+              ? 'PAST'
+              : item.status,
+          severity: item.severity,
+          diagnosedAt: item.diagnosedAt,
+          resolvedAt: item.resolvedAt,
+          diagnosedBy: item.diagnosedBy,
+          outcome: item.outcome,
+          notes: item.notes,
+          source: clinical ? 'CLINICAL' : 'PATIENT',
+        };
+      });
 
     const previousMedications = (passport?.medications ?? [])
       .filter((item) =>
@@ -327,7 +336,9 @@ export class ClinicCardService {
         route: item.route,
         startedAt: item.startedAt,
         endedAt: item.endedAt,
-        status: item.status,
+        status: item.endedAt != null || item.ongoing !== true
+          ? (String(item.status).toUpperCase() === 'ACTIVE' ? 'COMPLETED' : item.status)
+          : item.status,
         prescribedBy: item.prescribedBy,
         source: clinicalMedicationIds.has(item.medicationId) || clinicalMedicationRecordIds.has(item.id) || practitionerNames.has(normaliseName(item.prescribedBy)) ? 'CLINICAL' : 'PATIENT',
       }));
