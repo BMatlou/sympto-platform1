@@ -206,7 +206,7 @@ export class HealthGoalsService {
     if (!metricType || !metricKey || !source || !Number.isFinite(loggedValue)) throw new BadRequestException('Metric event data is invalid.'); if (Number.isNaN(occurredAt.getTime())) throw new BadRequestException('Metric event date is invalid.');
     const existing = sourceId ? await this.prisma.$queryRaw<Array<{ id: string }>>`SELECT "id" FROM "HealthGoalMetricEvent" WHERE "patientId" = ${patient.id} AND "source" = ${source} AND "sourceId" = ${sourceId} LIMIT 1` : [];
     let eventId: string;
-    if (existing.length) { eventId = String(existing[0].id); await this.prisma.$executeRaw`UPDATE "HealthGoalMetricEvent" SET "metricType" = ${metricType}, "metricKey" = ${metricKey}, "loggedValue" = ${loggedValue}, "occurredAt" = ${occurredAt}, "metadata" = ${payload?.metadata ? JSON.stringify(payload.metadata) : null}::jsonb WHERE "id" = ${eventId}::uuid`; }
+    if (existing.length) { eventId = String(existing[0].id); await this.prisma.$executeRaw`UPDATE "HealthGoalMetricEvent" SET "metricType" = ${metricType}, "metricKey" = ${metricKey}, "loggedValue" = ${loggedValue}, "occurredAt" = ${occurredAt}, "metadata" = ${payload?.metadata ? JSON.stringify(payload.metadata) : null}::jsonb WHERE "id"::text = ${eventId}`; }
     else { const inserted = await this.prisma.$queryRaw<Array<{ id: string }>>`INSERT INTO "HealthGoalMetricEvent" ("id", "patientId", "metricType", "metricKey", "loggedValue", "occurredAt", "source", "sourceId", "metadata") VALUES (${randomUUID()}::uuid, ${patient.id}, ${metricType}, ${metricKey}, ${loggedValue}, ${occurredAt}, ${source}, ${sourceId}, ${payload?.metadata ? JSON.stringify(payload.metadata) : null}::jsonb) RETURNING "id"`; eventId = String(inserted[0].id); }
     // The metric event is the source of truth. A goal-intelligence refresh must
     // not turn a successfully persisted patient log into an HTTP 500; the event
@@ -257,7 +257,7 @@ export class HealthGoalsService {
     if (baseline == null) { const patient = await this.prisma.patient.findUnique({ where: { id: patientId }, select: { weightKg: true } }); baseline = patient?.weightKg == null ? null : Number(patient.weightKg); }
     if (baseline == null || !Number.isFinite(baseline)) return null;
     if (existing.length) {
-      await this.prisma.$executeRaw`UPDATE "HealthGoalMetricEvent" SET "loggedValue" = ${baseline}, "occurredAt" = ${baselineAt} WHERE "id" = ${existing[0].id}::uuid`;
+      await this.prisma.$executeRaw`UPDATE "HealthGoalMetricEvent" SET "loggedValue" = ${baseline}, "occurredAt" = ${baselineAt} WHERE "id"::text = ${String(existing[0].id)}`;
       return baseline;
     }
     await this.prisma.$executeRaw`INSERT INTO "HealthGoalMetricEvent" ("id","patientId","metricType","metricKey","loggedValue","occurredAt","source","sourceId") VALUES (gen_random_uuid(),${patientId},'WEIGHT','weight.kg',${baseline},${baselineAt},'goal-baseline',${goalId})`;
@@ -332,7 +332,7 @@ export class HealthGoalsService {
     if (String(goal.status).toUpperCase() === 'ACHIEVED') throw new BadRequestException('Completed health goals are locked. Start a new goal instead.');
     const canonical = this.canonicalMetricConfig(String(goal.category), { ...config, frequencyTarget: config?.frequencyTarget ?? goal.targetValue });
     const existing = await this.prisma.$queryRaw<Array<{ id: string }>>`SELECT "id" FROM "HealthGoalMetricConfig" WHERE "healthGoalId" = ${goalId} LIMIT 1`;
-    if (existing.length) await this.prisma.$executeRaw`UPDATE "HealthGoalMetricConfig" SET "metricType" = ${canonical.metricType}, "metricKey" = ${canonical.metricKey}, "frequency" = ${canonical.frequency}, "frequencyTarget" = ${canonical.frequencyTarget}, "aggregation" = ${canonical.aggregation}, "comparison" = ${canonical.comparison}, "guidanceText" = ${canonical.guidanceText} WHERE "id" = ${existing[0].id}`;
+    if (existing.length) await this.prisma.$executeRaw`UPDATE "HealthGoalMetricConfig" SET "metricType" = ${canonical.metricType}, "metricKey" = ${canonical.metricKey}, "frequency" = ${canonical.frequency}, "frequencyTarget" = ${canonical.frequencyTarget}, "aggregation" = ${canonical.aggregation}, "comparison" = ${canonical.comparison}, "guidanceText" = ${canonical.guidanceText} WHERE "id"::text = ${String(existing[0].id)}`;
     else await this.prisma.$executeRaw`INSERT INTO "HealthGoalMetricConfig" ("id", "healthGoalId", "metricType", "metricKey", "frequency", "frequencyTarget", "aggregation", "comparison", "guidanceText") VALUES (gen_random_uuid(), ${goalId}, ${canonical.metricType}, ${canonical.metricKey}, ${canonical.frequency}, ${canonical.frequencyTarget}, ${canonical.aggregation}, ${canonical.comparison}, ${canonical.guidanceText})`;
     return canonical;
   }
