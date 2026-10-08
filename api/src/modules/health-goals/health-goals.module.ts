@@ -4,7 +4,6 @@ import { HealthGoalsController } from './health-goals.controller';
 import { PatientHealthGoalsController } from './patient-health-goals.controller';
 import { HealthGoalsService } from './health-goals.service';
 import { HealthGoalIntelligenceService } from './health-goal-intelligence.service';
-import { HealthGoalMetricSchemaService } from './health-goal-metric-schema.service';
 import { GoalsEngineService } from './goals-engine-v3.service';
 import { GoalsEngineService as CategoryAwareGoalsEngineService } from './goals-engine-v2.service';
 import { MedicationInsightService } from './medication-insight.service';
@@ -20,7 +19,6 @@ import { MedicationClinicalIntelligenceEngine } from './medication-clinical-inte
     GoalsEngineService,
     HealthGoalsService,
     HealthGoalIntelligenceService,
-    HealthGoalMetricSchemaService,
     MedicationInsightService,
     MedicationConnectedGoalsEngine,
     MedicationGoalIntelligenceEngine,
