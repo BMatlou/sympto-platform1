@@ -253,15 +253,14 @@ export default function HealthPassportPremium() {
         {historyEditing && computed.medicalHistory?.medicalRecord?.source !== "CLINICAL" && (
           <div className="mt-4 rounded-2xl border border-[#24c1c4]/20 bg-[#f7fdfd] p-4">
             <div>
-              <p className="font-semibold text-[#0b2d54]">Your history from before Sympto</p>
-              <p className="mt-1 text-xs leading-5 text-slate-500">Add what you remember from before you started using Sympto. These notes are marked as patient-reported until a healthcare professional records or confirms them.</p>
+              <p className="font-semibold text-[#0b2d54]">Other history from before Sympto</p>
+              <p className="mt-1 text-xs leading-5 text-slate-500">Add important history that is not already captured by your structured conditions, allergies, medicines or vaccinations. These details are patient-reported until a healthcare professional records or confirms them.</p>
             </div>
             <div className="mt-4 grid gap-3">
               {([
-                ["Past medical history", "pastMedicalHistory", "Diagnoses, illnesses or important health events from before Sympto."],
+                ["Other past medical history", "pastMedicalHistory", "Important illnesses, hospitalisations or health events not already recorded as a structured condition."],
                 ["Surgical history", "surgicalHistory", "Operations or procedures you had before using Sympto."],
-                ["Family history", "familyHistory", "Important health conditions in close family members."],
-                ["Social history", "socialHistory", "Relevant background such as work, living situation or other health-related history."],
+                ["Family medical history", "familyHistory", "Important health conditions in close family members."],
               ] as const).map(([label, field, placeholder]) => (
                 <label key={field} className="block">
                   <span className="mb-1.5 block text-xs font-semibold text-slate-600">{label}</span>
