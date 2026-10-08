@@ -207,7 +207,12 @@ export function MedicationsStep({
     onChange({
       medications: values.medications.map((medication, medicationIndex) =>
         medicationIndex === index
-          ? { ...medication, ongoing, endedAt: ongoing ? undefined : medication.endedAt }
+          ? {
+              ...medication,
+              ongoing,
+              status: ongoing ? "ACTIVE" : "COMPLETED",
+              endedAt: ongoing ? undefined : medication.endedAt,
+            }
           : medication,
       ),
     });
