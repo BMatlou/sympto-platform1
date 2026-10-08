@@ -290,6 +290,7 @@ export function ConditionsStep({
            * new conditions start as ongoing.
            */
           chronic: true,
+          status: "ACTIVE",
 
           notes: "",
         },
