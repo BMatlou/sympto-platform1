@@ -350,6 +350,18 @@ export function AllergiesStep({
   }
 
   /*
+   * Update whether this allergy is current or from the past.
+   */ 
+  function updateStatus(index: number, status: string) {
+    const updatedAllergies = values.allergies.map(
+      (allergy, allergyIndex) =>
+        allergyIndex === index ? { ...allergy, status } : allergy,
+    );
+
+    onChange({ allergies: updatedAllergies });
+  }
+
+  /*
    * Update severity.
    */
   function updateSeverity(
@@ -491,7 +503,7 @@ export function AllergiesStep({
 
       <p className="mt-1 text-xs leading-normal text-slate-500">
         {values.allergies.length > 0
-          ? "Review your allergies and set how strongly you react to each one."
+          ? "Record whether each allergy is current or from the past, and how strongly you react."
           : "Keep your allergy information here so it can be considered when relevant."}
       </p>
     </div>
@@ -588,8 +600,25 @@ export function AllergiesStep({
                   </div>
                 </div>
 
-                {/* Severity + Remove */}
-                <div className="flex items-center gap-2 self-end sm:shrink-0 sm:self-auto">
+                {/* Status + Severity + Remove */}
+                <div className="flex flex-wrap items-center justify-end gap-2 self-end sm:shrink-0 sm:self-auto">
+                  <div className="flex items-center rounded-full bg-white/90 p-0.5 shadow-sm ring-1 ring-slate-200/70">
+                    <button
+                      type="button"
+                      onClick={() => updateStatus(index, "ACTIVE")}
+                      className={`rounded-full px-2.5 py-1 text-[10px] font-semibold transition-all ${allergy.status === "ACTIVE" || !allergy.status ? "bg-emerald-500 text-white shadow-sm" : "text-slate-400 hover:text-slate-600"}`}
+                    >
+                      Current
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => updateStatus(index, "RESOLVED")}
+                      className={`rounded-full px-2.5 py-1 text-[10px] font-semibold transition-all ${allergy.status === "RESOLVED" ? "bg-slate-100 text-slate-700 shadow-sm" : "text-slate-400 hover:text-slate-600"}`}
+                    >
+                      Past
+                    </button>
+                  </div>
+
                   <div className="relative flex items-center gap-2 rounded-xl border border-slate-200/60 bg-white/90 py-1.5 pl-3 pr-2 shadow-sm focus-within:ring-2 focus-within:ring-[#24C1C4]/20">
                     <span className="select-none text-[9px] font-bold uppercase tracking-wider text-slate-400">
                       Severity
