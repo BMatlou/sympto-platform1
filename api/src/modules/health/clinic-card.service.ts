@@ -40,6 +40,19 @@ export class ClinicCardService {
     if (!patient) throw new NotFoundException('Patient profile not found for the authenticated user.');
 
     const passport = patient.healthPassport;
+    const medicalRecordClinicalAudit = patient.medicalRecord
+      ? await this.prisma.auditLog.findFirst({
+          where: {
+            entityType: 'SmartFileClinical/MEDICAL_RECORD',
+            entityId: patient.medicalRecord.id,
+            action: { in: ['CREATE', 'UPDATE'] },
+            success: true,
+          },
+          orderBy: { createdAt: 'desc' },
+          select: { id: true, createdAt: true },
+        })
+      : null;
+
     const clinicalPassportAudits = passport
       ? await this.prisma.auditLog.findMany({
           where: {
@@ -343,10 +356,23 @@ export class ClinicCardService {
               immunizationNotes: patient.medicalRecord.immunizationNotes,
               createdAt: patient.medicalRecord.createdAt,
               updatedAt: patient.medicalRecord.updatedAt,
-              source: 'CLINICAL',
-              sourceLabel: 'Clinical · view only',
+              source: medicalRecordClinicalAudit ? 'CLINICAL' : 'PATIENT',
+              sourceLabel: medicalRecordClinicalAudit ? 'Clinical · view only' : 'Patient reported · editable',
+              clinicalUpdatedAt: medicalRecordClinicalAudit?.createdAt ?? null,
             }
           : null,
+        hasHistory: Boolean(
+          patient.medicalRecord?.pastMedicalHistory ||
+          patient.medicalRecord?.surgicalHistory ||
+          patient.medicalRecord?.familyHistory ||
+          patient.medicalRecord?.socialHistory ||
+          (passport?.allergies?.length ?? 0) ||
+          (passport?.conditions?.length ?? 0) ||
+          (passport?.medications?.length ?? 0) ||
+          (passport?.immunizations?.length ?? 0) ||
+          (passport?.patientProcedures?.length ?? 0) ||
+          (passport?.patientDiagnoses?.length ?? 0),
+        ),
         previousAllergies: (passport?.allergies ?? []).filter((item) => String(item.status) !== 'ACTIVE').map((item) => ({
           id: item.id,
           name: item.allergy.name,
