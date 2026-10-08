@@ -149,6 +149,73 @@ export class ClinicCardService {
     const weightKg = patient.weightKg != null ? Number(patient.weightKg) : patient.baseline?.weightKg != null ? Number(patient.baseline.weightKg) : null;
     const calculatedBmi = heightCm && weightKg && heightCm > 0 && weightKg > 0 ? Number((weightKg / Math.pow(heightCm / 100, 2)).toFixed(2)) : null;
 
+    const [carePlanRows, referralRows] = await Promise.all([
+      this.prisma.carePlan.findMany({
+        where: {
+          patientId: patient.id,
+          status: { in: ['ACTIVE', 'ON_HOLD'] },
+        },
+        orderBy: { updatedAt: 'desc' },
+        take: 5,
+        include: {
+          practitioner: { include: { person: true } },
+        },
+      }),
+      this.prisma.referral.findMany({
+        where: {
+          patientId: patient.id,
+          status: { in: ['PENDING', 'ACCEPTED', 'SCHEDULED', 'IN_PROGRESS'] },
+        },
+        orderBy: { requestedDate: 'desc' },
+        take: 5,
+        include: {
+          referringPractitioner: { include: { person: true } },
+          receivingPractitioner: { include: { person: true } },
+          receivingPractice: true,
+        },
+      }),
+    ]);
+
+    const activeCarePlans = carePlanRows.map((carePlan) => ({
+      id: carePlan.id,
+      title: carePlan.title,
+      description: carePlan.description,
+      status: carePlan.status,
+      startDate: carePlan.startDate,
+      endDate: carePlan.endDate,
+      practitionerName: [carePlan.practitioner.person.preferredName ?? carePlan.practitioner.person.firstName, carePlan.practitioner.person.lastName]
+        .filter(Boolean)
+        .join(' '),
+      updatedAt: carePlan.updatedAt,
+      source: 'CLINICAL',
+      sourceLabel: 'Clinical · view only',
+    }));
+
+    const activeReferrals = referralRows.map((referral) => ({
+      id: referral.id,
+      referralNumber: referral.referralNumber,
+      type: referral.type,
+      specialty: referral.specialty,
+      priority: referral.priority,
+      status: referral.status,
+      reason: referral.reason,
+      clinicalSummary: referral.clinicalSummary,
+      requestedDate: referral.requestedDate,
+      acceptedDate: referral.acceptedDate,
+      receivingPractitionerName: referral.receivingPractitioner?.person
+        ? [referral.receivingPractitioner.person.preferredName ?? referral.receivingPractitioner.person.firstName, referral.receivingPractitioner.person.lastName]
+            .filter(Boolean)
+            .join(' ')
+        : null,
+      receivingPracticeName: referral.receivingPractice?.name ?? null,
+      referringPractitionerName: [referral.referringPractitioner.person.preferredName ?? referral.referringPractitioner.person.firstName, referral.referringPractitioner.person.lastName]
+        .filter(Boolean)
+        .join(' '),
+      updatedAt: referral.updatedAt,
+      source: 'CLINICAL',
+      sourceLabel: 'Clinical · view only',
+    }));
+
     const encounterRows = await this.prisma.encounter.findMany({
       where: { medicalRecord: { patientId: patient.id } },
       orderBy: { startedAt: 'desc' },
@@ -203,6 +270,8 @@ export class ClinicCardService {
       ...(passport?.immunizations ?? []).map((item) => item.updatedAt),
       ...activeDiagnoses.map((item) => item.updatedAt),
       ...completedProcedures.map((item) => item.updatedAt),
+      ...activeCarePlans.map((item) => item.updatedAt),
+      ...activeReferrals.map((item) => item.updatedAt),
     ].filter(Boolean) as Date[];
 
     return {
@@ -257,6 +326,8 @@ export class ClinicCardService {
           }
         : null,
       clinicalEncounters,
+      activeCarePlans,
+      activeReferrals,
       medicalHistory: {
         medicalRecord: patient.medicalRecord
           ? {
