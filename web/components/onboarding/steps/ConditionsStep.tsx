@@ -422,6 +422,7 @@ export function ConditionsStep({
             ? {
                 ...condition,
                 chronic: ongoing,
+                status: ongoing ? "ACTIVE" : "RESOLVED",
                 resolvedAt:
                   ongoing
                     ? undefined
