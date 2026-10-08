@@ -225,7 +225,7 @@ export default function HealthPassportPremium() {
               <ClinicalMarker label="Patient reported · editable" />
             )}
             <p className="mt-2 text-xs leading-5 text-slate-500">
-              Your pre-Sympto medical history can be recorded here. Conditions, medicines, allergies and vaccinations you entered during onboarding are also kept as structured health records below.
+              Your past and current conditions, allergies, medicines and vaccinations are brought in from onboarding. Use this section for additional history from before Sympto, such as surgeries, family medical history or other important health events.
             </p>
           </div>
           {!computed.medicalHistory?.medicalRecord || computed.medicalHistory.medicalRecord.source !== "CLINICAL" ? (
