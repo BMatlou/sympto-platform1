@@ -175,23 +175,11 @@ export default function HealthPassportPremium() {
       <Panel title="Baseline health" icon={<Activity className="h-5 w-5" />}>
         {computed.baseline ? (
           <>
-            <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
               {[
-                ["Height", computed.baseline.heightCm != null ? `${computed.baseline.heightCm} cm` : null],
-                ["Weight", computed.baseline.weightKg != null ? `${computed.baseline.weightKg} kg` : null],
+                ["Height", computed.baseline.heightCm != null ? String(computed.baseline.heightCm) + " cm" : null],
+                ["Weight", computed.baseline.weightKg != null ? String(computed.baseline.weightKg) + " kg" : null],
                 ["BMI", computed.baseline.bmi != null ? String(computed.baseline.bmi) : null],
-                [
-                  "Blood pressure",
-                  computed.baseline.systolicPressure != null || computed.baseline.diastolicPressure != null
-                    ? `${computed.baseline.systolicPressure ?? "—"} / ${computed.baseline.diastolicPressure ?? "—"} mmHg`
-                    : null,
-                ],
-                ["Resting heart rate", computed.baseline.restingHeartRate != null ? `${computed.baseline.restingHeartRate} bpm` : null],
-                ["Respiratory rate", computed.baseline.respiratoryRate != null ? `${computed.baseline.respiratoryRate} /min` : null],
-                ["Oxygen saturation", computed.baseline.oxygenSaturation != null ? `${computed.baseline.oxygenSaturation}%` : null],
-                ["Temperature", computed.baseline.bodyTemperature != null ? `${computed.baseline.bodyTemperature} °C` : null],
-                ["Blood glucose", computed.baseline.bloodGlucose != null ? String(computed.baseline.bloodGlucose) : null],
-                ["Cholesterol", computed.baseline.cholesterol != null ? String(computed.baseline.cholesterol) : null],
               ].map(([label, value]) => value != null && value !== "" ? (
                 <div key={label} className="rounded-2xl bg-slate-50 p-3.5">
                   <p className="text-[10px] font-bold uppercase text-slate-500">{label}</p>
