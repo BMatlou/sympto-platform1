@@ -65,19 +65,29 @@ export class PrismaExceptionFilter implements ExceptionFilter {
 
     if (process.env.NODE_ENV !== 'production' && exception.code === 'P2010') {
       const meta = exception.meta as Record<string, unknown> | undefined;
-      const dbCode = typeof meta?.code === 'string' ? meta.code : undefined;
-      const dbMessage = typeof meta?.message === 'string' ? meta.message : undefined;
-      if (dbCode || dbMessage) {
-        response.status(status).json({
-          success: false,
-          statusCode: status,
-          timestamp: new Date().toISOString(),
-          path: request.url,
-          message,
-          debug: { prismaCode: exception.code, databaseCode: dbCode, databaseMessage: dbMessage },
-        });
-        return;
-      }
+      const dbCode =
+        typeof meta?.code === 'string'
+          ? meta.code
+          : /Code:\s*[\`"]?([0-9A-Z]{5})/.exec(exception.message)?.[1] ?? null;
+      const dbMessage =
+        typeof meta?.message === 'string'
+          ? meta.message
+          : /Message:\s*([\\s\\S]+)$/i.exec(exception.message)?.[1]?.trim() ?? exception.message;
+
+      response.status(status).json({
+        success: false,
+        statusCode: status,
+        timestamp: new Date().toISOString(),
+        path: request.url,
+        message,
+        debug: {
+          prismaCode: exception.code,
+          databaseCode: dbCode,
+          databaseMessage: dbMessage,
+          prismaMessage: exception.message,
+        },
+      });
+      return;
     }
 
     response.status(status).json({
