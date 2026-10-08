@@ -225,7 +225,7 @@ export default function HealthPassportPremium() {
               <ClinicalMarker label="Patient reported · editable" />
             )}
             <p className="mt-2 text-xs leading-5 text-slate-500">
-              Your past and current conditions, allergies, medicines and vaccinations are brought in from onboarding. Use this section for additional history from before Sympto, such as surgeries, family medical history or other important health events.
+              Past conditions, past allergies and previous medicines from your onboarding are shown here. Current conditions, allergies and medicines remain in their dedicated sections below. Use this section for additional history from before Sympto, such as surgeries, family medical history or other important health events.
             </p>
           </div>
           {!computed.medicalHistory?.medicalRecord || computed.medicalHistory.medicalRecord.source !== "CLINICAL" ? (
@@ -303,11 +303,9 @@ export default function HealthPassportPremium() {
           </div>
         )}
 
-        {(computed.medicalHistory?.previousAllergies?.length ||
-          computed.medicalHistory?.previousConditions?.length ||
-          computed.medicalHistory?.previousMedications?.length) ? (
+        {computed.medicalHistory?.hasStructuredOnboardingHistory ? (
           <div className="mt-4 space-y-3">
-            <p className="text-xs font-bold uppercase tracking-[0.14em] text-slate-400">History from your structured records</p>
+            <p className="text-xs font-bold uppercase tracking-[0.14em] text-slate-400">History from onboarding</p>
 
             {computed.medicalHistory.previousAllergies?.map((item: any) => (
               <div key={`allergy-${item.id}`} className="rounded-2xl bg-white p-4 ring-1 ring-slate-100">
@@ -370,7 +368,9 @@ export default function HealthPassportPremium() {
         ) : null}
 
         {!computed.medicalHistory?.hasHistory && !computed.medicalHistory?.medicalRecord && (
-          <Empty>No medical history has been recorded yet. Add any important health history from before you joined Sympto.</Empty>
+          <Empty>
+            No past medical history has been recorded yet. Add important history from before you joined Sympto, such as a past illness, surgery or family medical history.
+          </Empty>
         )}
       </Panel>
     </div>
