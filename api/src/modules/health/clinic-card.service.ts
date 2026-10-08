@@ -374,12 +374,20 @@ export class ClinicCardService {
           patient.medicalRecord?.surgicalHistory ||
           patient.medicalRecord?.familyHistory ||
           patient.medicalRecord?.socialHistory ||
-          (passport?.allergies?.length ?? 0) ||
-          (passport?.conditions?.length ?? 0) ||
-          (passport?.medications?.length ?? 0) ||
-          (passport?.immunizations?.length ?? 0) ||
-          (passport?.patientProcedures?.length ?? 0) ||
-          (passport?.patientDiagnoses?.length ?? 0),
+          (passport?.allergies?.some((item) => String(item.status) !== 'ACTIVE') ?? false) ||
+          (passport?.conditions?.some((item) =>
+            String(item.status) !== 'ACTIVE' ||
+            (!clinicalConditionRecordIds.has(item.id) && item.chronic === false),
+          ) ?? false) ||
+          (passport?.medications?.some((item) => String(item.status) !== 'ACTIVE' || !item.ongoing) ?? false),
+        ),
+        hasStructuredOnboardingHistory: Boolean(
+          (passport?.allergies?.some((item) => String(item.status) !== 'ACTIVE') ?? false) ||
+          (passport?.conditions?.some((item) =>
+            String(item.status) !== 'ACTIVE' ||
+            (!clinicalConditionRecordIds.has(item.id) && item.chronic === false),
+          ) ?? false) ||
+          (passport?.medications?.some((item) => String(item.status) !== 'ACTIVE' || !item.ongoing) ?? false),
         ),
         previousAllergies: (passport?.allergies ?? []).filter((item) => String(item.status) !== 'ACTIVE').map((item) => ({
           id: item.id,
