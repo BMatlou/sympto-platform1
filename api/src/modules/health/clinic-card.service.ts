@@ -127,10 +127,6 @@ export class ClinicCardService {
     );
 
     const activeAllergies = (passport?.allergies ?? []).filter((item) => String(item.status) === 'ACTIVE');
-    const activeConditions = (passport?.conditions ?? []).filter((item) => String(item.status) === 'ACTIVE');
-    const activeMedications = (passport?.medications ?? []).filter((item) => String(item.status) === 'ACTIVE' && item.ongoing);
-    const activeDiagnoses = passport?.patientDiagnoses ?? [];
-    const completedProcedures = (passport?.patientProcedures ?? []).filter((item) => String(item.status) !== 'CANCELLED');
 
     const auditIds = async (entityType: string, ids: string[]) => {
       if (!ids.length) return new Set<string>();
@@ -152,6 +148,18 @@ export class ClinicCardService {
       auditIds('SmartFileClinical/PATIENT_MEDICATION', (passport?.medications ?? []).map((item) => item.id)),
       auditIds('SmartFileClinical/IMMUNIZATION', (passport?.immunizations ?? []).map((item) => item.id)),
     ]);
+
+    // An ongoing condition is ACTIVE when it was clinically recorded, or when
+    // the patient marked it as ongoing during onboarding. Older onboarding rows
+    // may still have status ACTIVE with chronic=false because the former Past
+    // toggle did not persist a resolved status.
+    const activeConditions = (passport?.conditions ?? []).filter((item) => {
+      if (String(item.status) !== 'ACTIVE') return false;
+      return clinicalConditionRecordIds.has(item.id) || item.chronic !== false;
+    });
+    const activeMedications = (passport?.medications ?? []).filter((item) => String(item.status) === 'ACTIVE' && item.ongoing);
+    const activeDiagnoses = passport?.patientDiagnoses ?? [];
+    const completedProcedures = (passport?.patientProcedures ?? []).filter((item) => String(item.status) !== 'CANCELLED');
 
     const practitionerName = (value: any) => {
       const person = value?.encounter?.practitioner?.person;
@@ -383,7 +391,10 @@ export class ClinicCardService {
           verifiedBy: item.verifiedBy,
           source: clinicalAllergyRecordIds.has(item.id) || Boolean(item.verifiedBy) ? 'CLINICAL' : 'PATIENT',
         })),
-        previousConditions: (passport?.conditions ?? []).filter((item) => String(item.status) !== 'ACTIVE').map((item) => ({
+        previousConditions: (passport?.conditions ?? []).filter((item) =>
+          String(item.status) !== 'ACTIVE' ||
+          (!clinicalConditionRecordIds.has(item.id) && item.chronic === false),
+        ).map((item) => ({
           id: item.id,
           name: item.condition.name,
           status: item.status,
