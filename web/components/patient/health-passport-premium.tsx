@@ -225,7 +225,7 @@ export default function HealthPassportPremium() {
               <ClinicalMarker label="Patient reported · editable" />
             )}
             <p className="mt-2 text-xs leading-5 text-slate-500">
-              Past conditions, past allergies and previous medicines from your onboarding are shown here. Current conditions, allergies and medicines remain in their dedicated sections below. Use this section for additional history from before Sympto, such as surgeries, family medical history or other important health events.
+              Past conditions, past allergies and previous medicines from onboarding appear here automatically. Current conditions, allergies and medicines remain in their dedicated sections below. Use the additional history form for information not already captured by onboarding, such as surgeries, family medical history or other important health events.
             </p>
           </div>
           {!computed.medicalHistory?.medicalRecord || computed.medicalHistory.medicalRecord.source !== "CLINICAL" ? (
@@ -304,72 +304,107 @@ export default function HealthPassportPremium() {
         )}
 
         {computed.medicalHistory?.hasStructuredOnboardingHistory ? (
-          <div className="mt-4 space-y-3">
-            <p className="text-xs font-bold uppercase tracking-[0.14em] text-slate-400">History from onboarding</p>
+          <div className="mt-4 space-y-5">
+            <div className="rounded-2xl bg-slate-50 px-4 py-3">
+              <p className="text-xs font-bold uppercase tracking-[0.14em] text-slate-400">History from onboarding</p>
+              <p className="mt-1 text-xs leading-5 text-slate-500">
+                These are the structured records you marked as past during onboarding. Current records stay in Allergies, Active conditions and Current medications below.
+              </p>
+            </div>
 
-            {computed.medicalHistory.previousAllergies?.map((item: any) => (
-              <div key={`allergy-${item.id}`} className="rounded-2xl bg-white p-4 ring-1 ring-slate-100">
-                <div className="flex items-center justify-between gap-3">
-                  <div>
-                    <p className="font-semibold text-[#0b2d54]">{text(item.name, "Allergy")}</p>
-                    <ClinicalMarker clinical={item.source === "CLINICAL"} />
-                  </div>
-                  <Badge tone="rose">{human(item.status)}</Badge>
+            {computed.medicalHistory.previousConditions?.length ? (
+              <div>
+                <div className="mb-2.5 flex items-center justify-between gap-3">
+                  <h3 className="text-sm font-bold text-[#0b2d54]">Past conditions</h3>
+                  <Badge tone="blue">{computed.medicalHistory.previousConditions.length}</Badge>
                 </div>
-                <DetailGrid items={[
-                  ["Severity", item.severity ? human(item.severity) : null],
-                  ["Reaction", item.reaction],
-                  ["Last reaction", date(item.lastReaction)],
-                  ["Verified by", item.verifiedBy],
-                ]} />
-              </div>
-            ))}
-
-            {computed.medicalHistory.previousConditions?.map((item: any) => (
-              <div key={`condition-${item.id}`} className="rounded-2xl bg-white p-4 ring-1 ring-slate-100">
-                <div className="flex items-center justify-between gap-3">
-                  <div>
-                    <p className="font-semibold text-[#0b2d54]">{text(item.name, "Condition")}</p>
-                    <ClinicalMarker item={item} clinical={item.source === "CLINICAL"} />
-                  </div>
-                  <Badge tone="blue">{human(item.status)}</Badge>
+                <div className="space-y-3">
+                  {computed.medicalHistory.previousConditions.map((item: any) => (
+                    <div key={`condition-${item.id}`} className="rounded-2xl bg-white p-4 ring-1 ring-slate-100">
+                      <div className="flex items-center justify-between gap-3">
+                        <div>
+                          <p className="font-semibold text-[#0b2d54]">{text(item.name, "Condition")}</p>
+                          <ClinicalMarker item={item} clinical={item.source === "CLINICAL"} />
+                        </div>
+                        <Badge tone="blue">{human(item.status)}</Badge>
+                      </div>
+                      <DetailGrid items={[
+                        ["Severity", item.severity ? human(item.severity) : null],
+                        ["Recorded", date(item.diagnosedAt)],
+                        ["Resolved", date(item.resolvedAt)],
+                        ["Recorded by", item.diagnosedBy],
+                        ["Outcome", item.outcome],
+                        ["Notes", item.notes],
+                      ]} />
+                    </div>
+                  ))}
                 </div>
-                <DetailGrid items={[
-                  ["Severity", item.severity ? human(item.severity) : null],
-                  ["Recorded", date(item.diagnosedAt)],
-                  ["Resolved", date(item.resolvedAt)],
-                  ["Recorded by", item.diagnosedBy],
-                  ["Outcome", item.outcome],
-                ]} />
               </div>
-            ))}
+            ) : null}
 
-            {computed.medicalHistory.previousMedications?.map((item: any) => (
-              <div key={`medication-${item.id}`} className="rounded-2xl bg-white p-4 ring-1 ring-slate-100">
-                <div className="flex items-center justify-between gap-3">
-                  <div>
-                    <p className="font-semibold text-[#0b2d54]">{text(item.name, "Medication")}</p>
-                    <ClinicalMarker item={item} clinical={item.source === "CLINICAL"} />
-                  </div>
-                  <Badge>{human(item.status)}</Badge>
+            {computed.medicalHistory.previousAllergies?.length ? (
+              <div>
+                <div className="mb-2.5 flex items-center justify-between gap-3">
+                  <h3 className="text-sm font-bold text-[#0b2d54]">Past allergies</h3>
+                  <Badge tone="rose">{computed.medicalHistory.previousAllergies.length}</Badge>
                 </div>
-                <DetailGrid items={[
-                  ["Dose", item.dosage],
-                  ["Frequency", item.frequency],
-                  ["Route", item.route],
-                  ["Started", date(item.startedAt)],
-                  ["Ended", date(item.endedAt)],
-                  ["Prescribed by", item.prescribedBy],
-                ]} />
+                <div className="space-y-3">
+                  {computed.medicalHistory.previousAllergies.map((item: any) => (
+                    <div key={`allergy-${item.id}`} className="rounded-2xl bg-white p-4 ring-1 ring-slate-100">
+                      <div className="flex items-center justify-between gap-3">
+                        <div>
+                          <p className="font-semibold text-[#0b2d54]">{text(item.name, "Allergy")}</p>
+                          <ClinicalMarker clinical={item.source === "CLINICAL"} />
+                        </div>
+                        <Badge tone="rose">{human(item.status)}</Badge>
+                      </div>
+                      <DetailGrid items={[
+                        ["Severity", item.severity ? human(item.severity) : null],
+                        ["Reaction", item.reaction],
+                        ["Last reaction", date(item.lastReaction)],
+                        ["Verified by", item.verifiedBy],
+                      ]} />
+                    </div>
+                  ))}
+                </div>
               </div>
-            ))}
+            ) : null}
 
+            {computed.medicalHistory.previousMedications?.length ? (
+              <div>
+                <div className="mb-2.5 flex items-center justify-between gap-3">
+                  <h3 className="text-sm font-bold text-[#0b2d54]">Previous medicines</h3>
+                  <Badge>{computed.medicalHistory.previousMedications.length}</Badge>
+                </div>
+                <div className="space-y-3">
+                  {computed.medicalHistory.previousMedications.map((item: any) => (
+                    <div key={`medication-${item.id}`} className="rounded-2xl bg-white p-4 ring-1 ring-slate-100">
+                      <div className="flex items-center justify-between gap-3">
+                        <div>
+                          <p className="font-semibold text-[#0b2d54]">{text(item.name, "Medication")}</p>
+                          <ClinicalMarker item={item} clinical={item.source === "CLINICAL"} />
+                        </div>
+                        <Badge>{human(item.status)}</Badge>
+                      </div>
+                      <DetailGrid items={[
+                        ["Dose", item.dosage],
+                        ["Frequency", item.frequency],
+                        ["Route", item.route],
+                        ["Started", date(item.startedAt)],
+                        ["Ended", date(item.endedAt)],
+                        ["Prescribed by", item.prescribedBy],
+                      ]} />
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ) : null}
           </div>
         ) : null}
 
         {!computed.medicalHistory?.hasHistory && !computed.medicalHistory?.medicalRecord && (
           <Empty>
-            No past medical history has been recorded yet. Add important history from before you joined Sympto, such as a past illness, surgery or family medical history.
+            No past structured history has been recorded yet. Past conditions, allergies and medicines from onboarding appear here when they are marked as Past. Use “Add other history” for additional information such as a past illness, surgery or family medical history.
           </Empty>
         )}
       </Panel>
