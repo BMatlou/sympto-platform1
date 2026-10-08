@@ -217,15 +217,14 @@ export default function HealthPassportPremium() {
 
     <div className="mt-5">
       <Panel title="Medical history" icon={<CalendarDays className="h-5 w-5" />}>
-        <div className="flex flex-wrap items-start justify-between gap-3">
-          <div>
-            {computed.medicalHistory?.medicalRecord ? (
-              <ClinicalMarker item={computed.medicalHistory.medicalRecord} />
-            ) : (
-              <ClinicalMarker label="Patient reported · editable" />
-            )}
-            <p className="mt-2 text-xs leading-5 text-slate-500">
-              Past conditions, past allergies and previous medicines from onboarding appear here automatically. Current conditions, allergies and medicines remain in their dedicated sections below. Use the additional history form for information not already captured by onboarding, such as surgeries, family medical history or other important health events.
+        <div className="flex items-center justify-between gap-3">
+          <div className="min-w-0">
+            <ClinicalMarker
+              item={computed.medicalHistory?.medicalRecord}
+              label={computed.medicalHistory?.medicalRecord?.source === "CLINICAL" ? undefined : "Patient reported · editable"}
+            />
+            <p className="mt-1.5 text-xs text-slate-500">
+              Past information from onboarding appears here automatically.
             </p>
           </div>
           {!computed.medicalHistory?.medicalRecord || computed.medicalHistory.medicalRecord.source !== "CLINICAL" ? (
@@ -236,57 +235,111 @@ export default function HealthPassportPremium() {
                 setHistoryError("");
                 setMessage("");
               }}
-              className="inline-flex min-h-9 items-center gap-1.5 rounded-xl bg-[#0b2d54] px-3.5 py-2 text-[10px] font-bold text-white"
+              className="inline-flex shrink-0 items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3 py-2 text-[10px] font-bold text-[#0b2d54] shadow-sm"
             >
               <Edit3 className="h-3.5 w-3.5" />
-              {computed.medicalHistory?.medicalRecord ? "Edit history" : "Add history"}
+              {computed.medicalHistory?.medicalRecord ? "Edit history" : "Add other history"}
             </button>
           ) : null}
         </div>
 
         {historyError && (
-          <div className="mt-3 rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-xs font-semibold text-red-800">
+          <div className="mt-3 rounded-xl border border-red-200 bg-red-50 px-3 py-2.5 text-xs font-semibold text-red-800">
             {historyError}
           </div>
         )}
 
         {historyEditing && computed.medicalHistory?.medicalRecord?.source !== "CLINICAL" && (
-          <div className="mt-4 rounded-2xl border border-[#24c1c4]/20 bg-[#f7fdfd] p-4">
+          <div className="mt-4 rounded-2xl border border-slate-200 bg-slate-50/70 p-4">
             <div>
-              <p className="font-semibold text-[#0b2d54]">Other history from before Sympto</p>
-              <p className="mt-1 text-xs leading-5 text-slate-500">Add important history that is not already captured by your structured conditions, allergies, medicines or vaccinations. These details are patient-reported until a healthcare professional records or confirms them.</p>
+              <p className="text-sm font-bold text-[#0b2d54]">Additional history</p>
+              <p className="mt-1 text-xs leading-5 text-slate-500">Only add information that is not already captured in your structured records.</p>
             </div>
-            <div className="mt-4 grid gap-3">
+            <div className="mt-3 grid gap-3">
               {([
-                ["Other past medical history", "pastMedicalHistory", "Important illnesses, hospitalisations or health events not already recorded as a structured condition."],
-                ["Surgical history", "surgicalHistory", "Operations or procedures you had before using Sympto."],
-                ["Family medical history", "familyHistory", "Important health conditions in close family members."],
+                ["Other past medical history", "pastMedicalHistory", "Important illnesses or health events."],
+                ["Surgical history", "surgicalHistory", "Operations or procedures."],
+                ["Family medical history", "familyHistory", "Important conditions in close family members."],
               ] as const).map(([label, field, placeholder]) => (
                 <label key={field} className="block">
-                  <span className="mb-1.5 block text-xs font-semibold text-slate-600">{label}</span>
+                  <span className="mb-1 block text-xs font-semibold text-slate-600">{label}</span>
                   <textarea
-                    rows={3}
+                    rows={2}
                     value={(historyForm as any)[field]}
                     onChange={(event) => setHistoryForm((value) => ({ ...value, [field]: event.target.value }))}
                     placeholder={placeholder}
-                    className="w-full rounded-xl border border-slate-200 bg-white px-3.5 py-3 text-xs leading-5 text-slate-700 outline-none focus:border-[#24c1c4]/50 focus:ring-2 focus:ring-[#24c1c4]/10"
+                    className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-xs leading-5 text-slate-700 outline-none focus:border-[#24c1c4]/50 focus:ring-2 focus:ring-[#24c1c4]/10"
                   />
                 </label>
               ))}
             </div>
-            <div className="mt-4 flex justify-end gap-2">
-              <button type="button" onClick={() => setHistoryEditing(false)} disabled={historySaving} className="rounded-xl border border-slate-200 px-4 py-2.5 text-xs font-semibold text-slate-600">Cancel</button>
-              <button type="button" onClick={saveMedicalHistory} disabled={historySaving} className="rounded-xl bg-[#0b2d54] px-4 py-2.5 text-xs font-bold text-white disabled:opacity-50">
+            <div className="mt-3 flex justify-end gap-2">
+              <button type="button" onClick={() => setHistoryEditing(false)} disabled={historySaving} className="rounded-xl border border-slate-200 px-3.5 py-2 text-xs font-semibold text-slate-600">Cancel</button>
+              <button type="button" onClick={saveMedicalHistory} disabled={historySaving} className="rounded-xl bg-[#0b2d54] px-3.5 py-2 text-xs font-bold text-white disabled:opacity-50">
                 {historySaving ? "Saving…" : "Save history"}
               </button>
             </div>
           </div>
         )}
 
+        {computed.medicalHistory?.hasStructuredOnboardingHistory ? (
+          <div className="mt-4 overflow-hidden rounded-2xl border border-slate-100">
+            <div className="flex items-center justify-between gap-3 bg-slate-50 px-4 py-3">
+              <div>
+                <p className="text-xs font-bold uppercase tracking-[0.14em] text-slate-400">From onboarding</p>
+                <p className="mt-0.5 text-[11px] text-slate-500">Past records you entered during setup.</p>
+              </div>
+              <Badge tone="blue">
+                {(computed.medicalHistory.previousConditions?.length ?? 0) +
+                  (computed.medicalHistory.previousAllergies?.length ?? 0) +
+                  (computed.medicalHistory.previousMedications?.length ?? 0)}
+              </Badge>
+            </div>
+
+            <div className="divide-y divide-slate-100 bg-white">
+              {computed.medicalHistory.previousConditions?.map((item: any) => (
+                <div key={"condition-" + item.id} className="flex items-center justify-between gap-3 px-4 py-3">
+                  <div className="min-w-0">
+                    <p className="text-sm font-semibold text-[#0b2d54]">{text(item.name, "Condition")}</p>
+                    <p className="mt-0.5 text-[11px] text-slate-500">
+                      Past condition
+                      {item.diagnosedAt || item.resolvedAt ? " · " + date(item.diagnosedAt) + (item.resolvedAt ? " — " + date(item.resolvedAt) : "") : ""}
+                    </p>
+                  </div>
+                  <Badge tone="blue">{human(item.status)}</Badge>
+                </div>
+              ))}
+
+              {computed.medicalHistory.previousAllergies?.map((item: any) => (
+                <div key={"allergy-" + item.id} className="flex items-center justify-between gap-3 px-4 py-3">
+                  <div className="min-w-0">
+                    <p className="text-sm font-semibold text-[#0b2d54]">{text(item.name, "Allergy")}</p>
+                    <p className="mt-0.5 text-[11px] text-slate-500">Past allergy · {item.source === "CLINICAL" ? "Clinical" : "Patient entered"}</p>
+                  </div>
+                  <Badge tone="rose">{human(item.status)}</Badge>
+                </div>
+              ))}
+
+              {computed.medicalHistory.previousMedications?.map((item: any) => (
+                <div key={"medication-" + item.id} className="flex items-center justify-between gap-3 px-4 py-3">
+                  <div className="min-w-0">
+                    <p className="text-sm font-semibold text-[#0b2d54]">{text(item.name, "Medication")}</p>
+                    <p className="mt-0.5 text-[11px] text-slate-500">
+                      Previous medicine
+                      {item.startedAt || item.endedAt ? " · " + date(item.startedAt) + (item.endedAt ? " — " + date(item.endedAt) : "") : ""}
+                    </p>
+                  </div>
+                  <Badge>{human(item.status)}</Badge>
+                </div>
+              ))}
+            </div>
+          </div>
+        ) : null}
+
         {computed.medicalHistory?.medicalRecord && !historyEditing && (
-          <div className="mt-4 rounded-2xl bg-slate-50 p-4">
+          <div className="mt-4 rounded-2xl bg-slate-50 px-4 py-3">
             <div className="flex items-center justify-between gap-3">
-              <p className="font-semibold text-[#0b2d54]">
+              <p className="text-sm font-bold text-[#0b2d54]">
                 {computed.medicalHistory.medicalRecord.source === "CLINICAL" ? "Clinical medical record" : "Your reported history"}
               </p>
               <Badge tone={computed.medicalHistory.medicalRecord.source === "CLINICAL" ? "blue" : "slate"}>
@@ -303,109 +356,10 @@ export default function HealthPassportPremium() {
           </div>
         )}
 
-        {computed.medicalHistory?.hasStructuredOnboardingHistory ? (
-          <div className="mt-4 space-y-5">
-            <div className="rounded-2xl bg-slate-50 px-4 py-3">
-              <p className="text-xs font-bold uppercase tracking-[0.14em] text-slate-400">History from onboarding</p>
-              <p className="mt-1 text-xs leading-5 text-slate-500">
-                These are the structured records you marked as past during onboarding. Current records stay in Allergies, Active conditions and Current medications below.
-              </p>
-            </div>
-
-            {computed.medicalHistory.previousConditions?.length ? (
-              <div>
-                <div className="mb-2.5 flex items-center justify-between gap-3">
-                  <h3 className="text-sm font-bold text-[#0b2d54]">Past conditions</h3>
-                  <Badge tone="blue">{computed.medicalHistory.previousConditions.length}</Badge>
-                </div>
-                <div className="space-y-3">
-                  {computed.medicalHistory.previousConditions.map((item: any) => (
-                    <div key={`condition-${item.id}`} className="rounded-2xl bg-white p-4 ring-1 ring-slate-100">
-                      <div className="flex items-center justify-between gap-3">
-                        <div>
-                          <p className="font-semibold text-[#0b2d54]">{text(item.name, "Condition")}</p>
-                          <ClinicalMarker item={item} clinical={item.source === "CLINICAL"} />
-                        </div>
-                        <Badge tone="blue">{human(item.status)}</Badge>
-                      </div>
-                      <DetailGrid items={[
-                        ["Severity", item.severity ? human(item.severity) : null],
-                        ["Recorded", date(item.diagnosedAt)],
-                        ["Resolved", date(item.resolvedAt)],
-                        ["Recorded by", item.diagnosedBy],
-                        ["Outcome", item.outcome],
-                        ["Notes", item.notes],
-                      ]} />
-                    </div>
-                  ))}
-                </div>
-              </div>
-            ) : null}
-
-            {computed.medicalHistory.previousAllergies?.length ? (
-              <div>
-                <div className="mb-2.5 flex items-center justify-between gap-3">
-                  <h3 className="text-sm font-bold text-[#0b2d54]">Past allergies</h3>
-                  <Badge tone="rose">{computed.medicalHistory.previousAllergies.length}</Badge>
-                </div>
-                <div className="space-y-3">
-                  {computed.medicalHistory.previousAllergies.map((item: any) => (
-                    <div key={`allergy-${item.id}`} className="rounded-2xl bg-white p-4 ring-1 ring-slate-100">
-                      <div className="flex items-center justify-between gap-3">
-                        <div>
-                          <p className="font-semibold text-[#0b2d54]">{text(item.name, "Allergy")}</p>
-                          <ClinicalMarker clinical={item.source === "CLINICAL"} />
-                        </div>
-                        <Badge tone="rose">{human(item.status)}</Badge>
-                      </div>
-                      <DetailGrid items={[
-                        ["Severity", item.severity ? human(item.severity) : null],
-                        ["Reaction", item.reaction],
-                        ["Last reaction", date(item.lastReaction)],
-                        ["Verified by", item.verifiedBy],
-                      ]} />
-                    </div>
-                  ))}
-                </div>
-              </div>
-            ) : null}
-
-            {computed.medicalHistory.previousMedications?.length ? (
-              <div>
-                <div className="mb-2.5 flex items-center justify-between gap-3">
-                  <h3 className="text-sm font-bold text-[#0b2d54]">Previous medicines</h3>
-                  <Badge>{computed.medicalHistory.previousMedications.length}</Badge>
-                </div>
-                <div className="space-y-3">
-                  {computed.medicalHistory.previousMedications.map((item: any) => (
-                    <div key={`medication-${item.id}`} className="rounded-2xl bg-white p-4 ring-1 ring-slate-100">
-                      <div className="flex items-center justify-between gap-3">
-                        <div>
-                          <p className="font-semibold text-[#0b2d54]">{text(item.name, "Medication")}</p>
-                          <ClinicalMarker item={item} clinical={item.source === "CLINICAL"} />
-                        </div>
-                        <Badge>{human(item.status)}</Badge>
-                      </div>
-                      <DetailGrid items={[
-                        ["Dose", item.dosage],
-                        ["Frequency", item.frequency],
-                        ["Route", item.route],
-                        ["Started", date(item.startedAt)],
-                        ["Ended", date(item.endedAt)],
-                        ["Prescribed by", item.prescribedBy],
-                      ]} />
-                    </div>
-                  ))}
-                </div>
-              </div>
-            ) : null}
-          </div>
-        ) : null}
-
         {!computed.medicalHistory?.hasHistory && !computed.medicalHistory?.medicalRecord && (
-          <Empty>
-            No past structured history has been recorded yet. Past conditions, allergies and medicines from onboarding appear here when they are marked as Past. Use “Add other history” for additional information such as a past illness, surgery or family medical history.
-          </Empty>
+          <p className="mt-4 rounded-2xl bg-slate-50 px-4 py-3 text-xs text-slate-500">
+            No past history has been recorded yet.
+          </p>
         )}
       </Panel>
     </div>
