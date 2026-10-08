@@ -23,45 +23,6 @@ export class PatientHealthGoalsController {
     return request.user?.sub ?? request.user?.userId ?? request.user?.id ?? '';
   }
 
-  private async ensureMetricEventStorage() {
-    await this.prisma.$executeRawUnsafe('CREATE EXTENSION IF NOT EXISTS pgcrypto');
-    await this.prisma.$executeRawUnsafe(`
-      CREATE TABLE IF NOT EXISTS "HealthGoalMetricEvent" (
-        "id" UUID NOT NULL DEFAULT gen_random_uuid(),
-        "patientId" TEXT NOT NULL,
-        "metricType" VARCHAR(64) NOT NULL,
-        "metricKey" VARCHAR(128) NOT NULL,
-        "loggedValue" NUMERIC(12,2) NOT NULL,
-        "occurredAt" TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
-        "source" VARCHAR(64) NOT NULL,
-        "sourceId" VARCHAR(128),
-        "metadata" JSONB,
-        "createdAt" TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
-        CONSTRAINT "HealthGoalMetricEvent_pkey" PRIMARY KEY ("id")
-      )
-    `);
-    await this.prisma.$executeRawUnsafe(`
-      ALTER TABLE "HealthGoalMetricEvent"
-        ADD COLUMN IF NOT EXISTS "patientId" TEXT,
-        ADD COLUMN IF NOT EXISTS "metricType" VARCHAR(64),
-        ADD COLUMN IF NOT EXISTS "metricKey" VARCHAR(128),
-        ADD COLUMN IF NOT EXISTS "loggedValue" NUMERIC(12,2),
-        ADD COLUMN IF NOT EXISTS "occurredAt" TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
-        ADD COLUMN IF NOT EXISTS "source" VARCHAR(64),
-        ADD COLUMN IF NOT EXISTS "sourceId" VARCHAR(128),
-        ADD COLUMN IF NOT EXISTS "metadata" JSONB,
-        ADD COLUMN IF NOT EXISTS "createdAt" TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
-    `);
-    await this.prisma.$executeRawUnsafe(`
-      CREATE INDEX IF NOT EXISTS "HealthGoalMetricEvent_patient_metric_idx"
-        ON "HealthGoalMetricEvent" ("patientId", "metricType", "metricKey", "occurredAt")
-    `);
-    await this.prisma.$executeRawUnsafe(`
-      CREATE INDEX IF NOT EXISTS "HealthGoalMetricEvent_source_idx"
-        ON "HealthGoalMetricEvent" ("source", "sourceId")
-    `);
-  }
-
   private async assertOwnGoal(goalId: string, userId: string) {
     // Authorization must not depend on the legacy relationship hydrator.
     // findOne() still performs relationship work that can fail when the old
@@ -574,7 +535,6 @@ export class PatientHealthGoalsController {
     const dayKey = String(body?.dayKey ?? '');
     if (!/^\d{4}-\d{2}-\d{2}$/.test(dayKey)) throw new BadRequestException('A valid local day is required for a smoking log.');
 
-    await this.ensureMetricEventStorage();
     const metricResult = await this.healthGoalsService.syncMetricEventForUser(userId, { metricType: 'SMOKING', metricKey: 'smoking.cigarettes', loggedValue: cigarettes, source: 'patient-smoking-log', sourceId: `${id}:${dayKey}` });
 
     const journalTitle = `Smoking log · ${dayKey}`;
@@ -617,7 +577,6 @@ export class PatientHealthGoalsController {
     const source = 'patient-alcohol-log';
     const sourceId = `${id}:${weekKey}`;
 
-    await this.ensureMetricEventStorage();
     const existing = await this.prisma.$queryRaw<Array<{ loggedValue: any }>>`
       SELECT "loggedValue"
       FROM "HealthGoalMetricEvent"
