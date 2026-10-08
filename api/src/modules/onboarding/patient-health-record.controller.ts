@@ -19,6 +19,8 @@ import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { PatientAllergyItemDto } from './dto/update-patient-allergies.dto';
 import { PatientConditionItemDto } from './dto/update-patient-conditions.dto';
 import { PatientImmunizationItemDto } from './dto/update-patient-immunizations.dto';
+import { UpdatePatientMedicalHistoryDto } from './dto/update-patient-medical-history.dto';
+import { AuditAction } from '@prisma/client';
 
 @Controller('patient-health-records')
 @UseGuards(JwtAuthGuard)
@@ -53,6 +55,74 @@ export class PatientHealthRecordController {
       select: { id: true },
     });
     if (audit) throw new ForbiddenException(message);
+  }
+
+  @Patch('medical-history')
+  async updateMedicalHistory(@Req() req: any, @Body() dto: UpdatePatientMedicalHistoryDto) {
+    const patient = await this.patientContext(req.user.sub);
+    const existing = await this.prisma.medicalRecord.findUnique({
+      where: { patientId: patient.id },
+      select: { id: true },
+    });
+
+    if (existing) {
+      const clinicalAudit = await this.prisma.auditLog.findFirst({
+        where: {
+          entityType: 'SmartFileClinical/MEDICAL_RECORD',
+          entityId: existing.id,
+          action: { in: ['CREATE', 'UPDATE'] },
+          success: true,
+        },
+        select: { id: true },
+      });
+
+      if (clinicalAudit) {
+        throw new ForbiddenException(
+          'This medical history was recorded by a healthcare professional and cannot be edited by the patient. Ask your clinician to update it.',
+        );
+      }
+    }
+
+    const data = {
+      pastMedicalHistory: dto.pastMedicalHistory?.trim() || null,
+      surgicalHistory: dto.surgicalHistory?.trim() || null,
+      familyHistory: dto.familyHistory?.trim() || null,
+      socialHistory: dto.socialHistory?.trim() || null,
+    };
+
+    const record = await this.prisma.$transaction(async (tx) => {
+      const medicalRecord = await tx.medicalRecord.upsert({
+        where: { patientId: patient.id },
+        update: data,
+        create: { patientId: patient.id, ...data },
+      });
+
+      await tx.auditLog.create({
+        data: {
+          userId: req.user.sub,
+          action: existing ? AuditAction.UPDATE : AuditAction.CREATE,
+          entityType: 'PatientReported/MEDICAL_RECORD',
+          entityId: medicalRecord.id,
+          newValues: data,
+          success: true,
+        },
+      });
+
+      return medicalRecord;
+    });
+
+    return {
+      data: {
+        id: record.id,
+        pastMedicalHistory: record.pastMedicalHistory,
+        surgicalHistory: record.surgicalHistory,
+        familyHistory: record.familyHistory,
+        socialHistory: record.socialHistory,
+        source: 'PATIENT',
+        sourceLabel: 'Patient reported · editable',
+        updatedAt: record.updatedAt,
+      },
+    };
   }
 
   @Get('clinical-diagnoses')
