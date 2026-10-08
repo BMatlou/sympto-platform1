@@ -548,7 +548,7 @@ export function ConditionsStep({
           condition.conditionId,
         );
 
-        const isOngoing = condition.chronic ?? false;
+        const isOngoing = String(condition.status ?? (condition.chronic ? "ACTIVE" : "RESOLVED")).toUpperCase() === "ACTIVE";
 
         return (
           <div
