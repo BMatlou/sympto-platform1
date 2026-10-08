@@ -63,7 +63,12 @@ export class PrismaExceptionFilter implements ExceptionFilter {
         break;
     }
 
-    if (process.env.NODE_ENV !== 'production' && exception.code === 'P2010') {
+    const isLocalRequest =
+      request.hostname === 'localhost' ||
+      request.hostname === '127.0.0.1' ||
+      request.hostname === '::1';
+
+    if (exception.code === 'P2010' && (process.env.NODE_ENV !== 'production' || isLocalRequest)) {
       const meta = exception.meta as Record<string, unknown> | undefined;
       const dbCode =
         typeof meta?.code === 'string'
