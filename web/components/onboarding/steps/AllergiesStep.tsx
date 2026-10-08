@@ -352,7 +352,7 @@ export function AllergiesStep({
   /*
    * Update whether this allergy is current or from the past.
    */ 
-  function updateStatus(index: number, status: string) {
+  function updateStatus(index: number, status: "ACTIVE" | "RESOLVED") {
     const updatedAllergies = values.allergies.map(
       (allergy, allergyIndex) =>
         allergyIndex === index ? { ...allergy, status } : allergy,
