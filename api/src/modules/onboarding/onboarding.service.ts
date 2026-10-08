@@ -1,4 +1,4 @@
-import { BadRequestException, ConflictException, Injectable } from '@nestjs/common';
+import { BadRequestException, ConflictException, ForbiddenException, Injectable } from '@nestjs/common';
 
 import { PrismaService } from '../../database/prisma.service';
 import { OnboardingRepository } from './onboarding.repository';
@@ -143,6 +143,7 @@ export class OnboardingService {
             },
             select: {
               id: true,
+              medicationId: true,
               status: true,
               ongoing: true,
             },
