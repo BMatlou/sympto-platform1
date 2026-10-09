@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { ArrowRight, Check, Droplets, Minus, Plus } from "lucide-react";
+import { ArrowRight, Droplets, Minus, Plus } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 import { healthJournalService } from "@/services/health-journal.service";
@@ -69,7 +69,6 @@ export default function TodayHydrationGoal({ goal, onUpdated }: Props) {
   const [loading, setLoading] = useState(true);
   const [savingAmount, setSavingAmount] = useState<number | null>(null);
 
-  const todayKey = useMemo(() => dayKey(new Date()), []);
   const journey = useMemo(() => {
     const startDate = new Date(String(goal?.createdAt ?? ""));
     const targetDate = new Date(String(goal?.targetDate ?? ""));
@@ -93,9 +92,6 @@ export default function TodayHydrationGoal({ goal, onUpdated }: Props) {
       setTodayIntakeMl(amount != null && Number.isFinite(amount) && amount >= 0 ? amount : null);
     } catch {
       // Keep the last successfully loaded value visible during temporary network errors.
-      toast.error("Hydration data could not be refreshed.", {
-        description: "Check your connection and refresh Today to retry.",
-      });
     } finally {
       setLoading(false);
     }
