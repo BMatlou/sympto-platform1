@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { ArrowRight, Droplets } from "lucide-react";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { healthJournalService } from "@/services/health-journal.service";
 import type { HealthJournal } from "@/types/health-journal";
 
@@ -79,6 +79,7 @@ export default function TodayHydrationGoal({ goal }: Props) {
   const [todayIntakeMl, setTodayIntakeMl] = useState<number | null>(null);
   const [loading, setLoading] = useState(true);
   const [lastUpdatedAt, setLastUpdatedAt] = useState<string | null>(null);
+  const refreshVersion = useRef(0);
 
   const journey = useMemo(() => {
     const startDate = new Date(String(goal?.createdAt ?? ""));
@@ -92,6 +93,7 @@ export default function TodayHydrationGoal({ goal }: Props) {
   }, [goal?.createdAt, goal?.targetDate]);
 
   const loadToday = useCallback(async () => {
+    const requestVersion = ++refreshVersion.current;
     try {
       const response = await healthJournalService.getAll({ limit: 100, page: 1 });
       const today = dayKey(new Date());
@@ -99,12 +101,14 @@ export default function TodayHydrationGoal({ goal }: Props) {
       const found = journals
         .filter((journal) => isTodayCheckIn(journal, today))
         .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())[0] ?? null;
+      // Do not let a slower, older request overwrite a newer check-in save event.
+      if (requestVersion !== refreshVersion.current) return;
       setTodayIntakeMl(waterAmountFromJournal(found));
       setLastUpdatedAt(found?.updatedAt ?? found?.createdAt ?? null);
     } catch {
       // Keep the last confirmed value when a refresh temporarily fails.
     } finally {
-      setLoading(false);
+      if (requestVersion === refreshVersion.current) setLoading(false);
     }
   }, []);
 
@@ -119,18 +123,29 @@ export default function TodayHydrationGoal({ goal }: Props) {
       const detail = (event as CustomEvent<{ journal?: HealthJournal; waterIntakeMl?: number | string | null }>).detail;
       const journal = detail?.journal;
       if (journal && isTodayCheckIn(journal, dayKey(new Date()))) {
-        setTodayIntakeMl(waterAmountFromJournal(journal));
-        setLastUpdatedAt(journal.updatedAt ?? journal.createdAt ?? null);
+        refreshVersion.current += 1;
+        const explicitValue = detail?.waterIntakeMl;
+        const parsedExplicitValue = explicitValue == null || explicitValue === "" ? null : Number(explicitValue);
+        const journalValue = waterAmountFromJournal(journal);
+        setTodayIntakeMl(
+          parsedExplicitValue != null && Number.isFinite(parsedExplicitValue) && parsedExplicitValue >= 0
+            ? parsedExplicitValue
+            : journalValue,
+        );
+        setLastUpdatedAt(journal.updatedAt ?? journal.createdAt ?? new Date().toISOString());
+        setLoading(false);
         return;
       }
 
       if (detail && detail.waterIntakeMl !== undefined) {
+        refreshVersion.current += 1;
         const value = detail.waterIntakeMl == null || detail.waterIntakeMl === ""
           ? null
           : Number(detail.waterIntakeMl);
         if (value == null || (Number.isFinite(value) && value >= 0)) {
           setTodayIntakeMl(value);
           setLastUpdatedAt(new Date().toISOString());
+          setLoading(false);
           return;
         }
       }
