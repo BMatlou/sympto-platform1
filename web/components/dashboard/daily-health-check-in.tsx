@@ -240,6 +240,33 @@ export default function DailyHealthCheckIn({ embedded = false, goals = [], medic
     return () => { active = false; };
   }, []);
 
+  // The standalone Hydration goal card edits only the saved water amount.
+  // Refresh that one field without resetting other check-in inputs that the
+  // patient may currently be editing.
+  useEffect(() => {
+    let active = true;
+    async function refreshWaterFromHydrationCard() {
+      try {
+        const response = await healthJournalService.getAll({ limit: 100 });
+        const existing = response.data
+          .filter(sameCheckIn)
+          .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())[0];
+        if (!active || !existing) return;
+        setSavedJournal(existing);
+        setWaterIntakeMl(existing.waterIntakeMl != null ? Number(existing.waterIntakeMl) : 0);
+        setWaterTouched(existing.waterIntakeMl != null);
+      } catch {
+        // Keep current form state if the refresh cannot reach the API.
+      }
+    }
+
+    window.addEventListener("sympto:water-intake-updated", refreshWaterFromHydrationCard);
+    return () => {
+      active = false;
+      window.removeEventListener("sympto:water-intake-updated", refreshWaterFromHydrationCard);
+    };
+  }, []);
+
   useEffect(() => {
     let active = true;
     const weekStart = startOfLocalWeek();
