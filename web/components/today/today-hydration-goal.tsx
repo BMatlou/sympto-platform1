@@ -49,11 +49,11 @@ function targetInMillilitres(goal: any): number | null {
 
 function updateJournalSummary(journalText: unknown, waterIntakeMl: number) {
   const existing = String(journalText ?? "")
-    .replace(/\bWater:\s*[\d,.]+\s*ml\.?/gi, "")
+    .replace(/\bWater:\s*[\d,.\s\u00a0\u202f]+\s*ml\.?/gi, "")
     .replace(/Daily health check-in recorded\.?/gi, "")
     .replace(/\s+/g, " ")
     .trim();
-  return [existing, `Water: ${formatNumber(waterIntakeMl)} ml.`].filter(Boolean).join(" ");
+  return [existing, `Water: ${Math.round(waterIntakeMl)} ml.`].filter(Boolean).join(" ");
 }
 
 function isTodayCheckIn(journal: HealthJournal, todayKey: string) {
@@ -106,13 +106,11 @@ export default function TodayHydrationGoal({ goal, onUpdated }: Props) {
     void refresh();
     const onCheckInUpdated = () => void refresh();
     window.addEventListener("sympto:health-checkin-updated", onCheckInUpdated);
-    window.addEventListener("sympto:water-intake-updated", onCheckInUpdated);
     const interval = window.setInterval(() => void refresh(), 15000);
     return () => {
       active = false;
       window.clearInterval(interval);
       window.removeEventListener("sympto:health-checkin-updated", onCheckInUpdated);
-      window.removeEventListener("sympto:water-intake-updated", onCheckInUpdated);
     };
   }, [loadToday, goalId]);
 
@@ -128,9 +126,10 @@ export default function TodayHydrationGoal({ goal, onUpdated }: Props) {
   const dashOffset = circumference * (1 - progressPercent / 100);
 
   async function addWater(amount: number) {
-    if (!Number.isFinite(amount) || amount === 0 || savingAmount !== null) return;
-    const nextTotal = Math.max(0, intake + amount);
-    setSavingAmount(amount);
+    const delta = Math.round(amount);
+    if (!Number.isFinite(delta) || delta === 0 || savingAmount !== null) return;
+    const nextTotal = Math.max(0, intake + delta);
+    setSavingAmount(delta);
     try {
       const journalText = updateJournalSummary(todayJournal?.journal, nextTotal);
       const saved = todayJournal
@@ -149,7 +148,7 @@ export default function TodayHydrationGoal({ goal, onUpdated }: Props) {
       setCustomAmount("250");
       window.dispatchEvent(new Event("sympto:water-intake-updated"));
       window.dispatchEvent(new Event("sympto:health-checkin-updated"));
-      toast.success(amount > 0 ? `Added ${formatNumber(amount)} ml` : `Removed ${formatNumber(Math.abs(amount))} ml`, {
+      toast.success(delta > 0 ? `Added ${formatNumber(delta)} ml` : `Removed ${formatNumber(Math.abs(delta))} ml`, {
         description: `${formatNumber(nextTotal)} ml recorded for today.`,
       });
       await onUpdated?.();
