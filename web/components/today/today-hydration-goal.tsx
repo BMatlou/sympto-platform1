@@ -50,7 +50,7 @@ function waterAmountFromJournal(journal: HealthJournal | null | undefined): numb
 
   // The structured field is the source of truth, including a deliberately
   // recorded zero. Read the narrative only for older records that lack it.
-  if (journal.waterIntakeMl !== null && journal.waterIntakeMl !== undefined && journal.waterIntakeMl !== "") {
+  if (journal.waterIntakeMl !== null && journal.waterIntakeMl !== undefined) {
     const amount = Number(journal.waterIntakeMl);
     return Number.isFinite(amount) && amount >= 0 ? amount : null;
   }
