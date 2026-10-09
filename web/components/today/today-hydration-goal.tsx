@@ -27,6 +27,19 @@ function formatNumber(value: number | null) {
   return value == null || !Number.isFinite(value) ? "—" : Math.round(value).toLocaleString("en-ZA");
 }
 
+function calendarDaysBetween(fromValue: unknown, toValue: unknown): number | null {
+  const fromKey = dayKey(fromValue);
+  const toKey = dayKey(toValue);
+  if (!fromKey || !toKey) return null;
+
+  const parseDay = (key: string) => {
+    const [year, month, day] = key.split("-").map(Number);
+    return Date.UTC(year, month - 1, day);
+  };
+
+  return Math.round((parseDay(toKey) - parseDay(fromKey)) / 86400000);
+}
+
 function formatDate(value: unknown) {
   if (!value) return "—";
   const date = new Date(String(value));
@@ -82,13 +95,14 @@ export default function TodayHydrationGoal({ goal }: Props) {
   const refreshVersion = useRef(0);
 
   const journey = useMemo(() => {
-    const startDate = new Date(String(goal?.createdAt ?? ""));
-    const targetDate = new Date(String(goal?.targetDate ?? ""));
-    const now = Date.now();
+    const today = new Date();
+    const elapsedCalendarDays = calendarDaysBetween(goal?.createdAt, today);
+    const remainingCalendarDays = calendarDaysBetween(today, goal?.targetDate);
     return {
-      journeyDay: Number.isNaN(startDate.getTime()) ? 1 : Math.max(1, Math.floor((now - startDate.getTime()) / 86400000) + 1),
-      daysLeft: Number.isNaN(targetDate.getTime()) ? null : Math.max(0, Math.ceil((targetDate.getTime() - now) / 86400000)),
-      targetDate,
+      // Journey days follow South African calendar dates, not elapsed 24-hour
+      // periods. A goal created yesterday is already on Day 2 today.
+      journeyDay: elapsedCalendarDays === null ? 1 : Math.max(1, elapsedCalendarDays + 1),
+      daysLeft: remainingCalendarDays === null ? null : Math.max(0, remainingCalendarDays),
     };
   }, [goal?.createdAt, goal?.targetDate]);
 
