@@ -1,21 +1,19 @@
 "use client";
 
 import Link from "next/link";
-import { ArrowRight, Droplets, Minus, Plus } from "lucide-react";
+import { ArrowRight, Droplets } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { toast } from "sonner";
 import { healthJournalService } from "@/services/health-journal.service";
 import type { HealthJournal } from "@/types/health-journal";
 
-type Props = { goal: any; onUpdated?: () => void | Promise<void> };
+type Props = { goal: any };
 
-const QUICK_ADD_ML = [250, 500, 750];
 const DAY_TIME_ZONE = "Africa/Johannesburg";
 
 function dayKey(value: unknown) {
   const date = value instanceof Date ? value : new Date(String(value ?? ""));
   if (Number.isNaN(date.getTime())) return "";
-  const parts = new Intl.DateTimeFormat("en-CA", {
+  const parts = new Intl.DateTimeFormat("en-GB", {
     timeZone: DAY_TIME_ZONE,
     year: "numeric",
     month: "2-digit",
@@ -47,27 +45,40 @@ function targetInMillilitres(goal: any): number | null {
     : target;
 }
 
-function updateJournalSummary(journalText: unknown, waterIntakeMl: number) {
-  const existing = String(journalText ?? "")
-    .replace(/\bWater:\s*[\d,.\s\u00a0\u202f]+\s*ml\.?/gi, "")
-    .replace(/Daily health check-in recorded\.?/gi, "")
-    .replace(/\s+/g, " ")
-    .trim();
-  return [existing, `Water: ${Math.round(waterIntakeMl)} ml.`].filter(Boolean).join(" ");
+function waterAmountFromJournal(journal: HealthJournal | null | undefined): number | null {
+  if (!journal) return null;
+
+  // The structured field is the source of truth, including a deliberately
+  // recorded zero. Read the narrative only for older records that lack it.
+  if (journal.waterIntakeMl !== null && journal.waterIntakeMl !== undefined && journal.waterIntakeMl !== "") {
+    const amount = Number(journal.waterIntakeMl);
+    return Number.isFinite(amount) && amount >= 0 ? amount : null;
+  }
+
+  const match = /\bWater:\s*([\d,.]+)\s*ml\b/i.exec(String(journal.journal ?? ""));
+  if (!match) return null;
+  const amount = Number(match[1].replace(/,/g, ""));
+  return Number.isFinite(amount) && amount >= 0 ? amount : null;
 }
 
-function isTodayCheckIn(journal: HealthJournal, todayKey: string) {
-  return journal.title === "Daily Health Check-in" && dayKey(journal.createdAt) === todayKey;
+function isTodayCheckIn(journal: HealthJournal, today: string) {
+  return String(journal?.title ?? "").trim().toLowerCase() === "daily health check-in"
+    && dayKey(journal.createdAt) === today;
 }
 
-export default function TodayHydrationGoal({ goal, onUpdated }: Props) {
+function journalListFromResponse(response: any): HealthJournal[] {
+  if (Array.isArray(response)) return response;
+  if (Array.isArray(response?.data)) return response.data;
+  if (Array.isArray(response?.data?.data)) return response.data.data;
+  return [];
+}
+
+export default function TodayHydrationGoal({ goal }: Props) {
   const goalId = String(goal?.id ?? "");
   const targetMl = targetInMillilitres(goal);
   const [todayIntakeMl, setTodayIntakeMl] = useState<number | null>(null);
-  const [todayJournal, setTodayJournal] = useState<HealthJournal | null>(null);
-  const [customAmount, setCustomAmount] = useState("250");
   const [loading, setLoading] = useState(true);
-  const [savingAmount, setSavingAmount] = useState<number | null>(null);
+  const [lastUpdatedAt, setLastUpdatedAt] = useState<string | null>(null);
 
   const journey = useMemo(() => {
     const startDate = new Date(String(goal?.createdAt ?? ""));
@@ -78,20 +89,20 @@ export default function TodayHydrationGoal({ goal, onUpdated }: Props) {
       daysLeft: Number.isNaN(targetDate.getTime()) ? null : Math.max(0, Math.ceil((targetDate.getTime() - now) / 86400000)),
       targetDate,
     };
-  }, [goal]);
+  }, [goal?.createdAt, goal?.targetDate]);
 
   const loadToday = useCallback(async () => {
     try {
-      const response = await healthJournalService.getAll({ limit: 100 });
-      const journals = Array.isArray(response?.data) ? response.data : [];
+      const response = await healthJournalService.getAll({ limit: 100, page: 1 });
+      const today = dayKey(new Date());
+      const journals = journalListFromResponse(response);
       const found = journals
-        .filter((journal) => isTodayCheckIn(journal, dayKey(new Date())))
+        .filter((journal) => isTodayCheckIn(journal, today))
         .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())[0] ?? null;
-      setTodayJournal(found);
-      const amount = found?.waterIntakeMl == null ? null : Number(found.waterIntakeMl);
-      setTodayIntakeMl(amount != null && Number.isFinite(amount) && amount >= 0 ? amount : null);
+      setTodayIntakeMl(waterAmountFromJournal(found));
+      setLastUpdatedAt(found?.updatedAt ?? found?.createdAt ?? null);
     } catch {
-      // Keep the last successfully loaded value visible during temporary network errors.
+      // Keep the last confirmed value when a refresh temporarily fails.
     } finally {
       setLoading(false);
     }
@@ -99,14 +110,38 @@ export default function TodayHydrationGoal({ goal, onUpdated }: Props) {
 
   useEffect(() => {
     let active = true;
-    const refresh = async () => {
-      if (!active) return;
-      await loadToday();
+
+    const refresh = () => {
+      if (active) void loadToday();
     };
-    void refresh();
-    const onCheckInUpdated = () => void refresh();
+
+    const onCheckInUpdated = (event: Event) => {
+      const detail = (event as CustomEvent<{ journal?: HealthJournal; waterIntakeMl?: number | string | null }>).detail;
+      const journal = detail?.journal;
+      if (journal && isTodayCheckIn(journal, dayKey(new Date()))) {
+        setTodayIntakeMl(waterAmountFromJournal(journal));
+        setLastUpdatedAt(journal.updatedAt ?? journal.createdAt ?? null);
+        return;
+      }
+
+      if (detail && detail.waterIntakeMl !== undefined) {
+        const value = detail.waterIntakeMl == null || detail.waterIntakeMl === ""
+          ? null
+          : Number(detail.waterIntakeMl);
+        if (value == null || (Number.isFinite(value) && value >= 0)) {
+          setTodayIntakeMl(value);
+          setLastUpdatedAt(new Date().toISOString());
+          return;
+        }
+      }
+
+      refresh();
+    };
+
+    refresh();
     window.addEventListener("sympto:health-checkin-updated", onCheckInUpdated);
-    const interval = window.setInterval(() => void refresh(), 15000);
+    const interval = window.setInterval(refresh, 15000);
+
     return () => {
       active = false;
       window.clearInterval(interval);
@@ -114,54 +149,21 @@ export default function TodayHydrationGoal({ goal, onUpdated }: Props) {
     };
   }, [loadToday, goalId]);
 
-  const intake = todayIntakeMl ?? 0;
-  const progressPercent = targetMl != null ? Math.min(100, Math.round((intake / targetMl) * 100)) : 0;
-  const remainingMl = targetMl == null ? null : Math.max(0, targetMl - intake);
-  const targetReached = todayIntakeMl != null && targetMl != null && intake >= targetMl;
+  const progressPercent = todayIntakeMl != null && targetMl != null
+    ? Math.min(100, Math.round((todayIntakeMl / targetMl) * 100))
+    : 0;
+  const remainingMl = targetMl == null || todayIntakeMl == null
+    ? targetMl
+    : Math.max(0, targetMl - todayIntakeMl);
+  const targetReached = todayIntakeMl != null && targetMl != null && todayIntakeMl >= targetMl;
   const unusuallySmallTarget = targetMl != null && targetMl < 250;
   const ringSize = 104;
   const ringStroke = 10;
   const radius = (ringSize - ringStroke) / 2;
   const circumference = 2 * Math.PI * radius;
   const dashOffset = circumference * (1 - progressPercent / 100);
-
-  async function addWater(amount: number) {
-    const delta = Math.round(amount);
-    if (!Number.isFinite(delta) || delta === 0 || savingAmount !== null) return;
-    const nextTotal = Math.max(0, intake + delta);
-    setSavingAmount(delta);
-    try {
-      const journalText = updateJournalSummary(todayJournal?.journal, nextTotal);
-      const saved = todayJournal
-        ? await healthJournalService.update(todayJournal.id, {
-            waterIntakeMl: nextTotal,
-            journal: journalText,
-          })
-        : await healthJournalService.create({
-            title: "Daily Health Check-in",
-            journal: journalText,
-            waterIntakeMl: nextTotal,
-            notes: "Captured from the Hydration goal card on Today.",
-          });
-      setTodayJournal(saved);
-      setTodayIntakeMl(nextTotal);
-      setCustomAmount("250");
-      window.dispatchEvent(new Event("sympto:water-intake-updated"));
-      window.dispatchEvent(new Event("sympto:health-checkin-updated"));
-      toast.success(delta > 0 ? `Added ${formatNumber(delta)} ml` : `Removed ${formatNumber(Math.abs(delta))} ml`, {
-        description: `${formatNumber(nextTotal)} ml recorded for today.`,
-      });
-      await onUpdated?.();
-    } catch (error: any) {
-      const message = error?.response?.data?.message;
-      toast.error(Array.isArray(message) ? message.join(" ") : String(message || "Water intake could not be saved."));
-    } finally {
-      setSavingAmount(null);
-    }
-  }
-
   const formattedTarget = targetMl == null
-    ? "Set a daily target"
+    ? "Target not set"
     : targetMl >= 1000
       ? `${(targetMl / 1000).toLocaleString("en-ZA", { maximumFractionDigits: 2 })} L`
       : `${formatNumber(targetMl)} ml`;
@@ -188,7 +190,7 @@ export default function TodayHydrationGoal({ goal, onUpdated }: Props) {
             <div className="relative shrink-0" style={{ width: ringSize, height: ringSize }}>
               <svg width={ringSize} height={ringSize} viewBox={`0 0 ${ringSize} ${ringSize}`} className="-rotate-90" aria-hidden="true">
                 <circle cx={ringSize / 2} cy={ringSize / 2} r={radius} fill="none" stroke="rgba(255,255,255,.12)" strokeWidth={ringStroke} />
-                {targetMl != null && <circle cx={ringSize / 2} cy={ringSize / 2} r={radius} fill="none" stroke="#24c1c4" strokeWidth={ringStroke} strokeLinecap="round" strokeDasharray={circumference} strokeDashoffset={dashOffset} />}
+                {targetMl != null && todayIntakeMl != null && <circle cx={ringSize / 2} cy={ringSize / 2} r={radius} fill="none" stroke="#24c1c4" strokeWidth={ringStroke} strokeLinecap="round" strokeDasharray={circumference} strokeDashoffset={dashOffset} />}
               </svg>
               <div className="absolute inset-0 grid place-items-center text-center">
                 <div>
@@ -204,19 +206,19 @@ export default function TodayHydrationGoal({ goal, onUpdated }: Props) {
                 <div>
                   <p className="text-[8px] font-black uppercase tracking-[.16em] text-white/40">Daily target</p>
                   <p className="mt-1 text-xl font-black leading-none tracking-[-.045em]">{targetMl == null ? "—" : formatNumber(targetMl)}</p>
-                  <p className="mt-1 text-[9px] font-semibold text-white/50">{targetMl != null && targetMl >= 1000 ? "ml · " + formattedTarget : "millilitres"}</p>
+                  <p className="mt-1 text-[9px] font-semibold text-white/50">{targetMl != null && targetMl >= 1000 ? `ml · ${formattedTarget}` : "millilitres"}</p>
                 </div>
                 <div className="border-l border-white/10 pl-3 sm:pl-4">
                   <p className="text-[8px] font-black uppercase tracking-[.16em] text-white/40">Progress</p>
                   <p className="mt-1 text-xl font-black leading-none tracking-[-.045em]">{todayIntakeMl == null || targetMl == null ? "—" : `${progressPercent}%`}</p>
-                  <p className="mt-1 text-[9px] font-semibold text-white/50">{remainingMl == null ? "target needed" : remainingMl > 0 ? `${formatNumber(remainingMl)} ml to go` : "minimum met"}</p>
+                  <p className="mt-1 text-[9px] font-semibold text-white/50">{remainingMl == null ? "target needed" : todayIntakeMl == null ? `${formatNumber(remainingMl)} ml target` : remainingMl > 0 ? `${formatNumber(remainingMl)} ml to go` : "minimum met"}</p>
                 </div>
               </div>
               <div className="mt-3 h-1.5 overflow-hidden rounded-full bg-white/10">
                 <div className="h-full rounded-full bg-[#24c1c4] transition-[width] duration-500" style={{ width: `${todayIntakeMl == null ? 0 : progressPercent}%` }} />
               </div>
               <p className="mt-2 text-[9px] font-semibold text-white/55">
-                {todayIntakeMl == null ? "Log a drink or update water in your Daily Health Check-in." : targetReached ? "Your saved intake has reached its daily target." : "Small, regular drinks help you build a steady routine."}
+                {todayIntakeMl == null ? "Water intake will appear here after you save today's Daily Health Check-in." : targetReached ? "Your saved intake has reached its daily target." : "Keep recording water in your Daily Health Check-in; your progress updates here."}
               </p>
             </div>
           </div>
@@ -228,33 +230,12 @@ export default function TodayHydrationGoal({ goal, onUpdated }: Props) {
           </div>
         )}
 
-        <section className="mt-3 rounded-[18px] border border-[#e1ecee] bg-[#f8fbfb] p-3">
-          <div className="flex items-center justify-between gap-3">
-            <p className="text-[8px] font-black uppercase tracking-[.14em] text-[#74859a]">Add water</p>
-            <p className="text-[8px] font-bold text-[#91a0aa]">Quick log · ml</p>
-          </div>
-          <div className="mt-2 grid grid-cols-3 gap-2">
-            {QUICK_ADD_ML.map((amount) => (
-              <button key={amount} type="button" disabled={savingAmount !== null || loading} onClick={() => void addWater(amount)} className="inline-flex min-h-11 items-center justify-center gap-1 rounded-xl border border-[#d9e9eb] bg-white px-2 py-2 text-[10px] font-black text-[#0b2d54] transition hover:border-[#24c1c4] hover:bg-[#effafa] disabled:cursor-not-allowed disabled:opacity-50">
-                <Plus className="h-3 w-3 text-[#0b7b80]" /> {amount} ml
-              </button>
-            ))}
-          </div>
-          <div className="mt-2 flex items-center gap-2">
-            <label htmlFor={`custom-water-${goalId}`} className="sr-only">Custom water amount in millilitres</label>
-            <input id={`custom-water-${goalId}`} type="number" inputMode="numeric" min="1" max="5000" step="50" value={customAmount} onChange={(event) => setCustomAmount(event.target.value)} className="min-h-10 min-w-0 flex-1 rounded-xl border border-[#d7e4e8] bg-white px-3 text-xs font-bold text-[#0b2d54] outline-none focus:border-[#24c1c4]" />
-            <button type="button" disabled={savingAmount !== null || loading || !customAmount.trim() || !Number.isFinite(Number(customAmount)) || Number(customAmount) < 1 || Number(customAmount) > 5000} onClick={() => void addWater(Number(customAmount))} className="inline-flex min-h-10 shrink-0 items-center justify-center gap-1 rounded-xl bg-[#0b2d54] px-3.5 py-2 text-[9px] font-black text-white disabled:opacity-50">
-              {savingAmount !== null ? "Saving…" : "Add amount"}
-            </button>
-          </div>
-          <button type="button" disabled={savingAmount !== null || loading || intake < 250} onClick={() => void addWater(-250)} className="mt-2 inline-flex min-h-8 items-center gap-1 rounded-lg px-2 text-[9px] font-bold text-[#74859a] transition hover:bg-white hover:text-[#0b2d54] disabled:cursor-not-allowed disabled:opacity-40">
-            <Minus className="h-3 w-3" /> Remove 250 ml
-          </button>
-        </section>
-
         <div className="mt-3 flex items-center justify-between gap-3 rounded-[18px] border border-[#e2ecef] bg-[#fbfdfd] px-3 py-2.5">
-          <p className="min-w-0 text-[9px] font-semibold leading-4 text-[#74859a]">This total is saved to your Daily Health Check-in. Changes made in either place stay in sync.</p>
-          <Link href="#daily-health-check-in" className="shrink-0 rounded-xl bg-[#0b2d54] px-3 py-2 text-[9px] font-black text-white">Check-in</Link>
+          <div className="min-w-0">
+            <p className="text-[9px] font-semibold leading-4 text-[#74859a]">Your Daily Health Check-in is the single place to record water. This card only displays the saved daily total.</p>
+            {lastUpdatedAt && <p className="mt-1 text-[8px] text-[#9aa8b3]">Updated {new Intl.DateTimeFormat("en-ZA", { hour: "2-digit", minute: "2-digit" }).format(new Date(lastUpdatedAt))}</p>}
+          </div>
+          <Link href="#daily-health-check-in" className="shrink-0 rounded-xl bg-[#0b2d54] px-3 py-2 text-[9px] font-black text-white">Open check-in</Link>
         </div>
       </div>
 
