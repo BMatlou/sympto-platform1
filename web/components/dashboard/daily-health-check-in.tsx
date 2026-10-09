@@ -88,10 +88,14 @@ function normaliseUnit(value: unknown) {
 }
 
 function hydrationTarget(goal?: Goal) {
-  if (!goal || goal.targetValue == null) return DEFAULT_WATER_GOAL_ML;
-  const target = numberValue(goal.targetValue, DEFAULT_WATER_GOAL_ML);
-  const unit = normaliseUnit(goal.unit);
-  return ["l", "liter", "litre", "liters", "litres"].includes(unit) ? target * 1000 : target;
+  if (!goal) return DEFAULT_WATER_GOAL_ML;
+  const configuredTarget = goal.metricConfig?.frequencyTarget ?? goal.targetValue;
+  if (configuredTarget == null) return DEFAULT_WATER_GOAL_ML;
+  const target = numberValue(configuredTarget, DEFAULT_WATER_GOAL_ML);
+  const unit = normaliseUnit(goal.unit).replace(/\s+/g, "");
+  return ["l", "l/day", "liter", "litre", "liters", "litres", "liter/day", "litre/day", "liters/day", "litres/day"].includes(unit)
+    ? target * 1000
+    : target;
 }
 
 function exerciseTarget(goal?: Goal) {
