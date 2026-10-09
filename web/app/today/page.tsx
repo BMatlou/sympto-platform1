@@ -10,6 +10,7 @@ import HealthVitalsSummary, { type DashboardVital } from "@/components/dashboard
 import PrescribedMedicationsCard from "@/components/today/prescribed-medications-card";
 import TodayMedicationActions from "@/components/today/today-medication-actions";
 import TodaySmokingGoal from "@/components/today/today-smoking-goal";
+import TodayHydrationGoal from "@/components/today/today-hydration-goal";
 import TodayAlcoholGoal from "@/components/today/today-alcohol-goal";
 import TodayWeightGoal from "@/components/today/today-weight-goal";
 import TodayExerciseGoal from "@/components/today/today-exercise-goal";
@@ -483,6 +484,9 @@ export default function TodayPage() {
               const category = String(goal?.category ?? "").toUpperCase();
               if (category === "NUTRITION") {
                 return <TodayNutritionGoal key={String(goal?.id ?? "nutrition-" + index)} goal={goal} onUpdated={reload} />;
+              }
+              if (category === "HYDRATION") {
+                return <TodayHydrationGoal key={String(goal?.id ?? "hydration-" + index)} goal={goal} onUpdated={reload} />;
               }
               return (
                 <TodaySupportedGoalCard
