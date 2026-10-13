@@ -293,11 +293,19 @@ export default function TodayBloodGlucoseGoal({ goal, patientId = "", currentWei
     exerciseMinutes: number | null;
     sleepHours: number | null;
     hydrationMl: number | null;
+    bloodPressureValue: string | null;
+    bloodPressureMeasuredAt: string | null;
+    weightKg: number | null;
+    weightMeasuredAt: string | null;
   }>({
     calories: null,
     exerciseMinutes: null,
     sleepHours: null,
     hydrationMl: null,
+    bloodPressureValue: null,
+    bloodPressureMeasuredAt: null,
+    weightKg: null,
+    weightMeasuredAt: null,
   });
 
   const journey = useMemo(() => {
@@ -383,6 +391,32 @@ export default function TodayBloodGlucoseGoal({ goal, patientId = "", currentWei
       return Number.isFinite(numeric) && numeric >= 0 ? numeric : null;
     };
 
+    // Health Vitals writes manual measurements into this dedicated journal
+    // entry; read the same source as the Current health panel.
+    const measurementJournals = journals
+      .filter((entry: any) =>
+        String(entry?.title ?? "") === "[Sympto] Today's measurements"
+        && localDayKey(entry?.updatedAt ?? entry?.createdAt) === today,
+      )
+      .sort((a: any, b: any) =>
+        new Date(String(b?.updatedAt ?? b?.createdAt ?? 0)).getTime()
+        - new Date(String(a?.updatedAt ?? a?.createdAt ?? 0)).getTime(),
+      );
+    const latestMeasurementJournal = measurementJournals[0] ?? null;
+    const systolic = Number(latestMeasurementJournal?.bloodPressureSystolic);
+    const diastolic = Number(latestMeasurementJournal?.bloodPressureDiastolic);
+    const bloodPressureValue = latestMeasurementJournal?.bloodPressureSystolic != null
+      && latestMeasurementJournal?.bloodPressureDiastolic != null
+      && Number.isFinite(systolic) && Number.isFinite(diastolic)
+      ? systolic + "/" + diastolic + " mmHg"
+      : null;
+    const journalWeight = latestMeasurementJournal?.weightKg == null || latestMeasurementJournal?.weightKg === ""
+      ? null
+      : Number(latestMeasurementJournal.weightKg);
+    const measuredAt = latestMeasurementJournal
+      ? String(latestMeasurementJournal.updatedAt ?? latestMeasurementJournal.createdAt ?? "")
+      : null;
+
     setDailyContext({
       // The Nutrition goal counts recorded meal events. Zero means no calories
       // have been logged today, not that the user consumed zero calories.
@@ -394,6 +428,10 @@ export default function TodayBloodGlucoseGoal({ goal, patientId = "", currentWei
       exerciseMinutes: checkInValue("exerciseMinutes") ?? (todayExercise.length ? Number(todayExercise[0].loggedValue) : null),
       sleepHours: checkInValue("sleepHours") ?? (todaySleep.length ? Number(todaySleep[0].loggedValue) : null),
       hydrationMl: checkInValue("waterIntakeMl"),
+      bloodPressureValue,
+      bloodPressureMeasuredAt: measuredAt,
+      weightKg: journalWeight != null && Number.isFinite(journalWeight) && journalWeight > 0 ? journalWeight : null,
+      weightMeasuredAt: journalWeight != null && Number.isFinite(journalWeight) && journalWeight > 0 ? measuredAt : null,
     });
   }, [hasActiveNutritionGoal]);
 
@@ -498,8 +536,9 @@ export default function TodayBloodGlucoseGoal({ goal, patientId = "", currentWei
   const systolicMeasurement = measurementFor(["BLOOD_PRESSURE_SYSTOLIC", "SYSTOLIC_PRESSURE", "SYSTOLIC"]);
   const diastolicMeasurement = measurementFor(["BLOOD_PRESSURE_DIASTOLIC", "DIASTOLIC_PRESSURE", "DIASTOLIC"]);
   const compositeBloodPressure = bloodPressureMeasurement?.value != null ? String(bloodPressureMeasurement.value).trim() : "";
-  const bloodPressureValue = compositeBloodPressure.includes("/")
-    ? compositeBloodPressure + (bloodPressureMeasurement?.unit ? " " + String(bloodPressureMeasurement.unit) : "")
+  const bpUnit = String(bloodPressureMeasurement?.unit ?? "mmHg").trim();
+  const bloodPressureFromMeasurements = compositeBloodPressure.includes("/")
+    ? compositeBloodPressure + (bpUnit && !/mmhg/i.test(compositeBloodPressure) ? " " + bpUnit : "")
     : systolicMeasurement?.value != null && diastolicMeasurement?.value != null
       ? String(systolicMeasurement.value) + "/" + String(diastolicMeasurement.value) + " mmHg"
       : systolicMeasurement?.value != null
@@ -507,14 +546,14 @@ export default function TodayBloodGlucoseGoal({ goal, patientId = "", currentWei
         : compositeBloodPressure || null;
   const bpDates = [bloodPressureMeasurement?.measuredAt, systolicMeasurement?.measuredAt, diastolicMeasurement?.measuredAt].filter(Boolean).map((item: any) => String(item));
   const bloodPressureContext = {
-    value: bloodPressureValue,
-    measuredAt: bpDates.sort((a: string, b: string) => new Date(b).getTime() - new Date(a).getTime())[0] ?? null,
+    value: dailyContext.bloodPressureValue ?? bloodPressureFromMeasurements,
+    measuredAt: dailyContext.bloodPressureMeasuredAt ?? bpDates.sort((a: string, b: string) => new Date(b).getTime() - new Date(a).getTime())[0] ?? null,
   };
   const weightMeasurement = measurementFor(["WEIGHT", "BODY_WEIGHT", "WEIGHT_KG"]);
-  const numericWeight = weightMeasurement?.value == null ? Number(currentWeightKg) : Number(weightMeasurement.value);
+  const numericWeight = dailyContext.weightKg ?? (weightMeasurement?.value == null ? Number(currentWeightKg) : Number(weightMeasurement.value));
   const weightContext = {
     value: Number.isFinite(numericWeight) && numericWeight > 0 ? numericWeight : null,
-    measuredAt: weightMeasurement?.measuredAt ?? null,
+    measuredAt: dailyContext.weightMeasuredAt ?? weightMeasurement?.measuredAt ?? null,
   };
   const linkedCarePlan = carePlans.find((plan: any) => String(plan?.id ?? "") === String(goal?.carePlanId ?? "")) ?? null;
   const linkedCarePlanPractitioner = linkedCarePlan?.practitioner?.person
