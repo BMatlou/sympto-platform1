@@ -36,6 +36,12 @@ function localDayKey(value: unknown = new Date()) {
   return String(values.year) + "-" + String(values.month) + "-" + String(values.day);
 }
 
+function localDateTimeInput(date: Date) {
+  const pad = (value: number) => String(value).padStart(2, "0");
+  return date.getFullYear() + "-" + pad(date.getMonth() + 1) + "-" + pad(date.getDate())
+    + "T" + pad(date.getHours()) + ":" + pad(date.getMinutes());
+}
+
 function formatNumber(value: number | null | undefined) {
   if (value == null || !Number.isFinite(Number(value))) return "—";
   return new Intl.NumberFormat("en-ZA", { maximumFractionDigits: 1, minimumFractionDigits: 0 }).format(Number(value));
@@ -93,7 +99,7 @@ export default function TodayBloodGlucoseGoal({ goal, onUpdated }: Props) {
   const [value, setValue] = useState("");
   const [readingContext, setReadingContext] = useState<GlucoseContext | "">("");
   const [note, setNote] = useState("");
-  const [measurementTime, setMeasurementTime] = useState(() => new Date().toISOString().slice(0, 16));
+  const [measurementTime, setMeasurementTime] = useState(() => localDateTimeInput(new Date()));
 
   const journey = useMemo(() => {
     const today = localDayKey(new Date());
@@ -249,7 +255,7 @@ export default function TodayBloodGlucoseGoal({ goal, onUpdated }: Props) {
             <div className="relative grid shrink-0 place-items-center rounded-full" style={{ width: ringSize, height: ringSize }}>
               <svg width={ringSize} height={ringSize} viewBox={"0 0 " + ringSize + " " + ringSize} className="-rotate-90" aria-hidden="true">
                 <circle cx={ringSize / 2} cy={ringSize / 2} r={radius} fill="none" stroke="rgba(255,255,255,.15)" strokeWidth={ringStroke} />
-                <circle cx={ringSize / 2} cy={ringSize / 2} r={radius} fill="none" stroke={veryLow ? "#f87171" : low ? "#fbbf24" : "#24c1c4"} strokeWidth={ringStroke} strokeLinecap="round" strokeDasharray={2 * Math.PI * radius * 0.72} strokeDashoffset={0} />
+                <circle cx={ringSize / 2} cy={ringSize / 2} r={radius} fill="none" stroke={veryLow ? "#f87171" : low ? "#fbbf24" : "#24c1c4"} strokeWidth={ringStroke} strokeLinecap="round" strokeDasharray={2 * Math.PI * radius} strokeDashoffset={0} />
               </svg>
               <div className="absolute inset-0 grid place-items-center text-center">
                 <div>
@@ -275,7 +281,7 @@ export default function TodayBloodGlucoseGoal({ goal, onUpdated }: Props) {
               </div>
               <div className="mt-3 flex flex-wrap items-center gap-2">
                 <span className="rounded-full bg-white/10 px-2.5 py-1.5 text-[9px] font-black text-[#b8ffff] ring-1 ring-white/10">{target == null ? "No target set" : "Saved target · " + formatNumber(target) + " mmol/L"}</span>
-                <span className="truncate text-[9px] font-semibold text-white/60">{targetLinked ? "Care-plan linked" : "Confirm target with clinician"}</span>
+                <span className="truncate text-[9px] font-semibold text-white/60">{target == null ? "Personal target optional" : targetLinked ? "Provider-linked goal" : "Confirm target with clinician"}</span>
               </div>
             </div>
           </div>
@@ -341,7 +347,7 @@ export default function TodayBloodGlucoseGoal({ goal, onUpdated }: Props) {
 
         <div className="mt-3 flex items-center justify-between gap-3 rounded-[18px] border border-[#e2ecef] bg-[#fbfdfd] px-3 py-2.5">
           <p className="min-w-0 text-[9px] font-semibold leading-4 text-[#74859a]">{latest ? "Your glucose history keeps each reading and its context. The saved target is not used to score a reading until a context-specific range is confirmed." : "Start by recording a measured value and when it was taken. You can track readings while arranging a target review."}</p>
-          <button type="button" onClick={() => { setOpen((current) => !current); if (!open) { setMeasurementTime(new Date().toISOString().slice(0, 16)); setReadingContext(""); } }} className="inline-flex shrink-0 items-center gap-1.5 rounded-xl bg-[#0b2d54] px-3 py-2 text-[9px] font-black text-white"><Plus className="h-3 w-3" />{open ? "Close" : "Record"}</button>
+          <button type="button" onClick={() => { setOpen((current) => !current); if (!open) { setMeasurementTime(localDateTimeInput(new Date())); setReadingContext(""); } }} className="inline-flex shrink-0 items-center gap-1.5 rounded-xl bg-[#0b2d54] px-3 py-2 text-[9px] font-black text-white"><Plus className="h-3 w-3" />{open ? "Close" : "Record"}</button>
         </div>
 
         <section className="mt-3 overflow-hidden rounded-[18px] border border-[#e2ecef]">
