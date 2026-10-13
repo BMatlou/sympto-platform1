@@ -330,7 +330,7 @@ export default function TodayBloodGlucoseGoal({ goal, onUpdated, conditions = []
   );
   const latestLabGlucose = latestReleasedLabMeasure(
     labOrders,
-    /^(?!.*(?:hba1c|hemoglobin a1c|haemoglobin a1c|glycated haemoglobin|glycated hemoglobin|glycosylated hemoglobin)).*(?:blood glucose|plasma glucose|fasting glucose|random glucose|glucose tolerance|glucose)$/i,
+    /^(?!.*(?:hba1c|hemoglobin a1c|haemoglobin a1c|glycated haemoglobin|glycated hemoglobin|glycosylated hemoglobin)).*glucose.*$/i,
   );
 
   async function saveReading() {
