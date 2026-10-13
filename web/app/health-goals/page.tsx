@@ -138,6 +138,7 @@ function goalCurrent(goal: any) {
   const value = isBloodGlucose
     ? goal?.currentValue ?? goal?.latestValue
     : goal?.latestValue ?? goal?.latestProgress?.currentValue ?? goal?.progress?.[0]?.currentValue ?? goal?.currentValue;
+  if (isBloodGlucose && (value === null || value === undefined || value === "")) return null;
   const number = Number(value);
   if (!Number.isFinite(number)) return null;
   const unit = String(goal?.unit ?? "").trim();
