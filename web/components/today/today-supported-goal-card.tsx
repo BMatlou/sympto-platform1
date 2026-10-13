@@ -701,7 +701,7 @@ export default function TodaySupportedGoalCard({ goal, activeGoals = [], onUpdat
               <div className="rounded-[17px] border border-[#e1ecef] bg-white p-3">
                 <p className="text-[8px] font-black uppercase tracking-[.12em] text-[#82939f]">Target consistency</p>
                 <p className="mt-1 text-xl font-black tracking-[-.04em] text-[#0b2d54]">
-                  {sleepInsight.targetNights == null ? "—" : sleepInsight.targetNights + " / " + sleepInsight.latestSeven.length}
+                  {sleepInsight.targetNights == null || sleepInsight.latestSeven.length === 0 ? "—" : sleepInsight.targetNights + " / " + sleepInsight.latestSeven.length}
                 </p>
                 <p className="mt-1 text-[9px] leading-4 text-[#74859a]">
                   {sleepInsight.targetNights == null
@@ -716,9 +716,7 @@ export default function TodaySupportedGoalCard({ goal, activeGoals = [], onUpdat
                   <p className="text-[10px] font-black leading-4 text-[#0b2d54]">{sleepInsight.trendTitle}</p>
                 </div>
                 <p className="mt-1 text-[9px] leading-4 text-[#74859a]">
-                  {sleepInsight.trend === "BUILDING"
-                    ? sleepInsight.latestSeven.length + " recent nights recorded"
-                    : sleepInsight.trendText}
+                  {sleepInsight.trendText}
                 </p>
               </div>
             </div>
