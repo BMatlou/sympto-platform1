@@ -434,7 +434,7 @@ export default function TodayBloodGlucoseGoal({ goal, patientId = "", currentWei
     if (!["ACTIVE", "IN_PROGRESS", "ON_TRACK", "IMPROVING", "STAGNANT", "DECLINING"].includes(status)) continue;
     if (category === "MEDICATION") {
       const medicationId = String(related?.patientMedicationId ?? related?.patientMedication?.id ?? "");
-      const linkedMedication = activeMedicationRecords.find((item: any) => String(item?.patientMedicationId ?? item?.id ?? "") === medicationId);
+      const linkedMedication = activeMedicationRecords.find((item: any) => String(item?.patientMedicationId ?? item?.patientMedication?.id ?? item?.id ?? "") === medicationId);
       const goalText = normaliseContextText(String(related?.title ?? "") + " " + String(related?.description ?? ""));
       const relevantByMedication = linkedMedication && (medicationHasExplicitGlucoseIndication(linkedMedication) || medicationNameSuggestsGlucoseTherapy(linkedMedication));
       const relevantByGoalText = /diabetes|glucose|insulin|metformin|gliclazide|glimepiride|sitagliptin|empagliflozin|dapagliflozin/.test(goalText);
@@ -793,7 +793,7 @@ export default function TodayBloodGlucoseGoal({ goal, patientId = "", currentWei
           <div className="mt-3 border-t border-[#e8eff1] pt-3">
             <div className="flex items-center justify-between gap-2">
               <p className="text-[8px] font-black uppercase tracking-[.14em] text-[#8a99a6]">Goals connected to glucose</p>
-              {relevantGoals.length > 0 && <span className="text-[8px] font-semibold text-[#74859a]">{relevantGoals.length} tracking</span>}
+              {relevantGoals.length > 0 && <span className="text-[8px] font-semibold text-[#74859a]">{allRelevantGoals.length} tracking</span>}
             </div>
             {relevantGoals.length > 0 ? (
               <div className="mt-1.5 flex flex-wrap gap-1.5">
