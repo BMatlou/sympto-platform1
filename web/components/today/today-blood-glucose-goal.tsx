@@ -271,13 +271,13 @@ export default function TodayBloodGlucoseGoal({ goal, onUpdated, conditions = []
       ? "Prediabetes recorded"
       : "No diabetes diagnosis recorded";
   const diabetesStatusDetail = diabetesDiagnosis
-    ? "Found in practitioner diagnosis records"
+    ? "Found in practitioner diagnosis records · " + recordDisplayName(diabetesDiagnosis)
     : diabetesCondition
-      ? (diabetesCondition.diagnosedBy || diabetesCondition.treatmentPlan ? "Clinician-recorded health condition" : "Health condition record")
+      ? (diabetesCondition.diagnosedBy || diabetesCondition.treatmentPlan ? "Clinician-recorded health condition · " : "Health condition record · ") + recordDisplayName(diabetesCondition)
       : prediabetesDiagnosis
-        ? "Found in practitioner diagnosis records"
+        ? "Found in practitioner diagnosis records · " + recordDisplayName(prediabetesDiagnosis)
         : prediabetesCondition
-          ? "Prediabetes is recorded in Health Conditions"
+          ? "Prediabetes is recorded in Health Conditions · " + recordDisplayName(prediabetesCondition)
           : "No matching entry was found in the current records; this does not rule out diabetes.";
 
   const activeMedicationRecords = medications.filter(activeRecord);
@@ -295,6 +295,14 @@ export default function TodayBloodGlucoseGoal({ goal, onUpdated, conditions = []
     const status = String(related?.status ?? "ACTIVE").toUpperCase();
     if (!relatedId || relatedId === goalId || !["MEDICATION", "NUTRITION", "EXERCISE", "SLEEP", "WEIGHT", "BLOOD_PRESSURE"].includes(category)) continue;
     if (!["ACTIVE", "IN_PROGRESS", "ON_TRACK", "IMPROVING", "STAGNANT", "DECLINING"].includes(status)) continue;
+    if (category === "MEDICATION") {
+      const medicationId = String(related?.patientMedicationId ?? related?.patientMedication?.id ?? "");
+      const linkedMedication = activeMedicationRecords.find((item: any) => String(item?.patientMedicationId ?? item?.id ?? "") === medicationId);
+      const goalText = normaliseContextText(String(related?.title ?? "") + " " + String(related?.description ?? ""));
+      const relevantByMedication = linkedMedication && (medicationHasExplicitGlucoseIndication(linkedMedication) || medicationNameSuggestsGlucoseTherapy(linkedMedication));
+      const relevantByGoalText = /diabetes|glucose|insulin|metformin|gliclazide|glimepiride|sitagliptin|empagliflozin|dapagliflozin/.test(goalText);
+      if (!relevantByMedication && !relevantByGoalText) continue;
+    }
     if (!connectedGoalMap.has(relatedId)) connectedGoalMap.set(relatedId, related);
   }
   const relevantGoals = Array.from(connectedGoalMap.values()).slice(0, 4);
