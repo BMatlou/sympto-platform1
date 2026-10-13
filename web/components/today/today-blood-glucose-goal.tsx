@@ -139,6 +139,10 @@ function medicationHasExplicitGlucoseIndication(record: any) {
   return /diabetes|diabetic|blood glucose|blood sugar|glyc(a|e)emic|prediabetes/.test(indication);
 }
 
+function patientMedicationId(record: any) {
+  return String(record?.patientMedicationId ?? record?.patientMedication?.id ?? record?.id ?? "");
+}
+
 function medicationNameSuggestsGlucoseTherapy(record: any) {
   const name = normaliseContextText(medicationDisplayName(record));
   return [
@@ -206,6 +210,12 @@ export default function TodayBloodGlucoseGoal({ goal, onUpdated, conditions = []
   const [readingContext, setReadingContext] = useState<GlucoseContext | "">("");
   const [note, setNote] = useState("");
   const [measurementTime, setMeasurementTime] = useState(() => localDateTimeInput(new Date()));
+  const [selectedMedicationId, setSelectedMedicationId] = useState("");
+  const [dailyContext, setDailyContext] = useState<{ calories: number | null; exerciseMinutes: number | null; sleepHours: number | null }>({
+    calories: null,
+    exerciseMinutes: null,
+    sleepHours: null,
+  });
 
   const journey = useMemo(() => {
     const today = localDayKey(new Date());
@@ -250,9 +260,41 @@ export default function TodayBloodGlucoseGoal({ goal, onUpdated, conditions = []
     }
   }, [goalId]);
 
+  const loadDailyContext = useCallback(async () => {
+    const to = new Date();
+    const from = new Date(to.getTime() - 48 * 60 * 60 * 1000);
+    const today = localDayKey(new Date());
+    const [nutritionResult, exerciseResult, sleepResult] = await Promise.allSettled([
+      healthGoalsService.getMetricEvents("NUTRITION", "nutrition.calories", from, to, "goal-manual"),
+      healthGoalsService.getMetricEvents("EXERCISE", "exercise.minutes", from, to, "health-journal"),
+      healthGoalsService.getMetricEvents("SLEEP", "sleep.hours", from, to, "health-journal"),
+    ]);
+    const eventsFrom = (result: PromiseSettledResult<HealthGoalMetricEventsResponse>) =>
+      result.status === "fulfilled" && Array.isArray(result.value?.events) ? result.value.events : [];
+    const todayNutrition = eventsFrom(nutritionResult)
+      .filter((event) => localDayKey(event.occurredAt) === today && Number.isFinite(Number(event.loggedValue)) && Number(event.loggedValue) >= 0);
+    const todayExercise = eventsFrom(exerciseResult)
+      .filter((event) => localDayKey(event.occurredAt) === today && Number.isFinite(Number(event.loggedValue)) && Number(event.loggedValue) >= 0)
+      .sort((a, b) => new Date(b.occurredAt).getTime() - new Date(a.occurredAt).getTime());
+    const todaySleep = eventsFrom(sleepResult)
+      .filter((event) => localDayKey(event.occurredAt) === today && Number.isFinite(Number(event.loggedValue)) && Number(event.loggedValue) >= 0)
+      .sort((a, b) => new Date(b.occurredAt).getTime() - new Date(a.occurredAt).getTime());
+    setDailyContext({
+      calories: todayNutrition.length ? todayNutrition.reduce((sum, event) => sum + Number(event.loggedValue), 0) : null,
+      // Daily Check-in entries are snapshots. Use the latest today, not a sum,
+      // to avoid counting multiple updated snapshots more than once.
+      exerciseMinutes: todayExercise.length ? Number(todayExercise[0].loggedValue) : null,
+      sleepHours: todaySleep.length ? Number(todaySleep[0].loggedValue) : null,
+    });
+  }, []);
+
   useEffect(() => {
     void loadEvents();
-    const refresh = () => void loadEvents();
+    void loadDailyContext();
+    const refresh = () => {
+      void loadEvents();
+      void loadDailyContext();
+    };
     window.addEventListener("sympto:health-goal-updated", refresh);
     window.addEventListener("sympto:today-action-updated", refresh);
     const interval = window.setInterval(refresh, 60000);
@@ -261,7 +303,7 @@ export default function TodayBloodGlucoseGoal({ goal, onUpdated, conditions = []
       window.removeEventListener("sympto:today-action-updated", refresh);
       window.clearInterval(interval);
     };
-  }, [loadEvents]);
+  }, [loadEvents, loadDailyContext]);
 
   const latest = events[0] ?? null;
   const todayKey = localDayKey(new Date());
