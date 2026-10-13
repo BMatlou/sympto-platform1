@@ -12,7 +12,7 @@ export type NutritionFood = {
   portions: Array<{ amount: number; modifier?: string | null; gramWeight: number; unit?: string | null; }>;
   source: string;
 };
-export type HealthGoalInput = { patientId: string; practitionerId?: string; carePlanId?: string; patientMedicationId?: string; title: string; description?: string; category: string; priority?: string; status?: string; targetValue?: string; currentValue?: string; unit?: string; targetDate?: string; metricType?: string; metricKey?: string; frequency?: "DAILY" | "WEEKLY" | "TOTAL"; frequencyTarget?: string; aggregation?: "SUM" | "LATEST" | "AVERAGE" | "MIN" | "MAX"; comparison?: "AT_LEAST" | "AT_MOST" | "CLOSEST" | "INCREASE_TO" | "DECREASE_TO"; guidanceText?: string; };
+export type HealthGoalInput = { patientId: string; practitionerId?: string; carePlanId?: string; patientMedicationId?: string; title: string; description?: string; category: string; priority?: string; status?: string; targetValue?: string; currentValue?: string; unit?: string; targetDate?: string; metricType?: string; metricKey?: string; frequency?: "DAILY" | "WEEKLY" | "TOTAL"; frequencyTarget?: string | null; aggregation?: "SUM" | "LATEST" | "AVERAGE" | "MIN" | "MAX"; comparison?: "AT_LEAST" | "AT_MOST" | "CLOSEST" | "INCREASE_TO" | "DECREASE_TO"; guidanceText?: string; };
 export type HealthGoalListResponse = { data: any[]; pagination?: { page: number; limit: number; total: number; totalPages: number } };
 export type WeightGoalIntelligence = {
   goal: { id: string; title: string; comparison: string; targetValue: number | null; unit?: string | null; targetDate?: string | null; priority?: string; status?: string; createdAt?: string };
