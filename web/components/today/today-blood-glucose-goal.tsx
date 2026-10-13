@@ -421,6 +421,10 @@ export default function TodayBloodGlucoseGoal({ goal, onUpdated, conditions = []
         toast.error("Choose a valid measurement time that is not in the future.");
         return;
       }
+      if (occurredAt.getTime() < Date.now() - 90 * 86400000) {
+        toast.error("This card keeps self-recorded readings from the last 90 days. Older clinical results belong in Tests & Results.");
+        return;
+      }
       const savedAt = occurredAt.toISOString();
       const sourceId = "glucose-" + goalId + "-" + Date.now();
       await healthGoalsService.syncMetricEvent({
