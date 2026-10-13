@@ -50,6 +50,7 @@ export interface HealthHomeResponse {
   family: Array<Record<string, any>>;
   allergies?: Array<Record<string, any>>;
   conditions?: Array<Record<string, any>>;
+  clinicalDiagnoses?: Array<Record<string, any>>;
   immunizations?: Array<Record<string, any>>;
   emergencyContacts?: Array<Record<string, any>>;
   wearables: { devices: Array<Record<string, any>>; latestMeasurements: Array<{ id?: string; type: string; value: number | string; unit: string; measuredAt: string; source?: string | null }>; deviceAlerts?: Array<Record<string, any>>; sleepSessions?: Array<Record<string, any>>; workoutSessions?: Array<Record<string, any>>; wellnessMetrics?: Array<Record<string, any>> };
