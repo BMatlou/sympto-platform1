@@ -48,7 +48,7 @@ function formatJourneyDate(value: unknown) {
   return formatDate(value, true);
 }
 
-export default function TodaySleepGoal({ goal, onUpdated }: Props) {
+export default function TodaySleepGoal({ goal }: Props) {
   const [history, setHistory] = useState<SleepEntry[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -234,7 +234,7 @@ export default function TodaySleepGoal({ goal, onUpdated }: Props) {
         <span className={"shrink-0 rounded-full px-2.5 py-1 text-[8px] font-black " + (
           current == null ? "bg-[#eef5f6] text-[#71879b]" : targetMet ? "bg-[#e8f8f7] text-[#0b7b80]" : "bg-amber-50 text-amber-800"
         )}>
-          {current == null ? (loading ? "Loading" : "Not logged") : targetMet ? "Target met" : "Below target"}
+          {current == null ? (loading ? "Loading" : "Not logged") : target == null ? "Logged" : targetMet ? "Target met" : "Below target"}
         </span>
       </header>
 
