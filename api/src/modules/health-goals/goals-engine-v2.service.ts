@@ -49,7 +49,44 @@ export class GoalsEngineService {
 
   async removeSourceEvents(patientId: string, source: string, sourceId: string) { await this.prisma.$executeRaw`DELETE FROM "HealthGoalMetricEvent" WHERE "patientId" = ${patientId} AND "source" = ${source} AND "sourceId" = ${sourceId}`; }
 
+  private async syncBloodGlucoseCurrentValues(patientId: string, now: Date) {
+    const rows = await this.prisma.$queryRaw<Array<{ healthGoalId: string; latestValue: Prisma.Decimal }>>`
+      SELECT hg."id" AS "healthGoalId", latest."loggedValue" AS "latestValue"
+      FROM "HealthGoal" hg
+      INNER JOIN "HealthGoalMetricConfig" c ON c."healthGoalId" = hg."id"
+      INNER JOIN LATERAL (
+        SELECT e."loggedValue"
+        FROM "HealthGoalMetricEvent" e
+        WHERE e."patientId" = hg."patientId"
+          AND e."metricType" = 'BLOOD_GLUCOSE'
+          AND e."metricKey" = 'blood_glucose.value'
+          AND e."source" NOT IN ('patient-baseline', 'goal-baseline')
+          AND e."occurredAt" <= ${now}
+        ORDER BY e."occurredAt" DESC
+        LIMIT 1
+      ) latest ON TRUE
+      WHERE hg."patientId" = ${patientId}
+        AND hg."status" IN ('ACTIVE', 'ON_HOLD')
+        AND c."metricType" = 'BLOOD_GLUCOSE'
+        AND c."metricKey" = 'blood_glucose.value'
+    `;
+    for (const row of rows) {
+      const value = Number(row.latestValue);
+      if (!Number.isFinite(value)) continue;
+      // Keep the latest measurement visible to existing goal summaries, but
+      // never calculate progress or auto-complete a glucose goal from a
+      // single AT_MOST threshold. That requires a context-specific clinical range.
+      await this.prisma.healthGoal.update({
+        where: { id: row.healthGoalId },
+        data: { currentValue: String(value) },
+      });
+    }
+  }
+
   private async restoreHistoricalAchievements(patientId: string, metricType: string, metricKey: string, now: Date) {
+    // Do not re-apply historical 100%/ACHIEVED records from the old single-ceiling
+    // glucose model. Glucose needs a validated reading context and clinical range.
+    if (metricType === 'BLOOD_GLUCOSE' && metricKey === 'blood_glucose.value') return;
     const legacy = await this.prisma.$queryRaw<Array<{ healthGoalId: string }>>`SELECT c."healthGoalId" FROM "HealthGoalMetricConfig" c INNER JOIN "HealthGoal" g ON g."id" = c."healthGoalId" WHERE g."patientId" = ${patientId} AND g."status" = 'ACTIVE' AND c."metricType" = ${metricType} AND c."metricKey" = ${metricKey} AND EXISTS (SELECT 1 FROM "HealthGoalProgress" p WHERE p."healthGoalId" = g."id" AND p."status" = 'ACHIEVED')`;
     if (!legacy.length) return;
     const currentRows = await this.prisma.$queryRaw<Array<{ loggedValue: number | null }>>`SELECT "loggedValue" FROM "HealthGoalMetricEvent" WHERE "patientId" = ${patientId} AND "metricType" = ${metricType} AND "metricKey" = ${metricKey} AND "occurredAt" <= ${now} AND "source" <> 'goal-baseline' ORDER BY "occurredAt" DESC LIMIT 1`;
@@ -61,17 +98,20 @@ export class GoalsEngineService {
   }
 
   async recomputeMatchingGoals(patientId: string, metricType: string, metricKey: string, now = new Date()) {
+    if (metricType === 'BLOOD_GLUCOSE' && metricKey === 'blood_glucose.value') {
+      await this.syncBloodGlucoseCurrentValues(patientId, now);
+      return [];
+    }
     await this.restoreHistoricalAchievements(patientId, metricType, metricKey, now);
     const configs = await this.prisma.$queryRaw<GoalConfig[]>`SELECT c."healthGoalId", c."metricType", c."metricKey", c."frequency", c."frequencyTarget", c."guidanceText", c."aggregation", c."comparison" FROM "HealthGoalMetricConfig" c INNER JOIN "HealthGoal" g ON g."id" = c."healthGoalId" WHERE g."patientId" = ${patientId} AND g."status" = 'ACTIVE' AND NOT EXISTS (SELECT 1 FROM "HealthGoalProgress" p WHERE p."healthGoalId" = g."id" AND p."status" = 'ACHIEVED') AND c."metricType" = ${metricType} AND c."metricKey" = ${metricKey}`;
     return this.evaluateConfigs(patientId, configs, now);
   }
-
   async recomputeAllMatchingGoals(patientId: string, now = new Date()) {
+    await this.syncBloodGlucoseCurrentValues(patientId, now);
     for (const metric of [['WEIGHT', 'weight.kg'], ['EXERCISE', 'exercise.minutes'], ['NUTRITION', 'nutrition.calories'], ['BLOOD_PRESSURE', 'blood_pressure.systolic'], ['BLOOD_PRESSURE', 'blood_pressure.diastolic'], ['BLOOD_GLUCOSE', 'blood_glucose.value'], ['CHOLESTEROL', 'cholesterol.total'], ['MEDICATION', 'medication.adherence'], ['SLEEP', 'sleep.hours'], ['MENTAL_HEALTH', 'mental.stress'], ['HYDRATION', 'hydration.ml'], ['SMOKING', 'smoking.cigarettes'], ['ALCOHOL', 'alcohol.drinks'], ['ALCOHOL', 'alcohol.frequency'], ['HEART_RATE', 'heart_rate.bpm']] as const) await this.restoreHistoricalAchievements(patientId, metric[0], metric[1], now);
-    const configs = await this.prisma.$queryRaw<GoalConfig[]>`SELECT c."healthGoalId", c."metricType", c."metricKey", c."frequency", c."frequencyTarget", c."guidanceText", c."aggregation", c."comparison" FROM "HealthGoalMetricConfig" c INNER JOIN "HealthGoal" g ON g."id" = c."healthGoalId" WHERE g."patientId" = ${patientId} AND g."status" = 'ACTIVE' AND NOT EXISTS (SELECT 1 FROM "HealthGoalProgress" p WHERE p."healthGoalId" = g."id" AND p."status" = 'ACHIEVED')`;
+    const configs = await this.prisma.$queryRaw<GoalConfig[]>`SELECT c."healthGoalId", c."metricType", c."metricKey", c."frequency", c."frequencyTarget", c."guidanceText", c."aggregation", c."comparison" FROM "HealthGoalMetricConfig" c INNER JOIN "HealthGoal" g ON g."id" = c."healthGoalId" WHERE g."patientId" = ${patientId} AND g."status" = 'ACTIVE' AND NOT (c."metricType" = 'BLOOD_GLUCOSE' AND c."metricKey" = 'blood_glucose.value') AND NOT EXISTS (SELECT 1 FROM "HealthGoalProgress" p WHERE p."healthGoalId" = g."id" AND p."status" = 'ACHIEVED')`;
     return this.evaluateConfigs(patientId, configs, now);
   }
-
   async backfillJournalMetrics(patientId: string) {
     await this.prisma.$executeRaw`DELETE FROM "HealthGoalMetricEvent" WHERE "patientId" = ${patientId} AND "source" = 'health-journal'`;
     const mappings: Array<[string, string, string]> = [['WEIGHT', 'weight.kg', '"weightKg"'], ['EXERCISE', 'exercise.minutes', '"exerciseMinutes"'], ['HYDRATION', 'hydration.ml', '"waterIntakeMl"'], ['SLEEP', 'sleep.hours', '"sleepHours"'], ['MENTAL_HEALTH', 'mental.stress', '"stressLevel"'], ['BLOOD_PRESSURE', 'blood_pressure.systolic', '"bloodPressureSystolic"'], ['BLOOD_PRESSURE', 'blood_pressure.diastolic', '"bloodPressureDiastolic"'], ['HEART_RATE', 'heart_rate.bpm', '"heartRate"'], ['OXYGEN', 'oxygen_saturation.percent', '"oxygenSaturation"'], ['RESPIRATION', 'respiratory_rate.bpm', '"respiratoryRate"'], ['TEMPERATURE', 'temperature.c', '"temperature"']];
@@ -99,6 +139,9 @@ export class GoalsEngineService {
   private async evaluateConfigs(patientId: string, configs: GoalConfig[], now: Date) {
     const updated: any[] = [];
     for (const config of configs) {
+      // Guard this at the evaluation boundary too, so no caller can accidentally
+      // score glucose against a plain numeric ceiling.
+      if (config.metricType === 'BLOOD_GLUCOSE' && config.metricKey === 'blood_glucose.value') continue;
       const goal = await this.prisma.healthGoal.findUnique({ where: { id: config.healthGoalId } });
       if (!goal || (goal.targetDate && goal.targetDate < now)) continue;
       const strategy = this.strategyFor(config);
