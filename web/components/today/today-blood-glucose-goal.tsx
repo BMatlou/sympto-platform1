@@ -416,6 +416,10 @@ export default function TodayBloodGlucoseGoal({ goal, onUpdated, conditions = []
           readingContext,
           unit: "mmol/L",
           note: note.trim() || null,
+          linkedMedicationId: selectedMedicationId || null,
+          linkedMedicationName: selectedMedicationId
+            ? medicationDisplayName(glucoseMedicationRecords.find((item: any) => patientMedicationId(item) === selectedMedicationId))
+            : null,
           enteredFrom: "today-blood-glucose-goal",
         },
       });
@@ -426,19 +430,21 @@ export default function TodayBloodGlucoseGoal({ goal, onUpdated, conditions = []
           occurredAt: savedAt,
           source: "patient-glucose-log",
           sourceId,
-          metadata: { kind: "blood-glucose-reading", readingContext, unit: "mmol/L", note: note.trim() || null },
+          metadata: { kind: "blood-glucose-reading", readingContext, unit: "mmol/L", note: note.trim() || null, linkedMedicationId: selectedMedicationId || null, linkedMedicationName: selectedMedicationId ? medicationDisplayName(glucoseMedicationRecords.find((item: any) => patientMedicationId(item) === selectedMedicationId)) : null },
         },
         ...current.filter((event) => event.sourceId !== sourceId),
       ].sort((a, b) => new Date(b.occurredAt).getTime() - new Date(a.occurredAt).getTime()));
       setValue("");
       setNote("");
       setReadingContext("");
+      setSelectedMedicationId("");
       setOpen(false);
       setShowHistory(true);
       window.dispatchEvent(new Event("sympto:health-goal-updated"));
       toast.success("Glucose reading saved.");
       await onUpdated?.();
       void loadEvents();
+      void loadDailyContext();
     } catch (error: any) {
       const message = error?.response?.data?.message;
       toast.error(Array.isArray(message) ? message.join(" ") : String(message || "We could not save this glucose reading."));
@@ -643,6 +649,21 @@ export default function TodayBloodGlucoseGoal({ goal, onUpdated, conditions = []
                   {CONTEXTS.map((item) => <option key={item.value} value={item.value}>{item.label}</option>)}
                 </select>
               </label>
+              {glucoseMedicationRecords.length > 0 && (
+                <label className="block sm:col-span-2">
+                  <span className="text-[8px] font-black uppercase tracking-[.14em] text-[#74859a]">Related medication (optional)</span>
+                  <select value={selectedMedicationId} onChange={(event) => setSelectedMedicationId(event.target.value)} className="mt-1.5 min-h-10 w-full rounded-xl border border-[#d7e4e8] bg-white px-3 text-xs font-bold text-[#0b2d54] outline-none focus:border-[#24c1c4]">
+                    <option value="">Do not link a medication</option>
+                    {glucoseMedicationRecords.map((medication: any, index: number) => {
+                      const id = patientMedicationId(medication);
+                      if (!id) return null;
+                      const details = [medication?.dosage, medication?.frequency].filter(Boolean).join(" · ");
+                      return <option key={id || index} value={id}>{medicationDisplayName(medication)}{details ? " · " + details : ""}</option>;
+                    })}
+                  </select>
+                  <span className="mt-1 block text-[8px] leading-4 text-[#8a99a6]">This adds context to the reading; it does not mean the medicine caused the result.</span>
+                </label>
+              )}
               <label className="block sm:col-span-2">
                 <span className="text-[8px] font-black uppercase tracking-[.14em] text-[#74859a]">Measurement date and time</span>
                 <input type="datetime-local" value={measurementTime} onChange={(event) => setMeasurementTime(event.target.value)} className="mt-1.5 min-h-10 w-full rounded-xl border border-[#d7e4e8] bg-white px-3 text-xs font-bold text-[#0b2d54] outline-none focus:border-[#24c1c4]" />
@@ -677,6 +698,7 @@ export default function TodayBloodGlucoseGoal({ goal, onUpdated, conditions = []
                   <div className="min-w-0">
                     <p className="text-xs font-black text-[#0b2d54]">{formatNumber(event.loggedValue)} mmol/L <span className="text-[9px] font-semibold text-[#74859a]">· {contextLabel(event)}</span></p>
                     <p className="mt-1 text-[9px] text-[#8a99a6]">{formatDate(event.occurredAt, true)} · {sourceLabel(event)}</p>
+                    {event.metadata?.linkedMedicationName && <p className="mt-1 text-[9px] leading-4 text-[#0b7b80]">Linked medication · {String(event.metadata.linkedMedicationName)}</p>}
                     {event.metadata?.note && <p className="mt-1 text-[9px] leading-4 text-[#74859a]">{String(event.metadata.note)}</p>}
                   </div>
                   <span className={"shrink-0 rounded-full px-2 py-1 text-[8px] font-black " + (event.loggedValue < 3.0 ? "bg-red-50 text-red-800" : event.loggedValue < 3.9 ? "bg-amber-50 text-amber-800" : "bg-[#eef5f6] text-[#647b8c]")}>{event.loggedValue < 3.0 ? "Very low" : event.loggedValue < 3.9 ? "Low" : "Recorded"}</span>
