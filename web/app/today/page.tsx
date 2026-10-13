@@ -490,7 +490,7 @@ export default function TodayPage() {
                 return <TodayHydrationGoal key={String(goal?.id ?? "hydration-" + index)} goal={goal} onUpdated={reload} />;
               }
               if (category === "BLOOD_GLUCOSE") {
-                return <TodayBloodGlucoseGoal key={String(goal?.id ?? "blood-glucose-" + index)} goal={goal} onUpdated={reload} conditions={Array.isArray(data.conditions) ? data.conditions : Array.isArray(data.healthSnapshot?.activeConditions) ? data.healthSnapshot.activeConditions : []} diagnoses={Array.isArray(data.clinicalDiagnoses) ? data.clinicalDiagnoses : []} medications={Array.isArray(data.medications) ? data.medications : medications} activeGoals={activeGoalsArray} labOrders={Array.isArray(data.recentResults?.laboratory) ? data.recentResults.laboratory : []} carePlans={Array.isArray(data.carePlans) ? data.carePlans : []} />;
+                return <TodayBloodGlucoseGoal key={String(goal?.id ?? "blood-glucose-" + index)} goal={goal} onUpdated={reload} conditions={Array.isArray(data.conditions) ? data.conditions : Array.isArray(data.healthSnapshot?.activeConditions) ? data.healthSnapshot.activeConditions : []} diagnoses={Array.isArray(data.clinicalDiagnoses) ? data.clinicalDiagnoses : []} medications={Array.isArray(data.medications) ? data.medications : medications} activeGoals={activeGoalsArray} labOrders={Array.isArray(data.recentResults?.laboratory) ? data.recentResults.laboratory : []} carePlans={Array.isArray(data.carePlans) ? data.carePlans : []} baseline={data.healthSnapshot?.baseline ?? null} />;
               }
               return (
                 <TodaySupportedGoalCard
