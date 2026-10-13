@@ -16,6 +16,7 @@ import TodayWeightGoal from "@/components/today/today-weight-goal";
 import TodayExerciseGoal from "@/components/today/today-exercise-goal";
 import TodaySupportedGoalCard from "@/components/today/today-supported-goal-card";
 import TodayNutritionGoal from "@/components/today/today-nutrition-goal";
+import TodayBloodGlucoseGoal from "@/components/today/today-blood-glucose-goal";
 import { healthJournalService } from "@/services/health-journal.service";
 
 const ACTIVE_GOAL_STATUSES = new Set(["IN_PROGRESS", "ACTIVE", "ON_TRACK", "IMPROVING", "STAGNANT", "DECLINING"]);
@@ -487,6 +488,9 @@ export default function TodayPage() {
               }
               if (category === "HYDRATION") {
                 return <TodayHydrationGoal key={String(goal?.id ?? "hydration-" + index)} goal={goal} onUpdated={reload} />;
+              }
+              if (category === "BLOOD_GLUCOSE") {
+                return <TodayBloodGlucoseGoal key={String(goal?.id ?? "blood-glucose-" + index)} goal={goal} onUpdated={reload} />;
               }
               return (
                 <TodaySupportedGoalCard
