@@ -270,7 +270,7 @@ export class HealthHomeService {
       }),
       this.prisma.symptomLog.findMany({ where: { clinicalEpisode: { patientId }, status: { in: ['ACTIVE', 'COMPLETED'] } }, include: { clinicalEpisode: true, symptoms: { include: { symptom: true } }, triggers: true }, orderBy: { startedAt: 'desc' }, take: 20 }),
       this.prisma.aIObservation.findMany({ where: { symptomLog: { clinicalEpisode: { patientId } } }, orderBy: { createdAt: 'desc' }, take: 10 }),
-      this.prisma.labOrder.findMany({ where: { patientId }, include: { laboratory: true, items: { include: { test: true, labResults: { orderBy: { createdAt: 'desc' }, take: 1, include: { items: { include: { test: true } } } } } } }, orderBy: { orderedAt: 'desc' }, take: 20 }),
+      this.prisma.labOrder.findMany({ where: { patientId }, include: { laboratory: true, items: { include: { test: { include: { unit: true } }, labResults: { orderBy: { createdAt: 'desc' }, take: 1, include: { items: { include: { test: { include: { unit: true } } } } } } } } }, orderBy: { orderedAt: 'desc' }, take: 20 }),
       this.prisma.imagingStudy.findMany({ where: { patientId }, include: { imagingCenter: true, reports: true }, orderBy: { createdAt: 'desc' }, take: 20 }),
       this.prisma.carePlan.findMany({ where: { patientId, status: { in: ['ACTIVE', 'DRAFT'] } }, include: { practitioner: { include: { person: true } }, goals: true, tasks: true }, orderBy: { createdAt: 'desc' }, take: 10 }),
       this.prisma.encounter.findMany({ where: { medicalRecord: { patientId } }, orderBy: { startedAt: 'desc' }, take: 50 }),
@@ -441,6 +441,17 @@ export class HealthHomeService {
         medicationId: medicationId ? String(medicationId) : null,
       };
     });
+    // Read diagnoses for the same selected patient as the Health Home request.
+    // This is important when the signed-in user is viewing an authorised family
+    // member: the glucose card must not accidentally show the owner's diagnoses.
+    const clinicalDiagnoses = healthPassportId
+      ? await this.prisma.patientDiagnosis.findMany({
+          where: { healthPassportId },
+          include: { diagnosis: true, encounter: true },
+          orderBy: { createdAt: 'desc' },
+          take: 100,
+        })
+      : [];
     const activeAllergies = allergies.filter((item) => item.status === 'ACTIVE' || !item.status);
     const activeConditions = conditions.filter((item) => item.status === 'ACTIVE' && !item.resolvedAt);
     const bloodType = patient.healthPassport?.bloodType ?? medicalRecord?.bloodType ?? null;
@@ -463,7 +474,7 @@ export class HealthHomeService {
         const status = String(goal?.status ?? '').toUpperCase();
         return !['CANCELLED', 'DELETED', 'ARCHIVED', 'ACHIEVED', 'EXPIRED', 'ON_HOLD'].includes(status);
       }),
-      medications: medicationsWithGoalLinks, appointments, goals: mappedGoals, healthGoals: mappedGoals, family, allergies, conditions, immunizations, emergencyContacts: patient.emergencyContacts,
+      medications: medicationsWithGoalLinks, appointments, goals: mappedGoals, healthGoals: mappedGoals, family, allergies, conditions, clinicalDiagnoses, immunizations, emergencyContacts: patient.emergencyContacts,
       wearables: {
         devices: devices.map((device) => ({ id: device.id, manufacturer: device.manufacturer, model: device.model, deviceType: device.deviceType, status: device.status, lastSyncAt: device.lastSyncAt, measurementCount: device._count.measurements })),
         latestMeasurements: journalSignals.signals,
