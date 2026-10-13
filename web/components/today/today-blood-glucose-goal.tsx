@@ -5,8 +5,9 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { Activity, ArrowRight, Clock3, Droplets, Plus } from "lucide-react";
 import { toast } from "sonner";
 import { healthGoalsService, type HealthGoalMetricEventsResponse } from "@/services/health-goals.service";
+import { healthJournalService } from "@/services/health-journal.service";
 
-type Props = { goal: any; patientId?: string; currentWeightKg?: number | null; currentHeightCm?: number | null; onUpdated?: () => Promise<void> | void; conditions?: any[]; diagnoses?: any[]; medications?: any[]; activeGoals?: any[]; labOrders?: any[]; carePlans?: any[]; baseline?: any };
+type Props = { goal: any; patientId?: string; currentWeightKg?: number | null; currentHeightCm?: number | null; measurements?: any[]; onUpdated?: () => Promise<void> | void; conditions?: any[]; diagnoses?: any[]; medications?: any[]; activeGoals?: any[]; labOrders?: any[]; carePlans?: any[]; baseline?: any };
 type GlucoseContext = "FASTING" | "BEFORE_MEAL" | "AFTER_MEAL_2H" | "BEDTIME" | "OVERNIGHT" | "OTHER";
 type GlucoseEvent = {
   id: string;
@@ -268,7 +269,7 @@ function latestReleasedLabMeasure(labOrders: any[], matcher: RegExp): ReleasedLa
   return measures[0] ?? null;
 }
 
-export default function TodayBloodGlucoseGoal({ goal, patientId = "", currentWeightKg = null, currentHeightCm = null, onUpdated, conditions = [], diagnoses = [], medications = [], activeGoals = [], labOrders = [], carePlans = [], baseline = null }: Props) {
+export default function TodayBloodGlucoseGoal({ goal, patientId = "", currentWeightKg = null, currentHeightCm = null, measurements = [], onUpdated, conditions = [], diagnoses = [], medications = [], activeGoals = [], labOrders = [], carePlans = [], baseline = null }: Props) {
   const goalId = String(goal?.id ?? "");
   const target = targetFromGoal(goal);
   const [events, setEvents] = useState<GlucoseEvent[]>([]);
@@ -287,10 +288,16 @@ export default function TodayBloodGlucoseGoal({ goal, patientId = "", currentWei
   const [supportMedicationId, setSupportMedicationId] = useState("");
   const [supportWeightDirection, setSupportWeightDirection] = useState<"LOSE" | "GAIN" | "MAINTAIN">("MAINTAIN");
   const [savingSupportGoal, setSavingSupportGoal] = useState(false);
-  const [dailyContext, setDailyContext] = useState<{ calories: number | null; exerciseMinutes: number | null; sleepHours: number | null }>({
+  const [dailyContext, setDailyContext] = useState<{
+    calories: number | null;
+    exerciseMinutes: number | null;
+    sleepHours: number | null;
+    hydrationMl: number | null;
+  }>({
     calories: null,
     exerciseMinutes: null,
     sleepHours: null,
+    hydrationMl: null,
   });
 
   const journey = useMemo(() => {
@@ -336,14 +343,20 @@ export default function TodayBloodGlucoseGoal({ goal, patientId = "", currentWei
     }
   }, [goalId]);
 
+  const hasActiveNutritionGoal = activeGoals.some((related: any) =>
+    String(related?.category ?? "").toUpperCase() === "NUTRITION"
+    && !["ACHIEVED", "ARCHIVED", "CANCELLED", "DELETED", "ON_HOLD"].includes(String(related?.status ?? "").toUpperCase()),
+  );
+
   const loadDailyContext = useCallback(async () => {
     const to = new Date();
     const from = new Date(to.getTime() - 48 * 60 * 60 * 1000);
     const today = localDayKey(new Date());
-    const [nutritionResult, exerciseResult, sleepResult] = await Promise.allSettled([
+    const [nutritionResult, exerciseResult, sleepResult, journalResult] = await Promise.allSettled([
       healthGoalsService.getMetricEvents("NUTRITION", "nutrition.calories", from, to, "goal-manual"),
       healthGoalsService.getMetricEvents("EXERCISE", "exercise.minutes", from, to, "health-journal"),
       healthGoalsService.getMetricEvents("SLEEP", "sleep.hours", from, to, "health-journal"),
+      healthJournalService.getAll({ limit: 100 }),
     ]);
     const eventsFrom = (result: PromiseSettledResult<HealthGoalMetricEventsResponse>) =>
       result.status === "fulfilled" && Array.isArray(result.value?.events) ? result.value.events : [];
@@ -355,14 +368,34 @@ export default function TodayBloodGlucoseGoal({ goal, patientId = "", currentWei
     const todaySleep = eventsFrom(sleepResult)
       .filter((event) => localDayKey(event.occurredAt) === today && Number.isFinite(Number(event.loggedValue)) && Number(event.loggedValue) >= 0)
       .sort((a, b) => new Date(b.occurredAt).getTime() - new Date(a.occurredAt).getTime());
+
+    const journals = journalResult.status === "fulfilled" && Array.isArray(journalResult.value?.data)
+      ? journalResult.value.data
+      : [];
+    const todayCheckIns = journals
+      .filter((entry: any) => String(entry?.title ?? "") === "Daily Health Check-in" && localDayKey(entry?.createdAt) === today)
+      .sort((a: any, b: any) => new Date(String(b?.updatedAt ?? b?.createdAt ?? 0)).getTime() - new Date(String(a?.updatedAt ?? a?.createdAt ?? 0)).getTime());
+    const latestCheckIn = todayCheckIns[0] ?? null;
+    const checkInValue = (field: "exerciseMinutes" | "sleepHours" | "waterIntakeMl") => {
+      const raw = latestCheckIn?.[field];
+      if (raw === null || raw === undefined || raw === "") return null;
+      const numeric = Number(raw);
+      return Number.isFinite(numeric) && numeric >= 0 ? numeric : null;
+    };
+
     setDailyContext({
-      calories: todayNutrition.length ? todayNutrition.reduce((sum, event) => sum + Number(event.loggedValue), 0) : null,
-      // Daily Check-in entries are snapshots. Use the latest today, not a sum,
-      // to avoid counting multiple updated snapshots more than once.
-      exerciseMinutes: todayExercise.length ? Number(todayExercise[0].loggedValue) : null,
-      sleepHours: todaySleep.length ? Number(todaySleep[0].loggedValue) : null,
+      // The Nutrition goal counts recorded meal events. Zero means no calories
+      // have been logged today, not that the user consumed zero calories.
+      calories: todayNutrition.length
+        ? todayNutrition.reduce((sum, event) => sum + Number(event.loggedValue), 0)
+        : nutritionResult.status === "fulfilled" && hasActiveNutritionGoal ? 0 : null,
+      // Prefer the saved Today check-in snapshot where present; metric-event
+      // history is the fallback, and snapshots must never be summed together.
+      exerciseMinutes: checkInValue("exerciseMinutes") ?? (todayExercise.length ? Number(todayExercise[0].loggedValue) : null),
+      sleepHours: checkInValue("sleepHours") ?? (todaySleep.length ? Number(todaySleep[0].loggedValue) : null),
+      hydrationMl: checkInValue("waterIntakeMl"),
     });
-  }, []);
+  }, [hasActiveNutritionGoal]);
 
   useEffect(() => {
     void loadEvents();
@@ -443,7 +476,7 @@ export default function TodayBloodGlucoseGoal({ goal, patientId = "", currentWei
     if (!connectedGoalMap.has(relatedId)) connectedGoalMap.set(relatedId, related);
   }
   const allRelevantGoals = Array.from(connectedGoalMap.values());
-  const relevantGoals = allRelevantGoals.slice(0, 4);
+  const relevantGoals = allRelevantGoals;
   const alreadyTrackedCategories = new Set(allRelevantGoals.map((related: any) => String(related?.category ?? "").toUpperCase()));
   const canOfferWeightGoal = Number.isFinite(Number(currentWeightKg)) && Number(currentWeightKg) > 0
     && Number.isFinite(Number(currentHeightCm)) && Number(currentHeightCm) > 0;
@@ -455,6 +488,34 @@ export default function TodayBloodGlucoseGoal({ goal, patientId = "", currentWei
   });
   const selectedSupportOption = SUPPORTING_GOAL_OPTIONS.find((option) => option.category === selectedSupportCategory) ?? null;
   const supportMedicationOptions = glucoseMedicationRecords.filter((medication: any) => Boolean(authoritativePatientMedicationId(medication)));
+  const bloodPressureGoalLinked = allRelevantGoals.some((related: any) => String(related?.category ?? "").toUpperCase() === "BLOOD_PRESSURE");
+  const weightGoalLinked = allRelevantGoals.some((related: any) => String(related?.category ?? "").toUpperCase() === "WEIGHT");
+  const normaliseMeasurementType = (value: unknown) => String(value ?? "").toUpperCase().replace(/[^A-Z0-9]+/g, "_").replace(/^_|_$/g, "");
+  const measurementFor = (types: string[]) => measurements.find((item: any) =>
+    types.includes(normaliseMeasurementType(item?.type ?? item?.measurementType ?? item?.name)),
+  ) ?? null;
+  const bloodPressureMeasurement = measurementFor(["BLOOD_PRESSURE", "BLOODPRESSURE"]);
+  const systolicMeasurement = measurementFor(["BLOOD_PRESSURE_SYSTOLIC", "SYSTOLIC_PRESSURE", "SYSTOLIC"]);
+  const diastolicMeasurement = measurementFor(["BLOOD_PRESSURE_DIASTOLIC", "DIASTOLIC_PRESSURE", "DIASTOLIC"]);
+  const compositeBloodPressure = bloodPressureMeasurement?.value != null ? String(bloodPressureMeasurement.value).trim() : "";
+  const bloodPressureValue = compositeBloodPressure.includes("/")
+    ? compositeBloodPressure + (bloodPressureMeasurement?.unit ? " " + String(bloodPressureMeasurement.unit) : "")
+    : systolicMeasurement?.value != null && diastolicMeasurement?.value != null
+      ? String(systolicMeasurement.value) + "/" + String(diastolicMeasurement.value) + " mmHg"
+      : systolicMeasurement?.value != null
+        ? String(systolicMeasurement.value) + " systolic"
+        : compositeBloodPressure || null;
+  const bpDates = [bloodPressureMeasurement?.measuredAt, systolicMeasurement?.measuredAt, diastolicMeasurement?.measuredAt].filter(Boolean).map((item: any) => String(item));
+  const bloodPressureContext = {
+    value: bloodPressureValue,
+    measuredAt: bpDates.sort((a: string, b: string) => new Date(b).getTime() - new Date(a).getTime())[0] ?? null,
+  };
+  const weightMeasurement = measurementFor(["WEIGHT", "BODY_WEIGHT", "WEIGHT_KG"]);
+  const numericWeight = weightMeasurement?.value == null ? Number(currentWeightKg) : Number(weightMeasurement.value);
+  const weightContext = {
+    value: Number.isFinite(numericWeight) && numericWeight > 0 ? numericWeight : null,
+    measuredAt: weightMeasurement?.measuredAt ?? null,
+  };
   const linkedCarePlan = carePlans.find((plan: any) => String(plan?.id ?? "") === String(goal?.carePlanId ?? "")) ?? null;
   const linkedCarePlanPractitioner = linkedCarePlan?.practitioner?.person
     ? [
@@ -770,24 +831,43 @@ export default function TodayBloodGlucoseGoal({ goal, patientId = "", currentWei
 
           <div className="mt-3 border-t border-[#e8eff1] pt-3">
             <p className="text-[8px] font-black uppercase tracking-[.14em] text-[#8a99a6]">Today's recorded context</p>
-            <div className="mt-2 grid grid-cols-3 gap-2">
+            <div className="mt-2 grid grid-cols-2 gap-2 sm:grid-cols-3">
               <div className="rounded-xl border border-[#e1eaed] bg-white p-2.5">
-                <p className="text-[8px] font-black uppercase tracking-[.1em] text-[#8a99a6]">Meal logs</p>
+                <p className="text-[8px] font-black uppercase tracking-[.1em] text-[#8a99a6]">Meal calories logged</p>
                 <p className="mt-1 text-xs font-black text-[#0b2d54]">{dailyContext.calories == null ? "—" : formatNumber(dailyContext.calories)}</p>
-                <p className="mt-0.5 text-[8px] text-[#74859a]">kcal today</p>
+                <p className="mt-0.5 text-[8px] text-[#74859a]">{dailyContext.calories == null ? "not available" : dailyContext.calories === 0 ? "kcal · no meal logged yet" : "kcal logged today"}</p>
               </div>
               <div className="rounded-xl border border-[#e1eaed] bg-white p-2.5">
                 <p className="text-[8px] font-black uppercase tracking-[.1em] text-[#8a99a6]">Activity</p>
                 <p className="mt-1 text-xs font-black text-[#0b2d54]">{dailyContext.exerciseMinutes == null ? "—" : formatNumber(dailyContext.exerciseMinutes)}</p>
-                <p className="mt-0.5 text-[8px] text-[#74859a]">minutes today</p>
+                <p className="mt-0.5 text-[8px] text-[#74859a]">{dailyContext.exerciseMinutes == null ? "not recorded today" : "minutes today"}</p>
               </div>
               <div className="rounded-xl border border-[#e1eaed] bg-white p-2.5">
                 <p className="text-[8px] font-black uppercase tracking-[.1em] text-[#8a99a6]">Sleep</p>
                 <p className="mt-1 text-xs font-black text-[#0b2d54]">{dailyContext.sleepHours == null ? "—" : formatNumber(dailyContext.sleepHours)}</p>
-                <p className="mt-0.5 text-[8px] text-[#74859a]">hours recorded</p>
+                <p className="mt-0.5 text-[8px] text-[#74859a]">{dailyContext.sleepHours == null ? "not recorded today" : "hours recorded"}</p>
               </div>
+              <div className="rounded-xl border border-[#e1eaed] bg-white p-2.5">
+                <p className="text-[8px] font-black uppercase tracking-[.1em] text-[#8a99a6]">Hydration</p>
+                <p className="mt-1 text-xs font-black text-[#0b2d54]">{dailyContext.hydrationMl == null ? "—" : formatNumber(dailyContext.hydrationMl)}</p>
+                <p className="mt-0.5 text-[8px] text-[#74859a]">{dailyContext.hydrationMl == null ? "not recorded today" : "ml logged today"}</p>
+              </div>
+              {bloodPressureGoalLinked && (
+                <div className="rounded-xl border border-[#e1eaed] bg-white p-2.5">
+                  <p className="text-[8px] font-black uppercase tracking-[.1em] text-[#8a99a6]">Blood pressure</p>
+                  <p className="mt-1 text-xs font-black text-[#0b2d54]">{bloodPressureContext.value ?? "—"}</p>
+                  <p className="mt-0.5 text-[8px] text-[#74859a]">{bloodPressureContext.measuredAt ? "recorded " + formatDate(bloodPressureContext.measuredAt) : bloodPressureContext.value ? "latest available reading" : "no reading found"}</p>
+                </div>
+              )}
+              {weightGoalLinked && (
+                <div className="rounded-xl border border-[#e1eaed] bg-white p-2.5">
+                  <p className="text-[8px] font-black uppercase tracking-[.1em] text-[#8a99a6]">Weight</p>
+                  <p className="mt-1 text-xs font-black text-[#0b2d54]">{weightContext.value == null ? "—" : formatNumber(weightContext.value) + " kg"}</p>
+                  <p className="mt-0.5 text-[8px] text-[#74859a]">{weightContext.measuredAt ? "recorded " + formatDate(weightContext.measuredAt) : weightContext.value != null ? "current recorded weight" : "no weight found"}</p>
+                </div>
+              )}
             </div>
-            <p className="mt-2 text-[8px] leading-4 text-[#8a99a6]">These are separate logs for the same day, not proof that food, activity or sleep caused a glucose change.</p>
+            <p className="mt-2 text-[8px] leading-4 text-[#8a99a6]">These entries add context to your glucose trend. They are recorded separately and do not prove that food, activity, sleep, hydration, blood pressure or weight caused a glucose change.</p>
           </div>
 
           <div className="mt-3 border-t border-[#e8eff1] pt-3">
