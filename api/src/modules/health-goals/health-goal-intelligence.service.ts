@@ -143,7 +143,7 @@ function glucoseRelatedMedicationGoal(goal: any): boolean {
     'glyburide', 'sitagliptin', 'linagliptin', 'saxagliptin', 'vildagliptin',
     'empagliflozin', 'dapagliflozin', 'canagliflozin', 'ertugliflozin',
     'pioglitazone', 'repaglinide', 'nateglinide', 'liraglutide', 'semaglutide',
-    'dulaglutide', 'exenatide',
+    'dulaglutide', 'exenatide', 'tirzepatide',
   ];
   return names.some((name) => glucoseTherapies.some((medicine) => name.includes(medicine)));
 }
