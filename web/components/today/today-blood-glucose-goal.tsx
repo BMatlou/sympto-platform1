@@ -769,25 +769,34 @@ export default function TodayBloodGlucoseGoal({ goal, patientId = "", currentWei
             <div className="min-w-0 flex-1">
               <div className="grid grid-cols-2 gap-3 sm:gap-4">
                 <div>
-                  <p className="text-[8px] font-black uppercase tracking-[.16em] text-white/40">Latest reading</p>
-                  <p className="mt-1 text-xl font-black leading-none tracking-[-.045em]">{latest ? formatNumber(latest.loggedValue) : "—"}</p>
-                  <p className="mt-1 text-[9px] font-semibold text-white/50">{latest ? formatDate(latest.occurredAt, true) : "No readings yet"}</p>
+                  <p className="text-[8px] font-black uppercase tracking-[.16em] text-white/40">Last recorded</p>
+                  <p className="mt-1 text-sm font-black leading-5 text-white">{latest ? formatDate(latest.occurredAt, true) : "No readings yet"}</p>
+                  <p className="mt-1 text-[9px] font-semibold text-white/50">{latest ? sourceLabel(latest) : "Record your first reading"}</p>
                 </div>
                 <div className="border-l border-white/10 pl-3 sm:pl-4">
                   <p className="text-[8px] font-black uppercase tracking-[.16em] text-white/40">Readings today</p>
                   <p className="mt-1 text-xl font-black leading-none tracking-[-.045em]">{todaysEvents.length}</p>
-                  <p className="mt-1 text-[9px] font-semibold text-white/50">{latest && localDayKey(latest.occurredAt) === todayKey ? contextLabel(latest) : "Log to build your history"}</p>
+                  <p className="mt-1 text-[9px] font-semibold text-white/50">{latest && localDayKey(latest.occurredAt) === todayKey ? contextLabel(latest) : "No reading context today"}</p>
                 </div>
               </div>
               <div className="mt-3 flex flex-wrap items-center gap-2">
-                <span className="rounded-full bg-white/10 px-2.5 py-1.5 text-[9px] font-black text-[#b8ffff] ring-1 ring-white/10">{target == null ? "No target set" : "Saved target · " + formatNumber(target) + " mmol/L"}</span>
-                <span className="truncate text-[9px] font-semibold text-white/60">{target == null ? "Personal target optional" : carePlanLinked ? "Care-plan linked · confirm target source" : practitionerLinked ? "Practitioner linked · confirm target source" : "Confirm target with clinician"}</span>
+                <span className="rounded-full bg-white/10 px-2.5 py-1.5 text-[9px] font-black text-[#b8ffff] ring-1 ring-white/10">{target == null ? "No target set" : "Target · " + formatNumber(target) + " mmol/L"}</span>
+                {target != null && <span className="text-[9px] font-semibold text-white/60">Confirm target with clinician</span>}
               </div>
             </div>
           </div>
         </section>
 
-        <section className="mt-3 rounded-[18px] border border-[#e2ecef] bg-[#fbfdfd] p-3.5">
+        <details className="mt-3 overflow-hidden rounded-[18px] border border-[#e2ecef] bg-white">
+          <summary className="flex cursor-pointer list-none items-center justify-between gap-3 bg-[#fbfdfd] px-3.5 py-3">
+            <span className="min-w-0">
+              <span className="block text-[10px] font-black text-[#0b2d54]">Health records & related goals</span>
+              <span className="mt-0.5 block text-[9px] text-[#74859a]">{diabetesStatusLabel}{allRelevantGoals.length > 0 ? " · " + allRelevantGoals.length + " related goals" : " · Clinical context"}</span>
+            </span>
+            <span className="shrink-0 text-[9px] font-black text-[#0b7b80]">View details <ArrowRight className="ml-1 inline h-3 w-3" /></span>
+          </summary>
+          <div className="px-3.5 pb-3.5">
+          <section className="pt-3">
           <div className="flex items-start justify-between gap-3">
             <div>
               <p className="text-[8px] font-black uppercase tracking-[.14em] text-[#8a99a6]">Health context</p>
@@ -1041,8 +1050,10 @@ export default function TodayBloodGlucoseGoal({ goal, patientId = "", currentWei
               <p className="mt-2 text-[9px] leading-4 text-[#74859a]">You are already tracking the supporting goals available from your current records. You can continue logging readings here on Today.</p>
             )}
           </div>
-          <p className="mt-3 text-[8px] leading-4 text-[#8a99a6]">These records provide context, not a diagnosis or proof that a medicine or behaviour caused a glucose change.</p>
-        </section>
+          <p className="mt-3 text-[8px] leading-4 text-[#8a99a6]">Context only: these records are separate measures and do not prove what caused a glucose change.</p>
+          </section>
+          </div>
+        </details>
 
         {(low || veryLow) && latest && (
           <div role="alert" className={"mt-3 rounded-[16px] border px-3 py-3 text-[10px] leading-5 " + (veryLow ? "border-red-200 bg-red-50 text-red-900" : "border-amber-200 bg-amber-50 text-amber-950")}>
@@ -1051,17 +1062,9 @@ export default function TodayBloodGlucoseGoal({ goal, patientId = "", currentWei
           </div>
         )}
 
-        <div className="mt-3 grid gap-3 sm:grid-cols-2">
-          <div className="rounded-[18px] border border-[#e2ecef] bg-[#fbfdfd] px-3 py-3">
-            <p className="text-[8px] font-black uppercase tracking-[.14em] text-[#8a99a6]">Clinical target status</p>
-            <p className="mt-1 text-sm font-black text-[#0b2d54]">{target == null ? "Tracking only" : "Needs context review"}</p>
-            <p className="mt-1 text-[9px] leading-4 text-[#74859a]">{target == null ? "You can record readings while you confirm a personal target." : "A single ceiling cannot interpret fasting, pre-meal and post-meal readings alike."}</p>
-          </div>
-          <div className="rounded-[18px] border border-[#e2ecef] bg-[#fbfdfd] px-3 py-3">
-            <p className="text-[8px] font-black uppercase tracking-[.14em] text-[#8a99a6]">Reading context</p>
-            <p className="mt-1 text-sm font-black text-[#0b2d54]">{latest ? contextLabel(latest) : "Not recorded yet"}</p>
-            <p className="mt-1 text-[9px] leading-4 text-[#74859a]">{latest ? sourceLabel(latest) + " · " + (hasEntryContext ? "context saved" : "context not recorded") : "Choose when you take each reading to make history more useful."}</p>
-          </div>
+        <div className="mt-3 rounded-[14px] border border-[#e2ecef] bg-[#fbfdfd] px-3 py-2.5">
+          <p className="text-[9px] font-black text-[#0b2d54]">{target == null ? "Tracking only · confirm a personal target with your care team" : "Clinical target needs context review"}</p>
+          {target != null && <p className="mt-0.5 text-[9px] leading-4 text-[#74859a]">Fasting, pre-meal and post-meal readings may require different target ranges.</p>}
         </div>
 
         {open && (
