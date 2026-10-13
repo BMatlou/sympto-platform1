@@ -297,10 +297,12 @@ export default function TodayBloodGlucoseGoal({ goal, onUpdated, conditions = []
     };
     window.addEventListener("sympto:health-goal-updated", refresh);
     window.addEventListener("sympto:today-action-updated", refresh);
+    window.addEventListener("sympto:health-checkin-updated", refresh);
     const interval = window.setInterval(refresh, 60000);
     return () => {
       window.removeEventListener("sympto:health-goal-updated", refresh);
       window.removeEventListener("sympto:today-action-updated", refresh);
+      window.removeEventListener("sympto:health-checkin-updated", refresh);
       window.clearInterval(interval);
     };
   }, [loadEvents, loadDailyContext]);
@@ -705,7 +707,7 @@ export default function TodayBloodGlucoseGoal({ goal, onUpdated, conditions = []
 
         <div className="mt-3 flex items-center justify-between gap-3 rounded-[18px] border border-[#e2ecef] bg-[#fbfdfd] px-3 py-2.5">
           <p className="min-w-0 text-[9px] font-semibold leading-4 text-[#74859a]">{latest ? "Your glucose history keeps each reading and its context. The saved target is not used to score a reading until a context-specific range is confirmed." : "Start by recording a measured value and when it was taken. You can track readings while arranging a target review."}</p>
-          <button type="button" onClick={() => { setOpen((current) => !current); if (!open) { setMeasurementTime(localDateTimeInput(new Date())); setReadingContext(""); } }} className="inline-flex shrink-0 items-center gap-1.5 rounded-xl bg-[#0b2d54] px-3 py-2 text-[9px] font-black text-white"><Plus className="h-3 w-3" />{open ? "Close" : "Record"}</button>
+          <button type="button" onClick={() => { setOpen((current) => !current); if (!open) { setMeasurementTime(localDateTimeInput(new Date())); setReadingContext(""); setSelectedMedicationId(""); } }} className="inline-flex shrink-0 items-center gap-1.5 rounded-xl bg-[#0b2d54] px-3 py-2 text-[9px] font-black text-white"><Plus className="h-3 w-3" />{open ? "Close" : "Record"}</button>
         </div>
 
         <section className="mt-3 overflow-hidden rounded-[18px] border border-[#e2ecef]">
