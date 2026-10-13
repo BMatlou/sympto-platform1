@@ -6,7 +6,7 @@ import { Activity, ArrowRight, Clock3, Droplets, Plus } from "lucide-react";
 import { toast } from "sonner";
 import { healthGoalsService, type HealthGoalMetricEventsResponse } from "@/services/health-goals.service";
 
-type Props = { goal: any; onUpdated?: () => Promise<void> | void; conditions?: any[]; diagnoses?: any[]; medications?: any[]; activeGoals?: any[]; labOrders?: any[] };
+type Props = { goal: any; onUpdated?: () => Promise<void> | void; conditions?: any[]; diagnoses?: any[]; medications?: any[]; activeGoals?: any[]; labOrders?: any[]; carePlans?: any[] };
 type GlucoseContext = "FASTING" | "BEFORE_MEAL" | "AFTER_MEAL_2H" | "BEDTIME" | "OVERNIGHT" | "OTHER";
 type GlucoseEvent = {
   id: string;
@@ -194,7 +194,7 @@ function latestReleasedLabMeasure(labOrders: any[], matcher: RegExp): ReleasedLa
   return measures[0] ?? null;
 }
 
-export default function TodayBloodGlucoseGoal({ goal, onUpdated, conditions = [], diagnoses = [], medications = [], activeGoals = [], labOrders = [] }: Props) {
+export default function TodayBloodGlucoseGoal({ goal, onUpdated, conditions = [], diagnoses = [], medications = [], activeGoals = [], labOrders = [], carePlans = [] }: Props) {
   const goalId = String(goal?.id ?? "");
   const target = targetFromGoal(goal);
   const [events, setEvents] = useState<GlucoseEvent[]>([]);
@@ -273,7 +273,8 @@ export default function TodayBloodGlucoseGoal({ goal, onUpdated, conditions = []
   const latestIsRecent = Number.isFinite(latestAgeMs) && latestAgeMs >= 0 && latestAgeMs <= 24 * 60 * 60 * 1000;
   const low = latestIsRecent && latest != null && latest.loggedValue < 3.9;
   const veryLow = latestIsRecent && latest != null && latest.loggedValue < 3.0;
-  const targetLinked = Boolean(goal?.practitionerId || goal?.carePlanId);
+  const carePlanLinked = Boolean(goal?.carePlanId);
+  const practitionerLinked = Boolean(goal?.practitionerId);
   const hasEntryContext = latest != null && Boolean(String(latest.metadata?.readingContext ?? latest.metadata?.glucoseContext ?? ""));
   const currentConditions = conditions.filter(activeRecord);
   const currentClinicalDiagnoses = diagnoses.filter(activeRecord);
@@ -324,6 +325,13 @@ export default function TodayBloodGlucoseGoal({ goal, onUpdated, conditions = []
     if (!connectedGoalMap.has(relatedId)) connectedGoalMap.set(relatedId, related);
   }
   const relevantGoals = Array.from(connectedGoalMap.values()).slice(0, 4);
+  const linkedCarePlan = carePlans.find((plan: any) => String(plan?.id ?? "") === String(goal?.carePlanId ?? "")) ?? null;
+  const linkedCarePlanPractitioner = linkedCarePlan?.practitioner?.person
+    ? [
+        linkedCarePlan.practitioner.person.preferredName ?? linkedCarePlan.practitioner.person.firstName,
+        linkedCarePlan.practitioner.person.lastName,
+      ].filter(Boolean).join(" ")
+    : "";
   const latestHba1c = latestReleasedLabMeasure(
     labOrders,
     /(hba1c|hemoglobin a1c|haemoglobin a1c|glycated haemoglobin|glycated hemoglobin|glycosylated hemoglobin)/i,
@@ -449,7 +457,7 @@ export default function TodayBloodGlucoseGoal({ goal, onUpdated, conditions = []
               </div>
               <div className="mt-3 flex flex-wrap items-center gap-2">
                 <span className="rounded-full bg-white/10 px-2.5 py-1.5 text-[9px] font-black text-[#b8ffff] ring-1 ring-white/10">{target == null ? "No target set" : "Saved target · " + formatNumber(target) + " mmol/L"}</span>
-                <span className="truncate text-[9px] font-semibold text-white/60">{target == null ? "Personal target optional" : targetLinked ? "Provider-linked goal" : "Confirm target with clinician"}</span>
+                <span className="truncate text-[9px] font-semibold text-white/60">{target == null ? "Personal target optional" : carePlanLinked ? "Care-plan linked · confirm target source" : practitionerLinked ? "Practitioner linked · confirm target source" : "Confirm target with clinician"}</span>
               </div>
             </div>
           </div>
@@ -463,6 +471,18 @@ export default function TodayBloodGlucoseGoal({ goal, onUpdated, conditions = []
               <p className="mt-1 text-[9px] leading-4 text-[#74859a]">{diabetesStatusDetail}</p>
             </div>
             <Link href="/health-conditions" className="shrink-0 rounded-lg border border-[#d6e4e7] bg-white px-2.5 py-1.5 text-[8px] font-black text-[#0b2d54]">Health record <ArrowRight className="ml-1 inline h-2.5 w-2.5" /></Link>
+          </div>
+
+          <div className="mt-3 border-t border-[#e8eff1] pt-3">
+            <div className="flex items-start justify-between gap-3">
+              <div className="min-w-0">
+                <p className="text-[8px] font-black uppercase tracking-[.14em] text-[#8a99a6]">Care plan & target source</p>
+                <p className="mt-1 text-[10px] font-bold text-[#0b2d54]">{linkedCarePlan ? String(linkedCarePlan.title ?? linkedCarePlan.name ?? "Linked care plan") : carePlanLinked ? "Linked care plan details unavailable" : practitionerLinked ? "Practitioner-linked goal" : "No care plan linked"}</p>
+                {linkedCarePlanPractitioner && <p className="mt-0.5 text-[9px] text-[#74859a]">Care team · {linkedCarePlanPractitioner}</p>}
+                <p className="mt-1 text-[8px] leading-4 text-[#8a99a6]">{target == null ? "Tracking-only mode; no clinical target is configured." : "A goal/care-plan link alone does not prove this numeric target was prescribed. Confirm the target and the timing context with the care team."}</p>
+              </div>
+              <Link href="/care-plans" className="shrink-0 rounded-lg border border-[#d6e4e7] bg-white px-2.5 py-1.5 text-[8px] font-black text-[#0b2d54]">Care plans <ArrowRight className="ml-1 inline h-2.5 w-2.5" /></Link>
+            </div>
           </div>
 
           <div className="mt-3 border-t border-[#e8eff1] pt-3">
