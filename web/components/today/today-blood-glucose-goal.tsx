@@ -433,8 +433,9 @@ export default function TodayBloodGlucoseGoal({ goal, patientId = "", currentWei
     }
     if (!connectedGoalMap.has(relatedId)) connectedGoalMap.set(relatedId, related);
   }
-  const relevantGoals = Array.from(connectedGoalMap.values()).slice(0, 4);
-  const alreadyTrackedCategories = new Set(relevantGoals.map((related: any) => String(related?.category ?? "").toUpperCase()));
+  const allRelevantGoals = Array.from(connectedGoalMap.values());
+  const relevantGoals = allRelevantGoals.slice(0, 4);
+  const alreadyTrackedCategories = new Set(allRelevantGoals.map((related: any) => String(related?.category ?? "").toUpperCase()));
   const canOfferWeightGoal = Number.isFinite(Number(currentWeightKg)) && Number(currentWeightKg) > 0
     && Number.isFinite(Number(currentHeightCm)) && Number(currentHeightCm) > 0;
   const supportingGoalOptions = SUPPORTING_GOAL_OPTIONS.filter((option) => {
@@ -471,7 +472,8 @@ export default function TodayBloodGlucoseGoal({ goal, patientId = "", currentWei
     if (!option) return;
     setSelectedSupportCategory(category);
     setSupportGoalTitle(option.title);
-    setSupportTarget(category === "MEDICATION" ? "90" : category === "WEIGHT" && supportWeightDirection === "MAINTAIN" && Number(currentWeightKg) > 0 ? String(currentWeightKg) : "");
+    if (category === "WEIGHT") setSupportWeightDirection("MAINTAIN");
+    setSupportTarget(category === "MEDICATION" ? "90" : category === "WEIGHT" && Number(currentWeightKg) > 0 ? String(currentWeightKg) : "");
     setSupportMedicationId(category === "MEDICATION" ? patientMedicationId(supportMedicationOptions[0] ?? {}) : "");
   }
 
@@ -1019,7 +1021,7 @@ export default function TodayBloodGlucoseGoal({ goal, patientId = "", currentWei
         </div>
         <div className="flex items-center gap-2">
           <p className="hidden text-[8px] text-[#7d8d99] sm:block">until {goal?.targetDate ? formatDate(goal.targetDate) : "No target date"}</p>
-          <Link href={"/health-goals#goal-" + encodeURIComponent(goalId)} className="inline-flex min-h-9 shrink-0 items-center justify-center gap-1 rounded-xl border border-[#d6e4e7] bg-white px-3 py-2 text-[9px] font-black text-[#0b2d54]">View goal <ArrowRight className="h-3 w-3" /></Link>
+          <span className="text-[8px] font-bold text-[#74859a]">Track and review on Today</span>
         </div>
       </footer>
     </article>
