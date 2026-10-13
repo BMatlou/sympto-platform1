@@ -431,9 +431,8 @@ export default function TodayNutritionGoal({ goal, onUpdated }: Props) {
     }
   }
 
-  const review = nutritionTargetReview(target);
   const showThreeDayReminder =
-    review != null && journey.journeyDay % 3 === 0;
+    nutritionTargetReview(target) != null && journey.journeyDay % 3 === 0;
 
   return (
     <article className="flex h-full min-w-0 flex-col overflow-hidden rounded-[30px] border border-[#dce9ee] bg-white shadow-[0_18px_48px_rgba(11,45,84,.06)]">
@@ -771,13 +770,6 @@ export default function TodayNutritionGoal({ goal, onUpdated }: Props) {
             <p className="mt-1 text-[10px] leading-5 text-amber-900/85">
               You have been tracking this target for {journey.journeyDay} days. Because this is a low-energy target, review it with a dietitian or other qualified healthcare professional.
             </p>
-          </div>
-        )}
-
-        {review && (
-          <div className="mt-4 rounded-[18px] border border-[#dce8eb] bg-[#f8fbfb] px-3.5 py-3">
-            <p className="text-[9px] font-black uppercase tracking-[.13em] text-[#6f8290]">Target review</p>
-            <p className="mt-1 text-[10px] leading-5 text-[#647784]">{review.text}</p>
           </div>
         )}
 
