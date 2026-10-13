@@ -149,7 +149,7 @@ export default function TodayBloodGlucoseGoal({ goal, onUpdated }: Props) {
     const refresh = () => void loadEvents();
     window.addEventListener("sympto:health-goal-updated", refresh);
     window.addEventListener("sympto:today-action-updated", refresh);
-    const interval = window.setInterval(refresh, 30000);
+    const interval = window.setInterval(refresh, 60000);
     return () => {
       window.removeEventListener("sympto:health-goal-updated", refresh);
       window.removeEventListener("sympto:today-action-updated", refresh);
@@ -160,8 +160,13 @@ export default function TodayBloodGlucoseGoal({ goal, onUpdated }: Props) {
   const latest = events[0] ?? null;
   const todayKey = localDayKey(new Date());
   const todaysEvents = events.filter((event) => localDayKey(event.occurredAt) === todayKey);
-  const low = latest != null && latest.loggedValue < 3.9;
-  const veryLow = latest != null && latest.loggedValue < 3.0;
+  // Show a prominent low-reading alert only while the measurement is recent;
+  // older low readings remain visible in the history without looking like a
+  // current emergency banner.
+  const latestAgeMs = latest ? Date.now() - new Date(latest.occurredAt).getTime() : Number.POSITIVE_INFINITY;
+  const latestIsRecent = Number.isFinite(latestAgeMs) && latestAgeMs >= 0 && latestAgeMs <= 24 * 60 * 60 * 1000;
+  const low = latestIsRecent && latest != null && latest.loggedValue < 3.9;
+  const veryLow = latestIsRecent && latest != null && latest.loggedValue < 3.0;
   const targetLinked = Boolean(goal?.practitionerId || goal?.carePlanId);
   const hasEntryContext = latest != null && Boolean(String(latest.metadata?.readingContext ?? latest.metadata?.glucoseContext ?? ""));
 
