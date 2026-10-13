@@ -56,7 +56,7 @@ const TARGET_RULES: Record<string, { label: string; placeholder: string; helper:
   EXERCISE: { label: "Minutes per week", placeholder: "e.g. 150", helper: "Tracks total exercise minutes recorded during the week." },
   NUTRITION: { label: "Daily calorie target", placeholder: "e.g. 2000", helper: "Tracks the total calories recorded for each day." },
   BLOOD_PRESSURE: { label: "Systolic target", placeholder: "e.g. 130", helper: "This goal currently tracks the systolic component of your blood-pressure readings." },
-  BLOOD_GLUCOSE: { label: "Target glucose", placeholder: "e.g. 7.0", helper: "Tracks the latest blood-glucose value recorded for the day." },
+  BLOOD_GLUCOSE: { label: "Optional target glucose", placeholder: "Leave blank to track only", helper: "Leave this blank if you do not have a personal target confirmed by your healthcare professional. A single ceiling is not suitable for interpreting fasting, pre-meal and post-meal readings alike." },
   CHOLESTEROL: { label: "Total cholesterol target", placeholder: "e.g. 5.0", helper: "Tracks the latest total-cholesterol result you record." },
   MEDICATION: { label: "Adherence target", placeholder: "e.g. 90", helper: "Tracks adherence for the selected prescribed medication on a weekly basis." },
   SLEEP: { label: "Hours per night", placeholder: "e.g. 8", helper: "Tracks the sleep duration recorded for each day." },
@@ -240,7 +240,8 @@ function HealthGoalsPageContent() {
     [availableMedications, draft.patientMedicationId],
   );
   const editorTargetNumber = Number(draft.targetValue);
-  const editorTargetValid = draft.targetValue.trim() !== "" && Number.isFinite(editorTargetNumber) && editorTargetNumber >= 0 && (editorTargetNumber > 0 || Boolean(targetRule.allowZero)) && (draft.category !== "MEDICATION" || (Boolean(draft.patientMedicationId) && editorTargetNumber >= 1 && editorTargetNumber <= 100)) && (draft.category !== "MENTAL_HEALTH" || (editorTargetNumber >= 1 && editorTargetNumber <= 10));
+  const glucoseTrackingOnly = draft.category === "BLOOD_GLUCOSE" && draft.targetValue.trim() === "";
+  const editorTargetValid = glucoseTrackingOnly || (draft.targetValue.trim() !== "" && Number.isFinite(editorTargetNumber) && editorTargetNumber >= 0 && (editorTargetNumber > 0 || Boolean(targetRule.allowZero)) && (draft.category !== "MEDICATION" || (Boolean(draft.patientMedicationId) && editorTargetNumber >= 1 && editorTargetNumber <= 100)) && (draft.category !== "MENTAL_HEALTH" || (editorTargetNumber >= 1 && editorTargetNumber <= 10)));
   const currentWeight = Number(dashboard?.patient?.weightKg);
   const currentHeight = Number(dashboard?.patient?.heightCm);
   const advisor = draft.category === "WEIGHT" ? weightAdvice(Number.isFinite(currentWeight) ? currentWeight : null, Number.isFinite(currentHeight) ? currentHeight : null, Number(draft.targetValue) > 0 ? Number(draft.targetValue) : null, draft.weightDirection, draft.targetDate) : null;
@@ -464,11 +465,12 @@ function HealthGoalsPageContent() {
 
   async function saveGoal() {
     if (!dashboard?.patient?.id) { toast.error("Your patient profile could not be identified."); return; }
-    if (!draft.category || !draft.title.trim() || !draft.priority || draft.targetValue.trim() === "") { toast.error("Add a goal name, category, priority and target."); return; }
+    const glucoseTrackingOnly = draft.category === "BLOOD_GLUCOSE" && draft.targetValue.trim() === "";
+    if (!draft.category || !draft.title.trim() || !draft.priority || (draft.targetValue.trim() === "" && !glucoseTrackingOnly)) { toast.error(glucoseTrackingOnly ? "Add a goal name and priority." : "Add a goal name, category, priority and target."); return; }
     const targetNumber = Number(draft.targetValue);
     const categoryConfig = CATEGORIES.find((item) => item.value === draft.category);
     const allowsZero = draft.category === "SMOKING" || draft.category === "ALCOHOL";
-    if (!categoryConfig || !Number.isFinite(targetNumber) || targetNumber < 0 || (targetNumber === 0 && !allowsZero)) { toast.error(allowsZero ? "Enter a valid target of 0 or more." : "Enter a positive target."); return; }
+    if (!categoryConfig || (!glucoseTrackingOnly && (!Number.isFinite(targetNumber) || targetNumber < 0 || (targetNumber === 0 && !allowsZero)))) { toast.error(allowsZero ? "Enter a valid target of 0 or more." : "Enter a positive target, or leave the Blood glucose target blank for tracking only."); return; }
     if (draft.category === "MEDICATION" && (!draft.patientMedicationId || targetNumber < 1 || targetNumber > 100)) { toast.error("Select a prescribed medication and set adherence between 1% and 100%."); return; }
     if (draft.category === "MENTAL_HEALTH" && (targetNumber < 1 || targetNumber > 10)) { toast.error("Stress target must be between 1 and 10."); return; }
     const config = CATEGORIES.find((item) => item.value === draft.category);
@@ -507,12 +509,12 @@ function HealthGoalsPageContent() {
       );
       const comparison: HealthGoalInput["comparison"] = draft.category === "WEIGHT" ? draft.weightDirection === "GAIN" ? "INCREASE_TO" : draft.weightDirection === "MAINTAIN" ? "CLOSEST" : "DECREASE_TO" : config.comparison;
       const normalizedTitle = goalDisplayTitle({ title: draft.title }, config.value);
-      const input: HealthGoalInput = { patientId: dashboard.patient.id, patientMedicationId: draft.category === "MEDICATION" ? draft.patientMedicationId || undefined : undefined, title: normalizedTitle, description: draft.description.trim() || undefined, category: config.value, priority: draft.priority, status: shouldResume ? "ACTIVE" : undefined, targetValue: draft.targetValue, unit: draft.unit || config.unit || undefined, targetDate: draft.targetDate || undefined, metricType: config.metricType, metricKey: config.metricKey, frequency: config.frequency, frequencyTarget: draft.targetValue, aggregation: config.aggregation, comparison };
+      const input: HealthGoalInput = { patientId: dashboard.patient.id, patientMedicationId: draft.category === "MEDICATION" ? draft.patientMedicationId || undefined : undefined, title: normalizedTitle, description: draft.description.trim() || undefined, category: config.value, priority: draft.priority, status: shouldResume ? "ACTIVE" : undefined, targetValue: glucoseTrackingOnly ? null : draft.targetValue, unit: draft.unit || config.unit || undefined, targetDate: draft.targetDate || undefined, metricType: config.metricType, metricKey: config.metricKey, frequency: config.frequency, frequencyTarget: glucoseTrackingOnly ? null : draft.targetValue, aggregation: config.aggregation, comparison };
       if (editingId) {
         await healthGoalsService.update(editingId, input);
         await healthGoalsService.configureMetric(editingId, { metricType: config.metricType, metricKey: config.metricKey, frequency: config.frequency, frequencyTarget: draft.targetValue, aggregation: config.aggregation, comparison });
-        toast.success(shouldResume ? "Medication goal resumed and tracking is active again." : "Health goal updated. Its baseline and tracking plan were refreshed; the original journey date remains unchanged.");
-      } else { await healthGoalsService.create(input); toast.success("Health goal added."); }
+        toast.success(draft.category === "BLOOD_GLUCOSE" && glucoseTrackingOnly ? "Glucose tracking saved without a clinical target." : shouldResume ? "Medication goal resumed and tracking is active again." : "Health goal updated. Its baseline and tracking plan were refreshed; the original journey date remains unchanged.");
+      } else { await healthGoalsService.create(input); toast.success(draft.category === "BLOOD_GLUCOSE" && glucoseTrackingOnly ? "Glucose tracking added without a clinical target." : "Health goal added."); }
       closeEditor(); await reload();
     } catch (err: any) { toast.error(String(err?.response?.data?.message || "We could not save this health goal.")); }
     finally { setSaving(false); }
@@ -563,6 +565,7 @@ function HealthGoalsPageContent() {
                    <TextField type="date" label="Target date" value={draft.targetDate} onChange={(value) => setDraft((current) => ({ ...current, targetDate: value }))} />
                  </div>
                  {selectedCategory && <div className="rounded-2xl border border-[#e1eaed] bg-[#fbfdfd] px-4 py-3"><div className="flex flex-wrap items-center gap-2"><span className="rounded-full bg-[#e9f9fa] px-2.5 py-1 text-[9px] font-black text-[#0b6f73]">{selectedCategory.frequency === "DAILY" ? "Daily" : selectedCategory.frequency === "WEEKLY" ? "Weekly" : "Journey"}</span><span className="rounded-full bg-[#f3f6f7] px-2.5 py-1 text-[9px] font-black text-[#74859a]">{selectedCategory.comparison === "AT_LEAST" ? "At least target" : selectedCategory.comparison === "AT_MOST" ? "At most target" : selectedCategory.comparison === "CLOSEST" ? "Stay close to target" : String(selectedCategory.comparison) === "INCREASE_TO" ? "Increase toward target" : "Decrease toward target"}</span></div><p className="mt-2 text-[10px] leading-5 text-[#74859a]">{targetRule.helper}</p>
+                  {draft.category === "BLOOD_GLUCOSE" && <p className="mt-2 text-[10px] leading-5 text-[#0b6f73]">{glucoseTrackingOnly ? "Tracking only: you can begin logging measured values without a target. Confirm a personal target and its measurement context with your healthcare professional." : "This is a saved target, not a universal glucose ceiling. Confirm the correct target range and timing context with your healthcare professional before treating it as a measure of control."}</p>}
                   {draft.category === "NUTRITION" && (() => {
                     const review = nutritionTargetReview(draft.targetValue);
                     const change = nutritionTargetChange(
