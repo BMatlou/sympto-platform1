@@ -339,39 +339,48 @@ export class HealthGoalsService {
 
   private assertGoalDefinition(category: string, targetValue: unknown, targetDate?: unknown) {
     const normalizedCategory = String(category ?? 'OTHER').toUpperCase();
+    const trackingOnlyGlucose = normalizedCategory === 'BLOOD_GLUCOSE'
+      && (targetValue == null || String(targetValue).trim() === '');
     const target = Number(targetValue);
-    if (targetValue == null || !Number.isFinite(target)) throw new BadRequestException('A valid numeric goal target is required.');
 
-    const allowsZero = normalizedCategory === 'SMOKING' || normalizedCategory === 'ALCOHOL';
-    if (target < 0 || (target === 0 && !allowsZero)) {
-      throw new BadRequestException(allowsZero ? 'This goal target must be 0 or greater.' : 'This goal target must be greater than 0.');
-    }
-    if (normalizedCategory === 'MEDICATION' && (target < 1 || target > 100)) {
-      throw new BadRequestException('Medication adherence goals must be between 1% and 100%.');
-    }
-    if (normalizedCategory === 'MENTAL_HEALTH' && (target < 1 || target > 10)) {
-      throw new BadRequestException('Mental health stress goals must be between 1 and 10.');
-    }
-    if (normalizedCategory === 'BLOOD_PRESSURE' && (target < 40 || target > 300)) {
-      throw new BadRequestException('Blood pressure targets must be within the supported measurement range.');
-    }
-    if (normalizedCategory === 'BLOOD_GLUCOSE' && (target < 0.1 || target > 50)) {
-      throw new BadRequestException('Blood glucose targets must be within the supported measurement range.');
-    }
-    if (normalizedCategory === 'CHOLESTEROL' && (target < 0.1 || target > 30)) {
-      throw new BadRequestException('Cholesterol targets must be within the supported measurement range.');
-    }
-    if (normalizedCategory === 'SLEEP' && (target <= 0 || target > 24)) {
-      throw new BadRequestException('Sleep targets must be greater than 0 and no more than 24 hours.');
-    }
-    if (normalizedCategory === 'HYDRATION' && (target <= 0 || target > 50000)) {
-      throw new BadRequestException('Hydration targets must be within the supported daily measurement range.');
-    }
-    if (normalizedCategory === 'HEART_RATE' && (target < 20 || target > 260)) {
-      throw new BadRequestException('Heart-rate targets must be within the supported measurement range.');
-    }
-    if (normalizedCategory === 'WEIGHT' && target <= 0) {
-      throw new BadRequestException('Weight targets must be greater than 0.');
+    // Glucose may be recorded without a target. A person new to Sympto must
+    // not be forced to adopt a generic glucose ceiling before clinical review.
+    if (!trackingOnlyGlucose) {
+      if (targetValue == null || !Number.isFinite(target)) {
+        throw new BadRequestException('A valid numeric goal target is required.');
+      }
+
+      const allowsZero = normalizedCategory === 'SMOKING' || normalizedCategory === 'ALCOHOL';
+      if (target < 0 || (target === 0 && !allowsZero)) {
+        throw new BadRequestException(allowsZero ? 'This goal target must be 0 or greater.' : 'This goal target must be greater than 0.');
+      }
+      if (normalizedCategory === 'MEDICATION' && (target < 1 || target > 100)) {
+        throw new BadRequestException('Medication adherence goals must be between 1% and 100%.');
+      }
+      if (normalizedCategory === 'MENTAL_HEALTH' && (target < 1 || target > 10)) {
+        throw new BadRequestException('Mental health stress goals must be between 1 and 10.');
+      }
+      if (normalizedCategory === 'BLOOD_PRESSURE' && (target < 40 || target > 300)) {
+        throw new BadRequestException('Blood pressure targets must be within the supported measurement range.');
+      }
+      if (normalizedCategory === 'BLOOD_GLUCOSE' && (target < 0.1 || target > 50)) {
+        throw new BadRequestException('Blood glucose targets must be within the supported measurement range.');
+      }
+      if (normalizedCategory === 'CHOLESTEROL' && (target < 0.1 || target > 30)) {
+        throw new BadRequestException('Cholesterol targets must be within the supported measurement range.');
+      }
+      if (normalizedCategory === 'SLEEP' && (target <= 0 || target > 24)) {
+        throw new BadRequestException('Sleep targets must be greater than 0 and no more than 24 hours.');
+      }
+      if (normalizedCategory === 'HYDRATION' && (target <= 0 || target > 50000)) {
+        throw new BadRequestException('Hydration targets must be within the supported daily measurement range.');
+      }
+      if (normalizedCategory === 'HEART_RATE' && (target < 20 || target > 260)) {
+        throw new BadRequestException('Heart-rate targets must be within the supported measurement range.');
+      }
+      if (normalizedCategory === 'WEIGHT' && target <= 0) {
+        throw new BadRequestException('Weight targets must be greater than 0.');
+      }
     }
 
     if (targetDate != null && String(targetDate).trim() !== '') {
@@ -382,7 +391,6 @@ export class HealthGoalsService {
       if (date < today) throw new BadRequestException('Target date cannot be in the past.');
     }
   }
-
   private async assertNoDuplicateGoal(
     patientId: string,
     category: string,
@@ -867,7 +875,8 @@ export class HealthGoalsService {
     if (targetCategory !== existingCategory) throw new BadRequestException('A goal category cannot be changed after it is created. Start a new goal for a different category.');
     if (patientMedicationId && targetCategory !== 'MEDICATION') throw new BadRequestException('A medication can only be attached to a medication goal.');
     if (patientMedicationId) await this.assertPatientMedicationBelongsToPatient(patientMedicationId, String(existing.patientId));
-    this.assertGoalDefinition(targetCategory, goalData.targetValue ?? existing.targetValue, goalData.targetDate ?? existing.targetDate);
+    const glucoseTrackingOnly = targetCategory === 'BLOOD_GLUCOSE' && Object.prototype.hasOwnProperty.call(dto, 'targetValue') && (dto as any).targetValue == null;
+    this.assertGoalDefinition(targetCategory, glucoseTrackingOnly ? null : goalData.targetValue ?? existing.targetValue, goalData.targetDate ?? existing.targetDate);
     const revisingWeightGoal = targetCategory === 'WEIGHT';
     let effectiveComparison: string | undefined = comparison;
     if (revisingWeightGoal) {
@@ -904,7 +913,7 @@ export class HealthGoalsService {
       metricType,
       metricKey,
       frequency,
-      frequencyTarget: frequencyTarget == null ? (goalData.targetValue ?? existing.targetValue) : frequencyTarget,
+      frequencyTarget: glucoseTrackingOnly ? null : frequencyTarget == null ? (goalData.targetValue ?? existing.targetValue) : frequencyTarget,
       aggregation,
       comparison: metricComparison,
       guidanceText,
