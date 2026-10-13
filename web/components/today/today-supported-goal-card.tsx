@@ -6,7 +6,6 @@ import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 import { healthGoalsService } from "@/services/health-goals.service";
 import { healthJournalService } from "@/services/health-journal.service";
-import BloodPressureInsights from "@/components/today/blood-pressure-insights";
 
 type SupportedGoalCardProps = {
   goal: any;
@@ -209,19 +208,12 @@ export default function TodaySupportedGoalCard({ goal, activeGoals = [], onUpdat
   const metricKey = String(goal?.metricConfig?.metricKey ?? defaultMetric.metricKey);
   const [liveCurrent, setLiveCurrent] = useState<number | null>(null);
   const [bpGoalStats, setBpGoalStats] = useState({ recordedDays: 0, targetDays: 0 });
-  const [bpMetricEvents, setBpMetricEvents] = useState<Array<{
-    id?: string;
-    loggedValue: number;
-    occurredAt: string;
-    source?: string | null;
-    sourceId?: string | null;
-  }> | null>(null);
 
   useEffect(() => {
     if (category !== "BLOOD_PRESSURE" || metricType !== "BLOOD_PRESSURE" || metricKey !== "blood_pressure.systolic") {
       setLiveCurrent(null);
       setBpGoalStats({ recordedDays: 0, targetDays: 0 });
-      setBpMetricEvents([]);
+
       return;
     }
 
@@ -238,11 +230,8 @@ export default function TodaySupportedGoalCard({ goal, activeGoals = [], onUpdat
         const events = (Array.isArray(result?.events) ? result.events : [])
           .filter((event: any) => Number.isFinite(Number(event?.loggedValue)))
           .map((event: any) => ({
-            id: event?.id == null ? undefined : String(event.id),
             loggedValue: Number(event.loggedValue),
             occurredAt: String(event.occurredAt),
-            source: event?.source == null ? null : String(event.source),
-            sourceId: event?.sourceId == null ? null : String(event.sourceId),
           }));
 
         const latest = [...events]
@@ -250,7 +239,6 @@ export default function TodaySupportedGoalCard({ goal, activeGoals = [], onUpdat
           .at(-1);
 
         setLiveCurrent(latest ? Number(latest.loggedValue) : null);
-        setBpMetricEvents(events);
 
         const latestByDay = new Map<string, { value: number; occurredAt: number }>();
         for (const event of events) {
@@ -287,7 +275,7 @@ export default function TodaySupportedGoalCard({ goal, activeGoals = [], onUpdat
         if (active) {
           setLiveCurrent(null);
           setBpGoalStats({ recordedDays: 0, targetDays: 0 });
-          setBpMetricEvents([]);
+
         }
       });
 
@@ -566,19 +554,6 @@ export default function TodaySupportedGoalCard({ goal, activeGoals = [], onUpdat
                 </Link>
               </div>
             </section>
-
-            <BloodPressureInsights
-              target={target}
-              exerciseGoalTarget={(() => {
-                const raw = linkedExerciseGoal?.targetValue ?? linkedExerciseGoal?.frequencyTarget ?? linkedExerciseGoal?.metricConfig?.frequencyTarget;
-                const numeric = Number(raw);
-                return Number.isFinite(numeric) ? numeric : null;
-              })()}
-              exerciseGoalTitle={linkedExerciseGoal?.title ?? "Exercise goal"}
-              exerciseGoalFrequency={String(linkedExerciseGoal?.metricConfig?.frequency ?? linkedExerciseGoal?.frequency ?? "WEEKLY").toUpperCase()}
-              challengeStartAt={goal?.createdAt ? String(goal.createdAt) : null}
-              bloodPressureEvents={bpMetricEvents}
-            />
 
             <div className="flex items-center justify-between gap-3 border-t border-[#edf2f4] px-1 pt-3">
               <div className="min-w-0">
