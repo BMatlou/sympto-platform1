@@ -6,7 +6,7 @@ import { Activity, ArrowRight, Clock3, Droplets, Plus } from "lucide-react";
 import { toast } from "sonner";
 import { healthGoalsService, type HealthGoalMetricEventsResponse } from "@/services/health-goals.service";
 
-type Props = { goal: any; onUpdated?: () => Promise<void> | void; conditions?: any[]; diagnoses?: any[]; medications?: any[]; activeGoals?: any[]; labOrders?: any[]; carePlans?: any[] };
+type Props = { goal: any; onUpdated?: () => Promise<void> | void; conditions?: any[]; diagnoses?: any[]; medications?: any[]; activeGoals?: any[]; labOrders?: any[]; carePlans?: any[]; baseline?: any };
 type GlucoseContext = "FASTING" | "BEFORE_MEAL" | "AFTER_MEAL_2H" | "BEDTIME" | "OVERNIGHT" | "OTHER";
 type GlucoseEvent = {
   id: string;
@@ -217,7 +217,7 @@ function latestReleasedLabMeasure(labOrders: any[], matcher: RegExp): ReleasedLa
   return measures[0] ?? null;
 }
 
-export default function TodayBloodGlucoseGoal({ goal, onUpdated, conditions = [], diagnoses = [], medications = [], activeGoals = [], labOrders = [], carePlans = [] }: Props) {
+export default function TodayBloodGlucoseGoal({ goal, onUpdated, conditions = [], diagnoses = [], medications = [], activeGoals = [], labOrders = [], carePlans = [], baseline = null }: Props) {
   const goalId = String(goal?.id ?? "");
   const target = targetFromGoal(goal);
   const [events, setEvents] = useState<GlucoseEvent[]>([]);
@@ -393,6 +393,11 @@ export default function TodayBloodGlucoseGoal({ goal, onUpdated, conditions = []
         linkedCarePlan.practitioner.person.lastName,
       ].filter(Boolean).join(" ")
     : "";
+  const baselineGlucoseValue = baseline?.bloodGlucose == null ? null : Number(baseline.bloodGlucose);
+  const baselineGlucose = baselineGlucoseValue != null && Number.isFinite(baselineGlucoseValue) && baselineGlucoseValue > 0
+    ? baselineGlucoseValue
+    : null;
+  const baselineEstablishedAt = baseline?.establishedAt ?? baseline?.createdAt ?? null;
   const latestHba1c = latestReleasedLabMeasure(
     labOrders,
     /(hba1c|hemoglobin a1c|haemoglobin a1c|glycated haemoglobin|glycated hemoglobin|glycosylated hemoglobin)/i,
@@ -588,7 +593,7 @@ export default function TodayBloodGlucoseGoal({ goal, onUpdated, conditions = []
               <p className="text-[8px] font-black uppercase tracking-[.14em] text-[#8a99a6]">Latest laboratory results</p>
               <Link href="/tests-results" className="text-[8px] font-black text-[#0b7b80]">Tests & results <ArrowRight className="ml-1 inline h-2.5 w-2.5" /></Link>
             </div>
-            {latestHba1c || latestLabGlucose ? (
+            {latestHba1c || latestLabGlucose || baselineGlucose != null ? (
               <div className="mt-2 grid gap-2 sm:grid-cols-2">
                 {latestHba1c && (
                   <div className="rounded-xl border border-[#e1eaed] bg-white p-3">
@@ -602,6 +607,13 @@ export default function TodayBloodGlucoseGoal({ goal, onUpdated, conditions = []
                     <p className="text-[8px] font-black uppercase tracking-[.12em] text-[#8a99a6]">Laboratory glucose</p>
                     <p className="mt-1 text-sm font-black text-[#0b2d54]">{latestLabGlucose.value}{latestLabGlucose.unit ? " " + latestLabGlucose.unit : ""}</p>
                     <p className="mt-1 text-[8px] leading-4 text-[#74859a]">{formatDate(latestLabGlucose.occurredAt)}{latestLabGlucose.laboratoryName ? " · " + latestLabGlucose.laboratoryName : ""}</p>
+                  </div>
+                )}
+                {baselineGlucose != null && (
+                  <div className="rounded-xl border border-[#e1eaed] bg-white p-3">
+                    <p className="text-[8px] font-black uppercase tracking-[.12em] text-[#8a99a6]">Recorded baseline</p>
+                    <p className="mt-1 text-sm font-black text-[#0b2d54]">{formatNumber(baselineGlucose)} mmol/L</p>
+                    <p className="mt-1 text-[8px] leading-4 text-[#74859a]">{baselineEstablishedAt ? "Established " + formatDate(baselineEstablishedAt) : "Date not recorded"} · shown separately from today's reading</p>
                   </div>
                 )}
               </div>
