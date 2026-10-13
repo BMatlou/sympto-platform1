@@ -345,11 +345,11 @@ export default function TodayBloodGlucoseGoal({ goal, onUpdated, conditions = []
   const diabetesStatusDetail = diabetesDiagnosis
     ? "Found in practitioner diagnosis records · " + recordDisplayName(diabetesDiagnosis)
     : diabetesCondition
-      ? (diabetesCondition.diagnosedBy || diabetesCondition.treatmentPlan ? "Clinician-recorded health condition · " : "Health condition record · ") + recordDisplayName(diabetesCondition)
+      ? (diabetesCondition.diagnosedBy || diabetesCondition.treatmentPlan ? "Clinician-recorded health condition · " : "Patient-entered health condition · ") + recordDisplayName(diabetesCondition)
       : prediabetesDiagnosis
         ? "Found in practitioner diagnosis records · " + recordDisplayName(prediabetesDiagnosis)
         : prediabetesCondition
-          ? "Prediabetes is recorded in Health Conditions · " + recordDisplayName(prediabetesCondition)
+          ? (prediabetesCondition.diagnosedBy || prediabetesCondition.treatmentPlan ? "Clinician-recorded prediabetes · " : "Patient-entered prediabetes record · ") + recordDisplayName(prediabetesCondition)
           : "No matching entry was found in the current records; this does not rule out diabetes.";
 
   const activeMedicationRecords = medications.filter(activeRecord);
