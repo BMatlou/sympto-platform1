@@ -501,7 +501,6 @@ export default function TodayBloodGlucoseGoal({ goal, patientId = "", currentWei
       toast.error("Choose a relevant prescribed medicine and set an adherence target from 1% to 100%.");
       return;
     }
-    if (category === "MENTAL_HEALTH") return;
     const comparison = category === "WEIGHT"
       ? supportWeightDirection === "GAIN" ? "INCREASE_TO" : supportWeightDirection === "LOSE" ? "DECREASE_TO" : "CLOSEST"
       : option.comparison;
