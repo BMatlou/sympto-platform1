@@ -445,11 +445,15 @@ export default function TodayBloodGlucoseGoal({ goal, patientId = "", currentWei
     window.addEventListener("sympto:health-goal-updated", refresh);
     window.addEventListener("sympto:today-action-updated", refresh);
     window.addEventListener("sympto:health-checkin-updated", refresh);
+    window.addEventListener("sympto:vitals-updated", refresh);
+    window.addEventListener("sympto:weight-updated", refresh);
     const interval = window.setInterval(refresh, 60000);
     return () => {
       window.removeEventListener("sympto:health-goal-updated", refresh);
       window.removeEventListener("sympto:today-action-updated", refresh);
       window.removeEventListener("sympto:health-checkin-updated", refresh);
+      window.removeEventListener("sympto:vitals-updated", refresh);
+      window.removeEventListener("sympto:weight-updated", refresh);
       window.clearInterval(interval);
     };
   }, [loadEvents, loadDailyContext]);
