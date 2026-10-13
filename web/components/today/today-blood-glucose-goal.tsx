@@ -154,6 +154,15 @@ function medicationNameSuggestsGlucoseTherapy(record: any) {
   ].some((medicine) => name.includes(medicine));
 }
 
+function medicationIsGlucoseRelevant(record: any) {
+  const indication = String(record?.indication ?? record?.reason ?? "").trim();
+  // An explicit, different indication (for example PCOS) takes precedence
+  // over a medicine name that is sometimes used for diabetes.
+  return indication
+    ? medicationHasExplicitGlucoseIndication(record)
+    : medicationNameSuggestsGlucoseTherapy(record);
+}
+
 type ReleasedLabMeasure = {
   testName: string;
   value: string;
@@ -344,9 +353,7 @@ export default function TodayBloodGlucoseGoal({ goal, onUpdated, conditions = []
           : "No matching entry was found in the current records; this does not rule out diabetes.";
 
   const activeMedicationRecords = medications.filter(activeRecord);
-  const glucoseMedicationRecords = activeMedicationRecords.filter(
-    (medication) => medicationHasExplicitGlucoseIndication(medication) || medicationNameSuggestsGlucoseTherapy(medication),
-  );
+  const glucoseMedicationRecords = activeMedicationRecords.filter(medicationIsGlucoseRelevant);
   const linkedGoalCandidates = [
     ...(Array.isArray(goal?.connectedGoals) ? goal.connectedGoals.map((relation: any) => relation?.goal ?? relation) : []),
     ...activeGoals,
