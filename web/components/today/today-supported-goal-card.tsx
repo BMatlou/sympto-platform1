@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { Activity, ArrowRight, Check, Droplets, HeartPulse, Moon, PencilLine, Sparkles, Target, TrendingDown, TrendingUp } from "lucide-react";
+import { Activity, ArrowRight, Check, Droplets, HeartPulse, Moon, PencilLine, Target } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 import { healthGoalsService } from "@/services/health-goals.service";
@@ -118,24 +118,6 @@ function formatJourneyDate(value: Date | null) {
   return new Intl.DateTimeFormat("en-ZA", { day: "2-digit", month: "short", year: "numeric" }).format(value);
 }
 
-function healthDayKey(value: unknown) {
-  const date = new Date(String(value ?? ""));
-  if (Number.isNaN(date.getTime())) return "";
-  const parts = new Intl.DateTimeFormat("en-GB", {
-    timeZone: "Africa/Johannesburg",
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-  }).formatToParts(date);
-  const values = Object.fromEntries(parts.map((part) => [part.type, part.value]));
-  return String(values.year) + "-" + String(values.month) + "-" + String(values.day);
-}
-
-function healthDayOrdinal(day: string) {
-  const [year, month, date] = day.split("-").map(Number);
-  if (![year, month, date].every(Number.isFinite)) return Number.NaN;
-  return Math.floor(Date.UTC(year, month - 1, date) / 86400000);
-}
 function nutritionTargetReview(target: number | null) {
   if (target == null || !Number.isFinite(target) || target <= 0 || target > 1200) return null;
   if (target < 800) {
@@ -226,8 +208,6 @@ export default function TodaySupportedGoalCard({ goal, activeGoals = [], onUpdat
   const metricType = String(goal?.metricConfig?.metricType ?? defaultMetric.metricType).toUpperCase();
   const metricKey = String(goal?.metricConfig?.metricKey ?? defaultMetric.metricKey);
   const [liveCurrent, setLiveCurrent] = useState<number | null>(null);
-  const [liveCurrentAt, setLiveCurrentAt] = useState<string | null>(null);
-  const [sleepHistory, setSleepHistory] = useState<Array<{ day: string; value: number; occurredAt: string }>>([]);
   const [bpGoalStats, setBpGoalStats] = useState({ recordedDays: 0, targetDays: 0 });
   const [bpMetricEvents, setBpMetricEvents] = useState<Array<{
     id?: string;
@@ -240,7 +220,6 @@ export default function TodaySupportedGoalCard({ goal, activeGoals = [], onUpdat
   useEffect(() => {
     if (category !== "BLOOD_PRESSURE" || metricType !== "BLOOD_PRESSURE" || metricKey !== "blood_pressure.systolic") {
       setLiveCurrent(null);
-      setLiveCurrentAt(null);
       setBpGoalStats({ recordedDays: 0, targetDays: 0 });
       setBpMetricEvents([]);
       return;
@@ -317,146 +296,7 @@ export default function TodaySupportedGoalCard({ goal, activeGoals = [], onUpdat
     };
   }, [category, metricType, metricKey, goalId, goal?.createdAt, goal?.updatedAt, target]);
 
-  // Sleep progress and insight are calculated from saved Daily Health Check-ins
-  // and their corresponding metric events. The journal value is the source of
-  // truth for a day when both streams contain that day's sleep duration.
-  useEffect(() => {
-    if (category !== "SLEEP" || metricType !== "SLEEP" || metricKey !== "sleep.hours") return;
-
-    let active = true;
-    const loadSleep = async () => {
-      const now = new Date();
-      const from = new Date(now.getTime() - 90 * 24 * 60 * 60 * 1000);
-      const [metricResult, journalResult] = await Promise.allSettled([
-        healthGoalsService.getMetricEvents(metricType, metricKey, from, now),
-        healthJournalService.getAll({ page: 1, limit: 100 }),
-      ]);
-
-      const metricEvents = metricResult.status === "fulfilled" && Array.isArray(metricResult.value?.events)
-        ? metricResult.value.events
-            .map((event: any) => ({
-              day: healthDayKey(event?.occurredAt),
-              value: Number(event?.loggedValue),
-              occurredAt: String(event?.occurredAt ?? ""),
-              recordedAt: new Date(String(event?.occurredAt ?? "")).getTime(),
-              priority: 1,
-            }))
-            .filter((event: any) => event.day && Number.isFinite(event.value) && event.value >= 0 && Number.isFinite(event.recordedAt))
-        : [];
-
-      const journals = journalResult.status === "fulfilled" && Array.isArray(journalResult.value?.data)
-        ? journalResult.value.data
-        : [];
-      const checkIns = journals
-        .filter((entry: any) =>
-          String(entry?.title ?? "") === "Daily Health Check-in"
-          && entry?.sleepHours !== null
-          && entry?.sleepHours !== undefined
-          && entry?.sleepHours !== ""
-          && Number.isFinite(Number(entry.sleepHours))
-          && Number(entry.sleepHours) >= 0,
-        )
-        .map((entry: any) => {
-          const dateForDay = String(entry.createdAt ?? entry.updatedAt ?? "");
-          const changedAt = String(entry.updatedAt ?? entry.createdAt ?? "");
-          return {
-            day: healthDayKey(dateForDay),
-            value: Number(entry.sleepHours),
-            occurredAt: dateForDay,
-            recordedAt: new Date(changedAt).getTime(),
-            priority: 2,
-          };
-        })
-        .filter((entry: any) => entry.day && Number.isFinite(entry.value) && Number.isFinite(entry.recordedAt));
-
-      const byDay = new Map<string, { day: string; value: number; occurredAt: string; recordedAt: number; priority: number }>();
-      for (const event of metricEvents) {
-        const previous = byDay.get(event.day);
-        if (!previous || previous.priority < event.priority || (previous.priority === event.priority && event.recordedAt >= previous.recordedAt)) {
-          byDay.set(event.day, event);
-        }
-      }
-      for (const entry of checkIns) {
-        const previous = byDay.get(entry.day);
-        if (!previous || previous.priority < entry.priority || (previous.priority === entry.priority && entry.recordedAt >= previous.recordedAt)) {
-          byDay.set(entry.day, entry);
-        }
-      }
-
-      const history = Array.from(byDay.values())
-        .sort((a, b) => a.day.localeCompare(b.day))
-        .slice(-90)
-        .map(({ day, value, occurredAt }) => ({ day, value, occurredAt }));
-
-      if (!active) return;
-      setSleepHistory(history);
-      const latest = history[history.length - 1] ?? null;
-      setLiveCurrent(latest?.value ?? null);
-      setLiveCurrentAt(latest?.occurredAt ?? null);
-    };
-
-    const refreshSleep = () => { void loadSleep(); };
-    refreshSleep();
-    window.addEventListener("sympto:health-checkin-updated", refreshSleep);
-    window.addEventListener("sympto:today-action-updated", refreshSleep);
-    const interval = window.setInterval(refreshSleep, 30000);
-    return () => {
-      active = false;
-      window.removeEventListener("sympto:health-checkin-updated", refreshSleep);
-      window.removeEventListener("sympto:today-action-updated", refreshSleep);
-      window.clearInterval(interval);
-    };
-  }, [category, metricType, metricKey, goalId, goal?.createdAt, goal?.updatedAt]);
-
-  const sleepInsight = useMemo(() => {
-    if (category !== "SLEEP") return null;
-    const today = healthDayOrdinal(healthDayKey(new Date()));
-    if (!Number.isFinite(today)) return null;
-    const dated = sleepHistory
-      .map((item) => ({ ...item, ordinal: healthDayOrdinal(item.day) }))
-      .filter((item) => Number.isFinite(item.ordinal) && item.ordinal <= today && item.ordinal >= today - 89);
-    const latestSeven = dated.filter((item) => item.ordinal >= today - 6);
-    const previousSeven = dated.filter((item) => item.ordinal >= today - 13 && item.ordinal <= today - 7);
-    const average = (items: typeof dated) => items.length
-      ? items.reduce((sum, item) => sum + item.value, 0) / items.length
-      : null;
-    const recentAverage = average(latestSeven);
-    const previousAverage = average(previousSeven);
-    const targetNights = target != null && target > 0
-      ? latestSeven.filter((item) => item.value >= target).length
-      : null;
-    let trend: "UP" | "DOWN" | "STEADY" | "BUILDING" = "BUILDING";
-    let trendTitle = "Your sleep pattern is building";
-    let trendText = "Sympto has " + latestSeven.length + " of the last 7 days with a recorded sleep duration. Keep logging your nights; a week-to-week comparison needs at least 3 recorded nights in each 7-day period.";
-    if (latestSeven.length >= 3 && previousSeven.length >= 3 && recentAverage != null && previousAverage != null) {
-      const delta = recentAverage - previousAverage;
-      if (delta >= 0.5) {
-        trend = "UP";
-        trendTitle = "Average sleep duration is higher";
-      } else if (delta <= -0.5) {
-        trend = "DOWN";
-        trendTitle = "Average sleep duration has dipped";
-      } else {
-        trend = "STEADY";
-        trendTitle = "Sleep duration is fairly steady";
-      }
-      trendText = "Your average was " + previousAverage.toFixed(1) + " hours in the previous 7 days and " + recentAverage.toFixed(1) + " hours in the latest 7 days (" + (delta > 0 ? "+" : "") + delta.toFixed(1) + " hours). This compares recorded duration only; it does not assess sleep quality or diagnose a sleep condition.";
-    } else if (latestSeven.length >= 3 && previousSeven.length < 3) {
-      trendText = "You have " + latestSeven.length + " recorded nights in the latest week, but only " + previousSeven.length + " in the previous week. Keep recording sleep to establish a reliable comparison.";
-    }
-    return {
-      latestSeven,
-      previousSeven,
-      recentAverage,
-      previousAverage,
-      targetNights,
-      trend,
-      trendTitle,
-      trendText,
-    };
-  }, [category, sleepHistory, target]);
-
-  const displayCurrent = (category === "BLOOD_PRESSURE" || category === "SLEEP") && liveCurrent != null ? liveCurrent : current;
+  const displayCurrent = category === "BLOOD_PRESSURE" && liveCurrent != null ? liveCurrent : current;
   const bpDistance = category === "BLOOD_PRESSURE" && displayCurrent != null && target != null
     ? displayCurrent - target
     : null;
@@ -468,27 +308,17 @@ export default function TodaySupportedGoalCard({ goal, activeGoals = [], onUpdat
     : 0;
   const displayProgress = category === "BLOOD_PRESSURE"
     ? bpAttainmentPercent
-    : category === "SLEEP" && displayCurrent == null
-      ? null
-      : displayCurrent == null
-        ? progress
-        : progressPercent({
-            ...goal,
-            currentValue: displayCurrent,
-            progress: [],
-            latestProgress: null,
-            progressPercent: null,
-          });
+    : displayCurrent == null
+      ? progress
+      : progressPercent({
+          ...goal,
+          currentValue: displayCurrent,
+          progress: [],
+          latestProgress: null,
+          progressPercent: null,
+        });
 
-  const nextStep = category === "SLEEP"
-    ? displayCurrent == null
-      ? "Save your sleep duration in the Daily Health Check-in. The current value and progress will update automatically."
-      : target == null
-        ? "Your latest sleep duration is recorded. Set a suitable target with your care team if you need one."
-        : displayCurrent >= target
-          ? "You logged " + displayCurrent + " hours against your " + target + "-hour target. Target met for the latest recorded night."
-          : "You logged " + displayCurrent + " of " + target + " hours. That is " + (displayProgress ?? 0) + "% of your target; keep logging sleep in the Daily Health Check-in to build a trend."
-    : goalNextStep(category, displayCurrent, target);
+  const nextStep = goalNextStep(category, displayCurrent, target);
 
   async function recordValue() {
     const numeric = Number(value);
@@ -663,7 +493,7 @@ export default function TodaySupportedGoalCard({ goal, activeGoals = [], onUpdat
         ) : (
           <>
           <div className="grid grid-cols-3 gap-2">
-          <div className="rounded-[16px] bg-[#f7fbfb] p-3"><p className="text-[8px] font-black uppercase tracking-[.12em] text-[#95a3ad]">Current</p><p className="mt-1 text-base font-black text-[#0b2d54]">{displayCurrent == null ? "—" : displayCurrent}{meta.unit && displayCurrent != null ? " " + meta.unit : ""}</p>{category === "SLEEP" && displayCurrent != null && liveCurrentAt && <p className="mt-1 text-[8px] leading-4 text-[#74859a]">Latest check-in · {new Intl.DateTimeFormat("en-ZA", { day: "numeric", month: "short" }).format(new Date(liveCurrentAt))}</p>}</div>
+          <div className="rounded-[16px] bg-[#f7fbfb] p-3"><p className="text-[8px] font-black uppercase tracking-[.12em] text-[#95a3ad]">Current</p><p className="mt-1 text-base font-black text-[#0b2d54]">{displayCurrent == null ? "—" : displayCurrent}{meta.unit && displayCurrent != null ? " " + meta.unit : ""}</p></div>
           <div className="rounded-[16px] bg-[#f7fbfb] p-3"><p className="text-[8px] font-black uppercase tracking-[.12em] text-[#95a3ad]">Target</p><p className="mt-1 text-base font-black text-[#0b2d54]">{target == null ? "—" : target}{meta.unit && target != null ? " " + meta.unit : ""}</p></div>
           <div className="rounded-[16px] bg-[#e9f9fa] p-3"><p className="text-[8px] font-black uppercase tracking-[.12em] text-[#0b7b80]">Progress</p><p className="mt-1 text-base font-black text-[#0b6f73]">{displayProgress == null ? "—" : displayProgress + "%"}</p></div>
         </div>
@@ -673,72 +503,6 @@ export default function TodaySupportedGoalCard({ goal, activeGoals = [], onUpdat
         <div className="mt-3 rounded-xl bg-[#e9f9fa] px-3 py-2"><p className="text-[9px] font-bold leading-4 text-[#0b6f73]">{nextStep}</p></div>
           </>
         )}
-        {category === "SLEEP" && sleepInsight && (
-          <section className="mt-4 rounded-[22px] border border-[#dcebed] bg-[#f8fbfc] p-4 sm:p-5">
-            <div className="flex items-center gap-2.5">
-              <span className="grid h-8 w-8 place-items-center rounded-[11px] bg-[#e8f8f7] text-[#0b7b80]">
-                <Sparkles className="h-3.5 w-3.5" />
-              </span>
-              <div>
-                <p className="text-[8px] font-black uppercase tracking-[.16em] text-[#0b7b80]">Sympto insight</p>
-                <p className="mt-0.5 text-sm font-black tracking-[-.02em] text-[#0b2d54]">Sleep in context</p>
-                <p className="mt-0.5 text-[9px] font-semibold text-[#7d8f9c]">Personal trends from your saved check-ins</p>
-              </div>
-            </div>
-
-            <div className="mt-3 grid gap-2 sm:grid-cols-3">
-              <div className="rounded-[17px] border border-[#e1ecef] bg-white p-3">
-                <p className="text-[8px] font-black uppercase tracking-[.12em] text-[#82939f]">7-day average</p>
-                <p className="mt-1 text-xl font-black tracking-[-.04em] text-[#0b2d54]">
-                  {sleepInsight.recentAverage == null ? "—" : sleepInsight.recentAverage.toFixed(1) + " h"}
-                </p>
-                <p className="mt-1 text-[9px] leading-4 text-[#74859a]">
-                  {sleepInsight.latestSeven.length === 0
-                    ? "No sleep entries recorded in the last 7 days"
-                    : "Across " + sleepInsight.latestSeven.length + " recorded " + (sleepInsight.latestSeven.length === 1 ? "night" : "nights")}
-                </p>
-              </div>
-              <div className="rounded-[17px] border border-[#e1ecef] bg-white p-3">
-                <p className="text-[8px] font-black uppercase tracking-[.12em] text-[#82939f]">Target consistency</p>
-                <p className="mt-1 text-xl font-black tracking-[-.04em] text-[#0b2d54]">
-                  {sleepInsight.targetNights == null || sleepInsight.latestSeven.length === 0 ? "—" : sleepInsight.targetNights + " / " + sleepInsight.latestSeven.length}
-                </p>
-                <p className="mt-1 text-[9px] leading-4 text-[#74859a]">
-                  {sleepInsight.targetNights == null
-                    ? "Set a target to compare recorded nights"
-                    : "Recorded nights at or above " + target + " hours"}
-                </p>
-              </div>
-              <div className="rounded-[17px] border border-[#e1ecef] bg-white p-3">
-                <p className="text-[8px] font-black uppercase tracking-[.12em] text-[#82939f]">Week-on-week</p>
-                <div className="mt-1 flex items-center gap-1.5">
-                  {sleepInsight.trend === "UP" ? <TrendingUp className="h-4 w-4 text-[#0b7b80]" /> : sleepInsight.trend === "DOWN" ? <TrendingDown className="h-4 w-4 text-[#8d6a64]" /> : <Moon className="h-4 w-4 text-[#0b7b80]" />}
-                  <p className="text-[10px] font-black leading-4 text-[#0b2d54]">{sleepInsight.trendTitle}</p>
-                </div>
-                <p className="mt-1 text-[9px] leading-4 text-[#74859a]">
-                  {sleepInsight.trendText}
-                </p>
-              </div>
-            </div>
-
-            <div className="mt-3 rounded-[16px] border border-[#dfeaec] bg-white px-3.5 py-3">
-              <p className="text-[8px] font-black uppercase tracking-[.13em] text-[#82939f]">What Sympto is seeing</p>
-              <p className="mt-1 text-[10px] font-bold leading-5 text-[#0b2d54]">
-                {displayCurrent == null
-                  ? "No sleep duration is available yet. Record it in the Daily Health Check-in to start your personal sleep history."
-                  : sleepInsight.latestSeven.length < 3
-                    ? "Your latest recorded night was " + displayCurrent + " hours. Sympto has " + sleepInsight.latestSeven.length + " of the last 7 days recorded, so it is too early to infer a recurring pattern."
-                    : "Your latest recorded night was " + displayCurrent + " hours. The last 7 days average " + (sleepInsight.recentAverage ?? 0).toFixed(1) + " hours across " + sleepInsight.latestSeven.length + " recorded nights" + (target != null && target > 0 ? ", with " + (sleepInsight.targetNights ?? 0) + " nights meeting the " + target + "-hour target." : ".")}
-              </p>
-              {connectedGoalRelations.length > 0 && (
-                <p className="mt-2 text-[9px] leading-4 text-[#74859a]">
-                  You also track {connectedGoalRelations.map((relation: any) => goalCategoryLabel(String(relation?.goal?.category ?? "OTHER"))).join(", ")}. Sympto keeps these as separate measures; connected goals do not prove that sleep caused a change in another health measure.
-                </p>
-              )}
-            </div>
-          </section>
-        )}
-
         {category === "BLOOD_PRESSURE" ? (
           <div className="mt-3 rounded-[17px] border border-[#dcebec] bg-[#f7fbfc] p-3.5">
             <div className="flex items-center justify-between gap-2">
