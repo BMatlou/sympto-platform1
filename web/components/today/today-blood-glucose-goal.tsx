@@ -188,6 +188,15 @@ function patientMedicationId(record: any) {
   return String(record?.patientMedicationId ?? record?.patientMedication?.id ?? record?.id ?? "");
 }
 
+function authoritativePatientMedicationId(record: any) {
+  const source = String(record?.source ?? "").trim().toUpperCase();
+  const syntheticPrescriptionId = String(record?.id ?? "").startsWith("prescription-item-");
+  return record?.patientMedication?.id
+    || (source !== "PRESCRIPTION" && !syntheticPrescriptionId ? record?.id : null)
+    || record?.patientMedicationId
+    || null;
+}
+
 function medicationNameSuggestsGlucoseTherapy(record: any) {
   const names = [
     record?.medication?.name,
@@ -445,7 +454,7 @@ export default function TodayBloodGlucoseGoal({ goal, patientId = "", currentWei
     return true;
   });
   const selectedSupportOption = SUPPORTING_GOAL_OPTIONS.find((option) => option.category === selectedSupportCategory) ?? null;
-  const supportMedicationOptions = glucoseMedicationRecords.filter((medication: any) => Boolean(patientMedicationId(medication)));
+  const supportMedicationOptions = glucoseMedicationRecords.filter((medication: any) => Boolean(authoritativePatientMedicationId(medication)));
   const linkedCarePlan = carePlans.find((plan: any) => String(plan?.id ?? "") === String(goal?.carePlanId ?? "")) ?? null;
   const linkedCarePlanPractitioner = linkedCarePlan?.practitioner?.person
     ? [
@@ -474,7 +483,7 @@ export default function TodayBloodGlucoseGoal({ goal, patientId = "", currentWei
     setSupportGoalTitle(option.title);
     if (category === "WEIGHT") setSupportWeightDirection("MAINTAIN");
     setSupportTarget(category === "MEDICATION" ? "90" : category === "WEIGHT" && Number(currentWeightKg) > 0 ? String(currentWeightKg) : "");
-    setSupportMedicationId(category === "MEDICATION" ? patientMedicationId(supportMedicationOptions[0] ?? {}) : "");
+    setSupportMedicationId(category === "MEDICATION" ? String(authoritativePatientMedicationId(supportMedicationOptions[0] ?? {}) ?? "") : "");
   }
 
   async function saveSupportingGoal() {
@@ -838,7 +847,7 @@ export default function TodayBloodGlucoseGoal({ goal, patientId = "", currentWei
                         <select value={supportMedicationId} onChange={(event) => setSupportMedicationId(event.target.value)} required className="mt-1 block min-h-9 w-full rounded-lg border border-[#d6e5e8] bg-white px-2.5 text-[11px] font-medium text-[#17314e]">
                           <option value="">Choose a medicine</option>
                           {supportMedicationOptions.map((medication: any) => (
-                            <option key={patientMedicationId(medication)} value={patientMedicationId(medication)}>{medicationDisplayName(medication)}</option>
+                            <option key={String(authoritativePatientMedicationId(medication))} value={String(authoritativePatientMedicationId(medication))}>{medicationDisplayName(medication)}</option>
                           ))}
                         </select>
                       </label>
