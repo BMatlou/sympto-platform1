@@ -620,6 +620,7 @@ export default function TodayBloodGlucoseGoal({ goal, onUpdated, conditions = []
             ) : (
               <p className="mt-1.5 text-[9px] leading-4 text-[#74859a]">No released HbA1c or glucose laboratory result was found in the recent test record.</p>
             )}
+            {!latestHba1c && !latestLabGlucose && baselineGlucose != null && <p className="mt-2 text-[8px] leading-4 text-[#8a99a6]">No finalized laboratory glucose result was found in recent results; the baseline is shown separately.</p>}
             <p className="mt-2 text-[8px] leading-4 text-[#8a99a6]">HbA1c is a different measure from an individual finger-stick or sensor reading; the results are shown separately and are not combined into a single score.</p>
           </div>
 
