@@ -110,7 +110,7 @@ function namedCondition(record: any) {
 }
 
 function isPrediabetesRecord(record: any) {
-  return /pre diabetes|prediabetes/.test(namedCondition(record));
+  return /pre diabetes|prediabetes|pre diabetic/.test(namedCondition(record));
 }
 
 function isDiabetesRecord(record: any) {
@@ -362,7 +362,7 @@ export default function TodayBloodGlucoseGoal({ goal, onUpdated, conditions = []
           ? (prediabetesCondition.diagnosedBy || prediabetesCondition.treatmentPlan ? "Clinician-recorded prediabetes · " : "Patient-entered prediabetes record · ") + recordDisplayName(prediabetesCondition)
           : "No matching entry was found in the current records; this does not rule out diabetes.";
 
-  const activeMedicationRecords = medications.filter(activeRecord);
+  const activeMedicationRecords = medications.filter((medication) => activeRecord(medication) && String(medication?.status ?? "ACTIVE").toUpperCase() !== "PAUSED");
   const glucoseMedicationRecords = activeMedicationRecords.filter(medicationIsGlucoseRelevant);
   const linkedGoalCandidates = [
     ...(Array.isArray(goal?.connectedGoals) ? goal.connectedGoals.map((relation: any) => relation?.goal ?? relation) : []),
