@@ -83,8 +83,9 @@ const GOAL_SUPPORT_RULES: Record<string, Array<{ sourceCategory: string; rationa
     { sourceCategory: 'NUTRITION', rationale: 'Nutrition tracking provides contextual information alongside this cardiovascular goal.' },
   ],
   BLOOD_GLUCOSE: [
-    { sourceCategory: 'EXERCISE', rationale: 'Exercise provides a useful activity signal alongside glucose tracking.' },
+    { sourceCategory: 'EXERCISE', rationale: 'Exercise provides a useful activity signal alongside glucose tracking; the link does not imply causation.' },
     { sourceCategory: 'NUTRITION', rationale: 'Nutrition tracking provides contextual information alongside glucose monitoring.' },
+    { sourceCategory: 'MEDICATION', rationale: 'A linked medication record may provide treatment context for glucose monitoring. Confirm its recorded indication; this connection does not establish a diagnosis or direct medicine changes.' },
   ],
   CHOLESTEROL: [
     { sourceCategory: 'EXERCISE', rationale: 'Exercise provides a useful activity signal alongside cholesterol tracking.' },
@@ -112,12 +113,39 @@ const GOAL_RELATED_PAIRS = new Set([
   'ALCOHOL|BLOOD_GLUCOSE',
   'ALCOHOL|CHOLESTEROL',
   'BLOOD_PRESSURE|HEART_RATE',
+  'BLOOD_GLUCOSE|BLOOD_PRESSURE',
+  'BLOOD_GLUCOSE|SLEEP',
+  'BLOOD_GLUCOSE|WEIGHT',
   'SLEEP|EXERCISE',
   'HYDRATION|EXERCISE',
 ]);
 
 const relationshipKey = (left: string, right: string) =>
   left < right ? left + '|' + right : right + '|' + left;
+
+function glucoseRelatedMedicationGoal(goal: any): boolean {
+  const medication = goal?.patientMedication;
+  const indication = String(medication?.indication ?? '').toLowerCase();
+  if (/diabet|blood glucose|blood sugar|glyc(a|e)em|prediabet/.test(indication)) return true;
+
+  // Medication names alone never establish a diabetes diagnosis. They are
+  // used only to decide whether a medication-adherence goal is useful context.
+  const names = [
+    medication?.medication?.name,
+    medication?.medication?.genericName,
+    medication?.medication?.brandName,
+    goal?.title,
+    goal?.description,
+  ].map((value) => String(value ?? '').toLowerCase()).filter(Boolean);
+  const glucoseTherapies = [
+    'metformin', 'insulin', 'gliclazide', 'glimepiride', 'glipizide', 'glibenclamide',
+    'glyburide', 'sitagliptin', 'linagliptin', 'saxagliptin', 'vildagliptin',
+    'empagliflozin', 'dapagliflozin', 'canagliflozin', 'ertugliflozin',
+    'pioglitazone', 'repaglinide', 'nateglinide', 'liraglutide', 'semaglutide',
+    'dulaglutide', 'exenatide',
+  ];
+  return names.some((name) => glucoseTherapies.some((medicine) => name.includes(medicine)));
+}
 
 function ageFromDateOfBirth(value: Date | null | undefined): number | null {
   if (!value) return null;
@@ -186,7 +214,19 @@ export class HealthGoalIntelligenceService {
   async syncGoalRelations(patientId: string) {
     const goals = await this.prisma.healthGoal.findMany({
       where: { patientId, status: { in: ['ACTIVE', 'ON_HOLD'] } },
-      select: { id: true, category: true },
+      select: {
+        id: true,
+        category: true,
+        title: true,
+        description: true,
+        patientMedicationId: true,
+        patientMedication: {
+          select: {
+            indication: true,
+            medication: { select: { name: true, genericName: true, brandName: true } },
+          },
+        },
+      },
     });
     const desired = new Map<string, { sourceGoalId: string; targetGoalId: string; relationshipType: 'SUPPORTS' | 'RELATED_TO'; rationale: string | null }>();
 
@@ -199,6 +239,14 @@ export class HealthGoalIntelligenceService {
         const supportRule = (GOAL_SUPPORT_RULES[targetCategory] ?? []).find(
           (rule) => rule.sourceCategory === sourceCategory,
         );
+        // Only link a medication goal to glucose monitoring when the saved
+        // medicine/indication makes that link relevant. Never connect all
+        // medication goals merely because the user records glucose.
+        if (
+          targetCategory === 'BLOOD_GLUCOSE' &&
+          sourceCategory === 'MEDICATION' &&
+          !glucoseRelatedMedicationGoal(sourceGoal)
+        ) continue;
         if (supportRule) {
           const relationshipType = 'SUPPORTS' as const;
           desired.set(sourceGoal.id + '|' + targetGoal.id + '|' + relationshipType, {
