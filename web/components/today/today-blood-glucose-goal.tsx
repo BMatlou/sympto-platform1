@@ -4,10 +4,9 @@ import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Activity, ArrowRight, Clock3, Droplets, Plus } from "lucide-react";
 import { toast } from "sonner";
-import { api } from "@/lib/api";
 import { healthGoalsService, type HealthGoalMetricEventsResponse } from "@/services/health-goals.service";
 
-type Props = { goal: any; onUpdated?: () => Promise<void> | void; conditions?: any[]; medications?: any[]; activeGoals?: any[] };
+type Props = { goal: any; onUpdated?: () => Promise<void> | void; conditions?: any[]; diagnoses?: any[]; medications?: any[]; activeGoals?: any[]; labOrders?: any[] };
 type GlucoseContext = "FASTING" | "BEFORE_MEAL" | "AFTER_MEAL_2H" | "BEDTIME" | "OVERNIGHT" | "OTHER";
 type GlucoseEvent = {
   id: string;
@@ -144,14 +143,58 @@ function medicationNameSuggestsGlucoseTherapy(record: any) {
   const name = normaliseContextText(medicationDisplayName(record));
   return [
     "metformin", "insulin", "gliclazide", "glimepiride", "glipizide", "glibenclamide",
-    "glyburide", "glimepiride", "sitagliptin", "linagliptin", "saxagliptin",
-    "vildagliptin", "empagliflozin", "dapagliflozin", "canagliflozin", "ertugliflozin",
+    "glyburide", "sitagliptin", "linagliptin", "saxagliptin", "vildagliptin",
+    "empagliflozin", "dapagliflozin", "canagliflozin", "ertugliflozin",
     "pioglitazone", "repaglinide", "nateglinide", "liraglutide", "semaglutide",
     "dulaglutide", "exenatide",
   ].some((medicine) => name.includes(medicine));
 }
 
-export default function TodayBloodGlucoseGoal({ goal, onUpdated, conditions = [], medications = [], activeGoals = [] }: Props) {
+type ReleasedLabMeasure = {
+  testName: string;
+  value: string;
+  unit: string;
+  occurredAt: string;
+  status: string;
+  laboratoryName: string;
+};
+
+function latestReleasedLabMeasure(labOrders: any[], matcher: RegExp): ReleasedLabMeasure | null {
+  const measures: ReleasedLabMeasure[] = [];
+  for (const order of Array.isArray(labOrders) ? labOrders : []) {
+    const orderItems = Array.isArray(order?.items) ? order.items : [];
+    for (const orderItem of orderItems) {
+      const results = Array.isArray(orderItem?.labResults) ? orderItem.labResults : [];
+      for (const result of results) {
+        const status = String(result?.status ?? "").toUpperCase();
+        const finalized = ["RELEASED", "VERIFIED", "AMENDED"].includes(status)
+          || Boolean(result?.releasedAt || result?.reportedAt);
+        if (!finalized || status === "CANCELLED") continue;
+        const resultItems = Array.isArray(result?.items) ? result.items : [];
+        for (const item of resultItems) {
+          const test = item?.test ?? orderItem?.test ?? {};
+          const testName = String(test?.name ?? test?.shortName ?? test?.code ?? "");
+          if (!testName || !matcher.test(testName)) continue;
+          const rawValue = item?.numericValue ?? item?.textValue;
+          if (rawValue == null || String(rawValue).trim() === "") continue;
+          const date = result?.releasedAt ?? result?.reportedAt ?? result?.createdAt;
+          measures.push({
+            testName,
+            value: String(rawValue),
+            unit: String(test?.unit?.symbol ?? test?.unit?.name ?? ""),
+            occurredAt: String(date ?? ""),
+            status,
+            laboratoryName: String(order?.laboratory?.name ?? ""),
+          });
+        }
+      }
+    }
+  }
+  measures.sort((a, b) => new Date(b.occurredAt).getTime() - new Date(a.occurredAt).getTime());
+  return measures[0] ?? null;
+}
+
+export default function TodayBloodGlucoseGoal({ goal, onUpdated, conditions = [], diagnoses = [], medications = [], activeGoals = [], labOrders = [] }: Props) {
   const goalId = String(goal?.id ?? "");
   const target = targetFromGoal(goal);
   const [events, setEvents] = useState<GlucoseEvent[]>([]);
@@ -163,7 +206,6 @@ export default function TodayBloodGlucoseGoal({ goal, onUpdated, conditions = []
   const [readingContext, setReadingContext] = useState<GlucoseContext | "">("");
   const [note, setNote] = useState("");
   const [measurementTime, setMeasurementTime] = useState(() => localDateTimeInput(new Date()));
-  const [clinicalDiagnoses, setClinicalDiagnoses] = useState<any[]>([]);
 
   const journey = useMemo(() => {
     const today = localDayKey(new Date());
@@ -221,30 +263,6 @@ export default function TodayBloodGlucoseGoal({ goal, onUpdated, conditions = []
     };
   }, [loadEvents]);
 
-  useEffect(() => {
-    let cancelled = false;
-    async function loadClinicalDiagnoses() {
-      try {
-        const response = await api.get("/patient-health-records/clinical-diagnoses");
-        const payload: any = response.data;
-        const records = Array.isArray(payload)
-          ? payload
-          : Array.isArray(payload?.data)
-            ? payload.data
-            : Array.isArray(payload?.data?.data)
-              ? payload.data.data
-              : [];
-        if (!cancelled) setClinicalDiagnoses(records);
-      } catch {
-        // Conditions and medications still render from Health Home if the
-        // clinical-diagnosis endpoint is temporarily unavailable.
-        if (!cancelled) setClinicalDiagnoses([]);
-      }
-    }
-    void loadClinicalDiagnoses();
-    return () => { cancelled = true; };
-  }, []);
-
   const latest = events[0] ?? null;
   const todayKey = localDayKey(new Date());
   const todaysEvents = events.filter((event) => localDayKey(event.occurredAt) === todayKey);
@@ -258,7 +276,7 @@ export default function TodayBloodGlucoseGoal({ goal, onUpdated, conditions = []
   const targetLinked = Boolean(goal?.practitionerId || goal?.carePlanId);
   const hasEntryContext = latest != null && Boolean(String(latest.metadata?.readingContext ?? latest.metadata?.glucoseContext ?? ""));
   const currentConditions = conditions.filter(activeRecord);
-  const currentClinicalDiagnoses = clinicalDiagnoses.filter(activeRecord);
+  const currentClinicalDiagnoses = diagnoses.filter(activeRecord);
   const diabetesDiagnosis = currentClinicalDiagnoses.find(isDiabetesRecord);
   const diabetesCondition = currentConditions.find(isDiabetesRecord);
   const prediabetesDiagnosis = currentClinicalDiagnoses.find(isPrediabetesRecord);
@@ -306,6 +324,14 @@ export default function TodayBloodGlucoseGoal({ goal, onUpdated, conditions = []
     if (!connectedGoalMap.has(relatedId)) connectedGoalMap.set(relatedId, related);
   }
   const relevantGoals = Array.from(connectedGoalMap.values()).slice(0, 4);
+  const latestHba1c = latestReleasedLabMeasure(
+    labOrders,
+    /(hba1c|hemoglobin a1c|haemoglobin a1c|glycated haemoglobin|glycated hemoglobin|glycosylated hemoglobin)/i,
+  );
+  const latestLabGlucose = latestReleasedLabMeasure(
+    labOrders,
+    /^(?!.*(?:hba1c|hemoglobin a1c|haemoglobin a1c|glycated haemoglobin|glycated hemoglobin|glycosylated hemoglobin)).*(?:blood glucose|plasma glucose|fasting glucose|random glucose|glucose tolerance|glucose)$/i,
+  );
 
   async function saveReading() {
     const numeric = Number(value.trim());
@@ -464,6 +490,34 @@ export default function TodayBloodGlucoseGoal({ goal, onUpdated, conditions = []
             {glucoseMedicationRecords.some((medication: any) => !medicationHasExplicitGlucoseIndication(medication)) && (
               <p className="mt-2 text-[8px] leading-4 text-[#8a99a6]">A medicine name alone does not confirm diabetes or the reason it was prescribed.</p>
             )}
+          </div>
+
+          <div className="mt-3 border-t border-[#e8eff1] pt-3">
+            <div className="flex items-center justify-between gap-2">
+              <p className="text-[8px] font-black uppercase tracking-[.14em] text-[#8a99a6]">Latest laboratory results</p>
+              <Link href="/tests-results" className="text-[8px] font-black text-[#0b7b80]">Tests & results <ArrowRight className="ml-1 inline h-2.5 w-2.5" /></Link>
+            </div>
+            {latestHba1c || latestLabGlucose ? (
+              <div className="mt-2 grid gap-2 sm:grid-cols-2">
+                {latestHba1c && (
+                  <div className="rounded-xl border border-[#e1eaed] bg-white p-3">
+                    <p className="text-[8px] font-black uppercase tracking-[.12em] text-[#8a99a6]">HbA1c · longer-term marker</p>
+                    <p className="mt-1 text-sm font-black text-[#0b2d54]">{latestHba1c.value}{latestHba1c.unit ? " " + latestHba1c.unit : ""}</p>
+                    <p className="mt-1 text-[8px] leading-4 text-[#74859a]">{formatDate(latestHba1c.occurredAt)}{latestHba1c.laboratoryName ? " · " + latestHba1c.laboratoryName : ""}</p>
+                  </div>
+                )}
+                {latestLabGlucose && (
+                  <div className="rounded-xl border border-[#e1eaed] bg-white p-3">
+                    <p className="text-[8px] font-black uppercase tracking-[.12em] text-[#8a99a6]">Laboratory glucose</p>
+                    <p className="mt-1 text-sm font-black text-[#0b2d54]">{latestLabGlucose.value}{latestLabGlucose.unit ? " " + latestLabGlucose.unit : ""}</p>
+                    <p className="mt-1 text-[8px] leading-4 text-[#74859a]">{formatDate(latestLabGlucose.occurredAt)}{latestLabGlucose.laboratoryName ? " · " + latestLabGlucose.laboratoryName : ""}</p>
+                  </div>
+                )}
+              </div>
+            ) : (
+              <p className="mt-1.5 text-[9px] leading-4 text-[#74859a]">No released HbA1c or glucose laboratory result was found in the recent test record.</p>
+            )}
+            <p className="mt-2 text-[8px] leading-4 text-[#8a99a6]">HbA1c is a different measure from an individual finger-stick or sensor reading; the results are shown separately and are not combined into a single score.</p>
           </div>
 
           <div className="mt-3 border-t border-[#e8eff1] pt-3">
