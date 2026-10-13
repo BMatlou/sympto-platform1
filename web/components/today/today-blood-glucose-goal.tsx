@@ -139,7 +139,7 @@ function medicationDisplayName(record: any) {
 
 function medicationHasExplicitGlucoseIndication(record: any) {
   const indication = normaliseContextText(record?.indication ?? record?.reason);
-  return /diabetes|diabetic|blood glucose|blood sugar|glyc(a|e)emic|prediabetes/.test(indication);
+  return /diabetes|diabetic|blood glucose|blood sugar|glyc(a|e)emic|prediabetes|t1dm|t2dm|t2d|dm2/.test(indication);
 }
 
 function patientMedicationId(record: any) {
@@ -147,14 +147,21 @@ function patientMedicationId(record: any) {
 }
 
 function medicationNameSuggestsGlucoseTherapy(record: any) {
-  const name = normaliseContextText(medicationDisplayName(record));
-  return [
+  const names = [
+    record?.medication?.name,
+    record?.medication?.genericName,
+    record?.medication?.brandName,
+    record?.name,
+    record?.genericName,
+  ].map(normaliseContextText).filter(Boolean);
+  const glucoseTherapies = [
     "metformin", "insulin", "gliclazide", "glimepiride", "glipizide", "glibenclamide",
     "glyburide", "sitagliptin", "linagliptin", "saxagliptin", "vildagliptin",
     "empagliflozin", "dapagliflozin", "canagliflozin", "ertugliflozin",
     "pioglitazone", "repaglinide", "nateglinide", "liraglutide", "semaglutide",
-    "dulaglutide", "exenatide",
-  ].some((medicine) => name.includes(medicine));
+    "dulaglutide", "exenatide", "tirzepatide",
+  ];
+  return names.some((name) => glucoseTherapies.some((medicine) => name.includes(medicine)));
 }
 
 function medicationIsGlucoseRelevant(record: any) {
