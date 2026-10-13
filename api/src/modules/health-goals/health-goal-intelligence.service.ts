@@ -125,8 +125,9 @@ const relationshipKey = (left: string, right: string) =>
 
 function glucoseRelatedMedicationGoal(goal: any): boolean {
   const medication = goal?.patientMedication;
-  const indication = String(medication?.indication ?? '').toLowerCase();
-  if (/diabet|blood glucose|blood sugar|glyc(a|e)em|prediabet/.test(indication)) return true;
+  const indication = String(medication?.indication ?? '').trim().toLowerCase();
+  const glucoseIndication = /diabet|blood glucose|blood sugar|glyc(a|e)em|prediabet/;
+  if (indication) return glucoseIndication.test(indication);
 
   // Medication names alone never establish a diabetes diagnosis. They are
   // used only to decide whether a medication-adherence goal is useful context.
