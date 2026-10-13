@@ -270,7 +270,7 @@ export class HealthHomeService {
       }),
       this.prisma.symptomLog.findMany({ where: { clinicalEpisode: { patientId }, status: { in: ['ACTIVE', 'COMPLETED'] } }, include: { clinicalEpisode: true, symptoms: { include: { symptom: true } }, triggers: true }, orderBy: { startedAt: 'desc' }, take: 20 }),
       this.prisma.aIObservation.findMany({ where: { symptomLog: { clinicalEpisode: { patientId } } }, orderBy: { createdAt: 'desc' }, take: 10 }),
-      this.prisma.labOrder.findMany({ where: { patientId }, include: { laboratory: true, items: { include: { test: { include: { unit: true } }, labResults: { orderBy: { createdAt: 'desc' }, take: 1, include: { items: { include: { test: { include: { unit: true } } } } } } } } }, orderBy: { orderedAt: 'desc' }, take: 20 }),
+      this.prisma.labOrder.findMany({ where: { patientId }, include: { laboratory: true, items: { include: { test: { include: { unit: true } }, labResults: { orderBy: { createdAt: 'desc' }, take: 10, include: { items: { include: { test: { include: { unit: true } } } } } } } } }, orderBy: { orderedAt: 'desc' }, take: 20 }),
       this.prisma.imagingStudy.findMany({ where: { patientId }, include: { imagingCenter: true, reports: true }, orderBy: { createdAt: 'desc' }, take: 20 }),
       this.prisma.carePlan.findMany({ where: { patientId, status: { in: ['ACTIVE', 'DRAFT'] } }, include: { practitioner: { include: { person: true } }, goals: true, tasks: true }, orderBy: { createdAt: 'desc' }, take: 10 }),
       this.prisma.encounter.findMany({ where: { medicalRecord: { patientId } }, orderBy: { startedAt: 'desc' }, take: 50 }),
