@@ -590,7 +590,7 @@ export default function TodayBloodGlucoseGoal({ goal, onUpdated, conditions = []
 
           <div className="mt-3 border-t border-[#e8eff1] pt-3">
             <div className="flex items-center justify-between gap-2">
-              <p className="text-[8px] font-black uppercase tracking-[.14em] text-[#8a99a6]">Latest laboratory results</p>
+              <p className="text-[8px] font-black uppercase tracking-[.14em] text-[#8a99a6]">Lab & baseline results</p>
               <Link href="/tests-results" className="text-[8px] font-black text-[#0b7b80]">Tests & results <ArrowRight className="ml-1 inline h-2.5 w-2.5" /></Link>
             </div>
             {latestHba1c || latestLabGlucose || baselineGlucose != null ? (
