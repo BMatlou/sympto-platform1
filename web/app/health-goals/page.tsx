@@ -146,24 +146,33 @@ function goalPresentation(goal: any) {
   const config = CATEGORIES.find((item) => item.value === category) ?? CATEGORIES[CATEGORIES.length - 1];
   const comparison = String(goal?.metricConfig?.comparison ?? "").toUpperCase();
   const numericTarget = Number(goal?.targetValue);
+  const isBloodGlucose = category === "BLOOD_GLUCOSE";
   const isWeight = category === "WEIGHT" && Number.isFinite(numericTarget);
-  const target = isWeight
-    ? comparison === "INCREASE_TO"
-      ? `Gain ${numericTarget.toFixed(1)} kg`
-      : comparison === "DECREASE_TO"
-        ? `Lose ${numericTarget.toFixed(1)} kg`
-        : comparison === "CLOSEST"
-          ? "Maintain baseline"
-          : `${numericTarget.toFixed(1)} kg`
-    : goal?.targetValue != null
-      ? `${goal.targetValue}${config.unit ? ` ${config.unit}` : ""}`
-      : "Target not set";
-  const progress = goalProgress(goal);
+  const target = isBloodGlucose
+    ? goal?.targetValue != null
+      ? String(goal.targetValue) + " mmol/L · context review"
+      : "Tracking only · no target"
+    : isWeight
+      ? comparison === "INCREASE_TO"
+        ? "Gain " + numericTarget.toFixed(1) + " kg"
+        : comparison === "DECREASE_TO"
+          ? "Lose " + numericTarget.toFixed(1) + " kg"
+          : comparison === "CLOSEST"
+            ? "Maintain baseline"
+            : numericTarget.toFixed(1) + " kg"
+      : goal?.targetValue != null
+        ? String(goal.targetValue) + (config.unit ? " " + config.unit : "")
+        : "Target not set";
+  // Glucose readings are retained, but must not receive a progress score
+  // until a context-specific clinical range is available.
+  const progress = isBloodGlucose ? 0 : goalProgress(goal);
   const isDirectionalWeight = category === "WEIGHT" && (comparison === "INCREASE_TO" || comparison === "DECREASE_TO");
-  const progressWidth = isDirectionalWeight ? Math.abs(progress) : progress;
-  const progressLabel = isDirectionalWeight && String(goal?.status ?? "").toUpperCase() !== "ACHIEVED"
-    ? (progress > 0 ? "+" : "") + progress + "%" + (progress < 0 ? " away" : "")
-    : progress + "%";
+  const progressWidth = isBloodGlucose ? 0 : isDirectionalWeight ? Math.abs(progress) : progress;
+  const progressLabel = isBloodGlucose
+    ? "Not scored"
+    : isDirectionalWeight && String(goal?.status ?? "").toUpperCase() !== "ACHIEVED"
+      ? (progress > 0 ? "+" : "") + progress + "%" + (progress < 0 ? " away" : "")
+      : progress + "%";
   return {
     config,
     progress,
@@ -172,10 +181,9 @@ function goalPresentation(goal: any) {
     current: goalCurrent(goal),
     target,
     title: goalDisplayTitle(goal, category),
-    achieved: String(goal?.status ?? "").toUpperCase() === "ACHIEVED",
+    achieved: !isBloodGlucose && String(goal?.status ?? "").toUpperCase() === "ACHIEVED",
   };
 }
-
 function bmiFor(weightKg: number | null, heightCm: number | null) {
   if (weightKg == null || heightCm == null || heightCm <= 0) return null;
   return weightKg / ((heightCm / 100) ** 2);
@@ -564,7 +572,7 @@ function HealthGoalsPageContent() {
                    {draft.category === "OTHER" ? <TextField label="Unit" value={draft.unit} placeholder="e.g. sessions, pages, points" onChange={(value) => setDraft((current) => ({ ...current, unit: value }))} /> : <div className="rounded-xl border border-[#e1eaed] bg-[#f8fbfc] px-3.5 py-3"><p className="text-[9px] font-black uppercase tracking-[.12em] text-[#91a0ae]">Unit</p><p className="mt-1 text-sm font-black text-[#0b2d54]">{selectedCategory?.unit || "As recorded"}</p></div>}
                    <TextField type="date" label="Target date" value={draft.targetDate} onChange={(value) => setDraft((current) => ({ ...current, targetDate: value }))} />
                  </div>
-                 {selectedCategory && <div className="rounded-2xl border border-[#e1eaed] bg-[#fbfdfd] px-4 py-3"><div className="flex flex-wrap items-center gap-2"><span className="rounded-full bg-[#e9f9fa] px-2.5 py-1 text-[9px] font-black text-[#0b6f73]">{selectedCategory.frequency === "DAILY" ? "Daily" : selectedCategory.frequency === "WEEKLY" ? "Weekly" : "Journey"}</span><span className="rounded-full bg-[#f3f6f7] px-2.5 py-1 text-[9px] font-black text-[#74859a]">{selectedCategory.comparison === "AT_LEAST" ? "At least target" : selectedCategory.comparison === "AT_MOST" ? "At most target" : selectedCategory.comparison === "CLOSEST" ? "Stay close to target" : String(selectedCategory.comparison) === "INCREASE_TO" ? "Increase toward target" : "Decrease toward target"}</span></div><p className="mt-2 text-[10px] leading-5 text-[#74859a]">{targetRule.helper}</p>
+                 {selectedCategory && <div className="rounded-2xl border border-[#e1eaed] bg-[#fbfdfd] px-4 py-3"><div className="flex flex-wrap items-center gap-2"><span className="rounded-full bg-[#e9f9fa] px-2.5 py-1 text-[9px] font-black text-[#0b6f73]">{selectedCategory.frequency === "DAILY" ? "Daily" : selectedCategory.frequency === "WEEKLY" ? "Weekly" : "Journey"}</span><span className="rounded-full bg-[#f3f6f7] px-2.5 py-1 text-[9px] font-black text-[#74859a]">{draft.category === "BLOOD_GLUCOSE" ? "Clinical range required" : selectedCategory.comparison === "AT_LEAST" ? "At least target" : selectedCategory.comparison === "AT_MOST" ? "At most target" : selectedCategory.comparison === "CLOSEST" ? "Stay close to target" : String(selectedCategory.comparison) === "INCREASE_TO" ? "Increase toward target" : "Decrease toward target"}</span></div><p className="mt-2 text-[10px] leading-5 text-[#74859a]">{targetRule.helper}</p>
                   {draft.category === "BLOOD_GLUCOSE" && <p className="mt-2 text-[10px] leading-5 text-[#0b6f73]">{glucoseTrackingOnly ? "Tracking only: you can begin logging measured values without a target. Confirm a personal target and its measurement context with your healthcare professional." : "This is a saved target, not a universal glucose ceiling. Confirm the correct target range and timing context with your healthcare professional before treating it as a measure of control."}</p>}
                   {draft.category === "NUTRITION" && (() => {
                     const review = nutritionTargetReview(draft.targetValue);
