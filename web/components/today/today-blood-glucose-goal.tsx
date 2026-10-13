@@ -260,7 +260,7 @@ export default function TodayBloodGlucoseGoal({ goal, onUpdated }: Props) {
             <div className="relative grid shrink-0 place-items-center rounded-full" style={{ width: ringSize, height: ringSize }}>
               <svg width={ringSize} height={ringSize} viewBox={"0 0 " + ringSize + " " + ringSize} className="-rotate-90" aria-hidden="true">
                 <circle cx={ringSize / 2} cy={ringSize / 2} r={radius} fill="none" stroke="rgba(255,255,255,.15)" strokeWidth={ringStroke} />
-                <circle cx={ringSize / 2} cy={ringSize / 2} r={radius} fill="none" stroke={veryLow ? "#f87171" : low ? "#fbbf24" : "#24c1c4"} strokeWidth={ringStroke} strokeLinecap="round" strokeDasharray={2 * Math.PI * radius} strokeDashoffset={0} />
+                <circle cx={ringSize / 2} cy={ringSize / 2} r={radius} fill="none" stroke="rgba(255,255,255,.28)" strokeWidth={ringStroke} />
               </svg>
               <div className="absolute inset-0 grid place-items-center text-center">
                 <div>
