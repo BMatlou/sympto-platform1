@@ -116,7 +116,10 @@ function isPrediabetesRecord(record: any) {
 function isDiabetesRecord(record: any) {
   const name = namedCondition(record);
   if (!name || isPrediabetesRecord(record)) return false;
-  return /\bdiabetes\b|\bdiabetic\b|type 1 diabetes|type 2 diabetes|gestational diabetes/.test(name);
+  // Avoid treating risk notes, family history or rule-out wording as the
+  // person's own diabetes diagnosis.
+  if (/family history|history of diabetes|risk of diabetes|screening|suspected|possible diabetes|rule out|no diabetes|not diabetic/.test(name)) return false;
+  return /\bdiabetes\b|\bdiabetic\b/.test(name);
 }
 
 function recordDisplayName(record: any) {
