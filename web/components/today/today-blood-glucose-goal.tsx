@@ -711,7 +711,7 @@ export default function TodayBloodGlucoseGoal({ goal, onUpdated, conditions = []
               )}
               <label className="block sm:col-span-2">
                 <span className="text-[8px] font-black uppercase tracking-[.14em] text-[#74859a]">Measurement date and time</span>
-                <input type="datetime-local" value={measurementTime} onChange={(event) => setMeasurementTime(event.target.value)} className="mt-1.5 min-h-10 w-full rounded-xl border border-[#d7e4e8] bg-white px-3 text-xs font-bold text-[#0b2d54] outline-none focus:border-[#24c1c4]" />
+                <input type="datetime-local" min={localDateTimeInput(new Date(Date.now() - 90 * 86400000))} max={localDateTimeInput(new Date())} value={measurementTime} onChange={(event) => setMeasurementTime(event.target.value)} className="mt-1.5 min-h-10 w-full rounded-xl border border-[#d7e4e8] bg-white px-3 text-xs font-bold text-[#0b2d54] outline-none focus:border-[#24c1c4]" />
               </label>
               <label className="block sm:col-span-2">
                 <span className="text-[8px] font-black uppercase tracking-[.14em] text-[#74859a]">Note (optional)</span>
@@ -738,7 +738,7 @@ export default function TodayBloodGlucoseGoal({ goal, onUpdated, conditions = []
           </button>
           {showHistory && (
             <div className="divide-y divide-[#edf2f4] bg-white">
-              {events.length === 0 ? <p className="px-3 py-4 text-[10px] text-[#74859a]">{loading ? "Loading readings…" : "No glucose readings recorded in the last 30 days."}</p> : events.slice(0, 6).map((event) => (
+              {events.length === 0 ? <p className="px-3 py-4 text-[10px] text-[#74859a]">{loading ? "Loading readings…" : "No glucose readings recorded in the last 90 days."}</p> : events.slice(0, 6).map((event) => (
                 <div key={event.id} className="flex items-start justify-between gap-3 px-3 py-3">
                   <div className="min-w-0">
                     <p className="text-xs font-black text-[#0b2d54]">{formatNumber(event.loggedValue)} mmol/L <span className="text-[9px] font-semibold text-[#74859a]">· {contextLabel(event)}</span></p>
@@ -749,7 +749,7 @@ export default function TodayBloodGlucoseGoal({ goal, onUpdated, conditions = []
                   <span className={"shrink-0 rounded-full px-2 py-1 text-[8px] font-black " + (event.loggedValue < 3.0 ? "bg-red-50 text-red-800" : event.loggedValue < 3.9 ? "bg-amber-50 text-amber-800" : "bg-[#eef5f6] text-[#647b8c]")}>{event.loggedValue < 3.0 ? "Very low" : event.loggedValue < 3.9 ? "Low" : "Recorded"}</span>
                 </div>
               ))}
-              <p className="px-3 py-2 text-[8px] font-semibold text-[#9aa8b3]">History shown here is from the last 30 days. Laboratory reports remain in Tests & Results.</p>
+              <p className="px-3 py-2 text-[8px] font-semibold text-[#9aa8b3]">Recent self-recorded history shown here covers the last 90 days. Older laboratory reports remain in Tests & Results.</p>
             </div>
           )}
         </section>
