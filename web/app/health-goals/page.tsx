@@ -134,7 +134,10 @@ function goalProgress(goal: any) {
 }
 
 function goalCurrent(goal: any) {
-  const value = goal?.latestValue ?? goal?.latestProgress?.currentValue ?? goal?.progress?.[0]?.currentValue ?? goal?.currentValue;
+  const isBloodGlucose = String(goal?.category ?? "").toUpperCase() === "BLOOD_GLUCOSE";
+  const value = isBloodGlucose
+    ? goal?.currentValue ?? goal?.latestValue
+    : goal?.latestValue ?? goal?.latestProgress?.currentValue ?? goal?.progress?.[0]?.currentValue ?? goal?.currentValue;
   const number = Number(value);
   if (!Number.isFinite(number)) return null;
   const unit = String(goal?.unit ?? "").trim();
