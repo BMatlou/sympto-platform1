@@ -176,6 +176,24 @@ export default function TodaySupportedGoalCard({ goal, activeGoals = [], onUpdat
   const source = sourceAction(category);
   const goalId = String(goal?.id ?? "");
   const journey = useMemo(() => journeyFor(goal), [goal]);
+  const connectedGoalRelations = useMemo(() => {
+    const relations = Array.isArray(goal?.connectedGoals) ? goal.connectedGoals : [];
+    const byGoalId = new Map<string, any>();
+    for (const relation of relations) {
+      const related = relation?.goal;
+      const relatedId = String(related?.id ?? "");
+      if (!relatedId) continue;
+      const previous = byGoalId.get(relatedId);
+      const relationType = String(relation?.relationshipType ?? "").toUpperCase();
+      const previousType = String(previous?.relationshipType ?? "").toUpperCase();
+      // The backend can return reciprocal relationship rows. Show each goal
+      // once, preferring the supporting relationship when both are present.
+      if (!previous || (relationType === "SUPPORTS" && previousType !== "SUPPORTS")) {
+        byGoalId.set(relatedId, relation);
+      }
+    }
+    return Array.from(byGoalId.values());
+  }, [goal?.connectedGoals]);
   const connectedExerciseGoal = Array.isArray(goal?.connectedGoals)
     ? goal.connectedGoals
         .map((relation: any) => relation?.goal)
@@ -189,6 +207,7 @@ export default function TodaySupportedGoalCard({ goal, activeGoals = [], onUpdat
   const metricType = String(goal?.metricConfig?.metricType ?? defaultMetric.metricType).toUpperCase();
   const metricKey = String(goal?.metricConfig?.metricKey ?? defaultMetric.metricKey);
   const [liveCurrent, setLiveCurrent] = useState<number | null>(null);
+  const [liveCurrentAt, setLiveCurrentAt] = useState<string | null>(null);
   const [bpGoalStats, setBpGoalStats] = useState({ recordedDays: 0, targetDays: 0 });
   const [bpMetricEvents, setBpMetricEvents] = useState<Array<{
     id?: string;
@@ -201,6 +220,7 @@ export default function TodaySupportedGoalCard({ goal, activeGoals = [], onUpdat
   useEffect(() => {
     if (category !== "BLOOD_PRESSURE" || metricType !== "BLOOD_PRESSURE" || metricKey !== "blood_pressure.systolic") {
       setLiveCurrent(null);
+      setLiveCurrentAt(null);
       setBpGoalStats({ recordedDays: 0, targetDays: 0 });
       setBpMetricEvents([]);
       return;
@@ -277,7 +297,75 @@ export default function TodaySupportedGoalCard({ goal, activeGoals = [], onUpdat
     };
   }, [category, metricType, metricKey, goalId, goal?.createdAt, goal?.updatedAt, target]);
 
-  const displayCurrent = category === "BLOOD_PRESSURE" && liveCurrent != null ? liveCurrent : current;
+  // Sleep progress comes from the saved Daily Health Check-in. Read both
+  // metric history and journal data so Current does not rely on a stale goal
+  // snapshot supplied when Today first loaded.
+  useEffect(() => {
+    if (category !== "SLEEP" || metricType !== "SLEEP" || metricKey !== "sleep.hours") return;
+
+    let active = true;
+    const loadSleep = async () => {
+      const now = new Date();
+      const from = new Date(now.getTime() - 90 * 24 * 60 * 60 * 1000);
+      const [metricResult, journalResult] = await Promise.allSettled([
+        healthGoalsService.getMetricEvents(metricType, metricKey, from, now),
+        healthJournalService.getAll({ page: 1, limit: 100 }),
+      ]);
+
+      const metricEvents = metricResult.status === "fulfilled" && Array.isArray(metricResult.value?.events)
+        ? metricResult.value.events
+            .map((event: any) => ({
+              value: Number(event?.loggedValue),
+              occurredAt: String(event?.occurredAt ?? ""),
+            }))
+            .filter((event: any) => Number.isFinite(event.value) && event.value >= 0 && !Number.isNaN(new Date(event.occurredAt).getTime()))
+        : [];
+      const latestMetric = metricEvents.sort((a: any, b: any) =>
+        new Date(b.occurredAt).getTime() - new Date(a.occurredAt).getTime(),
+      )[0] ?? null;
+
+      const journals = journalResult.status === "fulfilled" && Array.isArray(journalResult.value?.data)
+        ? journalResult.value.data
+        : [];
+      const latestCheckIn = journals
+        .filter((entry: any) =>
+          String(entry?.title ?? "") === "Daily Health Check-in"
+          && entry?.sleepHours !== null
+          && entry?.sleepHours !== undefined
+          && entry?.sleepHours !== ""
+          && Number.isFinite(Number(entry.sleepHours))
+          && Number(entry.sleepHours) >= 0,
+        )
+        .map((entry: any) => ({
+          value: Number(entry.sleepHours),
+          occurredAt: String(entry.updatedAt ?? entry.createdAt ?? ""),
+        }))
+        .filter((entry: any) => !Number.isNaN(new Date(entry.occurredAt).getTime()))
+        .sort((a: any, b: any) => new Date(b.occurredAt).getTime() - new Date(a.occurredAt).getTime())[0] ?? null;
+
+      const candidates = [latestMetric, latestCheckIn].filter(Boolean) as Array<{ value: number; occurredAt: string }>;
+      const latest = candidates.sort((a, b) =>
+        new Date(b.occurredAt).getTime() - new Date(a.occurredAt).getTime(),
+      )[0] ?? null;
+      if (!active) return;
+      setLiveCurrent(latest?.value ?? null);
+      setLiveCurrentAt(latest?.occurredAt ?? null);
+    };
+
+    const refreshSleep = () => { void loadSleep(); };
+    refreshSleep();
+    window.addEventListener("sympto:health-checkin-updated", refreshSleep);
+    window.addEventListener("sympto:today-action-updated", refreshSleep);
+    const interval = window.setInterval(refreshSleep, 30000);
+    return () => {
+      active = false;
+      window.removeEventListener("sympto:health-checkin-updated", refreshSleep);
+      window.removeEventListener("sympto:today-action-updated", refreshSleep);
+      window.clearInterval(interval);
+    };
+  }, [category, metricType, metricKey, goalId, goal?.createdAt, goal?.updatedAt]);
+
+  const displayCurrent = (category === "BLOOD_PRESSURE" || category === "SLEEP") && liveCurrent != null ? liveCurrent : current;
   const bpDistance = category === "BLOOD_PRESSURE" && displayCurrent != null && target != null
     ? displayCurrent - target
     : null;
@@ -289,17 +377,27 @@ export default function TodaySupportedGoalCard({ goal, activeGoals = [], onUpdat
     : 0;
   const displayProgress = category === "BLOOD_PRESSURE"
     ? bpAttainmentPercent
-    : displayCurrent == null
-      ? progress
-      : progressPercent({
-          ...goal,
-          currentValue: displayCurrent,
-          progress: [],
-          latestProgress: null,
-          progressPercent: null,
-        });
+    : category === "SLEEP" && displayCurrent == null
+      ? null
+      : displayCurrent == null
+        ? progress
+        : progressPercent({
+            ...goal,
+            currentValue: displayCurrent,
+            progress: [],
+            latestProgress: null,
+            progressPercent: null,
+          });
 
-  const nextStep = goalNextStep(category, displayCurrent, target);
+  const nextStep = category === "SLEEP"
+    ? displayCurrent == null
+      ? "Save your sleep duration in the Daily Health Check-in. The current value and progress will update automatically."
+      : target == null
+        ? "Your latest sleep duration is recorded. Set a suitable target with your care team if you need one."
+        : displayCurrent >= target
+          ? "You logged " + displayCurrent + " hours against your " + target + "-hour target. Target met for the latest recorded night."
+          : "You logged " + displayCurrent + " of " + target + " hours. That is " + (displayProgress ?? 0) + "% of your target; keep logging sleep in the Daily Health Check-in to build a trend."
+    : goalNextStep(category, displayCurrent, target);
 
   async function recordValue() {
     const numeric = Number(value);
@@ -346,7 +444,7 @@ export default function TodaySupportedGoalCard({ goal, activeGoals = [], onUpdat
   }
 
   return (
-    <article className="w-full overflow-hidden rounded-[26px] border border-[#dce9ee] bg-white shadow-[0_12px_32px_rgba(11,45,84,.045)]">
+    <article id={"today-goal-" + encodeURIComponent(goalId)} className="w-full overflow-hidden rounded-[26px] border border-[#dce9ee] bg-white shadow-[0_12px_32px_rgba(11,45,84,.045)]">
       <header className="flex items-start justify-between gap-3 border-b border-[#edf2f5] px-4 py-4 sm:px-5">
         <div className="flex min-w-0 items-start gap-3">
           <span className="grid h-10 w-10 shrink-0 place-items-center rounded-[14px] bg-[#e8f8f7] text-[#0b7b80]"><Icon className="h-4 w-4" /></span>
@@ -356,7 +454,7 @@ export default function TodaySupportedGoalCard({ goal, activeGoals = [], onUpdat
             <p className="mt-1 text-[9px] font-semibold text-[#8595a1]">{meta.comparison} · {meta.period} · {meta.unit || "Measured value"}</p>
           </div>
         </div>
-        <Link href={"/health-goals#goal-" + encodeURIComponent(goalId)} className="inline-flex h-9 shrink-0 items-center gap-1 rounded-xl border border-[#dce7eb] bg-white px-2.5 text-[9px] font-black text-[#0b2d54]">Goal <ArrowRight className="h-3 w-3" /></Link>
+        <span className="shrink-0 rounded-full bg-[#eef8f8] px-2.5 py-1.5 text-[8px] font-black uppercase tracking-[.1em] text-[#0b7b80]">Today</span>
       </header>
 
       <div className="px-4 pb-4 pt-4 sm:px-5">
@@ -465,7 +563,7 @@ export default function TodaySupportedGoalCard({ goal, activeGoals = [], onUpdat
                     <span className="text-lg font-black tracking-[-.04em] text-white">{displayProgress}%</span>
                   </div>
                   <div className="mt-2 h-2 overflow-hidden rounded-full bg-white/10">
-                    <div className="h-full rounded-full bg-[#24c1c4] transition-all" style={{ width: Math.max(0, displayProgress) + "%" }} />
+                    <div className="h-full rounded-full bg-[#24c1c4] transition-all" style={{ width: Math.max(0, displayProgress ?? 0) + "%" }} />
                   </div>
                 </div>
               </div>
@@ -474,12 +572,12 @@ export default function TodaySupportedGoalCard({ goal, activeGoals = [], onUpdat
         ) : (
           <>
           <div className="grid grid-cols-3 gap-2">
-          <div className="rounded-[16px] bg-[#f7fbfb] p-3"><p className="text-[8px] font-black uppercase tracking-[.12em] text-[#95a3ad]">Current</p><p className="mt-1 text-base font-black text-[#0b2d54]">{displayCurrent == null ? "—" : displayCurrent}{meta.unit && displayCurrent != null ? " " + meta.unit : ""}</p></div>
+          <div className="rounded-[16px] bg-[#f7fbfb] p-3"><p className="text-[8px] font-black uppercase tracking-[.12em] text-[#95a3ad]">Current</p><p className="mt-1 text-base font-black text-[#0b2d54]">{displayCurrent == null ? "—" : displayCurrent}{meta.unit && displayCurrent != null ? " " + meta.unit : ""}</p>{category === "SLEEP" && displayCurrent != null && liveCurrentAt && <p className="mt-1 text-[8px] leading-4 text-[#74859a]">Latest check-in · {new Intl.DateTimeFormat("en-ZA", { day: "numeric", month: "short" }).format(new Date(liveCurrentAt))}</p>}</div>
           <div className="rounded-[16px] bg-[#f7fbfb] p-3"><p className="text-[8px] font-black uppercase tracking-[.12em] text-[#95a3ad]">Target</p><p className="mt-1 text-base font-black text-[#0b2d54]">{target == null ? "—" : target}{meta.unit && target != null ? " " + meta.unit : ""}</p></div>
-          <div className="rounded-[16px] bg-[#e9f9fa] p-3"><p className="text-[8px] font-black uppercase tracking-[.12em] text-[#0b7b80]">Progress</p><p className="mt-1 text-base font-black text-[#0b6f73]">{displayProgress}%</p></div>
+          <div className="rounded-[16px] bg-[#e9f9fa] p-3"><p className="text-[8px] font-black uppercase tracking-[.12em] text-[#0b7b80]">Progress</p><p className="mt-1 text-base font-black text-[#0b6f73]">{displayProgress == null ? "—" : displayProgress + "%"}</p></div>
         </div>
 
-        <div className="mt-3 h-2 overflow-hidden rounded-full bg-[#edf3f5]"><div className="h-full rounded-full bg-[#24c1c4] transition-all" style={{ width: Math.max(0, displayProgress) + "%" }} /></div>
+        <div className="mt-3 h-2 overflow-hidden rounded-full bg-[#edf3f5]"><div className="h-full rounded-full bg-[#24c1c4] transition-all" style={{ width: Math.max(0, displayProgress ?? 0) + "%" }} /></div>
 
         <div className="mt-3 rounded-xl bg-[#e9f9fa] px-3 py-2"><p className="text-[9px] font-bold leading-4 text-[#0b6f73]">{nextStep}</p></div>
           </>
@@ -503,14 +601,14 @@ export default function TodaySupportedGoalCard({ goal, activeGoals = [], onUpdat
               </Link>
             </div>
           </div>
-        ) : Array.isArray(goal?.connectedGoals) && goal.connectedGoals.length > 0 ? (
+        ) : connectedGoalRelations.length > 0 ? (
           <div className="mt-3 rounded-[17px] border border-[#dcebec] bg-[#f7fbfc] p-3.5">
             <div className="flex items-center justify-between gap-2">
               <p className="text-[8px] font-black uppercase tracking-[.14em] text-[#82939f]">Goal connections</p>
-              <span className="text-[8px] font-bold text-[#9aa8b1]">{goal.connectedGoals.length} connected</span>
+              <span className="text-[8px] font-bold text-[#9aa8b1]">{connectedGoalRelations.length} connected</span>
             </div>
             <div className="mt-2 flex flex-wrap gap-2">
-              {goal.connectedGoals.slice(0, 4).map((relation: any) => {
+              {connectedGoalRelations.map((relation: any) => {
                 const related = relation?.goal;
                 const relatedCategory = String(related?.category ?? "").toUpperCase();
                 const direction = String(relation?.direction ?? "");
@@ -520,9 +618,7 @@ export default function TodaySupportedGoalCard({ goal, activeGoals = [], onUpdat
                 return (
                   <Link
                     key={String(relation?.id ?? related?.id ?? relatedCategory)}
-                    href={related?.id
-                      ? "/health-goals#goal-" + encodeURIComponent(String(related.id))
-                      : "/health-goals"}
+                    href="/today#today-goals"
                     className="inline-flex min-w-0 items-center gap-1 rounded-full bg-white px-2.5 py-1.5 text-[8px] font-bold text-[#0b6f73] ring-1 ring-[#dce8eb] transition hover:border-[#24c1c4]"
                     title={String(relation?.rationale ?? "")}
                   >
