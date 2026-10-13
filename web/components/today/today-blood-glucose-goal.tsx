@@ -6,7 +6,7 @@ import { Activity, ArrowRight, Clock3, Droplets, Plus } from "lucide-react";
 import { toast } from "sonner";
 import { healthGoalsService, type HealthGoalMetricEventsResponse } from "@/services/health-goals.service";
 
-type Props = { goal: any; onUpdated?: () => Promise<void> | void; conditions?: any[]; diagnoses?: any[]; medications?: any[]; activeGoals?: any[]; labOrders?: any[]; carePlans?: any[]; baseline?: any };
+type Props = { goal: any; patientId?: string; currentWeightKg?: number | null; currentHeightCm?: number | null; onUpdated?: () => Promise<void> | void; conditions?: any[]; diagnoses?: any[]; medications?: any[]; activeGoals?: any[]; labOrders?: any[]; carePlans?: any[]; baseline?: any };
 type GlucoseContext = "FASTING" | "BEFORE_MEAL" | "AFTER_MEAL_2H" | "BEDTIME" | "OVERNIGHT" | "OTHER";
 type GlucoseEvent = {
   id: string;
@@ -25,6 +25,48 @@ const CONTEXTS: Array<{ value: GlucoseContext; label: string }> = [
   { value: "OVERNIGHT", label: "Overnight" },
   { value: "OTHER", label: "Other / not specified" },
 ];
+
+type SupportingGoalCategory = "NUTRITION" | "EXERCISE" | "SLEEP" | "BLOOD_PRESSURE" | "MEDICATION" | "WEIGHT";
+
+const SUPPORTING_GOAL_OPTIONS = [
+  {
+    category: "NUTRITION", label: "Nutrition", title: "Nutrition goal", unit: "calories/day",
+    metricType: "NUTRITION", metricKey: "nutrition.calories", frequency: "DAILY", aggregation: "SUM", comparison: "AT_MOST",
+    targetLabel: "Daily calorie target",
+    rationale: "Log meals alongside glucose readings to help you and your care team review patterns over time. This does not prove that food caused a glucose change.",
+  },
+  {
+    category: "EXERCISE", label: "Exercise", title: "Exercise goal", unit: "mins/week",
+    metricType: "EXERCISE", metricKey: "exercise.minutes", frequency: "WEEKLY", aggregation: "SUM", comparison: "AT_LEAST",
+    targetLabel: "Minutes per week",
+    rationale: "Recording activity alongside glucose readings can add context to your trends; it does not prove that activity caused a change.",
+  },
+  {
+    category: "SLEEP", label: "Sleep", title: "Sleep goal", unit: "hours/night",
+    metricType: "SLEEP", metricKey: "sleep.hours", frequency: "DAILY", aggregation: "LATEST", comparison: "AT_LEAST",
+    targetLabel: "Hours per night",
+    rationale: "Tracking sleep can help you review whether sleep duration and glucose readings vary together over time. It does not establish cause.",
+  },
+  {
+    category: "BLOOD_PRESSURE", label: "Blood pressure", title: "Blood pressure goal", unit: "mmHg",
+    metricType: "BLOOD_PRESSURE", metricKey: "blood_pressure.systolic", frequency: "DAILY", aggregation: "LATEST", comparison: "AT_MOST",
+    targetLabel: "Systolic target",
+    rationale: "Blood pressure is another important part of cardiometabolic health. Use a target recommended for you by your clinician.",
+  },
+  {
+    category: "MEDICATION", label: "Medication adherence", title: "Medication adherence goal", unit: "%",
+    metricType: "MEDICATION", metricKey: "medication.adherence", frequency: "WEEKLY", aggregation: "AVERAGE", comparison: "AT_LEAST",
+    targetLabel: "Adherence target (%)",
+    rationale: "A medication goal can help you keep track of taking a relevant prescribed medicine as agreed with your clinician. It does not change your prescription or dosage.",
+  },
+  {
+    category: "WEIGHT", label: "Weight", title: "Weight goal", unit: "kg",
+    metricType: "WEIGHT", metricKey: "weight.kg", frequency: "TOTAL", aggregation: "LATEST", comparison: "CLOSEST",
+    targetLabel: "Target weight or amount (kg)",
+    rationale: "If weight management is part of your personal care plan, tracking it alongside glucose readings may add context. Weight change is not appropriate for every person.",
+  },
+] as const;
+
 
 function localDayKey(value: unknown = new Date()) {
   const date = value instanceof Date ? value : new Date(String(value ?? ""));
@@ -217,7 +259,7 @@ function latestReleasedLabMeasure(labOrders: any[], matcher: RegExp): ReleasedLa
   return measures[0] ?? null;
 }
 
-export default function TodayBloodGlucoseGoal({ goal, onUpdated, conditions = [], diagnoses = [], medications = [], activeGoals = [], labOrders = [], carePlans = [], baseline = null }: Props) {
+export default function TodayBloodGlucoseGoal({ goal, patientId = "", currentWeightKg = null, currentHeightCm = null, onUpdated, conditions = [], diagnoses = [], medications = [], activeGoals = [], labOrders = [], carePlans = [], baseline = null }: Props) {
   const goalId = String(goal?.id ?? "");
   const target = targetFromGoal(goal);
   const [events, setEvents] = useState<GlucoseEvent[]>([]);
@@ -230,6 +272,12 @@ export default function TodayBloodGlucoseGoal({ goal, onUpdated, conditions = []
   const [note, setNote] = useState("");
   const [measurementTime, setMeasurementTime] = useState(() => localDateTimeInput(new Date()));
   const [selectedMedicationId, setSelectedMedicationId] = useState("");
+  const [selectedSupportCategory, setSelectedSupportCategory] = useState<SupportingGoalCategory | "">("");
+  const [supportGoalTitle, setSupportGoalTitle] = useState("");
+  const [supportTarget, setSupportTarget] = useState("");
+  const [supportMedicationId, setSupportMedicationId] = useState("");
+  const [supportWeightDirection, setSupportWeightDirection] = useState<"LOSE" | "GAIN" | "MAINTAIN">("MAINTAIN");
+  const [savingSupportGoal, setSavingSupportGoal] = useState(false);
   const [dailyContext, setDailyContext] = useState<{ calories: number | null; exerciseMinutes: number | null; sleepHours: number | null }>({
     calories: null,
     exerciseMinutes: null,
@@ -386,6 +434,17 @@ export default function TodayBloodGlucoseGoal({ goal, onUpdated, conditions = []
     if (!connectedGoalMap.has(relatedId)) connectedGoalMap.set(relatedId, related);
   }
   const relevantGoals = Array.from(connectedGoalMap.values()).slice(0, 4);
+  const alreadyTrackedCategories = new Set(relevantGoals.map((related: any) => String(related?.category ?? "").toUpperCase()));
+  const canOfferWeightGoal = Number.isFinite(Number(currentWeightKg)) && Number(currentWeightKg) > 0
+    && Number.isFinite(Number(currentHeightCm)) && Number(currentHeightCm) > 0;
+  const supportingGoalOptions = SUPPORTING_GOAL_OPTIONS.filter((option) => {
+    if (alreadyTrackedCategories.has(option.category)) return false;
+    if (option.category === "MEDICATION") return glucoseMedicationRecords.some((medication: any) => Boolean(patientMedicationId(medication)));
+    if (option.category === "WEIGHT") return canOfferWeightGoal;
+    return true;
+  });
+  const selectedSupportOption = SUPPORTING_GOAL_OPTIONS.find((option) => option.category === selectedSupportCategory) ?? null;
+  const supportMedicationOptions = glucoseMedicationRecords.filter((medication: any) => Boolean(patientMedicationId(medication)));
   const linkedCarePlan = carePlans.find((plan: any) => String(plan?.id ?? "") === String(goal?.carePlanId ?? "")) ?? null;
   const linkedCarePlanPractitioner = linkedCarePlan?.practitioner?.person
     ? [
@@ -406,6 +465,81 @@ export default function TodayBloodGlucoseGoal({ goal, onUpdated, conditions = []
     labOrders,
     /^(?!.*(?:hba1c|hemoglobin a1c|haemoglobin a1c|glycated haemoglobin|glycated hemoglobin|glycosylated hemoglobin)).*glucose.*$/i,
   );
+
+  function startSupportingGoalSetup(category: SupportingGoalCategory) {
+    const option = SUPPORTING_GOAL_OPTIONS.find((item) => item.category === category);
+    if (!option) return;
+    setSelectedSupportCategory(category);
+    setSupportGoalTitle(option.title);
+    setSupportTarget(category === "MEDICATION" ? "90" : category === "WEIGHT" && supportWeightDirection === "MAINTAIN" && Number(currentWeightKg) > 0 ? String(currentWeightKg) : "");
+    setSupportMedicationId(category === "MEDICATION" ? patientMedicationId(supportMedicationOptions[0] ?? {}) : "");
+  }
+
+  async function saveSupportingGoal() {
+    const option = selectedSupportOption;
+    if (!option) return;
+    if (!patientId) {
+      toast.error("Your patient profile could not be identified. Refresh Today and try again.");
+      return;
+    }
+    if (!supportGoalTitle.trim()) {
+      toast.error("Enter a name for this goal.");
+      return;
+    }
+    const category = option.category;
+    const numeric = Number(supportTarget.trim());
+    if (category === "WEIGHT" && supportWeightDirection === "MAINTAIN") {
+      if (!Number.isFinite(Number(currentWeightKg)) || Number(currentWeightKg) <= 0) {
+        toast.error("Record your current weight before setting a maintenance goal.");
+        return;
+      }
+    } else if (!supportTarget.trim() || !Number.isFinite(numeric) || numeric <= 0) {
+      toast.error("Enter a target greater than zero.");
+      return;
+    }
+    if (category === "MEDICATION" && (!supportMedicationId || numeric < 1 || numeric > 100)) {
+      toast.error("Choose a relevant prescribed medicine and set an adherence target from 1% to 100%.");
+      return;
+    }
+    if (category === "MENTAL_HEALTH") return;
+    const comparison = category === "WEIGHT"
+      ? supportWeightDirection === "GAIN" ? "INCREASE_TO" : supportWeightDirection === "LOSE" ? "DECREASE_TO" : "CLOSEST"
+      : option.comparison;
+    const targetValue = category === "WEIGHT" && supportWeightDirection === "MAINTAIN"
+      ? Number(currentWeightKg)
+      : numeric;
+    const description = option.rationale + (category === "WEIGHT" ? " The selected plan is " + supportWeightDirection.toLowerCase() + "." : "");
+    try {
+      setSavingSupportGoal(true);
+      await healthGoalsService.create({
+        patientId,
+        patientMedicationId: category === "MEDICATION" ? supportMedicationId : undefined,
+        title: supportGoalTitle.trim(),
+        description,
+        category,
+        priority: "MEDIUM",
+        status: "ACTIVE",
+        targetValue: String(targetValue),
+        unit: option.unit,
+        metricType: option.metricType,
+        metricKey: option.metricKey,
+        frequency: option.frequency,
+        frequencyTarget: String(targetValue),
+        aggregation: option.aggregation,
+        comparison,
+      });
+      toast.success(option.label + " goal added to Today.");
+      setSelectedSupportCategory("");
+      setSupportGoalTitle("");
+      setSupportTarget("");
+      setSupportMedicationId("");
+      await onUpdated?.();
+    } catch (error: any) {
+      toast.error(String(error?.response?.data?.message || "We could not add this goal. Please try again."));
+    } finally {
+      setSavingSupportGoal(false);
+    }
+  }
 
   async function saveReading() {
     const numeric = Number(value.trim());
@@ -648,19 +782,130 @@ export default function TodayBloodGlucoseGoal({ goal, onUpdated, conditions = []
 
           <div className="mt-3 border-t border-[#e8eff1] pt-3">
             <div className="flex items-center justify-between gap-2">
-              <p className="text-[8px] font-black uppercase tracking-[.14em] text-[#8a99a6]">Relevant health goals</p>
-              <Link href="/health-goals" className="text-[8px] font-black text-[#0b7b80]">Manage goals <ArrowRight className="ml-1 inline h-2.5 w-2.5" /></Link>
+              <p className="text-[8px] font-black uppercase tracking-[.14em] text-[#8a99a6]">Goals connected to glucose</p>
+              {relevantGoals.length > 0 && <span className="text-[8px] font-semibold text-[#74859a]">{relevantGoals.length} tracking</span>}
             </div>
             {relevantGoals.length > 0 ? (
               <div className="mt-1.5 flex flex-wrap gap-1.5">
                 {relevantGoals.map((related: any) => (
-                  <Link key={String(related.id)} href={"/health-goals#goal-" + encodeURIComponent(String(related.id))} title={String(related?.description ?? "")} className="rounded-full border border-[#dce8eb] bg-white px-2.5 py-1.5 text-[9px] font-bold text-[#0b2d54]">
+                  <span key={String(related.id)} title={String(related?.description ?? "")} className="rounded-full border border-[#dce8eb] bg-white px-2.5 py-1.5 text-[9px] font-bold text-[#0b2d54]">
                     {String(related?.title ?? related?.category ?? "Health goal")}
-                  </Link>
+                  </span>
                 ))}
               </div>
             ) : (
-              <p className="mt-1.5 text-[9px] leading-4 text-[#74859a]">Nutrition, activity and medication-adherence goals can provide useful context when they are part of your plan.</p>
+              <p className="mt-1.5 text-[9px] leading-4 text-[#74859a]">You have not added any supporting goals yet. Choose one below to build a more useful picture alongside your glucose readings.</p>
+            )}
+
+            {supportingGoalOptions.length > 0 && (
+              <div className="mt-2.5 rounded-xl border border-[#dcebed] bg-[#f4fbfb] p-3">
+                <p className="text-[10px] font-black text-[#0b2d54]">Build your health picture</p>
+                <p className="mt-1 text-[9px] leading-4 text-[#74859a]">Add any goal that fits your care plan. It will be saved here on Today—no need to leave this page.</p>
+                <div className="mt-2 flex flex-wrap gap-1.5">
+                  {supportingGoalOptions.map((option) => (
+                    <button
+                      key={option.category}
+                      type="button"
+                      onClick={() => startSupportingGoalSetup(option.category)}
+                      className={"inline-flex min-h-8 items-center gap-1 rounded-lg border px-2.5 py-1.5 text-[9px] font-black " + (selectedSupportCategory === option.category ? "border-[#24c1c4] bg-white text-[#0b2d54]" : "border-[#d6e5e8] bg-white text-[#0b6370]")}
+                    >
+                      <Plus className="h-3 w-3" /> Set {option.label}
+                    </button>
+                  ))}
+                </div>
+                {selectedSupportOption && (
+                  <form
+                    className="mt-3 rounded-xl border border-[#dce8eb] bg-white p-3"
+                    onSubmit={(event) => { event.preventDefault(); void saveSupportingGoal(); }}
+                  >
+                    <div className="flex items-start justify-between gap-3">
+                      <div>
+                        <p className="text-[10px] font-black text-[#0b2d54]">Set up {selectedSupportOption.label.toLowerCase()}</p>
+                        <p className="mt-1 text-[9px] leading-4 text-[#74859a]">{selectedSupportOption.rationale}</p>
+                      </div>
+                      <button type="button" onClick={() => setSelectedSupportCategory("")} className="rounded-md px-2 py-1 text-[9px] font-bold text-[#74859a]">Cancel</button>
+                    </div>
+
+                    <label className="mt-3 block text-[9px] font-bold text-[#0b2d54]">
+                      Goal name
+                      <input value={supportGoalTitle} onChange={(event) => setSupportGoalTitle(event.target.value)} maxLength={100} required className="mt-1 block min-h-9 w-full rounded-lg border border-[#d6e5e8] bg-white px-2.5 text-[11px] font-medium text-[#17314e] outline-none focus:border-[#24c1c4]" />
+                    </label>
+
+                    {selectedSupportOption.category === "MEDICATION" && (
+                      <label className="mt-3 block text-[9px] font-bold text-[#0b2d54]">
+                        Prescribed medicine
+                        <select value={supportMedicationId} onChange={(event) => setSupportMedicationId(event.target.value)} required className="mt-1 block min-h-9 w-full rounded-lg border border-[#d6e5e8] bg-white px-2.5 text-[11px] font-medium text-[#17314e]">
+                          <option value="">Choose a medicine</option>
+                          {supportMedicationOptions.map((medication: any) => (
+                            <option key={patientMedicationId(medication)} value={patientMedicationId(medication)}>{medicationDisplayName(medication)}</option>
+                          ))}
+                        </select>
+                      </label>
+                    )}
+
+                    {selectedSupportOption.category === "WEIGHT" && (
+                      <label className="mt-3 block text-[9px] font-bold text-[#0b2d54]">
+                        Weight plan
+                        <select
+                          value={supportWeightDirection}
+                          onChange={(event) => {
+                            const next = event.target.value as "LOSE" | "GAIN" | "MAINTAIN";
+                            setSupportWeightDirection(next);
+                            setSupportTarget(next === "MAINTAIN" && Number(currentWeightKg) > 0 ? String(currentWeightKg) : "");
+                          }}
+                          className="mt-1 block min-h-9 w-full rounded-lg border border-[#d6e5e8] bg-white px-2.5 text-[11px] font-medium text-[#17314e]"
+                        >
+                          <option value="MAINTAIN">Maintain recorded weight</option>
+                          <option value="LOSE">Lose weight</option>
+                          <option value="GAIN">Gain weight</option>
+                        </select>
+                      </label>
+                    )}
+
+                    <label className="mt-3 block text-[9px] font-bold text-[#0b2d54]">
+                      {selectedSupportOption.category === "WEIGHT"
+                        ? supportWeightDirection === "MAINTAIN" ? "Recorded target weight (kg)" : "Amount of weight change (kg)"
+                        : selectedSupportOption.targetLabel}
+                      <div className="mt-1 flex items-center gap-2">
+                        <input
+                          type="number"
+                          min={selectedSupportOption.category === "MEDICATION" ? 1 : 0.1}
+                          max={selectedSupportOption.category === "MEDICATION" ? 100 : undefined}
+                          step={selectedSupportOption.category === "MEDICATION" ? 1 : "any"}
+                          value={supportTarget}
+                          onChange={(event) => setSupportTarget(event.target.value)}
+                          required
+                          readOnly={selectedSupportOption.category === "WEIGHT" && supportWeightDirection === "MAINTAIN"}
+                          className="min-h-9 w-full rounded-lg border border-[#d6e5e8] bg-white px-2.5 text-[11px] font-medium text-[#17314e] outline-none focus:border-[#24c1c4] read-only:bg-[#f4f8f9]"
+                        />
+                        <span className="shrink-0 text-[9px] font-bold text-[#74859a]">{selectedSupportOption.unit}</span>
+                      </div>
+                    </label>
+                    {selectedSupportOption.category === "BLOOD_PRESSURE" && (
+                      <p className="mt-1 text-[9px] leading-4 text-[#8a6870]">Use the systolic target recommended for you by your clinician; this card will not invent a clinical threshold.</p>
+                    )}
+                    {selectedSupportOption.category === "NUTRITION" && Number(supportTarget) > 0 && Number(supportTarget) <= 1200 && (
+                      <p className="mt-1 text-[9px] leading-4 text-[#8a6870]">Calorie targets at or below 1,200 kcal/day may need professional review; below 800 kcal/day requires specialist supervision.</p>
+                    )}
+                    {selectedSupportOption.category === "MEDICATION" && (
+                      <p className="mt-1 text-[9px] leading-4 text-[#74859a]">This tracks your chosen adherence target. It does not change medicine doses or instructions.</p>
+                    )}
+                    {selectedSupportOption.category === "WEIGHT" && supportWeightDirection !== "MAINTAIN" && (
+                      <p className="mt-1 text-[9px] leading-4 text-[#74859a]">Set this direction only if it matches your personal care plan. Your current weight and height are available for the baseline check.</p>
+                    )}
+
+                    <div className="mt-3 flex flex-wrap items-center justify-end gap-2">
+                      <button type="button" onClick={() => setSelectedSupportCategory("")} className="min-h-9 rounded-lg border border-[#d6e5e8] px-3 text-[9px] font-bold text-[#0b2d54]">Cancel</button>
+                      <button type="submit" disabled={savingSupportGoal} className="inline-flex min-h-9 items-center gap-1.5 rounded-lg bg-[#0b2d54] px-3.5 text-[9px] font-black text-white disabled:opacity-50">
+                        {savingSupportGoal ? "Saving…" : "Add to Today"} <ArrowRight className="h-3 w-3" />
+                      </button>
+                    </div>
+                  </form>
+                )}
+              </div>
+            )}
+            {supportingGoalOptions.length === 0 && relevantGoals.length > 0 && (
+              <p className="mt-2 text-[9px] leading-4 text-[#74859a]">You are already tracking the supporting goals available from your current records. You can continue logging readings here on Today.</p>
             )}
           </div>
           <p className="mt-3 text-[8px] leading-4 text-[#8a99a6]">These records provide context, not a diagnosis or proof that a medicine or behaviour caused a glucose change.</p>
