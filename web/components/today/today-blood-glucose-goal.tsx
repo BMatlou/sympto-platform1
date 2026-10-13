@@ -589,6 +589,28 @@ export default function TodayBloodGlucoseGoal({ goal, onUpdated, conditions = []
           </div>
 
           <div className="mt-3 border-t border-[#e8eff1] pt-3">
+            <p className="text-[8px] font-black uppercase tracking-[.14em] text-[#8a99a6]">Today's recorded context</p>
+            <div className="mt-2 grid grid-cols-3 gap-2">
+              <div className="rounded-xl border border-[#e1eaed] bg-white p-2.5">
+                <p className="text-[8px] font-black uppercase tracking-[.1em] text-[#8a99a6]">Meal logs</p>
+                <p className="mt-1 text-xs font-black text-[#0b2d54]">{dailyContext.calories == null ? "—" : formatNumber(dailyContext.calories)}</p>
+                <p className="mt-0.5 text-[8px] text-[#74859a]">kcal today</p>
+              </div>
+              <div className="rounded-xl border border-[#e1eaed] bg-white p-2.5">
+                <p className="text-[8px] font-black uppercase tracking-[.1em] text-[#8a99a6]">Activity</p>
+                <p className="mt-1 text-xs font-black text-[#0b2d54]">{dailyContext.exerciseMinutes == null ? "—" : formatNumber(dailyContext.exerciseMinutes)}</p>
+                <p className="mt-0.5 text-[8px] text-[#74859a]">minutes today</p>
+              </div>
+              <div className="rounded-xl border border-[#e1eaed] bg-white p-2.5">
+                <p className="text-[8px] font-black uppercase tracking-[.1em] text-[#8a99a6]">Sleep</p>
+                <p className="mt-1 text-xs font-black text-[#0b2d54]">{dailyContext.sleepHours == null ? "—" : formatNumber(dailyContext.sleepHours)}</p>
+                <p className="mt-0.5 text-[8px] text-[#74859a]">hours recorded</p>
+              </div>
+            </div>
+            <p className="mt-2 text-[8px] leading-4 text-[#8a99a6]">These are separate logs for the same day, not proof that food, activity or sleep caused a glucose change.</p>
+          </div>
+
+          <div className="mt-3 border-t border-[#e8eff1] pt-3">
             <div className="flex items-center justify-between gap-2">
               <p className="text-[8px] font-black uppercase tracking-[.14em] text-[#8a99a6]">Relevant health goals</p>
               <Link href="/health-goals" className="text-[8px] font-black text-[#0b7b80]">Manage goals <ArrowRight className="ml-1 inline h-2.5 w-2.5" /></Link>
