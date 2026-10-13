@@ -256,7 +256,7 @@ export default function TodayBloodGlucoseGoal({ goal, onUpdated, conditions = []
     }
     try {
       const to = new Date();
-      const from = new Date(to.getTime() - 30 * 86400000);
+      const from = new Date(to.getTime() - 90 * 86400000);
       const response: HealthGoalMetricEventsResponse = await healthGoalsService.getMetricEvents(
         "BLOOD_GLUCOSE", "blood_glucose.value", from, to,
       );
