@@ -4,9 +4,10 @@ import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Activity, ArrowRight, Clock3, Droplets, Plus } from "lucide-react";
 import { toast } from "sonner";
+import { api } from "@/lib/api";
 import { healthGoalsService, type HealthGoalMetricEventsResponse } from "@/services/health-goals.service";
 
-type Props = { goal: any; onUpdated?: () => Promise<void> | void };
+type Props = { goal: any; onUpdated?: () => Promise<void> | void; conditions?: any[]; medications?: any[]; activeGoals?: any[] };
 type GlucoseContext = "FASTING" | "BEFORE_MEAL" | "AFTER_MEAL_2H" | "BEDTIME" | "OVERNIGHT" | "OTHER";
 type GlucoseEvent = {
   id: string;
@@ -88,7 +89,69 @@ function targetFromGoal(goal: any): number | null {
   return Number.isFinite(value) && value > 0 ? value : null;
 }
 
-export default function TodayBloodGlucoseGoal({ goal, onUpdated }: Props) {
+function normaliseContextText(value: unknown) {
+  return String(value ?? "").toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
+}
+
+function activeRecord(record: any) {
+  const status = String(record?.status ?? "ACTIVE").toUpperCase();
+  return !["INACTIVE", "RESOLVED", "ENDED", "DISCONTINUED", "CANCELLED", "DELETED", "ARCHIVED"].includes(status)
+    && !record?.resolvedAt
+    && !record?.endedAt;
+}
+
+function namedCondition(record: any) {
+  return normaliseContextText(
+    record?.condition?.name ??
+    record?.diagnosis?.name ??
+    record?.diagnosis?.description ??
+    record?.name ??
+    record?.title,
+  );
+}
+
+function isPrediabetesRecord(record: any) {
+  return /pre diabetes|prediabetes/.test(namedCondition(record));
+}
+
+function isDiabetesRecord(record: any) {
+  const name = namedCondition(record);
+  if (!name || isPrediabetesRecord(record)) return false;
+  return /\bdiabetes\b|\bdiabetic\b|type 1 diabetes|type 2 diabetes|gestational diabetes/.test(name);
+}
+
+function recordDisplayName(record: any) {
+  return String(
+    record?.condition?.name ??
+    record?.diagnosis?.name ??
+    record?.diagnosis?.description ??
+    record?.name ??
+    record?.title ??
+    "Health condition",
+  );
+}
+
+function medicationDisplayName(record: any) {
+  return String(record?.medication?.name ?? record?.medication?.genericName ?? record?.name ?? record?.genericName ?? "Medication");
+}
+
+function medicationHasExplicitGlucoseIndication(record: any) {
+  const indication = normaliseContextText(record?.indication ?? record?.reason);
+  return /diabetes|diabetic|blood glucose|blood sugar|glyc(a|e)emic|prediabetes/.test(indication);
+}
+
+function medicationNameSuggestsGlucoseTherapy(record: any) {
+  const name = normaliseContextText(medicationDisplayName(record));
+  return [
+    "metformin", "insulin", "gliclazide", "glimepiride", "glipizide", "glibenclamide",
+    "glyburide", "glimepiride", "sitagliptin", "linagliptin", "saxagliptin",
+    "vildagliptin", "empagliflozin", "dapagliflozin", "canagliflozin", "ertugliflozin",
+    "pioglitazone", "repaglinide", "nateglinide", "liraglutide", "semaglutide",
+    "dulaglutide", "exenatide",
+  ].some((medicine) => name.includes(medicine));
+}
+
+export default function TodayBloodGlucoseGoal({ goal, onUpdated, conditions = [], medications = [], activeGoals = [] }: Props) {
   const goalId = String(goal?.id ?? "");
   const target = targetFromGoal(goal);
   const [events, setEvents] = useState<GlucoseEvent[]>([]);
@@ -100,6 +163,7 @@ export default function TodayBloodGlucoseGoal({ goal, onUpdated }: Props) {
   const [readingContext, setReadingContext] = useState<GlucoseContext | "">("");
   const [note, setNote] = useState("");
   const [measurementTime, setMeasurementTime] = useState(() => localDateTimeInput(new Date()));
+  const [clinicalDiagnoses, setClinicalDiagnoses] = useState<any[]>([]);
 
   const journey = useMemo(() => {
     const today = localDayKey(new Date());
@@ -157,6 +221,30 @@ export default function TodayBloodGlucoseGoal({ goal, onUpdated }: Props) {
     };
   }, [loadEvents]);
 
+  useEffect(() => {
+    let cancelled = false;
+    async function loadClinicalDiagnoses() {
+      try {
+        const response = await api.get("/patient-health-records/clinical-diagnoses");
+        const payload: any = response.data;
+        const records = Array.isArray(payload)
+          ? payload
+          : Array.isArray(payload?.data)
+            ? payload.data
+            : Array.isArray(payload?.data?.data)
+              ? payload.data.data
+              : [];
+        if (!cancelled) setClinicalDiagnoses(records);
+      } catch {
+        // Conditions and medications still render from Health Home if the
+        // clinical-diagnosis endpoint is temporarily unavailable.
+        if (!cancelled) setClinicalDiagnoses([]);
+      }
+    }
+    void loadClinicalDiagnoses();
+    return () => { cancelled = true; };
+  }, []);
+
   const latest = events[0] ?? null;
   const todayKey = localDayKey(new Date());
   const todaysEvents = events.filter((event) => localDayKey(event.occurredAt) === todayKey);
@@ -169,6 +257,47 @@ export default function TodayBloodGlucoseGoal({ goal, onUpdated }: Props) {
   const veryLow = latestIsRecent && latest != null && latest.loggedValue < 3.0;
   const targetLinked = Boolean(goal?.practitionerId || goal?.carePlanId);
   const hasEntryContext = latest != null && Boolean(String(latest.metadata?.readingContext ?? latest.metadata?.glucoseContext ?? ""));
+  const currentConditions = conditions.filter(activeRecord);
+  const currentClinicalDiagnoses = clinicalDiagnoses.filter(activeRecord);
+  const diabetesDiagnosis = currentClinicalDiagnoses.find(isDiabetesRecord);
+  const diabetesCondition = currentConditions.find(isDiabetesRecord);
+  const prediabetesDiagnosis = currentClinicalDiagnoses.find(isPrediabetesRecord);
+  const prediabetesCondition = currentConditions.find(isPrediabetesRecord);
+  const diabetesRecord = diabetesDiagnosis ?? diabetesCondition;
+  const prediabetesRecord = prediabetesDiagnosis ?? prediabetesCondition;
+  const diabetesStatusLabel = diabetesRecord
+    ? "Diabetes recorded"
+    : prediabetesRecord
+      ? "Prediabetes recorded"
+      : "No diabetes diagnosis recorded";
+  const diabetesStatusDetail = diabetesDiagnosis
+    ? "Found in practitioner diagnosis records"
+    : diabetesCondition
+      ? (diabetesCondition.diagnosedBy || diabetesCondition.treatmentPlan ? "Clinician-recorded health condition" : "Health condition record")
+      : prediabetesDiagnosis
+        ? "Found in practitioner diagnosis records"
+        : prediabetesCondition
+          ? "Prediabetes is recorded in Health Conditions"
+          : "No matching entry was found in the current records; this does not rule out diabetes.";
+
+  const activeMedicationRecords = medications.filter(activeRecord);
+  const glucoseMedicationRecords = activeMedicationRecords.filter(
+    (medication) => medicationHasExplicitGlucoseIndication(medication) || medicationNameSuggestsGlucoseTherapy(medication),
+  );
+  const linkedGoalCandidates = [
+    ...(Array.isArray(goal?.connectedGoals) ? goal.connectedGoals.map((relation: any) => relation?.goal ?? relation) : []),
+    ...activeGoals,
+  ];
+  const connectedGoalMap = new Map<string, any>();
+  for (const related of linkedGoalCandidates) {
+    const relatedId = String(related?.id ?? "");
+    const category = String(related?.category ?? "").toUpperCase();
+    const status = String(related?.status ?? "ACTIVE").toUpperCase();
+    if (!relatedId || relatedId === goalId || !["MEDICATION", "NUTRITION", "EXERCISE", "SLEEP", "WEIGHT", "BLOOD_PRESSURE"].includes(category)) continue;
+    if (!["ACTIVE", "IN_PROGRESS", "ON_TRACK", "IMPROVING", "STAGNANT", "DECLINING"].includes(status)) continue;
+    if (!connectedGoalMap.has(relatedId)) connectedGoalMap.set(relatedId, related);
+  }
+  const relevantGoals = Array.from(connectedGoalMap.values()).slice(0, 4);
 
   async function saveReading() {
     const numeric = Number(value.trim());
@@ -290,6 +419,63 @@ export default function TodayBloodGlucoseGoal({ goal, onUpdated }: Props) {
               </div>
             </div>
           </div>
+        </section>
+
+        <section className="mt-3 rounded-[18px] border border-[#e2ecef] bg-[#fbfdfd] p-3.5">
+          <div className="flex items-start justify-between gap-3">
+            <div>
+              <p className="text-[8px] font-black uppercase tracking-[.14em] text-[#8a99a6]">Health context</p>
+              <p className="mt-1 text-xs font-black text-[#0b2d54]">{diabetesStatusLabel}</p>
+              <p className="mt-1 text-[9px] leading-4 text-[#74859a]">{diabetesStatusDetail}</p>
+            </div>
+            <Link href="/health-conditions" className="shrink-0 rounded-lg border border-[#d6e4e7] bg-white px-2.5 py-1.5 text-[8px] font-black text-[#0b2d54]">Health record <ArrowRight className="ml-1 inline h-2.5 w-2.5" /></Link>
+          </div>
+
+          <div className="mt-3 border-t border-[#e8eff1] pt-3">
+            <p className="text-[8px] font-black uppercase tracking-[.14em] text-[#8a99a6]">Medication context</p>
+            {glucoseMedicationRecords.length > 0 ? (
+              <div className="mt-1.5 space-y-1.5">
+                {glucoseMedicationRecords.slice(0, 3).map((medication: any, index: number) => {
+                  const explicitIndication = medicationHasExplicitGlucoseIndication(medication);
+                  const indication = String(medication?.indication ?? medication?.reason ?? "").trim();
+                  const details = [medication?.dosage, medication?.frequency].filter(Boolean).join(" · ");
+                  return (
+                    <div key={String(medication?.patientMedicationId ?? medication?.id ?? index)} className="flex items-start justify-between gap-2">
+                      <div className="min-w-0">
+                        <p className="text-[10px] font-bold text-[#0b2d54]">{medicationDisplayName(medication)}{details ? " · " + details : ""}</p>
+                        <p className="mt-0.5 text-[9px] leading-4 text-[#74859a]">{indication ? "Indication on record: " + indication : "Indication not recorded"}</p>
+                      </div>
+                      <span className={"shrink-0 rounded-full px-2 py-1 text-[8px] font-black " + (explicitIndication ? "bg-[#e8f8f7] text-[#0b7b80]" : "bg-[#eef5f6] text-[#71879b]")}>{explicitIndication ? "Indication linked" : "Check indication"}</span>
+                    </div>
+                  );
+                })}
+              </div>
+            ) : (
+              <p className="mt-1.5 text-[9px] leading-4 text-[#74859a]">No glucose-related medicine was identified in the active medication list. Keep the list and each medicine’s indication up to date.</p>
+            )}
+            {glucoseMedicationRecords.some((medication: any) => !medicationHasExplicitGlucoseIndication(medication)) && (
+              <p className="mt-2 text-[8px] leading-4 text-[#8a99a6]">A medicine name alone does not confirm diabetes or the reason it was prescribed.</p>
+            )}
+          </div>
+
+          <div className="mt-3 border-t border-[#e8eff1] pt-3">
+            <div className="flex items-center justify-between gap-2">
+              <p className="text-[8px] font-black uppercase tracking-[.14em] text-[#8a99a6]">Relevant health goals</p>
+              <Link href="/health-goals" className="text-[8px] font-black text-[#0b7b80]">Manage goals <ArrowRight className="ml-1 inline h-2.5 w-2.5" /></Link>
+            </div>
+            {relevantGoals.length > 0 ? (
+              <div className="mt-1.5 flex flex-wrap gap-1.5">
+                {relevantGoals.map((related: any) => (
+                  <Link key={String(related.id)} href={"/health-goals#goal-" + encodeURIComponent(String(related.id))} title={String(related?.description ?? "")} className="rounded-full border border-[#dce8eb] bg-white px-2.5 py-1.5 text-[9px] font-bold text-[#0b2d54]">
+                    {String(related?.title ?? related?.category ?? "Health goal")}
+                  </Link>
+                ))}
+              </div>
+            ) : (
+              <p className="mt-1.5 text-[9px] leading-4 text-[#74859a]">Nutrition, activity and medication-adherence goals can provide useful context when they are part of your plan.</p>
+            )}
+          </div>
+          <p className="mt-3 text-[8px] leading-4 text-[#8a99a6]">These records provide context, not a diagnosis or proof that a medicine or behaviour caused a glucose change.</p>
         </section>
 
         {(low || veryLow) && latest && (
