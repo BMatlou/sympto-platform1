@@ -70,8 +70,15 @@ function localDayKey(value: unknown) {
 }
 
 function isMmolPerLitre(unit: string) {
-  const normalized = unit.toLowerCase().replace(/[\s·−–]/g, "");
+  const normalized = unit.toLowerCase().replace(/\s+/g, "").replace(/[−–]/g, "-");
   return ["mmol/l", "mmoll-1", "mmol·l-1", "mmol/litre", "mmol/liter"].includes(normalized);
+}
+
+function dayOrdinal(value: unknown) {
+  const key = localDayKey(value);
+  const [year, month, day] = key.split("-").map(Number);
+  if (![year, month, day].every(Number.isFinite)) return Number.NaN;
+  return Math.floor(Date.UTC(year, month - 1, day) / 86400000);
 }
 
 function releasedCholesterolLabs(labOrders: any[]): ReleasedCholesterolLab[] {
@@ -477,7 +484,14 @@ export default function TodayCholesterolGoal({ goal, labOrders = [], activeGoals
         <div className="mt-3 flex items-center justify-between gap-3 border-t border-[#edf2f4] px-1 pt-3">
           <div className="min-w-0">
             <p className="text-[8px] font-black uppercase tracking-[.14em] text-[#9aa8b3]">Journey</p>
-            <p className="mt-0.5 text-xs font-black text-[#0b2d54]">Day {Math.max(1, Math.floor((Date.now() - new Date(String(goal?.createdAt ?? Date.now())).getTime()) / 86400000) + 1)}{goal?.targetDate ? " · " + Math.max(0, Math.ceil((new Date(String(goal.targetDate)).getTime() - Date.now()) / 86400000)) + " days left" : " · Journey active"}</p>
+            <p className="mt-0.5 text-xs font-black text-[#0b2d54]">{(() => {
+              const today = dayOrdinal(new Date());
+              const start = dayOrdinal(goal?.createdAt);
+              const end = goal?.targetDate ? dayOrdinal(goal.targetDate) : Number.NaN;
+              const day = Number.isFinite(start) && Number.isFinite(today) ? Math.max(1, today - start + 1) : 1;
+              const left = Number.isFinite(end) && Number.isFinite(today) ? Math.max(0, end - today) : null;
+              return "Day " + day + (left === null ? " · Journey active" : " · " + left + " days left");
+            })()}</p>
           </div>
           <Link href="/tests-results" className="inline-flex min-h-9 shrink-0 items-center justify-center gap-1 rounded-xl border border-[#d6e4e7] bg-white px-3 py-2 text-[9px] font-black text-[#0b2d54]">
             Tests & results <ArrowRight className="h-3 w-3" />
