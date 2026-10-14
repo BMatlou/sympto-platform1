@@ -5,6 +5,7 @@ import { ArrowRight, Clock3, FlaskConical, Plus } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 import { healthGoalsService } from "@/services/health-goals.service";
+import { healthJournalService } from "@/services/health-journal.service";
 
 type Props = {
   goal: any;
@@ -291,6 +292,22 @@ export default function TodayCholesterolGoal({ goal, labOrders = [], activeGoals
           note: note.trim() || undefined,
         },
       });
+      try {
+        await healthJournalService.create({
+          title: "Goal measurement · Cholesterol",
+          journal: "Total cholesterol: " + formatNumber(numeric) + " mmol/L.",
+          notes: [
+            "Recorded from Today.",
+            "Measurement date and time: " + formatDate(occurredAt, true) + ".",
+            recordSource === "LAB_REPORT" ? "Transcribed from a lab report." : "Entered as a measured result.",
+            note.trim() ? "Note: " + note.trim() : "",
+          ].filter(Boolean).join(" "),
+        });
+      } catch {
+        toast.warning("Cholesterol result saved", {
+          description: "The result was saved, but the Health Journal entry could not be added.",
+        });
+      }
       toast.success("Cholesterol result recorded.");
       setValue("");
       setNote("");
