@@ -454,18 +454,22 @@ export default function TodayMentalHealthGoal({
       ? conditions
       : Array.isArray(healthPassport?.conditions)
         ? healthPassport.conditions
-        : [];
+        : Array.isArray(medicalRecord?.conditions)
+          ? medicalRecord.conditions
+          : [];
     return source.filter((record) => activeRecord(record) && conditionName(record)).slice(0, 6);
-  }, [conditions, healthPassport?.conditions]);
+  }, [conditions, healthPassport?.conditions, medicalRecord?.conditions]);
 
   const activeMedications = useMemo(() => {
     const source = medications.length > 0
       ? medications
       : Array.isArray(healthPassport?.medications)
         ? healthPassport.medications
-        : [];
+        : Array.isArray(medicalRecord?.medications)
+          ? medicalRecord.medications
+          : [];
     return source.filter((record) => activeRecord(record) && medicationName(record)).slice(0, 6);
-  }, [medications, healthPassport?.medications]);
+  }, [medications, healthPassport?.medications, medicalRecord?.medications]);
 
   const activeSymptoms = useMemo(() => {
     return symptoms.filter((record) => {
@@ -489,15 +493,24 @@ export default function TodayMentalHealthGoal({
     });
     const reportedMedicationEffect = activeMedications.find((item) => {
       const effect = String(item?.sideEffects ?? item?.sideEffect ?? item?.adverseEffects ?? item?.reportedSideEffects ?? "").trim();
-      return Boolean(effect);
+      return Boolean(effect) && !["NONE", "NO", "N/A", "NA", "UNKNOWN", "FALSE", "NOT RECORDED"].includes(effect.toUpperCase());
+    });
+    const ongoingSymptom = activeSymptoms.find((item) => String(item?.title ?? item?.symptomName ?? item?.name ?? "").trim());
+    const historyWithDetails = ["pastMedicalHistory", "familyHistory", "socialHistory"].some((key) => {
+      const value = medicalRecord?.[key] ?? healthPassport?.[key];
+      if (Array.isArray(value)) return value.length > 0;
+      if (value && typeof value === "object") return Object.keys(value).length > 0;
+      return typeof value === "string" && value.trim().length > 0;
     });
 
-    if (stressNeedsAttention && longTermCondition) {
-      const name = conditionName(longTermCondition);
+    if (stressNeedsAttention && (longTermCondition || ongoingSymptom)) {
+      const condition = longTermCondition ? conditionName(longTermCondition) : "";
+      const symptom = ongoingSymptom ? String(ongoingSymptom?.title ?? ongoingSymptom?.symptomName ?? ongoingSymptom?.name ?? "").trim() : "";
+      const context = [condition ? "Your Health Passport records " + condition : "", symptom ? "your health records still mark " + symptom + " as active" : ""].filter(Boolean).join(", and ");
       return {
-        title: "Make room for care-related stress",
-        message: "Your Health Passport records " + name + ". If managing this condition is part of today's mental load, note that in your Health Journal and bring repeated high-stress days to your care team. Sympto can help you review the overlap, but these records cannot show that the condition caused the stress.",
-        basis: "Recent stress scores + Health Passport",
+        title: "Bring the relevant health context into your review",
+        message: context + ". If managing this condition or symptom is part of the mental load on higher-stress days, note that in your Health Journal and discuss recurring stress with your care team. This is context to review, not proof of what caused the score.",
+        basis: "Recent stress pattern + your health records",
         action: "Open Health Journal",
         href: "/health-journal",
       };
@@ -554,14 +567,24 @@ export default function TodayMentalHealthGoal({
       };
     }
 
+    if (historyWithDetails) {
+      return {
+        title: "Use your history when it feels relevant",
+        message: "Your Health Passport includes additional medical, family or social history. If a detail from that history feels relevant on a higher-stress day, you can add a private note in your Health Journal and review repeated patterns with your care team. Sympto does not infer a cause from stored history.",
+        basis: "Health Passport + self-reported check-ins",
+        action: "Open Health Journal",
+        href: "/health-journal",
+      };
+    }
+
     return {
       title: "Build a useful personal baseline",
-      message: "Your profile alone cannot explain how you feel. Keep recording stress, mood and sleep across several days. If you choose, add a brief note about what was happening on higher-stress days; Sympto can then look for repeated patterns in your own entries rather than guess from profile details.",
-      basis: "Profile + repeated self-reported check-ins",
+      message: "There is not enough repeated personal data to identify what tends to accompany your stress yet. Keep recording stress, mood and sleep across several days; if you choose, add a brief note about what was happening on higher-stress days. Recommendations can become more specific as your own patterns emerge.",
+      basis: "Repeated self-reported check-ins",
       action: "Update check-in",
       href: "#daily-health-check-in",
     };
-  }, [activeConditions, activeMedications, drinksDaily, noUsualExercise, recent.recentAverage, recent.trend, smokesDaily, target]);
+  }, [activeConditions, activeMedications, activeSymptoms, drinksDaily, healthPassport, medicalRecord, noUsualExercise, recent.recentAverage, recent.trend, smokesDaily, target]);
 
   return (
     <article
