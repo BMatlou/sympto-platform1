@@ -11,6 +11,7 @@ import PrescribedMedicationsCard from "@/components/today/prescribed-medications
 import TodayMedicationActions from "@/components/today/today-medication-actions";
 import TodaySmokingGoal from "@/components/today/today-smoking-goal";
 import TodaySleepGoal from "@/components/today/today-sleep-goal";
+import TodayMentalHealthGoal from "@/components/today/today-mental-health-goal";
 import TodayHydrationGoal from "@/components/today/today-hydration-goal";
 import TodayAlcoholGoal from "@/components/today/today-alcohol-goal";
 import TodayWeightGoal from "@/components/today/today-weight-goal";
@@ -490,6 +491,20 @@ export default function TodayPage() {
               }
               if (category === "SLEEP") {
                 return <TodaySleepGoal key={String(goal?.id ?? "sleep-" + index)} goal={goal} onUpdated={reload} />;
+              }
+              if (category === "MENTAL_HEALTH") {
+                return <TodayMentalHealthGoal
+                  key={String(goal?.id ?? "mental-health-" + index)}
+                  goal={goal}
+                  onUpdated={reload}
+                  patient={data.patient ?? null}
+                  profile={data.profile ?? null}
+                  healthPassport={data.healthPassport ?? null}
+                  medicalRecord={data.medicalRecord ?? null}
+                  conditions={Array.isArray(data.conditions) ? data.conditions : Array.isArray(data.healthSnapshot?.activeConditions) ? data.healthSnapshot.activeConditions : []}
+                  medications={Array.isArray(data.medications) ? data.medications : medications}
+                  symptoms={activeSymptoms}
+                />;
               }
               if (category === "HYDRATION") {
                 return <TodayHydrationGoal key={String(goal?.id ?? "hydration-" + index)} goal={goal} onUpdated={reload} />;
