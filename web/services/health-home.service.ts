@@ -37,7 +37,7 @@ export interface HealthGoalRecord {
 export interface HealthHomeResponse {
   generatedAt: string;
   profile?: { firstName?: string | null; lastName?: string | null; preferredName?: string | null; dateOfBirth?: string | null; gender?: string | null; profileImageUrl?: string | null } | null;
-  patient: { id: string; patientNumber?: string | null; name?: string; firstName?: string; lastName?: string; profileImageUrl?: string | null; heightCm?: number | null; weightKg?: number | null; bmi?: number | null; bmiCategory?: string | null };
+  patient: { id: string; patientNumber?: string | null; name?: string; firstName?: string; lastName?: string; profileImageUrl?: string | null; heightCm?: number | null; weightKg?: number | null; bmi?: number | null; bmiCategory?: string | null; dominantHand?: string | null; smokingStatus?: string | null; alcoholConsumption?: string | null; exerciseFrequency?: string | null; occupation?: string | null };
   healthPassport?: Record<string, unknown> | null;
   medicalRecord?: Record<string, any> | null;
   healthSnapshot: { activeAllergies?: Array<Record<string, any>>; activeConditions: Array<Record<string, any>>; allergies: Array<Record<string, any>>; immunizations: Array<Record<string, any>>; bloodType?: string | null; rhesusFactor?: string | null; baseline?: Record<string, unknown> | null; weightKg?: number | null; heightCm?: number | null; bmi?: number | null; bmiCategory?: string | null; latestMeasurements: Array<Record<string, any>>; normalizedVitals?: Array<Record<string, any>>; connectedDevices: Array<Record<string, any>> };
