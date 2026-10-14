@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { ArrowRight, Check, Clock3, FlaskConical, Plus, TrendingDown, TrendingUp } from "lucide-react";
+import { ArrowRight, Clock3, FlaskConical, Plus } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 import { healthGoalsService } from "@/services/health-goals.service";
