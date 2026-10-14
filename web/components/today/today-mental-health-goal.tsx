@@ -474,18 +474,94 @@ export default function TodayMentalHealthGoal({
     }).slice(0, 4);
   }, [symptoms]);
 
-  const personalDetails = [
-    { label: "Smoking", value: valueFromRecords([patient, profile, healthPassport], ["smokingStatus", "smoking"]) },
-    { label: "Alcohol", value: valueFromRecords([patient, profile, healthPassport], ["alcoholConsumption", "alcoholUse"]) },
-    { label: "Usual exercise", value: valueFromRecords([patient, profile, healthPassport], ["exerciseFrequency", "physicalActivityFrequency"]) },
-  ].filter((item) => item.value != null).map((item) => ({ label: item.label, value: displayLabel(item.value) }));
+  const smokingProfile = String(valueFromRecords([patient, profile, healthPassport], ["smokingStatus", "smoking"]) ?? "").trim().toUpperCase();
+  const alcoholProfile = String(valueFromRecords([patient, profile, healthPassport], ["alcoholConsumption", "alcoholUse"]) ?? "").trim().toUpperCase();
+  const exerciseProfile = String(valueFromRecords([patient, profile, healthPassport], ["exerciseFrequency", "physicalActivityFrequency"]) ?? "").trim().toUpperCase();
+  const smokesDaily = /DAILY|EVERY DAY|EVERYDAY/.test(smokingProfile);
+  const drinksDaily = /DAILY|EVERY DAY|EVERYDAY/.test(alcoholProfile);
+  const noUsualExercise = /^(NONE|NEVER|NO|NO REGULAR EXERCISE|SEDENTARY|NOT ACTIVE|INACTIVE)$/.test(exerciseProfile);
 
-  const hasAdditionalHistory = ["pastMedicalHistory", "surgicalHistory", "familyHistory", "socialHistory"].some((key) => {
-    const value = medicalRecord?.[key] ?? healthPassport?.[key];
-    if (Array.isArray(value)) return value.length > 0;
-    if (value && typeof value === "object") return Object.keys(value).length > 0;
-    return typeof value === "string" && value.trim().length > 0;
-  });
+  const profileRecommendation = useMemo(() => {
+    const stressNeedsAttention = (target != null && recent.recentAverage != null && recent.recentAverage > target) || recent.trend === "HIGHER";
+    const longTermCondition = activeConditions.find((item) => {
+      const name = conditionName(item).toLowerCase();
+      return item?.chronic === true || item?.isChronic === true || /diabet|hypertension|asthma|heart disease|cardiovascular|epilep|arthritis|kidney disease/.test(name);
+    });
+    const reportedMedicationEffect = activeMedications.find((item) => {
+      const effect = String(item?.sideEffects ?? item?.sideEffect ?? item?.adverseEffects ?? item?.reportedSideEffects ?? "").trim();
+      return Boolean(effect);
+    });
+
+    if (stressNeedsAttention && longTermCondition) {
+      const name = conditionName(longTermCondition);
+      return {
+        title: "Make room for care-related stress",
+        message: "Your Health Passport records " + name + ". If managing this condition is part of today's mental load, note that in your Health Journal and bring repeated high-stress days to your care team. Sympto can help you review the overlap, but these records cannot show that the condition caused the stress.",
+        basis: "Recent stress scores + Health Passport",
+        action: "Open Health Journal",
+        href: "/health-journal",
+      };
+    }
+
+    if (reportedMedicationEffect) {
+      return {
+        title: "Review the timing with your care team",
+        message: "A possible medicine effect is already recorded in your health information. If it overlaps with changes in mood or stress, note when it happens and discuss it with the prescriber or pharmacist. Do not stop or change a medicine based on this goal.",
+        basis: "Existing medication note + wellbeing check-ins",
+        action: "Review Health Journal",
+        href: "/health-journal",
+      };
+    }
+
+    if (smokesDaily && drinksDaily) {
+      return {
+        title: "Look for your own pattern, one day at a time",
+        message: "Your profile records daily smoking and alcohol use. That alone does not tell us whether either is related to your stress. For a week, log your score and—only if useful to you—note what was happening around a difficult moment, including timing. Sympto can compare repeated check-ins without assuming cause and effect.",
+        basis: "Saved lifestyle profile + stress check-ins",
+        action: "Update check-in",
+        href: "#daily-health-check-in",
+      };
+    }
+
+    if (noUsualExercise) {
+      return {
+        title: "Choose a small, realistic reset",
+        message: "Your profile does not list a usual exercise routine, so start with observation rather than a demanding target. If movement is suitable for you, try a comfortable five-minute walk or stretch on one day and record your stress before and after. Repeat on other days before deciding whether it helps you personally.",
+        basis: "Saved activity profile + stress check-ins",
+        action: "Update check-in",
+        href: "#daily-health-check-in",
+      };
+    }
+
+    if (smokesDaily || drinksDaily) {
+      const habit = smokesDaily ? "smoking" : "alcohol use";
+      return {
+        title: "Track timing before drawing conclusions",
+        message: "Your profile records daily " + habit + ". Profile information cannot tell us whether it affects your stress. If you want to explore this, note timing alongside your daily score for several days; discuss any concerns or possible changes with a healthcare professional.",
+        basis: "Saved lifestyle profile + stress check-ins",
+        action: "Update check-in",
+        href: "#daily-health-check-in",
+      };
+    }
+
+    if (longTermCondition) {
+      return {
+        title: "Include your wider health in the picture",
+        message: "Your Health Passport records " + conditionName(longTermCondition) + ". If day-to-day health management is on your mind, add a note to your Health Journal when you check in. That gives you and your care team more context without assuming your condition explains a stress score.",
+        basis: "Health Passport + daily check-ins",
+        action: "Open Health Journal",
+        href: "/health-journal",
+      };
+    }
+
+    return {
+      title: "Build a useful personal baseline",
+      message: "Your profile alone cannot explain how you feel. Keep recording stress, mood and sleep across several days. If you choose, add a brief note about what was happening on higher-stress days; Sympto can then look for repeated patterns in your own entries rather than guess from profile details.",
+      basis: "Profile + repeated self-reported check-ins",
+      action: "Update check-in",
+      href: "#daily-health-check-in",
+    };
+  }, [activeConditions, activeMedications, drinksDaily, noUsualExercise, recent.recentAverage, recent.trend, smokesDaily, target]);
 
   return (
     <article
@@ -671,57 +747,20 @@ export default function TodayMentalHealthGoal({
           )}
         </section>
 
-        <details className="mt-3 rounded-[19px] border border-[#e2ecef] bg-white">
-          <summary className="flex cursor-pointer list-none items-center justify-between gap-3 px-3.5 py-3">
-            <span>
-              <span className="block text-[9px] font-black text-[#0b2d54]">Personal health context</span>
-              <span className="mt-0.5 block text-[8px] font-medium text-[#81929f]">
-                {activeConditions.length + " conditions · " + activeMedications.length + " medicines" + (activeSymptoms.length ? " · " + activeSymptoms.length + " active symptoms" : "")}
-              </span>
-            </span>
-            <span className="text-[9px] font-black text-[#0b7b80]">View</span>
-          </summary>
-          <div className="space-y-3 border-t border-[#edf2f4] px-3.5 py-3">
-            {personalDetails.length > 0 && (
-              <div>
-                <p className="text-[8px] font-black uppercase tracking-[.13em] text-[#82939f]">Profile</p>
-                <div className="mt-1.5 flex flex-wrap gap-1.5">
-                  {personalDetails.map((item) => <span key={item.label} className="rounded-full bg-[#f4f8f9] px-2.5 py-1.5 text-[8px] font-semibold text-[#526779]">{item.label}: {item.value}</span>)}
-                </div>
-              </div>
-            )}
-            <div>
-              <p className="text-[8px] font-black uppercase tracking-[.13em] text-[#82939f]">Active conditions</p>
-              {activeConditions.length ? (
-                <div className="mt-1.5 flex flex-wrap gap-1.5">
-                  {activeConditions.map((item, index) => <span key={String(item.id ?? conditionName(item) ?? index)} className="rounded-full bg-[#f4f8f9] px-2.5 py-1.5 text-[8px] font-semibold text-[#526779]">{conditionName(item)}</span>)}
-                </div>
-              ) : <p className="mt-1 text-[9px] text-[#81929f]">No active conditions were supplied by your current health records.</p>}
+        <section className="mt-3 rounded-[19px] border border-[#dcebec] bg-[#f7fbfc] p-3.5">
+          <div className="flex items-start justify-between gap-3">
+            <div className="min-w-0">
+              <p className="text-[8px] font-black uppercase tracking-[.14em] text-[#0b7b80]">Personalised guidance</p>
+              <h4 className="mt-1 text-[12px] font-black text-[#0b2d54]">{profileRecommendation.title}</h4>
             </div>
-            <div>
-              <p className="text-[8px] font-black uppercase tracking-[.13em] text-[#82939f]">Current medicines</p>
-              {activeMedications.length ? (
-                <div className="mt-1.5 flex flex-wrap gap-1.5">
-                  {activeMedications.map((item, index) => <span key={String(item.id ?? medicationName(item) ?? index)} className="rounded-full bg-[#f4f8f9] px-2.5 py-1.5 text-[8px] font-semibold text-[#526779]">{medicationName(item)}</span>)}
-                </div>
-              ) : <p className="mt-1 text-[9px] text-[#81929f]">No current medicines were supplied by your current health records.</p>}
-            </div>
-            {activeSymptoms.length > 0 && (
-              <div>
-                <p className="text-[8px] font-black uppercase tracking-[.13em] text-[#82939f]">Active symptoms</p>
-                <div className="mt-1.5 flex flex-wrap gap-1.5">
-                  {activeSymptoms.map((item, index) => <span key={String(item.id ?? index)} className="rounded-full bg-[#f4f8f9] px-2.5 py-1.5 text-[8px] font-semibold text-[#526779]">{String(item.title ?? item.symptomName ?? item.name)}</span>)}
-                </div>
-              </div>
-            )}
-            {hasAdditionalHistory && <p className="text-[9px] leading-4 text-[#74859a]">Additional medical, family or social history is on file in your Health Passport. It is not interpreted here as a cause of stress.</p>}
-            <div className="flex flex-wrap gap-2 pt-1">
-              <Link href="/health-passport" className="inline-flex min-h-9 items-center gap-1 rounded-xl border border-[#d6e4e7] bg-white px-3 py-2 text-[9px] font-black text-[#0b2d54]">Review Health Passport <ArrowRight className="h-3 w-3" /></Link>
-              <Link href="/profile" className="inline-flex min-h-9 items-center gap-1 rounded-xl border border-[#d6e4e7] bg-white px-3 py-2 text-[9px] font-black text-[#0b2d54]">Review profile <ArrowRight className="h-3 w-3" /></Link>
-            </div>
-            <p className="text-[9px] leading-4 text-[#74859a]">Your saved information helps you and your care team review context. This goal does not diagnose a mental-health condition or infer that medicines or conditions caused a stress score.</p>
+            <span className="shrink-0 rounded-full bg-white px-2.5 py-1.5 text-[8px] font-bold text-[#0b6f73] ring-1 ring-[#dce8eb]">Based on your records</span>
           </div>
-        </details>
+          <p className="mt-2 text-[10px] leading-5 text-[#526779]">{profileRecommendation.message}</p>
+          <p className="mt-2 text-[8px] font-semibold text-[#8a99a6]">{profileRecommendation.basis}</p>
+          <Link href={profileRecommendation.href} className="mt-3 inline-flex min-h-9 items-center gap-1 rounded-xl bg-[#0b2d54] px-3 py-2 text-[9px] font-black text-white">
+            {profileRecommendation.action} <ArrowRight className="h-3 w-3 text-[#24c1c4]" />
+          </Link>
+        </section>
 
         <div className="mt-3 flex items-center justify-between gap-3 rounded-[18px] border border-[#e2ecef] bg-[#fbfdfd] px-3 py-2.5">
           <p className="min-w-0 text-[9px] font-semibold leading-4 text-[#74859a]">
