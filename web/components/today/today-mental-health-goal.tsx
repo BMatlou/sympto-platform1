@@ -331,6 +331,101 @@ export default function TodayMentalHealthGoal({
   }, [entries, target]);
 
   const latestWithMood = [...entries].reverse().find((entry) => entry.mood && dayOrdinal(todayKey) - dayOrdinal(entry.day) <= 6) ?? null;
+  const sleepStressPattern = useMemo(() => {
+    const cutoff = dayOrdinal(todayKey) - 29;
+    const paired = entries.filter((entry) =>
+      entry.stress != null &&
+      entry.sleepHours != null &&
+      entry.sleepHours > 0 &&
+      dayOrdinal(entry.day) >= cutoff &&
+      dayOrdinal(entry.day) <= dayOrdinal(todayKey),
+    );
+    const shorterSleep = paired.filter((entry) => Number(entry.sleepHours) < 6);
+    const longerSleep = paired.filter((entry) => Number(entry.sleepHours) >= 6);
+    if (shorterSleep.length < 3 || longerSleep.length < 3) return null;
+    const shorterAverage = mean(shorterSleep.map((entry) => Number(entry.stress)));
+    const longerAverage = mean(longerSleep.map((entry) => Number(entry.stress)));
+    if (shorterAverage == null || longerAverage == null || Math.abs(shorterAverage - longerAverage) < 1) return null;
+    return {
+      shorterAverage,
+      longerAverage,
+      shorterDays: shorterSleep.length,
+      longerDays: longerSleep.length,
+      direction: shorterAverage > longerAverage ? "HIGHER" as const : "LOWER" as const,
+    };
+  }, [entries, todayKey]);
+
+  const moodStressPattern = useMemo(() => {
+    const cutoff = dayOrdinal(todayKey) - 29;
+    const paired = entries.filter((entry) =>
+      entry.stress != null &&
+      entry.mood &&
+      dayOrdinal(entry.day) >= cutoff &&
+      dayOrdinal(entry.day) <= dayOrdinal(todayKey),
+    );
+    const moodScore = (mood: string | null) => ({
+      VERY_BAD: 1,
+      BAD: 2,
+      NEUTRAL: 3,
+      GOOD: 4,
+      VERY_GOOD: 5,
+    } as Record<string, number>)[String(mood ?? "").toUpperCase()] ?? null;
+    const lowerMood = paired.filter((entry) => (moodScore(entry.mood) ?? 3) <= 2);
+    const neutralOrPositiveMood = paired.filter((entry) => (moodScore(entry.mood) ?? 0) >= 3);
+    if (lowerMood.length < 3 || neutralOrPositiveMood.length < 3) return null;
+    const lowerMoodAverage = mean(lowerMood.map((entry) => Number(entry.stress)));
+    const otherMoodAverage = mean(neutralOrPositiveMood.map((entry) => Number(entry.stress)));
+    if (lowerMoodAverage == null || otherMoodAverage == null || Math.abs(lowerMoodAverage - otherMoodAverage) < 1) return null;
+    return {
+      lowerMoodAverage,
+      otherMoodAverage,
+      lowerMoodDays: lowerMood.length,
+      otherMoodDays: neutralOrPositiveMood.length,
+      direction: lowerMoodAverage > otherMoodAverage ? "HIGHER" as const : "LOWER" as const,
+    };
+  }, [entries, todayKey]);
+
+  const personalRecommendation = useMemo(() => {
+    const todayIsMissing = !todayEntry?.stress && todayEntry?.stress !== 0;
+    if (recent.recentSeven.length < 3) {
+      return {
+        title: recent.recentSeven.length === 0 ? "Start building your personal baseline" : "Add a few more check-ins",
+        message: "There are " + recent.recentSeven.length + " recorded stress " + (recent.recentSeven.length === 1 ? "day" : "days") + " in the last week. Record your stress score in the Daily Health Check-in on a few more days so Sympto can compare your own patterns rather than offer a generic recommendation.",
+        action: "Update check-in",
+        href: "#daily-health-check-in",
+        evidence: recent.recentSeven.length + " of 7 days",
+      };
+    }
+    if (recent.recentAverage != null && target != null && recent.recentAverage > target) {
+      const aboveTargetDays = recent.recentSeven.filter((entry) => Number(entry.stress) > target).length;
+      return {
+        title: "Your recent scores are above your saved target",
+        message: "Stress averaged " + recent.recentAverage.toFixed(1) + "/10 across " + recent.recentSeven.length + " recorded days, and " + aboveTargetDays + " recorded " + (aboveTargetDays === 1 ? "day was" : "days were") + " above your target of " + formatNumber(target, 0) + ". Consider taking a short pause for a grounding or breathing exercise today. If higher stress persists or starts affecting daily life, consider speaking with a healthcare professional.",
+        action: todayIsMissing ? "Record today's check-in" : "Review check-in",
+        href: "#daily-health-check-in",
+        evidence: aboveTargetDays + " of " + recent.recentSeven.length + " days above target",
+      };
+    }
+    if (recent.trend === "HIGHER") {
+      return {
+        title: "Your recorded stress average has risen",
+        message: recent.trendText + " It may help to reflect on what has changed in your routine or workload, and to record anything you choose to share in your health journal. This pattern alone cannot identify a cause.",
+        action: "Review check-in",
+        href: "#daily-health-check-in",
+        evidence: recent.recentSeven.length + " recent days compared",
+      };
+    }
+    return {
+      title: recent.trend === "LOWER" ? "Your recent stress scores are trending lower" : "Keep building your personal trend",
+      message: recent.trend === "LOWER"
+        ? "Your recorded average is lower than the previous week. Continue the routines that feel helpful to you and keep checking in; this is a self-reported trend, not a clinical assessment."
+        : "Your recent average is " + (recent.recentAverage == null ? "not available" : recent.recentAverage.toFixed(1) + "/10") + ". Keep logging your own check-ins to see whether that pattern holds over time.",
+      action: "Update check-in",
+      href: "#daily-health-check-in",
+      evidence: recent.recentSeven.length + " recorded days",
+    };
+  }, [todayEntry, recent, target]);
+
   const recentCheckIns = entries.filter((entry) => {
     const offset = dayOrdinal(todayKey) - dayOrdinal(entry.day);
     return offset >= 0 && offset <= 6;
@@ -478,6 +573,41 @@ export default function TodayMentalHealthGoal({
             </div>
           </div>
           <p className="mt-2 text-[9px] leading-4 text-[#74859a]">{recent.trendText}</p>
+        </section>
+
+        <section className="mt-3 rounded-[19px] border border-[#dcebec] bg-[#f7fbfc] p-3.5">
+          <div className="flex items-start justify-between gap-3">
+            <div className="min-w-0">
+              <p className="text-[8px] font-black uppercase tracking-[.14em] text-[#0b7b80]">Your next step</p>
+              <h4 className="mt-1 text-[12px] font-black text-[#0b2d54]">{personalRecommendation.title}</h4>
+            </div>
+            <span className="shrink-0 rounded-full bg-white px-2.5 py-1.5 text-[8px] font-bold text-[#0b6f73] ring-1 ring-[#dce8eb]">{personalRecommendation.evidence}</span>
+          </div>
+          <p className="mt-2 text-[10px] leading-5 text-[#526779]">{personalRecommendation.message}</p>
+          {sleepStressPattern && (
+            <div className="mt-3 rounded-[14px] border border-[#e3ecef] bg-white p-3">
+              <p className="text-[8px] font-black uppercase tracking-[.12em] text-[#0b7b80]">A pattern in your own check-ins</p>
+              <p className="mt-1 text-[10px] leading-5 text-[#526779]">
+                Across the last 30 days, stress averaged {sleepStressPattern.shorterAverage.toFixed(1)}/10 on {sleepStressPattern.shorterDays} recorded days with under 6 hours of sleep and {sleepStressPattern.longerAverage.toFixed(1)}/10 on {sleepStressPattern.longerDays} days with 6 or more hours.
+                {sleepStressPattern.direction === "HIGHER"
+                  ? " Higher stress scores appeared more often on the shorter-sleep days in this sample."
+                  : " Higher stress scores did not appear more often on the shorter-sleep days in this sample."}
+                {" "}This is an observed overlap in your records, not proof that sleep caused the stress scores.
+              </p>
+            </div>
+          )}
+          {moodStressPattern && (
+            <div className="mt-3 rounded-[14px] border border-[#e3ecef] bg-white p-3">
+              <p className="text-[8px] font-black uppercase tracking-[.12em] text-[#0b7b80]">Mood and stress recorded together</p>
+              <p className="mt-1 text-[10px] leading-5 text-[#526779]">
+                Stress averaged {moodStressPattern.lowerMoodAverage.toFixed(1)}/10 on {moodStressPattern.lowerMoodDays} check-in days when you selected a low mood, compared with {moodStressPattern.otherMoodAverage.toFixed(1)}/10 on {moodStressPattern.otherMoodDays} days when you selected okay or better.
+                {" "}This describes what you recorded and does not establish a cause or diagnosis.
+              </p>
+            </div>
+          )}
+          <Link href={personalRecommendation.href} className="mt-3 inline-flex min-h-9 items-center gap-1 rounded-xl bg-[#0b2d54] px-3 py-2 text-[9px] font-black text-white">
+            {personalRecommendation.action} <ArrowRight className="h-3 w-3 text-[#24c1c4]" />
+          </Link>
         </section>
 
         <section className="mt-3 rounded-[19px] border border-[#e2ecef] bg-white p-3.5">
