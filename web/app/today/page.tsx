@@ -18,6 +18,7 @@ import TodayExerciseGoal from "@/components/today/today-exercise-goal";
 import TodaySupportedGoalCard from "@/components/today/today-supported-goal-card";
 import TodayNutritionGoal from "@/components/today/today-nutrition-goal";
 import TodayBloodGlucoseGoal from "@/components/today/today-blood-glucose-goal";
+import TodayCholesterolGoal from "@/components/today/today-cholesterol-goal";
 import { healthJournalService } from "@/services/health-journal.service";
 
 const ACTIVE_GOAL_STATUSES = new Set(["IN_PROGRESS", "ACTIVE", "ON_TRACK", "IMPROVING", "STAGNANT", "DECLINING"]);
@@ -495,6 +496,9 @@ export default function TodayPage() {
               }
               if (category === "BLOOD_GLUCOSE") {
                 return <TodayBloodGlucoseGoal key={String(goal?.id ?? "blood-glucose-" + index)} goal={goal} patientId={String(data.patient?.id ?? "")} currentWeightKg={data.patient?.weightKg ?? data.healthSnapshot?.baseline?.weightKg ?? null} currentHeightCm={data.patient?.heightCm ?? data.healthSnapshot?.baseline?.heightCm ?? null} measurements={healthVitals} onUpdated={reload} conditions={Array.isArray(data.conditions) ? data.conditions : Array.isArray(data.healthSnapshot?.activeConditions) ? data.healthSnapshot.activeConditions : []} diagnoses={Array.isArray(data.clinicalDiagnoses) ? data.clinicalDiagnoses : []} medications={Array.isArray(data.medications) ? data.medications : medications} activeGoals={activeGoalsArray} labOrders={Array.isArray(data.recentResults?.laboratory) ? data.recentResults.laboratory : []} carePlans={Array.isArray(data.carePlans) ? data.carePlans : []} baseline={data.healthSnapshot?.baseline ?? null} />;
+              }
+              if (category === "CHOLESTEROL") {
+                return <TodayCholesterolGoal key={String(goal?.id ?? "cholesterol-" + index)} goal={goal} labOrders={Array.isArray(data.recentResults?.laboratory) ? data.recentResults.laboratory : []} activeGoals={activeGoalsArray} onUpdated={reload} />;
               }
               return (
                 <TodaySupportedGoalCard
