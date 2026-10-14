@@ -526,6 +526,17 @@ export default function TodayMentalHealthGoal({
       };
     }
 
+    if (smokesDaily && drinksDaily && noUsualExercise) {
+      const condition = longTermCondition ? conditionName(longTermCondition) : "";
+      return {
+        title: "Explore one small change, not a full reset",
+        message: "Your profile records daily smoking and alcohol use, but no usual exercise routine. Those details do not explain your stress on their own. For a week, log your score and one short note about what was happening before higher-stress moments. If movement is suitable for you, try a comfortable five-minute walk or stretch on one day and record how you feel before and after. " + (condition ? "If managing " + condition + " is part of today's mental load, note that too. " : "") + "Sympto will look for repeated patterns, not assume cause and effect.",
+        basis: "Lifestyle profile + Health Passport + stress check-ins",
+        action: "Update check-in",
+        href: "#daily-health-check-in",
+      };
+    }
+
     if (smokesDaily && drinksDaily) {
       return {
         title: "Look for your own pattern, one day at a time",
