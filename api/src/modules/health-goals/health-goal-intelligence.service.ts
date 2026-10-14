@@ -92,7 +92,8 @@ const GOAL_SUPPORT_RULES: Record<string, Array<{ sourceCategory: string; rationa
     { sourceCategory: 'NUTRITION', rationale: 'Nutrition tracking provides contextual information alongside cholesterol monitoring.' },
   ],
   MENTAL_HEALTH: [
-    { sourceCategory: 'SLEEP', rationale: 'Sleep provides useful context alongside a mental-health tracking goal.' },
+    { sourceCategory: 'SLEEP', rationale: 'Sleep provides useful context alongside a mental-health tracking goal; the relationship does not imply that sleep caused a particular stress or mood score.' },
+    { sourceCategory: 'EXERCISE', rationale: 'Recorded movement provides a useful behaviour signal alongside stress and mood check-ins, without assuming cause and effect.' },
   ],
   MEDICATION: [
     { sourceCategory: 'SLEEP', rationale: 'Sleep provides contextual information that can be monitored alongside medication adherence.' },
@@ -118,6 +119,8 @@ const GOAL_RELATED_PAIRS = new Set([
   'BLOOD_GLUCOSE|WEIGHT',
   'SLEEP|EXERCISE',
   'HYDRATION|EXERCISE',
+  'ALCOHOL|MENTAL_HEALTH',
+  'MENTAL_HEALTH|SMOKING',
 ]);
 
 const relationshipKey = (left: string, right: string) =>
@@ -259,13 +262,18 @@ export class HealthGoalIntelligenceService {
           continue;
         }
 
-        if (GOAL_RELATED_PAIRS.has(relationshipKey(sourceCategory, targetCategory))) {
+        const relatedPairKey = relationshipKey(sourceCategory, targetCategory);
+        if (GOAL_RELATED_PAIRS.has(relatedPairKey)) {
           const relationshipType = 'RELATED_TO' as const;
+          const rationaleByPair: Record<string, string> = {
+            'ALCOHOL|MENTAL_HEALTH': 'Alcohol tracking can be reviewed alongside the user’s recorded stress and mood over time; this is context, not proof of cause.',
+            'MENTAL_HEALTH|SMOKING': 'Smoking tracking may be useful context alongside wellbeing check-ins, without assuming that smoking caused a particular score.',
+          };
           desired.set(sourceGoal.id + '|' + targetGoal.id + '|' + relationshipType, {
             sourceGoalId: sourceGoal.id,
             targetGoalId: targetGoal.id,
             relationshipType,
-            rationale: 'This goal provides related context that can be monitored alongside the other goal without assuming causation.',
+            rationale: rationaleByPair[relatedPairKey] ?? 'This goal provides related context that can be monitored alongside the other goal without assuming causation.',
           });
         }
       }
