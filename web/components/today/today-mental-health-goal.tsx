@@ -160,7 +160,6 @@ function valueFromRecords(records: any[], keys: string[]) {
 
 export default function TodayMentalHealthGoal({
   goal,
-  activeGoals = [],
   onUpdated,
   patient,
   profile,
@@ -322,7 +321,9 @@ export default function TodayMentalHealthGoal({
         trend = "STEADY";
         trendTitle = "Average stress is similar";
       }
-      trendText = "Your recorded 7-day average is " + (delta < 0 ? "" : delta > 0 ? "" : "about ") + Math.abs(delta).toFixed(1) + " point" + (Math.abs(delta) === 1 ? "" : "s") + (delta < 0 ? " lower" : delta > 0 ? " higher" : " from") + (delta === 0 ? " the previous week." : " than the previous week.") + " This describes your check-ins, not a diagnosis or proof of cause.";
+      trendText = delta === 0
+        ? "Your recorded 7-day average is about the same as the previous week. This describes your check-ins, not a diagnosis or proof of cause."
+        : "Your recorded 7-day average is " + Math.abs(delta).toFixed(1) + " point" + (Math.abs(delta) === 1 ? "" : "s") + (delta < 0 ? " lower" : " higher") + " than the previous week. This describes your check-ins, not a diagnosis or proof of cause.";
     } else {
       trendText = "You have " + recentSeven.length + " recorded " + (recentSeven.length === 1 ? "day" : "days") + " in the latest week and " + previousSeven.length + " in the week before. Keep checking in to build a reliable comparison.";
     }
