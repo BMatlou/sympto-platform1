@@ -520,9 +520,14 @@ export default function TodayMentalHealthGoal({
       const condition = longTermCondition ? conditionName(longTermCondition) : "";
       const symptom = ongoingSymptom ? String(ongoingSymptom?.title ?? ongoingSymptom?.symptomName ?? ongoingSymptom?.name ?? "").trim() : "";
       const context = [condition ? "Your Health Passport records " + condition : "", symptom ? "your health records still mark " + symptom + " as active" : ""].filter(Boolean).join(", and ");
+      const relevantFocus = condition && symptom
+        ? "If managing this condition or dealing with this symptom is part of the mental load on higher-stress days"
+        : condition
+          ? "If managing this condition is part of the mental load on higher-stress days"
+          : "If this symptom is affecting your routine on higher-stress days";
       return {
         title: "Bring the relevant health context into your review",
-        message: context + ". If managing this condition or symptom is part of the mental load on higher-stress days, note that in your Health Journal and discuss recurring stress with your care team. This is context to review, not proof of what caused the score.",
+        message: context + ". " + relevantFocus + ", note the overlap in your Health Journal and discuss recurring stress with your care team. This is context to review, not proof of what caused the score.",
         basis: "Recent stress pattern + your health records",
         action: "Open Health Journal",
         href: "/health-journal",
