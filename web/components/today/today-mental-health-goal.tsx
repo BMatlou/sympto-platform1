@@ -177,6 +177,17 @@ export default function TodayMentalHealthGoal({
   const targetNumber = numberOrNull(targetRaw);
   const target = targetNumber != null && targetNumber >= 1 && targetNumber <= 10 ? targetNumber : null;
 
+  const connectedSleepGoal = useMemo(() => {
+    const relations = Array.isArray(goal?.connectedGoals) ? goal.connectedGoals : [];
+    return relations
+      .map((relation: any) => relation?.goal)
+      .find((related: any) => String(related?.category ?? "").toUpperCase() === "SLEEP") ?? null;
+  }, [goal?.connectedGoals]);
+  const connectedSleepTarget = numberOrNull(connectedSleepGoal?.targetValue ?? connectedSleepGoal?.metricConfig?.frequencyTarget);
+  const sleepComparisonTarget = connectedSleepTarget != null && connectedSleepTarget > 0 && connectedSleepTarget <= 24
+    ? connectedSleepTarget
+    : 6;
+
   const journey = useMemo(() => {
     const todayOrdinal = dayOrdinal(dayKey(new Date()));
     const startOrdinal = dayOrdinal(dayKey(goal?.createdAt));
@@ -340,8 +351,8 @@ export default function TodayMentalHealthGoal({
       dayOrdinal(entry.day) >= cutoff &&
       dayOrdinal(entry.day) <= dayOrdinal(todayKey),
     );
-    const shorterSleep = paired.filter((entry) => Number(entry.sleepHours) < 6);
-    const longerSleep = paired.filter((entry) => Number(entry.sleepHours) >= 6);
+    const shorterSleep = paired.filter((entry) => Number(entry.sleepHours) < sleepComparisonTarget);
+    const longerSleep = paired.filter((entry) => Number(entry.sleepHours) >= sleepComparisonTarget);
     if (shorterSleep.length < 3 || longerSleep.length < 3) return null;
     const shorterAverage = mean(shorterSleep.map((entry) => Number(entry.stress)));
     const longerAverage = mean(longerSleep.map((entry) => Number(entry.stress)));
@@ -351,9 +362,11 @@ export default function TodayMentalHealthGoal({
       longerAverage,
       shorterDays: shorterSleep.length,
       longerDays: longerSleep.length,
+      sleepTarget: sleepComparisonTarget,
+      usesSavedTarget: connectedSleepTarget != null && connectedSleepTarget > 0 && connectedSleepTarget <= 24,
       direction: shorterAverage > longerAverage ? "HIGHER" as const : "LOWER" as const,
     };
-  }, [entries, todayKey]);
+  }, [connectedSleepTarget, entries, sleepComparisonTarget, todayKey]);
 
   const moodStressPattern = useMemo(() => {
     const cutoff = dayOrdinal(todayKey) - 29;
@@ -698,7 +711,7 @@ export default function TodayMentalHealthGoal({
             <div className="mt-3 rounded-[14px] border border-[#e3ecef] bg-white p-3">
               <p className="text-[8px] font-black uppercase tracking-[.12em] text-[#0b7b80]">A pattern in your own check-ins</p>
               <p className="mt-1 text-[10px] leading-5 text-[#526779]">
-                Across the last 30 days, stress averaged {sleepStressPattern.shorterAverage.toFixed(1)}/10 on {sleepStressPattern.shorterDays} recorded days with under 6 hours of sleep and {sleepStressPattern.longerAverage.toFixed(1)}/10 on {sleepStressPattern.longerDays} days with 6 or more hours.
+                Across the last 30 days, stress averaged {sleepStressPattern.shorterAverage.toFixed(1)}/10 on {sleepStressPattern.shorterDays} recorded days with less than {formatNumber(sleepStressPattern.sleepTarget)} hours of sleep and {sleepStressPattern.longerAverage.toFixed(1)}/10 on {sleepStressPattern.longerDays} days with at least {formatNumber(sleepStressPattern.sleepTarget)} hours.
                 {sleepStressPattern.direction === "HIGHER"
                   ? " Higher stress scores appeared more often on the shorter-sleep days in this sample."
                   : " Higher stress scores did not appear more often on the shorter-sleep days in this sample."}
