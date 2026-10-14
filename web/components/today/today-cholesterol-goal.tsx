@@ -292,6 +292,7 @@ export default function TodayCholesterolGoal({ goal, labOrders = [], activeGoals
           note: note.trim() || undefined,
         },
       });
+      let journalSaved = true;
       try {
         await healthJournalService.create({
           title: "Goal measurement · Cholesterol",
@@ -304,11 +305,15 @@ export default function TodayCholesterolGoal({ goal, labOrders = [], activeGoals
           ].filter(Boolean).join(" "),
         });
       } catch {
+        journalSaved = false;
+      }
+      if (journalSaved) {
+        toast.success("Cholesterol result recorded.");
+      } else {
         toast.warning("Cholesterol result saved", {
           description: "The result was saved, but the Health Journal entry could not be added.",
         });
       }
-      toast.success("Cholesterol result recorded.");
       setValue("");
       setNote("");
       setOpen(false);
