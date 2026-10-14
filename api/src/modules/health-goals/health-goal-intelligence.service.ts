@@ -120,6 +120,8 @@ const GOAL_RELATED_PAIRS = new Set([
   'SLEEP|EXERCISE',
   'HYDRATION|EXERCISE',
   'ALCOHOL|MENTAL_HEALTH',
+  'HYDRATION|MENTAL_HEALTH',
+  'MENTAL_HEALTH|NUTRITION',
   'MENTAL_HEALTH|SMOKING',
 ]);
 
@@ -267,6 +269,8 @@ export class HealthGoalIntelligenceService {
           const relationshipType = 'RELATED_TO' as const;
           const rationaleByPair: Record<string, string> = {
             'ALCOHOL|MENTAL_HEALTH': 'Alcohol tracking can be reviewed alongside the user’s recorded stress and mood over time; this is context, not proof of cause.',
+            'HYDRATION|MENTAL_HEALTH': 'Hydration tracking can be reviewed alongside wellbeing check-ins, without assuming that hydration caused a particular score.',
+            'MENTAL_HEALTH|NUTRITION': 'Nutrition records can provide context alongside wellbeing check-ins, without assuming that food caused a particular score.',
             'MENTAL_HEALTH|SMOKING': 'Smoking tracking may be useful context alongside wellbeing check-ins, without assuming that smoking caused a particular score.',
           };
           desired.set(sourceGoal.id + '|' + targetGoal.id + '|' + relationshipType, {
