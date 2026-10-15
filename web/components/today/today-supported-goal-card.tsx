@@ -789,7 +789,7 @@ export default function TodaySupportedGoalCard({ goal, activeGoals = [], healthC
   );
   const heartRateLatestCurrent = contextHeartRateIsNewer
     ? heartRateContextReading!.value
-    : heartRateStats.latestCurrent ?? heartRateContextReading?.value ?? current;
+    : heartRateStats.latestCurrent ?? heartRateContextReading?.value ?? null;
   const heartRateLatestAt = contextHeartRateIsNewer
     ? heartRateContextReading?.at ?? null
     : heartRateStats.latestAt ?? heartRateContextReading?.at ?? null;
