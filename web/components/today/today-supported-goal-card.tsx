@@ -1265,8 +1265,7 @@ export default function TodaySupportedGoalCard({ goal, activeGoals = [], healthC
         <div className="mt-3 rounded-xl bg-[#e9f9fa] px-3 py-2"><p className="text-[9px] font-bold leading-4 text-[#0b6f73]">{nextStep}</p></div>
           </>
         )}
-{detailsExpanded && (
-        {category === "BLOOD_PRESSURE" ? (
+{detailsExpanded && (category === "BLOOD_PRESSURE" ? (
           <div className="mt-3 rounded-[17px] border border-[#dcebec] bg-[#f7fbfc] p-3.5">
             <div className="flex items-center justify-between gap-2">
               <p className="text-[8px] font-black uppercase tracking-[.14em] text-[#82939f]">Goal connections</p>
@@ -1313,8 +1312,7 @@ export default function TodaySupportedGoalCard({ goal, activeGoals = [], healthC
               })}
             </div>
           </div>
-        ) : null}
-        )}
+        ) : null)}
 
         {category === "OTHER" && (
           <section className="mt-3 rounded-[20px] border border-[#dce9ec] bg-[#f7fbfc] p-4">
