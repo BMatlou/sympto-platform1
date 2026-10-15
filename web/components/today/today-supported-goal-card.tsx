@@ -52,7 +52,10 @@ const GOAL_META: Record<string, GoalMeta> = {
 };
 
 function normaliseCategory(goal: any) {
-  return String(goal?.category ?? goal?.metricConfig?.metricType ?? "OTHER").toUpperCase();
+  return String(goal?.category ?? goal?.metricType ?? goal?.metricConfig?.metricType ?? "OTHER")
+    .trim()
+    .toUpperCase()
+    .replace(/[\s-]+/g, "_");
 }
 
 function goalCategoryLabel(category: string) {
@@ -140,6 +143,80 @@ function currentValue(goal: any) {
 
 function targetValue(goal: any) {
   return numberOrNull(goal?.targetValue ?? goal?.metricConfig?.frequencyTarget);
+}
+
+type ContextMetricReading = { value: number; at: string | null };
+
+function latestContextMetricReading(
+  healthContext: SupportedGoalCardProps["healthContext"],
+  category: "BLOOD_PRESSURE" | "HEART_RATE",
+): ContextMetricReading | null {
+  const measurements = [
+    ...(Array.isArray(healthContext?.measurements) ? healthContext.measurements : []),
+    ...(Array.isArray(healthContext?.journal?.signals) ? healthContext.journal.signals : []),
+  ];
+  const eligibleRestingSources = new Set([
+    "manual-vitals",
+    "manual-entry",
+    "manual-vital",
+    "patient-baseline",
+    "clinical-vital",
+    "wearable-resting",
+    "health-journal",
+  ]);
+
+  const candidates = measurements.flatMap((item: any) => {
+    const type = String(item?.type ?? item?.metricType ?? item?.measurementType ?? "").trim().toUpperCase().replace(/[\s-]+/g, "_");
+    const name = String(item?.name ?? item?.label ?? item?.title ?? "").trim();
+    const searchable = type + " " + name.toUpperCase();
+    const isBloodPressure = category === "BLOOD_PRESSURE" && (
+      /BLOOD_PRESSURE|SYSTOLIC_PRESSURE|\bBP\b/.test(searchable) ||
+      /blood pressure|systolic/i.test(name) ||
+      item?.systolicPressure != null ||
+      item?.bloodPressureSystolic != null
+    );
+    const isHeartRate = category === "HEART_RATE" && (
+      /HEART_RATE|HEARTRATE|RESTING_HEART_RATE|PULSE_RATE/.test(searchable) ||
+      /heart rate|resting pulse/i.test(name) ||
+      item?.restingHeartRate != null ||
+      item?.heartRate != null
+    );
+    if (!isBloodPressure && !isHeartRate) return [];
+
+    const source = String(item?.source ?? item?.origin ?? "").trim().toLowerCase().replace(/_/g, "-");
+    const explicitlyResting = item?.isResting === true ||
+      item?.metadata?.resting === true ||
+      /resting/i.test(type + " " + name);
+    if (isHeartRate && !explicitlyResting && !eligibleRestingSources.has(source)) return [];
+
+    const values = category === "BLOOD_PRESSURE"
+      ? [item?.systolicPressure, item?.bloodPressureSystolic, item?.systolic, item?.loggedValue, item?.value]
+      : [item?.restingHeartRate, item?.heartRate, item?.bpm, item?.loggedValue, item?.value];
+    let value: number | null = null;
+    for (const candidate of values) {
+      value = numberOrNull(candidate);
+      if (value == null && category === "BLOOD_PRESSURE") {
+        const match = String(candidate ?? "").match(/^\s*(\d{2,3})(?:\s*\/\s*\d{2,3})?/);
+        if (match) value = numberOrNull(match[1]);
+      }
+      if (value == null && category === "HEART_RATE") {
+        const match = String(candidate ?? "").trim().match(/^(-?\d+(?:\.\d+)?)/);
+        if (match) value = numberOrNull(match[1]);
+      }
+      if (value != null) break;
+    }
+    const atValue = item?.measuredAt ?? item?.occurredAt ?? item?.recordedAt ?? item?.createdAt ?? item?.updatedAt ?? null;
+    const at = atValue == null ? null : String(atValue);
+    const time = at == null ? 0 : new Date(at).getTime();
+    if (value == null || !Number.isFinite(value) || (at != null && Number.isNaN(time))) return [];
+    if (category === "BLOOD_PRESSURE" && (value < 40 || value > 300)) return [];
+    if (category === "HEART_RATE" && (value < 20 || value > 260)) return [];
+    return [{ value, at, time }];
+  });
+
+  candidates.sort((a, b) => a.time - b.time);
+  const latest = candidates.at(-1);
+  return latest ? { value: latest.value, at: latest.at } : null;
 }
 
 function progressPercent(goal: any) {
@@ -510,9 +587,11 @@ export default function TodaySupportedGoalCard({ goal, activeGoals = [], healthC
     ? "/today#today-goal-" + encodeURIComponent(String(linkedExerciseGoal.id))
     : "/health-goals?open=exercise";
   const defaultMetric = DEFAULT_METRICS[category] ?? DEFAULT_METRICS.OTHER;
-  const metricType = String(goal?.metricConfig?.metricType ?? defaultMetric.metricType).toUpperCase();
-  const metricKey = String(goal?.metricConfig?.metricKey ?? defaultMetric.metricKey);
+  const canonicalVitalMetric = category === "BLOOD_PRESSURE" || category === "HEART_RATE";
+  const metricType = canonicalVitalMetric ? defaultMetric.metricType : String(goal?.metricConfig?.metricType ?? defaultMetric.metricType).toUpperCase();
+  const metricKey = canonicalVitalMetric ? defaultMetric.metricKey : String(goal?.metricConfig?.metricKey ?? defaultMetric.metricKey);
   const [liveCurrent, setLiveCurrent] = useState<number | null>(null);
+  const [bpLatestAt, setBpLatestAt] = useState<string | null>(null);
   const [bpGoalStats, setBpGoalStats] = useState({ recordedDays: 0, targetDays: 0 });
   const [heartRateStats, setHeartRateStats] = useState<{
     todayCurrent: number | null;
@@ -527,6 +606,7 @@ export default function TodaySupportedGoalCard({ goal, activeGoals = [], healthC
   useEffect(() => {
     if (category !== "BLOOD_PRESSURE" || metricType !== "BLOOD_PRESSURE" || metricKey !== "blood_pressure.systolic") {
       setLiveCurrent(null);
+      setBpLatestAt(null);
       setBpGoalStats({ recordedDays: 0, targetDays: 0 });
 
       return;
@@ -535,7 +615,10 @@ export default function TodaySupportedGoalCard({ goal, activeGoals = [], healthC
     let active = true;
     const now = new Date();
     const createdAt = new Date(String(goal?.createdAt ?? ""));
-    const from = Number.isNaN(createdAt.getTime()) ? new Date(0) : createdAt;
+    const goalStartedAt = Number.isNaN(createdAt.getTime()) ? 0 : createdAt.getTime();
+    // Fetch the full history for the latest reading, but count attainment only
+    // from the day this particular goal began.
+    const from = new Date(0);
 
     healthGoalsService
       .getMetricEvents(metricType, metricKey, from, now)
@@ -543,22 +626,24 @@ export default function TodaySupportedGoalCard({ goal, activeGoals = [], healthC
         if (!active) return;
 
         const events = (Array.isArray(result?.events) ? result.events : [])
-          .filter((event: any) => Number.isFinite(Number(event?.loggedValue)))
+          .filter((event: any) => {
+            const occurredAt = new Date(String(event?.occurredAt ?? ""));
+            return Number.isFinite(Number(event?.loggedValue)) && !Number.isNaN(occurredAt.getTime());
+          })
           .map((event: any) => ({
             loggedValue: Number(event.loggedValue),
             occurredAt: String(event.occurredAt),
-          }));
+          }))
+          .sort((a: any, b: any) => new Date(a.occurredAt).getTime() - new Date(b.occurredAt).getTime());
 
-        const latest = [...events]
-          .sort((a: any, b: any) => new Date(String(a?.occurredAt ?? 0)).getTime() - new Date(String(b?.occurredAt ?? 0)).getTime())
-          .at(-1);
-
+        const latest = events.at(-1);
         setLiveCurrent(latest ? Number(latest.loggedValue) : null);
+        setBpLatestAt(latest?.occurredAt ?? null);
 
         const latestByDay = new Map<string, { value: number; occurredAt: number }>();
         for (const event of events) {
-          const occurredAt = new Date(String(event?.occurredAt ?? ""));
-          if (Number.isNaN(occurredAt.getTime())) continue;
+          const occurredAt = new Date(event.occurredAt);
+          if (occurredAt.getTime() < goalStartedAt) continue;
 
           const parts = new Intl.DateTimeFormat("en-GB", {
             timeZone: "Africa/Johannesburg",
@@ -589,6 +674,7 @@ export default function TodaySupportedGoalCard({ goal, activeGoals = [], healthC
       .catch(() => {
         if (active) {
           setLiveCurrent(null);
+          setBpLatestAt(null);
           setBpGoalStats({ recordedDays: 0, targetDays: 0 });
 
         }
@@ -684,12 +770,21 @@ export default function TodaySupportedGoalCard({ goal, activeGoals = [], healthC
     };
   }, [category, metricType, metricKey, goalId, goal?.createdAt, goal?.updatedAt, target]);
 
+  const bloodPressureContextReading = category === "BLOOD_PRESSURE"
+    ? latestContextMetricReading(healthContext, "BLOOD_PRESSURE")
+    : null;
+  const heartRateContextReading = category === "HEART_RATE"
+    ? latestContextMetricReading(healthContext, "HEART_RATE")
+    : null;
   const heartRateHasTodayReading = heartRateStats.todayCurrent != null;
-  const heartRateDisplayAt = heartRateHasTodayReading ? heartRateStats.todayAt : heartRateStats.latestAt;
+  const heartRateLatestCurrent = heartRateStats.latestCurrent ?? heartRateContextReading?.value ?? current;
+  const heartRateLatestAt = heartRateStats.latestAt ?? heartRateContextReading?.at ?? null;
+  const heartRateDisplayAt = heartRateHasTodayReading ? heartRateStats.todayAt : heartRateLatestAt;
+  const bpDisplayAt = bpLatestAt ?? bloodPressureContextReading?.at ?? null;
   const displayCurrent = category === "HEART_RATE"
-    ? heartRateStats.todayCurrent ?? heartRateStats.latestCurrent
-    : category === "BLOOD_PRESSURE" && liveCurrent != null
-      ? liveCurrent
+    ? heartRateStats.todayCurrent ?? heartRateLatestCurrent
+    : category === "BLOOD_PRESSURE"
+      ? liveCurrent ?? bloodPressureContextReading?.value ?? current
       : current;
   const bpDistance = category === "BLOOD_PRESSURE" && displayCurrent != null && target != null
     ? displayCurrent - target
@@ -700,7 +795,7 @@ export default function TodaySupportedGoalCard({ goal, activeGoals = [], healthC
   const bpAttainmentPercent = category === "BLOOD_PRESSURE" && bpGoalStats.recordedDays > 0
     ? Math.round((bpGoalStats.targetDays / bpGoalStats.recordedDays) * 100)
     : 0;
-  const heartRateTodayScore = category === "HEART_RATE" && displayCurrent != null && target != null
+  const heartRateTodayScore = category === "HEART_RATE" && heartRateHasTodayReading && displayCurrent != null && target != null
     ? progressPercent({
         ...goal,
         currentValue: displayCurrent,
@@ -731,8 +826,26 @@ export default function TodaySupportedGoalCard({ goal, activeGoals = [], healthC
     ? "Your latest saved resting reading is from " + new Intl.DateTimeFormat("en-ZA", { timeZone: "Africa/Johannesburg", dateStyle: "medium" }).format(new Date(heartRateStats.latestAt)) + ". Record a new resting reading today to update the daily goal."
     : goalNextStep(category, displayCurrent, target, personalComparison);
   const heartRateInsight = category === "HEART_RATE"
-    ? buildHeartRateInsight(heartRateStats, target, heartRateHasTodayReading, connectedGoalRelations, activeGoals, healthContext)
+    ? buildHeartRateInsight({
+        ...heartRateStats,
+        latestCurrent: heartRateLatestCurrent,
+        latestAt: heartRateLatestAt,
+      }, target, heartRateHasTodayReading, connectedGoalRelations, activeGoals, healthContext)
     : null;
+  const bloodPressureInsight = category === "BLOOD_PRESSURE"
+    ? displayCurrent == null
+      ? "No blood-pressure reading is linked to this goal yet. Record a complete systolic/diastolic reading in Current health; Sympto will show the latest systolic value here."
+      : target == null
+        ? "Your latest systolic reading is " + displayCurrent + " mmHg. Add a personal target to measure goal attainment."
+        : bpWithinTarget
+          ? "Latest systolic reading: " + displayCurrent + " mmHg, " + (bpDistance === 0 ? "exactly at" : Math.abs(bpDistance ?? 0) + " mmHg below") + " your " + target + " mmHg ceiling."
+          : "Latest systolic reading: " + displayCurrent + " mmHg, " + Math.abs(bpDistance ?? 0) + " mmHg above your " + target + " mmHg ceiling."
+    : null;
+  const compactInsight = category === "BLOOD_PRESSURE"
+    ? bloodPressureInsight
+    : category === "HEART_RATE"
+      ? heartRateInsight?.summary ?? nextStep
+      : nextStep;
 
   async function recordValue() {
     const numeric = Number(value);
@@ -795,7 +908,7 @@ export default function TodaySupportedGoalCard({ goal, activeGoals = [], healthC
             {category === "OTHER" && customGoalMeasurementInstructions && <p className="mt-1 line-clamp-2 text-[10px] leading-4 text-[#71839a]"><span className="font-bold">Measurement method: </span>{customGoalMeasurementInstructions}</p>}
           </div>
         </div>
-        <span className="shrink-0 rounded-full bg-[#eef8f8] px-2.5 py-1.5 text-[8px] font-black uppercase tracking-[.1em] text-[#0b7b80]">{category === "HEART_RATE" ? (heartRateHasTodayReading ? "Reading saved" : heartRateStats.latestCurrent != null ? "Latest saved reading" : "No reading") : category === "OTHER" ? customGoalCategoryMatch ? "Use category" : personalGoalNeedsSetup ? "Setup required" : journey.isPastDue ? "Past due" : displayCurrent == null ? "Not started" : journey.daysLeft === 0 && journey.targetDate ? "Due today" : "Journey active" : "Today"}</span>
+        <span className={((category === "BLOOD_PRESSURE" && bpWithinTarget === false) || (category === "HEART_RATE" && displayCurrent != null && target != null && displayCurrent > target)) ? "shrink-0 rounded-full bg-amber-50 px-2.5 py-1.5 text-[8px] font-black uppercase tracking-[.1em] text-amber-800 ring-1 ring-amber-100" : "shrink-0 rounded-full bg-[#eef8f8] px-2.5 py-1.5 text-[8px] font-black uppercase tracking-[.1em] text-[#0b7b80]"}>{category === "BLOOD_PRESSURE" ? displayCurrent == null ? "No reading" : target == null ? "Target needed" : bpWithinTarget ? "Within target" : "Above target" : category === "HEART_RATE" ? (heartRateHasTodayReading ? (target != null && displayCurrent != null && displayCurrent > target ? "Above target" : "Reading saved") : heartRateLatestCurrent != null ? "Latest saved reading" : "No reading") : category === "OTHER" ? customGoalCategoryMatch ? "Use category" : personalGoalNeedsSetup ? "Setup required" : journey.isPastDue ? "Past due" : displayCurrent == null ? "Not started" : journey.daysLeft === 0 && journey.targetDate ? "Due today" : "Journey active" : "Today"}</span>
       </header>
 
       {(detailsExpanded || personalGoalNeedsSetup) && (
@@ -1246,21 +1359,23 @@ export default function TodaySupportedGoalCard({ goal, activeGoals = [], healthC
         <div className="px-4 pb-4 pt-4 sm:px-5">
           <div className="grid grid-cols-3 gap-2">
             <div className="rounded-[16px] bg-[#f7fbfb] p-3">
-              <p className="text-[8px] font-black uppercase tracking-[.12em] text-[#95a3ad]">{category === "HEART_RATE" ? "Latest reading" : "Current"}</p>
+              <p className="text-[8px] font-black uppercase tracking-[.12em] text-[#95a3ad]">{category === "HEART_RATE" ? "Latest reading" : category === "BLOOD_PRESSURE" ? "Latest systolic" : "Current"}</p>
               <p className="mt-1 break-words text-base font-black text-[#0b2d54]">{displayCurrent == null ? "—" : displayCurrent}{displayUnit && displayCurrent != null ? " " + displayUnit : ""}</p>
             </div>
             <div className="rounded-[16px] bg-[#f7fbfb] p-3">
-              <p className="text-[8px] font-black uppercase tracking-[.12em] text-[#95a3ad]">{category === "HEART_RATE" ? "Personal ceiling" : "Target"}</p>
+              <p className="text-[8px] font-black uppercase tracking-[.12em] text-[#95a3ad]">{category === "HEART_RATE" ? "Personal ceiling" : category === "BLOOD_PRESSURE" ? "Systolic ceiling" : "Target"}</p>
               <p className="mt-1 break-words text-base font-black text-[#0b2d54]">{target == null ? "—" : (category === "BLOOD_PRESSURE" || category === "HEART_RATE" ? "≤ " : "") + target}{displayUnit && target != null ? " " + displayUnit : ""}</p>
             </div>
             <div className="rounded-[16px] bg-[#e9f9fa] p-3">
-              <p className="text-[8px] font-black uppercase tracking-[.12em] text-[#0b7b80]">Progress</p>
-              <p className="mt-1 text-base font-black text-[#0b6f73]">{displayProgress == null ? "—" : displayProgress + "%"}</p>
+              <p className="text-[8px] font-black uppercase tracking-[.12em] text-[#0b7b80]">{category === "HEART_RATE" ? "Today's progress" : "Progress"}</p>
+              <p className="mt-1 text-base font-black text-[#0b6f73]">{category === "HEART_RATE" && !heartRateHasTodayReading ? "No reading today" : displayProgress == null ? "—" : displayProgress + "%"}</p>
             </div>
           </div>
           {displayProgress != null && <div className="mt-3 h-2 overflow-hidden rounded-full bg-[#edf3f5]"><div className="h-full rounded-full bg-[#24c1c4] transition-all" style={{ width: Math.max(0, displayProgress) + "%" }} /></div>}
-          <p className="mt-3 rounded-xl bg-[#e9f9fa] px-3 py-2 text-[9px] font-semibold leading-4 text-[#0b6f73]">{nextStep || meta.helper}</p>
-          {category === "HEART_RATE" && <p className="mt-2 text-[9px] leading-4 text-[#74859a]">Only readings clearly identified as resting are compared with this saved target.</p>}
+          <p className="mt-3 rounded-xl bg-[#e9f9fa] px-3 py-2 text-[9px] font-semibold leading-4 text-[#0b6f73]">{compactInsight || meta.helper}</p>
+          {category === "BLOOD_PRESSURE" && bpDisplayAt && <p className="mt-2 text-[9px] leading-4 text-[#74859a]">Latest reading recorded {formatInsightDateTime(bpDisplayAt) ?? "at an unknown time"}. Only systolic pressure is compared with this target.</p>}
+          {category === "HEART_RATE" && <p className="mt-2 text-[9px] leading-4 text-[#74859a]">{heartRateDisplayAt ? (heartRateHasTodayReading ? "Recorded today at " : "Latest resting reading · ") + (heartRateHasTodayReading ? new Intl.DateTimeFormat("en-ZA", { timeZone: "Africa/Johannesburg", hour: "2-digit", minute: "2-digit" }).format(new Date(heartRateDisplayAt)) : formatInsightDateTime(heartRateDisplayAt)) : "Only resting readings are shown here. Record one after sitting quietly for a few minutes."} Only readings clearly identified as resting are compared with this saved target.</p>}
+          {category === "HEART_RATE" && heartRateInsight?.trend && <p className="mt-2 text-[9px] leading-4 text-[#74859a]">Recent trend: {heartRateInsight.trend.fromValue} → {heartRateInsight.trend.toValue} bpm ({heartRateInsight.trend.delta > 0 ? "+" : ""}{heartRateInsight.trend.delta} bpm).</p>}
           {category === "BLOOD_PRESSURE" && <p className="mt-2 text-[9px] leading-4 text-[#74859a]">This goal compares systolic readings recorded in Health Vitals. Use your clinician-confirmed target.</p>}
           <div className="mt-3 flex flex-wrap items-center justify-between gap-2">
             {meta.action === "MANUAL" ? (
