@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { Activity, ArrowRight, Check, ChevronDown, Droplets, HeartPulse, Moon, PencilLine, Sparkles, Target } from "lucide-react";
+import { Activity, ArrowRight, Check, ChevronDown, Droplets, HeartPulse, Moon, PencilLine, Pill, Sparkles, Target } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 import { healthGoalsService } from "@/services/health-goals.service";
@@ -47,15 +47,18 @@ const GOAL_META: Record<string, GoalMeta> = {
   SLEEP: { label: "Sleep", unit: "hours/night", period: "Daily", comparison: "At least", action: "CHECK_IN", helper: "Sleep is recorded through your Daily Health Check-in so the goal stays connected to your health journal.", icon: Moon },
   MENTAL_HEALTH: { label: "Mental health", unit: "score", period: "Daily", comparison: "At most", action: "CHECK_IN", helper: "Your stress score is recorded through the Daily Health Check-in, where 1 is calm and 10 is very stressed.", icon: Activity },
   HYDRATION: { label: "Hydration", unit: "ml/day", period: "Daily", comparison: "At least", action: "CHECK_IN", helper: "Water intake is recorded through the Daily Health Check-in and compared with your daily target.", icon: Droplets },
+  MEDICATION: { label: "Medication", unit: "adherence %", period: "Journey", comparison: "At least", action: "VITALS", helper: "This goal needs to be linked to an active prescribed medicine before dose adherence can be calculated. Review your medicines and reconnect this goal to the correct prescription.", icon: Pill },
   HEART_RATE: { label: "Resting heart rate", unit: "bpm", period: "Daily", comparison: "At most", action: "VITALS", helper: "Record your resting heart rate in Today’s Current health section after sitting quietly for a few minutes. Wearable or clinical readings count only when the source identifies them as resting; exercise readings are not compared with this target.", icon: HeartPulse, step: "1", min: "20", max: "260", placeholder: "e.g. 72" },
   OTHER: { label: "Custom health goal", unit: "", period: "Journey", comparison: "Configured measure", action: "MANUAL", helper: "Record the actual value defined by this goal’s measurement instructions. Use the stated source and unit each time; do not guess or reuse readings already tracked by another health category.", icon: PencilLine, step: "0.1", min: "0", placeholder: "Enter the measured value" },
 };
 
 function normaliseCategory(goal: any) {
-  return String(goal?.category ?? goal?.metricType ?? goal?.metricConfig?.metricType ?? "OTHER")
+  const category = String(goal?.category ?? goal?.metricType ?? goal?.metricConfig?.metricType ?? "OTHER")
     .trim()
     .toUpperCase()
     .replace(/[\s-]+/g, "_");
+  // PERSONAL uses the same measurement-driven workflow as a configured custom goal.
+  return category === "PERSONAL" ? "OTHER" : category;
 }
 
 function goalCategoryLabel(category: string) {
@@ -232,6 +235,7 @@ function progressPercent(goal: any) {
 }
 
 function sourceAction(category: string) {
+  if (category === "MEDICATION") return { label: "Review prescribed medicines", href: "/medications" };
   if (category === "EXERCISE" || category === "SLEEP" || category === "MENTAL_HEALTH" || category === "HYDRATION") return { label: "Update Daily Health Check-in", href: "#daily-health-check-in" };
   if (category === "BLOOD_PRESSURE") return { label: "Open Today’s Vitals", href: "/today#current-health" };
   if (category === "HEART_RATE") return { label: "Open Today's Current health", href: "/today#current-health" };
@@ -908,7 +912,7 @@ export default function TodaySupportedGoalCard({ goal, activeGoals = [], healthC
             {category === "OTHER" && customGoalMeasurementInstructions && <p className="mt-1 line-clamp-2 text-[10px] leading-4 text-[#71839a]"><span className="font-bold">Measurement method: </span>{customGoalMeasurementInstructions}</p>}
           </div>
         </div>
-        <span className={((category === "BLOOD_PRESSURE" && bpWithinTarget === false) || (category === "HEART_RATE" && displayCurrent != null && target != null && displayCurrent > target)) ? "shrink-0 rounded-full bg-amber-50 px-2.5 py-1.5 text-[8px] font-black uppercase tracking-[.1em] text-amber-800 ring-1 ring-amber-100" : "shrink-0 rounded-full bg-[#eef8f8] px-2.5 py-1.5 text-[8px] font-black uppercase tracking-[.1em] text-[#0b7b80]"}>{category === "BLOOD_PRESSURE" ? displayCurrent == null ? "No reading" : target == null ? "Target needed" : bpWithinTarget ? "Within target" : "Above target" : category === "HEART_RATE" ? (heartRateHasTodayReading ? (target != null && displayCurrent != null && displayCurrent > target ? "Above target" : "Reading saved") : heartRateLatestCurrent != null ? "Latest saved reading" : "No reading") : category === "OTHER" ? customGoalCategoryMatch ? "Use category" : personalGoalNeedsSetup ? "Setup required" : journey.isPastDue ? "Past due" : displayCurrent == null ? "Not started" : journey.daysLeft === 0 && journey.targetDate ? "Due today" : "Journey active" : "Today"}</span>
+        <span className={((category === "BLOOD_PRESSURE" && bpWithinTarget === false) || (category === "HEART_RATE" && displayCurrent != null && target != null && displayCurrent > target)) ? "shrink-0 rounded-full bg-amber-50 px-2.5 py-1.5 text-[8px] font-black uppercase tracking-[.1em] text-amber-800 ring-1 ring-amber-100" : "shrink-0 rounded-full bg-[#eef8f8] px-2.5 py-1.5 text-[8px] font-black uppercase tracking-[.1em] text-[#0b7b80]"}>{category === "MEDICATION" ? "Medicine not linked" : category === "BLOOD_PRESSURE" ? displayCurrent == null ? "No reading" : target == null ? "Target needed" : bpWithinTarget ? "Within target" : "Above target" : category === "HEART_RATE" ? (heartRateHasTodayReading ? (target != null && displayCurrent != null && displayCurrent > target ? "Above target" : "Reading saved") : heartRateLatestCurrent != null ? "Latest saved reading" : "No reading") : category === "OTHER" ? customGoalCategoryMatch ? "Use category" : personalGoalNeedsSetup ? "Setup required" : journey.isPastDue ? "Past due" : displayCurrent == null ? "Not started" : journey.daysLeft === 0 && journey.targetDate ? "Due today" : "Journey active" : "Today"}</span>
       </header>
 
       {(detailsExpanded || personalGoalNeedsSetup) && (
@@ -1359,11 +1363,11 @@ export default function TodaySupportedGoalCard({ goal, activeGoals = [], healthC
         <div className="px-4 pb-4 pt-4 sm:px-5">
           <div className="grid grid-cols-3 gap-2">
             <div className="rounded-[16px] bg-[#f7fbfb] p-3">
-              <p className="text-[8px] font-black uppercase tracking-[.12em] text-[#95a3ad]">{category === "HEART_RATE" ? "Latest reading" : category === "BLOOD_PRESSURE" ? "Latest systolic" : "Current"}</p>
+              <p className="text-[8px] font-black uppercase tracking-[.12em] text-[#95a3ad]">{category === "HEART_RATE" ? "Latest reading" : category === "BLOOD_PRESSURE" ? "Latest systolic" : category === "MEDICATION" ? "Current adherence" : "Current"}</p>
               <p className="mt-1 break-words text-base font-black text-[#0b2d54]">{displayCurrent == null ? "—" : displayCurrent}{displayUnit && displayCurrent != null ? " " + displayUnit : ""}</p>
             </div>
             <div className="rounded-[16px] bg-[#f7fbfb] p-3">
-              <p className="text-[8px] font-black uppercase tracking-[.12em] text-[#95a3ad]">{category === "HEART_RATE" ? "Personal ceiling" : category === "BLOOD_PRESSURE" ? "Systolic ceiling" : "Target"}</p>
+              <p className="text-[8px] font-black uppercase tracking-[.12em] text-[#95a3ad]">{category === "HEART_RATE" ? "Personal ceiling" : category === "BLOOD_PRESSURE" ? "Systolic ceiling" : category === "MEDICATION" ? "Adherence target" : "Target"}</p>
               <p className="mt-1 break-words text-base font-black text-[#0b2d54]">{target == null ? "—" : (category === "BLOOD_PRESSURE" || category === "HEART_RATE" ? "≤ " : "") + target}{displayUnit && target != null ? " " + displayUnit : ""}</p>
             </div>
             <div className="rounded-[16px] bg-[#e9f9fa] p-3">
