@@ -719,7 +719,7 @@ export default function TodaySupportedGoalCard({ goal, activeGoals = [], healthC
           <div className="min-w-0">
             <p className="text-[8px] font-black uppercase tracking-[.16em] text-[#0b7b80]">{meta.label}</p>
             <h3 className="mt-1 truncate text-sm font-black tracking-[-.03em] text-[#0b2d54]">{personalGoalNeedsSetup ? "Finish goal setup" : String(goal?.title || meta.label)}</h3>
-            <p className="mt-1 text-[9px] font-semibold text-[#8595a1]">{category === "OTHER" ? personalComparisonLabel : meta.comparison} · {meta.period} · {displayUnit || "Measured value"}</p>
+            <p className="mt-1 text-[9px] font-semibold text-[#8595a1]">{personalGoalNeedsSetup ? "Setup required · define measure and unit" : `${category === "OTHER" ? personalComparisonLabel : meta.comparison} · ${meta.period} · ${displayUnit || "Measured value"}`}</p>
             {category === "OTHER" && String(goal?.description ?? "").trim() && <p className="mt-1 line-clamp-2 text-[10px] leading-4 text-[#71839a]">{String(goal.description).trim()}</p>}
           </div>
         </div>
