@@ -520,7 +520,7 @@ export default function TodayPage() {
                 if (nearestIndex !== activeGoalSlide) setExpandedGoalSlide(null);
               }}
               role="region" aria-label="Active health goals" aria-roledescription="carousel" tabIndex={0}
-              className="flex items-start snap-x snap-mandatory gap-4 overflow-x-auto scroll-smooth pb-1 [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#24c1c4]">
+              className="flex items-start snap-x snap-mandatory gap-4 overflow-x-auto overflow-y-hidden scroll-smooth pb-1 [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#24c1c4]">
               {medicationGoalCardsForToday.filter((item: any) => Boolean(item.medication)).map((item: any, index: number) => {
                 const slideKey = `medication-goal-slide-${String(item.goal?.id ?? patientMedicationId(item.medication) ?? index)}`;
                 return <GoalCarouselSlide key={slideKey} slideKey={slideKey} expandedGoalSlide={expandedGoalSlide} onToggle={toggleExpandedGoalSlide}>
