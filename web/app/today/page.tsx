@@ -303,9 +303,10 @@ export default function TodayPage() {
     );
   });
 
-  const medicationGoal = medicationGoalCardsForToday[0]?.goal ?? null;
-  const primaryMedicationId = medicationGoalCardsForToday[0]?.medication
-    ? patientMedicationId(medicationGoalCardsForToday[0].medication)
+  const linkedMedicationGoal = medicationGoalCardsForToday.find((item: any) => Boolean(item.medication)) ?? null;
+  const medicationGoal = linkedMedicationGoal?.goal ?? null;
+  const primaryMedicationId = linkedMedicationGoal?.medication
+    ? patientMedicationId(linkedMedicationGoal.medication)
     : null;
 
   const carePlans = data.carePlans ?? [];
@@ -517,7 +518,7 @@ export default function TodayPage() {
               }}
               role="region" aria-label="Active health goals" aria-roledescription="carousel" tabIndex={0}
               className="flex items-start snap-x snap-mandatory gap-4 overflow-x-auto scroll-smooth pb-1 [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#24c1c4]">
-              {medicationGoalCardsForToday.map((item: any, index: number) => {
+              {medicationGoalCardsForToday.filter((item: any) => Boolean(item.medication)).map((item: any, index: number) => {
                 const slideKey = `medication-goal-slide-${String(item.goal?.id ?? patientMedicationId(item.medication) ?? index)}`;
                 return <GoalCarouselSlide key={slideKey} slideKey={slideKey} expandedGoalSlide={expandedGoalSlide} onToggle={toggleExpandedGoalSlide}>
                   {item.medication
@@ -587,7 +588,7 @@ export default function TodayPage() {
               })}
             </div>
             {(() => {
-              const goalSlideCount = medicationGoalCardsForToday.length + smokingGoals.length + alcoholGoals.length + weightGoals.length + exerciseGoals.length + otherTodayGoals.length;
+              const goalSlideCount = medicationGoalCardsForToday.filter((item: any) => Boolean(item.medication)).length + smokingGoals.length + alcoholGoals.length + weightGoals.length + exerciseGoals.length + otherTodayGoals.length;
               if (goalSlideCount === 0) return null;
               const currentSlide = Math.min(activeGoalSlide, goalSlideCount - 1);
               const scrollToGoalSlide = (index: number) => {
