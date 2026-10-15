@@ -1269,7 +1269,29 @@ export default function TodaySupportedGoalCard({ goal, activeGoals = [], healthC
         <div className="mt-3 rounded-xl bg-[#e9f9fa] px-3 py-2"><p className="text-[9px] font-bold leading-4 text-[#0b6f73]">{nextStep}</p></div>
           </>
         )}
-{detailsExpanded && (category === "BLOOD_PRESSURE" ? (
+{detailsExpanded && category === "BLOOD_PRESSURE" && (
+          <section className="mt-3 rounded-[18px] border border-[#e2ecef] bg-white p-3.5">
+            <p className="text-[8px] font-black uppercase tracking-[.14em] text-[#82939f]">Reading details</p>
+            <div className="mt-2 grid grid-cols-3 gap-2">
+              <div className="rounded-[12px] bg-[#f7fbfb] p-2.5">
+                <p className="text-[8px] font-black uppercase tracking-[.1em] text-[#95a3ad]">Latest systolic</p>
+                <p className="mt-1 text-sm font-black text-[#0b2d54]">{displayCurrent == null ? "—" : displayCurrent + " mmHg"}</p>
+              </div>
+              <div className="rounded-[12px] bg-[#f7fbfb] p-2.5">
+                <p className="text-[8px] font-black uppercase tracking-[.1em] text-[#95a3ad]">Systolic ceiling</p>
+                <p className="mt-1 text-sm font-black text-[#0b2d54]">{target == null ? "—" : "≤ " + target + " mmHg"}</p>
+              </div>
+              <div className="rounded-[12px] bg-[#e9f9fa] p-2.5">
+                <p className="text-[8px] font-black uppercase tracking-[.1em] text-[#0b7b80]">Progress</p>
+                <p className="mt-1 text-sm font-black text-[#0b6f73]">{displayProgress == null ? "—" : displayProgress + "%"}</p>
+              </div>
+            </div>
+            <p className="mt-3 text-[10px] leading-5 text-[#506b7a]">{bloodPressureInsight || meta.helper}</p>
+            {bpDisplayAt && <p className="mt-1 text-[9px] leading-4 text-[#74859a]">Latest reading recorded {formatInsightDateTime(bpDisplayAt) ?? "at an unknown time"}. Only systolic pressure is compared with this target.</p>}
+            <p className="mt-1 text-[9px] leading-4 text-[#74859a]">This goal compares systolic readings recorded in Health Vitals. Use your clinician-confirmed target.</p>
+          </section>
+        )}
+        {detailsExpanded && (category === "BLOOD_PRESSURE" ? (
           <div className="mt-3 rounded-[17px] border border-[#dcebec] bg-[#f7fbfc] p-3.5">
             <div className="flex items-center justify-between gap-2">
               <p className="text-[8px] font-black uppercase tracking-[.14em] text-[#82939f]">Goal connections</p>
