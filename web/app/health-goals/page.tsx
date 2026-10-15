@@ -129,14 +129,29 @@ function formatDate(value: unknown) {
 
 function goalProgress(goal: any) {
   if (String(goal?.status ?? "").toUpperCase() === "ACHIEVED") return 100;
-  const latest = Number(goal?.latestProgress?.progressPercent ?? goal?.progressPercent ?? goal?.progress?.[0]?.progressPercent ?? 0);
-  if (!Number.isFinite(latest)) return 0;
   const category = String(goal?.category ?? "").toUpperCase();
   const comparison = String(goal?.metricConfig?.comparison ?? "").toUpperCase();
-  if (category === "WEIGHT" && (comparison === "INCREASE_TO" || comparison === "DECREASE_TO")) {
-    return Math.max(-100, Math.min(100, Math.round(latest)));
+  const storedProgress = goal?.latestProgress?.progressPercent ?? goal?.progressPercent ?? goal?.progress?.[0]?.progressPercent;
+  if (storedProgress !== null && storedProgress !== undefined && storedProgress !== "") {
+    const latest = Number(storedProgress);
+    if (Number.isFinite(latest)) {
+      if (category === "WEIGHT" && (comparison === "INCREASE_TO" || comparison === "DECREASE_TO")) {
+        return Math.max(-100, Math.min(100, Math.round(latest)));
+      }
+      return Math.max(0, Math.min(100, Math.round(latest)));
+    }
   }
-  return Math.max(0, Math.min(100, Math.round(latest)));
+
+  const currentRaw = goal?.latestValue ?? goal?.latestProgress?.currentValue ?? goal?.progress?.[0]?.currentValue ?? goal?.currentValue;
+  const targetRaw = goal?.targetValue ?? goal?.metricConfig?.frequencyTarget;
+  if (currentRaw === null || currentRaw === undefined || currentRaw === "" || targetRaw === null || targetRaw === undefined || targetRaw === "") return 0;
+  const current = Number(currentRaw);
+  const target = Number(targetRaw);
+  if (!Number.isFinite(current) || !Number.isFinite(target)) return 0;
+  if (category === "WEIGHT" && (comparison === "INCREASE_TO" || comparison === "DECREASE_TO")) return 0;
+  if (comparison === "AT_LEAST") return target > 0 ? Math.max(0, Math.min(100, Math.round((current / target) * 100))) : current >= target ? 100 : 0;
+  if (comparison === "AT_MOST") return target <= 0 ? current <= target ? 100 : 0 : current <= target ? 100 : Math.max(0, Math.min(100, Math.round((target / current) * 100)));
+  return target <= 0 ? current === target ? 100 : 0 : Math.max(0, Math.min(100, Math.round((1 - Math.abs(current - target) / Math.max(Math.abs(target), 1)) * 100)));
 }
 
 function goalCurrent(goal: any) {
