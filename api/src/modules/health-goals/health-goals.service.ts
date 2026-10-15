@@ -1070,9 +1070,11 @@ export class HealthGoalsService {
           ? 0
           : targetValue === 0
             ? targetMet ? 100 : 0
-            : targetValue > 0
-              ? Math.min(100, Math.max(0, (currentValue / targetValue) * 100))
-              : 0;
+            : targetValue > 0 && comparison === 'AT_MOST'
+              ? currentValue <= targetValue ? 100 : Math.max(0, Math.min(100, (targetValue / currentValue) * 100))
+              : targetValue > 0
+                ? Math.min(100, Math.max(0, (currentValue / targetValue) * 100))
+                : 0;
         if (targetMet) {
           progressStatus = recurring ? HealthGoalProgressStatus.ON_TRACK : HealthGoalProgressStatus.ACHIEVED;
           terminal = progressStatus === HealthGoalProgressStatus.ACHIEVED;
