@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { Activity, ArrowRight, Check, Droplets, HeartPulse, Moon, PencilLine, Target } from "lucide-react";
+import { Activity, ArrowRight, Check, ChevronDown, Droplets, HeartPulse, Moon, PencilLine, Sparkles, Target } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 import { healthGoalsService } from "@/services/health-goals.service";
@@ -199,6 +199,21 @@ function formatInsightDateTime(value: unknown) {
   }).format(date);
 }
 
+type HeartRateInsightResult = {
+  summary: string;
+  status: "NO_DATA" | "NO_TARGET" | "WITHIN_TARGET" | "ABOVE_TARGET";
+  trend: null | {
+    fromLabel: string;
+    fromValue: number;
+    toLabel: string;
+    toValue: number;
+    delta: number;
+    bothWithinTarget: boolean | null;
+    recordedDays: number;
+  };
+  context: string[];
+};
+
 function buildHeartRateInsight(
   stats: {
     todayCurrent: number | null;
@@ -214,46 +229,46 @@ function buildHeartRateInsight(
   connectedGoalRelations: any[],
   activeGoals: any[],
   healthContext?: SupportedGoalCardProps["healthContext"],
-): { summary: string; context: string[] } {
+): HeartRateInsightResult {
   const fmt = (value: number) => Number.isInteger(value) ? String(value) : value.toFixed(1);
   const latest = stats.todayCurrent ?? stats.latestCurrent;
   const weeklyReadings = stats.days
     .filter((point) => point.value != null && !point.isFuture)
     .sort((a, b) => a.dateKey.localeCompare(b.dateKey));
   let summary: string;
+  let status: HeartRateInsightResult["status"];
 
   if (latest == null) {
-    summary = "There is no eligible resting reading yet, so Sympto cannot assess this goal. Record a pulse after sitting quietly for a few minutes to establish a baseline.";
+    summary = "Record a resting reading to start your trend.";
+    status = "NO_DATA";
   } else if (target == null) {
-    summary = `Your latest saved resting pulse is ${fmt(latest)} bpm. This goal has no usable target value, so target attainment cannot be assessed yet.`;
+    summary = `Your latest reading is ${fmt(latest)} bpm. Add a personal ceiling to assess it against this goal.`;
+    status = "NO_TARGET";
   } else if (latest < target) {
-    summary = `Your latest saved resting pulse is ${fmt(latest)} bpm—${fmt(target - latest)} bpm below your saved ceiling of ${fmt(target)} bpm.`;
+    summary = `${fmt(latest)} bpm is ${fmt(target - latest)} bpm below your ${fmt(target)} bpm ceiling.`;
+    status = "WITHIN_TARGET";
   } else if (latest === target) {
-    summary = `Your latest saved resting pulse is ${fmt(latest)} bpm, exactly at your saved ceiling of ${fmt(target)} bpm.`;
+    summary = `${fmt(latest)} bpm is exactly at your ${fmt(target)} bpm ceiling.`;
+    status = "WITHIN_TARGET";
   } else {
-    summary = `Your latest saved resting pulse is ${fmt(latest)} bpm—${fmt(latest - target)} bpm above your saved ceiling of ${fmt(target)} bpm.`;
+    summary = `${fmt(latest)} bpm is ${fmt(latest - target)} bpm above your saved ceiling.`;
+    status = "ABOVE_TARGET";
   }
 
-  if (weeklyReadings.length >= 2) {
-    const previous = weeklyReadings[weeklyReadings.length - 2];
-    const recent = weeklyReadings[weeklyReadings.length - 1];
-    const delta = Number(recent.value) - Number(previous.value);
-    const direction = delta > 0 ? `rose by ${fmt(delta)} bpm` : delta < 0 ? `fell by ${fmt(Math.abs(delta))} bpm` : "was unchanged";
-    const within = target == null ? "" : previous.value! <= target && recent.value! <= target
-      ? " Both readings are within your saved ceiling."
-      : previous.value! > target && recent.value! > target
-        ? " Both readings are above your saved ceiling."
-        : " The two readings fall on different sides of your saved ceiling.";
-    summary += ` Across the last two recorded days this week (${previous.label} ${fmt(previous.value!)} → ${recent.label} ${fmt(recent.value!)} bpm), your pulse ${direction}.${within} Two recorded days are not enough to establish a sustained pattern.`;
-  } else if (weeklyReadings.length === 1) {
-    summary += " Only one day has a recorded reading this calendar week, so there is not yet enough weekly data to judge a pattern.";
-  } else {
-    summary += " There are no recorded readings in the current Monday–Sunday week, so this is a historical value rather than a current-week trend.";
-  }
-
-  if (!hasTodayReading && latest != null) {
-    summary += " No resting reading is saved for today yet; recording one after a few quiet minutes will update today's goal status.";
-  }
+  const previous = weeklyReadings.length >= 2 ? weeklyReadings[weeklyReadings.length - 2] : null;
+  const recent = weeklyReadings.length >= 2 ? weeklyReadings[weeklyReadings.length - 1] : null;
+  const delta = previous && recent ? Number(recent.value) - Number(previous.value) : null;
+  const trend = previous && recent && previous.value != null && recent.value != null
+    ? {
+        fromLabel: previous.label,
+        fromValue: previous.value,
+        toLabel: recent.label,
+        toValue: recent.value,
+        delta: delta ?? 0,
+        bothWithinTarget: target == null ? null : previous.value <= target && recent.value <= target,
+        recordedDays: weeklyReadings.length,
+      }
+    : null;
 
   const context: string[] = [];
   const measurements = [
@@ -275,12 +290,11 @@ function buildHeartRateInsight(
       const targetNote = relatedTarget == null
         ? ""
         : systolic <= relatedTarget
-          ? `, at or below its saved systolic target of ${fmt(relatedTarget)} mmHg`
-          : `, ${fmt(systolic - relatedTarget)} mmHg above its saved systolic target of ${fmt(relatedTarget)} mmHg`;
-      const when = formatInsightDateTime(bpVital?.measuredAt);
-      context.push(`Connected Blood pressure goal: the latest available systolic reading is ${fmt(systolic)} mmHg${targetNote}${when ? ` (recorded ${when})` : ""}. This is separate context; it does not explain the pulse reading.`);
+          ? ` · within the saved ${fmt(relatedTarget)} mmHg target`
+          : ` · ${fmt(systolic - relatedTarget)} mmHg above its saved target`;
+      context.push(`Blood pressure: ${fmt(systolic)} mmHg${targetNote}${formatInsightDateTime(bpVital?.measuredAt) ? ` · ${formatInsightDateTime(bpVital?.measuredAt)}` : ""}. Related context, not a cause of the pulse reading.`);
     } else {
-      context.push("Your Blood pressure goal is connected, but no readable blood-pressure measurement is available in Today's current snapshot to compare alongside this pulse.");
+      context.push("Blood pressure goal is connected, but no recent comparable reading is available.");
     }
   }
 
@@ -294,11 +308,9 @@ function buildHeartRateInsight(
     const exerciseUnit = String(linkedGoal?.unit ?? relationGoal?.unit ?? "minutes").trim();
     const exerciseAt = linkedGoal?.latestProgress?.measuredAt ?? linkedGoal?.progress?.[0]?.measuredAt ?? null;
     const exerciseWhen = formatInsightDateTime(exerciseAt);
-    if (latestExercise != null) {
-      context.push(`Connected Exercise goal: the latest stored progress is ${fmt(latestExercise)}${exerciseUnit ? ` ${exerciseUnit}` : ""}${exerciseTarget == null ? "" : ` against a target of ${fmt(exerciseTarget)}${exerciseUnit ? ` ${exerciseUnit}` : ""}`}${exerciseWhen ? ` (updated ${exerciseWhen})` : ""}. Activity provides context only; activity-related heart rates are not counted as resting readings.`);
-    } else {
-      context.push("Your Exercise goal is connected as context, but no comparable exercise value is available yet. Sympto keeps activity-related heart rates separate from resting readings.");
-    }
+    context.push(latestExercise != null
+      ? `Exercise goal: ${fmt(latestExercise)}${exerciseUnit ? ` ${exerciseUnit}` : ""}${exerciseTarget == null ? "" : ` of ${fmt(exerciseTarget)}${exerciseUnit ? ` ${exerciseUnit}` : ""}`}${exerciseWhen ? ` · updated ${exerciseWhen}` : ""}. Activity-related pulse readings are not counted as resting.`
+      : "Exercise goal is connected; no comparable exercise value is available yet.");
   }
 
   const symptomRecords = Array.isArray(healthContext?.symptoms) && healthContext!.symptoms!.length
@@ -312,46 +324,43 @@ function buildHeartRateInsight(
     ),
   );
   if (relevantSymptom) {
-    const name = String(relevantSymptom?.title ?? relevantSymptom?.name ?? "a related symptom");
-    context.unshift(`Relevant symptom record: ${name}${relevantSymptom?.overallSeverity ? ` (severity recorded as ${String(relevantSymptom.overallSeverity).toLowerCase().replaceAll("_", " ")})` : ""}. Review the symptom history alongside your pulse. If chest pain, severe breathlessness, or fainting is happening now, seek urgent medical care.`);
+    const name = String(relevantSymptom?.title ?? relevantSymptom?.name ?? "related symptoms");
+    context.unshift(`Symptom to review: ${name}${relevantSymptom?.overallSeverity ? ` · ${String(relevantSymptom.overallSeverity).toLowerCase().replaceAll("_", " ")}` : ""}. If chest pain, severe breathlessness or fainting is happening now, seek urgent medical care.`);
   }
 
-  const weekDelta = weeklyReadings.length >= 2
-    ? Number(weeklyReadings[weeklyReadings.length - 1].value) - Number(weeklyReadings[weeklyReadings.length - 2].value)
-    : 0;
-  const needsClinicalContext = (latest != null && target != null && latest > target) || Math.abs(weekDelta) >= 5;
+  const needsClinicalContext = status === "ABOVE_TARGET" || (delta != null && Math.abs(delta) >= 5);
   if (needsClinicalContext) {
     const conditionNames = (Array.isArray(healthContext?.conditions) ? healthContext!.conditions! : [])
       .filter((item: any) => !item?.status || String(item.status).toUpperCase() === "ACTIVE")
       .map((item: any) => String(item?.condition?.name ?? item?.name ?? item?.title ?? "").trim())
       .filter(Boolean)
       .filter((name: string, index: number, all: string[]) => all.indexOf(name) === index)
-      .slice(0, 3);
+      .slice(0, 2);
     const medicationNames = (Array.isArray(healthContext?.medications) ? healthContext!.medications! : [])
       .filter((item: any) => !item?.status || ["ACTIVE", "PAUSED", "ONGOING"].includes(String(item.status).toUpperCase()))
       .map((item: any) => String(item?.medication?.name ?? item?.name ?? item?.genericName ?? "").trim())
       .filter(Boolean)
       .filter((name: string, index: number, all: string[]) => all.indexOf(name) === index)
-      .slice(0, 3);
+      .slice(0, 2);
     const profileFactors = [
       patient?.smokingStatus ? `smoking recorded as ${String(patient.smokingStatus).toLowerCase().replaceAll("_", " ")}` : "",
       patient?.alcoholConsumption ? `alcohol use recorded as ${String(patient.alcoholConsumption).toLowerCase().replaceAll("_", " ")}` : "",
     ].filter(Boolean);
     const items = [
-      conditionNames.length ? `active conditions on file: ${conditionNames.join(", ")}` : "",
-      medicationNames.length ? `current medicines on file: ${medicationNames.join(", ")}` : "",
-      profileFactors.length ? profileFactors.join("; ") : "",
+      conditionNames.length ? `conditions on file: ${conditionNames.join(", ")}` : "",
+      medicationNames.length ? `medicines on file: ${medicationNames.join(", ")}` : "",
+      profileFactors.join("; "),
     ].filter(Boolean);
     if (items.length) {
-      context.push(`Additional context from your record: ${items.join("; ")}. This information does not identify the cause of a pulse change. If above-target readings or the change persist, review the trend and your medicines with a healthcare professional; do not change prescribed treatment based on this card.`);
+      context.push(`${items.join(" · ")}. These are review prompts, not an explanation of what caused the pulse reading. If the change persists, discuss the trend and medicines with a healthcare professional.`);
     }
   }
 
   if (!context.length) {
-    context.push("No additional linked measurement or relevant symptom is available to compare yet. This insight is based on the dated resting readings and your saved personal ceiling.");
+    context.push("No additional linked measurement or relevant symptom is available. The summary is based on dated resting readings and your saved ceiling.");
   }
 
-  return { summary, context: context.slice(0, 4) };
+  return { summary, status, trend, context: context.slice(0, 4) };
 }
 
 const DEFAULT_METRICS: Record<string, { metricType: string; metricKey: string }> = {
@@ -890,17 +899,69 @@ export default function TodaySupportedGoalCard({ goal, activeGoals = [], healthC
               <p className="mt-3 text-[10px] leading-5 text-white/55">Heart rate changes with activity, stress, illness and medicines. Only readings clearly identified as resting are compared with this goal. The target shown above is your saved goal, not a diagnosis or a universal threshold.</p>
             </div>
           </section>
-          <section className="mt-3 rounded-[20px] border border-[#dce9ec] bg-[#f7fbfc] p-4 sm:p-5" aria-live="polite">
-            <p className="text-[9px] font-black uppercase tracking-[.16em] text-[#0b7b80]">Sympto insight</p>
-            <p className="mt-2 text-[12px] font-bold leading-6 text-[#0b2d54]">{heartRateInsight?.summary}</p>
-            <div className="mt-3 border-t border-[#e0ebef] pt-3">
-              <p className="text-[8px] font-black uppercase tracking-[.14em] text-[#82939f]">Connected health context</p>
-              <div className="mt-2 space-y-2">
+          <section className="mt-3 rounded-[22px] border border-[#dce9ec] bg-white p-4 shadow-[0_5px_18px_rgba(11,45,84,.025)] sm:p-5" aria-live="polite">
+            <div className="flex items-start justify-between gap-3">
+              <div className="min-w-0">
+                <div className="flex items-center gap-2">
+                  <span className="grid h-7 w-7 shrink-0 place-items-center rounded-[10px] bg-[#e8f8f7] text-[#0b7b80]"><Sparkles className="h-3.5 w-3.5" /></span>
+                  <p className="text-[9px] font-black uppercase tracking-[.16em] text-[#0b7b80]">Sympto insight</p>
+                </div>
+                <p className="mt-3 text-sm font-bold leading-6 text-[#0b2d54]">{heartRateInsight?.summary}</p>
+              </div>
+              <span className={heartRateInsight?.status === "WITHIN_TARGET"
+                ? "shrink-0 rounded-full bg-[#e8f8f7] px-2.5 py-1.5 text-[9px] font-black text-[#0b7b80]"
+                : heartRateInsight?.status === "ABOVE_TARGET"
+                  ? "shrink-0 rounded-full bg-amber-50 px-2.5 py-1.5 text-[9px] font-black text-amber-800"
+                  : "shrink-0 rounded-full bg-slate-100 px-2.5 py-1.5 text-[9px] font-black text-slate-600"}>
+                {heartRateInsight?.status === "WITHIN_TARGET" ? "Within goal" : heartRateInsight?.status === "ABOVE_TARGET" ? "Above goal" : heartRateInsight?.status === "NO_TARGET" ? "Set target" : "Needs reading"}
+              </span>
+            </div>
+
+            {heartRateInsight?.trend ? (
+              <div className="mt-4 flex flex-wrap items-center justify-between gap-3 rounded-[15px] bg-[#f6fafb] px-3.5 py-3">
+                <div>
+                  <p className="text-[8px] font-black uppercase tracking-[.13em] text-[#82939f]">This week</p>
+                  <p className="mt-1 text-[11px] font-bold text-[#0b2d54]">
+                    {heartRateInsight.trend.fromLabel} {heartRateInsight.trend.fromValue}
+                    <ArrowRight className="mx-1 inline h-3 w-3 text-[#8da0aa]" />
+                    {heartRateInsight.trend.toLabel} {heartRateInsight.trend.toValue} bpm
+                  </p>
+                </div>
+                <div className="text-right">
+                  <p className={heartRateInsight.trend.delta > 0 ? "text-sm font-black text-[#0b2d54]" : "text-sm font-black text-[#0b7b80]"}>
+                    {heartRateInsight.trend.delta > 0 ? "+" : ""}{heartRateInsight.trend.delta} bpm
+                  </p>
+                  <p className="text-[9px] text-[#82939f]">{heartRateInsight.trend.recordedDays} days logged</p>
+                </div>
+              </div>
+            ) : (
+              <p className="mt-3 text-[10px] leading-5 text-[#82939f]">
+                {heartRateStats.recordedDays === 1 ? "One day logged this week. Another reading will help build the trend." : heartRateStats.recordedDays === 0 ? "No readings logged this calendar week yet." : "Keep logging resting readings to build your weekly trend."}
+              </p>
+            )}
+
+            {!heartRateHasTodayReading && heartRateStats.latestAt && (
+              <p className="mt-3 flex items-center gap-2 text-[10px] font-semibold text-[#71839a]">
+                <span className="h-1.5 w-1.5 rounded-full bg-[#b4c3ca]" />
+                No reading today
+                <span className="font-normal">· Add one to update today's status.</span>
+              </p>
+            )}
+
+            <details className="group mt-3 border-t border-[#edf2f4] pt-3">
+              <summary className="flex cursor-pointer list-none items-center justify-between gap-3 text-[10px] font-bold text-[#617583]">
+                <span>Related health context</span>
+                <span className="flex items-center gap-2 text-[9px] font-semibold text-[#82939f]">
+                  {connectedGoalRelations.length ? connectedGoalRelations.length + " linked goals" : "Health record"}
+                  <ChevronDown className="h-3.5 w-3.5 transition-transform group-open:rotate-180" />
+                </span>
+              </summary>
+              <div className="mt-3 space-y-2">
                 {(heartRateInsight?.context ?? []).map((note, index) => (
                   <p key={index} className="text-[10px] leading-5 text-[#617583]">{note}</p>
                 ))}
               </div>
-            </div>
+            </details>
           </section>
           </>
         ) : (
@@ -988,29 +1049,19 @@ export default function TodaySupportedGoalCard({ goal, activeGoals = [], healthC
             </div>
           </div>
         ) : category === "HEART_RATE" ? (
-          <>
-            <section className="mt-3 rounded-[17px] border border-[#dce9ec] bg-[#f7fbfc] p-3.5">
-              <div className="flex items-center justify-between gap-3">
-                <div className="min-w-0">
-                  <p className="text-[8px] font-black uppercase tracking-[.14em] text-[#82939f]">Goal journey</p>
-                  <p className="mt-1 text-[11px] font-black text-[#0b2d54]">Day {journey.journeyDay} · {journey.daysLeft === null ? "No end date set" : journey.daysLeft === 0 ? "Target date today" : journey.daysLeft + (journey.daysLeft === 1 ? " day left" : " days left")}</p>
-                  <p className="mt-1 text-[9px] text-[#82939f]">Target date: {journey.targetDate && !Number.isNaN(journey.targetDate.getTime()) ? formatJourneyDate(journey.targetDate) : "Not set"} · Daily ceiling ≤ {target ?? "—"} bpm</p>
-                </div>
-                <span className="shrink-0 rounded-full bg-white px-2.5 py-1.5 text-[8px] font-black text-[#0b7b80] ring-1 ring-[#dce9ec]">{journey.daysLeft == null ? "Ongoing" : journey.daysLeft === 0 ? "Due today" : "In progress"}</span>
+          <section className="mt-3 rounded-[20px] border border-[#dce9ec] bg-[#f7fbfc] p-4 sm:p-5">
+            <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+              <div className="min-w-0">
+                <p className="text-[8px] font-black uppercase tracking-[.15em] text-[#82939f]">Goal journey</p>
+                <p className="mt-1 text-[12px] font-black text-[#0b2d54]">Day {journey.journeyDay}<span className="mx-1.5 text-[#a2b2ba]">·</span>{journey.daysLeft === null ? "Ongoing" : journey.daysLeft === 0 ? "Due today" : journey.daysLeft + (journey.daysLeft === 1 ? " day left" : " days left")}</p>
+                <p className="mt-1 text-[9px] text-[#82939f]">{journey.targetDate && !Number.isNaN(journey.targetDate.getTime()) ? "Target date " + formatJourneyDate(journey.targetDate) : "No target date set"}</p>
               </div>
-            </section>
-            <section className="mt-3 rounded-[22px] border border-[#dce9ec] bg-[#f7fbfc] p-4 sm:p-5">
-              <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                <div className="min-w-0">
-                  <p className="text-[10px] font-black uppercase tracking-[.15em] text-[#0b7b80]">Record a resting reading</p>
-                  <p className="mt-1 text-sm font-black text-[#0b2d54]">Build a reliable trend</p>
-                  <p className="mt-1 text-[11px] leading-5 text-[#758896]">{meta.helper}</p>
-                </div>
-                <Link href={source.href} className="inline-flex min-h-11 shrink-0 items-center justify-center gap-2 rounded-xl bg-[#0b2d54] px-4 py-3 text-[11px] font-black text-white transition hover:bg-[#0f5a62]">
-                  {source.label} <ArrowRight className="h-4 w-4 text-[#24c1c4]" />
-                </Link>
-              </div>
-            </section>
+              <Link href={source.href} className="inline-flex min-h-10 shrink-0 items-center justify-center gap-2 rounded-xl bg-[#0b2d54] px-4 py-2.5 text-[10px] font-black text-white transition hover:bg-[#0f5a62]">
+                Record a reading <ArrowRight className="h-3.5 w-3.5 text-[#24c1c4]" />
+              </Link>
+            </div>
+            <p className="mt-3 border-t border-[#e3edef] pt-3 text-[10px] leading-5 text-[#758896]">Sit quietly for a few minutes first. Only readings identified as resting count toward this goal.</p>
+          </section>
           </>
         ) : (
           <div className="mt-3 rounded-[17px] bg-[#fbfdfd] p-3.5 ring-1 ring-[#e4edef]">
