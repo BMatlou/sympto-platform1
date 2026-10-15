@@ -194,8 +194,34 @@ export class HealthGoalsService {
 
   async getMetricEventsForUser(userId: string, filters: any) {
     const patient = await this.findPatientForUser(userId); if (!patient) throw new NotFoundException('Patient not found.');
-    const metricType = String(filters?.metricType ?? '').trim(); const metricKey = String(filters?.metricKey ?? '').trim(); const source = filters?.source ? String(filters.source).trim() : undefined; const from = filters?.from instanceof Date ? filters.from : new Date(filters?.from); const to = filters?.to instanceof Date ? filters.to : new Date(filters?.to);
+    const metricType = String(filters?.metricType ?? '').trim().toUpperCase(); const metricKey = String(filters?.metricKey ?? '').trim(); const source = filters?.source ? String(filters.source).trim() : undefined; const from = filters?.from instanceof Date ? filters.from : new Date(filters?.from); const to = filters?.to instanceof Date ? filters.to : new Date(filters?.to);
     if (!metricType || !metricKey) throw new BadRequestException('Metric type and metric key are required.'); if (Number.isNaN(from.getTime()) || Number.isNaN(to.getTime())) throw new BadRequestException('Metric event date range is invalid.');
+
+    // Older manual vital entries may exist in HealthJournal without a corresponding
+    // metric event (the metric stream was introduced later). Backfill only this
+    // patient's heart-rate journal events on demand, without rewriting other metrics.
+    if (metricType === 'HEART_RATE' && metricKey === 'heart_rate.bpm') {
+      await this.prisma.$executeRaw`
+        INSERT INTO "HealthGoalMetricEvent"
+          ("id", "patientId", "metricType", "metricKey", "loggedValue", "occurredAt", "source", "sourceId")
+        SELECT
+          gen_random_uuid(), journal."patientId", 'HEART_RATE', 'heart_rate.bpm',
+          journal."heartRate", journal."createdAt", 'health-journal', journal."id"
+        FROM "HealthJournal" journal
+        WHERE journal."patientId" = ${patient.id}
+          AND journal."heartRate" IS NOT NULL
+          AND NOT EXISTS (
+            SELECT 1
+            FROM "HealthGoalMetricEvent" existing
+            WHERE existing."patientId" = journal."patientId"
+              AND existing."metricType" = 'HEART_RATE'
+              AND existing."metricKey" = 'heart_rate.bpm'
+              AND existing."source" = 'health-journal'
+              AND existing."sourceId" = journal."id"
+          )
+      `;
+    }
+
     const events = await this.prisma.$queryRaw<Array<{ id: string; loggedValue: Prisma.Decimal; occurredAt: Date; source: string; sourceId: string | null; metadata: any }>>`SELECT "id", "loggedValue", "occurredAt", "source", "sourceId", "metadata" FROM "HealthGoalMetricEvent" WHERE "patientId" = ${patient.id} AND "metricType" = ${metricType} AND "metricKey" = ${metricKey} AND "occurredAt" >= ${from} AND "occurredAt" < ${to} ${source ? Prisma.sql`AND "source" = ${source}` : Prisma.empty} ORDER BY "occurredAt" ASC`;
     return { success: true, count: events.length, events: events.map((event) => ({ id: String(event.id), loggedValue: Number(event.loggedValue), occurredAt: event.occurredAt, source: event.source, sourceId: event.sourceId, metadata: event.metadata ?? null })) };
   }
