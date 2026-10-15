@@ -520,6 +520,43 @@ export class HealthGoalsService {
     }
   }
 
+  private async assertCustomGoalDoesNotDuplicateMedication(patientId: string, title: unknown) {
+    const normalizedTitle = String(title ?? '').trim().toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
+    if (!patientId || !normalizedTitle) return;
+
+    // Side-effect tracking is distinct from adherence to a prescribed medicine.
+    if (/\b(side effects?|adverse reactions?|drug interactions?|medication symptoms?|medicine symptoms?)\b/.test(normalizedTitle)) return;
+
+    const rows = await this.prisma.patientMedication.findMany({
+      where: {
+        status: 'ACTIVE',
+        healthPassport: { patientId },
+      },
+      select: {
+        medication: {
+          select: { name: true, genericName: true, brandName: true },
+        },
+      },
+    });
+
+    const mentioned = rows.find((row) => {
+      const names = [row.medication?.name, row.medication?.genericName, row.medication?.brandName];
+      return names.some((name) => {
+        const normalizedName = String(name ?? '').toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
+        if (!normalizedName) return false;
+        const aliases = [normalizedName, ...normalizedName.split(' ').filter((part) => part.length >= 4)];
+        return aliases.some((alias) => alias.length >= 4 && (\` \${normalizedTitle} \`).includes(\` \${alias} \`));
+      });
+    });
+
+    if (mentioned) {
+      const medicationName = String(mentioned.medication?.name ?? mentioned.medication?.genericName ?? mentioned.medication?.brandName ?? 'your saved medicine');
+      throw new BadRequestException(
+        \`This custom health goal names your saved medicine “\${medicationName}”. Use the Medication goal and select this prescription so Sympto can track adherence against the correct medication record.\`,
+      );
+    }
+  }
+
   private async assertNoDuplicateGoal(
     patientId: string,
     category: string,
@@ -706,6 +743,7 @@ export class HealthGoalsService {
     const unit = goalData.unit ?? (isMedicationGoal ? '%' : undefined);
 
     this.assertPersonalGoalFields(category, goalData.title, unit, goalData.description);
+    if (category === 'OTHER') await this.assertCustomGoalDoesNotDuplicateMedication(patientId, goalData.title);
     this.assertGoalDefinition(category, targetValue, targetDate);
 
     const effectiveComparison =
@@ -1021,6 +1059,7 @@ export class HealthGoalsService {
     if (patientMedicationId) await this.assertPatientMedicationBelongsToPatient(patientMedicationId, String(existing.patientId));
     const glucoseTrackingOnly = targetCategory === 'BLOOD_GLUCOSE' && Object.prototype.hasOwnProperty.call(dto, 'targetValue') && (dto as any).targetValue == null;
     this.assertPersonalGoalFields(targetCategory, goalData.title ?? existing.title, goalData.unit ?? existing.unit, goalData.description ?? existing.description);
+    if (targetCategory === 'OTHER') await this.assertCustomGoalDoesNotDuplicateMedication(String(existing.patientId), goalData.title ?? existing.title);
     this.assertGoalDefinition(targetCategory, glucoseTrackingOnly ? null : goalData.targetValue ?? existing.targetValue, goalData.targetDate ?? existing.targetDate);
     const revisingWeightGoal = targetCategory === 'WEIGHT';
     let effectiveComparison: string | undefined = comparison;
@@ -1072,6 +1111,7 @@ export class HealthGoalsService {
     const goal = await this.findOne(id);
     // Guard legacy custom goals at the write boundary too: changing the UI alone must not allow a duplicate metric to be logged here.
     this.assertPersonalGoalFields(String(goal.category), goal.title, goal.unit, goal.description);
+    if (String(goal.category).toUpperCase() === 'OTHER') await this.assertCustomGoalDoesNotDuplicateMedication(String(goal.patientId), goal.title);
     const currentValue = Number(dto.currentValue);
     if (!Number.isFinite(currentValue)) throw new BadRequestException('Health goal progress value is invalid.');
 
