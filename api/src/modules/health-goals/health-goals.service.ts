@@ -466,6 +466,13 @@ export class HealthGoalsService {
     const value = String(title ?? '').trim().toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
     if (!value) return null;
 
+    // Allow distinct measures that the current dedicated category does not track.
+    if (/\b(sleep quality|sleep score|deep sleep|rem sleep|sleep apnea)\b/.test(value)) return null;
+    if (/\bdiastolic\b/.test(value) && !/\bsystolic\b/.test(value)) return null;
+    if (/\b(ldl|hdl|non hdl)\b/.test(value)) return null;
+    if (/\b(smoke free days?|cigarette free days?|days without smoking|days without cigarettes)\b/.test(value)) return null;
+    if (/\b(alcohol free days?|sober days?|days sober|sobriety streak)\b/.test(value)) return null;
+
     // Weight training is exercise, not a body-weight target.
     if (/\b(weight training|strength training)\b/.test(value)) {
       return { category: 'EXERCISE', label: 'Exercise', measurement: 'weekly exercise minutes' };
