@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { ArrowRight, CalendarDays, ClipboardCheck, Sparkles } from "lucide-react";
+import { ArrowLeft, ArrowRight, CalendarDays, ClipboardCheck, Sparkles } from "lucide-react";
 import { cloneElement, isValidElement, useEffect, useState, type ReactElement, type ReactNode } from "react";
 import ProtectedRoute from "@/components/auth/protected-route";
 import { useDashboard } from "@/hooks/use-dashboard";
@@ -98,18 +98,18 @@ function isMedicationGoal(goal: any) {
   return category === "MEDICATION" || metricType === "MEDICATION" || metricKey === "medication.adherence";
 }
 
-type GoalCarouselSlideProps = {
-  slideKey: string;
-  expandedGoalSlide: string | null;
-  onToggle: (slideKey: string) => void;
+type TodayGoalCardSlotProps = {
+  cardKey: string;
+  expandedGoalCard: string | null;
+  onToggle: (cardKey: string) => void;
   children: ReactNode;
 };
 
-function GoalCarouselSlide({ slideKey, expandedGoalSlide, onToggle, children }: GoalCarouselSlideProps) {
-  const expanded = expandedGoalSlide === slideKey;
+function TodayGoalCardSlot({ cardKey, expandedGoalCard, onToggle, children }: TodayGoalCardSlotProps) {
+  const expanded = expandedGoalCard === cardKey;
   const detailsProps = {
     detailsExpanded: expanded,
-    onToggleDetails: () => onToggle(slideKey),
+    onToggleDetails: () => onToggle(cardKey),
   };
   const card = isValidElement(children)
     ? cloneElement(children as ReactElement<any>, detailsProps)
@@ -127,9 +127,9 @@ function GoalCarouselSlide({ slideKey, expandedGoalSlide, onToggle, children }: 
 export default function TodayPage() {
   const { data, loading, error, reload } = useDashboard();
   const [symptomFeed, setSymptomFeed] = useState<any[]>([]);
-  const [expandedGoalSlide, setExpandedGoalSlide] = useState<string | null>(null);
-  const toggleExpandedGoalSlide = (slideKey: string) => {
-    setExpandedGoalSlide((current) => current === slideKey ? null : slideKey);
+  const [expandedGoalCard, setExpandedGoalSlide] = useState<string | null>(null);
+  const toggleExpandedGoalCard = (cardKey: string) => {
+    setExpandedGoalSlide((current) => current === cardKey ? null : cardKey);
   };
 
   useEffect(() => {
@@ -501,45 +501,45 @@ export default function TodayPage() {
           <div className="mt-3.5">
             <div role="region" aria-label="Active health goals" className="grid grid-cols-1 items-stretch gap-4 md:grid-cols-2">
               {medicationGoalCardsForToday.filter((item: any) => Boolean(item.medication)).map((item: any, index: number) => {
-                const slideKey = `medication-goal-slide-${String(item.goal?.id ?? patientMedicationId(item.medication) ?? index)}`;
-                return <GoalCarouselSlide key={slideKey} slideKey={slideKey} expandedGoalSlide={expandedGoalSlide} onToggle={toggleExpandedGoalSlide}>
+                const cardKey = `medication-goal-slide-${String(item.goal?.id ?? patientMedicationId(item.medication) ?? index)}`;
+                return <TodayGoalCardSlot key={cardKey} cardKey={cardKey} expandedGoalCard={expandedGoalCard} onToggle={toggleExpandedGoalCard}>
                   {item.medication
                     ? <TodayMedicationActions medications={[item.medication]} goal={item.goal} onUpdated={reload} />
                     : <TodaySupportedGoalCard goal={item.goal} activeGoals={activeGoalsArray} onUpdated={reload} />}
-                </GoalCarouselSlide>;
+                </TodayGoalCardSlot>;
               })}
               {smokingGoals.map((goal: any) => {
-                const slideKey = `smoking-goal-slide-${String(goal?.id)}`;
-                return <GoalCarouselSlide key={slideKey} slideKey={slideKey} expandedGoalSlide={expandedGoalSlide} onToggle={toggleExpandedGoalSlide}><TodaySmokingGoal goal={goal} onUpdated={reload} /></GoalCarouselSlide>;
+                const cardKey = `smoking-goal-slide-${String(goal?.id)}`;
+                return <TodayGoalCardSlot key={cardKey} cardKey={cardKey} expandedGoalCard={expandedGoalCard} onToggle={toggleExpandedGoalCard}><TodaySmokingGoal goal={goal} onUpdated={reload} /></TodayGoalCardSlot>;
               })}
               {alcoholGoals.map((goal: any) => {
-                const slideKey = `alcohol-goal-slide-${String(goal?.id)}`;
-                return <GoalCarouselSlide key={slideKey} slideKey={slideKey} expandedGoalSlide={expandedGoalSlide} onToggle={toggleExpandedGoalSlide}><TodayAlcoholGoal goal={goal} onUpdated={reload} /></GoalCarouselSlide>;
+                const cardKey = `alcohol-goal-slide-${String(goal?.id)}`;
+                return <TodayGoalCardSlot key={cardKey} cardKey={cardKey} expandedGoalCard={expandedGoalCard} onToggle={toggleExpandedGoalCard}><TodayAlcoholGoal goal={goal} onUpdated={reload} /></TodayGoalCardSlot>;
               })}
               {weightGoals.map((goal: any) => {
-                const slideKey = `weight-goal-slide-${String(goal?.id)}`;
-                return <GoalCarouselSlide key={slideKey} slideKey={slideKey} expandedGoalSlide={expandedGoalSlide} onToggle={toggleExpandedGoalSlide}><TodayWeightGoal goal={goal} bmi={bmi} heightCm={heightCm} weightKg={weightKg} /></GoalCarouselSlide>;
+                const cardKey = `weight-goal-slide-${String(goal?.id)}`;
+                return <TodayGoalCardSlot key={cardKey} cardKey={cardKey} expandedGoalCard={expandedGoalCard} onToggle={toggleExpandedGoalCard}><TodayWeightGoal goal={goal} bmi={bmi} heightCm={heightCm} weightKg={weightKg} /></TodayGoalCardSlot>;
               })}
               {exerciseGoals.map((goal: any) => {
-                const slideKey = `exercise-goal-slide-${String(goal?.id)}`;
-                return <GoalCarouselSlide key={slideKey} slideKey={slideKey} expandedGoalSlide={expandedGoalSlide} onToggle={toggleExpandedGoalSlide}><TodayExerciseGoal goal={goal} /></GoalCarouselSlide>;
+                const cardKey = `exercise-goal-slide-${String(goal?.id)}`;
+                return <TodayGoalCardSlot key={cardKey} cardKey={cardKey} expandedGoalCard={expandedGoalCard} onToggle={toggleExpandedGoalCard}><TodayExerciseGoal goal={goal} /></TodayGoalCardSlot>;
               })}
               {otherTodayGoals.map((goal: any, index: number) => {
                 const category = goalCategory(goal);
-                const slideKey = `health-goal-slide-${String(goal?.id ?? index)}`;
-                if (category === "NUTRITION") return <GoalCarouselSlide key={slideKey} slideKey={slideKey} expandedGoalSlide={expandedGoalSlide} onToggle={toggleExpandedGoalSlide}><TodayNutritionGoal goal={goal} onUpdated={reload} /></GoalCarouselSlide>;
-                if (category === "SLEEP") return <GoalCarouselSlide key={slideKey} slideKey={slideKey} expandedGoalSlide={expandedGoalSlide} onToggle={toggleExpandedGoalSlide}><TodaySleepGoal goal={goal} onUpdated={reload} /></GoalCarouselSlide>;
+                const cardKey = `health-goal-slide-${String(goal?.id ?? index)}`;
+                if (category === "NUTRITION") return <TodayGoalCardSlot key={cardKey} cardKey={cardKey} expandedGoalCard={expandedGoalCard} onToggle={toggleExpandedGoalCard}><TodayNutritionGoal goal={goal} onUpdated={reload} /></TodayGoalCardSlot>;
+                if (category === "SLEEP") return <TodayGoalCardSlot key={cardKey} cardKey={cardKey} expandedGoalCard={expandedGoalCard} onToggle={toggleExpandedGoalCard}><TodaySleepGoal goal={goal} onUpdated={reload} /></TodayGoalCardSlot>;
                 if (category === "MENTAL_HEALTH") return (
-                  <GoalCarouselSlide key={slideKey} slideKey={slideKey} expandedGoalSlide={expandedGoalSlide} onToggle={toggleExpandedGoalSlide}>
+                  <TodayGoalCardSlot key={cardKey} cardKey={cardKey} expandedGoalCard={expandedGoalCard} onToggle={toggleExpandedGoalCard}>
                     <TodayMentalHealthGoal goal={goal} onUpdated={reload} patient={data.patient ?? null} profile={data.profile ?? null}
                       healthPassport={data.healthPassport ?? null} medicalRecord={data.medicalRecord ?? null}
                       conditions={Array.isArray(data.conditions) ? data.conditions : Array.isArray(data.healthSnapshot?.activeConditions) ? data.healthSnapshot.activeConditions : []}
                       medications={Array.isArray(data.medications) ? data.medications : medications} symptoms={activeSymptoms} />
-                  </GoalCarouselSlide>
+                  </TodayGoalCardSlot>
                 );
-                if (category === "HYDRATION") return <GoalCarouselSlide key={slideKey} slideKey={slideKey} expandedGoalSlide={expandedGoalSlide} onToggle={toggleExpandedGoalSlide}><TodayHydrationGoal goal={goal} onUpdated={reload} /></GoalCarouselSlide>;
+                if (category === "HYDRATION") return <TodayGoalCardSlot key={cardKey} cardKey={cardKey} expandedGoalCard={expandedGoalCard} onToggle={toggleExpandedGoalCard}><TodayHydrationGoal goal={goal} onUpdated={reload} /></TodayGoalCardSlot>;
                 if (category === "BLOOD_GLUCOSE") return (
-                  <GoalCarouselSlide key={slideKey} slideKey={slideKey} expandedGoalSlide={expandedGoalSlide} onToggle={toggleExpandedGoalSlide}>
+                  <TodayGoalCardSlot key={cardKey} cardKey={cardKey} expandedGoalCard={expandedGoalCard} onToggle={toggleExpandedGoalCard}>
                     <TodayBloodGlucoseGoal goal={goal} patientId={String(data.patient?.id ?? "")}
                       currentWeightKg={data.patient?.weightKg ?? data.healthSnapshot?.baseline?.weightKg ?? null}
                       currentHeightCm={data.patient?.heightCm ?? data.healthSnapshot?.baseline?.heightCm ?? null}
@@ -549,23 +549,23 @@ export default function TodayPage() {
                       medications={Array.isArray(data.medications) ? data.medications : medications} activeGoals={activeGoalsArray}
                       labOrders={Array.isArray(data.recentResults?.laboratory) ? data.recentResults.laboratory : []}
                       carePlans={Array.isArray(data.carePlans) ? data.carePlans : []} baseline={data.healthSnapshot?.baseline ?? null} />
-                  </GoalCarouselSlide>
+                  </TodayGoalCardSlot>
                 );
                 if (category === "CHOLESTEROL") return (
-                  <GoalCarouselSlide key={slideKey} slideKey={slideKey} expandedGoalSlide={expandedGoalSlide} onToggle={toggleExpandedGoalSlide}>
+                  <TodayGoalCardSlot key={cardKey} cardKey={cardKey} expandedGoalCard={expandedGoalCard} onToggle={toggleExpandedGoalCard}>
                     <TodayCholesterolGoal goal={goal} labOrders={Array.isArray(data.recentResults?.laboratory) ? data.recentResults.laboratory : []}
                       activeGoals={activeGoalsArray} onUpdated={reload} />
-                  </GoalCarouselSlide>
+                  </TodayGoalCardSlot>
                 );
                 return (
-                  <GoalCarouselSlide key={slideKey} slideKey={slideKey} expandedGoalSlide={expandedGoalSlide} onToggle={toggleExpandedGoalSlide}>
+                  <TodayGoalCardSlot key={cardKey} cardKey={cardKey} expandedGoalCard={expandedGoalCard} onToggle={toggleExpandedGoalCard}>
                     <TodaySupportedGoalCard goal={goal} activeGoals={activeGoalsArray}
                       healthContext={{ patient: data.patient ?? null, profile: data.profile ?? null,
                         conditions: Array.isArray(data.conditions) ? data.conditions : Array.isArray(data.healthSnapshot?.activeConditions) ? data.healthSnapshot.activeConditions : [],
                         medications: Array.isArray(data.medications) ? data.medications : Array.isArray(medications) ? medications : [],
                         symptoms: activeSymptoms, measurements: healthVitals, journal: data.journal ?? null }}
                       onUpdated={reload} />
-                  </GoalCarouselSlide>
+                  </TodayGoalCardSlot>
                 );
               })}
             </div>
