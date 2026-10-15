@@ -838,8 +838,10 @@ export default function TodaySupportedGoalCard({ goal, activeGoals = [], healthC
         progressPercent: null,
       })
     : null;
-  const displayProgress = category === "BLOOD_PRESSURE"
-    ? target != null && bpGoalStats.recordedDays > 0 ? bpAttainmentPercent : null
+  const displayProgress = category === "MEDICATION"
+    ? null
+    : category === "BLOOD_PRESSURE"
+      ? target != null && bpGoalStats.recordedDays > 0 ? bpAttainmentPercent : null
     : category === "HEART_RATE"
       ? heartRateTodayScore
       : category === "OTHER" && displayCurrent == null
@@ -875,11 +877,13 @@ export default function TodaySupportedGoalCard({ goal, activeGoals = [], healthC
           ? "Latest systolic reading: " + displayCurrent + " mmHg, " + (bpDistance === 0 ? "exactly at" : Math.abs(bpDistance ?? 0) + " mmHg below") + " your " + target + " mmHg ceiling."
           : "Latest systolic reading: " + displayCurrent + " mmHg, " + Math.abs(bpDistance ?? 0) + " mmHg above your " + target + " mmHg ceiling."
     : null;
-  const compactInsight = category === "BLOOD_PRESSURE"
-    ? bloodPressureInsight
-    : category === "HEART_RATE"
-      ? heartRateInsight?.summary ?? nextStep
-      : nextStep;
+  const compactInsight = category === "MEDICATION"
+    ? meta.helper
+    : category === "BLOOD_PRESSURE"
+      ? bloodPressureInsight
+      : category === "HEART_RATE"
+        ? heartRateInsight?.summary ?? nextStep
+        : nextStep;
 
   async function recordValue() {
     const numeric = Number(value);
