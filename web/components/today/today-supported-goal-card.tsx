@@ -1404,25 +1404,25 @@ export default function TodaySupportedGoalCard({ goal, activeGoals = [], healthC
       </div>
       )}
       {!detailsExpanded && !personalGoalNeedsSetup && (
-        <div className="px-4 pb-4 pt-4 sm:px-5">
+        <div className={(category === "BLOOD_PRESSURE" || category === "HEART_RATE") ? "mx-4 mb-4 mt-4 flex flex-1 flex-col justify-between gap-3 rounded-[22px] bg-[#0b2d54] p-4 text-white sm:mx-5" : "px-4 pb-4 pt-4 sm:px-5"}>
           <div className="grid grid-cols-3 gap-2">
-            <div className="rounded-[16px] bg-[#f7fbfb] p-3">
-              <p className="text-[8px] font-black uppercase tracking-[.12em] text-[#95a3ad]">{category === "HEART_RATE" ? "Latest reading" : category === "BLOOD_PRESSURE" ? "Latest systolic" : category === "MEDICATION" ? "Current adherence" : "Current"}</p>
-              <p className="mt-1 break-words text-base font-black text-[#0b2d54]">{displayCurrent == null ? "—" : displayCurrent}{displayUnit && displayCurrent != null ? " " + displayUnit : ""}</p>
+            <div className={(category === "BLOOD_PRESSURE" || category === "HEART_RATE") ? "rounded-[16px] bg-white/[.06] p-3 ring-1 ring-white/10" : "rounded-[16px] bg-[#f7fbfb] p-3"}>
+              <p className={(category === "BLOOD_PRESSURE" || category === "HEART_RATE") ? "text-[8px] font-black uppercase tracking-[.12em] text-white/50" : "text-[8px] font-black uppercase tracking-[.12em] text-[#95a3ad]"}>{category === "HEART_RATE" ? "Latest reading" : category === "BLOOD_PRESSURE" ? "Latest systolic" : category === "MEDICATION" ? "Current adherence" : "Current"}</p>
+              <p className={(category === "BLOOD_PRESSURE" || category === "HEART_RATE") ? "mt-1 break-words text-base font-black text-white" : "mt-1 break-words text-base font-black text-[#0b2d54]"}>{displayCurrent == null ? "—" : displayCurrent}{displayUnit && displayCurrent != null ? " " + displayUnit : ""}</p>
             </div>
             <div className="rounded-[16px] bg-[#f7fbfb] p-3">
-              <p className="text-[8px] font-black uppercase tracking-[.12em] text-[#95a3ad]">{category === "HEART_RATE" ? "Personal ceiling" : category === "BLOOD_PRESSURE" ? "Systolic ceiling" : category === "MEDICATION" ? "Adherence target" : "Target"}</p>
-              <p className="mt-1 break-words text-base font-black text-[#0b2d54]">{target == null ? "—" : (category === "BLOOD_PRESSURE" || category === "HEART_RATE" ? "≤ " : "") + target}{displayUnit && target != null ? " " + displayUnit : ""}</p>
+              <p className={(category === "BLOOD_PRESSURE" || category === "HEART_RATE") ? "text-[8px] font-black uppercase tracking-[.12em] text-white/50" : "text-[8px] font-black uppercase tracking-[.12em] text-[#95a3ad]"}>{category === "HEART_RATE" ? "Personal ceiling" : category === "BLOOD_PRESSURE" ? "Systolic ceiling" : category === "MEDICATION" ? "Adherence target" : "Target"}</p>
+              <p className={(category === "BLOOD_PRESSURE" || category === "HEART_RATE") ? "mt-1 break-words text-base font-black text-white" : "mt-1 break-words text-base font-black text-[#0b2d54]"}>{target == null ? "—" : (category === "BLOOD_PRESSURE" || category === "HEART_RATE" ? "≤ " : "") + target}{displayUnit && target != null ? " " + displayUnit : ""}</p>
             </div>
-            <div className="rounded-[16px] bg-[#e9f9fa] p-3">
-              <p className="text-[8px] font-black uppercase tracking-[.12em] text-[#0b7b80]">{category === "HEART_RATE" ? "Today's progress" : "Progress"}</p>
-              <p className="mt-1 text-base font-black text-[#0b6f73]">{category === "HEART_RATE" && !heartRateHasTodayReading ? "No reading today" : displayProgress == null ? "—" : displayProgress + "%"}</p>
+            <div className={(category === "BLOOD_PRESSURE" || category === "HEART_RATE") ? "rounded-[16px] bg-[#24c1c4]/10 p-3 ring-1 ring-[#24c1c4]/20" : "rounded-[16px] bg-[#e9f9fa] p-3"}>
+              <p className={(category === "BLOOD_PRESSURE" || category === "HEART_RATE") ? "text-[8px] font-black uppercase tracking-[.12em] text-[#8ef0ef]" : "text-[8px] font-black uppercase tracking-[.12em] text-[#0b7b80]"}>{category === "HEART_RATE" ? "Today's progress" : "Progress"}</p>
+              <p className={(category === "BLOOD_PRESSURE" || category === "HEART_RATE") ? "mt-1 text-base font-black text-white" : "mt-1 text-base font-black text-[#0b6f73]"}>{category === "HEART_RATE" && !heartRateHasTodayReading ? "No reading today" : displayProgress == null ? "—" : displayProgress + "%"}</p>
             </div>
           </div>
-          {displayProgress != null && <div className="mt-3 h-2 overflow-hidden rounded-full bg-[#edf3f5]"><div className="h-full rounded-full bg-[#24c1c4] transition-all" style={{ width: Math.max(0, displayProgress) + "%" }} /></div>}
-          <p className="mt-3 rounded-xl bg-[#e9f9fa] px-3 py-2 text-[9px] font-semibold leading-4 text-[#0b6f73]">{compactInsight || meta.helper}</p>
-          {category === "BLOOD_PRESSURE" && bpDisplayAt && <p className="mt-2 text-[9px] leading-4 text-[#74859a]">Latest reading recorded {formatInsightDateTime(bpDisplayAt) ?? "at an unknown time"}. Only systolic pressure is compared with this target.</p>}
-          {category === "HEART_RATE" && <p className="mt-2 text-[9px] leading-4 text-[#74859a]">{heartRateDisplayAt ? (heartRateHasTodayReading ? "Recorded today at " : "Latest resting reading · ") + (heartRateHasTodayReading ? new Intl.DateTimeFormat("en-ZA", { timeZone: "Africa/Johannesburg", hour: "2-digit", minute: "2-digit" }).format(new Date(heartRateDisplayAt)) : formatInsightDateTime(heartRateDisplayAt)) : "Only resting readings are shown here. Record one after sitting quietly for a few minutes."} Only readings clearly identified as resting are compared with this saved target.</p>}
+          {displayProgress != null && <div className={(category === "BLOOD_PRESSURE" || category === "HEART_RATE") ? "mt-3 h-2 overflow-hidden rounded-full bg-white/10" : "mt-3 h-2 overflow-hidden rounded-full bg-[#edf3f5]"}><div className="h-full rounded-full bg-[#24c1c4] transition-all" style={{ width: Math.max(0, displayProgress) + "%" }} /></div>}
+          <p className={(category === "BLOOD_PRESSURE" || category === "HEART_RATE") ? "mt-3 rounded-xl bg-white/[.07] px-3 py-2 text-[9px] font-semibold leading-4 text-white/80" : "mt-3 rounded-xl bg-[#e9f9fa] px-3 py-2 text-[9px] font-semibold leading-4 text-[#0b6f73]"}>{compactInsight || meta.helper}</p>
+          {category === "BLOOD_PRESSURE" && bpDisplayAt && <p className={(category === "BLOOD_PRESSURE" || category === "HEART_RATE") ? "mt-2 text-[9px] leading-4 text-white/55" : "mt-2 text-[9px] leading-4 text-[#74859a]"}>Latest reading recorded {formatInsightDateTime(bpDisplayAt) ?? "at an unknown time"}. Only systolic pressure is compared with this target.</p>}
+          {category === "HEART_RATE" && <p className={(category === "BLOOD_PRESSURE" || category === "HEART_RATE") ? "mt-2 text-[9px] leading-4 text-white/55" : "mt-2 text-[9px] leading-4 text-[#74859a]"}>{heartRateDisplayAt ? (heartRateHasTodayReading ? "Recorded today at " : "Latest resting reading · ") + (heartRateHasTodayReading ? new Intl.DateTimeFormat("en-ZA", { timeZone: "Africa/Johannesburg", hour: "2-digit", minute: "2-digit" }).format(new Date(heartRateDisplayAt)) : formatInsightDateTime(heartRateDisplayAt)) : "Only resting readings are shown here. Record one after sitting quietly for a few minutes."} Only readings clearly identified as resting are compared with this saved target.</p>}
           {category === "HEART_RATE" && heartRateInsight?.trend && <p className="mt-2 text-[9px] leading-4 text-[#74859a]">Recent trend: {heartRateInsight.trend.fromValue} → {heartRateInsight.trend.toValue} bpm ({heartRateInsight.trend.delta > 0 ? "+" : ""}{heartRateInsight.trend.delta} bpm).</p>}
           {category === "BLOOD_PRESSURE" && <p className="mt-2 text-[9px] leading-4 text-[#74859a]">This goal compares systolic readings recorded in Health Vitals. Use your clinician-confirmed target.</p>}
           <div className="mt-3 flex flex-wrap items-center justify-between gap-2">
@@ -1432,9 +1432,9 @@ export default function TodaySupportedGoalCard({ goal, activeGoals = [], healthC
                 <button type="button" onClick={() => void recordValue()} disabled={saving || value.trim() === ""} className="inline-flex min-h-9 shrink-0 items-center justify-center gap-1 rounded-xl bg-[#0b2d54] px-3 py-2 text-[9px] font-black text-white disabled:cursor-not-allowed disabled:opacity-40">{saving ? "Saving…" : "Record"}</button>
               </div>
             ) : (
-              <Link href={source.href} className="inline-flex min-h-9 items-center justify-center gap-1.5 rounded-xl bg-[#0b2d54] px-3.5 py-2 text-[9px] font-black text-white">{source.label} <ArrowRight className="h-3 w-3 text-[#24c1c4]" /></Link>
+              <Link href={source.href} className={(category === "BLOOD_PRESSURE" || category === "HEART_RATE") ? "inline-flex min-h-9 items-center justify-center gap-1.5 rounded-xl bg-[#24c1c4] px-3.5 py-2 text-[9px] font-black text-[#0b2d54]" : "inline-flex min-h-9 items-center justify-center gap-1.5 rounded-xl bg-[#0b2d54] px-3.5 py-2 text-[9px] font-black text-white"}>{source.label} <ArrowRight className="h-3 w-3 text-[#24c1c4]" /></Link>
             )}
-            {onToggleDetails && <GoalCardDisclosureButton expanded={false} onToggle={onToggleDetails} label={category === "HEART_RATE" ? "Show insights" : "Show details"} />}
+            {onToggleDetails && <GoalCardDisclosureButton expanded={false} onToggle={onToggleDetails} dark={category === "BLOOD_PRESSURE" || category === "HEART_RATE"} label={category === "HEART_RATE" ? "Show insights" : "Show details"} />}
           </div>
           {category === "OTHER" && (
             <p className="mt-2 text-[8px] leading-4 text-[#82939f]">Measurement method: {customGoalMeasurementInstructions || "Use the measurement method saved with this goal."}</p>
