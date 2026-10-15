@@ -2,11 +2,12 @@
 
 import Link from "next/link";
 import { ArrowRight, Dumbbell } from "lucide-react";
+import GoalCardDisclosureButton from "@/components/today/goal-card-disclosure-button";
 import { useEffect, useMemo, useState } from "react";
 import { healthGoalsService } from "@/services/health-goals.service";
 import { canonicalExerciseDayTotals, canonicalExerciseWeekTotal, type ExerciseMetricEvent } from "@/lib/exercise-metric";
 
-type Props = { goal: any };
+type Props = { goal: any; detailsExpanded?: boolean; onToggleDetails?: () => void };
 type ExerciseEvent = ExerciseMetricEvent & { sourceId?: string | null };
 
 function startOfLocalWeek(date = new Date()) {
@@ -39,7 +40,7 @@ function journeyFor(goal: any) {
   };
 }
 
-export default function TodayExerciseGoal({ goal }: Props) {
+export default function TodayExerciseGoal({ goal, detailsExpanded, onToggleDetails }: Props) {
   const [events, setEvents] = useState<ExerciseEvent[]>([]);
   const [loading, setLoading] = useState(true);
   const targetMinutes = Number(goal?.metricConfig?.frequencyTarget ?? goal?.frequencyTarget ?? goal?.targetValue ?? 0) || 0;
@@ -83,7 +84,7 @@ export default function TodayExerciseGoal({ goal }: Props) {
       : `${remainingMinutes} minutes to go this week.`;
 
   return (
-    <article id={`today-goal-${String(goal?.id ?? "")}`} className="flex h-full min-w-0 flex-col overflow-hidden rounded-[30px] border border-[#dfeaec] bg-white shadow-[0_18px_48px_rgba(11,45,84,.065)]">
+    <article id={`today-goal-${String(goal?.id ?? "")}`} className={detailsExpanded ? "flex h-auto min-w-0 flex-col overflow-visible rounded-[30px] border border-[#dfeaec] bg-white shadow-[0_18px_48px_rgba(11,45,84,.065)]" : "flex h-full min-w-0 flex-col overflow-hidden rounded-[30px] border border-[#dfeaec] bg-white shadow-[0_18px_48px_rgba(11,45,84,.065)]"}>
       <div className="flex items-center gap-3 px-5 pb-4 pt-5 sm:px-6 sm:pt-6">
         <span className="grid h-10 w-10 shrink-0 place-items-center rounded-[14px] bg-[#e8f8f7] text-[#0b7b80] ring-1 ring-[#d8efed]"><Dumbbell className="h-4 w-4" /></span>
         <div className="min-w-0">
@@ -143,12 +144,43 @@ export default function TodayExerciseGoal({ goal }: Props) {
               <p className="text-[10px] font-black text-white/70">Day {journey.journeyDay} · {journey.daysLeft === null ? "Journey active" : journey.daysLeft === 0 ? "Target date today" : `${journey.daysLeft} days left`}</p>
               <p className="mt-1 text-[9px] text-white/40">Target date: {formatDate(journey.targetDate)}</p>
             </div>
-            <Link href={`/health-goals#goal-${encodeURIComponent(String(goal?.id ?? ""))}`} className="inline-flex min-h-9 shrink-0 items-center gap-1.5 rounded-xl bg-white/10 px-3 py-2 text-[10px] font-black text-white ring-1 ring-white/10 transition hover:bg-white/15">
-              View goal <ArrowRight className="h-3 w-3" />
-            </Link>
+            <div className="flex flex-wrap items-center justify-end gap-2">{onToggleDetails && <GoalCardDisclosureButton expanded={Boolean(detailsExpanded)} onToggle={onToggleDetails} label="Show details" />}<Link href={`/health-goals#goal-${encodeURIComponent(String(goal?.id ?? ""))}`} className="inline-flex min-h-9 shrink-0 items-center gap-1.5 rounded-xl bg-white/10 px-3 py-2 text-[10px] font-black text-white ring-1 ring-white/10 transition hover:bg-white/15">View goal <ArrowRight className="h-3 w-3" /></Link></div>
           </div>
         </div>
       </div>
+      {detailsExpanded && (
+        <section className="mx-4 mb-4 rounded-[18px] border border-[#e1ecee] bg-[#f8fbfb] p-3.5 sm:mx-5">
+          <div className="flex items-start justify-between gap-3">
+            <div>
+              <p className="text-[8px] font-black uppercase tracking-[.14em] text-[#0b7b80]">Weekly activity breakdown</p>
+              <p className="mt-1 text-[9px] leading-4 text-[#74859a]">Monday–Sunday · recorded exercise minutes from your Daily Health Check-in</p>
+            </div>
+            <div className="text-right">
+              <p className="text-[8px] font-black uppercase tracking-[.12em] text-[#8a99a6]">Days logged</p>
+              <p className="mt-0.5 text-sm font-black text-[#0b2d54]">{Array.from(dayTotals.keys()).filter((key) => key >= localDayKey(weekStart) && key <= localDayKey(new Date())).length} / 7</p>
+            </div>
+          </div>
+          <div className="mt-3 grid grid-cols-7 gap-1.5">
+            {Array.from({ length: 7 }, (_, index) => {
+              const date = new Date(weekStart);
+              date.setDate(date.getDate() + index);
+              const key = localDayKey(date);
+              const minutes = dayTotals.get(key) ?? 0;
+              const isFuture = key > localDayKey(new Date());
+              return (
+                <div key={key} className="min-w-0 rounded-[12px] bg-white px-1.5 py-2 text-center ring-1 ring-[#e5edef]">
+                  <p className="text-[8px] font-bold text-[#82939f]">{new Intl.DateTimeFormat("en-ZA", { weekday: "short" }).format(date)}</p>
+                  <p className="mt-1 text-[10px] font-black text-[#0b2d54]">{isFuture ? "—" : minutes}</p>
+                  <p className="text-[7px] text-[#8a99a6]">min</p>
+                </div>
+              );
+            })}
+          </div>
+          <p className="mt-3 text-[9px] leading-4 text-[#74859a]">
+            {String(goal?.description ?? "").trim() || "Exercise minutes are taken from your saved Daily Health Check-in. Sympto totals the recorded minutes for this calendar week and compares them with your weekly target."}
+          </p>
+        </section>
+      )}
     </article>
   );
 }
