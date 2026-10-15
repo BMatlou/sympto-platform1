@@ -1,8 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { ArrowLeft, ArrowRight, CalendarDays, ClipboardCheck, Sparkles } from "lucide-react";
-import { useEffect, useRef, useState } from "react";
+import { ArrowLeft, ArrowRight, CalendarDays, ChevronDown, ClipboardCheck, Sparkles } from "lucide-react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import ProtectedRoute from "@/components/auth/protected-route";
 import { useDashboard } from "@/hooks/use-dashboard";
 import DailyHealthCheckIn from "@/components/dashboard/daily-health-check-in";
@@ -88,11 +88,56 @@ function isMedicationGoal(goal: any) {
   return category === "MEDICATION" || metricType === "MEDICATION" || metricKey === "medication.adherence";
 }
 
+type GoalCarouselSlideProps = {
+  slideKey: string;
+  expandedGoalSlide: string | null;
+  onToggle: (slideKey: string) => void;
+  children: ReactNode;
+};
+
+function GoalCarouselSlide({ slideKey, expandedGoalSlide, onToggle, children }: GoalCarouselSlideProps) {
+  const expanded = expandedGoalSlide === slideKey;
+
+  return (
+    <div
+      data-goal-slide
+      data-goal-slide-key={slideKey}
+      role="group"
+      aria-roledescription="slide"
+      className={expanded
+        ? "relative min-w-0 w-full shrink-0 snap-start"
+        : "relative h-[480px] min-w-0 w-full shrink-0 snap-start overflow-hidden rounded-[26px]"}
+    >
+      {expanded && (
+        <div className="mb-2 flex justify-end">
+          <button type="button" aria-expanded="true" onClick={() => onToggle(slideKey)}
+            className="inline-flex min-h-9 items-center justify-center gap-2 rounded-full border border-[#dce8eb] bg-white px-3.5 py-2 text-[9px] font-black text-[#0b2d54] shadow-sm transition hover:border-[#24c1c4] hover:bg-[#f7fcfc] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#24c1c4]">
+            Hide insights & details
+            <ChevronDown className="h-3.5 w-3.5 rotate-180 transition-transform" />
+          </button>
+        </div>
+      )}
+      {children}
+      {!expanded && (
+        <button type="button" aria-expanded="false" onClick={() => onToggle(slideKey)}
+          className="absolute inset-x-0 bottom-0 z-20 flex min-h-[64px] w-full items-end justify-center gap-2 rounded-b-[26px] border-t border-[#edf2f4] bg-gradient-to-t from-white via-white/95 to-white/75 px-4 pb-4 pt-7 text-[10px] font-black text-[#0b2d54] backdrop-blur-[2px] transition hover:text-[#0b7b80] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-[-3px] focus-visible:outline-[#24c1c4]">
+          Show insights & details
+          <ChevronDown className="h-3.5 w-3.5 transition-transform" />
+        </button>
+      )}
+    </div>
+  );
+}
+
 export default function TodayPage() {
   const { data, loading, error, reload } = useDashboard();
   const [symptomFeed, setSymptomFeed] = useState<any[]>([]);
   const goalCarouselRef = useRef<HTMLDivElement | null>(null);
   const [activeGoalSlide, setActiveGoalSlide] = useState(0);
+  const [expandedGoalSlide, setExpandedGoalSlide] = useState<string | null>(null);
+  const toggleExpandedGoalSlide = (slideKey: string) => {
+    setExpandedGoalSlide((current) => current === slideKey ? null : slideKey);
+  };
 
   useEffect(() => {
     let active = true;
@@ -457,158 +502,88 @@ export default function TodayPage() {
             <Link href="/health-goals" className="text-[10px] font-black text-[#0b2d54]">Manage goals <ArrowRight className="ml-1 inline h-3.5 w-3.5" /></Link>
           </div>
           <div className="mt-3.5">
-            <div
-              ref={goalCarouselRef}
+            <div ref={goalCarouselRef}
               onScroll={(event) => {
                 const container = event.currentTarget;
                 const slides = Array.from(container.querySelectorAll<HTMLElement>("[data-goal-slide]"));
                 if (slides.length === 0) return;
                 const containerLeft = container.getBoundingClientRect().left;
-                let nearestIndex = 0;
-                let nearestDistance = Number.POSITIVE_INFINITY;
+                let nearestIndex = 0, nearestDistance = Number.POSITIVE_INFINITY;
                 slides.forEach((slide, index) => {
                   const distance = Math.abs(slide.getBoundingClientRect().left - containerLeft);
-                  if (distance < nearestDistance) {
-                    nearestDistance = distance;
-                    nearestIndex = index;
-                  }
+                  if (distance < nearestDistance) { nearestDistance = distance; nearestIndex = index; }
                 });
                 setActiveGoalSlide((current) => current === nearestIndex ? current : nearestIndex);
+                if (nearestIndex !== activeGoalSlide) setExpandedGoalSlide(null);
               }}
-              role="region"
-              aria-label="Active health goals"
-              aria-roledescription="carousel"
-              tabIndex={0}
-              className="flex snap-x snap-mandatory gap-4 overflow-x-auto scroll-smooth pb-1 [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#24c1c4]"
-            >
-              {medicationGoalCardsForToday.map((item: any, index: number) => (
-                <div
-                  key={`medication-goal-slide-${String(item.goal?.id ?? patientMedicationId(item.medication) ?? index)}`}
-                  data-goal-slide
-                  role="group"
-                  aria-roledescription="slide"
-                  className="min-w-0 w-full shrink-0 snap-start"
-                >
-                  {item.medication ? (
-                    <TodayMedicationActions
-                      medications={[item.medication]}
-                      goal={item.goal}
-                      onUpdated={reload}
-                    />
-                  ) : (
-                    <TodaySupportedGoalCard
-                      goal={item.goal}
-                      activeGoals={activeGoalsArray}
-                      onUpdated={reload}
-                    />
-                  )}
-                </div>
-              ))}
-              {smokingGoals.map((goal: any) => (
-                <div key={`smoking-goal-slide-${String(goal?.id)}`} data-goal-slide role="group" aria-roledescription="slide" className="min-w-0 w-full shrink-0 snap-start">
-                  <TodaySmokingGoal goal={goal} onUpdated={reload} />
-                </div>
-              ))}
-              {alcoholGoals.map((goal: any) => (
-                <div key={`alcohol-goal-slide-${String(goal?.id)}`} data-goal-slide role="group" aria-roledescription="slide" className="min-w-0 w-full shrink-0 snap-start">
-                  <TodayAlcoholGoal goal={goal} onUpdated={reload} />
-                </div>
-              ))}
-              {weightGoals.map((goal: any) => (
-                <div key={`weight-goal-slide-${String(goal?.id)}`} data-goal-slide role="group" aria-roledescription="slide" className="min-w-0 w-full shrink-0 snap-start">
-                  <TodayWeightGoal goal={goal} bmi={bmi} heightCm={heightCm} weightKg={weightKg} />
-                </div>
-              ))}
-              {exerciseGoals.map((goal: any) => (
-                <div key={`exercise-goal-slide-${String(goal?.id)}`} data-goal-slide role="group" aria-roledescription="slide" className="min-w-0 w-full shrink-0 snap-start">
-                  <TodayExerciseGoal goal={goal} />
-                </div>
-              ))}
+              role="region" aria-label="Active health goals" aria-roledescription="carousel" tabIndex={0}
+              className="flex items-start snap-x snap-mandatory gap-4 overflow-x-auto scroll-smooth pb-1 [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#24c1c4]">
+              {medicationGoalCardsForToday.map((item: any, index: number) => {
+                const slideKey = `medication-goal-slide-${String(item.goal?.id ?? patientMedicationId(item.medication) ?? index)}`;
+                return <GoalCarouselSlide key={slideKey} slideKey={slideKey} expandedGoalSlide={expandedGoalSlide} onToggle={toggleExpandedGoalSlide}>
+                  {item.medication
+                    ? <TodayMedicationActions medications={[item.medication]} goal={item.goal} onUpdated={reload} />
+                    : <TodaySupportedGoalCard goal={item.goal} activeGoals={activeGoalsArray} onUpdated={reload} />}
+                </GoalCarouselSlide>;
+              })}
+              {smokingGoals.map((goal: any) => {
+                const slideKey = `smoking-goal-slide-${String(goal?.id)}`;
+                return <GoalCarouselSlide key={slideKey} slideKey={slideKey} expandedGoalSlide={expandedGoalSlide} onToggle={toggleExpandedGoalSlide}><TodaySmokingGoal goal={goal} onUpdated={reload} /></GoalCarouselSlide>;
+              })}
+              {alcoholGoals.map((goal: any) => {
+                const slideKey = `alcohol-goal-slide-${String(goal?.id)}`;
+                return <GoalCarouselSlide key={slideKey} slideKey={slideKey} expandedGoalSlide={expandedGoalSlide} onToggle={toggleExpandedGoalSlide}><TodayAlcoholGoal goal={goal} onUpdated={reload} /></GoalCarouselSlide>;
+              })}
+              {weightGoals.map((goal: any) => {
+                const slideKey = `weight-goal-slide-${String(goal?.id)}`;
+                return <GoalCarouselSlide key={slideKey} slideKey={slideKey} expandedGoalSlide={expandedGoalSlide} onToggle={toggleExpandedGoalSlide}><TodayWeightGoal goal={goal} bmi={bmi} heightCm={heightCm} weightKg={weightKg} /></GoalCarouselSlide>;
+              })}
+              {exerciseGoals.map((goal: any) => {
+                const slideKey = `exercise-goal-slide-${String(goal?.id)}`;
+                return <GoalCarouselSlide key={slideKey} slideKey={slideKey} expandedGoalSlide={expandedGoalSlide} onToggle={toggleExpandedGoalSlide}><TodayExerciseGoal goal={goal} /></GoalCarouselSlide>;
+              })}
               {otherTodayGoals.map((goal: any, index: number) => {
                 const category = String(goal?.category ?? "").toUpperCase();
-                const slideClassName = "min-w-0 w-full shrink-0 snap-start";
-                const slideProps = { "data-goal-slide": true, role: "group" as const, "aria-roledescription": "slide" };
-
-                if (category === "NUTRITION") {
-                  return <div key={`nutrition-goal-slide-${String(goal?.id ?? index)}`} {...slideProps} className={slideClassName}><TodayNutritionGoal goal={goal} onUpdated={reload} /></div>;
-                }
-                if (category === "SLEEP") {
-                  return <div key={`sleep-goal-slide-${String(goal?.id ?? index)}`} {...slideProps} className={slideClassName}><TodaySleepGoal goal={goal} onUpdated={reload} /></div>;
-                }
-                if (category === "MENTAL_HEALTH") {
-                  return (
-                    <div key={`mental-health-goal-slide-${String(goal?.id ?? index)}`} {...slideProps} className={slideClassName}>
-                      <TodayMentalHealthGoal
-                        goal={goal}
-                        onUpdated={reload}
-                        patient={data.patient ?? null}
-                        profile={data.profile ?? null}
-                        healthPassport={data.healthPassport ?? null}
-                        medicalRecord={data.medicalRecord ?? null}
-                        conditions={Array.isArray(data.conditions) ? data.conditions : Array.isArray(data.healthSnapshot?.activeConditions) ? data.healthSnapshot.activeConditions : []}
-                        medications={Array.isArray(data.medications) ? data.medications : medications}
-                        symptoms={activeSymptoms}
-                      />
-                    </div>
-                  );
-                }
-                if (category === "HYDRATION") {
-                  return <div key={`hydration-goal-slide-${String(goal?.id ?? index)}`} {...slideProps} className={slideClassName}><TodayHydrationGoal goal={goal} onUpdated={reload} /></div>;
-                }
-                if (category === "BLOOD_GLUCOSE") {
-                  return (
-                    <div key={`blood-glucose-goal-slide-${String(goal?.id ?? index)}`} {...slideProps} className={slideClassName}>
-                      <TodayBloodGlucoseGoal
-                        goal={goal}
-                        patientId={String(data.patient?.id ?? "")}
-                        currentWeightKg={data.patient?.weightKg ?? data.healthSnapshot?.baseline?.weightKg ?? null}
-                        currentHeightCm={data.patient?.heightCm ?? data.healthSnapshot?.baseline?.heightCm ?? null}
-                        measurements={healthVitals}
-                        onUpdated={reload}
-                        conditions={Array.isArray(data.conditions) ? data.conditions : Array.isArray(data.healthSnapshot?.activeConditions) ? data.healthSnapshot.activeConditions : []}
-                        diagnoses={Array.isArray(data.clinicalDiagnoses) ? data.clinicalDiagnoses : []}
-                        medications={Array.isArray(data.medications) ? data.medications : medications}
-                        activeGoals={activeGoalsArray}
-                        labOrders={Array.isArray(data.recentResults?.laboratory) ? data.recentResults.laboratory : []}
-                        carePlans={Array.isArray(data.carePlans) ? data.carePlans : []}
-                        baseline={data.healthSnapshot?.baseline ?? null}
-                      />
-                    </div>
-                  );
-                }
-                if (category === "CHOLESTEROL") {
-                  return (
-                    <div key={`cholesterol-goal-slide-${String(goal?.id ?? index)}`} {...slideProps} className={slideClassName}>
-                      <TodayCholesterolGoal
-                        goal={goal}
-                        labOrders={Array.isArray(data.recentResults?.laboratory) ? data.recentResults.laboratory : []}
-                        activeGoals={activeGoalsArray}
-                        onUpdated={reload}
-                      />
-                    </div>
-                  );
-                }
+                const slideKey = `health-goal-slide-${String(goal?.id ?? index)}`;
+                if (category === "NUTRITION") return <GoalCarouselSlide key={slideKey} slideKey={slideKey} expandedGoalSlide={expandedGoalSlide} onToggle={toggleExpandedGoalSlide}><TodayNutritionGoal goal={goal} onUpdated={reload} /></GoalCarouselSlide>;
+                if (category === "SLEEP") return <GoalCarouselSlide key={slideKey} slideKey={slideKey} expandedGoalSlide={expandedGoalSlide} onToggle={toggleExpandedGoalSlide}><TodaySleepGoal goal={goal} onUpdated={reload} /></GoalCarouselSlide>;
+                if (category === "MENTAL_HEALTH") return (
+                  <GoalCarouselSlide key={slideKey} slideKey={slideKey} expandedGoalSlide={expandedGoalSlide} onToggle={toggleExpandedGoalSlide}>
+                    <TodayMentalHealthGoal goal={goal} onUpdated={reload} patient={data.patient ?? null} profile={data.profile ?? null}
+                      healthPassport={data.healthPassport ?? null} medicalRecord={data.medicalRecord ?? null}
+                      conditions={Array.isArray(data.conditions) ? data.conditions : Array.isArray(data.healthSnapshot?.activeConditions) ? data.healthSnapshot.activeConditions : []}
+                      medications={Array.isArray(data.medications) ? data.medications : medications} symptoms={activeSymptoms} />
+                  </GoalCarouselSlide>
+                );
+                if (category === "HYDRATION") return <GoalCarouselSlide key={slideKey} slideKey={slideKey} expandedGoalSlide={expandedGoalSlide} onToggle={toggleExpandedGoalSlide}><TodayHydrationGoal goal={goal} onUpdated={reload} /></GoalCarouselSlide>;
+                if (category === "BLOOD_GLUCOSE") return (
+                  <GoalCarouselSlide key={slideKey} slideKey={slideKey} expandedGoalSlide={expandedGoalSlide} onToggle={toggleExpandedGoalSlide}>
+                    <TodayBloodGlucoseGoal goal={goal} patientId={String(data.patient?.id ?? "")}
+                      currentWeightKg={data.patient?.weightKg ?? data.healthSnapshot?.baseline?.weightKg ?? null}
+                      currentHeightCm={data.patient?.heightCm ?? data.healthSnapshot?.baseline?.heightCm ?? null}
+                      measurements={healthVitals} onUpdated={reload}
+                      conditions={Array.isArray(data.conditions) ? data.conditions : Array.isArray(data.healthSnapshot?.activeConditions) ? data.healthSnapshot.activeConditions : []}
+                      diagnoses={Array.isArray(data.clinicalDiagnoses) ? data.clinicalDiagnoses : []}
+                      medications={Array.isArray(data.medications) ? data.medications : medications} activeGoals={activeGoalsArray}
+                      labOrders={Array.isArray(data.recentResults?.laboratory) ? data.recentResults.laboratory : []}
+                      carePlans={Array.isArray(data.carePlans) ? data.carePlans : []} baseline={data.healthSnapshot?.baseline ?? null} />
+                  </GoalCarouselSlide>
+                );
+                if (category === "CHOLESTEROL") return (
+                  <GoalCarouselSlide key={slideKey} slideKey={slideKey} expandedGoalSlide={expandedGoalSlide} onToggle={toggleExpandedGoalSlide}>
+                    <TodayCholesterolGoal goal={goal} labOrders={Array.isArray(data.recentResults?.laboratory) ? data.recentResults.laboratory : []}
+                      activeGoals={activeGoalsArray} onUpdated={reload} />
+                  </GoalCarouselSlide>
+                );
                 return (
-                  <div key={`health-goal-slide-${String(goal?.id ?? index)}`} {...slideProps} className={slideClassName}>
-                    <TodaySupportedGoalCard
-                      goal={goal}
-                      activeGoals={activeGoalsArray}
-                      healthContext={{
-                        patient: data.patient ?? null,
-                        profile: data.profile ?? null,
-                        conditions: Array.isArray(data.conditions)
-                          ? data.conditions
-                          : Array.isArray(data.healthSnapshot?.activeConditions)
-                            ? data.healthSnapshot.activeConditions
-                            : [],
+                  <GoalCarouselSlide key={slideKey} slideKey={slideKey} expandedGoalSlide={expandedGoalSlide} onToggle={toggleExpandedGoalSlide}>
+                    <TodaySupportedGoalCard goal={goal} activeGoals={activeGoalsArray}
+                      healthContext={{ patient: data.patient ?? null, profile: data.profile ?? null,
+                        conditions: Array.isArray(data.conditions) ? data.conditions : Array.isArray(data.healthSnapshot?.activeConditions) ? data.healthSnapshot.activeConditions : [],
                         medications: Array.isArray(data.medications) ? data.medications : Array.isArray(medications) ? medications : [],
-                        symptoms: activeSymptoms,
-                        measurements: healthVitals,
-                        journal: data.journal ?? null,
-                      }}
-                      onUpdated={reload}
-                    />
-                  </div>
+                        symptoms: activeSymptoms, measurements: healthVitals, journal: data.journal ?? null }}
+                      onUpdated={reload} />
+                  </GoalCarouselSlide>
                 );
               })}
             </div>
@@ -623,33 +598,25 @@ export default function TodayPage() {
                 const targetLeft = container.scrollLeft + slide.getBoundingClientRect().left - container.getBoundingClientRect().left;
                 container.scrollTo({ left: Math.max(0, targetLeft), behavior: "smooth" });
                 setActiveGoalSlide(index);
+                setExpandedGoalSlide(null);
               };
               return (
                 <div className="mt-3 flex flex-col items-center gap-1.5">
                   <div className="flex w-full items-center justify-between gap-3">
                     {goalSlideCount > 1 ? (
-                      <button type="button" onClick={() => scrollToGoalSlide(Math.max(0, currentSlide - 1))} disabled={currentSlide === 0} aria-label="Previous goal" className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-[#dce8eb] bg-white text-[#0b2d54] transition hover:border-[#24c1c4] hover:bg-[#f3fbfb] disabled:cursor-not-allowed disabled:opacity-35">
-                        <ArrowLeft className="h-3.5 w-3.5" />
-                      </button>
+                      <button type="button" onClick={() => scrollToGoalSlide(Math.max(0, currentSlide - 1))} disabled={currentSlide === 0} aria-label="Previous goal" className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-[#dce8eb] bg-white text-[#0b2d54] transition hover:border-[#24c1c4] hover:bg-[#f3fbfb] disabled:cursor-not-allowed disabled:opacity-35"><ArrowLeft className="h-3.5 w-3.5" /></button>
                     ) : <span className="h-8 w-8 shrink-0" />}
                     <div className="flex min-h-8 flex-wrap items-center justify-center gap-1.5" role="group" aria-label="Choose an active goal">
                       {Array.from({ length: goalSlideCount }, (_, index) => (
-                        <button
-                          key={`goal-pagination-dot-${index}`}
-                          type="button"
-                          aria-label={`Go to goal ${index + 1} of ${goalSlideCount}`}
-                          aria-current={currentSlide === index ? "true" : undefined}
-                          onClick={() => scrollToGoalSlide(index)}
+                        <button key={`goal-pagination-dot-${index}`} type="button" aria-label={`Go to goal ${index + 1} of ${goalSlideCount}`}
+                          aria-current={currentSlide === index ? "true" : undefined} onClick={() => scrollToGoalSlide(index)}
                           className={currentSlide === index
                             ? "h-1.5 w-5 rounded-full bg-[#24c1c4] transition-all duration-300 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#0b2d54]"
-                            : "h-1.5 w-1.5 rounded-full bg-[#cbd9e1] transition-all duration-300 hover:bg-[#7794a5] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#0b2d54]"}
-                        />
+                            : "h-1.5 w-1.5 rounded-full bg-[#cbd9e1] transition-all duration-300 hover:bg-[#7794a5] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#0b2d54]"} />
                       ))}
                     </div>
                     {goalSlideCount > 1 ? (
-                      <button type="button" onClick={() => scrollToGoalSlide(Math.min(goalSlideCount - 1, currentSlide + 1))} disabled={currentSlide === goalSlideCount - 1} aria-label="Next goal" className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-[#dce8eb] bg-white text-[#0b2d54] transition hover:border-[#24c1c4] hover:bg-[#f3fbfb] disabled:cursor-not-allowed disabled:opacity-35">
-                        <ArrowRight className="h-3.5 w-3.5" />
-                      </button>
+                      <button type="button" onClick={() => scrollToGoalSlide(Math.min(goalSlideCount - 1, currentSlide + 1))} disabled={currentSlide === goalSlideCount - 1} aria-label="Next goal" className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-[#dce8eb] bg-white text-[#0b2d54] transition hover:border-[#24c1c4] hover:bg-[#f3fbfb] disabled:cursor-not-allowed disabled:opacity-35"><ArrowRight className="h-3.5 w-3.5" /></button>
                     ) : <span className="h-8 w-8 shrink-0" />}
                   </div>
                   <p className="text-[9px] font-bold tracking-[0.12em] text-[#71839a]" aria-live="polite">Goal {currentSlide + 1} of {goalSlideCount}</p>
