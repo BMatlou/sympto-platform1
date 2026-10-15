@@ -299,7 +299,7 @@ function HealthGoalsPageContent() {
   useEffect(() => {
     if (!editorOpen || !editingGoal) return;
     const category = CATEGORIES.find((item) => item.value === String(editingGoal.category ?? "")) ?? CATEGORIES[CATEGORIES.length - 1];
-    setDraft({ title: goalDisplayTitle(editingGoal, category.value), description: String(editingGoal.description ?? ""), category: category.value, priority: String(editingGoal.priority ?? "MEDIUM"), targetValue: editingGoal.targetValue == null ? "" : String(editingGoal.targetValue), unit: String(editingGoal.unit ?? category.unit), targetDate: editingGoal.targetDate ? String(editingGoal.targetDate).slice(0, 10) : "", weightDirection: String(editingGoal?.metricConfig?.comparison ?? "DECREASE_TO").toUpperCase() === "INCREASE_TO" ? "GAIN" : String(editingGoal?.metricConfig?.comparison ?? "").toUpperCase() === "CLOSEST" ? "MAINTAIN" : "LOSE", personalComparison: personalComparisonFromGoal(editingGoal) });
+    setDraft({ title: goalEditorTitle(editingGoal, category.value), description: String(editingGoal.description ?? ""), category: category.value, priority: String(editingGoal.priority ?? "MEDIUM"), targetValue: editingGoal.targetValue == null ? "" : String(editingGoal.targetValue), unit: String(editingGoal.unit ?? category.unit), targetDate: editingGoal.targetDate ? String(editingGoal.targetDate).slice(0, 10) : "", weightDirection: String(editingGoal?.metricConfig?.comparison ?? "DECREASE_TO").toUpperCase() === "INCREASE_TO" ? "GAIN" : String(editingGoal?.metricConfig?.comparison ?? "").toUpperCase() === "CLOSEST" ? "MAINTAIN" : "LOSE", personalComparison: personalComparisonFromGoal(editingGoal) });
   }, [editingGoal, editorOpen]);
 
   useEffect(() => {
