@@ -1,8 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { ArrowLeft, ArrowRight, CalendarDays, ChevronDown, ClipboardCheck, Sparkles } from "lucide-react";
-import { useEffect, useRef, useState, type ReactNode } from "react";
+import { ArrowLeft, ArrowRight, CalendarDays, ClipboardCheck, Sparkles } from "lucide-react";
+import { cloneElement, isValidElement, useEffect, useRef, useState, type ReactElement, type ReactNode } from "react";
 import ProtectedRoute from "@/components/auth/protected-route";
 import { useDashboard } from "@/hooks/use-dashboard";
 import DailyHealthCheckIn from "@/components/dashboard/daily-health-check-in";
@@ -97,6 +97,13 @@ type GoalCarouselSlideProps = {
 
 function GoalCarouselSlide({ slideKey, expandedGoalSlide, onToggle, children }: GoalCarouselSlideProps) {
   const expanded = expandedGoalSlide === slideKey;
+  const detailsProps = {
+    detailsExpanded: expanded,
+    onToggleDetails: () => onToggle(slideKey),
+  };
+  const card = isValidElement(children)
+    ? cloneElement(children as ReactElement<any>, detailsProps)
+    : children;
 
   return (
     <div
@@ -106,37 +113,9 @@ function GoalCarouselSlide({ slideKey, expandedGoalSlide, onToggle, children }: 
       aria-roledescription="slide"
       className={expanded
         ? "relative min-w-0 w-full shrink-0 snap-start lg:w-[calc(50%-0.5rem)]"
-        : "relative h-[520px] min-w-0 w-full shrink-0 snap-start lg:w-[calc(50%-0.5rem)]"}
+        : "relative h-[520px] min-w-0 w-full shrink-0 snap-start lg:w-[calc(50%-0.5rem)] [&>*]:h-full [&>*]:min-h-0"}
     >
-      {expanded ? (
-        <>
-          <div className="mb-2 flex justify-end">
-            <button type="button" aria-expanded="true" onClick={() => onToggle(slideKey)}
-              className="inline-flex min-h-9 items-center justify-center gap-2 rounded-full border border-[#dce8eb] bg-white px-3.5 py-2 text-[9px] font-black text-[#0b2d54] transition hover:border-[#24c1c4] hover:bg-[#f7fcfc] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#24c1c4]">
-              Hide insights & details
-              <ChevronDown className="h-3.5 w-3.5 rotate-180 transition-transform" />
-            </button>
-          </div>
-          {children}
-        </>
-      ) : (
-        <>
-          <div className="flex h-10 items-center justify-end px-1">
-            <button
-              type="button"
-              aria-expanded="false"
-              onClick={() => onToggle(slideKey)}
-              className="inline-flex min-h-8 items-center justify-center gap-1.5 px-1 text-[9px] font-semibold text-[#71839a] transition-colors hover:text-[#0b7b80] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#24c1c4]"
-            >
-              Show details
-              <ChevronDown className="h-3 w-3 transition-transform" />
-            </button>
-          </div>
-          <div className="h-[480px] overflow-hidden rounded-[26px]">
-            {children}
-          </div>
-        </>
-      )}
+      {card}
     </div>
   );
 }
