@@ -70,7 +70,7 @@ export class DeviceMeasurementsService {
         // provider's metric key or notes explicitly identify it as resting.
         const context = `${deviceMetricKey ?? ''} ${notes ?? ''}`;
         const explicitlyResting =
-          /\\brest(?:ing)?\\b.{0,24}\\b(?:heart[\\s_-]*rate|pulse)\\b|\\b(?:heart[\\s_-]*rate|pulse)\\b.{0,24}\\brest(?:ing)?\\b/i.test(context);
+          /\brest(?:ing)?\b.{0,24}\b(?:heart[\s_-]*rate|pulse)\b|\b(?:heart[\s_-]*rate|pulse)\b.{0,24}\brest(?:ing)?\b/i.test(context);
         if (explicitlyResting) {
           mappings.push(['HEART_RATE', 'heart_rate.bpm', value]);
         }
