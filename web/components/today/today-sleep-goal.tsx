@@ -5,8 +5,9 @@ import { ArrowRight, Moon, TrendingDown, TrendingUp } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { healthGoalsService } from "@/services/health-goals.service";
 import { healthJournalService } from "@/services/health-journal.service";
+import GoalCardDisclosureButton from "@/components/today/goal-card-disclosure-button";
 
-type Props = { goal: any; onUpdated?: () => void | Promise<void> };
+type Props = { goal: any; onUpdated?: () => void | Promise<void>; detailsExpanded?: boolean; onToggleDetails?: () => void };
 type SleepEntry = { day: string; value: number; occurredAt: string };
 
 function sleepDayKey(value: unknown) {
@@ -48,7 +49,7 @@ function formatJourneyDate(value: unknown) {
   return formatDate(value, true);
 }
 
-export default function TodaySleepGoal({ goal }: Props) {
+export default function TodaySleepGoal({ goal, detailsExpanded, onToggleDetails }: Props) {
   const [history, setHistory] = useState<SleepEntry[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -310,6 +311,7 @@ export default function TodaySleepGoal({ goal }: Props) {
           </div>
         </section>
 
+        {detailsExpanded && (
         <section className="mt-3 rounded-[18px] border border-[#e2ecef] bg-[#fbfdfd] p-3.5">
           <div className="flex items-center justify-between gap-3">
             <div className="min-w-0">
@@ -344,6 +346,7 @@ export default function TodaySleepGoal({ goal }: Props) {
           </div>
           <p className="mt-2 text-[9px] leading-4 text-[#74859a]">{recent.trendText}</p>
         </section>
+        )}
 
         <div className="mt-3 flex items-center justify-between gap-3 rounded-[18px] border border-[#e2ecef] bg-[#fbfdfd] px-3 py-2.5">
           <p className="min-w-0 text-[9px] font-semibold leading-4 text-[#74859a]">
@@ -374,6 +377,7 @@ export default function TodaySleepGoal({ goal }: Props) {
           </Link>
         </div>
       </footer>
+      {onToggleDetails && <div className="px-4 pb-3 sm:px-5"><GoalCardDisclosureButton expanded={Boolean(detailsExpanded)} onToggle={onToggleDetails} label="Show sleep insights" /></div>}
     </article>
   );
 }
