@@ -623,7 +623,7 @@ export default function TodayMentalHealthGoal({
   return (
     <article
       id={"today-goal-" + encodeURIComponent(goalId)}
-      className={detailsExpanded ? "flex h-auto min-w-0 flex-col overflow-visible rounded-[26px] border border-[#e5edef] bg-white shadow-[0_14px_36px_rgba(11,45,84,.07)]" : "flex h-full min-w-0 flex-col overflow-hidden rounded-[26px] border border-[#e5edef] bg-white shadow-[0_14px_36px_rgba(11,45,84,.07)]"}
+      className={detailsExpanded ? "flex h-full min-h-0 min-w-0 flex-col overflow-y-auto [scrollbar-width:thin] rounded-[26px] border border-[#e5edef] bg-white shadow-[0_14px_36px_rgba(11,45,84,.07)]" : "flex h-full min-w-0 flex-col overflow-hidden rounded-[26px] border border-[#e5edef] bg-white shadow-[0_14px_36px_rgba(11,45,84,.07)]"}
     >
       <header className="flex items-center justify-between gap-3 px-4 pb-3 pt-4 sm:px-5 sm:pt-5">
         <div className="flex min-w-0 items-center gap-2.5">
