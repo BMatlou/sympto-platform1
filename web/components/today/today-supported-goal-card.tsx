@@ -719,7 +719,7 @@ export default function TodaySupportedGoalCard({ goal, activeGoals = [], healthC
             {category === "OTHER" && String(goal?.description ?? "").trim() && <p className="mt-1 line-clamp-2 text-[10px] leading-4 text-[#71839a]">{String(goal.description).trim()}</p>}
           </div>
         </div>
-        <span className="shrink-0 rounded-full bg-[#eef8f8] px-2.5 py-1.5 text-[8px] font-black uppercase tracking-[.1em] text-[#0b7b80]">{category === "HEART_RATE" ? (heartRateHasTodayReading ? "Reading saved" : heartRateStats.latestCurrent != null ? "Latest saved reading" : "No reading") : category === "OTHER" ? displayCurrent == null ? "Not started" : journey.isPastDue ? "Past due" : journey.daysLeft === 0 && journey.targetDate ? "Due today" : "Journey active" : "Today"}</span>
+        <span className="shrink-0 rounded-full bg-[#eef8f8] px-2.5 py-1.5 text-[8px] font-black uppercase tracking-[.1em] text-[#0b7b80]">{category === "HEART_RATE" ? (heartRateHasTodayReading ? "Reading saved" : heartRateStats.latestCurrent != null ? "Latest saved reading" : "No reading") : category === "OTHER" ? journey.isPastDue ? "Past due" : displayCurrent == null ? "Not started" : journey.daysLeft === 0 && journey.targetDate ? "Due today" : "Journey active" : "Today"}</span>
       </header>
 
       <div className="px-4 pb-4 pt-4 sm:px-5">
