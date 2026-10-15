@@ -105,8 +105,8 @@ function GoalCarouselSlide({ slideKey, expandedGoalSlide, onToggle, children }: 
       role="group"
       aria-roledescription="slide"
       className={expanded
-        ? "relative min-w-0 w-full shrink-0 snap-start"
-        : "relative h-[480px] min-w-0 w-full shrink-0 snap-start overflow-hidden rounded-[26px]"}
+        ? "relative min-w-0 w-full shrink-0 snap-start lg:w-[calc(50%-0.5rem)]"
+        : "relative h-[480px] min-w-0 w-full shrink-0 snap-start overflow-hidden rounded-[26px] lg:w-[calc(50%-0.5rem)]"}
     >
       {expanded && (
         <div className="mb-2 flex justify-end">
