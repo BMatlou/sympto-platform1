@@ -933,7 +933,7 @@ export default function TodaySupportedGoalCard({ goal, activeGoals = [], healthC
   }
 
   return (
-    <article id={"today-goal-" + encodeURIComponent(goalId)} className={detailsExpanded ? "flex h-auto min-h-[480px] w-full flex-col overflow-visible rounded-[26px] border border-[#dce9ee] bg-white shadow-[0_12px_32px_rgba(11,45,84,.045)]" : "flex h-auto min-h-[480px] w-full flex-col overflow-visible rounded-[26px] border border-[#dce9ee] bg-white shadow-[0_12px_32px_rgba(11,45,84,.045)]"}>
+    <article id={"today-goal-" + encodeURIComponent(goalId)} className={detailsExpanded ? "flex flex-1 h-auto min-h-[480px] w-full flex-col overflow-visible rounded-[26px] border border-[#dce9ee] bg-white shadow-[0_12px_32px_rgba(11,45,84,.045)]" : "flex flex-1 h-auto min-h-[480px] w-full flex-col overflow-visible rounded-[26px] border border-[#dce9ee] bg-white shadow-[0_12px_32px_rgba(11,45,84,.045)]"}>
       <header className="flex items-start justify-between gap-3 border-b border-[#edf2f5] px-4 py-4 sm:px-5">
         <div className="flex min-w-0 items-start gap-3">
           <span className="grid h-10 w-10 shrink-0 place-items-center rounded-[14px] bg-[#e8f8f7] text-[#0b7b80]"><Icon className="h-4 w-4" /></span>
