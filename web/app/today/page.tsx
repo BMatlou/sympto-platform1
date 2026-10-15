@@ -82,10 +82,11 @@ function medicationName(medication: any) {
 }
 
 function goalCategory(goal: any) {
-  return String(goal?.category ?? goal?.metricType ?? goal?.metricConfig?.metricType ?? "")
+  const category = String(goal?.category ?? goal?.metricType ?? goal?.metricConfig?.metricType ?? "")
     .trim()
     .toUpperCase()
     .replace(/[\s-]+/g, "_");
+  return category === "PERSONAL" ? "OTHER" : category;
 }
 
 function isMedicationGoal(goal: any) {
