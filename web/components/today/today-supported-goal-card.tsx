@@ -1062,7 +1062,6 @@ export default function TodaySupportedGoalCard({ goal, activeGoals = [], healthC
             </div>
             <p className="mt-3 border-t border-[#e3edef] pt-3 text-[10px] leading-5 text-[#758896]">Sit quietly for a few minutes first. Only readings identified as resting count toward this goal.</p>
           </section>
-          </>
         ) : (
           <div className="mt-3 rounded-[17px] bg-[#fbfdfd] p-3.5 ring-1 ring-[#e4edef]">
             <p className="text-[10px] leading-5 text-[#758896]">{meta.helper}</p>
