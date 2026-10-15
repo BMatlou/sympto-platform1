@@ -64,7 +64,7 @@ const TARGET_RULES: Record<string, { label: string; placeholder: string; helper:
   HYDRATION: { label: "Daily water target", placeholder: "e.g. 2500", helper: "Tracks the total water intake recorded for the day." },
   SMOKING: { label: "Daily cigarette ceiling", placeholder: "0 for smoke-free", helper: "Set the maximum cigarettes you want to record for a day. Zero is valid.", allowZero: true },
   ALCOHOL: { label: "Weekly drink ceiling", placeholder: "0 for no drinks", helper: "Set the maximum drinks you want to record for a week. Zero is valid.", allowZero: true },
-  HEART_RATE: { label: "Maximum resting rate", placeholder: "e.g. 80", helper: "Tracks the latest heart-rate measurement recorded for the day." },
+  HEART_RATE: { label: "Maximum resting rate", placeholder: "e.g. 80", helper: "Use a personal ceiling agreed with your healthcare professional. Measure after sitting quietly for a few minutes; general exercise readings must not be compared with a resting-rate target." },
   OTHER: { label: "Target value", placeholder: "Enter your target", helper: "Use this for a measurable personal target that does not fit the health categories above." },
 };
 
