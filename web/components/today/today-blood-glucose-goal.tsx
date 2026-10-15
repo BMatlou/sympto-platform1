@@ -1158,6 +1158,7 @@ export default function TodayBloodGlucoseGoal({ goal, patientId = "", currentWei
           <span className="text-[8px] font-bold text-[#74859a]">Track and review on Today</span>
         </div>
       </footer>
+      </div>
     </article>
   );
 }
