@@ -462,14 +462,53 @@ export class HealthGoalsService {
       if (date < today) throw new BadRequestException('Target date cannot be in the past.');
     }
   }
-  private assertPersonalGoalFields(category: string, title: unknown, unit: unknown) {
+  private matchPersonalGoalCategory(title: unknown): { category: string; label: string; measurement: string } | null {
+    const value = String(title ?? '').trim().toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
+    if (!value) return null;
+
+    // Weight training is exercise, not a body-weight target.
+    if (/\b(weight training|strength training)\b/.test(value)) {
+      return { category: 'EXERCISE', label: 'Exercise', measurement: 'weekly exercise minutes' };
+    }
+
+    const rules: Array<{ category: string; label: string; measurement: string; patterns: RegExp[] }> = [
+      { category: 'WEIGHT', label: 'Weight', measurement: 'body-weight change or maintenance', patterns: [/\bweight\b/, /\blose weight\b/, /\bgain weight\b/, /\bweight loss\b/, /\bweight gain\b/, /\bmaintain weight\b/, /\bbody weight\b/] },
+      { category: 'EXERCISE', label: 'Exercise', measurement: 'weekly exercise minutes', patterns: [/\bexercise\b/, /\bworkouts?\b/, /\bphysical activity\b/, /\bactive minutes?\b/, /\bexercise minutes?\b/, /\bminutes of exercise\b/] },
+      { category: 'NUTRITION', label: 'Nutrition', measurement: 'daily calorie intake', patterns: [/\bcalories?\b/, /\bkcal\b/, /\bcalorie intake\b/, /\benergy intake\b/] },
+      { category: 'BLOOD_PRESSURE', label: 'Blood pressure', measurement: 'systolic blood pressure readings', patterns: [/\bblood pressure\b/, /\bsystolic\b/, /\bdiastolic\b/, /\bbp target\b/] },
+      { category: 'BLOOD_GLUCOSE', label: 'Blood glucose', measurement: 'recorded blood-glucose values', patterns: [/\bblood glucose\b/, /\bblood sugar\b/, /\bglucose\b/] },
+      { category: 'CHOLESTEROL', label: 'Cholesterol', measurement: 'total cholesterol results', patterns: [/\bcholesterol\b/] },
+      { category: 'MEDICATION', label: 'Medication', measurement: 'adherence to a saved prescribed medication', patterns: [/\bmedication adherence\b/, /\bmedicine adherence\b/, /\bmedication\b/, /\bmedicines?\b/, /\bprescription adherence\b/] },
+      { category: 'SLEEP', label: 'Sleep', measurement: 'recorded sleep duration in hours per night', patterns: [/\bsleep\b/, /\bhours of sleep\b/, /\bsleep duration\b/] },
+      { category: 'MENTAL_HEALTH', label: 'Mental health', measurement: 'the daily stress score', patterns: [/\bstress score\b/, /\bstress level\b/, /\bdaily stress\b/, /\bstress rating\b/] },
+      { category: 'HYDRATION', label: 'Hydration', measurement: 'daily water intake', patterns: [/\bhydration\b/, /\bwater intake\b/, /\bdaily water\b/, /\bdrink water\b/, /\bfluid intake\b/] },
+      { category: 'SMOKING', label: 'Smoking', measurement: 'daily cigarette count', patterns: [/\bsmoking\b/, /\bcigarettes?\b/, /\bsmoke free\b/, /\bquit smoking\b/] },
+      { category: 'ALCOHOL', label: 'Alcohol', measurement: 'weekly alcohol-drink count', patterns: [/\balcohol\b/, /\bdrinks? per week\b/, /\bdrinks per week\b/] },
+      { category: 'HEART_RATE', label: 'Heart rate', measurement: 'resting heart-rate readings', patterns: [/\bheart rate\b/, /\bresting pulse\b/, /\bpulse rate\b/] },
+    ];
+
+    return rules.find((rule) => rule.patterns.some((pattern) => pattern.test(value))) ?? null;
+  }
+
+  private assertPersonalGoalFields(category: string, title: unknown, unit: unknown, measurementInstructions?: unknown) {
     if (String(category ?? '').toUpperCase() !== 'OTHER') return;
     const cleanTitle = String(title ?? '').trim();
-    if (!cleanTitle || cleanTitle.toLowerCase() === 'personal goal') {
-      throw new BadRequestException('Give your personal goal a specific name.');
+    if (!cleanTitle || ['personal goal', 'custom health goal'].includes(cleanTitle.toLowerCase())) {
+      throw new BadRequestException('Give your custom health goal a specific measurement name.');
     }
+
+    const existingCategory = this.matchPersonalGoalCategory(cleanTitle);
+    if (existingCategory) {
+      throw new BadRequestException(
+        `“${cleanTitle}” matches Sympto’s existing ${existingCategory.label} category, which already tracks ${existingCategory.measurement}. Choose ${existingCategory.label} instead of Custom health goal.`,
+      );
+    }
+
     if (!String(unit ?? '').trim()) {
-      throw new BadRequestException('A personal goal needs a unit so its measurements are meaningful.');
+      throw new BadRequestException('A custom health goal needs a unit so its measurements are meaningful.');
+    }
+    if (!String(measurementInstructions ?? '').trim()) {
+      throw new BadRequestException('Explain how you will measure this health goal, including where the recorded value comes from.');
     }
   }
 
@@ -658,7 +697,7 @@ export class HealthGoalsService {
       goalData.targetValue ?? (isMedicationGoal ? String(DEFAULT_MEDICATION_TARGET) : undefined);
     const unit = goalData.unit ?? (isMedicationGoal ? '%' : undefined);
 
-    this.assertPersonalGoalFields(category, goalData.title, unit);
+    this.assertPersonalGoalFields(category, goalData.title, unit, goalData.description);
     this.assertGoalDefinition(category, targetValue, targetDate);
 
     const effectiveComparison =
@@ -973,7 +1012,7 @@ export class HealthGoalsService {
     if (patientMedicationId && targetCategory !== 'MEDICATION') throw new BadRequestException('A medication can only be attached to a medication goal.');
     if (patientMedicationId) await this.assertPatientMedicationBelongsToPatient(patientMedicationId, String(existing.patientId));
     const glucoseTrackingOnly = targetCategory === 'BLOOD_GLUCOSE' && Object.prototype.hasOwnProperty.call(dto, 'targetValue') && (dto as any).targetValue == null;
-    this.assertPersonalGoalFields(targetCategory, goalData.title ?? existing.title, goalData.unit ?? existing.unit);
+    this.assertPersonalGoalFields(targetCategory, goalData.title ?? existing.title, goalData.unit ?? existing.unit, goalData.description ?? existing.description);
     this.assertGoalDefinition(targetCategory, glucoseTrackingOnly ? null : goalData.targetValue ?? existing.targetValue, goalData.targetDate ?? existing.targetDate);
     const revisingWeightGoal = targetCategory === 'WEIGHT';
     let effectiveComparison: string | undefined = comparison;
