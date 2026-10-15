@@ -167,14 +167,9 @@ export default function TodaySmokingGoal({ goal, onUpdated, detailsExpanded, onT
 
       <footer className="flex items-center justify-between gap-3 border-t border-[#edf2f4] bg-[#fbfdfd] px-4 py-3 sm:px-5">
         <div className="min-w-0"><p className="text-[8px] font-black uppercase tracking-[.14em] text-[#9aa8b3]">Journey</p><p className="mt-0.5 text-xs font-black text-[#0b2d54]">Day {journeyDay}{daysLeft !== null ? ` · ${daysLeft} days left` : ""}</p></div>
-        <div className="flex items-center gap-2"><p className="hidden text-[8px] text-[#7d8d99] sm:block">until {formatDate(goal?.targetDate)}</p><Link href={`/health-goals#goal-${encodeURIComponent(String(goal?.id ?? ""))}`} className="inline-flex min-h-9 shrink-0 items-center justify-center gap-1 rounded-xl border border-[#d6e4e7] bg-white px-3 py-2 text-[9px] font-black text-[#0b2d54]">View goal <ArrowRight className="h-3 w-3" /></Link></div>
+        <div className="flex flex-wrap items-center justify-end gap-2"><p className="hidden text-[8px] text-[#7d8d99] sm:block">until {formatDate(goal?.targetDate)}</p>{onToggleDetails && <GoalCardDisclosureButton expanded={Boolean(detailsExpanded)} onToggle={onToggleDetails} /> }<Link href={`/health-goals#goal-${encodeURIComponent(String(goal?.id ?? ""))}`} className="inline-flex min-h-9 shrink-0 items-center justify-center gap-1 rounded-xl border border-[#d6e4e7] bg-white px-3 py-2 text-[9px] font-black text-[#0b2d54]">View goal <ArrowRight className="h-3 w-3" /></Link></div>
       </footer>
 
-      {onToggleDetails && (
-        <div className="px-4 pb-3 sm:px-5">
-          <GoalCardDisclosureButton expanded={Boolean(detailsExpanded)} onToggle={onToggleDetails} />
-        </div>
-      )}
       {detailsExpanded && (
         <section className="mx-4 mb-4 rounded-[18px] border border-[#e1ecee] bg-[#f8fbfb] p-3.5 text-[#526b7c] sm:mx-5">
           <p className="text-[8px] font-black uppercase tracking-[.14em] text-[#0b7b80]">About this goal</p>
