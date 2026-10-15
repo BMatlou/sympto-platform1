@@ -225,7 +225,7 @@ export class HealthGoalsService {
           ("id", "patientId", "metricType", "metricKey", "loggedValue", "occurredAt", "source", "sourceId")
         SELECT
           gen_random_uuid(), baseline."patientId", 'HEART_RATE', 'heart_rate.bpm',
-          baseline."restingHeartRate", baseline."establishedAt", 'patient-baseline', 'baseline'
+          baseline."restingHeartRate", COALESCE(baseline."establishedAt", baseline."createdAt"), 'patient-baseline', 'baseline'
         FROM "PatientBaseline" baseline
         WHERE baseline."patientId" = ${patient.id}
           AND baseline."restingHeartRate" IS NOT NULL
