@@ -438,7 +438,37 @@ export default function TodaySupportedGoalCard({ goal, activeGoals = [], healthC
   const progress = progressPercent(goal);
   const displayUnit = category === "OTHER" ? String(goal?.unit ?? "").trim() : meta.unit;
   const personalGoalTitle = String(goal?.title ?? "").trim();
-  const customGoalCategoryMatch = category === "OTHER" ? matchExistingGoalCategory(personalGoalTitle) : null;
+  const customGoalTitle = personalGoalTitle.toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
+  const separateCustomHealthOutcome = /\b(symptoms?|asthma|pain|rash|cough|breathing|allerg(y|ies)|side effects?|adverse reactions?|drug interactions?)\b/.test(customGoalTitle);
+  const explicitMedicationUseIntent = /\b(adherence|adherent|missed doses?|dose schedule|prescription schedule|on time|medication routine|medicine routine|taking as prescribed|take .{0,60}(daily|every day|on time|as prescribed)|taking .{0,60}(daily|every day|on time|as prescribed))\b/.test(customGoalTitle);
+  const simplifiedCustomTitle = customGoalTitle.replace(/\b(custom|health|goal|target|my|track|tracking|monitor|measure|record)\b/g, " ").trim();
+  const medicationGoalMention = category === "OTHER" && !(separateCustomHealthOutcome && !explicitMedicationUseIntent)
+    ? (Array.isArray(healthContext?.medications) ? healthContext.medications : []).find((medication: any) => {
+        const names = [
+          medication?.medication?.name,
+          medication?.medication?.genericName,
+          medication?.medication?.brandName,
+          medication?.name,
+          medication?.genericName,
+          medication?.brandName,
+        ];
+        return names.some((name) => {
+          const normalizedName = String(name ?? "").trim().toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
+          if (!normalizedName) return false;
+          const aliases = [normalizedName, ...normalizedName.split(" ").filter((part) => part.length >= 4)].filter((alias) => alias.length >= 4);
+          const titleMentionsMedicine = aliases.some((alias) => (" " + customGoalTitle + " ").includes(" " + alias + " "));
+          const titleIsMedicineLabel = aliases.some((alias) => customGoalTitle === alias || simplifiedCustomTitle === alias);
+          return titleMentionsMedicine && (explicitMedicationUseIntent || titleIsMedicineLabel);
+        });
+      })
+    : null;
+  const customGoalCategoryMatch = category === "OTHER"
+    ? matchExistingGoalCategory(personalGoalTitle) ?? (medicationGoalMention ? {
+        value: "MEDICATION",
+        label: "Medication",
+        measurement: "adherence to your saved prescribed medicine",
+      } : null)
+    : null;
   const customGoalMeasurementInstructions = String(goal?.description ?? "").trim();
   const personalGoalNeedsSetup = category === "OTHER" && (
     !personalGoalTitle || ["personal goal", "custom health goal"].includes(personalGoalTitle.toLowerCase()) ||
