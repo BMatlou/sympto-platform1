@@ -53,12 +53,14 @@ const GOAL_META: Record<string, GoalMeta> = {
 };
 
 function normaliseCategory(goal: any) {
-  const category = String(goal?.category ?? goal?.metricType ?? goal?.metricConfig?.metricType ?? "OTHER")
+  const rawCategory = [goal?.category, goal?.metricType, goal?.metricConfig?.metricType]
+    .find((value) => String(value ?? "").trim() !== "");
+  const category = String(rawCategory ?? "OTHER")
     .trim()
     .toUpperCase()
     .replace(/[\s-]+/g, "_");
-  // PERSONAL uses the same measurement-driven workflow as a configured custom goal.
-  return category === "PERSONAL" ? "OTHER" : category;
+  // Personal goals use the configured custom-goal measurement workflow.
+  return category === "PERSONAL" || category === "PERSONAL_GOAL" ? "OTHER" : category;
 }
 
 function goalCategoryLabel(category: string) {
