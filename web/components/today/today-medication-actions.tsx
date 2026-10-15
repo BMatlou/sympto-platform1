@@ -394,7 +394,7 @@ export default function TodayMedicationActions({ medications, goal: suppliedGoal
   const scheduledGoalDoses = Math.max(0, Math.ceil((daysLeft !== null ? daysLeft + journeyDay - 1 : 30) * totalRequiredDosesPerDay));
   const targetDoseCount = Math.ceil((scheduledGoalDoses * targetAdherence) / 100);
   const dosesNeededForGoal = Math.max(0, targetDoseCount - takenDosesSoFar);
-  const cardClass = detailsExpanded ? "h-auto min-h-[480px] w-full overflow-visible rounded-[26px] border border-[#dce9ee] bg-white shadow-[0_14px_34px_rgba(11,45,84,.06)]" : "h-auto min-h-[480px] w-full overflow-visible rounded-[26px] border border-[#dce9ee] bg-white shadow-[0_14px_34px_rgba(11,45,84,.06)]";
+  const cardClass = detailsExpanded ? "flex-1 h-auto min-h-[480px] w-full overflow-visible rounded-[26px] border border-[#dce9ee] bg-white shadow-[0_14px_34px_rgba(11,45,84,.06)]" : "flex-1 h-auto min-h-[480px] w-full overflow-visible rounded-[26px] border border-[#dce9ee] bg-white shadow-[0_14px_34px_rgba(11,45,84,.06)]";
 
   return (
     <section id={finalGoal?.id ? `health-goal-card-${String(finalGoal.id)}` : medicationAnchorId ?? "medication-adherence-card-unassigned"} className={cardClass}>
