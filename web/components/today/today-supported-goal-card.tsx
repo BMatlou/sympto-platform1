@@ -98,11 +98,12 @@ function matchExistingGoalCategory(title: string): ExistingGoalCategoryMatch | n
   const normalized = String(title ?? "").trim().toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
   if (!normalized) return null;
   // Allow distinct measures that the current dedicated category does not track.
-  if (/\b(sleep quality|sleep score|deep sleep|rem sleep|sleep apnea)\b/.test(normalized)) return null;
+  if (/\b(sleep quality|sleep score|deep sleep|rem sleep|sleep apnea|sleep stages?)\b/.test(normalized)) return null;
   if (/\bdiastolic\b/.test(normalized) && !/\bsystolic\b/.test(normalized)) return null;
   if (/\b(ldl|hdl|non hdl)\b/.test(normalized)) return null;
-  if (/\b(smoke free days?|cigarette free days?|days without smoking|days without cigarettes)\b/.test(normalized)) return null;
+  if (/\b(smoke free days?|cigarette free days?|days without smoking|days without cigarettes|smoking abstinence days?)\b/.test(normalized)) return null;
   if (/\b(alcohol free days?|sober days?|days sober|sobriety streak)\b/.test(normalized)) return null;
+  if (/\b(step count|steps per (day|week)|daily steps|walking distance|running distance|workout sessions?|exercise sessions?|number of workouts|reps? per|weights? lifted|calories burned|active calories|heart rate variability|hrv|exercise heart rate|heart rate during exercise|medication side effects?|medicine side effects?|drug side effects?|adverse drug reactions?)\b/.test(normalized)) return null;
   if (/\b(weight training|strength training)\b/.test(normalized)) {
     return EXISTING_GOAL_CATEGORY_MATCHERS.find((item) => item.value === "EXERCISE") ?? null;
   }
