@@ -198,8 +198,34 @@ export class HealthGoalsService {
     if (!metricType || !metricKey) throw new BadRequestException('Metric type and metric key are required.'); if (Number.isNaN(from.getTime()) || Number.isNaN(to.getTime())) throw new BadRequestException('Metric event date range is invalid.');
 
     // Older manual vital entries may exist in HealthJournal without a corresponding
-    // metric event (the metric stream was introduced later). Backfill only this
-    // patient's heart-rate journal events on demand, without rewriting other metrics.
+    // metric event (the metric stream was introduced later). Backfill the requested
+    // vital only, on demand, and keep insertion idempotent by source/sourceId.
+    if (metricType === 'BLOOD_PRESSURE' && metricKey === 'blood_pressure.systolic') {
+      await this.prisma.$executeRaw`
+        INSERT INTO "HealthGoalMetricEvent"
+          ("id", "patientId", "metricType", "metricKey", "loggedValue", "occurredAt", "source", "sourceId")
+        SELECT
+          gen_random_uuid(), journal."patientId", 'BLOOD_PRESSURE', 'blood_pressure.systolic',
+          journal."bloodPressureSystolic", COALESCE(journal."updatedAt", journal."createdAt"),
+          'health-journal', journal."id"
+        FROM "HealthJournal" journal
+        WHERE journal."patientId" = ${patient.id}
+          AND journal."bloodPressureSystolic" IS NOT NULL
+          AND NOT EXISTS (
+            SELECT 1
+            FROM "HealthGoalMetricEvent" existing
+            WHERE existing."patientId" = journal."patientId"
+              AND existing."metricType" = 'BLOOD_PRESSURE'
+              AND existing."metricKey" = 'blood_pressure.systolic'
+              AND existing."source" = 'health-journal'
+              AND existing."sourceId" = journal."id"
+          )
+      `;
+    }
+
+    // Older manual vital entries may exist in HealthJournal without a corresponding
+    // metric event (the metric stream was introduced later). Backfill this patient's
+    // heart-rate journal events on demand, without rewriting other metrics.
     if (metricType === 'HEART_RATE' && metricKey === 'heart_rate.bpm') {
       await this.prisma.$executeRaw`
         INSERT INTO "HealthGoalMetricEvent"
