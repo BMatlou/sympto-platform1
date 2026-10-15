@@ -949,7 +949,15 @@ export default function TodaySupportedGoalCard({ goal, activeGoals = [], healthC
 
       {(detailsExpanded || personalGoalNeedsSetup || category === "BLOOD_PRESSURE" || category === "HEART_RATE") && (
       <div className="px-4 pb-4 pt-4 sm:px-5">
-        {detailsExpanded && onToggleDetails && <div className="mb-3 flex justify-end"><GoalCardDisclosureButton expanded onToggle={onToggleDetails} label="Show less" /></div>}
+        {(category === "BLOOD_PRESSURE" || category === "HEART_RATE") && (
+          <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+            <Link href={source.href} className="inline-flex min-h-9 items-center justify-center gap-1.5 rounded-xl bg-[#0b2d54] px-3.5 py-2 text-[9px] font-black text-white transition hover:bg-[#0f5a62]">
+              {category === "BLOOD_PRESSURE" ? source.label : "Record a reading"} <ArrowRight className="h-3.5 w-3.5 text-[#24c1c4]" />
+            </Link>
+            {onToggleDetails && <GoalCardDisclosureButton expanded={Boolean(detailsExpanded)} onToggle={onToggleDetails} label={category === "BLOOD_PRESSURE" ? "Show blood-pressure details" : "Show heart-rate insights"} />}
+          </div>
+        )}
+        {detailsExpanded && onToggleDetails && category !== "BLOOD_PRESSURE" && category !== "HEART_RATE" && <div className="mb-3 flex justify-end"><GoalCardDisclosureButton expanded onToggle={onToggleDetails} label="Show less" /></div>}
         {personalGoalNeedsSetup ? (
           <section className="mt-3 rounded-[20px] border border-[#dce9ec] bg-[#f7fbfc] p-4">
             <p className="text-[9px] font-black uppercase tracking-[.14em] text-[#0b7b80]">{customGoalCategoryMatch ? "Dedicated category already exists" : "Measurement setup required"}</p>
@@ -1174,6 +1182,7 @@ export default function TodaySupportedGoalCard({ goal, activeGoals = [], healthC
               <p className="mt-3 text-[10px] leading-5 text-white/55">Heart rate changes with activity, stress, illness and medicines. Only readings clearly identified as resting are compared with this goal. The target shown above is your saved goal, not a diagnosis or a universal threshold.</p>
             </div>
           </section>
+{detailsExpanded && (
           <section className="mt-3 rounded-[22px] border border-[#dce9ec] bg-white p-4 shadow-[0_5px_18px_rgba(11,45,84,.025)] sm:p-5" aria-live="polite">
             <div className="flex items-start justify-between gap-3">
               <div className="min-w-0">
@@ -1241,6 +1250,7 @@ export default function TodaySupportedGoalCard({ goal, activeGoals = [], healthC
               </div>
             </details>
           </section>
+          )}
           </>
         ) : (
           <>
@@ -1255,6 +1265,7 @@ export default function TodaySupportedGoalCard({ goal, activeGoals = [], healthC
         <div className="mt-3 rounded-xl bg-[#e9f9fa] px-3 py-2"><p className="text-[9px] font-bold leading-4 text-[#0b6f73]">{nextStep}</p></div>
           </>
         )}
+{detailsExpanded && (
         {category === "BLOOD_PRESSURE" ? (
           <div className="mt-3 rounded-[17px] border border-[#dcebec] bg-[#f7fbfc] p-3.5">
             <div className="flex items-center justify-between gap-2">
@@ -1303,6 +1314,7 @@ export default function TodaySupportedGoalCard({ goal, activeGoals = [], healthC
             </div>
           </div>
         ) : null}
+        )}
 
         {category === "OTHER" && (
           <section className="mt-3 rounded-[20px] border border-[#dce9ec] bg-[#f7fbfc] p-4">
@@ -1337,7 +1349,7 @@ export default function TodaySupportedGoalCard({ goal, activeGoals = [], healthC
           </section>
         )}
 
-        {personalGoalNeedsSetup ? null : category === "BLOOD_PRESSURE" ? (
+        {!detailsExpanded && (category === "BLOOD_PRESSURE" || category === "HEART_RATE") ? null : personalGoalNeedsSetup ? null : category === "BLOOD_PRESSURE" ? (
           <div className="mt-4 space-y-3">
             <section className="rounded-[22px] border border-[#dfeaec] bg-[#f8fbfb] p-4 sm:p-5">
               <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
