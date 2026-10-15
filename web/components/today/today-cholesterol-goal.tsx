@@ -377,7 +377,28 @@ export default function TodayCholesterolGoal({ goal, labOrders = [], activeGoals
           </div>
         </section>
 
-        {onToggleDetails && <div className="mt-2 px-1"><GoalCardDisclosureButton expanded={Boolean(detailsExpanded)} onToggle={onToggleDetails} label="Show results & insights" /></div>}
+        {onToggleDetails && (
+          <div className="mt-2 flex flex-wrap items-center justify-between gap-2 px-1">
+            {!detailsExpanded && (
+              <button
+                type="button"
+                onClick={() => {
+                  if (!open) {
+                    setMeasuredAt(localDateTimeInput(new Date()));
+                    setValue("");
+                    setNote("");
+                    setOpen(true);
+                  }
+                  onToggleDetails();
+                }}
+                className="inline-flex min-h-10 items-center justify-center gap-1.5 rounded-xl bg-[#0b2d54] px-4 py-2.5 text-[10px] font-black text-white transition hover:bg-[#123e66]"
+              >
+                <Plus className="h-3.5 w-3.5 text-[#24c1c4]" /> {latest ? "Record result" : "Add result"}
+              </button>
+            )}
+            <GoalCardDisclosureButton expanded={Boolean(detailsExpanded)} onToggle={onToggleDetails} label="Show results & insights" />
+          </div>
+        )}
         {detailsExpanded && (
           <>
         {releasedLabs.length > 0 && (() => {
