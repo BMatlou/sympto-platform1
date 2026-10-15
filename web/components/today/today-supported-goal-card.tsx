@@ -1056,6 +1056,39 @@ export default function TodaySupportedGoalCard({ goal, activeGoals = [], healthC
           </div>
         ) : null}
 
+        {category === "OTHER" && (
+          <section className="mt-3 rounded-[20px] border border-[#dce9ec] bg-[#f7fbfc] p-4">
+            <div className="flex items-start justify-between gap-3">
+              <div className="min-w-0">
+                <p className="text-[8px] font-black uppercase tracking-[.14em] text-[#82939f]">Goal journey</p>
+                <p className="mt-1 text-[12px] font-black text-[#0b2d54]">Day {journey.journeyDay}<span className="mx-1.5 text-[#a2b2ba]">·</span>{journey.isPastDue ? "Past target date" : journey.daysLeft === null ? "Ongoing" : journey.daysLeft === 0 ? "Due today" : journey.daysLeft + (journey.daysLeft === 1 ? " day left" : " days left")}</p>
+                <p className="mt-1 text-[9px] text-[#82939f]">{journey.targetDate && !Number.isNaN(journey.targetDate.getTime()) ? "Target date " + formatJourneyDate(journey.targetDate) : "No target date set"}{current != null ? " · Latest value " + current + (displayUnit ? " " + displayUnit : "") : " · No measurement recorded yet"}</p>
+              </div>
+              <span className="shrink-0 rounded-full bg-white px-2.5 py-1.5 text-[8px] font-black text-[#0b7b80] ring-1 ring-[#dce8eb]">{personalComparisonLabel}</span>
+            </div>
+            {Array.isArray(goal?.progress) && goal.progress.length > 0 && (
+              <details className="group mt-3 border-t border-[#e3edef] pt-3">
+                <summary className="flex cursor-pointer list-none items-center justify-between gap-3 text-[10px] font-bold text-[#617583]">
+                  <span>Measurement history</span>
+                  <span className="flex items-center gap-2 text-[9px] font-semibold text-[#82939f]">{goal.progress.length} saved <ChevronDown className="h-3.5 w-3.5 transition-transform group-open:rotate-180" /></span>
+                </summary>
+                <div className="mt-3 space-y-2">
+                  {goal.progress.slice(0, 5).map((entry: any, index: number) => (
+                    <div key={String(entry?.id ?? entry?.measuredAt ?? index)} className="flex items-start justify-between gap-3 rounded-xl bg-white px-3 py-2">
+                      <div className="min-w-0">
+                        <p className="text-[11px] font-black text-[#0b2d54]">{entry?.currentValue == null ? "—" : String(entry.currentValue) + (displayUnit ? " " + displayUnit : "")}</p>
+                        <p className="mt-0.5 text-[9px] leading-4 text-[#82939f]">{formatInsightDateTime(entry?.measuredAt ?? entry?.createdAt) ?? "Date unavailable"}</p>
+                        {String(entry?.notes ?? "").trim() && <p className="mt-1 text-[9px] leading-4 text-[#71839a]">{String(entry.notes).trim()}</p>}
+                      </div>
+                      <span className="shrink-0 text-[8px] font-bold text-[#82939f]">{entry?.progressPercent == null ? "Recorded" : Math.round(Number(entry.progressPercent)) + "%"}</span>
+                    </div>
+                  ))}
+                </div>
+              </details>
+            )}
+          </section>
+        )}
+
         {category === "BLOOD_PRESSURE" ? (
           <div className="mt-4 space-y-3">
             <section className="rounded-[22px] border border-[#dfeaec] bg-[#f8fbfb] p-4 sm:p-5">
@@ -1097,11 +1130,13 @@ export default function TodaySupportedGoalCard({ goal, activeGoals = [], healthC
             <p className="text-[10px] leading-5 text-[#758896]">{meta.helper}</p>
             {category === "NUTRITION" && nutritionTargetReview(target) && <div className="mt-2 rounded-[14px] border border-amber-200 bg-amber-50 px-3 py-2.5"><p className="text-[9px] font-black uppercase tracking-[.12em] text-amber-900">Target review</p><p className="mt-1 text-[10px] leading-5 text-amber-900/85">{nutritionTargetReview(target)}</p></div>}
             {meta.action === "MANUAL" ? (
+              <>
               <div className="mt-3 flex flex-col gap-2 sm:flex-row">
                 <input type="number" inputMode="decimal" step={meta.step} min={meta.min} max={meta.max} value={value} onChange={(event) => setValue(event.target.value)} placeholder={meta.placeholder} aria-label={"Record " + meta.label + " value"} className="min-h-10 w-full rounded-xl border border-[#d8e5e9] bg-white px-3 text-xs font-bold text-[#0b2d54] outline-none placeholder:text-[#a2afb8] focus:border-[#24c1c4]" />
                 <button type="button" onClick={() => void recordValue()} disabled={saving || value.trim() === ""} className="inline-flex min-h-10 shrink-0 items-center justify-center gap-1.5 rounded-xl bg-[#0b2d54] px-4 py-2 text-[9px] font-black text-white disabled:cursor-not-allowed disabled:opacity-40"><Check className="h-3.5 w-3.5 text-[#24c1c4]" />{saving ? "Saving…" : "Record value"}</button>
               </div>
               {category === "OTHER" && <input type="text" maxLength={240} value={measurementNote} onChange={(event) => setMeasurementNote(event.target.value)} placeholder="Optional note about this measurement" aria-label="Personal goal measurement note" className="mt-2 min-h-10 w-full rounded-xl border border-[#d8e5e9] bg-white px-3 text-[11px] font-medium text-[#0b2d54] outline-none placeholder:text-[#a2afb8] focus:border-[#24c1c4]" />}
+              </>
             ) : (
               <Link href={source.href} className="mt-3 inline-flex min-h-10 w-full items-center justify-center gap-1.5 rounded-xl bg-[#0b2d54] px-4 py-2 text-[9px] font-black text-white"><ArrowRight className="h-3.5 w-3.5 text-[#24c1c4]" />{source.label}</Link>
             )}
