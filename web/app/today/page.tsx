@@ -121,7 +121,7 @@ function GoalCarouselSlide({ slideKey, expandedGoalSlide, onToggle, children }: 
       data-goal-slide-key={slideKey}
       role="group"
       aria-roledescription="slide"
-      className="relative h-[480px] min-w-0 w-full shrink-0 snap-start lg:w-[calc(50%-0.5rem)]"
+      className="relative min-h-[480px] min-w-0 w-full shrink-0 snap-start lg:w-[calc(50%-0.5rem)]"
     >
       {card}
     </div>
