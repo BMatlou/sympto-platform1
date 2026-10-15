@@ -526,7 +526,7 @@ export class HealthGoalsService {
 
     // A custom goal about a separate health outcome is not the same as adherence.
     const separateHealthOutcome = /\b(symptoms?|asthma|pain|rash|cough|breathing|allerg(y|ies)|side effects?|adverse reactions?|drug interactions?)\b/.test(normalizedTitle);
-    const explicitMedicationUseIntent = /\b(adherence|adherent|missed doses?|dose schedule|prescription schedule|on time|medication routine|medicine routine|taking as prescribed)\b/.test(normalizedTitle);
+    const explicitMedicationUseIntent = /\b(adherence|adherent|missed doses?|dose schedule|prescription schedule|on time|medication routine|medicine routine|taking as prescribed|take .{0,60}(daily|every day|on time|as prescribed)|taking .{0,60}(daily|every day|on time|as prescribed))\b/.test(normalizedTitle);
     if (separateHealthOutcome && !explicitMedicationUseIntent) return;
 
     const simplifiedTitle = normalizedTitle.replace(/\b(custom|health|goal|target|my|track|tracking|monitor|measure|record)\b/g, ' ').trim();
