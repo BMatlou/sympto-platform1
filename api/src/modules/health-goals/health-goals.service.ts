@@ -220,6 +220,25 @@ export class HealthGoalsService {
               AND existing."sourceId" = journal."id"
           )
       `;
+      await this.prisma.$executeRaw`
+        INSERT INTO "HealthGoalMetricEvent"
+          ("id", "patientId", "metricType", "metricKey", "loggedValue", "occurredAt", "source", "sourceId")
+        SELECT
+          gen_random_uuid(), baseline."patientId", 'HEART_RATE', 'heart_rate.bpm',
+          baseline."restingHeartRate", baseline."establishedAt", 'patient-baseline', 'baseline'
+        FROM "PatientBaseline" baseline
+        WHERE baseline."patientId" = ${patient.id}
+          AND baseline."restingHeartRate" IS NOT NULL
+          AND NOT EXISTS (
+            SELECT 1
+            FROM "HealthGoalMetricEvent" existing
+            WHERE existing."patientId" = baseline."patientId"
+              AND existing."metricType" = 'HEART_RATE'
+              AND existing."metricKey" = 'heart_rate.bpm'
+              AND existing."source" = 'patient-baseline'
+              AND existing."sourceId" = 'baseline'
+          )
+      `;
     }
 
     const events = await this.prisma.$queryRaw<Array<{ id: string; loggedValue: Prisma.Decimal; occurredAt: Date; source: string; sourceId: string | null; metadata: any }>>`SELECT "id", "loggedValue", "occurredAt", "source", "sourceId", "metadata" FROM "HealthGoalMetricEvent" WHERE "patientId" = ${patient.id} AND "metricType" = ${metricType} AND "metricKey" = ${metricKey} AND "occurredAt" >= ${from} AND "occurredAt" < ${to} ${source ? Prisma.sql`AND "source" = ${source}` : Prisma.empty} ORDER BY "occurredAt" ASC`;
