@@ -735,7 +735,7 @@ export default function TodayBloodGlucoseGoal({ goal, patientId = "", currentWei
   const radius = (ringSize - ringStroke) / 2;
 
   return (
-    <article id={"today-goal-" + goalId} className={detailsExpanded ? "flex h-auto min-h-[480px] min-w-0 flex-col overflow-visible rounded-[26px] border border-[#e5edef] bg-white shadow-[0_14px_36px_rgba(11,45,84,.07)]" : "flex h-auto min-h-[480px] min-w-0 flex-col overflow-visible rounded-[26px] border border-[#e5edef] bg-white shadow-[0_14px_36px_rgba(11,45,84,.07)]"}>
+    <article id={"today-goal-" + goalId} className={detailsExpanded ? "flex flex-1 h-auto min-h-[480px] min-w-0 flex-col overflow-visible rounded-[26px] border border-[#e5edef] bg-white shadow-[0_14px_36px_rgba(11,45,84,.07)]" : "flex flex-1 h-auto min-h-[480px] min-w-0 flex-col overflow-visible rounded-[26px] border border-[#e5edef] bg-white shadow-[0_14px_36px_rgba(11,45,84,.07)]"}>
       <header className="flex items-center justify-between gap-3 px-4 pb-3 pt-4 sm:px-5 sm:pt-5">
         <div className="flex min-w-0 items-center gap-2.5">
           <span className="grid h-9 w-9 shrink-0 place-items-center rounded-[13px] bg-[#e8f8f7] text-[#0b7b80] ring-1 ring-[#d3efed]"><Droplets className="h-4 w-4" /></span>
