@@ -22,7 +22,7 @@ export class ClinicalVitalsService {
     // resting-rate target. Accept only clinical vital types explicitly marked
     // as resting heart rate/pulse.
     const explicitlyResting =
-      /\\brest(?:ing)?\\b.{0,24}\\b(?:heart[\\s_-]*rate|pulse)\\b|\\b(?:heart[\\s_-]*rate|pulse)\\b.{0,24}\\brest(?:ing)?\\b/i.test(vitalName);
+      /\brest(?:ing)?\b.{0,24}\b(?:heart[\s_-]*rate|pulse)\b|\b(?:heart[\s_-]*rate|pulse)\b.{0,24}\brest(?:ing)?\b/i.test(vitalName);
     if (!explicitlyResting) return;
     const loggedValue = Number(value);
     if (!Number.isFinite(loggedValue)) return;
