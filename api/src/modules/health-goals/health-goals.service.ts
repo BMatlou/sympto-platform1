@@ -405,7 +405,7 @@ export class HealthGoalsService {
         throw new BadRequestException('A valid numeric goal target is required.');
       }
 
-      const allowsZero = normalizedCategory === 'SMOKING' || normalizedCategory === 'ALCOHOL';
+      const allowsZero = normalizedCategory === 'SMOKING' || normalizedCategory === 'ALCOHOL' || normalizedCategory === 'OTHER';
       if (target < 0 || (target === 0 && !allowsZero)) {
         throw new BadRequestException(allowsZero ? 'This goal target must be 0 or greater.' : 'This goal target must be greater than 0.');
       }
@@ -1061,24 +1061,34 @@ export class HealthGoalsService {
                 ? HealthGoalProgressStatus.DECLINING
                 : HealthGoalProgressStatus.STAGNANT;
       } else {
-        progressPercent = targetValue != null && targetValue > 0
-          ? Math.min(100, Math.max(0, (currentValue / targetValue) * 100))
-          : 0;
-        if (targetValue != null && targetValue > 0 && (
-          (comparison === 'AT_LEAST' && currentValue >= targetValue) ||
-          (comparison === 'AT_MOST' && currentValue <= targetValue)
-        )) {
+        const targetMet = targetValue != null && Number.isFinite(targetValue) && (
+          comparison === 'AT_LEAST' ? currentValue >= targetValue
+            : comparison === 'AT_MOST' ? currentValue <= targetValue
+              : false
+        );
+        progressPercent = targetValue == null || !Number.isFinite(targetValue)
+          ? 0
+          : targetValue === 0
+            ? targetMet ? 100 : 0
+            : targetValue > 0
+              ? Math.min(100, Math.max(0, (currentValue / targetValue) * 100))
+              : 0;
+        if (targetMet) {
           progressStatus = recurring ? HealthGoalProgressStatus.ON_TRACK : HealthGoalProgressStatus.ACHIEVED;
           terminal = progressStatus === HealthGoalProgressStatus.ACHIEVED;
-          if (comparison === 'AT_MOST') progressPercent = 100;
+          progressPercent = 100;
         } else {
           progressStatus = previousValue == null
             ? HealthGoalProgressStatus.IMPROVING
-            : currentValue > previousValue
-              ? HealthGoalProgressStatus.IMPROVING
-              : currentValue < previousValue
-                ? HealthGoalProgressStatus.DECLINING
-                : HealthGoalProgressStatus.STAGNANT;
+            : currentValue === previousValue
+              ? HealthGoalProgressStatus.STAGNANT
+              : comparison === 'AT_MOST'
+                ? currentValue < previousValue
+                  ? HealthGoalProgressStatus.IMPROVING
+                  : HealthGoalProgressStatus.DECLINING
+                : currentValue > previousValue
+                  ? HealthGoalProgressStatus.IMPROVING
+                  : HealthGoalProgressStatus.DECLINING;
         }
       }
     }
