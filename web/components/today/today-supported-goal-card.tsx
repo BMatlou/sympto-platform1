@@ -805,13 +805,15 @@ export default function TodaySupportedGoalCard({ goal, activeGoals = [], healthC
   const bpDisplayAt = contextBloodPressureIsNewer
     ? bloodPressureContextReading?.at ?? null
     : bpLatestAt ?? bloodPressureContextReading?.at ?? null;
-  const displayCurrent = category === "HEART_RATE"
-    ? heartRateTodayCurrent ?? heartRateLatestCurrent
-    : category === "BLOOD_PRESSURE"
-      ? contextBloodPressureIsNewer
-        ? bloodPressureContextReading?.value ?? liveCurrent ?? current
-        : liveCurrent ?? bloodPressureContextReading?.value ?? current
-      : current;
+  const displayCurrent = category === "MEDICATION"
+    ? null
+    : category === "HEART_RATE"
+      ? heartRateTodayCurrent ?? heartRateLatestCurrent
+      : category === "BLOOD_PRESSURE"
+        ? contextBloodPressureIsNewer
+          ? bloodPressureContextReading?.value ?? liveCurrent ?? current
+          : liveCurrent ?? bloodPressureContextReading?.value ?? current
+        : current;
   const bpDistance = category === "BLOOD_PRESSURE" && displayCurrent != null && target != null
     ? displayCurrent - target
     : null;
