@@ -545,14 +545,14 @@ export class HealthGoalsService {
         const normalizedName = String(name ?? '').toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
         if (!normalizedName) return false;
         const aliases = [normalizedName, ...normalizedName.split(' ').filter((part) => part.length >= 4)];
-        return aliases.some((alias) => alias.length >= 4 && (\` \${normalizedTitle} \`).includes(\` \${alias} \`));
+        return aliases.some((alias) => alias.length >= 4 && (' ' + normalizedTitle + ' ').includes(' ' + alias + ' '));
       });
     });
 
     if (mentioned) {
       const medicationName = String(mentioned.medication?.name ?? mentioned.medication?.genericName ?? mentioned.medication?.brandName ?? 'your saved medicine');
       throw new BadRequestException(
-        \`This custom health goal names your saved medicine “\${medicationName}”. Use the Medication goal and select this prescription so Sympto can track adherence against the correct medication record.\`,
+        'This custom health goal names your saved medicine “' + medicationName + '”. Use the Medication goal and select this prescription so Sympto can track adherence against the correct medication record.',
       );
     }
   }
