@@ -322,11 +322,9 @@ export default function TodaySupportedGoalCard({ goal, activeGoals = [], onUpdat
     let active = true;
     const now = new Date();
     const todayKey = southAfricaDayKey(now);
-    const thirtyDaysAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
-    // Health Vitals can be saved before a goal is created. Read the recent
-    // history independently of the goal's creation date, including legacy
-    // entries backfilled from the Health Journal.
-    const from = thirtyDaysAgo;
+    // Health Vitals can be saved long before a goal is created. Fetch the
+    // goal-eligible source history so the latest known reading remains visible.
+    const from = new Date(0);
     const eligibleSources = new Set(["manual-vitals", "patient-baseline", "clinical-vital", "wearable-resting", "health-journal"]);
 
     healthGoalsService
@@ -646,7 +644,9 @@ export default function TodaySupportedGoalCard({ goal, activeGoals = [], onUpdat
                   </div>
                   <p className="mt-2 text-[11px] leading-5 text-white/55">
                     {heartRateDisplayAt
-                      ? (heartRateHasTodayReading ? "Recorded today at " : "Last recorded ") + new Intl.DateTimeFormat("en-ZA", { timeZone: "Africa/Johannesburg", dateStyle: heartRateHasTodayReading ? undefined : "medium", hour: "2-digit", minute: "2-digit" }).format(new Date(heartRateDisplayAt))
+                      ? (heartRateHasTodayReading
+                          ? "Recorded today at " + new Intl.DateTimeFormat("en-ZA", { timeZone: "Africa/Johannesburg", hour: "2-digit", minute: "2-digit" }).format(new Date(heartRateDisplayAt))
+                          : "Last recorded " + new Intl.DateTimeFormat("en-ZA", { timeZone: "Africa/Johannesburg", dateStyle: "medium", timeStyle: "short" }).format(new Date(heartRateDisplayAt)))
                       : "No resting heart-rate reading has been saved yet."}
                   </p>
                   {!heartRateHasTodayReading && heartRateStats.latestAt && (
