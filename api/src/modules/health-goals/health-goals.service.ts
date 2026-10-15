@@ -241,7 +241,11 @@ export class HealthGoalsService {
       `;
     }
 
-    const events = await this.prisma.$queryRaw<Array<{ id: string; loggedValue: Prisma.Decimal; occurredAt: Date; source: string; sourceId: string | null; metadata: any }>>`SELECT "id", "loggedValue", "occurredAt", "source", "sourceId", "metadata" FROM "HealthGoalMetricEvent" WHERE "patientId" = ${patient.id} AND "metricType" = ${metricType} AND "metricKey" = ${metricKey} AND "occurredAt" >= ${from} AND "occurredAt" < ${to} ${source ? Prisma.sql`AND "source" = ${source}` : Prisma.empty} ORDER BY "occurredAt" ASC`;
+    const heartRateSourceFilter = !source && metricType === 'HEART_RATE' && metricKey === 'heart_rate.bpm'
+      ? Prisma.sql`AND "source" IN ('manual-vitals', 'patient-baseline', 'clinical-vital', 'wearable-resting', 'health-journal')`
+      : Prisma.empty;
+    const sourceFilter = source ? Prisma.sql`AND "source" = ${source}` : heartRateSourceFilter;
+    const events = await this.prisma.$queryRaw<Array<{ id: string; loggedValue: Prisma.Decimal; occurredAt: Date; source: string; sourceId: string | null; metadata: any }>>`SELECT "id", "loggedValue", "occurredAt", "source", "sourceId", "metadata" FROM "HealthGoalMetricEvent" WHERE "patientId" = ${patient.id} AND "metricType" = ${metricType} AND "metricKey" = ${metricKey} AND "occurredAt" >= ${from} AND "occurredAt" < ${to} ${sourceFilter} ORDER BY "occurredAt" ASC`;
     return { success: true, count: events.length, events: events.map((event) => ({ id: String(event.id), loggedValue: Number(event.loggedValue), occurredAt: event.occurredAt, source: event.source, sourceId: event.sourceId, metadata: event.metadata ?? null })) };
   }
 
