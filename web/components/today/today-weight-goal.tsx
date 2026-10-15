@@ -5,6 +5,7 @@ import { ArrowRight, Scale, TrendingDown, TrendingUp } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { healthGoalsService } from "@/services/health-goals.service";
 import { TODAY_GOAL_FOOTER_CLASS } from "@/components/today/today-goal-card-styles";
+import GoalCardDisclosureButton from "@/components/today/goal-card-disclosure-button";
 
 function numberValue(value: unknown): number | null {
   const parsed = Number(value);
@@ -44,10 +45,12 @@ type Props = {
   bmi?: number | string | null;
   heightCm?: number | string | null;
   weightKg?: number | string | null;
+  detailsExpanded?: boolean;
+  onToggleDetails?: () => void;
 };
 type WeightEvent = { loggedValue: number; occurredAt: string; source?: string | null; sourceId?: string | null };
 
-export default function TodayWeightGoal({ goal, fallbackWeight, bmi: dashboardBmi, heightCm: dashboardHeightCm, weightKg: dashboardWeightKg }: Props) {
+export default function TodayWeightGoal({ goal, fallbackWeight, bmi: dashboardBmi, heightCm: dashboardHeightCm, weightKg: dashboardWeightKg, detailsExpanded, onToggleDetails }: Props) {
   const [events, setEvents] = useState<WeightEvent[]>([]);
   const [baselineWeight, setBaselineWeight] = useState<number | null>(null);
   const [journeyStartAt, setJourneyStartAt] = useState<string | null>(null);
@@ -492,6 +495,19 @@ export default function TodayWeightGoal({ goal, fallbackWeight, bmi: dashboardBm
           </div>
         )}
 
+        {(bmiCaution || gainTargetCaution) && !loading && (
+          <div role="alert" className="mt-3 rounded-[16px] border border-amber-200 bg-amber-50 px-3.5 py-3 text-[10px] leading-5 text-amber-900">
+            This weight target needs review against your recorded height and BMI. Please discuss the target with a qualified healthcare professional before changing your plan.
+          </div>
+        )}
+        <div className="mt-3 flex items-center justify-between gap-3">
+          <Link href={`/health-goals#goal-${encodeURIComponent(String(goal?.id ?? ""))}`} className="inline-flex min-h-8 items-center gap-1 rounded-lg px-1 text-[10px] font-semibold text-[#71839a] hover:text-[#0b7b80]">
+            View goal <ArrowRight className="h-3 w-3" />
+          </Link>
+          {onToggleDetails ? <GoalCardDisclosureButton expanded={Boolean(detailsExpanded)} onToggle={onToggleDetails} /> : null}
+        </div>
+        {detailsExpanded && (
+          <>
         {!loading && !goalCompleted && !isMaintenanceGoal && currentWeight != null && !bmiCaution && targetAmount != null && remainingGoalAmount != null && (
           <div className="mt-4 rounded-[20px] border border-[#e1eaed] bg-[#f8fbfc] px-4 py-3.5 text-[10px] font-semibold leading-5 text-[#74859a]">
             {targetReached
@@ -635,8 +651,11 @@ export default function TodayWeightGoal({ goal, fallbackWeight, bmi: dashboardBm
             </>}
           </div>
         )}
+          </>
+        )}
       </div>
 
+      {detailsExpanded && (
       <div className={`${TODAY_GOAL_FOOTER_CLASS} bg-[#fbfdfd]`}>
         <div className="flex items-center justify-between gap-3 text-[10px] font-semibold text-[#74859a]">
           <span>{goalCompleted ? "Completed journey" : `Day ${journey.journeyDay} · ${journey.daysLeft === null ? "Journey active" : journey.daysLeft === 0 ? "Target date today" : `${journey.daysLeft} days left`}`}</span>
@@ -644,6 +663,7 @@ export default function TodayWeightGoal({ goal, fallbackWeight, bmi: dashboardBm
         </div>
         <p className="mt-2 text-[9px] leading-4 text-[#9aa8b1]">For weight goals, the measurement recorded when this goal was created or last revised is the baseline. Lose and Gain goals store the requested amount of weight change and derive the destination from the baseline; Maintenance goals use recent weight averages and trend rather than requiring an exact daily match to the baseline. Completed weight goals remain at 100% as history.</p>
       </div>
+      )}
     </article>
   );
 }
