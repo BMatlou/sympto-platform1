@@ -467,11 +467,12 @@ export class HealthGoalsService {
     if (!value) return null;
 
     // Allow distinct measures that the current dedicated category does not track.
-    if (/\b(sleep quality|sleep score|deep sleep|rem sleep|sleep apnea)\b/.test(value)) return null;
+    if (/\b(sleep quality|sleep score|deep sleep|rem sleep|sleep apnea|sleep stages?)\b/.test(value)) return null;
     if (/\bdiastolic\b/.test(value) && !/\bsystolic\b/.test(value)) return null;
     if (/\b(ldl|hdl|non hdl)\b/.test(value)) return null;
-    if (/\b(smoke free days?|cigarette free days?|days without smoking|days without cigarettes)\b/.test(value)) return null;
+    if (/\b(smoke free days?|cigarette free days?|days without smoking|days without cigarettes|smoking abstinence days?)\b/.test(value)) return null;
     if (/\b(alcohol free days?|sober days?|days sober|sobriety streak)\b/.test(value)) return null;
+    if (/\b(step count|steps per (day|week)|daily steps|walking distance|running distance|workout sessions?|exercise sessions?|number of workouts|reps? per|weights? lifted|calories burned|active calories|heart rate variability|\bhrv\b|exercise heart rate|heart rate during exercise|medication side effects?|medicine side effects?|drug side effects?|adverse drug reactions?)\b/.test(value)) return null;
 
     // Weight training is exercise, not a body-weight target.
     if (/\b(weight training|strength training)\b/.test(value)) {
