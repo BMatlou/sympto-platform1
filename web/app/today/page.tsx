@@ -119,10 +119,14 @@ function GoalCarouselSlide({ slideKey, expandedGoalSlide, onToggle, children }: 
       )}
       {children}
       {!expanded && (
-        <button type="button" aria-expanded="false" onClick={() => onToggle(slideKey)}
-          className="absolute inset-x-0 bottom-0 z-20 flex min-h-[64px] w-full items-end justify-center gap-2 rounded-b-[26px] border-t border-[#edf2f4] bg-gradient-to-t from-white via-white/95 to-white/75 px-4 pb-4 pt-7 text-[10px] font-black text-[#0b2d54] backdrop-blur-[2px] transition hover:text-[#0b7b80] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-[-3px] focus-visible:outline-[#24c1c4]">
-          Show insights & details
-          <ChevronDown className="h-3.5 w-3.5 transition-transform" />
+        <button
+          type="button"
+          aria-expanded="false"
+          onClick={() => onToggle(slideKey)}
+          className="absolute bottom-3 right-3 z-20 inline-flex min-h-9 items-center justify-center gap-1.5 rounded-full border border-[#dce8eb] bg-white px-3 py-2 text-[9px] font-bold text-[#0b2d54] shadow-[0_3px_10px_rgba(11,45,84,0.08)] transition hover:border-[#24c1c4] hover:bg-[#f8fcfc] hover:text-[#0b7b80] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#24c1c4]"
+        >
+          Show details
+          <ChevronDown className="h-3 w-3 transition-transform" />
         </button>
       )}
     </div>
