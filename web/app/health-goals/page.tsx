@@ -340,7 +340,7 @@ function HealthGoalsPageContent() {
           const aliases = [normalizedName, ...normalizedName.split(" ").filter((part) => part.length >= 4)];
           const usableAliases = aliases.filter((alias) => alias.length >= 4);
           const titleMentionsMedicine = usableAliases.some((alias) => (" " + customTitle + " ").includes(" " + alias + " "));
-          const explicitMedicationUseIntent = /\b(adherence|adherent|missed doses?|dose schedule|prescription schedule|on time|medication routine|medicine routine|taking as prescribed)\b/.test(customTitle);
+          const explicitMedicationUseIntent = /\b(adherence|adherent|missed doses?|dose schedule|prescription schedule|on time|medication routine|medicine routine|taking as prescribed|take .{0,60}(daily|every day|on time|as prescribed)|taking .{0,60}(daily|every day|on time|as prescribed))\b/.test(customTitle);
           const separateCustomHealthOutcome = /\b(symptoms?|asthma|pain|rash|cough|breathing|allerg(y|ies)|side effects?|adverse reactions?|drug interactions?)\b/.test(customTitle);
           const simplifiedCustomTitle = customTitle.replace(/\b(custom|health|goal|target|my|track|tracking|monitor|measure|record)\b/g, " ").trim();
           const titleIsMedicineLabel = usableAliases.some((alias) => customTitle === alias || simplifiedCustomTitle === alias);
