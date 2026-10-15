@@ -289,7 +289,7 @@ export class HealthGoalIntelligenceService {
     for (const relation of existing) {
       const key = `${relation.sourceGoalId}|${relation.targetGoalId}|${relation.relationshipType}`;
       if (!desired.has(key)) {
-        await this.prisma.$executeRawUnsafe('DELETE FROM "HealthGoalRelation" WHERE "id"=$1::uuid', relation.id);
+        await this.prisma.$executeRawUnsafe('DELETE FROM "HealthGoalRelation" WHERE "id"::text=$1', relation.id);
       }
     }
 
