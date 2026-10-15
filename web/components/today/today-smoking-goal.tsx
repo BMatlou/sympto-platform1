@@ -2,10 +2,11 @@
 
 import Link from "next/link";
 import { ArrowRight, Cigarette } from "lucide-react";
+import GoalCardDisclosureButton from "@/components/today/goal-card-disclosure-button";
 import { useEffect, useMemo, useState } from "react";
 import { healthGoalsService } from "@/services/health-goals.service";
 
-type Props = { goal: any; onUpdated?: () => void | Promise<void> };
+type Props = { goal: any; onUpdated?: () => void | Promise<void>; detailsExpanded?: boolean; onToggleDetails?: () => void };
 
 function localDayKey(date = new Date()) {
   const parts = new Intl.DateTimeFormat("en-GB", { timeZone: "Africa/Johannesburg", year: "numeric", month: "2-digit", day: "2-digit" }).formatToParts(date);
@@ -32,7 +33,7 @@ function calendarMidnight(value: unknown) {
   return new Date(date.getFullYear(), date.getMonth(), date.getDate());
 }
 
-export default function TodaySmokingGoal({ goal, onUpdated }: Props) {
+export default function TodaySmokingGoal({ goal, onUpdated, detailsExpanded, onToggleDetails }: Props) {
   const [todayLogged, setTodayLogged] = useState<number | null>(null);
   const [draft, setDraft] = useState("");
   const [open, setOpen] = useState(false);
@@ -168,6 +169,26 @@ export default function TodaySmokingGoal({ goal, onUpdated }: Props) {
         <div className="min-w-0"><p className="text-[8px] font-black uppercase tracking-[.14em] text-[#9aa8b3]">Journey</p><p className="mt-0.5 text-xs font-black text-[#0b2d54]">Day {journeyDay}{daysLeft !== null ? ` · ${daysLeft} days left` : ""}</p></div>
         <div className="flex items-center gap-2"><p className="hidden text-[8px] text-[#7d8d99] sm:block">until {formatDate(goal?.targetDate)}</p><Link href={`/health-goals#goal-${encodeURIComponent(String(goal?.id ?? ""))}`} className="inline-flex min-h-9 shrink-0 items-center justify-center gap-1 rounded-xl border border-[#d6e4e7] bg-white px-3 py-2 text-[9px] font-black text-[#0b2d54]">View goal <ArrowRight className="h-3 w-3" /></Link></div>
       </footer>
+
+      {onToggleDetails && (
+        <div className="px-4 pb-3 sm:px-5">
+          <GoalCardDisclosureButton expanded={Boolean(detailsExpanded)} onToggle={onToggleDetails} />
+        </div>
+      )}
+      {detailsExpanded && (
+        <section className="mx-4 mb-4 rounded-[18px] border border-[#e1ecee] bg-[#f8fbfb] p-3.5 text-[#526b7c] sm:mx-5">
+          <p className="text-[8px] font-black uppercase tracking-[.14em] text-[#0b7b80]">About this goal</p>
+          <p className="mt-1.5 text-[10px] leading-5">
+            Sympto compares your logged cigarette count with your saved daily ceiling. A lower count is progress toward reducing smoking; the ceiling is a tracking limit, not a recommended amount to smoke.
+          </p>
+          {String(goal?.description ?? "").trim() && (
+            <p className="mt-2 border-t border-[#e0ebed] pt-2 text-[10px] leading-5">{String(goal.description).trim()}</p>
+          )}
+          <p className="mt-2 text-[9px] leading-4 text-[#82939f]">
+            {goal?.targetDate ? "Target date · " + formatDate(goal.targetDate) : "Keep logging daily to build a more reliable record."}
+          </p>
+        </section>
+      )}
     </article>
   );
 }
