@@ -380,10 +380,16 @@ export class HealthGoalsService {
     if (!goal) throw new NotFoundException('Health goal not found.');
     if (String(goal.status).toUpperCase() === 'ACHIEVED') throw new BadRequestException('Completed health goals are locked. Start a new goal instead.');
     const canonical = this.canonicalMetricConfig(String(goal.category), { ...config, frequencyTarget: config?.frequencyTarget ?? goal.targetValue });
-    const existing = await this.prisma.$queryRaw<Array<{ id: string }>>`SELECT "id" FROM "HealthGoalMetricConfig" WHERE "healthGoalId" = ${goalId} LIMIT 1`;
-    if (existing.length) await this.prisma.$executeRaw`UPDATE "HealthGoalMetricConfig" SET "metricType" = ${canonical.metricType}, "metricKey" = ${canonical.metricKey}, "frequency" = ${canonical.frequency}, "frequencyTarget" = ${canonical.frequencyTarget}, "aggregation" = ${canonical.aggregation}, "comparison" = ${canonical.comparison}, "guidanceText" = ${canonical.guidanceText} WHERE "id"::text = ${String(existing[0].id)}`;
-    else await this.prisma.$executeRaw`INSERT INTO "HealthGoalMetricConfig" ("id", "healthGoalId", "metricType", "metricKey", "frequency", "frequencyTarget", "aggregation", "comparison", "guidanceText") VALUES (gen_random_uuid(), ${goalId}, ${canonical.metricType}, ${canonical.metricKey}, ${canonical.frequency}, ${canonical.frequencyTarget}, ${canonical.aggregation}, ${canonical.comparison}, ${canonical.guidanceText})`;
-    return canonical;
+    const existing = await this.prisma.$queryRaw<Array<{ id: string; metricKey: string }>>`SELECT "id", "metricKey" FROM "HealthGoalMetricConfig" WHERE "healthGoalId" = ${goalId} LIMIT 1`;
+    const isPersonalGoal = String(goal.category).toUpperCase() === 'OTHER';
+    const existingMetricKey = String(existing[0]?.metricKey ?? '');
+    const metricKey = isPersonalGoal
+      ? existingMetricKey.startsWith('other.value.') ? existingMetricKey : `other.value.${goalId}`
+      : canonical.metricKey;
+    const persistedConfig = { ...canonical, metricKey };
+    if (existing.length) await this.prisma.$executeRaw`UPDATE "HealthGoalMetricConfig" SET "metricType" = ${persistedConfig.metricType}, "metricKey" = ${persistedConfig.metricKey}, "frequency" = ${persistedConfig.frequency}, "frequencyTarget" = ${persistedConfig.frequencyTarget}, "aggregation" = ${persistedConfig.aggregation}, "comparison" = ${persistedConfig.comparison}, "guidanceText" = ${persistedConfig.guidanceText} WHERE "id"::text = ${String(existing[0].id)}`;
+    else await this.prisma.$executeRaw`INSERT INTO "HealthGoalMetricConfig" ("id", "healthGoalId", "metricType", "metricKey", "frequency", "frequencyTarget", "aggregation", "comparison", "guidanceText") VALUES (gen_random_uuid(), ${goalId}, ${persistedConfig.metricType}, ${persistedConfig.metricKey}, ${persistedConfig.frequency}, ${persistedConfig.frequencyTarget}, ${persistedConfig.aggregation}, ${persistedConfig.comparison}, ${persistedConfig.guidanceText})`;
+    return persistedConfig;
   }
 
   private assertGoalDefinition(category: string, targetValue: unknown, targetDate?: unknown) {
@@ -445,6 +451,7 @@ export class HealthGoalsService {
     category: string,
     patientMedicationId?: string | null,
     excludeGoalId?: string,
+    title?: string,
   ) {
     const normalizedCategory = String(category ?? '').toUpperCase();
     if (!patientId || !normalizedCategory) return;
@@ -463,6 +470,12 @@ export class HealthGoalsService {
       where.patientMedicationId = patientMedicationId;
     }
 
+    if (normalizedCategory === 'OTHER') {
+      const personalTitle = String(title ?? '').trim();
+      if (!personalTitle) throw new BadRequestException('A personal goal must have a specific name.');
+      where.title = { equals: personalTitle, mode: 'insensitive' };
+    }
+
     const existing = await this.prisma.healthGoal.findFirst({
       where,
       select: { id: true, title: true, category: true, patientMedicationId: true },
@@ -470,6 +483,9 @@ export class HealthGoalsService {
 
     if (!existing) return;
 
+    if (normalizedCategory === 'OTHER') {
+      throw new ConflictException('You already have an active personal goal with this name. Use a different name or edit the existing goal.');
+    }
     const label = normalizedCategory === 'MEDICATION' ? 'for the selected medication' : 'in this category';
     throw new ConflictException(
       `You already have an active ${normalizedCategory.toLowerCase().replaceAll('_', ' ')} goal ${label}. Edit the existing goal instead of creating a duplicate.`,
@@ -608,7 +624,7 @@ export class HealthGoalsService {
     // checked inside the same transaction as the authoritative PatientMedication
     // ownership check and primary HealthGoal write.
     if (category !== 'MEDICATION') {
-      await this.assertNoDuplicateGoal(patientId, category, patientMedicationId ?? null);
+      await this.assertNoDuplicateGoal(patientId, category, patientMedicationId ?? null, undefined, String(goalData.title ?? ''));
     }
 
     const targetValue =
@@ -735,6 +751,10 @@ export class HealthGoalsService {
 
       throw error;
     }
+    const persistedMetricConfig = {
+      ...metricConfig,
+      metricKey: category === 'OTHER' ? `other.value.${goal.id}` : metricConfig.metricKey,
+    };
     let metricConfigReady = false;
     let metricConfigFallbackUsed = false;
 
@@ -746,7 +766,7 @@ export class HealthGoalsService {
         INSERT INTO "HealthGoalMetricConfig"
           ("id", "healthGoalId", "metricType", "metricKey", "frequency", "frequencyTarget", "aggregation", "comparison", "guidanceText")
         VALUES
-          (${metricConfigId}::uuid, ${goal.id}::text, ${metricConfig.metricType}, ${metricConfig.metricKey}, ${metricConfig.frequency}, ${metricConfig.frequencyTarget}, ${metricConfig.aggregation}, ${metricConfig.comparison}, ${metricConfig.guidanceText})
+          (${metricConfigId}::uuid, ${goal.id}::text, ${persistedMetricConfig.metricType}, ${persistedMetricConfig.metricKey}, ${persistedMetricConfig.frequency}, ${persistedMetricConfig.frequencyTarget}, ${persistedMetricConfig.aggregation}, ${persistedMetricConfig.comparison}, ${persistedMetricConfig.guidanceText})
       `;
 
       metricConfigReady = true;
@@ -766,7 +786,7 @@ export class HealthGoalsService {
           INSERT INTO "HealthGoalMetricConfig"
             ("id", "healthGoalId", "metricType", "metricKey", "frequency", "frequencyTarget")
           VALUES
-            (${fallbackMetricConfigId}::uuid, ${goal.id}::text, ${metricConfig.metricType}, ${metricConfig.metricKey}, ${metricConfig.frequency}, ${metricConfig.frequencyTarget})
+            (${fallbackMetricConfigId}::uuid, ${goal.id}::text, ${persistedMetricConfig.metricType}, ${persistedMetricConfig.metricKey}, ${persistedMetricConfig.frequency}, ${persistedMetricConfig.frequencyTarget})
         `;
 
         metricConfigReady = true;
@@ -805,7 +825,7 @@ export class HealthGoalsService {
       ...goal,
       metricConfig: {
         metricType: metricType ?? goalRuleFor(category).metricType,
-        metricKey: metricKey ?? goalRuleFor(category).metricKey,
+        metricKey: persistedMetricConfig.metricKey,
         frequency: frequency ?? goalRuleFor(category).frequency,
         frequencyTarget:
           frequencyTarget == null
@@ -941,7 +961,9 @@ export class HealthGoalsService {
       await this.assertWeightTargetDirection(String(existing.patientId), goalData.targetValue ?? existing.targetValue, effectiveComparison);
     }
     const metricComparison = revisingWeightGoal ? effectiveComparison : comparison;
-    if (isMedicationGoal && patientMedicationId !== undefined) {
+    if (targetCategory === 'OTHER') {
+      await this.assertNoDuplicateGoal(String(existing.patientId), targetCategory, null, id, String(goalData.title ?? existing.title ?? ''));
+    } else if (isMedicationGoal && patientMedicationId !== undefined) {
       await this.assertNoDuplicateGoal(String(existing.patientId), targetCategory, patientMedicationId ?? null, id);
     }
     const updateData: any = {
@@ -1018,23 +1040,46 @@ export class HealthGoalsService {
       }    } else {
       const targetValue = goal.targetValue == null ? null : Number(goal.targetValue);
       const previousValue = goal.currentValue == null ? null : Number(goal.currentValue);
-      const isMaintenanceGoal = comparison === 'CLOSEST';
-      progressPercent = targetValue != null && targetValue > 0
-        ? Math.min(100, Math.max(0, (currentValue / targetValue) * 100))
-        : 0;
-      if (isMaintenanceGoal) {
-        progressStatus = HealthGoalProgressStatus.ON_TRACK;
-      } else if (targetValue != null && targetValue > 0 && currentValue >= targetValue) {
-        progressStatus = recurring ? HealthGoalProgressStatus.ON_TRACK : HealthGoalProgressStatus.ACHIEVED;
-        terminal = progressStatus === HealthGoalProgressStatus.ACHIEVED;
-      } else {
-        progressStatus = previousValue == null
-          ? HealthGoalProgressStatus.IMPROVING
-          : currentValue > previousValue
+      const isClosestGoal = comparison === 'CLOSEST';
+
+      if (isClosestGoal && targetValue != null && Number.isFinite(targetValue)) {
+        const distance = Math.abs(currentValue - targetValue);
+        const previousDistance = previousValue != null && Number.isFinite(previousValue)
+          ? Math.abs(previousValue - targetValue)
+          : null;
+        const tolerance = Math.max(0.5, Math.abs(targetValue) * 0.05);
+        progressPercent = targetValue === 0
+          ? distance <= tolerance ? 100 : 0
+          : Math.max(0, Math.min(100, (1 - distance / Math.max(Math.abs(targetValue), 1)) * 100));
+        progressStatus = distance <= tolerance
+          ? HealthGoalProgressStatus.ON_TRACK
+          : previousDistance == null
             ? HealthGoalProgressStatus.IMPROVING
-            : currentValue < previousValue
-              ? HealthGoalProgressStatus.DECLINING
-              : HealthGoalProgressStatus.STAGNANT;
+            : distance < previousDistance
+              ? HealthGoalProgressStatus.IMPROVING
+              : distance > previousDistance
+                ? HealthGoalProgressStatus.DECLINING
+                : HealthGoalProgressStatus.STAGNANT;
+      } else {
+        progressPercent = targetValue != null && targetValue > 0
+          ? Math.min(100, Math.max(0, (currentValue / targetValue) * 100))
+          : 0;
+        if (targetValue != null && targetValue > 0 && (
+          (comparison === 'AT_LEAST' && currentValue >= targetValue) ||
+          (comparison === 'AT_MOST' && currentValue <= targetValue)
+        )) {
+          progressStatus = recurring ? HealthGoalProgressStatus.ON_TRACK : HealthGoalProgressStatus.ACHIEVED;
+          terminal = progressStatus === HealthGoalProgressStatus.ACHIEVED;
+          if (comparison === 'AT_MOST') progressPercent = 100;
+        } else {
+          progressStatus = previousValue == null
+            ? HealthGoalProgressStatus.IMPROVING
+            : currentValue > previousValue
+              ? HealthGoalProgressStatus.IMPROVING
+              : currentValue < previousValue
+                ? HealthGoalProgressStatus.DECLINING
+                : HealthGoalProgressStatus.STAGNANT;
+        }
       }
     }
 
