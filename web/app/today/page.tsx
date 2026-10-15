@@ -520,6 +520,19 @@ export default function TodayPage() {
                   key={String(goal?.id ?? "goal-" + index)}
                   goal={goal}
                   activeGoals={activeGoalsArray}
+                  healthContext={{
+                    patient: data.patient ?? null,
+                    profile: data.profile ?? null,
+                    conditions: Array.isArray(data.conditions)
+                      ? data.conditions
+                      : Array.isArray(data.healthSnapshot?.activeConditions)
+                        ? data.healthSnapshot.activeConditions
+                        : [],
+                    medications: Array.isArray(data.medications) ? data.medications : Array.isArray(medications) ? medications : [],
+                    symptoms: activeSymptoms,
+                    measurements: healthVitals,
+                    journal: data.journal ?? null,
+                  }}
                   onUpdated={reload}
                 />
               );
