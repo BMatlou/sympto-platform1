@@ -947,7 +947,7 @@ export default function TodaySupportedGoalCard({ goal, activeGoals = [], healthC
         <span className={((category === "BLOOD_PRESSURE" && bpWithinTarget === false) || (category === "HEART_RATE" && displayCurrent != null && target != null && displayCurrent > target)) ? "shrink-0 rounded-full bg-amber-50 px-2.5 py-1.5 text-[8px] font-black uppercase tracking-[.1em] text-amber-800 ring-1 ring-amber-100" : "shrink-0 rounded-full bg-[#eef8f8] px-2.5 py-1.5 text-[8px] font-black uppercase tracking-[.1em] text-[#0b7b80]"}>{category === "MEDICATION" ? "Medicine not linked" : category === "BLOOD_PRESSURE" ? displayCurrent == null ? "No reading" : target == null ? "Target needed" : bpWithinTarget ? "Within target" : "Above target" : category === "HEART_RATE" ? (heartRateHasTodayReading ? (target != null && displayCurrent != null && displayCurrent > target ? "Above target" : "Reading saved") : heartRateLatestCurrent != null ? "Latest saved reading" : "No reading") : category === "OTHER" ? customGoalCategoryMatch ? "Use category" : personalGoalNeedsSetup ? "Setup required" : journey.isPastDue ? "Past due" : displayCurrent == null ? "Not started" : journey.daysLeft === 0 && journey.targetDate ? "Due today" : "Journey active" : "Today"}</span>
       </header>
 
-      {(detailsExpanded || personalGoalNeedsSetup) && (
+      {(detailsExpanded || personalGoalNeedsSetup || category === "BLOOD_PRESSURE" || category === "HEART_RATE") && (
       <div className="px-4 pb-4 pt-4 sm:px-5">
         {(category === "BLOOD_PRESSURE" || category === "HEART_RATE") && (
           <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
@@ -1403,7 +1403,7 @@ export default function TodaySupportedGoalCard({ goal, activeGoals = [], healthC
         )}
       </div>
       )}
-      {!detailsExpanded && !personalGoalNeedsSetup && (
+      {!detailsExpanded && !personalGoalNeedsSetup && category !== "BLOOD_PRESSURE" && category !== "HEART_RATE" && (
         <div className={(category === "BLOOD_PRESSURE" || category === "HEART_RATE") ? "mx-4 mb-4 mt-4 flex flex-1 flex-col justify-between gap-3 rounded-[22px] bg-[#0b2d54] p-4 text-white sm:mx-5" : "px-4 pb-4 pt-4 sm:px-5"}>
           <div className="grid grid-cols-3 gap-2">
             <div className={(category === "BLOOD_PRESSURE" || category === "HEART_RATE") ? "rounded-[16px] bg-white/[.06] p-3 ring-1 ring-white/10" : "rounded-[16px] bg-[#f7fbfb] p-3"}>
