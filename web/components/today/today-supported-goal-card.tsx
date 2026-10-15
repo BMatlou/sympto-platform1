@@ -97,6 +97,12 @@ const EXISTING_GOAL_CATEGORY_MATCHERS: Array<ExistingGoalCategoryMatch & { patte
 function matchExistingGoalCategory(title: string): ExistingGoalCategoryMatch | null {
   const normalized = String(title ?? "").trim().toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
   if (!normalized) return null;
+  // Allow distinct measures that the current dedicated category does not track.
+  if (/\b(sleep quality|sleep score|deep sleep|rem sleep|sleep apnea)\b/.test(normalized)) return null;
+  if (/\bdiastolic\b/.test(normalized) && !/\bsystolic\b/.test(normalized)) return null;
+  if (/\b(ldl|hdl|non hdl)\b/.test(normalized)) return null;
+  if (/\b(smoke free days?|cigarette free days?|days without smoking|days without cigarettes)\b/.test(normalized)) return null;
+  if (/\b(alcohol free days?|sober days?|days sober|sobriety streak)\b/.test(normalized)) return null;
   if (/\b(weight training|strength training)\b/.test(normalized)) {
     return EXISTING_GOAL_CATEGORY_MATCHERS.find((item) => item.value === "EXERCISE") ?? null;
   }
@@ -755,7 +761,7 @@ export default function TodaySupportedGoalCard({ goal, activeGoals = [], healthC
             {category === "OTHER" && customGoalMeasurementInstructions && <p className="mt-1 line-clamp-2 text-[10px] leading-4 text-[#71839a]"><span className="font-bold">Measurement method: </span>{customGoalMeasurementInstructions}</p>}
           </div>
         </div>
-        <span className="shrink-0 rounded-full bg-[#eef8f8] px-2.5 py-1.5 text-[8px] font-black uppercase tracking-[.1em] text-[#0b7b80]">{category === "HEART_RATE" ? (heartRateHasTodayReading ? "Reading saved" : heartRateStats.latestCurrent != null ? "Latest saved reading" : "No reading") : category === "OTHER" ? personalGoalNeedsSetup ? "Setup required" : journey.isPastDue ? "Past due" : displayCurrent == null ? "Not started" : journey.daysLeft === 0 && journey.targetDate ? "Due today" : "Journey active" : "Today"}</span>
+        <span className="shrink-0 rounded-full bg-[#eef8f8] px-2.5 py-1.5 text-[8px] font-black uppercase tracking-[.1em] text-[#0b7b80]">{category === "HEART_RATE" ? (heartRateHasTodayReading ? "Reading saved" : heartRateStats.latestCurrent != null ? "Latest saved reading" : "No reading") : category === "OTHER" ? customGoalCategoryMatch ? "Use category" : personalGoalNeedsSetup ? "Setup required" : journey.isPastDue ? "Past due" : displayCurrent == null ? "Not started" : journey.daysLeft === 0 && journey.targetDate ? "Due today" : "Journey active" : "Today"}</span>
       </header>
 
       <div className="px-4 pb-4 pt-4 sm:px-5">
