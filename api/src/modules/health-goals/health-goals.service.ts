@@ -524,9 +524,12 @@ export class HealthGoalsService {
     const normalizedTitle = String(title ?? '').trim().toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
     if (!patientId || !normalizedTitle) return;
 
-    // Side-effect tracking is distinct from adherence to a prescribed medicine.
-    if (/\b(side effects?|adverse reactions?|drug interactions?|medication symptoms?|medicine symptoms?)\b/.test(normalizedTitle)) return;
+    // A custom goal about a separate health outcome is not the same as adherence.
+    const separateHealthOutcome = /\b(symptoms?|asthma|pain|rash|cough|breathing|allerg(y|ies)|side effects?|adverse reactions?|drug interactions?)\b/.test(normalizedTitle);
+    const explicitMedicationUseIntent = /\b(adherence|adherent|missed doses?|dose schedule|prescription schedule|on time|medication routine|medicine routine|taking as prescribed)\b/.test(normalizedTitle);
+    if (separateHealthOutcome && !explicitMedicationUseIntent) return;
 
+    const simplifiedTitle = normalizedTitle.replace(/\b(custom|health|goal|target|my|track|tracking|monitor|measure|record)\b/g, ' ').trim();
     const rows = await this.prisma.patientMedication.findMany({
       where: {
         status: 'ACTIVE',
@@ -545,7 +548,9 @@ export class HealthGoalsService {
         const normalizedName = String(name ?? '').toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
         if (!normalizedName) return false;
         const aliases = [normalizedName, ...normalizedName.split(' ').filter((part) => part.length >= 4)];
-        return aliases.some((alias) => alias.length >= 4 && (' ' + normalizedTitle + ' ').includes(' ' + alias + ' '));
+        const titleMentionsMedicine = aliases.some((alias) => alias.length >= 4 && (' ' + normalizedTitle + ' ').includes(' ' + alias + ' '));
+        const titleIsMedicineLabel = aliases.some((alias) => alias.length >= 4 && (normalizedTitle === alias || simplifiedTitle === alias));
+        return titleMentionsMedicine && (explicitMedicationUseIntent || titleIsMedicineLabel);
       });
     });
 
