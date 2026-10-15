@@ -401,6 +401,10 @@ export default function TodaySupportedGoalCard({ goal, activeGoals = [], healthC
   const target = targetValue(goal);
   const progress = progressPercent(goal);
   const displayUnit = category === "OTHER" ? String(goal?.unit ?? "").trim() : meta.unit;
+  const personalGoalTitle = String(goal?.title ?? "").trim();
+  const personalGoalNeedsSetup = category === "OTHER" && (
+    !personalGoalTitle || personalGoalTitle.toLowerCase() === "personal goal" || !displayUnit
+  );
   const personalComparison = String(goal?.metricConfig?.comparison ?? "CLOSEST").toUpperCase();
   const personalComparisonLabel = personalComparison === "AT_LEAST" ? "At least target" : personalComparison === "AT_MOST" ? "At most target" : "Stay close to target";
   const source = sourceAction(category);
