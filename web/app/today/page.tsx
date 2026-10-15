@@ -121,19 +121,19 @@ function GoalCarouselSlide({ slideKey, expandedGoalSlide, onToggle, children }: 
         </>
       ) : (
         <>
-          <div className="h-[480px] overflow-hidden rounded-[26px]">
-            {children}
-          </div>
-          <div className="flex h-10 items-center justify-end pr-1">
+          <div className="flex h-10 items-center justify-end px-1">
             <button
               type="button"
               aria-expanded="false"
               onClick={() => onToggle(slideKey)}
-              className="inline-flex min-h-8 items-center justify-center gap-1.5 rounded-full border border-[#dce8eb] bg-white px-3 py-1.5 text-[9px] font-bold text-[#0b2d54] transition hover:border-[#24c1c4] hover:bg-[#f8fcfc] hover:text-[#0b7b80] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#24c1c4]"
+              className="inline-flex min-h-8 items-center justify-center gap-1.5 px-1 text-[9px] font-semibold text-[#71839a] transition-colors hover:text-[#0b7b80] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#24c1c4]"
             >
               Show details
               <ChevronDown className="h-3 w-3 transition-transform" />
             </button>
+          </div>
+          <div className="h-[480px] overflow-hidden rounded-[26px]">
+            {children}
           </div>
         </>
       )}
