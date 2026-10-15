@@ -332,9 +332,9 @@ export class HealthGoalIntelligenceService {
     try {
       await this.prisma.$executeRaw`
         INSERT INTO "HealthGoalRelation"
-          ("id","patientId","sourceGoalId","targetGoalId","relationshipType","rationale","createdBy")
+          ("id","patientId","sourceGoalId","targetGoalId","relationshipType","rationale","createdBy","createdAt","updatedAt")
         VALUES
-          (gen_random_uuid(), ${patientId}, ${sourceGoalId}, ${targetGoalId}, ${relationshipType}, ${rationale}, 'SYSTEM')
+          (gen_random_uuid(), ${patientId}, ${sourceGoalId}, ${targetGoalId}, ${relationshipType}, ${rationale}, 'SYSTEM', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
       `;
     } catch (error: any) {
       // A concurrent request may have inserted the same relation after the
