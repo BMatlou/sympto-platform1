@@ -45,7 +45,7 @@ const GOAL_META: Record<string, GoalMeta> = {
   MENTAL_HEALTH: { label: "Mental health", unit: "score", period: "Daily", comparison: "At most", action: "CHECK_IN", helper: "Your stress score is recorded through the Daily Health Check-in, where 1 is calm and 10 is very stressed.", icon: Activity },
   HYDRATION: { label: "Hydration", unit: "ml/day", period: "Daily", comparison: "At least", action: "CHECK_IN", helper: "Water intake is recorded through the Daily Health Check-in and compared with your daily target.", icon: Droplets },
   HEART_RATE: { label: "Resting heart rate", unit: "bpm", period: "Daily", comparison: "At most", action: "VITALS", helper: "Record your resting heart rate in Today’s Current health section after sitting quietly for a few minutes. Wearable or clinical readings count only when the source identifies them as resting; exercise readings are not compared with this target.", icon: HeartPulse, step: "1", min: "20", max: "260", placeholder: "e.g. 72" },
-  OTHER: { label: "Personal goal", unit: "", period: "Journey", comparison: "Configurable target", action: "MANUAL", helper: "Record the current measurable value for this personal goal. Sympto saves a dated history for this goal and compares each value using the rule you selected.", icon: PencilLine, step: "0.1", min: "0", placeholder: "Enter your current value" },
+  OTHER: { label: "Custom health goal", unit: "", period: "Journey", comparison: "Configured measure", action: "MANUAL", helper: "Record the actual value defined by this goal’s measurement instructions. Use the stated source and unit each time; do not guess or reuse readings already tracked by another health category.", icon: PencilLine, step: "0.1", min: "0", placeholder: "Enter the measured value" },
 };
 
 function normaliseCategory(goal: any) {
@@ -67,7 +67,7 @@ function goalCategoryLabel(category: string) {
     SMOKING: "Smoking",
     ALCOHOL: "Alcohol",
     HEART_RATE: "Heart rate",
-    OTHER: "Personal goal",
+    OTHER: "Custom health goal",
   };
   return labels[category] ?? category.replaceAll("_", " ").toLowerCase().replace(/\b\w/g, (letter) => letter.toUpperCase());
 }
@@ -75,6 +75,35 @@ function goalCategoryLabel(category: string) {
 function metaFor(goal: any) {
   return GOAL_META[normaliseCategory(goal)] ?? GOAL_META.OTHER;
 }
+
+type ExistingGoalCategoryMatch = { value: string; label: string; measurement: string };
+
+const EXISTING_GOAL_CATEGORY_MATCHERS: Array<ExistingGoalCategoryMatch & { patterns: RegExp[] }> = [
+  { value: "WEIGHT", label: "Weight", measurement: "body-weight change or maintenance", patterns: [/\bweight\b/, /\blose weight\b/, /\bgain weight\b/, /\bweight loss\b/, /\bweight gain\b/, /\bmaintain weight\b/, /\bbody weight\b/] },
+  { value: "EXERCISE", label: "Exercise", measurement: "weekly exercise minutes", patterns: [/\bexercise\b/, /\bworkouts?\b/, /\bphysical activity\b/, /\bactive minutes?\b/, /\bexercise minutes?\b/, /\bminutes of exercise\b/, /\b(weight training|strength training)\b/] },
+  { value: "NUTRITION", label: "Nutrition", measurement: "daily calorie intake", patterns: [/\bcalories?\b/, /\bkcal\b/, /\bcalorie intake\b/, /\benergy intake\b/] },
+  { value: "BLOOD_PRESSURE", label: "Blood pressure", measurement: "systolic blood pressure readings", patterns: [/\bblood pressure\b/, /\bsystolic\b/, /\bdiastolic\b/, /\bbp target\b/] },
+  { value: "BLOOD_GLUCOSE", label: "Blood glucose", measurement: "recorded blood-glucose values", patterns: [/\bblood glucose\b/, /\bblood sugar\b/, /\bglucose\b/] },
+  { value: "CHOLESTEROL", label: "Cholesterol", measurement: "total cholesterol results", patterns: [/\bcholesterol\b/] },
+  { value: "MEDICATION", label: "Medication", measurement: "adherence to a saved prescribed medication", patterns: [/\bmedication adherence\b/, /\bmedicine adherence\b/, /\bmedication\b/, /\bmedicines?\b/, /\bprescription adherence\b/] },
+  { value: "SLEEP", label: "Sleep", measurement: "recorded sleep duration in hours per night", patterns: [/\bsleep\b/, /\bhours of sleep\b/, /\bsleep duration\b/] },
+  { value: "MENTAL_HEALTH", label: "Mental health", measurement: "the daily stress score", patterns: [/\bstress score\b/, /\bstress level\b/, /\bdaily stress\b/, /\bstress rating\b/] },
+  { value: "HYDRATION", label: "Hydration", measurement: "daily water intake", patterns: [/\bhydration\b/, /\bwater intake\b/, /\bdaily water\b/, /\bdrink water\b/, /\bfluid intake\b/] },
+  { value: "SMOKING", label: "Smoking", measurement: "daily cigarette count", patterns: [/\bsmoking\b/, /\bcigarettes?\b/, /\bsmoke free\b/, /\bquit smoking\b/] },
+  { value: "ALCOHOL", label: "Alcohol", measurement: "weekly alcohol-drink count", patterns: [/\balcohol\b/, /\bdrinks? per week\b/, /\bdrinks per week\b/] },
+  { value: "HEART_RATE", label: "Heart rate", measurement: "resting heart-rate readings", patterns: [/\bheart rate\b/, /\bresting pulse\b/, /\bpulse rate\b/] },
+];
+
+function matchExistingGoalCategory(title: string): ExistingGoalCategoryMatch | null {
+  const normalized = String(title ?? "").trim().toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
+  if (!normalized) return null;
+  if (/\b(weight training|strength training)\b/.test(normalized)) {
+    return EXISTING_GOAL_CATEGORY_MATCHERS.find((item) => item.value === "EXERCISE") ?? null;
+  }
+  return EXISTING_GOAL_CATEGORY_MATCHERS.find((item) => item.patterns.some((pattern) => pattern.test(normalized))) ?? null;
+}
+
+
 
 type HeartRateDayPoint = { dateKey: string; label: string; value: number | null; measuredAt: string | null; isFuture: boolean };
 
@@ -402,8 +431,11 @@ export default function TodaySupportedGoalCard({ goal, activeGoals = [], healthC
   const progress = progressPercent(goal);
   const displayUnit = category === "OTHER" ? String(goal?.unit ?? "").trim() : meta.unit;
   const personalGoalTitle = String(goal?.title ?? "").trim();
+  const customGoalCategoryMatch = category === "OTHER" ? matchExistingGoalCategory(personalGoalTitle) : null;
+  const customGoalMeasurementInstructions = String(goal?.description ?? "").trim();
   const personalGoalNeedsSetup = category === "OTHER" && (
-    !personalGoalTitle || personalGoalTitle.toLowerCase() === "personal goal" || !displayUnit
+    !personalGoalTitle || ["personal goal", "custom health goal"].includes(personalGoalTitle.toLowerCase()) ||
+    !displayUnit || target == null || !customGoalMeasurementInstructions || Boolean(customGoalCategoryMatch)
   );
   const personalComparison = String(goal?.metricConfig?.comparison ?? "CLOSEST").toUpperCase();
   const personalComparisonLabel = personalComparison === "AT_LEAST" ? "At least target" : personalComparison === "AT_MOST" ? "At most target" : "Stay close to target";
@@ -718,9 +750,9 @@ export default function TodaySupportedGoalCard({ goal, activeGoals = [], healthC
           <span className="grid h-10 w-10 shrink-0 place-items-center rounded-[14px] bg-[#e8f8f7] text-[#0b7b80]"><Icon className="h-4 w-4" /></span>
           <div className="min-w-0">
             <p className="text-[8px] font-black uppercase tracking-[.16em] text-[#0b7b80]">{meta.label}</p>
-            <h3 className="mt-1 truncate text-sm font-black tracking-[-.03em] text-[#0b2d54]">{personalGoalNeedsSetup ? "Finish goal setup" : String(goal?.title || meta.label)}</h3>
+            <h3 className="mt-1 truncate text-sm font-black tracking-[-.03em] text-[#0b2d54]">{customGoalCategoryMatch ? "Use " + customGoalCategoryMatch.label + " category" : personalGoalNeedsSetup ? "Finish goal setup" : String(goal?.title || meta.label)}</h3>
             <p className="mt-1 text-[9px] font-semibold text-[#8595a1]">{personalGoalNeedsSetup ? "Setup required · define measure and unit" : `${category === "OTHER" ? personalComparisonLabel : meta.comparison} · ${meta.period} · ${displayUnit || "Measured value"}`}</p>
-            {category === "OTHER" && String(goal?.description ?? "").trim() && <p className="mt-1 line-clamp-2 text-[10px] leading-4 text-[#71839a]">{String(goal.description).trim()}</p>}
+            {category === "OTHER" && customGoalMeasurementInstructions && <p className="mt-1 line-clamp-2 text-[10px] leading-4 text-[#71839a]"><span className="font-bold">Measurement method: </span>{customGoalMeasurementInstructions}</p>}
           </div>
         </div>
         <span className="shrink-0 rounded-full bg-[#eef8f8] px-2.5 py-1.5 text-[8px] font-black uppercase tracking-[.1em] text-[#0b7b80]">{category === "HEART_RATE" ? (heartRateHasTodayReading ? "Reading saved" : heartRateStats.latestCurrent != null ? "Latest saved reading" : "No reading") : category === "OTHER" ? personalGoalNeedsSetup ? "Setup required" : journey.isPastDue ? "Past due" : displayCurrent == null ? "Not started" : journey.daysLeft === 0 && journey.targetDate ? "Due today" : "Journey active" : "Today"}</span>
@@ -729,18 +761,21 @@ export default function TodaySupportedGoalCard({ goal, activeGoals = [], healthC
       <div className="px-4 pb-4 pt-4 sm:px-5">
         {personalGoalNeedsSetup ? (
           <section className="mt-3 rounded-[20px] border border-[#dce9ec] bg-[#f7fbfc] p-4">
-            <p className="text-[9px] font-black uppercase tracking-[.14em] text-[#0b7b80]">Measurement setup required</p>
+            <p className="text-[9px] font-black uppercase tracking-[.14em] text-[#0b7b80]">{customGoalCategoryMatch ? "Dedicated category already exists" : "Measurement setup required"}</p>
             <p className="mt-2 text-[11px] leading-5 text-[#506b7a]">
-              {!personalGoalTitle || personalGoalTitle.toLowerCase() === "personal goal"
-                ? "Give this goal a specific name so you know what the number represents. "
-                : ""}
-              {!displayUnit ? "Add a unit, such as pages, sessions, minutes or points. " : ""}
+              {customGoalCategoryMatch
+                ? "This goal overlaps Sympto’s " + customGoalCategoryMatch.label + " category, which already tracks " + customGoalCategoryMatch.measurement + ". Do not record the same health measurement here; create the dedicated category goal instead."
+                : !personalGoalTitle || ["personal goal", "custom health goal"].includes(personalGoalTitle.toLowerCase())
+                  ? "Give this goal a specific measurement name so you know what the number represents. "
+                  : ""}
+              {!displayUnit ? "Add a unit that describes the health measurement, such as sessions/week or symptom-free days. " : ""}
+              {!customGoalMeasurementInstructions ? "Explain how you will obtain each value, for example by counting completed physiotherapy sessions during the week. " : ""}
               {target == null
                 ? "Enter a target after defining the measure and its unit."
                 : "The saved target is " + target + (displayUnit ? " " + displayUnit : " (unit not set)") + "; it cannot be interpreted until the missing setup details are added."}
             </p>
-            <Link href={"/health-goals?edit=" + encodeURIComponent(goalId)} className="mt-3 inline-flex min-h-10 w-full items-center justify-center gap-2 rounded-xl bg-[#0b2d54] px-4 py-2.5 text-[10px] font-black text-white">
-              <PencilLine className="h-3.5 w-3.5 text-[#24c1c4]" />Finish goal setup
+            <Link href={customGoalCategoryMatch ? "/health-goals" : "/health-goals?edit=" + encodeURIComponent(goalId)} className="mt-3 inline-flex min-h-10 w-full items-center justify-center gap-2 rounded-xl bg-[#0b2d54] px-4 py-2.5 text-[10px] font-black text-white">
+              <PencilLine className="h-3.5 w-3.5 text-[#24c1c4]" />{customGoalCategoryMatch ? "Open health-goal categories" : "Finish goal setup"}
             </Link>
           </section>
         ) : category === "BLOOD_PRESSURE" ? (
