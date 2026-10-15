@@ -6,6 +6,7 @@ import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 import { healthGoalsService } from "@/services/health-goals.service";
 import { healthJournalService } from "@/services/health-journal.service";
+import GoalCardDisclosureButton from "@/components/today/goal-card-disclosure-button";
 
 type SupportedGoalCardProps = {
   goal: any;
@@ -20,6 +21,8 @@ type SupportedGoalCardProps = {
     journal?: any;
   };
   onUpdated?: () => Promise<void> | void;
+  detailsExpanded?: boolean;
+  onToggleDetails?: () => void;
 };
 
 type GoalMeta = {
@@ -426,7 +429,7 @@ const DEFAULT_METRICS: Record<string, { metricType: string; metricKey: string }>
   OTHER: { metricType: "OTHER", metricKey: "other.value" },
 };
 
-export default function TodaySupportedGoalCard({ goal, activeGoals = [], healthContext, onUpdated }: SupportedGoalCardProps) {
+export default function TodaySupportedGoalCard({ goal, activeGoals = [], healthContext, onUpdated, detailsExpanded, onToggleDetails }: SupportedGoalCardProps) {
   const [value, setValue] = useState("");
   const [measurementNote, setMeasurementNote] = useState("");
   const [saving, setSaving] = useState(false);
@@ -795,6 +798,7 @@ export default function TodaySupportedGoalCard({ goal, activeGoals = [], healthC
         <span className="shrink-0 rounded-full bg-[#eef8f8] px-2.5 py-1.5 text-[8px] font-black uppercase tracking-[.1em] text-[#0b7b80]">{category === "HEART_RATE" ? (heartRateHasTodayReading ? "Reading saved" : heartRateStats.latestCurrent != null ? "Latest saved reading" : "No reading") : category === "OTHER" ? customGoalCategoryMatch ? "Use category" : personalGoalNeedsSetup ? "Setup required" : journey.isPastDue ? "Past due" : displayCurrent == null ? "Not started" : journey.daysLeft === 0 && journey.targetDate ? "Due today" : "Journey active" : "Today"}</span>
       </header>
 
+      {(detailsExpanded || personalGoalNeedsSetup) && (
       <div className="px-4 pb-4 pt-4 sm:px-5">
         {personalGoalNeedsSetup ? (
           <section className="mt-3 rounded-[20px] border border-[#dce9ec] bg-[#f7fbfc] p-4">
@@ -1235,7 +1239,44 @@ export default function TodaySupportedGoalCard({ goal, activeGoals = [], healthC
             {meta.action === "MANUAL" && (category === "BLOOD_GLUCOSE" || category === "CHOLESTEROL") && <Link href="/tests-results" className="mt-2 inline-flex min-h-9 w-full items-center justify-center gap-1.5 rounded-xl border border-[#dce7eb] bg-white px-3 py-2 text-[9px] font-black text-[#0b2d54]">View recorded results <ArrowRight className="h-3.5 w-3.5" /></Link>}
           </div>
         )}
-      </div>
+
+      )}
+      {!detailsExpanded && !personalGoalNeedsSetup && (
+        <div className="px-4 pb-4 pt-4 sm:px-5">
+          <div className="grid grid-cols-3 gap-2">
+            <div className="rounded-[16px] bg-[#f7fbfb] p-3">
+              <p className="text-[8px] font-black uppercase tracking-[.12em] text-[#95a3ad]">{category === "HEART_RATE" ? "Latest reading" : "Current"}</p>
+              <p className="mt-1 break-words text-base font-black text-[#0b2d54]">{displayCurrent == null ? "—" : displayCurrent}{displayUnit && displayCurrent != null ? " " + displayUnit : ""}</p>
+            </div>
+            <div className="rounded-[16px] bg-[#f7fbfb] p-3">
+              <p className="text-[8px] font-black uppercase tracking-[.12em] text-[#95a3ad]">{category === "HEART_RATE" ? "Personal ceiling" : "Target"}</p>
+              <p className="mt-1 break-words text-base font-black text-[#0b2d54]">{target == null ? "—" : (category === "BLOOD_PRESSURE" || category === "HEART_RATE" ? "≤ " : "") + target}{displayUnit && target != null ? " " + displayUnit : ""}</p>
+            </div>
+            <div className="rounded-[16px] bg-[#e9f9fa] p-3">
+              <p className="text-[8px] font-black uppercase tracking-[.12em] text-[#0b7b80]">Progress</p>
+              <p className="mt-1 text-base font-black text-[#0b6f73]">{displayProgress == null ? "—" : displayProgress + "%"}</p>
+            </div>
+          </div>
+          {displayProgress != null && <div className="mt-3 h-2 overflow-hidden rounded-full bg-[#edf3f5]"><div className="h-full rounded-full bg-[#24c1c4] transition-all" style={{ width: Math.max(0, displayProgress) + "%" }} /></div>}
+          <p className="mt-3 rounded-xl bg-[#e9f9fa] px-3 py-2 text-[9px] font-semibold leading-4 text-[#0b6f73]">{nextStep || meta.helper}</p>
+          {category === "HEART_RATE" && <p className="mt-2 text-[9px] leading-4 text-[#74859a]">Only readings clearly identified as resting are compared with this saved target.</p>}
+          {category === "BLOOD_PRESSURE" && <p className="mt-2 text-[9px] leading-4 text-[#74859a]">This goal compares systolic readings recorded in Health Vitals. Use your clinician-confirmed target.</p>}
+          <div className="mt-3 flex flex-wrap items-center justify-between gap-2">
+            {meta.action === "MANUAL" ? (
+              <div className="flex min-w-0 flex-1 gap-2">
+                <input type="number" inputMode="decimal" step={meta.step} min={meta.min} max={meta.max} value={value} onChange={(event) => setValue(event.target.value)} placeholder={meta.placeholder} aria-label={"Record " + meta.label + " value"} className="min-h-9 min-w-0 flex-1 rounded-xl border border-[#d8e5e9] bg-white px-3 text-[10px] font-bold text-[#0b2d54] outline-none placeholder:text-[#a2afb8] focus:border-[#24c1c4]" />
+                <button type="button" onClick={() => void recordValue()} disabled={saving || value.trim() === ""} className="inline-flex min-h-9 shrink-0 items-center justify-center gap-1 rounded-xl bg-[#0b2d54] px-3 py-2 text-[9px] font-black text-white disabled:cursor-not-allowed disabled:opacity-40">{saving ? "Saving…" : "Record"}</button>
+              </div>
+            ) : (
+              <Link href={source.href} className="inline-flex min-h-9 items-center justify-center gap-1.5 rounded-xl bg-[#0b2d54] px-3.5 py-2 text-[9px] font-black text-white">{source.label} <ArrowRight className="h-3 w-3 text-[#24c1c4]" /></Link>
+            )}
+            {onToggleDetails && <GoalCardDisclosureButton expanded={false} onToggle={onToggleDetails} label={category === "HEART_RATE" ? "Show insights" : "Show details"} />}
+          </div>
+          {category === "OTHER" && (
+            <p className="mt-2 text-[8px] leading-4 text-[#82939f]">Measurement method: {customGoalMeasurementInstructions || "Use the measurement method saved with this goal."}</p>
+          )}
+        </div>
+      )}
     </article>
   );
 }
