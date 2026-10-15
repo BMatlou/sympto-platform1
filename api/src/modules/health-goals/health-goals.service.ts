@@ -369,6 +369,22 @@ export class HealthGoalsService {
         ADD COLUMN IF NOT EXISTS "updatedAt" TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
     `);
     await this.prisma.$executeRawUnsafe(`
+      ALTER TABLE "HealthGoalMetricConfig"
+        ALTER COLUMN "createdAt" SET DEFAULT CURRENT_TIMESTAMP,
+        ALTER COLUMN "updatedAt" SET DEFAULT CURRENT_TIMESTAMP
+    `);
+    await this.prisma.$executeRawUnsafe(`
+      UPDATE "HealthGoalMetricConfig"
+      SET "createdAt" = COALESCE("createdAt", CURRENT_TIMESTAMP),
+          "updatedAt" = COALESCE("updatedAt", "createdAt", CURRENT_TIMESTAMP)
+      WHERE "createdAt" IS NULL OR "updatedAt" IS NULL
+    `);
+    await this.prisma.$executeRawUnsafe(`
+      ALTER TABLE "HealthGoalMetricConfig"
+        ALTER COLUMN "createdAt" SET NOT NULL,
+        ALTER COLUMN "updatedAt" SET NOT NULL
+    `);
+    await this.prisma.$executeRawUnsafe(`
       CREATE UNIQUE INDEX IF NOT EXISTS "HealthGoalMetricConfig_healthGoalId_key"
         ON "HealthGoalMetricConfig" ("healthGoalId")
     `);
@@ -388,7 +404,7 @@ export class HealthGoalsService {
       : canonical.metricKey;
     const persistedConfig = { ...canonical, metricKey };
     if (existing.length) await this.prisma.$executeRaw`UPDATE "HealthGoalMetricConfig" SET "metricType" = ${persistedConfig.metricType}, "metricKey" = ${persistedConfig.metricKey}, "frequency" = ${persistedConfig.frequency}, "frequencyTarget" = ${persistedConfig.frequencyTarget}, "aggregation" = ${persistedConfig.aggregation}, "comparison" = ${persistedConfig.comparison}, "guidanceText" = ${persistedConfig.guidanceText} WHERE "id"::text = ${String(existing[0].id)}`;
-    else await this.prisma.$executeRaw`INSERT INTO "HealthGoalMetricConfig" ("id", "healthGoalId", "metricType", "metricKey", "frequency", "frequencyTarget", "aggregation", "comparison", "guidanceText") VALUES (gen_random_uuid(), ${goalId}, ${persistedConfig.metricType}, ${persistedConfig.metricKey}, ${persistedConfig.frequency}, ${persistedConfig.frequencyTarget}, ${persistedConfig.aggregation}, ${persistedConfig.comparison}, ${persistedConfig.guidanceText})`;
+    else await this.prisma.$executeRaw`INSERT INTO "HealthGoalMetricConfig" ("id", "healthGoalId", "metricType", "metricKey", "frequency", "frequencyTarget", "aggregation", "comparison", "guidanceText", "createdAt", "updatedAt") VALUES (gen_random_uuid(), ${goalId}, ${persistedConfig.metricType}, ${persistedConfig.metricKey}, ${persistedConfig.frequency}, ${persistedConfig.frequencyTarget}, ${persistedConfig.aggregation}, ${persistedConfig.comparison}, ${persistedConfig.guidanceText}, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)`;
     return persistedConfig;
   }
 
@@ -776,9 +792,9 @@ export class HealthGoalsService {
       // First attempt: write the complete current metric contract.
       await this.prisma.$executeRaw`
         INSERT INTO "HealthGoalMetricConfig"
-          ("id", "healthGoalId", "metricType", "metricKey", "frequency", "frequencyTarget", "aggregation", "comparison", "guidanceText")
+          ("id", "healthGoalId", "metricType", "metricKey", "frequency", "frequencyTarget", "aggregation", "comparison", "guidanceText", "createdAt", "updatedAt")
         VALUES
-          (${metricConfigId}::uuid, ${goal.id}::text, ${persistedMetricConfig.metricType}, ${persistedMetricConfig.metricKey}, ${persistedMetricConfig.frequency}, ${persistedMetricConfig.frequencyTarget}, ${persistedMetricConfig.aggregation}, ${persistedMetricConfig.comparison}, ${persistedMetricConfig.guidanceText})
+          (${metricConfigId}::uuid, ${goal.id}::text, ${persistedMetricConfig.metricType}, ${persistedMetricConfig.metricKey}, ${persistedMetricConfig.frequency}, ${persistedMetricConfig.frequencyTarget}, ${persistedMetricConfig.aggregation}, ${persistedMetricConfig.comparison}, ${persistedMetricConfig.guidanceText}, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
       `;
 
       metricConfigReady = true;
@@ -796,9 +812,9 @@ export class HealthGoalsService {
         // optional aggregation/comparison values if those columns exist.
         await this.prisma.$executeRaw`
           INSERT INTO "HealthGoalMetricConfig"
-            ("id", "healthGoalId", "metricType", "metricKey", "frequency", "frequencyTarget")
+            ("id", "healthGoalId", "metricType", "metricKey", "frequency", "frequencyTarget", "createdAt", "updatedAt")
           VALUES
-            (${fallbackMetricConfigId}::uuid, ${goal.id}::text, ${persistedMetricConfig.metricType}, ${persistedMetricConfig.metricKey}, ${persistedMetricConfig.frequency}, ${persistedMetricConfig.frequencyTarget})
+            (${fallbackMetricConfigId}::uuid, ${goal.id}::text, ${persistedMetricConfig.metricType}, ${persistedMetricConfig.metricKey}, ${persistedMetricConfig.frequency}, ${persistedMetricConfig.frequencyTarget}, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
         `;
 
         metricConfigReady = true;
