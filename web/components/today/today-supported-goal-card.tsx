@@ -933,7 +933,7 @@ export default function TodaySupportedGoalCard({ goal, activeGoals = [], healthC
   }
 
   return (
-    <article id={"today-goal-" + encodeURIComponent(goalId)} className={detailsExpanded ? "w-full overflow-visible rounded-[26px] border border-[#dce9ee] bg-white shadow-[0_12px_32px_rgba(11,45,84,.045)]" : "w-full overflow-hidden rounded-[26px] border border-[#dce9ee] bg-white shadow-[0_12px_32px_rgba(11,45,84,.045)]"}>
+    <article id={"today-goal-" + encodeURIComponent(goalId)} className={detailsExpanded ? "h-full min-h-0 w-full overflow-y-auto [scrollbar-width:thin] rounded-[26px] border border-[#dce9ee] bg-white shadow-[0_12px_32px_rgba(11,45,84,.045)]" : "h-full min-h-0 w-full overflow-hidden rounded-[26px] border border-[#dce9ee] bg-white shadow-[0_12px_32px_rgba(11,45,84,.045)]"}>
       <header className="flex items-start justify-between gap-3 border-b border-[#edf2f5] px-4 py-4 sm:px-5">
         <div className="flex min-w-0 items-start gap-3">
           <span className="grid h-10 w-10 shrink-0 place-items-center rounded-[14px] bg-[#e8f8f7] text-[#0b7b80]"><Icon className="h-4 w-4" /></span>
