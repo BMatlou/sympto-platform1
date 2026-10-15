@@ -148,7 +148,7 @@ export const AlcoholGoalCard: React.FC<AlcoholGoalCardProps> = ({ goal, onUpdate
   }
 
   return (
-    <article className={detailsExpanded ? "flex h-full min-h-0 min-w-0 flex-col overflow-y-auto [scrollbar-width:thin] rounded-[30px] border border-[#dfeaec] bg-white shadow-[0_18px_48px_rgba(11,45,84,.06)]" : "flex h-full min-w-0 flex-col overflow-hidden rounded-[30px] border border-[#dfeaec] bg-white shadow-[0_18px_48px_rgba(11,45,84,.06)]"}>
+    <article className={detailsExpanded ? "flex h-full min-h-0 min-w-0 flex-col overflow-y-auto [scrollbar-width:thin] rounded-[30px] border border-[#dfeaec] bg-white shadow-[0_18px_48px_rgba(11,45,84,.06)]" : "flex h-full min-h-0 min-w-0 flex-col overflow-y-auto [scrollbar-width:thin] rounded-[30px] border border-[#dfeaec] bg-white shadow-[0_18px_48px_rgba(11,45,84,.06)]"}>
       <div className="flex items-center justify-between gap-4 px-5 pb-4 pt-5 sm:px-6 sm:pt-6">
         <div className="flex min-w-0 items-center gap-3">
           <span className="grid h-10 w-10 shrink-0 place-items-center rounded-[14px] bg-[#e8f8f7] text-[#0b7b80] ring-1 ring-[#d8efed]"><Wine className="h-4 w-4" /></span>
