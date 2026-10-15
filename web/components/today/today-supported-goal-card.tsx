@@ -44,7 +44,7 @@ const GOAL_META: Record<string, GoalMeta> = {
   SLEEP: { label: "Sleep", unit: "hours/night", period: "Daily", comparison: "At least", action: "CHECK_IN", helper: "Sleep is recorded through your Daily Health Check-in so the goal stays connected to your health journal.", icon: Moon },
   MENTAL_HEALTH: { label: "Mental health", unit: "score", period: "Daily", comparison: "At most", action: "CHECK_IN", helper: "Your stress score is recorded through the Daily Health Check-in, where 1 is calm and 10 is very stressed.", icon: Activity },
   HYDRATION: { label: "Hydration", unit: "ml/day", period: "Daily", comparison: "At least", action: "CHECK_IN", helper: "Water intake is recorded through the Daily Health Check-in and compared with your daily target.", icon: Droplets },
-  HEART_RATE: { label: "Resting heart rate", unit: "bpm", period: "Daily", comparison: "At most", action: "VITALS", helper: "Record a resting reading in Health Vitals after sitting quietly for a few minutes. Wearable or clinical readings count only when the source identifies them as resting; exercise readings are not compared with this target.", icon: HeartPulse, step: "1", min: "20", max: "260", placeholder: "e.g. 72" },
+  HEART_RATE: { label: "Resting heart rate", unit: "bpm", period: "Daily", comparison: "At most", action: "VITALS", helper: "Record your resting heart rate in Today’s Current health section after sitting quietly for a few minutes. Wearable or clinical readings count only when the source identifies them as resting; exercise readings are not compared with this target.", icon: HeartPulse, step: "1", min: "20", max: "260", placeholder: "e.g. 72" },
   OTHER: { label: "Personal goal", unit: "", period: "Journey", comparison: "Stay close to target", action: "MANUAL", helper: "Record a measurable value for your personal goal. The comparison is based on how close the value is to your target.", icon: PencilLine, step: "0.1", min: "0", placeholder: "Enter today's value" },
 };
 
@@ -118,7 +118,8 @@ function progressPercent(goal: any) {
 function sourceAction(category: string) {
   if (category === "EXERCISE" || category === "SLEEP" || category === "MENTAL_HEALTH" || category === "HYDRATION") return { label: "Update Daily Health Check-in", href: "#daily-health-check-in" };
   if (category === "BLOOD_PRESSURE") return { label: "Open Today’s Vitals", href: "/today#current-health" };
-  if (category === "WEIGHT" || category === "HEART_RATE") return { label: "Open Health Vitals", href: "/health-vitals" };
+  if (category === "HEART_RATE") return { label: "Open Today's Current health", href: "/today#current-health" };
+  if (category === "WEIGHT") return { label: "Open Health Vitals", href: "/health-vitals" };
   return { label: "Open health goal", href: "/health-goals" };
 }
 
@@ -157,7 +158,7 @@ function nutritionTargetReview(target: number | null) {
 function goalNextStep(category: string, current: number | null, target: number | null) {
   if (current == null || target == null) {
     if (category === "HEART_RATE") {
-      return "No resting heart-rate reading has been recorded today. Sit quietly for a few minutes, then record your resting pulse in Health Vitals.";
+      return "No resting heart-rate reading has been recorded today. Sit quietly for a few minutes, then record your resting pulse in Today’s Current health section.";
     }
     return category === "NUTRITION"
       ? "Add up today's meals and snacks, then record the total calorie intake."
