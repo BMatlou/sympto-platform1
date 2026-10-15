@@ -68,9 +68,9 @@ export class DeviceMeasurementsService {
         // A generic wearable heart-rate sample may be from exercise or another
         // active period. Only score it against a resting-rate goal when the
         // provider's metric key or notes explicitly identify it as resting.
-        const context = `${deviceMetricKey ?? ''} ${notes ?? ''}`;
+        const context = `${deviceMetricKey ?? ''} ${notes ?? ''}`.replace(/[_-]+/g, ' ');
         const explicitlyResting =
-          /\brest(?:ing)?\b.{0,24}\b(?:heart[\s_-]*rate|pulse)\b|\b(?:heart[\s_-]*rate|pulse)\b.{0,24}\brest(?:ing)?\b/i.test(context);
+          /\brest(?:ing)?\b.{0,24}\b(?:heart\s*rate|pulse)\b|\b(?:heart\s*rate|pulse)\b.{0,24}\brest(?:ing)?\b/i.test(context);
         if (explicitlyResting) {
           mappings.push(['HEART_RATE', 'heart_rate.bpm', value]);
         }
