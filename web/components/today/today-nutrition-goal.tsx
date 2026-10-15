@@ -438,7 +438,7 @@ export default function TodayNutritionGoal({ goal, onUpdated, detailsExpanded, o
     nutritionTargetReview(target) != null && journey.journeyDay % 3 === 0;
 
   return (
-    <article className={detailsExpanded ? "flex h-auto min-w-0 flex-col overflow-visible rounded-[30px] border border-[#dce9ee] bg-white shadow-[0_18px_48px_rgba(11,45,84,.06)]" : "flex h-full min-w-0 flex-col overflow-hidden rounded-[30px] border border-[#dce9ee] bg-white shadow-[0_18px_48px_rgba(11,45,84,.06)]"}>
+    <article className={detailsExpanded ? "flex h-full min-h-0 min-w-0 flex-col overflow-y-auto [scrollbar-width:thin] rounded-[30px] border border-[#dce9ee] bg-white shadow-[0_18px_48px_rgba(11,45,84,.06)]" : "flex h-full min-w-0 flex-col overflow-hidden rounded-[30px] border border-[#dce9ee] bg-white shadow-[0_18px_48px_rgba(11,45,84,.06)]"}>
       <header className="flex items-start justify-between gap-3 px-5 pb-4 pt-5 sm:px-6 sm:pt-6">
         <div className="flex min-w-0 items-start gap-3">
           <span className="grid h-10 w-10 shrink-0 place-items-center rounded-[14px] bg-[#e8f8f7] text-[#0b7b80] ring-1 ring-[#d8efed]">
