@@ -164,6 +164,7 @@ function latestContextMetricReading(
     "manual-vital",
     "patient-baseline",
     "clinical-vital",
+    "clinical-record",
     "wearable-resting",
     "health-journal",
   ]);
@@ -780,15 +781,42 @@ export default function TodaySupportedGoalCard({ goal, activeGoals = [], healthC
   const heartRateContextReading = category === "HEART_RATE"
     ? latestContextMetricReading(healthContext, "HEART_RATE")
     : null;
-  const heartRateHasTodayReading = heartRateStats.todayCurrent != null;
-  const heartRateLatestCurrent = heartRateStats.latestCurrent ?? heartRateContextReading?.value ?? current;
-  const heartRateLatestAt = heartRateStats.latestAt ?? heartRateContextReading?.at ?? null;
-  const heartRateDisplayAt = heartRateHasTodayReading ? heartRateStats.todayAt : heartRateLatestAt;
-  const bpDisplayAt = bpLatestAt ?? bloodPressureContextReading?.at ?? null;
+  const contextBloodPressureIsNewer = Boolean(
+    bloodPressureContextReading &&
+    (liveCurrent == null || !bpLatestAt ||
+      (bloodPressureContextReading.at != null &&
+       new Date(bloodPressureContextReading.at).getTime() > new Date(bpLatestAt).getTime())),
+  );
+  const contextHeartRateIsNewer = Boolean(
+    heartRateContextReading &&
+    (heartRateStats.latestCurrent == null || !heartRateStats.latestAt ||
+      (heartRateContextReading.at != null &&
+       new Date(heartRateContextReading.at).getTime() > new Date(heartRateStats.latestAt).getTime())),
+  );
+  const heartRateLatestCurrent = contextHeartRateIsNewer
+    ? heartRateContextReading!.value
+    : heartRateStats.latestCurrent ?? heartRateContextReading?.value ?? current;
+  const heartRateLatestAt = contextHeartRateIsNewer
+    ? heartRateContextReading?.at ?? null
+    : heartRateStats.latestAt ?? heartRateContextReading?.at ?? null;
+  const heartRateContextIsToday = Boolean(
+    contextHeartRateIsNewer &&
+    heartRateContextReading?.at &&
+    southAfricaDayKey(new Date(heartRateContextReading.at)) === southAfricaDayKey(new Date()),
+  );
+  const heartRateTodayCurrent = heartRateStats.todayCurrent ?? (heartRateContextIsToday ? heartRateContextReading?.value ?? null : null);
+  const heartRateTodayAt = heartRateStats.todayAt ?? (heartRateContextIsToday ? heartRateContextReading?.at ?? null : null);
+  const heartRateHasTodayReading = heartRateTodayCurrent != null;
+  const heartRateDisplayAt = heartRateHasTodayReading ? heartRateTodayAt : heartRateLatestAt;
+  const bpDisplayAt = contextBloodPressureIsNewer
+    ? bloodPressureContextReading?.at ?? null
+    : bpLatestAt ?? bloodPressureContextReading?.at ?? null;
   const displayCurrent = category === "HEART_RATE"
-    ? heartRateStats.todayCurrent ?? heartRateLatestCurrent
+    ? heartRateTodayCurrent ?? heartRateLatestCurrent
     : category === "BLOOD_PRESSURE"
-      ? liveCurrent ?? bloodPressureContextReading?.value ?? current
+      ? contextBloodPressureIsNewer
+        ? bloodPressureContextReading?.value ?? liveCurrent ?? current
+        : liveCurrent ?? bloodPressureContextReading?.value ?? current
       : current;
   const bpDistance = category === "BLOOD_PRESSURE" && displayCurrent != null && target != null
     ? displayCurrent - target
@@ -796,7 +824,7 @@ export default function TodaySupportedGoalCard({ goal, activeGoals = [], healthC
   const bpWithinTarget = category === "BLOOD_PRESSURE" && displayCurrent != null && target != null
     ? displayCurrent <= target
     : null;
-  const bpAttainmentPercent = category === "BLOOD_PRESSURE" && bpGoalStats.recordedDays > 0
+  const bpAttainmentPercent = category === "BLOOD_PRESSURE" && target != null && bpGoalStats.recordedDays > 0
     ? Math.round((bpGoalStats.targetDays / bpGoalStats.recordedDays) * 100)
     : 0;
   const heartRateTodayScore = category === "HEART_RATE" && heartRateHasTodayReading && displayCurrent != null && target != null
@@ -811,7 +839,7 @@ export default function TodaySupportedGoalCard({ goal, activeGoals = [], healthC
       })
     : null;
   const displayProgress = category === "BLOOD_PRESSURE"
-    ? bpGoalStats.recordedDays > 0 ? bpAttainmentPercent : null
+    ? target != null && bpGoalStats.recordedDays > 0 ? bpAttainmentPercent : null
     : category === "HEART_RATE"
       ? heartRateTodayScore
       : category === "OTHER" && displayCurrent == null
@@ -832,6 +860,8 @@ export default function TodaySupportedGoalCard({ goal, activeGoals = [], healthC
   const heartRateInsight = category === "HEART_RATE"
     ? buildHeartRateInsight({
         ...heartRateStats,
+        todayCurrent: heartRateTodayCurrent,
+        todayAt: heartRateTodayAt,
         latestCurrent: heartRateLatestCurrent,
         latestAt: heartRateLatestAt,
       }, target, heartRateHasTodayReading, connectedGoalRelations, activeGoals, healthContext)
@@ -948,9 +978,11 @@ export default function TodaySupportedGoalCard({ goal, activeGoals = [], healthC
                   <div>
                     <p className="text-[9px] font-black uppercase tracking-[.17em] text-[#24c1c4]">Blood pressure · Daily target</p>
                     <p className="mt-1 text-[10px] font-semibold text-white/55">
-                      {bpGoalStats.recordedDays > 0
-                        ? `${bpGoalStats.targetDays} of ${bpGoalStats.recordedDays} recorded days at target`
-                        : "Start recording readings to build your trend"}
+                      {target == null
+                        ? "Add a personal systolic ceiling to measure goal attainment"
+                        : bpGoalStats.recordedDays > 0
+                          ? `${bpGoalStats.targetDays} of ${bpGoalStats.recordedDays} recorded days at target`
+                          : "Start recording readings to build your trend"}
                     </p>
                   </div>
                   <span className={bpWithinTarget === false
