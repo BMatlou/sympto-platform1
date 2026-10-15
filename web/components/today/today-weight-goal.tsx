@@ -500,11 +500,16 @@ export default function TodayWeightGoal({ goal, fallbackWeight, bmi: dashboardBm
             This weight target needs review against your recorded height and BMI. Please discuss the target with a qualified healthcare professional before changing your plan.
           </div>
         )}
-        <div className="mt-3 flex items-center justify-between gap-3">
-          <Link href={`/health-goals#goal-${encodeURIComponent(String(goal?.id ?? ""))}`} className="inline-flex min-h-8 items-center gap-1 rounded-lg px-1 text-[10px] font-semibold text-[#71839a] hover:text-[#0b7b80]">
+        <div className="mt-3 flex flex-wrap items-center justify-between gap-2">
+          <Link href={`/health-goals#goal-${encodeURIComponent(String(goal?.id ?? ""))}`} className="inline-flex min-h-9 items-center gap-1 rounded-lg px-1 text-[10px] font-semibold text-[#71839a] hover:text-[#0b7b80]">
             View goal <ArrowRight className="h-3 w-3" />
           </Link>
-          {onToggleDetails ? <GoalCardDisclosureButton expanded={Boolean(detailsExpanded)} onToggle={onToggleDetails} /> : null}
+          <div className="flex flex-wrap items-center gap-2">
+            <Link href="/health-vitals" className="inline-flex min-h-9 items-center justify-center gap-1.5 rounded-xl bg-[#0b2d54] px-3.5 py-2 text-[10px] font-black text-white transition hover:bg-[#123e66]">
+              Record weight <ArrowRight className="h-3 w-3 text-[#24c1c4]" />
+            </Link>
+            {onToggleDetails ? <GoalCardDisclosureButton expanded={Boolean(detailsExpanded)} onToggle={onToggleDetails} /> : null}
+          </div>
         </div>
         {detailsExpanded && (
           <>
