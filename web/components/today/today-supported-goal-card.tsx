@@ -620,9 +620,9 @@ export default function TodaySupportedGoalCard({ goal, activeGoals = [], healthC
     let active = true;
     const now = new Date();
     const createdAt = new Date(String(goal?.createdAt ?? ""));
-    const goalStartedAt = Number.isNaN(createdAt.getTime()) ? 0 : createdAt.getTime();
+    const goalStartDayKey = Number.isNaN(createdAt.getTime()) ? "0000-01-01" : southAfricaDayKey(createdAt);
     // Fetch the full history for the latest reading, but count attainment only
-    // from the day this particular goal began.
+    // from the goal's local calendar start date.
     const from = new Date(0);
 
     healthGoalsService
@@ -648,16 +648,10 @@ export default function TodaySupportedGoalCard({ goal, activeGoals = [], healthC
         const latestByDay = new Map<string, { value: number; occurredAt: number }>();
         for (const event of events) {
           const occurredAt = new Date(event.occurredAt);
-          if (occurredAt.getTime() < goalStartedAt) continue;
-
-          const parts = new Intl.DateTimeFormat("en-GB", {
-            timeZone: "Africa/Johannesburg",
-            year: "numeric",
-            month: "2-digit",
-            day: "2-digit",
-          }).formatToParts(occurredAt);
-          const values = Object.fromEntries(parts.map((part) => [part.type, part.value]));
-          const dayKey = String(values.year) + "-" + String(values.month) + "-" + String(values.day);
+          const dayKey = southAfricaDayKey(occurredAt);
+          // A reading earlier on the goal's first local calendar day still
+          // belongs to that day's tracking window.
+          if (dayKey < goalStartDayKey) continue;
           const value = Number(event.loggedValue);
           const existing = latestByDay.get(dayKey);
 
@@ -992,7 +986,7 @@ export default function TodaySupportedGoalCard({ goal, activeGoals = [], healthC
                   <span className={bpWithinTarget === false
                     ? "rounded-full bg-red-400/10 px-2.5 py-1 text-[8px] font-black uppercase tracking-[.12em] text-red-200 ring-1 ring-red-300/20"
                     : "rounded-full bg-[#24c1c4]/10 px-2.5 py-1 text-[8px] font-black uppercase tracking-[.12em] text-[#8ef0ef] ring-1 ring-[#24c1c4]/20"}>
-                    {displayCurrent == null || target == null ? "No reading" : bpWithinTarget ? "Within target" : "Above target"}
+                    {displayCurrent == null ? "No reading" : target == null ? "Target needed" : bpWithinTarget ? "Within target" : "Above target"}
                   </span>
                 </div>
 
