@@ -4,10 +4,11 @@ import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Activity, ArrowRight, Clock3, Droplets, Plus } from "lucide-react";
 import { toast } from "sonner";
+import GoalCardDisclosureButton from "@/components/today/goal-card-disclosure-button";
 import { healthGoalsService, type HealthGoalMetricEventsResponse } from "@/services/health-goals.service";
 import { healthJournalService } from "@/services/health-journal.service";
 
-type Props = { goal: any; patientId?: string; currentWeightKg?: number | null; currentHeightCm?: number | null; measurements?: any[]; onUpdated?: () => Promise<void> | void; conditions?: any[]; diagnoses?: any[]; medications?: any[]; activeGoals?: any[]; labOrders?: any[]; carePlans?: any[]; baseline?: any };
+type Props = { goal: any; patientId?: string; currentWeightKg?: number | null; currentHeightCm?: number | null; measurements?: any[]; onUpdated?: () => Promise<void> | void; conditions?: any[]; diagnoses?: any[]; medications?: any[]; activeGoals?: any[]; labOrders?: any[]; carePlans?: any[]; baseline?: any; detailsExpanded?: boolean; onToggleDetails?: () => void };
 type GlucoseContext = "FASTING" | "BEFORE_MEAL" | "AFTER_MEAL_2H" | "BEDTIME" | "OVERNIGHT" | "OTHER";
 type GlucoseEvent = {
   id: string;
@@ -269,7 +270,7 @@ function latestReleasedLabMeasure(labOrders: any[], matcher: RegExp): ReleasedLa
   return measures[0] ?? null;
 }
 
-export default function TodayBloodGlucoseGoal({ goal, patientId = "", currentWeightKg = null, currentHeightCm = null, measurements = [], onUpdated, conditions = [], diagnoses = [], medications = [], activeGoals = [], labOrders = [], carePlans = [], baseline = null }: Props) {
+export default function TodayBloodGlucoseGoal({ goal, patientId = "", currentWeightKg = null, currentHeightCm = null, measurements = [], onUpdated, conditions = [], diagnoses = [], medications = [], activeGoals = [], labOrders = [], carePlans = [], baseline = null, detailsExpanded, onToggleDetails }: Props) {
   const goalId = String(goal?.id ?? "");
   const target = targetFromGoal(goal);
   const [events, setEvents] = useState<GlucoseEvent[]>([]);
@@ -787,14 +788,10 @@ export default function TodayBloodGlucoseGoal({ goal, patientId = "", currentWei
           </div>
         </section>
 
-        <details className="mt-3 overflow-hidden rounded-[18px] border border-[#e2ecef] bg-white">
-          <summary className="flex cursor-pointer list-none items-center justify-between gap-3 bg-[#fbfdfd] px-3.5 py-3">
-            <span className="min-w-0">
-              <span className="block text-[10px] font-black text-[#0b2d54]">Health records & related goals</span>
-              <span className="mt-0.5 block text-[9px] text-[#74859a]">{diabetesStatusLabel}{allRelevantGoals.length > 0 ? " · " + allRelevantGoals.length + " related goals" : " · Clinical context"}</span>
-            </span>
-            <span className="shrink-0 text-[9px] font-black text-[#0b7b80]">View details <ArrowRight className="ml-1 inline h-3 w-3" /></span>
-          </summary>
+        {onToggleDetails && <div className="mt-2 px-1"><GoalCardDisclosureButton expanded={Boolean(detailsExpanded)} onToggle={onToggleDetails} label="Show records & insights" /></div>}
+
+        {detailsExpanded && (
+        <section className="mt-3 overflow-hidden rounded-[18px] border border-[#e2ecef] bg-white">
           <div className="px-3.5 pb-3.5">
           <section className="pt-3">
           <div className="flex items-start justify-between gap-3">
@@ -1053,7 +1050,8 @@ export default function TodayBloodGlucoseGoal({ goal, patientId = "", currentWei
           <p className="mt-3 text-[8px] leading-4 text-[#8a99a6]">Context only: these records are separate measures and do not prove what caused a glucose change.</p>
           </section>
           </div>
-        </details>
+        </section>
+        )}
 
         {(low || veryLow) && latest && (
           <div role="alert" className={"mt-3 rounded-[16px] border px-3 py-3 text-[10px] leading-5 " + (veryLow ? "border-red-200 bg-red-50 text-red-900" : "border-amber-200 bg-amber-50 text-amber-950")}>
@@ -1125,6 +1123,7 @@ export default function TodayBloodGlucoseGoal({ goal, patientId = "", currentWei
           <button type="button" onClick={() => { setOpen((current) => !current); if (!open) { setMeasurementTime(localDateTimeInput(new Date())); setReadingContext(""); setSelectedMedicationId(""); } }} className="inline-flex shrink-0 items-center gap-1.5 rounded-xl bg-[#0b2d54] px-3 py-2 text-[9px] font-black text-white"><Plus className="h-3 w-3" />{open ? "Close" : "Record"}</button>
         </div>
 
+        {detailsExpanded && (
         <section className="mt-3 overflow-hidden rounded-[18px] border border-[#e2ecef]">
           <button type="button" onClick={() => setShowHistory((current) => !current)} className="flex min-h-10 w-full items-center justify-between gap-3 bg-[#fbfdfd] px-3 py-2.5 text-left">
             <span className="inline-flex items-center gap-2 text-[9px] font-black text-[#0b2d54]"><Clock3 className="h-3.5 w-3.5 text-[#0b7b80]" />Recent readings <span className="rounded-full bg-[#eaf5f6] px-2 py-0.5 text-[8px] text-[#0b7b80]">{events.length}</span></span>
@@ -1148,6 +1147,8 @@ export default function TodayBloodGlucoseGoal({ goal, patientId = "", currentWei
           )}
         </section>
       </div>
+
+        )}
 
       <footer className="flex items-center justify-between gap-3 border-t border-[#edf2f4] bg-[#fbfdfd] px-4 py-3 sm:px-5">
         <div className="min-w-0">
