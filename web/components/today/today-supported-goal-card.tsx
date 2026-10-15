@@ -67,7 +67,7 @@ function metaFor(goal: any) {
   return GOAL_META[normaliseCategory(goal)] ?? GOAL_META.OTHER;
 }
 
-type HeartRateDayPoint = { dateKey: string; label: string; value: number | null; measuredAt: string | null };
+type HeartRateDayPoint = { dateKey: string; label: string; value: number | null; measuredAt: string | null; isFuture: boolean };
 
 function southAfricaDayKey(value: Date) {
   const parts = new Intl.DateTimeFormat("en-CA", {
@@ -231,10 +231,12 @@ export default function TodaySupportedGoalCard({ goal, activeGoals = [], onUpdat
   const [heartRateStats, setHeartRateStats] = useState<{
     todayCurrent: number | null;
     todayAt: string | null;
+    latestCurrent: number | null;
+    latestAt: string | null;
     recordedDays: number;
     targetDays: number;
     days: HeartRateDayPoint[];
-  }>({ todayCurrent: null, todayAt: null, recordedDays: 0, targetDays: 0, days: [] });
+  }>({ todayCurrent: null, todayAt: null, latestCurrent: null, latestAt: null, recordedDays: 0, targetDays: 0, days: [] });
 
   useEffect(() => {
     if (category !== "BLOOD_PRESSURE" || metricType !== "BLOOD_PRESSURE" || metricKey !== "blood_pressure.systolic") {
@@ -313,7 +315,7 @@ export default function TodaySupportedGoalCard({ goal, activeGoals = [], onUpdat
 
   useEffect(() => {
     if (category !== "HEART_RATE" || metricType !== "HEART_RATE" || metricKey !== "heart_rate.bpm") {
-      setHeartRateStats({ todayCurrent: null, todayAt: null, recordedDays: 0, targetDays: 0, days: [] });
+      setHeartRateStats({ todayCurrent: null, todayAt: null, latestCurrent: null, latestAt: null, recordedDays: 0, targetDays: 0, days: [] });
       return;
     }
 
@@ -321,11 +323,11 @@ export default function TodaySupportedGoalCard({ goal, activeGoals = [], onUpdat
     const now = new Date();
     const todayKey = southAfricaDayKey(now);
     const thirtyDaysAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
-    const createdAt = new Date(String(goal?.createdAt ?? ""));
-    const from = !Number.isNaN(createdAt.getTime()) && createdAt > thirtyDaysAgo
-      ? createdAt
-      : thirtyDaysAgo;
-    const eligibleSources = new Set(["manual-vitals", "patient-baseline", "clinical-vital", "wearable-resting"]);
+    // Health Vitals can be saved before a goal is created. Read the recent
+    // history independently of the goal's creation date, including legacy
+    // entries backfilled from the Health Journal.
+    const from = thirtyDaysAgo;
+    const eligibleSources = new Set(["manual-vitals", "patient-baseline", "clinical-vital", "wearable-resting", "health-journal"]);
 
     healthGoalsService
       .getMetricEvents(metricType, metricKey, from, now)
@@ -333,11 +335,14 @@ export default function TodaySupportedGoalCard({ goal, activeGoals = [], onUpdat
         if (!active) return;
 
         const latestByDay = new Map<string, { value: number; at: Date }>();
+        let latestKnown: { value: number; at: Date } | null = null;
         for (const event of Array.isArray(result?.events) ? result.events : []) {
           const sourceName = String(event?.source ?? "").toLowerCase();
           const value = Number(event?.loggedValue);
           const at = new Date(String(event?.occurredAt ?? ""));
           if (!eligibleSources.has(sourceName) || !Number.isFinite(value) || value < 20 || value > 260 || Number.isNaN(at.getTime())) continue;
+
+          if (!latestKnown || at.getTime() > latestKnown.at.getTime()) latestKnown = { value, at };
 
           const dayKey = southAfricaDayKey(at);
           const existing = latestByDay.get(dayKey);
@@ -346,10 +351,17 @@ export default function TodaySupportedGoalCard({ goal, activeGoals = [], onUpdat
           }
         }
 
+        // Anchor the trend to the current calendar week: Monday through Sunday.
+        // Future days remain empty rather than shifting the chart to a rolling week.
         const [year, month, day] = todayKey.split("-").map(Number);
+        const todayDate = new Date(Date.UTC(year, month - 1, day));
+        const daysSinceMonday = (todayDate.getUTCDay() + 6) % 7;
+        const monday = new Date(todayDate);
+        monday.setUTCDate(monday.getUTCDate() - daysSinceMonday);
         const dayPoints: HeartRateDayPoint[] = [];
-        for (let offset = 6; offset >= 0; offset -= 1) {
-          const date = new Date(Date.UTC(year, month - 1, day - offset));
+        for (let offset = 0; offset < 7; offset += 1) {
+          const date = new Date(monday);
+          date.setUTCDate(monday.getUTCDate() + offset);
           const dateKey = date.toISOString().slice(0, 10);
           const entry = latestByDay.get(dateKey);
           const displayDate = new Date(dateKey + "T12:00:00+02:00");
@@ -358,25 +370,28 @@ export default function TodaySupportedGoalCard({ goal, activeGoals = [], onUpdat
             label: new Intl.DateTimeFormat("en-ZA", { timeZone: "Africa/Johannesburg", weekday: "short" }).format(displayDate),
             value: entry?.value ?? null,
             measuredAt: entry?.at.toISOString() ?? null,
+            isFuture: dateKey > todayKey,
           });
         }
 
-        const recent = dayPoints.filter((point) => point.value != null);
+        const recorded = dayPoints.filter((point) => point.value != null);
         const targetDays = target == null
           ? 0
-          : recent.filter((point) => Number(point.value) <= target).length;
+          : recorded.filter((point) => Number(point.value) <= target).length;
         const todayEntry = latestByDay.get(todayKey);
         setHeartRateStats({
           todayCurrent: todayEntry?.value ?? null,
           todayAt: todayEntry?.at.toISOString() ?? null,
-          recordedDays: recent.length,
+          latestCurrent: latestKnown?.value ?? null,
+          latestAt: latestKnown?.at.toISOString() ?? null,
+          recordedDays: recorded.length,
           targetDays,
           days: dayPoints,
         });
       })
       .catch(() => {
         if (active) {
-          setHeartRateStats({ todayCurrent: null, todayAt: null, recordedDays: 0, targetDays: 0, days: [] });
+          setHeartRateStats({ todayCurrent: null, todayAt: null, latestCurrent: null, latestAt: null, recordedDays: 0, targetDays: 0, days: [] });
         }
       });
 
@@ -385,8 +400,10 @@ export default function TodaySupportedGoalCard({ goal, activeGoals = [], onUpdat
     };
   }, [category, metricType, metricKey, goalId, goal?.createdAt, goal?.updatedAt, target]);
 
+  const heartRateHasTodayReading = heartRateStats.todayCurrent != null;
+  const heartRateDisplayAt = heartRateHasTodayReading ? heartRateStats.todayAt : heartRateStats.latestAt;
   const displayCurrent = category === "HEART_RATE"
-    ? heartRateStats.todayCurrent
+    ? heartRateStats.todayCurrent ?? heartRateStats.latestCurrent
     : category === "BLOOD_PRESSURE" && liveCurrent != null
       ? liveCurrent
       : current;
@@ -424,7 +441,9 @@ export default function TodaySupportedGoalCard({ goal, activeGoals = [], onUpdat
           progressPercent: null,
         });
 
-  const nextStep = goalNextStep(category, displayCurrent, target);
+  const nextStep = category === "HEART_RATE" && !heartRateHasTodayReading && heartRateStats.latestAt
+    ? "Your latest saved resting reading is from " + new Intl.DateTimeFormat("en-ZA", { timeZone: "Africa/Johannesburg", dateStyle: "medium" }).format(new Date(heartRateStats.latestAt)) + ". Record a new resting reading today to update the daily goal."
+    : goalNextStep(category, displayCurrent, target);
 
   async function recordValue() {
     const numeric = Number(value);
@@ -481,7 +500,7 @@ export default function TodaySupportedGoalCard({ goal, activeGoals = [], onUpdat
             <p className="mt-1 text-[9px] font-semibold text-[#8595a1]">{meta.comparison} · {meta.period} · {meta.unit || "Measured value"}</p>
           </div>
         </div>
-        <span className="shrink-0 rounded-full bg-[#eef8f8] px-2.5 py-1.5 text-[8px] font-black uppercase tracking-[.1em] text-[#0b7b80]">{category === "HEART_RATE" ? (heartRateStats.todayCurrent == null ? "No reading" : "Reading saved") : "Today"}</span>
+        <span className="shrink-0 rounded-full bg-[#eef8f8] px-2.5 py-1.5 text-[8px] font-black uppercase tracking-[.1em] text-[#0b7b80]">{category === "HEART_RATE" ? (heartRateHasTodayReading ? "Reading saved" : heartRateStats.latestCurrent != null ? "Latest saved reading" : "No reading") : "Today"}</span>
       </header>
 
       <div className="px-4 pb-4 pt-4 sm:px-5">
@@ -610,22 +629,29 @@ export default function TodaySupportedGoalCard({ goal, activeGoals = [], onUpdat
                   : displayCurrent <= (target ?? 0)
                     ? "rounded-full bg-[#24c1c4]/15 px-3 py-1.5 text-[10px] font-bold text-[#9af0ef] ring-1 ring-[#24c1c4]/20"
                     : "rounded-full bg-amber-400/10 px-3 py-1.5 text-[10px] font-bold text-amber-100 ring-1 ring-amber-200/20"}>
-                  {displayCurrent == null || target == null ? "No reading today" : displayCurrent <= target ? "Within personal target" : "Above personal target"}
+                  {displayCurrent == null || target == null
+                    ? "No reading available"
+                    : !heartRateHasTodayReading
+                      ? displayCurrent <= target ? "Latest reading within target" : "Latest reading above target"
+                      : displayCurrent <= target ? "Within personal target" : "Above personal target"}
                 </span>
               </div>
 
               <div className="mt-5 grid gap-3 sm:grid-cols-[1.15fr_.85fr]">
                 <div className="rounded-[20px] bg-white/[.06] p-4 ring-1 ring-white/10">
-                  <p className="text-[10px] font-black uppercase tracking-[.14em] text-white/50">Today's latest resting reading</p>
+                  <p className="text-[10px] font-black uppercase tracking-[.14em] text-white/50">{heartRateHasTodayReading ? "Today's resting reading" : "Latest saved resting reading"}</p>
                   <div className="mt-2 flex items-end gap-2">
                     <p className="text-[46px] font-black leading-none tracking-[-.07em]">{displayCurrent == null ? "—" : displayCurrent}</p>
                     <span className="mb-1 text-sm font-bold text-white/55">bpm</span>
                   </div>
                   <p className="mt-2 text-[11px] leading-5 text-white/55">
-                    {heartRateStats.todayAt
-                      ? "Recorded " + new Intl.DateTimeFormat("en-ZA", { timeZone: "Africa/Johannesburg", hour: "2-digit", minute: "2-digit" }).format(new Date(heartRateStats.todayAt))
-                      : "No eligible resting reading has been recorded today."}
+                    {heartRateDisplayAt
+                      ? (heartRateHasTodayReading ? "Recorded today at " : "Last recorded ") + new Intl.DateTimeFormat("en-ZA", { timeZone: "Africa/Johannesburg", dateStyle: heartRateHasTodayReading ? undefined : "medium", hour: "2-digit", minute: "2-digit" }).format(new Date(heartRateDisplayAt))
+                      : "No resting heart-rate reading has been saved yet."}
                   </p>
+                  {!heartRateHasTodayReading && heartRateStats.latestAt && (
+                    <p className="mt-1 text-[10px] text-amber-100/80">There is no reading for today yet.</p>
+                  )}
                 </div>
 
                 <div className="grid gap-3 sm:grid-rows-2">
@@ -635,7 +661,7 @@ export default function TodaySupportedGoalCard({ goal, activeGoals = [], onUpdat
                     <p className="mt-1 text-[10px] font-semibold text-white/55">beats per minute</p>
                   </div>
                   <div className="rounded-[20px] bg-white/[.06] p-4 ring-1 ring-white/10">
-                    <p className="text-[10px] font-black uppercase tracking-[.14em] text-white/50">Today's target score</p>
+                    <p className="text-[10px] font-black uppercase tracking-[.14em] text-white/50">Reading vs target</p>
                     <p className="mt-2 text-xl font-black">{displayProgress == null ? "Not measured" : displayProgress + "%"}</p>
                     <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-white/10">
                       <div className="h-full rounded-full bg-[#24c1c4] transition-all" style={{ width: Math.max(0, displayProgress ?? 0) + "%" }} />
@@ -647,18 +673,18 @@ export default function TodaySupportedGoalCard({ goal, activeGoals = [], onUpdat
               <div className="mt-4 rounded-[20px] bg-white/[.06] p-4 ring-1 ring-white/10">
                 <div className="flex flex-wrap items-end justify-between gap-2">
                   <div>
-                    <p className="text-[10px] font-black uppercase tracking-[.14em] text-white/55">Last 7 days</p>
+                    <p className="text-[10px] font-black uppercase tracking-[.14em] text-white/55">This calendar week</p>
                     <p className="mt-1 text-sm font-bold">
                       {heartRateStats.recordedDays > 0
                         ? heartRateStats.targetDays + " of " + heartRateStats.recordedDays + " recorded days at target"
                         : "No resting readings recorded yet"}
                     </p>
                   </div>
-                  <p className="text-[10px] text-white/50">Latest eligible reading each day</p>
+                  <p className="text-[10px] text-white/50">Mon–Sun · latest eligible reading per day</p>
                 </div>
                 <div className="mt-4 grid grid-cols-7 gap-2" role="img" aria-label="Latest resting heart-rate reading for each of the last seven days">
                   {heartRateStats.days.map((point) => (
-                    <div key={point.dateKey} className="flex min-w-0 flex-col items-center gap-1.5" title={point.value == null ? point.label + ": no reading" : point.label + ": " + point.value + " bpm"}>
+                    <div key={point.dateKey} className="flex min-w-0 flex-col items-center gap-1.5" title={point.value == null ? point.label + (point.isFuture ? ": not yet" : ": no reading") : point.label + ": " + point.value + " bpm"}>
                       <div className="flex h-16 w-full items-end justify-center rounded-lg bg-white/[.04] px-1 pt-1">
                         <div
                           className={point.value == null
@@ -666,7 +692,7 @@ export default function TodaySupportedGoalCard({ goal, activeGoals = [], onUpdat
                             : target != null && point.value <= target
                               ? "w-full rounded-md bg-[#24c1c4]"
                               : "w-full rounded-md bg-amber-300"}
-                          style={{ height: point.value == null ? "8%" : Math.max(12, Math.min(100, ((point.value - 35) / 115) * 100)) + "%" }}
+                          style={{ height: point.value == null ? (point.isFuture ? "3%" : "8%") : Math.max(12, Math.min(100, ((point.value - 35) / 115) * 100)) + "%" }}
                         />
                       </div>
                       <span className="text-[9px] font-semibold text-white/50">{point.label}</span>
