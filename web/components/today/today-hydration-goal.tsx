@@ -2,11 +2,12 @@
 
 import Link from "next/link";
 import { ArrowRight, Droplets } from "lucide-react";
+import GoalCardDisclosureButton from "@/components/today/goal-card-disclosure-button";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { healthJournalService } from "@/services/health-journal.service";
 import type { HealthJournal } from "@/types/health-journal";
 
-type Props = { goal: any };
+type Props = { goal: any; onUpdated?: () => Promise<void> | void; detailsExpanded?: boolean; onToggleDetails?: () => void };
 
 const DAY_TIME_ZONE = "Africa/Johannesburg";
 
@@ -86,7 +87,7 @@ function journalListFromResponse(response: any): HealthJournal[] {
   return [];
 }
 
-export default function TodayHydrationGoal({ goal }: Props) {
+export default function TodayHydrationGoal({ goal, detailsExpanded, onToggleDetails }: Props) {
   const goalId = String(goal?.id ?? "");
   const targetMl = targetInMillilitres(goal);
   const [todayIntakeMl, setTodayIntakeMl] = useState<number | null>(null);
@@ -198,7 +199,7 @@ export default function TodayHydrationGoal({ goal }: Props) {
       : `${formatNumber(targetMl)} ml`;
 
   return (
-    <article id={`today-goal-${goalId}`} className="flex h-full min-w-0 flex-col overflow-hidden rounded-[26px] border border-[#e5edef] bg-white shadow-[0_14px_36px_rgba(11,45,84,.07)]">
+    <article id={`today-goal-${goalId}`} className={detailsExpanded ? "flex h-auto min-w-0 flex-col overflow-visible rounded-[26px] border border-[#e5edef] bg-white shadow-[0_14px_36px_rgba(11,45,84,.07)]" : "flex h-full min-w-0 flex-col overflow-hidden rounded-[26px] border border-[#e5edef] bg-white shadow-[0_14px_36px_rgba(11,45,84,.07)]"}>
       <header className="flex items-center justify-between gap-3 px-4 pb-3 pt-4 sm:px-5 sm:pt-5">
         <div className="flex min-w-0 items-center gap-2.5">
           <span className="grid h-9 w-9 shrink-0 place-items-center rounded-[13px] bg-[#e8f8f7] text-[#0b7b80] ring-1 ring-[#d3efed]"><Droplets className="h-4 w-4" /></span>
@@ -275,9 +276,29 @@ export default function TodayHydrationGoal({ goal }: Props) {
         </div>
         <div className="flex items-center gap-2">
           <p className="hidden text-[8px] text-[#7d8d99] sm:block">until {formatDate(goal?.targetDate)}</p>
-          <Link href={`/health-goals#goal-${encodeURIComponent(goalId)}`} className="inline-flex min-h-9 shrink-0 items-center justify-center gap-1 rounded-xl border border-[#d6e4e7] bg-white px-3 py-2 text-[9px] font-black text-[#0b2d54]">View goal <ArrowRight className="h-3 w-3" /></Link>
+          <div className="flex items-center gap-2">{onToggleDetails && <GoalCardDisclosureButton expanded={Boolean(detailsExpanded)} onToggle={onToggleDetails} label="Show details" />}<Link href={`/health-goals#goal-${encodeURIComponent(goalId)}`} className="inline-flex min-h-9 shrink-0 items-center justify-center gap-1 rounded-xl border border-[#d6e4e7] bg-white px-3 py-2 text-[9px] font-black text-[#0b2d54]">View goal <ArrowRight className="h-3 w-3" /></Link></div>
         </div>
       </footer>
+      {detailsExpanded && (
+        <section className="mx-4 mb-4 rounded-[18px] border border-[#e1ecee] bg-[#f8fbfb] p-3.5 sm:mx-5">
+          <p className="text-[8px] font-black uppercase tracking-[.14em] text-[#0b7b80]">How this goal is tracked</p>
+          <div className="mt-2 grid grid-cols-2 gap-2">
+            <div className="rounded-[13px] bg-white p-3 ring-1 ring-[#e5edef]">
+              <p className="text-[8px] font-black uppercase tracking-[.12em] text-[#82939f]">Saved daily target</p>
+              <p className="mt-1 text-sm font-black text-[#0b2d54]">{targetMl == null ? "Not set" : formatNumber(targetMl) + " ml"}</p>
+              <p className="mt-0.5 text-[8px] text-[#74859a]">{formattedTarget}</p>
+            </div>
+            <div className="rounded-[13px] bg-white p-3 ring-1 ring-[#e5edef]">
+              <p className="text-[8px] font-black uppercase tracking-[.12em] text-[#82939f]">Saved today</p>
+              <p className="mt-1 text-sm font-black text-[#0b2d54]">{todayIntakeMl == null ? "Not logged" : formatNumber(todayIntakeMl) + " ml"}</p>
+              <p className="mt-0.5 text-[8px] text-[#74859a]">{lastUpdatedAt ? "Updated " + new Intl.DateTimeFormat("en-ZA", { hour: "2-digit", minute: "2-digit" }).format(new Date(lastUpdatedAt)) : "Check-in time unavailable"}</p>
+            </div>
+          </div>
+          <p className="mt-3 text-[9px] leading-5 text-[#74859a]">
+            {String(goal?.description ?? "").trim() || "Water is recorded in the Daily Health Check-in. Sympto displays that saved daily total here; it does not add water from a separate manual log on this card."}
+          </p>
+        </section>
+      )}
     </article>
   );
 }
