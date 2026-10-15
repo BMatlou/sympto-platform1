@@ -1109,7 +1109,7 @@ export default function TodaySupportedGoalCard({ goal, activeGoals = [], healthC
           </section>
         )}
 
-        {category === "BLOOD_PRESSURE" ? (
+        {personalGoalNeedsSetup ? null : category === "BLOOD_PRESSURE" ? (
           <div className="mt-4 space-y-3">
             <section className="rounded-[22px] border border-[#dfeaec] bg-[#f8fbfb] p-4 sm:p-5">
               <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
