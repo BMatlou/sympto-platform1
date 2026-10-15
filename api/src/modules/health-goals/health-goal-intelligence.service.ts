@@ -101,9 +101,6 @@ const GOAL_SUPPORT_RULES: Record<string, Array<{ sourceCategory: string; rationa
     { sourceCategory: 'EXERCISE', rationale: 'Exercise provides a supporting behaviour signal that can be viewed alongside medication adherence.' },
     { sourceCategory: 'NUTRITION', rationale: 'Nutrition tracking provides contextual information that can be viewed alongside medication adherence.' },
   ],
-  HEART_RATE: [
-    { sourceCategory: 'EXERCISE', rationale: 'Exercise provides an activity signal that can be viewed alongside heart-rate measurements.' },
-  ],
 };
 
 const GOAL_RELATED_PAIRS = new Set([
@@ -114,6 +111,7 @@ const GOAL_RELATED_PAIRS = new Set([
   'ALCOHOL|BLOOD_GLUCOSE',
   'ALCOHOL|CHOLESTEROL',
   'BLOOD_PRESSURE|HEART_RATE',
+  'EXERCISE|HEART_RATE',
   'BLOOD_GLUCOSE|BLOOD_PRESSURE',
   'BLOOD_GLUCOSE|SLEEP',
   'BLOOD_GLUCOSE|WEIGHT',
@@ -269,6 +267,7 @@ export class HealthGoalIntelligenceService {
           const relationshipType = 'RELATED_TO' as const;
           const rationaleByPair: Record<string, string> = {
             'ALCOHOL|MENTAL_HEALTH': 'Alcohol tracking can be reviewed alongside the user’s recorded stress and mood over time; this is context, not proof of cause.',
+            'EXERCISE|HEART_RATE': 'Exercise can raise heart rate during activity. Review activity readings separately from resting measurements; this connection is context, not proof of cause or goal attainment.',
             'HYDRATION|MENTAL_HEALTH': 'Hydration tracking can be reviewed alongside wellbeing check-ins, without assuming that hydration caused a particular score.',
             'MENTAL_HEALTH|NUTRITION': 'Nutrition records can provide context alongside wellbeing check-ins, without assuming that food caused a particular score.',
             'MENTAL_HEALTH|SMOKING': 'Smoking tracking may be useful context alongside wellbeing check-ins, without assuming that smoking caused a particular score.',
