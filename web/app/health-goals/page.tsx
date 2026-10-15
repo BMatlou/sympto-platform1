@@ -498,7 +498,7 @@ function HealthGoalsPageContent() {
         ...current,
         category,
         unit: config?.unit ?? "",
-        title: titleWasCategoryDefault ? config?.label ?? "" : current.title,
+        title: titleWasCategoryDefault ? (category === "OTHER" ? "" : config?.label ?? "") : current.title,
         targetValue:
           category === "WEIGHT" &&
           current.weightDirection === "MAINTAIN" &&
