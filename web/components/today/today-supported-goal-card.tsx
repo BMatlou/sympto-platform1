@@ -35,7 +35,7 @@ const GOAL_META: Record<string, GoalMeta> = {
   SLEEP: { label: "Sleep", unit: "hours/night", period: "Daily", comparison: "At least", action: "CHECK_IN", helper: "Sleep is recorded through your Daily Health Check-in so the goal stays connected to your health journal.", icon: Moon },
   MENTAL_HEALTH: { label: "Mental health", unit: "score", period: "Daily", comparison: "At most", action: "CHECK_IN", helper: "Your stress score is recorded through the Daily Health Check-in, where 1 is calm and 10 is very stressed.", icon: Activity },
   HYDRATION: { label: "Hydration", unit: "ml/day", period: "Daily", comparison: "At least", action: "CHECK_IN", helper: "Water intake is recorded through the Daily Health Check-in and compared with your daily target.", icon: Droplets },
-  HEART_RATE: { label: "Heart rate", unit: "bpm", period: "Daily", comparison: "At most", action: "VITALS", helper: "Use Health Vitals to save a resting heart-rate reading, or let supported wearable/clinical readings provide it.", icon: HeartPulse, step: "1", min: "20", max: "260", placeholder: "e.g. 72" },
+  HEART_RATE: { label: "Resting heart rate", unit: "bpm", period: "Daily", comparison: "At most", action: "VITALS", helper: "Record a resting reading in Health Vitals after sitting quietly for a few minutes. Wearable or clinical readings count only when the source identifies them as resting; exercise readings are not compared with this target.", icon: HeartPulse, step: "1", min: "20", max: "260", placeholder: "e.g. 72" },
   OTHER: { label: "Personal goal", unit: "", period: "Journey", comparison: "Stay close to target", action: "MANUAL", helper: "Record a measurable value for your personal goal. The comparison is based on how close the value is to your target.", icon: PencilLine, step: "0.1", min: "0", placeholder: "Enter today's value" },
 };
 
@@ -65,6 +65,19 @@ function goalCategoryLabel(category: string) {
 
 function metaFor(goal: any) {
   return GOAL_META[normaliseCategory(goal)] ?? GOAL_META.OTHER;
+}
+
+type HeartRateDayPoint = { dateKey: string; label: string; value: number | null; measuredAt: string | null };
+
+function southAfricaDayKey(value: Date) {
+  const parts = new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Africa/Johannesburg",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).formatToParts(value);
+  const fields = Object.fromEntries(parts.map((part) => [part.type, part.value]));
+  return String(fields.year) + "-" + String(fields.month) + "-" + String(fields.day);
 }
 
 function numberOrNull(value: unknown) {
@@ -127,6 +140,9 @@ function nutritionTargetReview(target: number | null) {
 
 function goalNextStep(category: string, current: number | null, target: number | null) {
   if (current == null || target == null) {
+    if (category === "HEART_RATE") {
+      return "No resting heart-rate reading has been recorded today. Sit quietly for a few minutes, then record your resting pulse in Health Vitals.";
+    }
     return category === "NUTRITION"
       ? "Add up today's meals and snacks, then record the total calorie intake."
       : "Record a measure to start meaningful progress tracking.";
@@ -137,7 +153,11 @@ function goalNextStep(category: string, current: number | null, target: number |
     }
     return "You are above today's calorie target. Keep recording your intake and review the next meal choices so the daily total stays at or below the target.";
   }
-  if (category === "BLOOD_PRESSURE" || category === "BLOOD_GLUCOSE" || category === "CHOLESTEROL" || category === "MENTAL_HEALTH" || category === "HEART_RATE") {
+  if (category === "HEART_RATE") {
+    if (current <= target) return "Today's resting reading is at or below your personal ceiling. Continue tracking resting readings consistently.";
+    return "Today's resting reading is above your personal ceiling. Recheck after resting and review repeated high readings with a healthcare professional.";
+  }
+  if (category === "BLOOD_PRESSURE" || category === "BLOOD_GLUCOSE" || category === "CHOLESTEROL" || category === "MENTAL_HEALTH") {
     if (current <= target) return "You are currently within your ceiling. Keep tracking the next reading.";
     return "You are above the goal ceiling. Review the next reading and keep tracking the trend.";
   }
@@ -208,6 +228,13 @@ export default function TodaySupportedGoalCard({ goal, activeGoals = [], onUpdat
   const metricKey = String(goal?.metricConfig?.metricKey ?? defaultMetric.metricKey);
   const [liveCurrent, setLiveCurrent] = useState<number | null>(null);
   const [bpGoalStats, setBpGoalStats] = useState({ recordedDays: 0, targetDays: 0 });
+  const [heartRateStats, setHeartRateStats] = useState<{
+    todayCurrent: number | null;
+    todayAt: string | null;
+    recordedDays: number;
+    targetDays: number;
+    days: HeartRateDayPoint[];
+  }>({ todayCurrent: null, todayAt: null, recordedDays: 0, targetDays: 0, days: [] });
 
   useEffect(() => {
     if (category !== "BLOOD_PRESSURE" || metricType !== "BLOOD_PRESSURE" || metricKey !== "blood_pressure.systolic") {
@@ -284,7 +311,85 @@ export default function TodaySupportedGoalCard({ goal, activeGoals = [], onUpdat
     };
   }, [category, metricType, metricKey, goalId, goal?.createdAt, goal?.updatedAt, target]);
 
-  const displayCurrent = category === "BLOOD_PRESSURE" && liveCurrent != null ? liveCurrent : current;
+  useEffect(() => {
+    if (category !== "HEART_RATE" || metricType !== "HEART_RATE" || metricKey !== "heart_rate.bpm") {
+      setHeartRateStats({ todayCurrent: null, todayAt: null, recordedDays: 0, targetDays: 0, days: [] });
+      return;
+    }
+
+    let active = true;
+    const now = new Date();
+    const todayKey = southAfricaDayKey(now);
+    const thirtyDaysAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+    const createdAt = new Date(String(goal?.createdAt ?? ""));
+    const from = !Number.isNaN(createdAt.getTime()) && createdAt > thirtyDaysAgo
+      ? createdAt
+      : thirtyDaysAgo;
+    const eligibleSources = new Set(["manual-vitals", "patient-baseline", "clinical-vital", "wearable-resting"]);
+
+    healthGoalsService
+      .getMetricEvents(metricType, metricKey, from, now)
+      .then((result) => {
+        if (!active) return;
+
+        const latestByDay = new Map<string, { value: number; at: Date }>();
+        for (const event of Array.isArray(result?.events) ? result.events : []) {
+          const sourceName = String(event?.source ?? "").toLowerCase();
+          const value = Number(event?.loggedValue);
+          const at = new Date(String(event?.occurredAt ?? ""));
+          if (!eligibleSources.has(sourceName) || !Number.isFinite(value) || value < 20 || value > 260 || Number.isNaN(at.getTime())) continue;
+
+          const dayKey = southAfricaDayKey(at);
+          const existing = latestByDay.get(dayKey);
+          if (!existing || at.getTime() >= existing.at.getTime()) {
+            latestByDay.set(dayKey, { value, at });
+          }
+        }
+
+        const [year, month, day] = todayKey.split("-").map(Number);
+        const dayPoints: HeartRateDayPoint[] = [];
+        for (let offset = 6; offset >= 0; offset -= 1) {
+          const date = new Date(Date.UTC(year, month - 1, day - offset));
+          const dateKey = date.toISOString().slice(0, 10);
+          const entry = latestByDay.get(dateKey);
+          const displayDate = new Date(dateKey + "T12:00:00+02:00");
+          dayPoints.push({
+            dateKey,
+            label: new Intl.DateTimeFormat("en-ZA", { timeZone: "Africa/Johannesburg", weekday: "short" }).format(displayDate),
+            value: entry?.value ?? null,
+            measuredAt: entry?.at.toISOString() ?? null,
+          });
+        }
+
+        const recent = dayPoints.filter((point) => point.value != null);
+        const targetDays = target == null
+          ? 0
+          : recent.filter((point) => Number(point.value) <= target).length;
+        const todayEntry = latestByDay.get(todayKey);
+        setHeartRateStats({
+          todayCurrent: todayEntry?.value ?? null,
+          todayAt: todayEntry?.at.toISOString() ?? null,
+          recordedDays: recent.length,
+          targetDays,
+          days: dayPoints,
+        });
+      })
+      .catch(() => {
+        if (active) {
+          setHeartRateStats({ todayCurrent: null, todayAt: null, recordedDays: 0, targetDays: 0, days: [] });
+        }
+      });
+
+    return () => {
+      active = false;
+    };
+  }, [category, metricType, metricKey, goalId, goal?.createdAt, goal?.updatedAt, target]);
+
+  const displayCurrent = category === "HEART_RATE"
+    ? heartRateStats.todayCurrent
+    : category === "BLOOD_PRESSURE" && liveCurrent != null
+      ? liveCurrent
+      : current;
   const bpDistance = category === "BLOOD_PRESSURE" && displayCurrent != null && target != null
     ? displayCurrent - target
     : null;
@@ -294,11 +399,24 @@ export default function TodaySupportedGoalCard({ goal, activeGoals = [], onUpdat
   const bpAttainmentPercent = category === "BLOOD_PRESSURE" && bpGoalStats.recordedDays > 0
     ? Math.round((bpGoalStats.targetDays / bpGoalStats.recordedDays) * 100)
     : 0;
+  const heartRateTodayScore = category === "HEART_RATE" && displayCurrent != null && target != null
+    ? progressPercent({
+        ...goal,
+        currentValue: displayCurrent,
+        targetValue: target,
+        metricConfig: { ...goal?.metricConfig, comparison: "AT_MOST" },
+        progress: [],
+        latestProgress: null,
+        progressPercent: null,
+      })
+    : null;
   const displayProgress = category === "BLOOD_PRESSURE"
-    ? bpAttainmentPercent
-    : displayCurrent == null
-      ? progress
-      : progressPercent({
+    ? bpGoalStats.recordedDays > 0 ? bpAttainmentPercent : null
+    : category === "HEART_RATE"
+      ? heartRateTodayScore
+      : displayCurrent == null
+        ? progress
+        : progressPercent({
           ...goal,
           currentValue: displayCurrent,
           progress: [],
@@ -363,7 +481,7 @@ export default function TodaySupportedGoalCard({ goal, activeGoals = [], onUpdat
             <p className="mt-1 text-[9px] font-semibold text-[#8595a1]">{meta.comparison} · {meta.period} · {meta.unit || "Measured value"}</p>
           </div>
         </div>
-        <span className="shrink-0 rounded-full bg-[#eef8f8] px-2.5 py-1.5 text-[8px] font-black uppercase tracking-[.1em] text-[#0b7b80]">Today</span>
+        <span className="shrink-0 rounded-full bg-[#eef8f8] px-2.5 py-1.5 text-[8px] font-black uppercase tracking-[.1em] text-[#0b7b80]">{category === "HEART_RATE" ? (heartRateStats.todayCurrent == null ? "No reading" : "Reading saved") : "Today"}</span>
       </header>
 
       <div className="px-4 pb-4 pt-4 sm:px-5">
@@ -478,6 +596,88 @@ export default function TodaySupportedGoalCard({ goal, activeGoals = [], onUpdat
               </div>
             </section>
           </>
+        ) : category === "HEART_RATE" ? (
+          <section className="relative overflow-hidden rounded-[25px] bg-[#0b2d54] px-4 py-5 text-white shadow-[0_16px_34px_rgba(11,45,84,.15)] sm:px-5">
+            <div className="pointer-events-none absolute -right-12 -top-14 h-40 w-40 rounded-full bg-[#24c1c4]/10 blur-3xl" aria-hidden="true" />
+            <div className="relative">
+              <div className="flex flex-wrap items-start justify-between gap-3">
+                <div>
+                  <p className="text-[10px] font-black uppercase tracking-[.16em] text-[#24c1c4]">Resting heart rate · Daily goal</p>
+                  <p className="mt-1 text-[11px] text-white/60">Use readings taken after sitting quietly for a few minutes.</p>
+                </div>
+                <span className={displayCurrent == null
+                  ? "rounded-full bg-white/10 px-3 py-1.5 text-[10px] font-bold text-white/75 ring-1 ring-white/10"
+                  : displayCurrent <= (target ?? 0)
+                    ? "rounded-full bg-[#24c1c4]/15 px-3 py-1.5 text-[10px] font-bold text-[#9af0ef] ring-1 ring-[#24c1c4]/20"
+                    : "rounded-full bg-amber-400/10 px-3 py-1.5 text-[10px] font-bold text-amber-100 ring-1 ring-amber-200/20"}>
+                  {displayCurrent == null || target == null ? "No reading today" : displayCurrent <= target ? "Within personal target" : "Above personal target"}
+                </span>
+              </div>
+
+              <div className="mt-5 grid gap-3 sm:grid-cols-[1.15fr_.85fr]">
+                <div className="rounded-[20px] bg-white/[.06] p-4 ring-1 ring-white/10">
+                  <p className="text-[10px] font-black uppercase tracking-[.14em] text-white/50">Today's latest resting reading</p>
+                  <div className="mt-2 flex items-end gap-2">
+                    <p className="text-[46px] font-black leading-none tracking-[-.07em]">{displayCurrent == null ? "—" : displayCurrent}</p>
+                    <span className="mb-1 text-sm font-bold text-white/55">bpm</span>
+                  </div>
+                  <p className="mt-2 text-[11px] leading-5 text-white/55">
+                    {heartRateStats.todayAt
+                      ? "Recorded " + new Intl.DateTimeFormat("en-ZA", { timeZone: "Africa/Johannesburg", hour: "2-digit", minute: "2-digit" }).format(new Date(heartRateStats.todayAt))
+                      : "No eligible resting reading has been recorded today."}
+                  </p>
+                </div>
+
+                <div className="grid gap-3 sm:grid-rows-2">
+                  <div className="rounded-[20px] bg-[#24c1c4]/10 p-4 ring-1 ring-[#24c1c4]/20">
+                    <p className="text-[10px] font-black uppercase tracking-[.14em] text-[#9af0ef]">Personal ceiling</p>
+                    <p className="mt-2 text-2xl font-black tracking-[-.04em]">{target == null ? "—" : "≤ " + target}</p>
+                    <p className="mt-1 text-[10px] font-semibold text-white/55">beats per minute</p>
+                  </div>
+                  <div className="rounded-[20px] bg-white/[.06] p-4 ring-1 ring-white/10">
+                    <p className="text-[10px] font-black uppercase tracking-[.14em] text-white/50">Today's target score</p>
+                    <p className="mt-2 text-xl font-black">{displayProgress == null ? "Not measured" : displayProgress + "%"}</p>
+                    <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-white/10">
+                      <div className="h-full rounded-full bg-[#24c1c4] transition-all" style={{ width: Math.max(0, displayProgress ?? 0) + "%" }} />
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div className="mt-4 rounded-[20px] bg-white/[.06] p-4 ring-1 ring-white/10">
+                <div className="flex flex-wrap items-end justify-between gap-2">
+                  <div>
+                    <p className="text-[10px] font-black uppercase tracking-[.14em] text-white/55">Last 7 days</p>
+                    <p className="mt-1 text-sm font-bold">
+                      {heartRateStats.recordedDays > 0
+                        ? heartRateStats.targetDays + " of " + heartRateStats.recordedDays + " recorded days at target"
+                        : "No resting readings recorded yet"}
+                    </p>
+                  </div>
+                  <p className="text-[10px] text-white/50">Latest eligible reading each day</p>
+                </div>
+                <div className="mt-4 grid grid-cols-7 gap-2" role="img" aria-label="Latest resting heart-rate reading for each of the last seven days">
+                  {heartRateStats.days.map((point) => (
+                    <div key={point.dateKey} className="flex min-w-0 flex-col items-center gap-1.5" title={point.value == null ? point.label + ": no reading" : point.label + ": " + point.value + " bpm"}>
+                      <div className="flex h-16 w-full items-end justify-center rounded-lg bg-white/[.04] px-1 pt-1">
+                        <div
+                          className={point.value == null
+                            ? "w-full rounded-md bg-white/10"
+                            : target != null && point.value <= target
+                              ? "w-full rounded-md bg-[#24c1c4]"
+                              : "w-full rounded-md bg-amber-300"}
+                          style={{ height: point.value == null ? "8%" : Math.max(12, Math.min(100, ((point.value - 35) / 115) * 100)) + "%" }}
+                        />
+                      </div>
+                      <span className="text-[9px] font-semibold text-white/50">{point.label}</span>
+                      <span className="text-[9px] font-bold text-white/75">{point.value == null ? "—" : point.value}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+              <p className="mt-3 text-[10px] leading-5 text-white/55">Heart rate changes with activity, stress, illness and medicines. Only readings clearly identified as resting are compared with this goal. The 80 bpm target is your saved goal, not a diagnosis or a universal threshold.</p>
+            </div>
+          </section>
         ) : (
           <>
           <div className="grid grid-cols-3 gap-2">
@@ -562,6 +762,19 @@ export default function TodaySupportedGoalCard({ goal, activeGoals = [], onUpdat
               </div>
             </div>
           </div>
+        ) : category === "HEART_RATE" ? (
+          <section className="mt-4 rounded-[22px] border border-[#dce9ec] bg-[#f7fbfc] p-4 sm:p-5">
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+              <div className="min-w-0">
+                <p className="text-[10px] font-black uppercase tracking-[.15em] text-[#0b7b80]">Record a resting reading</p>
+                <p className="mt-1 text-sm font-black text-[#0b2d54]">Build a reliable trend</p>
+                <p className="mt-1 text-[11px] leading-5 text-[#758896]">{meta.helper}</p>
+              </div>
+              <Link href={source.href} className="inline-flex min-h-11 shrink-0 items-center justify-center gap-2 rounded-xl bg-[#0b2d54] px-4 py-3 text-[11px] font-black text-white transition hover:bg-[#0f5a62]">
+                {source.label} <ArrowRight className="h-4 w-4 text-[#24c1c4]" />
+              </Link>
+            </div>
+          </section>
         ) : (
           <div className="mt-3 rounded-[17px] bg-[#fbfdfd] p-3.5 ring-1 ring-[#e4edef]">
             <p className="text-[10px] leading-5 text-[#758896]">{meta.helper}</p>
