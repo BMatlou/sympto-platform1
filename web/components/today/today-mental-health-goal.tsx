@@ -5,6 +5,7 @@ import { Activity, ArrowRight, Brain, TrendingDown, TrendingUp } from "lucide-re
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { healthGoalsService } from "@/services/health-goals.service";
 import { healthJournalService } from "@/services/health-journal.service";
+import GoalCardDisclosureButton from "@/components/today/goal-card-disclosure-button";
 
 type Props = {
   goal: any;
@@ -17,6 +18,8 @@ type Props = {
   conditions?: any[];
   medications?: any[];
   symptoms?: any[];
+  detailsExpanded?: boolean;
+  onToggleDetails?: () => void;
 };
 
 type CheckInEntry = {
@@ -168,6 +171,8 @@ export default function TodayMentalHealthGoal({
   conditions = [],
   medications = [],
   symptoms = [],
+  detailsExpanded,
+  onToggleDetails,
 }: Props) {
   const [entries, setEntries] = useState<CheckInEntry[]>([]);
   const [loading, setLoading] = useState(true);
@@ -670,6 +675,8 @@ export default function TodayMentalHealthGoal({
           </div>
         </section>
 
+        {detailsExpanded && (
+          <>
         <section className="mt-3 rounded-[19px] border border-[#e2ecef] bg-[#fbfdfd] p-3.5">
           <div className="flex items-start justify-between gap-3">
             <div className="min-w-0">
@@ -814,6 +821,9 @@ export default function TodayMentalHealthGoal({
           </Link>
         </section>
 
+          </>
+        )}
+
         <div className="mt-3 flex items-center justify-between gap-3 rounded-[18px] border border-[#e2ecef] bg-[#fbfdfd] px-3 py-2.5">
           <p className="min-w-0 text-[9px] font-semibold leading-4 text-[#74859a]">
             {todayStress != null
@@ -835,6 +845,7 @@ export default function TodayMentalHealthGoal({
           View goal <ArrowRight className="h-3 w-3" />
         </Link>
       </footer>
+      {onToggleDetails && <div className="px-4 pb-3 sm:px-5"><GoalCardDisclosureButton expanded={Boolean(detailsExpanded)} onToggle={onToggleDetails} label="Show health insights" /></div>}
     </article>
   );
 }
