@@ -1062,6 +1062,8 @@ export class HealthGoalsService {
   }
   async recordProgress(id: string, dto: RecordHealthGoalProgressDto) {
     const goal = await this.findOne(id);
+    // Guard legacy custom goals at the write boundary too: changing the UI alone must not allow a duplicate metric to be logged here.
+    this.assertPersonalGoalFields(String(goal.category), goal.title, goal.unit, goal.description);
     const currentValue = Number(dto.currentValue);
     if (!Number.isFinite(currentValue)) throw new BadRequestException('Health goal progress value is invalid.');
 
