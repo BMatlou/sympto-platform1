@@ -259,7 +259,7 @@ export class GoalsEngineService {
   }
 
   private async aggregateMetric(patientId: string, metricType: string, metricKey: string, start: Date, end: Date, aggregation: GoalConfig['aggregation']) {
-    const rows = await this.prisma.$queryRaw<Array<{ loggedValue: Prisma.Decimal; occurredAt: Date; source: string | null }>>`SELECT "loggedValue", "occurredAt", "source" FROM "HealthGoalMetricEvent" WHERE "patientId" = ${patientId} AND "metricType" = ${metricType} AND "metricKey" = ${metricKey} AND "source" <> 'goal-baseline' AND "occurredAt" >= ${start} AND "occurredAt" <= ${end} ORDER BY "occurredAt" ASC`;
+    const rows = await this.prisma.$queryRaw<Array<{ loggedValue: Prisma.Decimal; occurredAt: Date; source: string | null }>>`SELECT "loggedValue", "occurredAt", "source" FROM "HealthGoalMetricEvent" WHERE "patientId" = ${patientId} AND "metricType" = ${metricType} AND "metricKey" = ${metricKey} AND "source" <> 'goal-baseline' AND NOT ("metricType" = 'HEART_RATE' AND "metricKey" = 'heart_rate.bpm' AND COALESCE("source", '') LIKE 'wearable%' AND COALESCE("source", '') <> 'wearable-resting') AND "occurredAt" >= ${start} AND "occurredAt" <= ${end} ORDER BY "occurredAt" ASC`;
     if (!rows.length) return null;
 
     if (metricType === 'EXERCISE' && metricKey === 'exercise.minutes' && aggregation === 'SUM') {
@@ -438,7 +438,7 @@ export class GoalsEngineService {
     ) {
       return this.evaluateBloodPressureStrategy(patientId, title, config, goalCreatedAt, now, target);
     }
-    const history = await this.prisma.$queryRaw<Array<{ loggedValue: Prisma.Decimal; occurredAt: Date }>>`SELECT "loggedValue", "occurredAt" FROM "HealthGoalMetricEvent" WHERE "patientId" = ${patientId} AND "metricType" = ${config.metricType} AND "metricKey" = ${config.metricKey} AND "occurredAt" >= ${goalCreatedAt} AND "occurredAt" <= ${now} ORDER BY "occurredAt" ASC`;
+    const history = await this.prisma.$queryRaw<Array<{ loggedValue: Prisma.Decimal; occurredAt: Date }>>`SELECT "loggedValue", "occurredAt" FROM "HealthGoalMetricEvent" WHERE "patientId" = ${patientId} AND "metricType" = ${config.metricType} AND "metricKey" = ${config.metricKey} AND NOT ("metricType" = 'HEART_RATE' AND "metricKey" = 'heart_rate.bpm' AND COALESCE("source", '') LIKE 'wearable%' AND COALESCE("source", '') <> 'wearable-resting') AND "occurredAt" >= ${goalCreatedAt} AND "occurredAt" <= ${now} ORDER BY "occurredAt" ASC`;
     const values = history.map((row) => Number(row.loggedValue)).filter(Number.isFinite);
     const latest = values.length ? values[values.length - 1] : aggregate;
     let progressPercent = 0; let achieved = false; let currentValue = latest;
