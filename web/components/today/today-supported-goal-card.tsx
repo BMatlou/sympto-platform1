@@ -143,7 +143,7 @@ function journeyFor(goal: any) {
 
 function formatJourneyDate(value: Date | null) {
   if (!value || Number.isNaN(value.getTime())) return "—";
-  return new Intl.DateTimeFormat("en-ZA", { day: "2-digit", month: "short", year: "numeric" }).format(value);
+  return new Intl.DateTimeFormat("en-ZA", { timeZone: "Africa/Johannesburg", day: "2-digit", month: "short", year: "numeric" }).format(value);
 }
 
 function nutritionTargetReview(target: number | null) {
@@ -256,7 +256,10 @@ function buildHeartRateInsight(
   }
 
   const context: string[] = [];
-  const measurements = Array.isArray(healthContext?.measurements) ? healthContext!.measurements! : [];
+  const measurements = [
+    ...(Array.isArray(healthContext?.measurements) ? healthContext!.measurements! : []),
+    ...(Array.isArray(healthContext?.journal?.signals) ? healthContext!.journal!.signals : []),
+  ];
   const patient = healthContext?.patient ?? healthContext?.profile ?? {};
   const relations = Array.isArray(connectedGoalRelations) ? connectedGoalRelations : [];
 
@@ -298,7 +301,11 @@ function buildHeartRateInsight(
     }
   }
 
-  const symptomRecords = Array.isArray(healthContext?.symptoms) ? healthContext!.symptoms! : [];
+  const symptomRecords = Array.isArray(healthContext?.symptoms) && healthContext!.symptoms!.length
+    ? healthContext!.symptoms!
+    : Array.isArray(healthContext?.journal?.recentSymptoms)
+      ? healthContext!.journal!.recentSymptoms
+      : [];
   const relevantSymptom = symptomRecords.find((symptom: any) =>
     /palpitation|chest pain|chest tightness|shortness of breath|breathless|faint|dizz|light.?headed/i.test(
       [symptom?.title, symptom?.name, ...(Array.isArray(symptom?.symptoms) ? symptom.symptoms.map((item: any) => item?.name ?? item) : [])].filter(Boolean).join(" "),
@@ -306,7 +313,7 @@ function buildHeartRateInsight(
   );
   if (relevantSymptom) {
     const name = String(relevantSymptom?.title ?? relevantSymptom?.name ?? "a related symptom");
-    context.unshift(`Relevant symptom record: ${name}${relevantSymptom?.overallSeverity ? ` (severity recorded as ${String(relevantSymptom.overallSeverity).toLowerCase().replaceAll("_", " ")} )` : ""}. Review the symptom history alongside your pulse. If chest pain, severe breathlessness, or fainting is happening now, seek urgent medical care.`);
+    context.unshift(`Relevant symptom record: ${name}${relevantSymptom?.overallSeverity ? ` (severity recorded as ${String(relevantSymptom.overallSeverity).toLowerCase().replaceAll("_", " ")})` : ""}. Review the symptom history alongside your pulse. If chest pain, severe breathlessness, or fainting is happening now, seek urgent medical care.`);
   }
 
   const weekDelta = weeklyReadings.length >= 2
