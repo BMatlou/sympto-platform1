@@ -446,6 +446,17 @@ export class HealthGoalsService {
       if (date < today) throw new BadRequestException('Target date cannot be in the past.');
     }
   }
+  private assertPersonalGoalFields(category: string, title: unknown, unit: unknown) {
+    if (String(category ?? '').toUpperCase() !== 'OTHER') return;
+    const cleanTitle = String(title ?? '').trim();
+    if (!cleanTitle || cleanTitle.toLowerCase() === 'personal goal') {
+      throw new BadRequestException('Give your personal goal a specific name.');
+    }
+    if (!String(unit ?? '').trim()) {
+      throw new BadRequestException('A personal goal needs a unit so its measurements are meaningful.');
+    }
+  }
+
   private async assertNoDuplicateGoal(
     patientId: string,
     category: string,
@@ -631,6 +642,7 @@ export class HealthGoalsService {
       goalData.targetValue ?? (isMedicationGoal ? String(DEFAULT_MEDICATION_TARGET) : undefined);
     const unit = goalData.unit ?? (isMedicationGoal ? '%' : undefined);
 
+    this.assertPersonalGoalFields(category, goalData.title, unit);
     this.assertGoalDefinition(category, targetValue, targetDate);
 
     const effectiveComparison =
@@ -945,6 +957,7 @@ export class HealthGoalsService {
     if (patientMedicationId && targetCategory !== 'MEDICATION') throw new BadRequestException('A medication can only be attached to a medication goal.');
     if (patientMedicationId) await this.assertPatientMedicationBelongsToPatient(patientMedicationId, String(existing.patientId));
     const glucoseTrackingOnly = targetCategory === 'BLOOD_GLUCOSE' && Object.prototype.hasOwnProperty.call(dto, 'targetValue') && (dto as any).targetValue == null;
+    this.assertPersonalGoalFields(targetCategory, goalData.title ?? existing.title, goalData.unit ?? existing.unit);
     this.assertGoalDefinition(targetCategory, glucoseTrackingOnly ? null : goalData.targetValue ?? existing.targetValue, goalData.targetDate ?? existing.targetDate);
     const revisingWeightGoal = targetCategory === 'WEIGHT';
     let effectiveComparison: string | undefined = comparison;
