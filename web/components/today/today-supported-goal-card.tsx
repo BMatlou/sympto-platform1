@@ -1356,9 +1356,7 @@ export default function TodaySupportedGoalCard({ goal, activeGoals = [], healthC
                   <p className="mt-1 text-sm font-black text-[#0b2d54]">Keep Health Vitals up to date</p>
                   <p className="mt-1 text-[10px] leading-5 text-[#758896]">{meta.helper}</p>
                 </div>
-                <Link href={source.href} className="inline-flex min-h-10 shrink-0 items-center justify-center gap-1.5 rounded-xl bg-[#0b2d54] px-3.5 py-2.5 text-[9px] font-black text-white transition hover:bg-[#0f5a62]">
-                  {source.label} <ArrowRight className="h-3.5 w-3.5 text-[#24c1c4]" />
-                </Link>
+                <p className="text-[9px] leading-4 text-[#74859a]">Use the Record reading action above to open Health Vitals.</p>
               </div>
             </section>
 
@@ -1377,9 +1375,7 @@ export default function TodaySupportedGoalCard({ goal, activeGoals = [], healthC
                 <p className="mt-1 text-[12px] font-black text-[#0b2d54]">Day {journey.journeyDay}<span className="mx-1.5 text-[#a2b2ba]">·</span>{journey.daysLeft === null ? "Ongoing" : journey.daysLeft === 0 ? "Due today" : journey.daysLeft + (journey.daysLeft === 1 ? " day left" : " days left")}</p>
                 <p className="mt-1 text-[9px] text-[#82939f]">{journey.targetDate && !Number.isNaN(journey.targetDate.getTime()) ? "Target date " + formatJourneyDate(journey.targetDate) : "No target date set"}</p>
               </div>
-              <Link href={source.href} className="inline-flex min-h-10 shrink-0 items-center justify-center gap-2 rounded-xl bg-[#0b2d54] px-4 py-2.5 text-[10px] font-black text-white transition hover:bg-[#0f5a62]">
-                Record a reading <ArrowRight className="h-3.5 w-3.5 text-[#24c1c4]" />
-              </Link>
+              <p className="text-[9px] leading-4 text-[#74859a]">Use the Record a reading action above to open Health Vitals.</p>
             </div>
             <p className="mt-3 border-t border-[#e3edef] pt-3 text-[10px] leading-5 text-[#758896]">Sit quietly for a few minutes first. Only readings identified as resting count toward this goal.</p>
           </section>
