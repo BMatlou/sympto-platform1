@@ -45,7 +45,7 @@ const GOAL_META: Record<string, GoalMeta> = {
   MENTAL_HEALTH: { label: "Mental health", unit: "score", period: "Daily", comparison: "At most", action: "CHECK_IN", helper: "Your stress score is recorded through the Daily Health Check-in, where 1 is calm and 10 is very stressed.", icon: Activity },
   HYDRATION: { label: "Hydration", unit: "ml/day", period: "Daily", comparison: "At least", action: "CHECK_IN", helper: "Water intake is recorded through the Daily Health Check-in and compared with your daily target.", icon: Droplets },
   HEART_RATE: { label: "Resting heart rate", unit: "bpm", period: "Daily", comparison: "At most", action: "VITALS", helper: "Record your resting heart rate in Today’s Current health section after sitting quietly for a few minutes. Wearable or clinical readings count only when the source identifies them as resting; exercise readings are not compared with this target.", icon: HeartPulse, step: "1", min: "20", max: "260", placeholder: "e.g. 72" },
-  OTHER: { label: "Personal goal", unit: "", period: "Journey", comparison: "Stay close to target", action: "MANUAL", helper: "Record a measurable value for your personal goal. The comparison is based on how close the value is to your target.", icon: PencilLine, step: "0.1", min: "0", placeholder: "Enter today's value" },
+  OTHER: { label: "Personal goal", unit: "", period: "Journey", comparison: "Configurable target", action: "MANUAL", helper: "Record the current measurable value for this personal goal. Sympto saves a dated history for this goal and compares each value using the rule you selected.", icon: PencilLine, step: "0.1", min: "0", placeholder: "Enter your current value" },
 };
 
 function normaliseCategory(goal: any) {
@@ -110,9 +110,9 @@ function progressPercent(goal: any) {
   const target = targetValue(goal);
   if (current == null || target == null) return 0;
   const comparison = String(goal?.metricConfig?.comparison ?? "").toUpperCase();
-  if (comparison === "AT_LEAST") return target > 0 ? Math.max(0, Math.min(100, Math.round((current / target) * 100))) : 100;
-  if (comparison === "AT_MOST") return target <= 0 ? current <= 0 ? 100 : 0 : current <= target ? 100 : Math.max(0, Math.min(100, Math.round((target / current) * 100)));
-  return target <= 0 ? 100 : Math.max(0, Math.min(100, Math.round((1 - Math.abs(current - target) / Math.max(Math.abs(target), 1)) * 100)));
+  if (comparison === "AT_LEAST") return target > 0 ? Math.max(0, Math.min(100, Math.round((current / target) * 100))) : current >= target ? 100 : 0;
+  if (comparison === "AT_MOST") return target <= 0 ? current <= target ? 100 : 0 : current <= target ? 100 : Math.max(0, Math.min(100, Math.round((target / current) * 100)));
+  return target <= 0 ? current === 0 ? 100 : 0 : Math.max(0, Math.min(100, Math.round((1 - Math.abs(current - target) / Math.max(Math.abs(target), 1)) * 100)));
 }
 
 function sourceAction(category: string) {
@@ -135,9 +135,11 @@ function journeyFor(goal: any) {
   const todayKey = southAfricaDayKey(new Date());
   const startKey = startDate && !Number.isNaN(startDate.getTime()) ? southAfricaDayKey(startDate) : todayKey;
   const targetKey = targetDate && !Number.isNaN(targetDate.getTime()) ? southAfricaDayKey(targetDate) : null;
+  const targetDayDelta = targetKey == null ? null : dateKeyOrdinal(targetKey) - dateKeyOrdinal(todayKey);
   return {
     journeyDay: Math.max(1, dateKeyOrdinal(todayKey) - dateKeyOrdinal(startKey) + 1),
-    daysLeft: targetKey == null ? null : Math.max(0, dateKeyOrdinal(targetKey) - dateKeyOrdinal(todayKey)),
+    daysLeft: targetDayDelta == null ? null : Math.max(0, targetDayDelta),
+    isPastDue: targetDayDelta != null && targetDayDelta < 0,
     targetDate,
   };
 }
@@ -155,7 +157,7 @@ function nutritionTargetReview(target: number | null) {
   return "This calorie target is within the 800–1,200 calories/day low-energy range. Current NICE guidance recommends this range only within a specialist-supported, multicomponent approach for eligible adults. Review the target with a dietitian or other qualified healthcare professional.";
 }
 
-function goalNextStep(category: string, current: number | null, target: number | null) {
+function goalNextStep(category: string, current: number | null, target: number | null, comparison = "CLOSEST") {
   if (current == null || target == null) {
     if (category === "HEART_RATE") {
       return "No resting heart-rate reading has been recorded today. Sit quietly for a few minutes, then record your resting pulse in Today’s Current health section.";
@@ -183,8 +185,20 @@ function goalNextStep(category: string, current: number | null, target: number |
     return "Keep building toward the target in the current period.";
   }
   if (category === "OTHER") {
-    if (Math.abs(current - target) <= Math.max(0.5, Math.abs(target) * 0.05)) return "Your current value is close to the target.";
-    return current < target ? "Continue moving toward the target." : "Your current value is above the target; keep tracking the direction.";
+    const rule = String(comparison ?? "CLOSEST").toUpperCase();
+    if (rule === "AT_LEAST") {
+      if (current >= target) return "Target reached. Keep the recorded total up to date as your journey continues.";
+      return `You are ${Number((target - current).toFixed(2))} below your target. Keep recording progress toward it.`;
+    }
+    if (rule === "AT_MOST") {
+      if (current <= target) return "Your latest value is within the maximum you set.";
+      return `Your latest value is ${Number((current - target).toFixed(2))} above your maximum target.`;
+    }
+    const distance = Math.abs(current - target);
+    if (distance <= Math.max(0.5, Math.abs(target) * 0.05)) return "Your latest value is close to the target you set.";
+    return current < target
+      ? `Your latest value is ${Number((target - current).toFixed(2))} below the target. Keep tracking how it changes.`
+      : `Your latest value is ${Number((current - target).toFixed(2))} above the target. Keep tracking how it changes.`;
   }
   return "Keep tracking this goal.";
 }
@@ -378,6 +392,7 @@ const DEFAULT_METRICS: Record<string, { metricType: string; metricKey: string }>
 
 export default function TodaySupportedGoalCard({ goal, activeGoals = [], healthContext, onUpdated }: SupportedGoalCardProps) {
   const [value, setValue] = useState("");
+  const [measurementNote, setMeasurementNote] = useState("");
   const [saving, setSaving] = useState(false);
   const category = normaliseCategory(goal);
   const meta = metaFor(goal);
@@ -385,6 +400,9 @@ export default function TodaySupportedGoalCard({ goal, activeGoals = [], healthC
   const current = currentValue(goal);
   const target = targetValue(goal);
   const progress = progressPercent(goal);
+  const displayUnit = category === "OTHER" ? String(goal?.unit ?? "").trim() : meta.unit;
+  const personalComparison = String(goal?.metricConfig?.comparison ?? "CLOSEST").toUpperCase();
+  const personalComparisonLabel = personalComparison === "AT_LEAST" ? "At least target" : personalComparison === "AT_MOST" ? "At most target" : "Stay close to target";
   const source = sourceAction(category);
   const goalId = String(goal?.id ?? "");
   const journey = useMemo(() => journeyFor(goal), [goal]);
@@ -621,9 +639,11 @@ export default function TodaySupportedGoalCard({ goal, activeGoals = [], healthC
     ? bpGoalStats.recordedDays > 0 ? bpAttainmentPercent : null
     : category === "HEART_RATE"
       ? heartRateTodayScore
-      : displayCurrent == null
-        ? progress
-        : progressPercent({
+      : category === "OTHER" && displayCurrent == null
+        ? null
+        : displayCurrent == null
+          ? progress
+          : progressPercent({
           ...goal,
           currentValue: displayCurrent,
           progress: [],
@@ -633,7 +653,7 @@ export default function TodaySupportedGoalCard({ goal, activeGoals = [], healthC
 
   const nextStep = category === "HEART_RATE" && !heartRateHasTodayReading && heartRateStats.latestAt
     ? "Your latest saved resting reading is from " + new Intl.DateTimeFormat("en-ZA", { timeZone: "Africa/Johannesburg", dateStyle: "medium" }).format(new Date(heartRateStats.latestAt)) + ". Record a new resting reading today to update the daily goal."
-    : goalNextStep(category, displayCurrent, target);
+    : goalNextStep(category, displayCurrent, target, personalComparison);
   const heartRateInsight = category === "HEART_RATE"
     ? buildHeartRateInsight(heartRateStats, target, heartRateHasTodayReading, connectedGoalRelations, activeGoals, healthContext)
     : null;
@@ -647,15 +667,19 @@ export default function TodaySupportedGoalCard({ goal, activeGoals = [], healthC
 
     setSaving(true);
     try {
-      const occurredAt = new Date().toISOString();
-      await healthGoalsService.syncMetricEvent({
-        metricType,
-        metricKey,
-        loggedValue: numeric,
-        occurredAt,
-        source: "goal-manual",
-        sourceId: "goal-" + goalId + "-" + Date.now(),
-      });
+      if (category === "OTHER") {
+        await healthGoalsService.recordProgress(goalId, numeric, measurementNote.trim() || undefined);
+      } else {
+        const occurredAt = new Date().toISOString();
+        await healthGoalsService.syncMetricEvent({
+          metricType,
+          metricKey,
+          loggedValue: numeric,
+          occurredAt,
+          source: "goal-manual",
+          sourceId: "goal-" + goalId + "-" + Date.now(),
+        });
+      }
 
       if (["NUTRITION", "BLOOD_GLUCOSE", "CHOLESTEROL"].includes(category)) {
         try {
@@ -672,6 +696,7 @@ export default function TodaySupportedGoalCard({ goal, activeGoals = [], healthC
       }
 
       setValue("");
+      if (category === "OTHER") setMeasurementNote("");
       toast.success(meta.label + " value recorded.");
       await onUpdated?.();
     } catch (error: any) {
@@ -690,10 +715,11 @@ export default function TodaySupportedGoalCard({ goal, activeGoals = [], healthC
           <div className="min-w-0">
             <p className="text-[8px] font-black uppercase tracking-[.16em] text-[#0b7b80]">{meta.label}</p>
             <h3 className="mt-1 truncate text-sm font-black tracking-[-.03em] text-[#0b2d54]">{String(goal?.title || meta.label)}</h3>
-            <p className="mt-1 text-[9px] font-semibold text-[#8595a1]">{meta.comparison} · {meta.period} · {meta.unit || "Measured value"}</p>
+            <p className="mt-1 text-[9px] font-semibold text-[#8595a1]">{category === "OTHER" ? personalComparisonLabel : meta.comparison} · {meta.period} · {displayUnit || "Measured value"}</p>
+            {category === "OTHER" && String(goal?.description ?? "").trim() && <p className="mt-1 line-clamp-2 text-[10px] leading-4 text-[#71839a]">{String(goal.description).trim()}</p>}
           </div>
         </div>
-        <span className="shrink-0 rounded-full bg-[#eef8f8] px-2.5 py-1.5 text-[8px] font-black uppercase tracking-[.1em] text-[#0b7b80]">{category === "HEART_RATE" ? (heartRateHasTodayReading ? "Reading saved" : heartRateStats.latestCurrent != null ? "Latest saved reading" : "No reading") : "Today"}</span>
+        <span className="shrink-0 rounded-full bg-[#eef8f8] px-2.5 py-1.5 text-[8px] font-black uppercase tracking-[.1em] text-[#0b7b80]">{category === "HEART_RATE" ? (heartRateHasTodayReading ? "Reading saved" : heartRateStats.latestCurrent != null ? "Latest saved reading" : "No reading") : category === "OTHER" ? displayCurrent == null ? "Not started" : journey.isPastDue ? "Past due" : journey.daysLeft === 0 && journey.targetDate ? "Due today" : "Journey active" : "Today"}</span>
       </header>
 
       <div className="px-4 pb-4 pt-4 sm:px-5">
@@ -971,12 +997,12 @@ export default function TodaySupportedGoalCard({ goal, activeGoals = [], healthC
         ) : (
           <>
           <div className="grid grid-cols-3 gap-2">
-          <div className="rounded-[16px] bg-[#f7fbfb] p-3"><p className="text-[8px] font-black uppercase tracking-[.12em] text-[#95a3ad]">Current</p><p className="mt-1 text-base font-black text-[#0b2d54]">{displayCurrent == null ? "—" : displayCurrent}{meta.unit && displayCurrent != null ? " " + meta.unit : ""}</p></div>
-          <div className="rounded-[16px] bg-[#f7fbfb] p-3"><p className="text-[8px] font-black uppercase tracking-[.12em] text-[#95a3ad]">Target</p><p className="mt-1 text-base font-black text-[#0b2d54]">{target == null ? "—" : target}{meta.unit && target != null ? " " + meta.unit : ""}</p></div>
+          <div className="rounded-[16px] bg-[#f7fbfb] p-3"><p className="text-[8px] font-black uppercase tracking-[.12em] text-[#95a3ad]">Current</p><p className="mt-1 text-base font-black text-[#0b2d54]">{displayCurrent == null ? "—" : displayCurrent}{displayUnit && displayCurrent != null ? " " + displayUnit : ""}</p></div>
+          <div className="rounded-[16px] bg-[#f7fbfb] p-3"><p className="text-[8px] font-black uppercase tracking-[.12em] text-[#95a3ad]">Target</p><p className="mt-1 text-base font-black text-[#0b2d54]">{target == null ? "—" : target}{displayUnit && target != null ? " " + displayUnit : ""}</p></div>
           <div className="rounded-[16px] bg-[#e9f9fa] p-3"><p className="text-[8px] font-black uppercase tracking-[.12em] text-[#0b7b80]">Progress</p><p className="mt-1 text-base font-black text-[#0b6f73]">{displayProgress == null ? "—" : displayProgress + "%"}</p></div>
         </div>
 
-        <div className="mt-3 h-2 overflow-hidden rounded-full bg-[#edf3f5]"><div className="h-full rounded-full bg-[#24c1c4] transition-all" style={{ width: Math.max(0, displayProgress ?? 0) + "%" }} /></div>
+        {displayProgress != null && <div className="mt-3 h-2 overflow-hidden rounded-full bg-[#edf3f5]"><div className="h-full rounded-full bg-[#24c1c4] transition-all" style={{ width: Math.max(0, displayProgress) + "%" }} /></div>}
 
         <div className="mt-3 rounded-xl bg-[#e9f9fa] px-3 py-2"><p className="text-[9px] font-bold leading-4 text-[#0b6f73]">{nextStep}</p></div>
           </>
@@ -1075,6 +1101,7 @@ export default function TodaySupportedGoalCard({ goal, activeGoals = [], healthC
                 <input type="number" inputMode="decimal" step={meta.step} min={meta.min} max={meta.max} value={value} onChange={(event) => setValue(event.target.value)} placeholder={meta.placeholder} aria-label={"Record " + meta.label + " value"} className="min-h-10 w-full rounded-xl border border-[#d8e5e9] bg-white px-3 text-xs font-bold text-[#0b2d54] outline-none placeholder:text-[#a2afb8] focus:border-[#24c1c4]" />
                 <button type="button" onClick={() => void recordValue()} disabled={saving || value.trim() === ""} className="inline-flex min-h-10 shrink-0 items-center justify-center gap-1.5 rounded-xl bg-[#0b2d54] px-4 py-2 text-[9px] font-black text-white disabled:cursor-not-allowed disabled:opacity-40"><Check className="h-3.5 w-3.5 text-[#24c1c4]" />{saving ? "Saving…" : "Record value"}</button>
               </div>
+              {category === "OTHER" && <input type="text" maxLength={240} value={measurementNote} onChange={(event) => setMeasurementNote(event.target.value)} placeholder="Optional note about this measurement" aria-label="Personal goal measurement note" className="mt-2 min-h-10 w-full rounded-xl border border-[#d8e5e9] bg-white px-3 text-[11px] font-medium text-[#0b2d54] outline-none placeholder:text-[#a2afb8] focus:border-[#24c1c4]" />}
             ) : (
               <Link href={source.href} className="mt-3 inline-flex min-h-10 w-full items-center justify-center gap-1.5 rounded-xl bg-[#0b2d54] px-4 py-2 text-[9px] font-black text-white"><ArrowRight className="h-3.5 w-3.5 text-[#24c1c4]" />{source.label}</Link>
             )}
