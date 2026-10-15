@@ -96,6 +96,12 @@ const CUSTOM_GOAL_CATEGORY_MATCHERS: Array<SupportedGoalCategoryMatch & { patter
 function matchExistingGoalCategory(title: string): SupportedGoalCategoryMatch | null {
   const normalized = String(title ?? "").trim().toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
   if (!normalized) return null;
+  // Allow distinct measures that the current dedicated category does not track.
+  if (/\b(sleep quality|sleep score|deep sleep|rem sleep|sleep apnea)\b/.test(normalized)) return null;
+  if (/\bdiastolic\b/.test(normalized) && !/\bsystolic\b/.test(normalized)) return null;
+  if (/\b(ldl|hdl|non hdl)\b/.test(normalized)) return null;
+  if (/\b(smoke free days?|cigarette free days?|days without smoking|days without cigarettes)\b/.test(normalized)) return null;
+  if (/\b(alcohol free days?|sober days?|days sober|sobriety streak)\b/.test(normalized)) return null;
   // Weight training is an exercise goal, not a body-weight target.
   if (/\b(weight training|strength training)\b/.test(normalized)) {
     return CUSTOM_GOAL_CATEGORY_MATCHERS.find((item) => item.value === "EXERCISE") ?? null;
