@@ -4,6 +4,7 @@ import Link from "next/link";
 import { ArrowRight, Clock3, FlaskConical, Plus } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
+import GoalCardDisclosureButton from "@/components/today/goal-card-disclosure-button";
 import { healthGoalsService } from "@/services/health-goals.service";
 import { healthJournalService } from "@/services/health-journal.service";
 
@@ -12,6 +13,8 @@ type Props = {
   labOrders?: any[];
   activeGoals?: any[];
   onUpdated?: () => Promise<void> | void;
+  detailsExpanded?: boolean;
+  onToggleDetails?: () => void;
 };
 
 type CholesterolEntry = {
@@ -132,7 +135,7 @@ function relatedGoalLabel(goal: any) {
   return labels[category] ?? String(goal?.title ?? "Related goal");
 }
 
-export default function TodayCholesterolGoal({ goal, labOrders = [], activeGoals = [], onUpdated }: Props) {
+export default function TodayCholesterolGoal({ goal, labOrders = [], activeGoals = [], onUpdated, detailsExpanded, onToggleDetails }: Props) {
   const [events, setEvents] = useState<CholesterolEntry[]>([]);
   const [loading, setLoading] = useState(true);
   const [open, setOpen] = useState(false);
@@ -374,6 +377,9 @@ export default function TodayCholesterolGoal({ goal, labOrders = [], activeGoals
           </div>
         </section>
 
+        {onToggleDetails && <div className="mt-2 px-1"><GoalCardDisclosureButton expanded={Boolean(detailsExpanded)} onToggle={onToggleDetails} label="Show results & insights" /></div>}
+        {detailsExpanded && (
+          <>
         {releasedLabs.length > 0 && (() => {
           const lab = releasedLabs[0];
           const comparable = lab.numericValue != null && isMmolPerLitre(lab.unit);
@@ -502,6 +508,9 @@ export default function TodayCholesterolGoal({ goal, labOrders = [], activeGoals
             </div>
           )}
         </section>
+
+          </>
+        )}
 
         <div className="mt-3 flex items-center justify-between gap-3 border-t border-[#edf2f4] px-1 pt-3">
           <div className="min-w-0">
