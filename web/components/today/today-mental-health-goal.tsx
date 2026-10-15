@@ -623,7 +623,7 @@ export default function TodayMentalHealthGoal({
   return (
     <article
       id={"today-goal-" + encodeURIComponent(goalId)}
-      className="flex h-full min-w-0 flex-col overflow-hidden rounded-[26px] border border-[#e5edef] bg-white shadow-[0_14px_36px_rgba(11,45,84,.07)]"
+      className={detailsExpanded ? "flex h-auto min-w-0 flex-col overflow-visible rounded-[26px] border border-[#e5edef] bg-white shadow-[0_14px_36px_rgba(11,45,84,.07)]" : "flex h-full min-w-0 flex-col overflow-hidden rounded-[26px] border border-[#e5edef] bg-white shadow-[0_14px_36px_rgba(11,45,84,.07)]"}
     >
       <header className="flex items-center justify-between gap-3 px-4 pb-3 pt-4 sm:px-5 sm:pt-5">
         <div className="flex min-w-0 items-center gap-2.5">
@@ -675,6 +675,7 @@ export default function TodayMentalHealthGoal({
           </div>
         </section>
 
+        {onToggleDetails && <div className="px-3.5 pb-1 sm:px-4"><GoalCardDisclosureButton expanded={Boolean(detailsExpanded)} onToggle={onToggleDetails} label="Show health insights" /></div>}
         {detailsExpanded && (
           <>
         <section className="mt-3 rounded-[19px] border border-[#e2ecef] bg-[#fbfdfd] p-3.5">
@@ -845,7 +846,6 @@ export default function TodayMentalHealthGoal({
           View goal <ArrowRight className="h-3 w-3" />
         </Link>
       </footer>
-      {onToggleDetails && <div className="px-4 pb-3 sm:px-5"><GoalCardDisclosureButton expanded={Boolean(detailsExpanded)} onToggle={onToggleDetails} label="Show health insights" /></div>}
     </article>
   );
 }
