@@ -19,6 +19,7 @@ type GoalDraft = {
   unit: string;
   targetDate: string;
   weightDirection: "LOSE" | "GAIN" | "MAINTAIN";
+  personalComparison: "AT_LEAST" | "AT_MOST" | "CLOSEST";
   patientMedicationId?: string;
 };
 
@@ -33,6 +34,11 @@ function getAuthoritativePatientMedicationId(medication: any) {
 
 function normaliseMedicationName(value: unknown) {
   return String(value ?? "").trim().toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
+}
+
+function personalComparisonFromGoal(goal: any): GoalDraft["personalComparison"] {
+  const comparison = String(goal?.metricConfig?.comparison ?? "CLOSEST").toUpperCase();
+  return comparison === "AT_LEAST" || comparison === "AT_MOST" ? comparison : "CLOSEST";
 }
 
 const CATEGORIES = [
@@ -91,7 +97,7 @@ function nutritionTargetChange(previousValue: unknown, nextValue: string) {
 }
 
 function emptyDraft(): GoalDraft {
-  return { title: "", description: "", category: "", priority: "MEDIUM", targetValue: "", unit: "", targetDate: "", weightDirection: "LOSE", patientMedicationId: "" };
+  return { title: "", description: "", category: "", priority: "MEDIUM", targetValue: "", unit: "", targetDate: "", weightDirection: "LOSE", personalComparison: "CLOSEST", patientMedicationId: "" };
 }
 
 function formatEnum(value: unknown) {
@@ -253,7 +259,7 @@ function HealthGoalsPageContent() {
   );
   const editorTargetNumber = Number(draft.targetValue);
   const glucoseTrackingOnly = draft.category === "BLOOD_GLUCOSE" && draft.targetValue.trim() === "";
-  const editorTargetValid = glucoseTrackingOnly || (draft.targetValue.trim() !== "" && Number.isFinite(editorTargetNumber) && editorTargetNumber >= 0 && (editorTargetNumber > 0 || Boolean(targetRule.allowZero)) && (draft.category !== "MEDICATION" || (Boolean(draft.patientMedicationId) && editorTargetNumber >= 1 && editorTargetNumber <= 100)) && (draft.category !== "MENTAL_HEALTH" || (editorTargetNumber >= 1 && editorTargetNumber <= 10)));
+  const editorTargetValid = glucoseTrackingOnly || (draft.targetValue.trim() !== "" && Number.isFinite(editorTargetNumber) && editorTargetNumber >= 0 && (editorTargetNumber > 0 || Boolean(targetRule.allowZero) || draft.category === "OTHER") && (draft.category !== "MEDICATION" || (Boolean(draft.patientMedicationId) && editorTargetNumber >= 1 && editorTargetNumber <= 100)) && (draft.category !== "MENTAL_HEALTH" || (editorTargetNumber >= 1 && editorTargetNumber <= 10)));
   const currentWeight = Number(dashboard?.patient?.weightKg);
   const currentHeight = Number(dashboard?.patient?.heightCm);
   const advisor = draft.category === "WEIGHT" ? weightAdvice(Number.isFinite(currentWeight) ? currentWeight : null, Number.isFinite(currentHeight) ? currentHeight : null, Number(draft.targetValue) > 0 ? Number(draft.targetValue) : null, draft.weightDirection, draft.targetDate) : null;
@@ -263,7 +269,7 @@ function HealthGoalsPageContent() {
   useEffect(() => {
     if (!editorOpen || !editingGoal) return;
     const category = CATEGORIES.find((item) => item.value === String(editingGoal.category ?? "")) ?? CATEGORIES[CATEGORIES.length - 1];
-    setDraft({ title: goalDisplayTitle(editingGoal, category.value), description: String(editingGoal.description ?? ""), category: category.value, priority: String(editingGoal.priority ?? "MEDIUM"), targetValue: editingGoal.targetValue == null ? "" : String(editingGoal.targetValue), unit: String(editingGoal.unit ?? category.unit), targetDate: editingGoal.targetDate ? String(editingGoal.targetDate).slice(0, 10) : "", weightDirection: String(editingGoal?.metricConfig?.comparison ?? "DECREASE_TO").toUpperCase() === "INCREASE_TO" ? "GAIN" : String(editingGoal?.metricConfig?.comparison ?? "").toUpperCase() === "CLOSEST" ? "MAINTAIN" : "LOSE" });
+    setDraft({ title: goalDisplayTitle(editingGoal, category.value), description: String(editingGoal.description ?? ""), category: category.value, priority: String(editingGoal.priority ?? "MEDIUM"), targetValue: editingGoal.targetValue == null ? "" : String(editingGoal.targetValue), unit: String(editingGoal.unit ?? category.unit), targetDate: editingGoal.targetDate ? String(editingGoal.targetDate).slice(0, 10) : "", weightDirection: String(editingGoal?.metricConfig?.comparison ?? "DECREASE_TO").toUpperCase() === "INCREASE_TO" ? "GAIN" : String(editingGoal?.metricConfig?.comparison ?? "").toUpperCase() === "CLOSEST" ? "MAINTAIN" : "LOSE", personalComparison: personalComparisonFromGoal(editingGoal) });
   }, [editingGoal, editorOpen]);
 
   useEffect(() => {
@@ -320,7 +326,7 @@ function HealthGoalsPageContent() {
       return;
     }
     setEditingId(String(goal.id));
-    setDraft({ title: goalDisplayTitle(goal, category.value), description: String(goal.description ?? ""), category: category.value, priority: String(goal.priority ?? "MEDIUM"), targetValue: goal.targetValue == null ? "" : String(goal.targetValue), unit: String(goal.unit ?? category.unit), targetDate: goal.targetDate ? String(goal.targetDate).slice(0, 10) : "", weightDirection: String(goal?.metricConfig?.comparison ?? "DECREASE_TO").toUpperCase() === "INCREASE_TO" ? "GAIN" : String(goal?.metricConfig?.comparison ?? "").toUpperCase() === "CLOSEST" ? "MAINTAIN" : "LOSE" });
+    setDraft({ title: goalDisplayTitle(goal, category.value), description: String(goal.description ?? ""), category: category.value, priority: String(goal.priority ?? "MEDIUM"), targetValue: goal.targetValue == null ? "" : String(goal.targetValue), unit: String(goal.unit ?? category.unit), targetDate: goal.targetDate ? String(goal.targetDate).slice(0, 10) : "", weightDirection: String(goal?.metricConfig?.comparison ?? "DECREASE_TO").toUpperCase() === "INCREASE_TO" ? "GAIN" : String(goal?.metricConfig?.comparison ?? "").toUpperCase() === "CLOSEST" ? "MAINTAIN" : "LOSE", personalComparison: personalComparisonFromGoal(goal) });
     setEditorOpen(true);
   }, [dashboard?.goals, healthGoals, loading, searchParams]);
 
@@ -443,7 +449,7 @@ function HealthGoalsPageContent() {
     }
     setEditingId(String(goal.id));
     const category = CATEGORIES.find((item) => item.value === String(goal.category ?? "")) ?? CATEGORIES[CATEGORIES.length - 1];
-    setDraft({ title: String(goal.title ?? ""), description: String(goal.description ?? ""), category: category.value, priority: String(goal.priority ?? "MEDIUM"), targetValue: goal.targetValue == null ? "" : String(goal.targetValue), unit: String(goal.unit ?? category.unit), targetDate: goal.targetDate ? String(goal.targetDate).slice(0, 10) : "", weightDirection: String(goal?.metricConfig?.comparison ?? "DECREASE_TO").toUpperCase() === "INCREASE_TO" ? "GAIN" : String(goal?.metricConfig?.comparison ?? "").toUpperCase() === "CLOSEST" ? "MAINTAIN" : "LOSE" });
+    setDraft({ title: String(goal.title ?? ""), description: String(goal.description ?? ""), category: category.value, priority: String(goal.priority ?? "MEDIUM"), targetValue: goal.targetValue == null ? "" : String(goal.targetValue), unit: String(goal.unit ?? category.unit), targetDate: goal.targetDate ? String(goal.targetDate).slice(0, 10) : "", weightDirection: String(goal?.metricConfig?.comparison ?? "DECREASE_TO").toUpperCase() === "INCREASE_TO" ? "GAIN" : String(goal?.metricConfig?.comparison ?? "").toUpperCase() === "CLOSEST" ? "MAINTAIN" : "LOSE", personalComparison: personalComparisonFromGoal(goal) });
     setEditorOpen(true);
   }
   function closeEditor() { if (saving) return; setEditorOpen(false); setEditingId(null); setDraft(emptyDraft()); }
@@ -479,9 +485,11 @@ function HealthGoalsPageContent() {
     if (!dashboard?.patient?.id) { toast.error("Your patient profile could not be identified."); return; }
     const glucoseTrackingOnly = draft.category === "BLOOD_GLUCOSE" && draft.targetValue.trim() === "";
     if (!draft.category || !draft.title.trim() || !draft.priority || (draft.targetValue.trim() === "" && !glucoseTrackingOnly)) { toast.error(glucoseTrackingOnly ? "Add a goal name and priority." : "Add a goal name, category, priority and target."); return; }
+    if (draft.category === "OTHER" && draft.title.trim().toLowerCase() === "personal goal") { toast.error("Give your personal goal a specific name so you can recognise it in Today."); return; }
+    if (draft.category === "OTHER" && !draft.unit.trim()) { toast.error("Add a unit for your personal goal, such as books, sessions, pages or points."); return; }
     const targetNumber = Number(draft.targetValue);
     const categoryConfig = CATEGORIES.find((item) => item.value === draft.category);
-    const allowsZero = draft.category === "SMOKING" || draft.category === "ALCOHOL";
+    const allowsZero = draft.category === "SMOKING" || draft.category === "ALCOHOL" || draft.category === "OTHER";
     if (!categoryConfig || (!glucoseTrackingOnly && (!Number.isFinite(targetNumber) || targetNumber < 0 || (targetNumber === 0 && !allowsZero)))) { toast.error(allowsZero ? "Enter a valid target of 0 or more." : "Enter a positive target, or leave the Blood glucose target blank for tracking only."); return; }
     if (draft.category === "MEDICATION" && (!draft.patientMedicationId || targetNumber < 1 || targetNumber > 100)) { toast.error("Select a prescribed medication and set adherence between 1% and 100%."); return; }
     if (draft.category === "MENTAL_HEALTH" && (targetNumber < 1 || targetNumber > 10)) { toast.error("Stress target must be between 1 and 10."); return; }
@@ -519,7 +527,7 @@ function HealthGoalsPageContent() {
           String(editingGoal?.status ?? "").toUpperCase() === "ON_HOLD"
         )
       );
-      const comparison: HealthGoalInput["comparison"] = draft.category === "WEIGHT" ? draft.weightDirection === "GAIN" ? "INCREASE_TO" : draft.weightDirection === "MAINTAIN" ? "CLOSEST" : "DECREASE_TO" : config.comparison;
+      const comparison: HealthGoalInput["comparison"] = draft.category === "WEIGHT" ? draft.weightDirection === "GAIN" ? "INCREASE_TO" : draft.weightDirection === "MAINTAIN" ? "CLOSEST" : "DECREASE_TO" : draft.category === "OTHER" ? draft.personalComparison : config.comparison;
       const normalizedTitle = goalDisplayTitle({ title: draft.title }, config.value);
       const input: HealthGoalInput = { patientId: dashboard.patient.id, patientMedicationId: draft.category === "MEDICATION" ? draft.patientMedicationId || undefined : undefined, title: normalizedTitle, description: draft.description.trim() || undefined, category: config.value, priority: draft.priority, status: shouldResume ? "ACTIVE" : undefined, targetValue: glucoseTrackingOnly ? null : draft.targetValue, unit: draft.unit || config.unit || undefined, targetDate: draft.targetDate || undefined, metricType: config.metricType, metricKey: config.metricKey, frequency: config.frequency, frequencyTarget: glucoseTrackingOnly ? null : draft.targetValue, aggregation: config.aggregation, comparison };
       if (editingId) {
@@ -576,7 +584,8 @@ function HealthGoalsPageContent() {
                    {draft.category === "OTHER" ? <TextField label="Unit" value={draft.unit} placeholder="e.g. sessions, pages, points" onChange={(value) => setDraft((current) => ({ ...current, unit: value }))} /> : <div className="rounded-xl border border-[#e1eaed] bg-[#f8fbfc] px-3.5 py-3"><p className="text-[9px] font-black uppercase tracking-[.12em] text-[#91a0ae]">Unit</p><p className="mt-1 text-sm font-black text-[#0b2d54]">{selectedCategory?.unit || "As recorded"}</p></div>}
                    <TextField type="date" label="Target date" value={draft.targetDate} onChange={(value) => setDraft((current) => ({ ...current, targetDate: value }))} />
                  </div>
-                 {selectedCategory && <div className="rounded-2xl border border-[#e1eaed] bg-[#fbfdfd] px-4 py-3"><div className="flex flex-wrap items-center gap-2"><span className="rounded-full bg-[#e9f9fa] px-2.5 py-1 text-[9px] font-black text-[#0b6f73]">{selectedCategory.frequency === "DAILY" ? "Daily" : selectedCategory.frequency === "WEEKLY" ? "Weekly" : "Journey"}</span><span className="rounded-full bg-[#f3f6f7] px-2.5 py-1 text-[9px] font-black text-[#74859a]">{draft.category === "BLOOD_GLUCOSE" ? "Clinical range required" : selectedCategory.comparison === "AT_LEAST" ? "At least target" : selectedCategory.comparison === "AT_MOST" ? "At most target" : selectedCategory.comparison === "CLOSEST" ? "Stay close to target" : String(selectedCategory.comparison) === "INCREASE_TO" ? "Increase toward target" : "Decrease toward target"}</span></div><p className="mt-2 text-[10px] leading-5 text-[#74859a]">{targetRule.helper}</p>
+                 {draft.category === "OTHER" && <div className="rounded-2xl border border-[#dce9ee] bg-[#f7fbfc] p-4"><label className="block"><span className="text-[10px] font-black uppercase tracking-[0.13em] text-[#74859a]">How should Sympto compare your value?</span><select value={draft.personalComparison} onChange={(event) => setDraft((current) => ({ ...current, personalComparison: event.target.value as GoalDraft["personalComparison"] }))} className="mt-2 min-h-11 w-full rounded-xl border border-[#d7e4e8] bg-white px-3 text-sm font-bold text-[#0b2d54] outline-none focus:border-[#24c1c4]"><option value="CLOSEST">Stay close to target</option><option value="AT_LEAST">Reach at least the target</option><option value="AT_MOST">Stay at or below the target</option></select></label><p className="mt-2 text-[10px] leading-5 text-[#74859a]">{draft.personalComparison === "AT_LEAST" ? "Progress increases as your value approaches and reaches the target. This suits goals such as completing a number of sessions or books." : draft.personalComparison === "AT_MOST" ? "The target is a maximum. A value at or below it meets the target; a value above it does not." : "Progress is calculated by how close your latest measured value is to the target."}</p></div>}
+                 {selectedCategory && <div className="rounded-2xl border border-[#e1eaed] bg-[#fbfdfd] px-4 py-3"><div className="flex flex-wrap items-center gap-2"><span className="rounded-full bg-[#e9f9fa] px-2.5 py-1 text-[9px] font-black text-[#0b6f73]">{selectedCategory.frequency === "DAILY" ? "Daily" : selectedCategory.frequency === "WEEKLY" ? "Weekly" : "Journey"}</span><span className="rounded-full bg-[#f3f6f7] px-2.5 py-1 text-[9px] font-black text-[#74859a]">{draft.category === "BLOOD_GLUCOSE" ? "Clinical range required" : draft.category === "OTHER" ? draft.personalComparison === "AT_LEAST" ? "At least target" : draft.personalComparison === "AT_MOST" ? "At most target" : "Stay close to target" : selectedCategory.comparison === "AT_LEAST" ? "At least target" : selectedCategory.comparison === "AT_MOST" ? "At most target" : selectedCategory.comparison === "CLOSEST" ? "Stay close to target" : String(selectedCategory.comparison) === "INCREASE_TO" ? "Increase toward target" : "Decrease toward target"}</span></div><p className="mt-2 text-[10px] leading-5 text-[#74859a]">{targetRule.helper}</p>
                   {draft.category === "BLOOD_GLUCOSE" && <p className="mt-2 text-[10px] leading-5 text-[#0b6f73]">{glucoseTrackingOnly ? "Tracking only: you can begin logging measured values without a target. Confirm a personal target and its measurement context with your healthcare professional." : "This is a saved target, not a universal glucose ceiling. Confirm the correct target range and timing context with your healthcare professional before treating it as a measure of control."}</p>}
                   {draft.category === "NUTRITION" && (() => {
                     const review = nutritionTargetReview(draft.targetValue);
