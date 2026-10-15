@@ -55,6 +55,8 @@ export class DeviceMeasurementsService {
     value: number,
     secondaryValue: number | undefined,
     measuredAt: Date,
+    deviceMetricKey: string | null | undefined,
+    notes: string | null | undefined,
     source: string | undefined,
   ) {
     if (!source?.startsWith('wearable')) return;
@@ -62,9 +64,18 @@ export class DeviceMeasurementsService {
     const mappings: Array<[string, string, number | undefined]> = [];
 
     switch (measurementType) {
-      case MeasurementType.HEART_RATE:
-        mappings.push(['HEART_RATE', 'heart_rate.bpm', value]);
+      case MeasurementType.HEART_RATE: {
+        // A generic wearable heart-rate sample may be from exercise or another
+        // active period. Only score it against a resting-rate goal when the
+        // provider's metric key or notes explicitly identify it as resting.
+        const context = `${deviceMetricKey ?? ''} ${notes ?? ''}`;
+        const explicitlyResting =
+          /\\brest(?:ing)?\\b.{0,24}\\b(?:heart[\\s_-]*rate|pulse)\\b|\\b(?:heart[\\s_-]*rate|pulse)\\b.{0,24}\\brest(?:ing)?\\b/i.test(context);
+        if (explicitlyResting) {
+          mappings.push(['HEART_RATE', 'heart_rate.bpm', value]);
+        }
         break;
+      }
       case MeasurementType.BLOOD_PRESSURE:
         mappings.push(['BLOOD_PRESSURE', 'blood_pressure.systolic', value]);
         if (secondaryValue != null) {
@@ -95,7 +106,7 @@ export class DeviceMeasurementsService {
         metricKey,
         loggedValue: loggedValue as number,
         occurredAt: measuredAt,
-        source: 'wearable',
+        source: metricType === 'HEART_RATE' ? 'wearable-resting' : 'wearable',
         sourceId: measurementId,
       });
     }
@@ -176,6 +187,8 @@ export class DeviceMeasurementsService {
       Number(measurement.value),
       measurement.secondaryValue == null ? undefined : Number(measurement.secondaryValue),
       measurement.measuredAt,
+      measurement.metricKey ?? undefined,
+      measurement.notes ?? undefined,
       measurement.source ?? undefined,
     );
 
