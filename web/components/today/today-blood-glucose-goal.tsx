@@ -1146,8 +1146,6 @@ export default function TodayBloodGlucoseGoal({ goal, patientId = "", currentWei
             </div>
           )}
         </section>
-      </div>
-
         )}
 
       <footer className="flex items-center justify-between gap-3 border-t border-[#edf2f4] bg-[#fbfdfd] px-4 py-3 sm:px-5">
