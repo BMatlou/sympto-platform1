@@ -106,28 +106,36 @@ function GoalCarouselSlide({ slideKey, expandedGoalSlide, onToggle, children }: 
       aria-roledescription="slide"
       className={expanded
         ? "relative min-w-0 w-full shrink-0 snap-start lg:w-[calc(50%-0.5rem)]"
-        : "relative h-[480px] min-w-0 w-full shrink-0 snap-start overflow-hidden rounded-[26px] lg:w-[calc(50%-0.5rem)]"}
+        : "relative h-[520px] min-w-0 w-full shrink-0 snap-start lg:w-[calc(50%-0.5rem)]"}
     >
-      {expanded && (
-        <div className="mb-2 flex justify-end">
-          <button type="button" aria-expanded="true" onClick={() => onToggle(slideKey)}
-            className="inline-flex min-h-9 items-center justify-center gap-2 rounded-full border border-[#dce8eb] bg-white px-3.5 py-2 text-[9px] font-black text-[#0b2d54] shadow-sm transition hover:border-[#24c1c4] hover:bg-[#f7fcfc] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#24c1c4]">
-            Hide insights & details
-            <ChevronDown className="h-3.5 w-3.5 rotate-180 transition-transform" />
-          </button>
-        </div>
-      )}
-      {children}
-      {!expanded && (
-        <button
-          type="button"
-          aria-expanded="false"
-          onClick={() => onToggle(slideKey)}
-          className="absolute bottom-3 right-3 z-20 inline-flex min-h-9 items-center justify-center gap-1.5 rounded-full border border-[#dce8eb] bg-white px-3 py-2 text-[9px] font-bold text-[#0b2d54] shadow-[0_3px_10px_rgba(11,45,84,0.08)] transition hover:border-[#24c1c4] hover:bg-[#f8fcfc] hover:text-[#0b7b80] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#24c1c4]"
-        >
-          Show details
-          <ChevronDown className="h-3 w-3 transition-transform" />
-        </button>
+      {expanded ? (
+        <>
+          <div className="mb-2 flex justify-end">
+            <button type="button" aria-expanded="true" onClick={() => onToggle(slideKey)}
+              className="inline-flex min-h-9 items-center justify-center gap-2 rounded-full border border-[#dce8eb] bg-white px-3.5 py-2 text-[9px] font-black text-[#0b2d54] transition hover:border-[#24c1c4] hover:bg-[#f7fcfc] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#24c1c4]">
+              Hide insights & details
+              <ChevronDown className="h-3.5 w-3.5 rotate-180 transition-transform" />
+            </button>
+          </div>
+          {children}
+        </>
+      ) : (
+        <>
+          <div className="h-[480px] overflow-hidden rounded-[26px]">
+            {children}
+          </div>
+          <div className="flex h-10 items-center justify-end pr-1">
+            <button
+              type="button"
+              aria-expanded="false"
+              onClick={() => onToggle(slideKey)}
+              className="inline-flex min-h-8 items-center justify-center gap-1.5 rounded-full border border-[#dce8eb] bg-white px-3 py-1.5 text-[9px] font-bold text-[#0b2d54] transition hover:border-[#24c1c4] hover:bg-[#f8fcfc] hover:text-[#0b7b80] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#24c1c4]"
+            >
+              Show details
+              <ChevronDown className="h-3 w-3 transition-transform" />
+            </button>
+          </div>
+        </>
       )}
     </div>
   );
