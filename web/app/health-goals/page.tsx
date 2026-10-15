@@ -304,7 +304,6 @@ function HealthGoalsPageContent() {
   const editingGoal = editingId ? healthGoals.find((goal: any) => String(goal.id) === editingId) : null;
   const selectedCategory = CATEGORIES.find((item) => item.value === draft.category);
   const targetRule = TARGET_RULES[draft.category] ?? TARGET_RULES.OTHER;
-  const customGoalCategoryMatch = draft.category === "OTHER" ? matchExistingGoalCategory(draft.title) : null;
   const availableMedications = useMemo(() => {
     const source = Array.isArray(dashboard?.medications) && dashboard.medications.length > 0
       ? dashboard.medications
@@ -323,6 +322,33 @@ function HealthGoalsPageContent() {
       ),
     [availableMedications, draft.patientMedicationId],
   );
+
+  const customTitle = draft.title.trim().toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
+  const medicationGoalMention = draft.category === "OTHER" && !/\b(side effects?|adverse reactions?|drug interactions?|medication symptoms?|medicine symptoms?)\b/.test(customTitle)
+    ? availableMedications.find((medication: any) => {
+        const names = [
+          medication?.medication?.name,
+          medication?.medication?.genericName,
+          medication?.medication?.brandName,
+          medication?.name,
+          medication?.genericName,
+          medication?.brandName,
+        ];
+        return names.some((name) => {
+          const normalizedName = String(name ?? "").trim().toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
+          if (!normalizedName) return false;
+          const aliases = [normalizedName, ...normalizedName.split(" ").filter((part) => part.length >= 4)];
+          return aliases.some((alias) => alias.length >= 4 && (" " + customTitle + " ").includes(" " + alias + " "));
+        });
+      })
+    : null;
+  const customGoalCategoryMatch = draft.category === "OTHER"
+    ? matchExistingGoalCategory(draft.title) ?? (medicationGoalMention ? {
+        value: "MEDICATION",
+        label: "Medication",
+        measurement: "adherence to your saved prescribed medicine",
+      } : null)
+    : null;
   const editorTargetNumber = Number(draft.targetValue);
   const glucoseTrackingOnly = draft.category === "BLOOD_GLUCOSE" && draft.targetValue.trim() === "";
   const editorTargetValid = !customGoalCategoryMatch && (draft.category !== "OTHER" || Boolean(draft.description.trim())) && (glucoseTrackingOnly || (draft.targetValue.trim() !== "" && Number.isFinite(editorTargetNumber) && editorTargetNumber >= 0 && (editorTargetNumber > 0 || Boolean(targetRule.allowZero) || draft.category === "OTHER") && (draft.category !== "MEDICATION" || (Boolean(draft.patientMedicationId) && editorTargetNumber >= 1 && editorTargetNumber <= 100)) && (draft.category !== "MENTAL_HEALTH" || (editorTargetNumber >= 1 && editorTargetNumber <= 10))));
