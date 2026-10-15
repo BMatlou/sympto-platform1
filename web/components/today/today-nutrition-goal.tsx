@@ -4,12 +4,15 @@ import Link from "next/link";
 import { ArrowRight, Check, Plus, Utensils } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
+import GoalCardDisclosureButton from "@/components/today/goal-card-disclosure-button";
 import { healthGoalsService, type NutritionFood } from "@/services/health-goals.service";
 import { healthJournalService } from "@/services/health-journal.service";
 
 type Props = {
   goal: any;
   onUpdated?: () => Promise<void> | void;
+  detailsExpanded?: boolean;
+  onToggleDetails?: () => void;
 };
 
 type NutritionItem = {
@@ -171,7 +174,7 @@ function isTodayJournal(entry: any) {
 
 
 
-export default function TodayNutritionGoal({ goal, onUpdated }: Props) {
+export default function TodayNutritionGoal({ goal, onUpdated, detailsExpanded, onToggleDetails }: Props) {
   const [events, setEvents] = useState<NutritionEvent[]>([]);
   const [todayCheckIn, setTodayCheckIn] = useState<TodayCheckIn | null>(null);
   const [foods, setFoods] = useState<NutritionFood[]>([]);
@@ -537,6 +540,9 @@ export default function TodayNutritionGoal({ goal, onUpdated }: Props) {
           </div>
         </section>
 
+        {onToggleDetails && <div className="mt-2 px-1"><GoalCardDisclosureButton expanded={Boolean(detailsExpanded)} onToggle={onToggleDetails} label="Show meal log & details" /></div>}
+        {detailsExpanded && (
+          <>
         <section className="mt-4 rounded-[24px] border border-[#dfeaec] bg-[#f8fbfb] p-4 sm:p-5">
           <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
             <div className="min-w-0">
@@ -763,6 +769,9 @@ export default function TodayNutritionGoal({ goal, onUpdated }: Props) {
             <p className={`mt-1 text-[9px] leading-4 ${todayCheckIn?.exerciseMinutes != null ? "text-white/70" : "text-[#8a99a4]"}`}>{todayCheckIn?.exerciseMinutes == null ? "Record physical activity in the Daily Health Check-in." : "Movement recorded in today's Daily Health Check-in."}</p>
           </Link>
         </section>
+
+          </>
+        )}
 
         {showThreeDayReminder && (
           <div className="mt-4 rounded-[18px] border border-amber-200 bg-amber-50 px-3.5 py-3">
