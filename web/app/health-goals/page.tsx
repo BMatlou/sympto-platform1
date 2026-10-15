@@ -120,6 +120,15 @@ function goalDisplayTitle(goal: any, categoryValue?: string) {
   return titleMatchesAnotherCategory ? config.label : rawTitle;
 }
 
+function goalEditorTitle(goal: any, categoryValue?: string) {
+  const category = String(categoryValue ?? goal?.category ?? "OTHER").toUpperCase();
+  const rawTitle = String(goal?.title ?? "").trim();
+  // Older Personal goals were stored with the category label as their title.
+  // Treat that placeholder as missing so the user is prompted to name the measure.
+  if (category === "OTHER" && (!rawTitle || rawTitle.toLowerCase() === "personal goal")) return "";
+  return goalDisplayTitle(goal, category);
+}
+
 function formatDate(value: unknown) {
   if (!value) return null;
   const date = new Date(String(value));
