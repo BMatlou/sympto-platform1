@@ -82,11 +82,13 @@ function medicationName(medication: any) {
 }
 
 function goalCategory(goal: any) {
-  const category = String(goal?.category ?? goal?.metricType ?? goal?.metricConfig?.metricType ?? "")
+  const rawCategory = [goal?.category, goal?.metricType, goal?.metricConfig?.metricType]
+    .find((value) => String(value ?? "").trim() !== "");
+  const category = String(rawCategory ?? "")
     .trim()
     .toUpperCase()
     .replace(/[\s-]+/g, "_");
-  return category === "PERSONAL" ? "OTHER" : category;
+  return category === "PERSONAL" || category === "PERSONAL_GOAL" ? "OTHER" : category;
 }
 
 function isMedicationGoal(goal: any) {
@@ -296,11 +298,14 @@ export default function TodayPage() {
   const dedicatedTodayCategories = new Set(["MEDICATION", "SMOKING", "ALCOHOL", "WEIGHT", "EXERCISE"]);
   const otherTodayGoals = activeGoalsArray.filter((goal: any) => {
     const category = goalCategory(goal);
-    if (!dedicatedTodayCategories.has(category)) return true;
-    if (category !== "MEDICATION") return false;
-    return !medicationGoalCardsForToday.some((item: any) =>
-      String(item?.goal?.id ?? "") === String(goal?.id ?? "") && Boolean(item?.medication),
-    );
+    if (isMedicationGoal(goal)) {
+      // Linked medicines have their own adherence card. Unlinked medication
+      // goals appear once in the general carousel with an explicit repair action.
+      return !medicationGoalCardsForToday.some((item: any) =>
+        String(item?.goal?.id ?? "") === String(goal?.id ?? "") && Boolean(item?.medication),
+      );
+    }
+    return !dedicatedTodayCategories.has(category);
   });
 
   const linkedMedicationGoal = medicationGoalCardsForToday.find((item: any) => Boolean(item.medication)) ?? null;
