@@ -149,7 +149,9 @@ function goalCurrent(goal: any) {
   const number = Number(value);
   if (!Number.isFinite(number)) return null;
   const unit = String(goal?.unit ?? "").trim();
-  return `${Number.isInteger(number) ? number : number.toFixed(1)}${unit ? ` ${unit}` : ""}`;
+  const personal = String(goal?.category ?? "").toUpperCase() === "OTHER";
+  const formatted = Number.isInteger(number) ? String(number) : personal ? String(Number(number.toFixed(2))) : number.toFixed(1);
+  return `${formatted}${unit ? ` ${unit}` : ""}`;
 }
 
 function goalPresentation(goal: any) {
@@ -172,7 +174,7 @@ function goalPresentation(goal: any) {
             ? "Maintain baseline"
             : numericTarget.toFixed(1) + " kg"
       : goal?.targetValue != null
-        ? String(goal.targetValue) + ((category === "OTHER" ? String(goal?.unit ?? "").trim() : config.unit) ? " " + (category === "OTHER" ? String(goal?.unit ?? "").trim() : config.unit) : "")
+        ? (category === "OTHER" && Number.isFinite(numericTarget) ? String(Number(numericTarget.toFixed(2))) : String(goal.targetValue)) + ((category === "OTHER" ? String(goal?.unit ?? "").trim() : config.unit) ? " " + (category === "OTHER" ? String(goal?.unit ?? "").trim() : config.unit) : "")
         : "Target not set";
   // Glucose readings are retained, but must not receive a progress score
   // until a context-specific clinical range is available.
