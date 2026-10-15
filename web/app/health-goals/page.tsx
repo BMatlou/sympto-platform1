@@ -416,6 +416,7 @@ function HealthGoalsPageContent() {
           ? String(existingMedicationGoal.targetDate).slice(0, 10)
           : "",
         weightDirection: "LOSE",
+        personalComparison: "CLOSEST",
         patientMedicationId: String(
           existingMedicationGoal.patientMedicationId ??
           existingMedicationGoal.patientMedication?.id ??
@@ -434,6 +435,7 @@ function HealthGoalsPageContent() {
         unit: "%",
         targetDate: "",
         weightDirection: "LOSE",
+        personalComparison: "CLOSEST",
         patientMedicationId: String(resolvedPatientMedicationId || ""),
       });
     }
@@ -500,20 +502,26 @@ function HealthGoalsPageContent() {
       const weight = Number(dashboard?.patient?.weightKg);
       if (!Number.isFinite(amount) || amount <= 0) { toast.error("Enter a positive target weight."); return; }
       const height = Number(dashboard?.patient?.heightCm);      const analysis = weightAdvice(Number.isFinite(weight) ? weight : null, Number.isFinite(height) ? height : null, amount, draft.weightDirection, draft.targetDate);      if (!analysis) { toast.error(draft.weightDirection === "MAINTAIN" ? "Add your current weight before setting a weight-maintenance goal." : "Add your current weight and height before setting a weight goal."); return; }
-    }    const liveGoals = healthGoals.filter((goal: any) => {
+    }
+    const normalizedTitle = goalDisplayTitle({ title: draft.title }, config.value);
+    const liveGoals = healthGoals.filter((goal: any) => {
       if (editingId && String(goal?.id) === String(editingId)) return false;
       return ["ACTIVE", "ON_HOLD"].includes(String(goal?.status ?? "").toUpperCase()) &&
         String(goal?.category ?? "").toUpperCase() === draft.category;
     });
     const duplicateGoal = draft.category === "MEDICATION"
       ? liveGoals.find((goal: any) => String(goal?.patientMedicationId ?? goal?.patientMedication?.id ?? "") === String(draft.patientMedicationId ?? ""))
-      : liveGoals[0];
+      : draft.category === "OTHER"
+        ? liveGoals.find((goal: any) => normaliseMedicationName(goal?.title) === normaliseMedicationName(normalizedTitle))
+        : liveGoals[0];
 
     if (duplicateGoal) {
       toast.error(
         draft.category === "MEDICATION"
           ? "This medication already has an active medication goal. Edit that goal instead of creating another."
-          : `You already have an active ${draft.category.toLowerCase().replaceAll("_", " ")} goal. Edit the existing goal instead of creating another.`,
+          : draft.category === "OTHER"
+            ? "A personal goal with this name already exists. Choose another title or edit the existing goal."
+            : `You already have an active ${draft.category.toLowerCase().replaceAll("_", " ")} goal. Edit the existing goal instead of creating another.`,
       );
       return;
     }
@@ -528,7 +536,6 @@ function HealthGoalsPageContent() {
         )
       );
       const comparison: HealthGoalInput["comparison"] = draft.category === "WEIGHT" ? draft.weightDirection === "GAIN" ? "INCREASE_TO" : draft.weightDirection === "MAINTAIN" ? "CLOSEST" : "DECREASE_TO" : draft.category === "OTHER" ? draft.personalComparison : config.comparison;
-      const normalizedTitle = goalDisplayTitle({ title: draft.title }, config.value);
       const input: HealthGoalInput = { patientId: dashboard.patient.id, patientMedicationId: draft.category === "MEDICATION" ? draft.patientMedicationId || undefined : undefined, title: normalizedTitle, description: draft.description.trim() || undefined, category: config.value, priority: draft.priority, status: shouldResume ? "ACTIVE" : undefined, targetValue: glucoseTrackingOnly ? null : draft.targetValue, unit: draft.unit || config.unit || undefined, targetDate: draft.targetDate || undefined, metricType: config.metricType, metricKey: config.metricKey, frequency: config.frequency, frequencyTarget: glucoseTrackingOnly ? null : draft.targetValue, aggregation: config.aggregation, comparison };
       if (editingId) {
         await healthGoalsService.update(editingId, input);
