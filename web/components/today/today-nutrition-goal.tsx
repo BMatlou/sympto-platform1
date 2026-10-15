@@ -540,7 +540,20 @@ export default function TodayNutritionGoal({ goal, onUpdated, detailsExpanded, o
           </div>
         </section>
 
-        {onToggleDetails && <div className="mt-2 px-1"><GoalCardDisclosureButton expanded={Boolean(detailsExpanded)} onToggle={onToggleDetails} label="Show meal log & details" /></div>}
+        {onToggleDetails && (
+          <div className="mt-2 flex flex-wrap items-center justify-between gap-2 px-1">
+            {!detailsExpanded && (
+              <button
+                type="button"
+                onClick={onToggleDetails}
+                className="inline-flex min-h-10 items-center justify-center gap-1.5 rounded-xl bg-[#0b2d54] px-4 py-2.5 text-[10px] font-black text-white transition hover:bg-[#123e66]"
+              >
+                <Plus className="h-3.5 w-3.5 text-[#24c1c4]" /> Log a meal
+              </button>
+            )}
+            <GoalCardDisclosureButton expanded={Boolean(detailsExpanded)} onToggle={onToggleDetails} label="Show meal log & details" />
+          </div>
+        )}
         {detailsExpanded && (
           <>
         <section className="mt-4 rounded-[24px] border border-[#dfeaec] bg-[#f8fbfb] p-4 sm:p-5">
