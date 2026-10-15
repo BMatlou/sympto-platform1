@@ -127,9 +127,9 @@ function TodayGoalCardSlot({ cardKey, expandedGoalCard, onToggle, children }: To
 export default function TodayPage() {
   const { data, loading, error, reload } = useDashboard();
   const [symptomFeed, setSymptomFeed] = useState<any[]>([]);
-  const [expandedGoalCard, setExpandedGoalSlide] = useState<string | null>(null);
+  const [expandedGoalCard, setExpandedGoalCard] = useState<string | null>(null);
   const toggleExpandedGoalCard = (cardKey: string) => {
-    setExpandedGoalSlide((current) => current === cardKey ? null : cardKey);
+    setExpandedGoalCard((current) => current === cardKey ? null : cardKey);
   };
 
   useEffect(() => {
