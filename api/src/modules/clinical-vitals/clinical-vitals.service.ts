@@ -17,6 +17,26 @@ export class ClinicalVitalsService {
     await this.goalsEngine.recordMetricEvent({ patientId, metricType: 'WEIGHT', metricKey: 'weight.kg', loggedValue, occurredAt: measuredAt, source: 'clinical-vital', sourceId: vitalId });
   }
 
+  private async syncRestingHeartRateGoal(patientId: string, vitalId: string, vitalName: string, value: unknown, measuredAt: Date) {
+    // A general pulse observed during exertion must not be scored against a
+    // resting-rate target. Accept only clinical vital types explicitly marked
+    // as resting heart rate/pulse.
+    const explicitlyResting =
+      /\\brest(?:ing)?\\b.{0,24}\\b(?:heart[\\s_-]*rate|pulse)\\b|\\b(?:heart[\\s_-]*rate|pulse)\\b.{0,24}\\brest(?:ing)?\\b/i.test(vitalName);
+    if (!explicitlyResting) return;
+    const loggedValue = Number(value);
+    if (!Number.isFinite(loggedValue)) return;
+    await this.goalsEngine.recordMetricEvent({
+      patientId,
+      metricType: 'HEART_RATE',
+      metricKey: 'heart_rate.bpm',
+      loggedValue,
+      occurredAt: measuredAt,
+      source: 'clinical-vital',
+      sourceId: vitalId,
+    });
+  }
+
   async create(dto: CreateClinicalVitalDto) {
     const encounter = await this.prisma.encounter.findUnique({ where: { id: dto.encounterId }, select: { id: true, medicalRecord: { select: { patientId: true } } } });
     if (!encounter) throw new NotFoundException('Encounter not found.');
@@ -26,6 +46,7 @@ export class ClinicalVitalsService {
     const measuredAt = new Date(dto.measuredAt);
     const vital = await this.prisma.clinicalVital.create({ data: { encounterId: dto.encounterId, vitalTypeId: dto.vitalTypeId, value: dto.value, measuredAt }, include: { encounter: true, vitalType: true } });
     await this.syncWeightGoal(encounter.medicalRecord.patientId, vital.id, vitalType.name, dto.value, measuredAt);
+    await this.syncRestingHeartRateGoal(encounter.medicalRecord.patientId, vital.id, vitalType.name, dto.value, measuredAt);
     return vital;
   }
 
