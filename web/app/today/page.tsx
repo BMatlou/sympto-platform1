@@ -1,8 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { ArrowLeft, ArrowRight, CalendarDays, ClipboardCheck, Sparkles } from "lucide-react";
-import { cloneElement, isValidElement, useEffect, useRef, useState, type ReactElement, type ReactNode } from "react";
+import { ArrowRight, CalendarDays, ClipboardCheck, Sparkles } from "lucide-react";
+import { cloneElement, isValidElement, useEffect, useState, type ReactElement, type ReactNode } from "react";
 import ProtectedRoute from "@/components/auth/protected-route";
 import { useDashboard } from "@/hooks/use-dashboard";
 import DailyHealthCheckIn from "@/components/dashboard/daily-health-check-in";
@@ -117,11 +117,7 @@ function GoalCarouselSlide({ slideKey, expandedGoalSlide, onToggle, children }: 
 
   return (
     <div
-      data-goal-slide
-      data-goal-slide-key={slideKey}
-      role="group"
-      aria-roledescription="slide"
-      className="relative flex min-h-[480px] min-w-0 w-full shrink-0 snap-start flex-col lg:w-[calc(50%-0.5rem)]"
+      className="relative flex min-h-[480px] min-w-0 w-full flex-col"
     >
       {card}
     </div>
@@ -131,8 +127,6 @@ function GoalCarouselSlide({ slideKey, expandedGoalSlide, onToggle, children }: 
 export default function TodayPage() {
   const { data, loading, error, reload } = useDashboard();
   const [symptomFeed, setSymptomFeed] = useState<any[]>([]);
-  const goalCarouselRef = useRef<HTMLDivElement | null>(null);
-  const [activeGoalSlide, setActiveGoalSlide] = useState(0);
   const [expandedGoalSlide, setExpandedGoalSlide] = useState<string | null>(null);
   const toggleExpandedGoalSlide = (slideKey: string) => {
     setExpandedGoalSlide((current) => current === slideKey ? null : slideKey);
@@ -505,22 +499,7 @@ export default function TodayPage() {
             <Link href="/health-goals" className="text-[10px] font-black text-[#0b2d54]">Manage goals <ArrowRight className="ml-1 inline h-3.5 w-3.5" /></Link>
           </div>
           <div className="mt-3.5">
-            <div ref={goalCarouselRef}
-              onScroll={(event) => {
-                const container = event.currentTarget;
-                const slides = Array.from(container.querySelectorAll<HTMLElement>("[data-goal-slide]"));
-                if (slides.length === 0) return;
-                const containerLeft = container.getBoundingClientRect().left;
-                let nearestIndex = 0, nearestDistance = Number.POSITIVE_INFINITY;
-                slides.forEach((slide, index) => {
-                  const distance = Math.abs(slide.getBoundingClientRect().left - containerLeft);
-                  if (distance < nearestDistance) { nearestDistance = distance; nearestIndex = index; }
-                });
-                setActiveGoalSlide((current) => current === nearestIndex ? current : nearestIndex);
-                if (nearestIndex !== activeGoalSlide) setExpandedGoalSlide(null);
-              }}
-              role="region" aria-label="Active health goals" aria-roledescription="carousel" tabIndex={0}
-              className="flex items-stretch snap-x snap-mandatory gap-4 overflow-x-auto overflow-y-hidden scroll-smooth pb-1 [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#24c1c4]">
+            <div role="region" aria-label="Active health goals" className="grid grid-cols-1 items-stretch gap-4 md:grid-cols-2">
               {medicationGoalCardsForToday.filter((item: any) => Boolean(item.medication)).map((item: any, index: number) => {
                 const slideKey = `medication-goal-slide-${String(item.goal?.id ?? patientMedicationId(item.medication) ?? index)}`;
                 return <GoalCarouselSlide key={slideKey} slideKey={slideKey} expandedGoalSlide={expandedGoalSlide} onToggle={toggleExpandedGoalSlide}>
@@ -590,42 +569,7 @@ export default function TodayPage() {
                 );
               })}
             </div>
-            {(() => {
-              const goalSlideCount = medicationGoalCardsForToday.filter((item: any) => Boolean(item.medication)).length + smokingGoals.length + alcoholGoals.length + weightGoals.length + exerciseGoals.length + otherTodayGoals.length;
-              if (goalSlideCount === 0) return null;
-              const currentSlide = Math.min(activeGoalSlide, goalSlideCount - 1);
-              const scrollToGoalSlide = (index: number) => {
-                const container = goalCarouselRef.current;
-                const slide = container?.querySelectorAll<HTMLElement>("[data-goal-slide]")[index];
-                if (!container || !slide) return;
-                const targetLeft = container.scrollLeft + slide.getBoundingClientRect().left - container.getBoundingClientRect().left;
-                container.scrollTo({ left: Math.max(0, targetLeft), behavior: "smooth" });
-                setActiveGoalSlide(index);
-                setExpandedGoalSlide(null);
-              };
-              return (
-                <div className="mt-3 flex flex-col items-center gap-1.5">
-                  <div className="flex w-full items-center justify-between gap-3">
-                    {goalSlideCount > 1 ? (
-                      <button type="button" onClick={() => scrollToGoalSlide(Math.max(0, currentSlide - 1))} disabled={currentSlide === 0} aria-label="Previous goal" className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-[#dce8eb] bg-white text-[#0b2d54] transition hover:border-[#24c1c4] hover:bg-[#f3fbfb] disabled:cursor-not-allowed disabled:opacity-35"><ArrowLeft className="h-3.5 w-3.5" /></button>
-                    ) : <span className="h-8 w-8 shrink-0" />}
-                    <div className="flex min-h-8 flex-wrap items-center justify-center gap-1.5" role="group" aria-label="Choose an active goal">
-                      {Array.from({ length: goalSlideCount }, (_, index) => (
-                        <button key={`goal-pagination-dot-${index}`} type="button" aria-label={`Go to goal ${index + 1} of ${goalSlideCount}`}
-                          aria-current={currentSlide === index ? "true" : undefined} onClick={() => scrollToGoalSlide(index)}
-                          className={currentSlide === index
-                            ? "h-1.5 w-5 rounded-full bg-[#24c1c4] transition-all duration-300 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#0b2d54]"
-                            : "h-1.5 w-1.5 rounded-full bg-[#cbd9e1] transition-all duration-300 hover:bg-[#7794a5] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#0b2d54]"} />
-                      ))}
-                    </div>
-                    {goalSlideCount > 1 ? (
-                      <button type="button" onClick={() => scrollToGoalSlide(Math.min(goalSlideCount - 1, currentSlide + 1))} disabled={currentSlide === goalSlideCount - 1} aria-label="Next goal" className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-[#dce8eb] bg-white text-[#0b2d54] transition hover:border-[#24c1c4] hover:bg-[#f3fbfb] disabled:cursor-not-allowed disabled:opacity-35"><ArrowRight className="h-3.5 w-3.5" /></button>
-                    ) : <span className="h-8 w-8 shrink-0" />}
-                  </div>
-                  <p className="text-[9px] font-bold tracking-[0.12em] text-[#71839a]" aria-live="polite">Goal {currentSlide + 1} of {goalSlideCount}</p>
-                </div>
-              );
-            })()}
+
           </div>
           {activeGoalsArray.length === 0 && (
             <div className="mt-3.5 rounded-[24px] border border-dashed border-[#dce8eb] bg-[#f8fbfb] p-6 text-center">
