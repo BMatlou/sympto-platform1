@@ -243,8 +243,16 @@ export class NotificationProcessorService
       String(notification.channel).toUpperCase() === 'PUSH'
         ? 'WEB_PUSH'
         : 'IN_APP';
+    // A missing subscription is not a transient network failure. Retrying it
+    // five times cannot help; the browser must register a subscription first.
+    // Push and in-app notifications are separate records, so terminally
+    // retiring this push item does not affect its in-app counterpart.
+    const missingPushSubscription =
+      provider === 'WEB_PUSH' &&
+      message.startsWith('PUSH_NOT_CONFIGURED:');
+    const permanentFailure = missingPushSubscription || nextAttemptCount >= 5;
 
-    if (nextAttemptCount >= 5) {
+    if (permanentFailure) {
       await this.prisma.$transaction([
         this.prisma.notificationDelivery.create({
           data: {
@@ -266,9 +274,15 @@ export class NotificationProcessorService
         }),
       ]);
 
-      this.logger.error(
-        `Notification ${notification.id} failed permanently after ${nextAttemptCount} attempts: ${message}`,
-      );
+      if (missingPushSubscription) {
+        this.logger.warn(
+          `Push notification ${notification.id} was not retried because no active subscription is registered. The separate in-app notification, if present, remains unaffected. ${message}`,
+        );
+      } else {
+        this.logger.error(
+          `Notification ${notification.id} failed permanently after ${nextAttemptCount} attempts: ${message}`,
+        );
+      }
       return;
     }
 
