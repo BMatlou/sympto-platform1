@@ -81,8 +81,15 @@ function medicationName(medication: any) {
   return normalise(medication?.medication?.name || medication?.name || medication?.medication?.genericName || medication?.medication?.brandName);
 }
 
+function goalCategory(goal: any) {
+  return String(goal?.category ?? goal?.metricType ?? goal?.metricConfig?.metricType ?? "")
+    .trim()
+    .toUpperCase()
+    .replace(/[\s-]+/g, "_");
+}
+
 function isMedicationGoal(goal: any) {
-  const category = String(goal?.category ?? "").toUpperCase();
+  const category = goalCategory(goal);
   const metricType = String(goal?.metricType ?? "").toUpperCase();
   const metricKey = String(goal?.metricConfig?.metricKey ?? goal?.metricKey ?? "").toLowerCase();
   return category === "MEDICATION" || metricType === "MEDICATION" || metricKey === "medication.adherence";
@@ -218,10 +225,10 @@ export default function TodayPage() {
   });
 
   const medicationGoalsForToday = activeGoalsArray.filter((goal: any) => isMedicationGoal(goal));
-  const smokingGoals = activeGoalsArray.filter((goal: any) => String(goal?.category ?? "").toUpperCase() === "SMOKING");
-  const alcoholGoals = activeGoalsArray.filter((goal: any) => String(goal?.category ?? "").toUpperCase() === "ALCOHOL");
-  const weightGoals = activeGoalsArray.filter((goal: any) => String(goal?.category ?? "").toUpperCase() === "WEIGHT");
-  const exerciseGoals = activeGoalsArray.filter((goal: any) => String(goal?.category ?? "").toUpperCase() === "EXERCISE");
+  const smokingGoals = activeGoalsArray.filter((goal: any) => goalCategory(goal) === "SMOKING");
+  const alcoholGoals = activeGoalsArray.filter((goal: any) => goalCategory(goal) === "ALCOHOL");
+  const weightGoals = activeGoalsArray.filter((goal: any) => goalCategory(goal) === "WEIGHT");
+  const exerciseGoals = activeGoalsArray.filter((goal: any) => goalCategory(goal) === "EXERCISE");
 
   const medicationGoalCardsForToday = medicationGoalsForToday.map((goal: any) => {
     const linkedPatientMedicationId =
@@ -287,7 +294,7 @@ export default function TodayPage() {
 
   const dedicatedTodayCategories = new Set(["MEDICATION", "SMOKING", "ALCOHOL", "WEIGHT", "EXERCISE"]);
   const otherTodayGoals = activeGoalsArray.filter((goal: any) => {
-    const category = String(goal?.category ?? "").toUpperCase();
+    const category = goalCategory(goal);
     if (!dedicatedTodayCategories.has(category)) return true;
     if (category !== "MEDICATION") return false;
     return !medicationGoalCardsForToday.some((item: any) =>
@@ -534,7 +541,7 @@ export default function TodayPage() {
                 return <GoalCarouselSlide key={slideKey} slideKey={slideKey} expandedGoalSlide={expandedGoalSlide} onToggle={toggleExpandedGoalSlide}><TodayExerciseGoal goal={goal} /></GoalCarouselSlide>;
               })}
               {otherTodayGoals.map((goal: any, index: number) => {
-                const category = String(goal?.category ?? "").toUpperCase();
+                const category = goalCategory(goal);
                 const slideKey = `health-goal-slide-${String(goal?.id ?? index)}`;
                 if (category === "NUTRITION") return <GoalCarouselSlide key={slideKey} slideKey={slideKey} expandedGoalSlide={expandedGoalSlide} onToggle={toggleExpandedGoalSlide}><TodayNutritionGoal goal={goal} onUpdated={reload} /></GoalCarouselSlide>;
                 if (category === "SLEEP") return <GoalCarouselSlide key={slideKey} slideKey={slideKey} expandedGoalSlide={expandedGoalSlide} onToggle={toggleExpandedGoalSlide}><TodaySleepGoal goal={goal} onUpdated={reload} /></GoalCarouselSlide>;
