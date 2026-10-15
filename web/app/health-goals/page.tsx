@@ -145,6 +145,7 @@ function goalCurrent(goal: any) {
     ? goal?.currentValue ?? goal?.latestValue
     : goal?.latestValue ?? goal?.latestProgress?.currentValue ?? goal?.progress?.[0]?.currentValue ?? goal?.currentValue;
   if (isBloodGlucose && (value === null || value === undefined || value === "")) return null;
+  if (value === null || value === undefined || value === "") return null;
   const number = Number(value);
   if (!Number.isFinite(number)) return null;
   const unit = String(goal?.unit ?? "").trim();
@@ -171,16 +172,19 @@ function goalPresentation(goal: any) {
             ? "Maintain baseline"
             : numericTarget.toFixed(1) + " kg"
       : goal?.targetValue != null
-        ? String(goal.targetValue) + (config.unit ? " " + config.unit : "")
+        ? String(goal.targetValue) + ((category === "OTHER" ? String(goal?.unit ?? "").trim() : config.unit) ? " " + (category === "OTHER" ? String(goal?.unit ?? "").trim() : config.unit) : "")
         : "Target not set";
   // Glucose readings are retained, but must not receive a progress score
   // until a context-specific clinical range is available.
+  const hasMeasurement = goal?.latestValue != null || goal?.latestProgress?.currentValue != null || goal?.progress?.[0]?.currentValue != null || goal?.currentValue != null;
   const progress = isBloodGlucose ? 0 : goalProgress(goal);
   const isDirectionalWeight = category === "WEIGHT" && (comparison === "INCREASE_TO" || comparison === "DECREASE_TO");
   const progressWidth = isBloodGlucose ? 0 : isDirectionalWeight ? Math.abs(progress) : progress;
   const progressLabel = isBloodGlucose
     ? "Not scored"
-    : isDirectionalWeight && String(goal?.status ?? "").toUpperCase() !== "ACHIEVED"
+    : category === "OTHER" && !hasMeasurement
+      ? "Not started"
+      : isDirectionalWeight && String(goal?.status ?? "").toUpperCase() !== "ACHIEVED"
       ? (progress > 0 ? "+" : "") + progress + "%" + (progress < 0 ? " away" : "")
       : progress + "%";
   return {
@@ -628,7 +632,7 @@ function HealthGoalsPageContent() {
                   })()}</div>}
                </div>
               <TextField label="Why this goal matters" value={draft.description} placeholder="Optional context or motivation" onChange={(value) => setDraft((current) => ({ ...current, description: value }))} />
-              <div className="rounded-2xl border border-[#dce9ee] bg-[#f7fbfc] p-4"><div className="flex items-start gap-3"><Target className="mt-0.5 h-4 w-4 shrink-0 text-[#0b6f73]" /><div><p className="text-xs font-black text-[#0b2d54]">Sympto will connect this goal to your health data</p><p className="mt-1 text-[11px] leading-5 text-[#74859a]">{draft.category === "WEIGHT" ? `${draft.weightDirection === "LOSE" ? "Loss" : draft.weightDirection === "GAIN" ? "Gain" : "Maintenance"} goal · directional target is the requested amount of weight change; destination is calculated from your baseline` : `${selectedCategory?.frequency === "DAILY" ? "Daily" : selectedCategory?.frequency === "WEEKLY" ? "Weekly" : "Overall"} tracking · ${selectedCategory?.comparison === "AT_LEAST" ? "at least" : selectedCategory?.comparison === "AT_MOST" ? "at most" : String(selectedCategory?.comparison ?? "") === "DECREASE_TO" ? "decrease toward" : "target comparison"} your target.`}</p></div></div></div>
+              <div className="rounded-2xl border border-[#dce9ee] bg-[#f7fbfc] p-4"><div className="flex items-start gap-3"><Target className="mt-0.5 h-4 w-4 shrink-0 text-[#0b6f73]" /><div><p className="text-xs font-black text-[#0b2d54]">Sympto will connect this goal to your health data</p><p className="mt-1 text-[11px] leading-5 text-[#74859a]">{draft.category === "WEIGHT" ? `${draft.weightDirection === "LOSE" ? "Loss" : draft.weightDirection === "GAIN" ? "Gain" : "Maintenance"} goal · directional target is the requested amount of weight change; destination is calculated from your baseline` : draft.category === "OTHER" ? `Personal tracking · ${draft.personalComparison === "AT_LEAST" ? "at least" : draft.personalComparison === "AT_MOST" ? "at or below" : "close to"} your target · each dated measurement is saved to this goal's own history.` : `${selectedCategory?.frequency === "DAILY" ? "Daily" : selectedCategory?.frequency === "WEEKLY" ? "Weekly" : "Overall"} tracking · ${selectedCategory?.comparison === "AT_LEAST" ? "at least" : selectedCategory?.comparison === "AT_MOST" ? "at most" : String(selectedCategory?.comparison ?? "") === "DECREASE_TO" ? "decrease toward" : "target comparison"} your target.`}</p></div></div></div>
             </>}
           </div>
           <div className="sticky bottom-0 flex items-center justify-between gap-3 border-t border-[#edf2f5] bg-white/95 px-5 py-4 backdrop-blur sm:px-7"><button type="button" onClick={closeEditor} className="rounded-xl px-4 py-2.5 text-xs font-black text-[#74859a]">Cancel</button><button type="button" onClick={() => void saveGoal()} disabled={saving || !draft.category || !draft.title.trim() || !editorTargetValid} className="inline-flex min-h-10 items-center gap-2 rounded-xl bg-[#0b2d54] px-5 py-2.5 text-xs font-black text-white disabled:cursor-not-allowed disabled:opacity-40">{saving ? "Saving…" : editingId ? (searchParams.get("resume") === "1" || String(editingGoal?.status ?? "").toUpperCase() === "ON_HOLD" ? "Resume goal" : "Save changes") : "Add goal"}<ArrowRight className="h-3.5 w-3.5" /></button></div>
