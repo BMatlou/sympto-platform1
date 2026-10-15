@@ -727,7 +727,23 @@ export default function TodaySupportedGoalCard({ goal, activeGoals = [], healthC
       </header>
 
       <div className="px-4 pb-4 pt-4 sm:px-5">
-        {category === "BLOOD_PRESSURE" ? (
+        {personalGoalNeedsSetup ? (
+          <section className="mt-3 rounded-[20px] border border-[#dce9ec] bg-[#f7fbfc] p-4">
+            <p className="text-[9px] font-black uppercase tracking-[.14em] text-[#0b7b80]">Measurement setup required</p>
+            <p className="mt-2 text-[11px] leading-5 text-[#506b7a]">
+              {!personalGoalTitle || personalGoalTitle.toLowerCase() === "personal goal"
+                ? "Give this goal a specific name so you know what the number represents. "
+                : ""}
+              {!displayUnit ? "Add a unit, such as pages, sessions, minutes or points. " : ""}
+              {target == null
+                ? "Enter a target after defining the measure and its unit."
+                : "The saved target is " + target + (displayUnit ? " " + displayUnit : " (unit not set)") + "; it cannot be interpreted until the missing setup details are added."}
+            </p>
+            <Link href={"/health-goals?edit=" + encodeURIComponent(goalId)} className="mt-3 inline-flex min-h-10 w-full items-center justify-center gap-2 rounded-xl bg-[#0b2d54] px-4 py-2.5 text-[10px] font-black text-white">
+              <PencilLine className="h-3.5 w-3.5 text-[#24c1c4]" />Finish goal setup
+            </Link>
+          </section>
+        ) : category === "BLOOD_PRESSURE" ? (
           <>
             <section className="relative overflow-hidden rounded-[28px] bg-[#0b2d54] px-5 py-6 text-white shadow-[0_16px_34px_rgba(11,45,84,.16)] sm:px-6 sm:py-7">
               <div className="pointer-events-none absolute -right-16 -top-16 h-44 w-44 rounded-full bg-[#24c1c4]/10 blur-3xl" aria-hidden="true" />
