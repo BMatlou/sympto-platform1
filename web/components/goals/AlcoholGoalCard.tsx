@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { ArrowRight, Wine } from "lucide-react";
+import GoalCardDisclosureButton from "@/components/today/goal-card-disclosure-button";
 import { useEffect, useMemo, useState } from "react";
 import { healthGoalsService } from "@/services/health-goals.service";
 
@@ -16,7 +17,7 @@ export interface AlcoholGoalData {
   frequencyTarget?: number | string | null;
 }
 
-type AlcoholGoalCardProps = { goal: AlcoholGoalData; onUpdated?: () => void | Promise<void> };
+type AlcoholGoalCardProps = { goal: AlcoholGoalData; onUpdated?: () => void | Promise<void>; detailsExpanded?: boolean; onToggleDetails?: () => void };
 
 function formatNumber(value: unknown) {
   const number = Number(value);
@@ -73,7 +74,7 @@ function daysUntilTarget(targetDate: string | null | undefined) {
   return Math.max(0, Math.ceil((target.getTime() - today.getTime()) / 86400000));
 }
 
-export const AlcoholGoalCard: React.FC<AlcoholGoalCardProps> = ({ goal, onUpdated }) => {
+export const AlcoholGoalCard: React.FC<AlcoholGoalCardProps> = ({ goal, onUpdated, detailsExpanded, onToggleDetails }) => {
   const targetRaw = goal?.metricConfig?.frequencyTarget ?? goal?.frequencyTarget ?? goal?.targetValue;
   const weeklyTarget = Number(targetRaw);
   const hasTarget = targetRaw !== null && targetRaw !== undefined && targetRaw !== "" && Number.isFinite(weeklyTarget) && weeklyTarget >= 0;
@@ -147,7 +148,7 @@ export const AlcoholGoalCard: React.FC<AlcoholGoalCardProps> = ({ goal, onUpdate
   }
 
   return (
-    <article className="flex h-full min-w-0 flex-col overflow-hidden rounded-[30px] border border-[#dfeaec] bg-white shadow-[0_18px_48px_rgba(11,45,84,.06)]">
+    <article className={detailsExpanded ? "flex h-auto min-w-0 flex-col overflow-visible rounded-[30px] border border-[#dfeaec] bg-white shadow-[0_18px_48px_rgba(11,45,84,.06)]" : "flex h-full min-w-0 flex-col overflow-hidden rounded-[30px] border border-[#dfeaec] bg-white shadow-[0_18px_48px_rgba(11,45,84,.06)]"}>
       <div className="flex items-center justify-between gap-4 px-5 pb-4 pt-5 sm:px-6 sm:pt-6">
         <div className="flex min-w-0 items-center gap-3">
           <span className="grid h-10 w-10 shrink-0 place-items-center rounded-[14px] bg-[#e8f8f7] text-[#0b7b80] ring-1 ring-[#d8efed]"><Wine className="h-4 w-4" /></span>
@@ -202,9 +203,20 @@ export const AlcoholGoalCard: React.FC<AlcoholGoalCardProps> = ({ goal, onUpdate
       </div>
 
       <div className="border-t border-[#edf2f4] bg-[#fbfdfd] px-5 py-4 sm:px-6">
-        <div className="flex items-center justify-between gap-3"><div><p className="text-[9px] font-black uppercase tracking-[.14em] text-[#91a0ae]">Target date</p><p className="mt-1 text-sm font-black text-[#0b2d54]">{targetDateLabel}</p></div><Link href={`/health-goals#goal-${encodeURIComponent(String(goal?.id ?? ""))}`} className="inline-flex min-h-10 items-center justify-center gap-1.5 rounded-xl border border-[#d6e5e8] bg-white px-3.5 py-2 text-[10px] font-black text-[#0b2d54]">View goal <ArrowRight className="h-3 w-3" /></Link></div>
+        <div className="flex items-center justify-between gap-3"><div><p className="text-[9px] font-black uppercase tracking-[.14em] text-[#91a0ae]">Target date</p><p className="mt-1 text-sm font-black text-[#0b2d54]">{targetDateLabel}</p></div><div className="flex shrink-0 items-center gap-2">{onToggleDetails && <GoalCardDisclosureButton expanded={Boolean(detailsExpanded)} onToggle={onToggleDetails} label="Show details" />}<Link href={`/health-goals#goal-${encodeURIComponent(String(goal?.id ?? ""))}`} className="inline-flex min-h-10 items-center justify-center gap-1.5 rounded-xl border border-[#d6e5e8] bg-white px-3.5 py-2 text-[10px] font-black text-[#0b2d54]">View goal <ArrowRight className="h-3 w-3" /></Link></div></div>
         <p className="mt-1.5 text-[9px] font-medium text-[#7b8da1]">{targetDaysLeft === 0 ? "Target date is today" : `${targetDaysLeft} days left to target`}</p>
       </div>
+      {detailsExpanded && (
+        <section className="mx-4 mb-4 rounded-[18px] border border-[#e1ecee] bg-[#f8fbfb] p-3.5 text-[#526b7c] sm:mx-5">
+          <p className="text-[8px] font-black uppercase tracking-[.14em] text-[#0b7b80]">How this goal is tracked</p>
+          <p className="mt-1.5 text-[10px] leading-5">
+            Sympto compares the drinks you log for the current week with your saved weekly target. The target is a personal tracking goal, not a clinical assessment of alcohol-related risk.
+          </p>
+          <p className="mt-2 text-[9px] leading-4 text-[#82939f]">
+            Keep logging actual intake even after reaching the target so your health record remains accurate. Discuss questions about alcohol use and your health with a qualified healthcare professional.
+          </p>
+        </section>
+      )}
     </article>
   );
 };
