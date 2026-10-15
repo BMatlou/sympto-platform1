@@ -10,6 +10,15 @@ import { healthJournalService } from "@/services/health-journal.service";
 type SupportedGoalCardProps = {
   goal: any;
   activeGoals?: any[];
+  healthContext?: {
+    patient?: any;
+    profile?: any;
+    conditions?: any[];
+    medications?: any[];
+    symptoms?: any[];
+    measurements?: any[];
+    journal?: any;
+  };
   onUpdated?: () => Promise<void> | void;
 };
 
@@ -114,13 +123,20 @@ function sourceAction(category: string) {
 }
 
 
+function dateKeyOrdinal(dateKey: string) {
+  const [year, month, day] = dateKey.split("-").map(Number);
+  return Date.UTC(year, month - 1, day) / 86400000;
+}
+
 function journeyFor(goal: any) {
-  const startDate = new Date(String(goal?.createdAt ?? ""));
-  const targetDate = new Date(String(goal?.targetDate ?? ""));
-  const now = Date.now();
+  const startDate = goal?.createdAt ? new Date(String(goal.createdAt)) : null;
+  const targetDate = goal?.targetDate ? new Date(String(goal.targetDate)) : null;
+  const todayKey = southAfricaDayKey(new Date());
+  const startKey = startDate && !Number.isNaN(startDate.getTime()) ? southAfricaDayKey(startDate) : todayKey;
+  const targetKey = targetDate && !Number.isNaN(targetDate.getTime()) ? southAfricaDayKey(targetDate) : null;
   return {
-    journeyDay: Number.isNaN(startDate.getTime()) ? 1 : Math.max(1, Math.floor((now - startDate.getTime()) / 86400000) + 1),
-    daysLeft: Number.isNaN(targetDate.getTime()) ? null : Math.max(0, Math.ceil((targetDate.getTime() - now) / 86400000)),
+    journeyDay: Math.max(1, dateKeyOrdinal(todayKey) - dateKeyOrdinal(startKey) + 1),
+    daysLeft: targetKey == null ? null : Math.max(0, dateKeyOrdinal(targetKey) - dateKeyOrdinal(todayKey)),
     targetDate,
   };
 }
@@ -172,6 +188,165 @@ function goalNextStep(category: string, current: number | null, target: number |
   return "Keep tracking this goal.";
 }
 
+
+function formatInsightDateTime(value: unknown) {
+  const date = value ? new Date(String(value)) : null;
+  if (!date || Number.isNaN(date.getTime())) return null;
+  return new Intl.DateTimeFormat("en-ZA", {
+    timeZone: "Africa/Johannesburg",
+    dateStyle: "medium",
+    timeStyle: "short",
+  }).format(date);
+}
+
+function buildHeartRateInsight(
+  stats: {
+    todayCurrent: number | null;
+    todayAt: string | null;
+    latestCurrent: number | null;
+    latestAt: string | null;
+    recordedDays: number;
+    targetDays: number;
+    days: HeartRateDayPoint[];
+  },
+  target: number | null,
+  hasTodayReading: boolean,
+  connectedGoalRelations: any[],
+  activeGoals: any[],
+  healthContext?: SupportedGoalCardProps["healthContext"],
+): { summary: string; context: string[] } {
+  const fmt = (value: number) => Number.isInteger(value) ? String(value) : value.toFixed(1);
+  const latest = stats.todayCurrent ?? stats.latestCurrent;
+  const weeklyReadings = stats.days
+    .filter((point) => point.value != null && !point.isFuture)
+    .sort((a, b) => a.dateKey.localeCompare(b.dateKey));
+  let summary: string;
+
+  if (latest == null) {
+    summary = "There is no eligible resting reading yet, so Sympto cannot assess this goal. Record a pulse after sitting quietly for a few minutes to establish a baseline.";
+  } else if (target == null) {
+    summary = `Your latest saved resting pulse is ${fmt(latest)} bpm. This goal has no usable target value, so target attainment cannot be assessed yet.`;
+  } else if (latest < target) {
+    summary = `Your latest saved resting pulse is ${fmt(latest)} bpm—${fmt(target - latest)} bpm below your saved ceiling of ${fmt(target)} bpm.`;
+  } else if (latest === target) {
+    summary = `Your latest saved resting pulse is ${fmt(latest)} bpm, exactly at your saved ceiling of ${fmt(target)} bpm.`;
+  } else {
+    summary = `Your latest saved resting pulse is ${fmt(latest)} bpm—${fmt(latest - target)} bpm above your saved ceiling of ${fmt(target)} bpm.`;
+  }
+
+  if (weeklyReadings.length >= 2) {
+    const previous = weeklyReadings[weeklyReadings.length - 2];
+    const recent = weeklyReadings[weeklyReadings.length - 1];
+    const delta = Number(recent.value) - Number(previous.value);
+    const direction = delta > 0 ? `rose by ${fmt(delta)} bpm` : delta < 0 ? `fell by ${fmt(Math.abs(delta))} bpm` : "was unchanged";
+    const within = target == null ? "" : previous.value! <= target && recent.value! <= target
+      ? " Both readings are within your saved ceiling."
+      : previous.value! > target && recent.value! > target
+        ? " Both readings are above your saved ceiling."
+        : " The two readings fall on different sides of your saved ceiling.";
+    summary += ` Across the last two recorded days this week (${previous.label} ${fmt(previous.value!)} → ${recent.label} ${fmt(recent.value!)} bpm), your pulse ${direction}.${within} Two recorded days are not enough to establish a sustained pattern.`;
+  } else if (weeklyReadings.length === 1) {
+    summary += " Only one day has a recorded reading this calendar week, so there is not yet enough weekly data to judge a pattern.";
+  } else {
+    summary += " There are no recorded readings in the current Monday–Sunday week, so this is a historical value rather than a current-week trend.";
+  }
+
+  if (!hasTodayReading && latest != null) {
+    summary += " No resting reading is saved for today yet; recording one after a few quiet minutes will update today's goal status.";
+  }
+
+  const context: string[] = [];
+  const measurements = Array.isArray(healthContext?.measurements) ? healthContext!.measurements! : [];
+  const patient = healthContext?.patient ?? healthContext?.profile ?? {};
+  const relations = Array.isArray(connectedGoalRelations) ? connectedGoalRelations : [];
+
+  const bloodPressureRelation = relations.find((relation) => String(relation?.goal?.category ?? "").toUpperCase() === "BLOOD_PRESSURE");
+  if (bloodPressureRelation) {
+    const bpVital = measurements.find((measurement: any) =>
+      /BLOOD[_ ]?PRESSURE|SYSTOLIC/i.test(String(measurement?.type ?? measurement?.name ?? "")),
+    );
+    const match = bpVital ? String(bpVital.value ?? "").match(/^\s*(\d+(?:\.\d+)?)/) : null;
+    const systolic = match ? Number(match[1]) : null;
+    const relatedTarget = numberOrNull(bloodPressureRelation?.goal?.targetValue);
+    if (systolic != null && Number.isFinite(systolic)) {
+      const targetNote = relatedTarget == null
+        ? ""
+        : systolic <= relatedTarget
+          ? `, at or below its saved systolic target of ${fmt(relatedTarget)} mmHg`
+          : `, ${fmt(systolic - relatedTarget)} mmHg above its saved systolic target of ${fmt(relatedTarget)} mmHg`;
+      const when = formatInsightDateTime(bpVital?.measuredAt);
+      context.push(`Connected Blood pressure goal: the latest available systolic reading is ${fmt(systolic)} mmHg${targetNote}${when ? ` (recorded ${when})` : ""}. This is separate context; it does not explain the pulse reading.`);
+    } else {
+      context.push("Your Blood pressure goal is connected, but no readable blood-pressure measurement is available in Today's current snapshot to compare alongside this pulse.");
+    }
+  }
+
+  const exerciseRelation = relations.find((relation) => String(relation?.goal?.category ?? "").toUpperCase() === "EXERCISE");
+  if (exerciseRelation) {
+    const relationGoal = exerciseRelation.goal;
+    const linkedGoal = activeGoals.find((item: any) => String(item?.id ?? "") === String(relationGoal?.id ?? "")) ??
+      activeGoals.find((item: any) => String(item?.category ?? "").toUpperCase() === "EXERCISE");
+    const latestExercise = linkedGoal ? currentValue(linkedGoal) : null;
+    const exerciseTarget = linkedGoal ? targetValue(linkedGoal) : numberOrNull(relationGoal?.targetValue);
+    const exerciseUnit = String(linkedGoal?.unit ?? relationGoal?.unit ?? "minutes").trim();
+    const exerciseAt = linkedGoal?.latestProgress?.measuredAt ?? linkedGoal?.progress?.[0]?.measuredAt ?? null;
+    const exerciseWhen = formatInsightDateTime(exerciseAt);
+    if (latestExercise != null) {
+      context.push(`Connected Exercise goal: the latest stored progress is ${fmt(latestExercise)}${exerciseUnit ? ` ${exerciseUnit}` : ""}${exerciseTarget == null ? "" : ` against a target of ${fmt(exerciseTarget)}${exerciseUnit ? ` ${exerciseUnit}` : ""}`}${exerciseWhen ? ` (updated ${exerciseWhen})` : ""}. Activity provides context only; activity-related heart rates are not counted as resting readings.`);
+    } else {
+      context.push("Your Exercise goal is connected as context, but no comparable exercise value is available yet. Sympto keeps activity-related heart rates separate from resting readings.");
+    }
+  }
+
+  const symptomRecords = Array.isArray(healthContext?.symptoms) ? healthContext!.symptoms! : [];
+  const relevantSymptom = symptomRecords.find((symptom: any) =>
+    /palpitation|chest pain|chest tightness|shortness of breath|breathless|faint|dizz|light.?headed/i.test(
+      [symptom?.title, symptom?.name, ...(Array.isArray(symptom?.symptoms) ? symptom.symptoms.map((item: any) => item?.name ?? item) : [])].filter(Boolean).join(" "),
+    ),
+  );
+  if (relevantSymptom) {
+    const name = String(relevantSymptom?.title ?? relevantSymptom?.name ?? "a related symptom");
+    context.unshift(`Relevant symptom record: ${name}${relevantSymptom?.overallSeverity ? ` (severity recorded as ${String(relevantSymptom.overallSeverity).toLowerCase().replaceAll("_", " ")} )` : ""}. Review the symptom history alongside your pulse. If chest pain, severe breathlessness, or fainting is happening now, seek urgent medical care.`);
+  }
+
+  const weekDelta = weeklyReadings.length >= 2
+    ? Number(weeklyReadings[weeklyReadings.length - 1].value) - Number(weeklyReadings[weeklyReadings.length - 2].value)
+    : 0;
+  const needsClinicalContext = (latest != null && target != null && latest > target) || Math.abs(weekDelta) >= 5;
+  if (needsClinicalContext) {
+    const conditionNames = (Array.isArray(healthContext?.conditions) ? healthContext!.conditions! : [])
+      .filter((item: any) => !item?.status || String(item.status).toUpperCase() === "ACTIVE")
+      .map((item: any) => String(item?.condition?.name ?? item?.name ?? item?.title ?? "").trim())
+      .filter(Boolean)
+      .filter((name: string, index: number, all: string[]) => all.indexOf(name) === index)
+      .slice(0, 3);
+    const medicationNames = (Array.isArray(healthContext?.medications) ? healthContext!.medications! : [])
+      .filter((item: any) => !item?.status || ["ACTIVE", "PAUSED", "ONGOING"].includes(String(item.status).toUpperCase()))
+      .map((item: any) => String(item?.medication?.name ?? item?.name ?? item?.genericName ?? "").trim())
+      .filter(Boolean)
+      .filter((name: string, index: number, all: string[]) => all.indexOf(name) === index)
+      .slice(0, 3);
+    const profileFactors = [
+      patient?.smokingStatus ? `smoking recorded as ${String(patient.smokingStatus).toLowerCase().replaceAll("_", " ")}` : "",
+      patient?.alcoholConsumption ? `alcohol use recorded as ${String(patient.alcoholConsumption).toLowerCase().replaceAll("_", " ")}` : "",
+    ].filter(Boolean);
+    const items = [
+      conditionNames.length ? `active conditions on file: ${conditionNames.join(", ")}` : "",
+      medicationNames.length ? `current medicines on file: ${medicationNames.join(", ")}` : "",
+      profileFactors.length ? profileFactors.join("; ") : "",
+    ].filter(Boolean);
+    if (items.length) {
+      context.push(`Additional context from your record: ${items.join("; ")}. This information does not identify the cause of a pulse change. If above-target readings or the change persist, review the trend and your medicines with a healthcare professional; do not change prescribed treatment based on this card.`);
+    }
+  }
+
+  if (!context.length) {
+    context.push("No additional linked measurement or relevant symptom is available to compare yet. This insight is based on the dated resting readings and your saved personal ceiling.");
+  }
+
+  return { summary, context: context.slice(0, 4) };
+}
+
 const DEFAULT_METRICS: Record<string, { metricType: string; metricKey: string }> = {
   NUTRITION: { metricType: "NUTRITION", metricKey: "nutrition.calories" },
   BLOOD_PRESSURE: { metricType: "BLOOD_PRESSURE", metricKey: "blood_pressure.systolic" },
@@ -184,7 +359,7 @@ const DEFAULT_METRICS: Record<string, { metricType: string; metricKey: string }>
   OTHER: { metricType: "OTHER", metricKey: "other.value" },
 };
 
-export default function TodaySupportedGoalCard({ goal, activeGoals = [], onUpdated }: SupportedGoalCardProps) {
+export default function TodaySupportedGoalCard({ goal, activeGoals = [], healthContext, onUpdated }: SupportedGoalCardProps) {
   const [value, setValue] = useState("");
   const [saving, setSaving] = useState(false);
   const category = normaliseCategory(goal);
@@ -442,6 +617,9 @@ export default function TodaySupportedGoalCard({ goal, activeGoals = [], onUpdat
   const nextStep = category === "HEART_RATE" && !heartRateHasTodayReading && heartRateStats.latestAt
     ? "Your latest saved resting reading is from " + new Intl.DateTimeFormat("en-ZA", { timeZone: "Africa/Johannesburg", dateStyle: "medium" }).format(new Date(heartRateStats.latestAt)) + ". Record a new resting reading today to update the daily goal."
     : goalNextStep(category, displayCurrent, target);
+  const heartRateInsight = category === "HEART_RATE"
+    ? buildHeartRateInsight(heartRateStats, target, heartRateHasTodayReading, connectedGoalRelations, activeGoals, healthContext)
+    : null;
 
   async function recordValue() {
     const numeric = Number(value);
@@ -614,6 +792,7 @@ export default function TodaySupportedGoalCard({ goal, activeGoals = [], onUpdat
             </section>
           </>
         ) : category === "HEART_RATE" ? (
+          <>
           <section className="relative overflow-hidden rounded-[25px] bg-[#0b2d54] px-4 py-5 text-white shadow-[0_16px_34px_rgba(11,45,84,.15)] sm:px-5">
             <div className="pointer-events-none absolute -right-12 -top-14 h-40 w-40 rounded-full bg-[#24c1c4]/10 blur-3xl" aria-hidden="true" />
             <div className="relative">
@@ -701,9 +880,22 @@ export default function TodaySupportedGoalCard({ goal, activeGoals = [], onUpdat
                   ))}
                 </div>
               </div>
-              <p className="mt-3 text-[10px] leading-5 text-white/55">Heart rate changes with activity, stress, illness and medicines. Only readings clearly identified as resting are compared with this goal. The 80 bpm target is your saved goal, not a diagnosis or a universal threshold.</p>
+              <p className="mt-3 text-[10px] leading-5 text-white/55">Heart rate changes with activity, stress, illness and medicines. Only readings clearly identified as resting are compared with this goal. The target shown above is your saved goal, not a diagnosis or a universal threshold.</p>
             </div>
           </section>
+          <section className="mt-3 rounded-[20px] border border-[#dce9ec] bg-[#f7fbfc] p-4 sm:p-5" aria-live="polite">
+            <p className="text-[9px] font-black uppercase tracking-[.16em] text-[#0b7b80]">Sympto insight</p>
+            <p className="mt-2 text-[12px] font-bold leading-6 text-[#0b2d54]">{heartRateInsight?.summary}</p>
+            <div className="mt-3 border-t border-[#e0ebef] pt-3">
+              <p className="text-[8px] font-black uppercase tracking-[.14em] text-[#82939f]">Connected health context</p>
+              <div className="mt-2 space-y-2">
+                {(heartRateInsight?.context ?? []).map((note, index) => (
+                  <p key={index} className="text-[10px] leading-5 text-[#617583]">{note}</p>
+                ))}
+              </div>
+            </div>
+          </section>
+          </>
         ) : (
           <>
           <div className="grid grid-cols-3 gap-2">
@@ -789,18 +981,30 @@ export default function TodaySupportedGoalCard({ goal, activeGoals = [], onUpdat
             </div>
           </div>
         ) : category === "HEART_RATE" ? (
-          <section className="mt-4 rounded-[22px] border border-[#dce9ec] bg-[#f7fbfc] p-4 sm:p-5">
-            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-              <div className="min-w-0">
-                <p className="text-[10px] font-black uppercase tracking-[.15em] text-[#0b7b80]">Record a resting reading</p>
-                <p className="mt-1 text-sm font-black text-[#0b2d54]">Build a reliable trend</p>
-                <p className="mt-1 text-[11px] leading-5 text-[#758896]">{meta.helper}</p>
+          <>
+            <section className="mt-3 rounded-[17px] border border-[#dce9ec] bg-[#f7fbfc] p-3.5">
+              <div className="flex items-center justify-between gap-3">
+                <div className="min-w-0">
+                  <p className="text-[8px] font-black uppercase tracking-[.14em] text-[#82939f]">Goal journey</p>
+                  <p className="mt-1 text-[11px] font-black text-[#0b2d54]">Day {journey.journeyDay} · {journey.daysLeft === null ? "No end date set" : journey.daysLeft === 0 ? "Target date today" : journey.daysLeft + (journey.daysLeft === 1 ? " day left" : " days left")}</p>
+                  <p className="mt-1 text-[9px] text-[#82939f]">Target date: {journey.targetDate && !Number.isNaN(journey.targetDate.getTime()) ? formatJourneyDate(journey.targetDate) : "Not set"} · Daily ceiling ≤ {target ?? "—"} bpm</p>
+                </div>
+                <span className="shrink-0 rounded-full bg-white px-2.5 py-1.5 text-[8px] font-black text-[#0b7b80] ring-1 ring-[#dce9ec]">{journey.daysLeft == null ? "Ongoing" : journey.daysLeft === 0 ? "Due today" : "In progress"}</span>
               </div>
-              <Link href={source.href} className="inline-flex min-h-11 shrink-0 items-center justify-center gap-2 rounded-xl bg-[#0b2d54] px-4 py-3 text-[11px] font-black text-white transition hover:bg-[#0f5a62]">
-                {source.label} <ArrowRight className="h-4 w-4 text-[#24c1c4]" />
-              </Link>
-            </div>
-          </section>
+            </section>
+            <section className="mt-3 rounded-[22px] border border-[#dce9ec] bg-[#f7fbfc] p-4 sm:p-5">
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                <div className="min-w-0">
+                  <p className="text-[10px] font-black uppercase tracking-[.15em] text-[#0b7b80]">Record a resting reading</p>
+                  <p className="mt-1 text-sm font-black text-[#0b2d54]">Build a reliable trend</p>
+                  <p className="mt-1 text-[11px] leading-5 text-[#758896]">{meta.helper}</p>
+                </div>
+                <Link href={source.href} className="inline-flex min-h-11 shrink-0 items-center justify-center gap-2 rounded-xl bg-[#0b2d54] px-4 py-3 text-[11px] font-black text-white transition hover:bg-[#0f5a62]">
+                  {source.label} <ArrowRight className="h-4 w-4 text-[#24c1c4]" />
+                </Link>
+              </div>
+            </section>
+          </>
         ) : (
           <div className="mt-3 rounded-[17px] bg-[#fbfdfd] p-3.5 ring-1 ring-[#e4edef]">
             <p className="text-[10px] leading-5 text-[#758896]">{meta.helper}</p>
