@@ -481,7 +481,7 @@ function HealthGoalsPageContent() {
     }
     setEditingId(String(goal.id));
     const category = CATEGORIES.find((item) => item.value === String(goal.category ?? "")) ?? CATEGORIES[CATEGORIES.length - 1];
-    setDraft({ title: String(goal.title ?? ""), description: String(goal.description ?? ""), category: category.value, priority: String(goal.priority ?? "MEDIUM"), targetValue: goal.targetValue == null ? "" : String(goal.targetValue), unit: String(goal.unit ?? category.unit), targetDate: goal.targetDate ? String(goal.targetDate).slice(0, 10) : "", weightDirection: String(goal?.metricConfig?.comparison ?? "DECREASE_TO").toUpperCase() === "INCREASE_TO" ? "GAIN" : String(goal?.metricConfig?.comparison ?? "").toUpperCase() === "CLOSEST" ? "MAINTAIN" : "LOSE", personalComparison: personalComparisonFromGoal(goal) });
+    setDraft({ title: goalEditorTitle(goal, category.value), description: String(goal.description ?? ""), category: category.value, priority: String(goal.priority ?? "MEDIUM"), targetValue: goal.targetValue == null ? "" : String(goal.targetValue), unit: String(goal.unit ?? category.unit), targetDate: goal.targetDate ? String(goal.targetDate).slice(0, 10) : "", weightDirection: String(goal?.metricConfig?.comparison ?? "DECREASE_TO").toUpperCase() === "INCREASE_TO" ? "GAIN" : String(goal?.metricConfig?.comparison ?? "").toUpperCase() === "CLOSEST" ? "MAINTAIN" : "LOSE", personalComparison: personalComparisonFromGoal(goal) });
     setEditorOpen(true);
   }
   function closeEditor() { if (saving) return; setEditorOpen(false); setEditingId(null); setDraft(emptyDraft()); }
