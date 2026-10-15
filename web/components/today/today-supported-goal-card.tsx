@@ -1239,7 +1239,7 @@ export default function TodaySupportedGoalCard({ goal, activeGoals = [], healthC
             {meta.action === "MANUAL" && (category === "BLOOD_GLUCOSE" || category === "CHOLESTEROL") && <Link href="/tests-results" className="mt-2 inline-flex min-h-9 w-full items-center justify-center gap-1.5 rounded-xl border border-[#dce7eb] bg-white px-3 py-2 text-[9px] font-black text-[#0b2d54]">View recorded results <ArrowRight className="h-3.5 w-3.5" /></Link>}
           </div>
         )}
-
+      </div>
       )}
       {!detailsExpanded && !personalGoalNeedsSetup && (
         <div className="px-4 pb-4 pt-4 sm:px-5">
