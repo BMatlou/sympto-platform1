@@ -1148,6 +1148,7 @@ export default function TodaySupportedGoalCard({ goal, activeGoals = [], healthC
                 </div>
               </div>
 
+              {detailsExpanded && (
               <div className="mt-4 rounded-[20px] bg-white/[.06] p-4 ring-1 ring-white/10">
                 <div className="flex flex-wrap items-end justify-between gap-2">
                   <div>
@@ -1180,6 +1181,7 @@ export default function TodaySupportedGoalCard({ goal, activeGoals = [], healthC
                 </div>
               </div>
               <p className="mt-3 text-[10px] leading-5 text-white/55">Heart rate changes with activity, stress, illness and medicines. Only readings clearly identified as resting are compared with this goal. The target shown above is your saved goal, not a diagnosis or a universal threshold.</p>
+              )}
             </div>
           </section>
 {detailsExpanded && (
