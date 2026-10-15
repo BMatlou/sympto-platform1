@@ -933,6 +933,9 @@ export default function TodaySupportedGoalCard({ goal, activeGoals = [], healthC
                   </p>
                   <p className="text-[9px] text-[#82939f]">{heartRateInsight.trend.recordedDays} days logged</p>
                 </div>
+                <p className="mt-2 basis-full text-[9px] leading-4 text-[#82939f]">
+                  {heartRateInsight.trend.bothWithinTarget === true ? "Both readings are within your ceiling." : heartRateInsight.trend.bothWithinTarget === false ? "At least one reading is above your ceiling." : "Trend reflects recorded resting readings only."}
+                </p>
               </div>
             ) : (
               <p className="mt-3 text-[10px] leading-5 text-[#82939f]">
