@@ -342,6 +342,7 @@ export class HealthReportNotificationSchedulerService
       appointments,
       patientVitals,
       deviceMeasurements,
+      wellnessMetrics,
       sleepSessions,
       workouts,
       encounters,
@@ -423,6 +424,10 @@ export class HealthReportNotificationSchedulerService
             },
           },
         },
+      }),
+      this.prisma.wearableWellnessMetric.findMany({
+        where: { patientId, measuredAt: { gte: period.start, lt: period.end } },
+        orderBy: { measuredAt: 'asc' },
       }),
       this.prisma.sleepSession.findMany({
         where: { patientId, startedAt: { gte: period.start, lt: period.end } },
@@ -797,6 +802,7 @@ export class HealthReportNotificationSchedulerService
           weightKg: entry.weightKg,
         })),
         deviceMeasurements,
+        wellnessMetrics,
         sleepSessions,
         workouts,
       },
