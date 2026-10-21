@@ -914,10 +914,34 @@ function HealthContextSection({ report, coveragePercent, daysLogged, totalDays }
     : null;
   const allConditions = snapshot?.conditions ?? [];
   const currentConditions = allConditions.filter((item) => !["RESOLVED"].includes(String(item.status ?? "").toUpperCase()));
+  const currentDiagnoses = (snapshot?.diagnoses ?? []).filter((item) => !["RESOLVED"].includes(String(item.status ?? "").toUpperCase()));
+  const conditionDisplayItems: { name: string; status?: string | null; severity?: string | null; stage?: string | null }[] = currentConditions.map((item) => ({
+    name: String(item.condition?.name || "Condition"),
+    status: item.status,
+    severity: item.severity,
+  }));
+  currentDiagnoses.forEach((item) => {
+    const name = String(item.diagnosis?.name ?? "").trim();
+    if (name && !conditionDisplayItems.some((condition) => condition.name.toLowerCase() === name.toLowerCase())) {
+      conditionDisplayItems.push({ name, status: item.status, severity: item.severity, stage: item.stage });
+    }
+  });
   const currentAllergies = (snapshot?.allergies ?? []).filter((item) => !["INACTIVE", "RESOLVED"].includes(String(item.status ?? "").toUpperCase()));
   const currentMedications = (snapshot?.medications ?? []).filter((item) => String(item.status ?? "ACTIVE").toUpperCase() === "ACTIVE");
   const goals = snapshot?.activeGoals ?? [];
   const riskAssessments = snapshot?.riskAssessments ?? [];
+  const medicalRecord = snapshot?.medicalRecord;
+  const additionalHistory: { label: string; value: string }[] = [
+    { label: "Past medical history", value: medicalRecord?.pastMedicalHistory ?? "" },
+    { label: "Chronic conditions (free-text notes)", value: medicalRecord?.chronicConditions ?? "" },
+    { label: "Surgical history", value: medicalRecord?.surgicalHistory ?? "" },
+    { label: "Family history", value: medicalRecord?.familyHistory ?? "" },
+    { label: "Social history", value: medicalRecord?.socialHistory ?? "" },
+    { label: "Additional medication notes", value: medicalRecord?.currentMedications ?? "" },
+    { label: "Additional allergy notes", value: medicalRecord?.allergies ?? "" },
+    { label: "Immunisation notes", value: medicalRecord?.immunizationNotes ?? "" },
+  ].filter((item) => item.value.trim().length > 0);
+  const bloodTypeLabel = snapshot?.bloodType ? human(snapshot.bloodType) : snapshot?.rhesusFactor ? "Rhesus " + human(snapshot.rhesusFactor) : "";
   const coverageTone: StatusTone = coveragePercent >= 75 ? "good" : coveragePercent >= 40 ? "watch" : "high";
   const displayName = person?.preferredName || person?.firstName || "Your profile";
   return (
@@ -953,10 +977,11 @@ function HealthContextSection({ report, coveragePercent, daysLogged, totalDays }
           <div className="rounded-xl bg-[#f5fafb] p-3"><p className="text-[10px] font-bold uppercase tracking-wide text-slate-500">Weight</p><p className="mt-1 text-lg font-black text-[#0b2d54]">{weightKg === null ? "Not recorded" : formatNumber(weightKg, 1) + " kg"}</p></div>
           <div className="rounded-xl bg-[#f5fafb] p-3"><p className="text-[10px] font-bold uppercase tracking-wide text-slate-500">BMI · adult screening</p><p className="mt-1 text-lg font-black text-[#0b2d54]">{bmi === null ? "Not calculated" : formatNumber(bmi, 1)}</p><p className="mt-1 text-[10px] leading-4 text-slate-500">{bmi === null ? "Needs a recorded age of 18+ plus height and weight." : "A screening measure, not a diagnosis."}</p></div>
         </div>
+        {bloodTypeLabel && <p className="mt-3 text-[10px] text-slate-500">Recorded blood group: <strong className="text-[#0b2d54]">{bloodTypeLabel}</strong></p>}
         <div className="mt-4 grid gap-4 md:grid-cols-2">
           <div>
-            <h3 className="text-xs font-black text-[#0b2d54]">Health conditions</h3>
-            {currentConditions.length ? <div className="mt-2 flex flex-wrap gap-2">{currentConditions.map((item, index) => <span key={String(item.condition?.name ?? index)} className="rounded-full border border-[#dcebed] bg-[#f5fafb] px-3 py-1.5 text-[10px] font-bold text-[#0b2d54]">{item.condition?.name || "Condition"}{item.status && String(item.status).toUpperCase() !== "ACTIVE" ? " · " + human(item.status) : ""}{item.severity ? " · " + human(item.severity) : ""}</span>)}</div> : <p className="mt-1 text-xs leading-5 text-slate-500">No current conditions are recorded in the Health Passport.</p>}
+            <h3 className="text-xs font-black text-[#0b2d54]">Health conditions and diagnoses</h3>
+            {conditionDisplayItems.length ? <div className="mt-2 flex flex-wrap gap-2">{conditionDisplayItems.map((item) => <span key={item.name.toLowerCase()} title={["Health Passport condition or recorded diagnosis", item.status ? human(item.status) : "", item.severity ? human(item.severity) : ""].filter(Boolean).join(" · ")} className="rounded-full border border-[#dcebed] bg-[#f5fafb] px-3 py-1.5 text-[10px] font-bold text-[#0b2d54]">{item.name}{item.status && String(item.status).toUpperCase() !== "ACTIVE" ? " · " + human(item.status) : ""}{item.severity ? " · " + human(item.severity) : ""}{item.stage ? " · Stage " + item.stage : ""}</span>)}</div> : <p className="mt-1 text-xs leading-5 text-slate-500">No current conditions or diagnoses are recorded in the Health Passport.</p>}
           </div>
           <div>
             <h3 className="text-xs font-black text-[#0b2d54]">Allergies</h3>
@@ -976,6 +1001,15 @@ function HealthContextSection({ report, coveragePercent, daysLogged, totalDays }
             {![profile?.smokingStatus, profile?.alcoholConsumption, profile?.exerciseFrequency].some(Boolean) && <p className="mt-1 text-xs leading-5 text-slate-500">Lifestyle details are not fully recorded. The report will not infer them.</p>}
           </div>
         </div>
+        {additionalHistory.length > 0 && (
+          <details className="mt-4 rounded-xl border border-slate-200 bg-slate-50 p-3">
+            <summary className="cursor-pointer text-xs font-black text-[#0b2d54]">Additional medical history on file ({additionalHistory.length})</summary>
+            <p className="mt-1 text-[10px] leading-4 text-slate-500">These are notes already saved in your medical record. They may be free-text summaries; review them if they differ from the structured information above.</p>
+            <div className="mt-3 space-y-3">
+              {additionalHistory.map((item) => <div key={item.label}><p className="text-[10px] font-black uppercase tracking-wide text-slate-500">{item.label}</p><p className="mt-1 whitespace-pre-wrap text-xs leading-5 text-slate-700">{item.value}</p></div>)}
+            </div>
+          </details>
+        )}
         {riskAssessments.length > 0 && (
           <div className="mt-4 border-t border-slate-100 pt-4">
             <h3 className="text-xs font-black text-[#0b2d54]">Recorded clinical risk assessments</h3>
