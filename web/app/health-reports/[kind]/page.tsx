@@ -1,35 +1,29 @@
 "use client";
 
 import Link from "next/link";
-import { useSearchParams, useParams } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useParams, useSearchParams } from "next/navigation";
+import { useEffect, useMemo, useState } from "react";
 import {
   Activity,
+  AlertTriangle,
+  ArrowDownRight,
   ArrowLeft,
+  ArrowRight,
+  ArrowUpRight,
   CalendarDays,
+  CheckCircle2,
   ClipboardList,
+  Droplets,
   FileText,
-  FlaskConical,
+  Footprints,
   HeartPulse,
-  Pill,
+  Info,
+  Moon,
   ShieldCheck,
   Stethoscope,
 } from "lucide-react";
 import ProtectedRoute from "@/components/auth/protected-route";
 import { api } from "@/lib/api";
-
-const unwrap = <T,>(value: any): T => value?.data ?? value;
-const text = (value: unknown, fallback = "Not recorded") =>
-  value === null || value === undefined || value === "" ? fallback : String(value);
-const date = (value: unknown) =>
-  value
-    ? new Intl.DateTimeFormat("en-ZA", {
-        dateStyle: "medium",
-        timeZone: "Africa/Johannesburg",
-      }).format(new Date(String(value)))
-    : "Not recorded";
-const human = (value: unknown) =>
-  text(value).replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
 
 type Report = {
   type: "WEEKLY" | "MONTHLY";
@@ -65,209 +59,618 @@ type Report = {
   generatedAt: string;
 };
 
-function Section({
-  icon: Icon,
-  title,
-  count,
-  children,
-}: {
-  icon: typeof HeartPulse;
-  title: string;
-  count: number;
-  children: React.ReactNode;
-}) {
+type SeriesPoint = { date: string; value: number; source?: string };
+type DailyValue = { date: string; value: number };
+
+const unwrap = <T,>(value: any): T => value?.data ?? value;
+const arr = (value: unknown): any[] => Array.isArray(value) ? value : [];
+const finite = (value: unknown): number | null => {
+  if (value === null || value === undefined || value === "") return null;
+  const number = Number(value);
+  return Number.isFinite(number) ? number : null;
+};
+
+function dateKey(value: unknown) {
+  if (!value) return "";
+  const parsed = new Date(String(value));
+  if (Number.isNaN(parsed.getTime())) return "";
+  return new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Africa/Johannesburg",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).format(parsed);
+}
+
+function dateLabel(value: unknown) {
+  if (!value) return "Not recorded";
+  const parsed = new Date(String(value));
+  if (Number.isNaN(parsed.getTime())) return "Not recorded";
+  return new Intl.DateTimeFormat("en-ZA", {
+    timeZone: "Africa/Johannesburg",
+    day: "numeric",
+    month: "short",
+    year: "numeric",
+  }).format(parsed);
+}
+
+function human(value: unknown) {
+  return String(value ?? "").replace(/[_-]+/g, " ").replace(/\b\w/g, (letter) => letter.toUpperCase());
+}
+
+function mean(values: number[]) {
+  if (!values.length) return null;
+  return values.reduce((sum, value) => sum + value, 0) / values.length;
+}
+
+function formatNumber(value: number | null, digits = 1) {
+  if (value === null || !Number.isFinite(value)) return "—";
+  return new Intl.NumberFormat("en-ZA", {
+    minimumFractionDigits: digits,
+    maximumFractionDigits: digits,
+  }).format(value);
+}
+
+function periodDays(report: Report) {
+  const start = new Date(report.period.start).getTime();
+  const end = new Date(report.period.end).getTime();
+  if (!Number.isFinite(start) || !Number.isFinite(end) || end <= start) return report.type === "WEEKLY" ? 7 : 30;
+  return Math.max(1, Math.round((end - start) / 86_400_000));
+}
+
+function dailyMetric(report: Report | null, field: string): DailyValue[] {
+  if (!report) return [];
+  const grouped = new Map<string, { total: number; count: number }>();
+  arr(report.activity?.journalEntries).forEach((entry: any) => {
+    const key = dateKey(entry.createdAt || entry.recordedAt || entry.updatedAt);
+    const value = finite(entry[field]);
+    if (!key || value === null) return;
+    const current = grouped.get(key) ?? { total: 0, count: 0 };
+    current.total += value;
+    current.count += 1;
+    grouped.set(key, current);
+  });
+  return Array.from(grouped.entries())
+    .map(([date, group]) => ({ date, value: group.total / group.count }))
+    .sort((a, b) => a.date.localeCompare(b.date));
+}
+
+function recordedDays(report: Report) {
+  const days = new Set<string>();
+  const add = (value: unknown) => {
+    const key = dateKey(value);
+    if (key) days.add(key);
+  };
+  arr(report.activity.journalEntries).forEach((item: any) => add(item.createdAt || item.recordedAt));
+  arr(report.activity.symptoms).forEach((item: any) => add(item.startedAt || item.createdAt));
+  arr(report.activity.patientVitals).forEach((item: any) => add(item.recordedAt || item.createdAt));
+  arr(report.activity.deviceMeasurements).forEach((item: any) => add(item.measuredAt));
+  arr(report.activity.sleepSessions).forEach((item: any) => add(item.startedAt || item.endedAt));
+  arr(report.activity.workouts).forEach((item: any) => add(item.startedAt || item.endedAt));
+  return days;
+}
+
+function addVital(
+  output: SeriesPoint[],
+  metric: string,
+  value: unknown,
+  at: unknown,
+  source: string,
+) {
+  const numeric = finite(value);
+  const day = dateKey(at);
+  if (numeric === null || !day) return;
+  output.push({ date: day, value: numeric, source });
+}
+
+function addNamedVital(
+  output: SeriesPoint[],
+  nameValue: unknown,
+  value: unknown,
+  at: unknown,
+  source: string,
+) {
+  const name = String(nameValue ?? "").toLowerCase().replace(/[_-]+/g, " ");
+  const raw = String(value ?? "").trim();
+  const bloodPressurePair = raw.match(/^(\d+(?:\.\d+)?)\s*\/\s*(\d+(?:\.\d+)?)$/);
+  if (/blood pressure|bloodpressure|\bbp\b/.test(name) && bloodPressurePair) {
+    addVital(output, "systolic", bloodPressurePair[1], at, source);
+    addVital(output, "diastolic", bloodPressurePair[2], at, source);
+    return;
+  }
+
+  let metric = "";
+  if (/systolic|sys bp|sbp/.test(name)) metric = "systolic";
+  else if (/diastolic|dia bp|dbp/.test(name)) metric = "diastolic";
+  else if (/resting heart|heart rate|heartrate|\bpulse\b|\bhr\b/.test(name)) metric = "heartRate";
+  else if (/weight|body mass/.test(name)) metric = "weight";
+  else if (/oxygen|spo2|o2 saturation/.test(name)) metric = "oxygen";
+  else if (/temperature|temp\b/.test(name)) metric = "temperature";
+  else if (/respiratory|breathing rate/.test(name)) metric = "respiratory";
+  if (metric) addVital(output, metric, value, at, source);
+}
+
+function vitalSeries(report: Report | null, metric: string): SeriesPoint[] {
+  if (!report) return [];
+  const points: SeriesPoint[] = [];
+  arr(report.activity?.patientVitals).forEach((item: any) => {
+    const at = item.recordedAt || item.createdAt;
+    if (metric === "systolic") addVital(points, metric, item.bloodPressureSystolic, at, "Health Vitals");
+    if (metric === "diastolic") addVital(points, metric, item.bloodPressureDiastolic, at, "Health Vitals");
+    if (metric === "heartRate") addVital(points, metric, item.heartRate, at, "Health Vitals");
+    if (metric === "weight") addVital(points, metric, item.weightKg, at, "Health Vitals");
+    if (metric === "oxygen") addVital(points, metric, item.oxygenSaturation, at, "Health Vitals");
+    if (metric === "temperature") addVital(points, metric, item.temperature, at, "Health Vitals");
+    if (metric === "respiratory") addVital(points, metric, item.respiratoryRate, at, "Health Vitals");
+  });
+  arr(report.activity?.deviceMeasurements).forEach((item: any) => {
+    const before = points.length;
+    addNamedVital(points, item.measurementType || item.metricKey || item.vitalType?.name, item.value, item.measuredAt, "Connected device");
+    if (points.length > before && points[points.length - 1].date && points[points.length - 1].source === "Connected device") {
+      const matchesMetric = (
+        (metric === "systolic" && /systolic|sys bp|sbp/.test(String(item.measurementType || item.metricKey || item.vitalType?.name || "").toLowerCase().replace(/[_-]+/g, " "))) ||
+        (metric === "diastolic" && /diastolic|dia bp|dbp/.test(String(item.measurementType || item.metricKey || item.vitalType?.name || "").toLowerCase().replace(/[_-]+/g, " "))) ||
+        (metric === "heartRate" && /resting heart|heart rate|heartrate|\bpulse\b|\bhr\b/.test(String(item.measurementType || item.metricKey || item.vitalType?.name || "").toLowerCase().replace(/[_-]+/g, " "))) ||
+        (metric === "weight" && /weight|body mass/.test(String(item.measurementType || item.metricKey || item.vitalType?.name || "").toLowerCase().replace(/[_-]+/g, " "))) ||
+        (metric === "oxygen" && /oxygen|spo2|o2 saturation/.test(String(item.measurementType || item.metricKey || item.vitalType?.name || "").toLowerCase().replace(/[_-]+/g, " "))) ||
+        (metric === "temperature" && /temperature|temp\b/.test(String(item.measurementType || item.metricKey || item.vitalType?.name || "").toLowerCase().replace(/[_-]+/g, " "))) ||
+        (metric === "respiratory" && /respiratory|breathing rate/.test(String(item.measurementType || item.metricKey || item.vitalType?.name || "").toLowerCase().replace(/[_-]+/g, " ")))
+      );
+      if (matchesMetric) return;
+      points.splice(before);
+    }
+  });
+  arr(report.clinical?.vitals).forEach((item: any) => {
+    addNamedVital(points, item.vitalType?.code || item.vitalType?.name, item.value, item.measuredAt || item.recordedAt, "Clinical record");
+  });
+
+  const deduped = new Map<string, SeriesPoint>();
+  for (const point of points) {
+    const key = point.date + "|" + point.value;
+    if (!deduped.has(key)) deduped.set(key, point);
+  }
+  return Array.from(deduped.values()).sort((a, b) => a.date.localeCompare(b.date));
+}
+
+function lowMoodCounts(report: Report | null) {
+  const entries = arr(report?.activity?.journalEntries).filter((entry: any) => Boolean(entry.mood));
+  const low = entries.filter((entry: any) => ["VERY_BAD", "BAD", "VERY_LOW", "LOW"].includes(String(entry.mood).toUpperCase()));
+  return { low: low.length, total: entries.length };
+}
+
+function recurringSymptoms(report: Report | null) {
+  const counts = new Map<string, { label: string; count: number }>();
+  arr(report?.activity?.symptoms).forEach((item: any) => {
+    const labels = arr(item.symptoms)
+      .map((symptom: any) => symptom.symptom?.name || symptom.name)
+      .filter(Boolean);
+    if (!labels.length && item.title && !["symptom recorded", "symptom log"].includes(String(item.title).toLowerCase())) {
+      labels.push(item.title);
+    }
+    const distinct = new Set(labels.map((label: string) => String(label).trim()).filter(Boolean));
+    distinct.forEach((label) => {
+      const key = String(label).toLowerCase();
+      const current = counts.get(key) ?? { label: String(label), count: 0 };
+      current.count += 1;
+      counts.set(key, current);
+    });
+  });
+  return Array.from(counts.values()).sort((a, b) => b.count - a.count);
+}
+
+function routineAssociation(report: Report | null) {
+  if (!report) return null;
+  const sleep = dailyMetric(report, "sleepHours");
+  const stress = dailyMetric(report, "stressLevel");
+  const stressByDay = new Map(stress.map((item) => [item.date, item.value]));
+  const matched = sleep
+    .filter((item) => stressByDay.has(item.date))
+    .map((item) => ({ sleep: item.value, stress: stressByDay.get(item.date)! }));
+  if (matched.length < 4) return null;
+
+  const sortedSleep = matched.map((item) => item.sleep).sort((a, b) => a - b);
+  const median = sortedSleep[Math.floor(sortedSleep.length / 2)];
+  const shorter = matched.filter((item) => item.sleep < median);
+  const longer = matched.filter((item) => item.sleep >= median);
+  if (shorter.length < 2 || longer.length < 2) return null;
+  const shortStress = mean(shorter.map((item) => item.stress));
+  const longStress = mean(longer.map((item) => item.stress));
+  if (shortStress === null || longStress === null) return null;
+  return { shorterDays: shorter.length, longerDays: longer.length, shortStress, longStress, delta: shortStress - longStress };
+}
+
+function compareText(
+  currentValues: number[],
+  previousValues: number[],
+  unit: string,
+  digits = 1,
+  previousLoading = false,
+) {
+  const current = mean(currentValues);
+  if (current === null) return "No usable readings in this period.";
+  if (previousLoading) return "Comparing with the previous period…";
+  const previous = mean(previousValues);
+  if (previous === null) return "No comparable readings were available in the previous period.";
+  const delta = current - previous;
+  if (Math.abs(delta) < 0.05) {
+    return "Average " + formatNumber(current, digits) + (unit ? " " + unit : "") + " — broadly unchanged from the previous period.";
+  }
+  return "Average " + (delta > 0 ? "rose " : "fell ") + formatNumber(Math.abs(delta), digits) + (unit ? " " + unit : "") + " compared with the previous period.";
+}
+
+function MiniTrend({ values, label }: { values: number[]; label: string }) {
+  if (values.length < 2) {
+    return <div className="mt-3 flex h-12 items-center rounded-xl bg-slate-50 px-3 text-[11px] text-slate-400">Add more readings to reveal a trend.</div>;
+  }
+  const width = 180;
+  const height = 42;
+  const padding = 4;
+  const minimum = Math.min(...values);
+  const maximum = Math.max(...values);
+  const range = maximum - minimum || 1;
+  const coordinates = values.map((value, index) => {
+    const x = padding + index * (width - padding * 2) / (values.length - 1);
+    const y = height - padding - ((value - minimum) / range) * (height - padding * 2);
+    return String(x) + "," + String(y);
+  }).join(" ");
   return (
-    <section className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
-      <div className="flex items-center justify-between gap-3">
-        <div className="flex items-center gap-3">
-          <div className="grid h-10 w-10 place-items-center rounded-xl bg-[#24c1c4]/10 text-[#0b2d54]">
-            <Icon className="h-5 w-5" />
-          </div>
-          <h2 className="font-bold text-[#0b2d54]">{title}</h2>
-        </div>
-        <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-bold text-slate-500">
-          {count}
-        </span>
-      </div>
-      <div className="mt-4">{children}</div>
-    </section>
+    <div className="mt-3 rounded-xl bg-[#f5fafb] px-3 py-2">
+      <svg viewBox="0 0 180 42" className="h-12 w-full" role="img" aria-label={label}>
+        <polyline points={coordinates} fill="none" stroke="#24c1c4" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
+      </svg>
+      <div className="mt-1 flex justify-between text-[10px] text-slate-400"><span>Earlier</span><span>Latest</span></div>
+    </div>
   );
 }
 
-function Empty({ label }: { label: string }) {
-  return <p className="text-sm text-slate-500">No {label} were recorded in this period.</p>;
+function SummaryTile({ icon: Icon, label, value, detail }: { icon: typeof Activity; label: string; value: string; detail: string }) {
+  return (
+    <article className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+      <div className="flex items-center gap-2 text-[#71839a]"><Icon className="h-4 w-4 text-[#24c1c4]" /><span className="text-[10px] font-black uppercase tracking-[0.12em]">{label}</span></div>
+      <p className="mt-3 text-2xl font-black tracking-tight text-[#0b2d54]">{value}</p>
+      <p className="mt-1 text-xs leading-5 text-slate-500">{detail}</p>
+    </article>
+  );
+}
+
+function RoutineTrendCard({
+  icon: Icon,
+  title,
+  subtitle,
+  current,
+  previous,
+  unit,
+  digits = 1,
+  previousLoading,
+}: {
+  icon: typeof Activity;
+  title: string;
+  subtitle: string;
+  current: DailyValue[];
+  previous: DailyValue[];
+  unit: string;
+  digits?: number;
+  previousLoading: boolean;
+}) {
+  const currentMean = mean(current.map((item) => item.value));
+  const previousMean = mean(previous.map((item) => item.value));
+  const values = current.map((item) => item.value);
+  return (
+    <article className="min-w-0 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+      <div className="flex items-start gap-3">
+        <span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-[#24c1c4]/10 text-[#0b2d54]"><Icon className="h-5 w-5" /></span>
+        <div className="min-w-0 flex-1"><h3 className="font-bold text-[#0b2d54]">{title}</h3><p className="mt-1 text-xs leading-5 text-slate-500">{subtitle}</p></div>
+      </div>
+      {currentMean === null ? (
+        <div className="mt-4 rounded-xl bg-slate-50 p-3 text-sm text-slate-500">No entries for this measure in the selected period.</div>
+      ) : (
+        <>
+          <div className="mt-4 flex items-baseline gap-2"><p className="text-2xl font-black tracking-tight text-[#0b2d54]">{formatNumber(currentMean, digits)} <span className="text-sm font-bold text-slate-500">{unit}</span></p><span className="text-[10px] text-slate-400">{current.length} {current.length === 1 ? "day" : "days"}</span></div>
+          <MiniTrend values={values} label={title + " daily trend"} />
+          <p className="mt-3 text-xs leading-5 text-slate-500">{compareText(values, previous.map((item) => item.value), unit, digits, previousLoading)}</p>
+        </>
+      )}
+    </article>
+  );
+}
+
+function VitalTrendCard({
+  label,
+  unit,
+  digits,
+  current,
+  previous,
+  previousLoading,
+}: {
+  label: string;
+  unit: string;
+  digits: number;
+  current: SeriesPoint[];
+  previous: SeriesPoint[];
+  previousLoading: boolean;
+}) {
+  const currentValues = current.map((item) => item.value);
+  const previousValues = previous.map((item) => item.value);
+  const average = mean(currentValues);
+  const latest = current[current.length - 1];
+  const first = current[0];
+  const withinPeriod = current.length > 1
+    ? Math.abs(latest.value - first.value) < 0.05
+      ? "Little change between first and latest readings."
+      : "First-to-latest change: " + (latest.value > first.value ? "+" : "") + formatNumber(latest.value - first.value, digits) + " " + unit + "."
+    : "One reading is available; more readings are needed to show a trend.";
+  return (
+    <article className="min-w-0 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+      <div className="flex items-start justify-between gap-3"><div><p className="text-sm font-bold text-[#0b2d54]">{label}</p><p className="mt-1 text-[11px] text-slate-500">{current.length} readings in this period</p></div><HeartPulse className="h-5 w-5 shrink-0 text-[#24c1c4]" /></div>
+      {average === null ? <p className="mt-4 text-sm text-slate-500">No readings in this period.</p> : (
+        <>
+          <div className="mt-4 flex flex-wrap items-baseline gap-x-3 gap-y-1"><p className="text-2xl font-black tracking-tight text-[#0b2d54]">{formatNumber(average, digits)} <span className="text-sm font-bold text-slate-500">{unit}</span></p>{latest && <p className="text-xs text-slate-500">Latest {formatNumber(latest.value, digits)} {unit}</p>}</div>
+          <MiniTrend values={currentValues} label={label + " trend"} />
+          <p className="mt-3 text-xs leading-5 text-slate-500">{withinPeriod}</p>
+          <p className="mt-1 text-xs leading-5 text-slate-500">{compareText(currentValues, previousValues, unit, digits, previousLoading)}</p>
+        </>
+      )}
+    </article>
+  );
+}
+
+function clinicalEvents(report: Report) {
+  return arr(report.clinical.encounters).length +
+    arr(report.clinical.diagnoses).length +
+    arr(report.clinical.prescriptions).length +
+    arr(report.clinical.notes).length +
+    arr(report.clinical.vitals).length +
+    arr(report.clinical.labResults).length +
+    arr(report.clinical.imaging).length +
+    arr(report.clinical.procedures).length +
+    arr(report.clinical.carePlans).length +
+    arr(report.clinical.referrals).length;
+}
+
+function flaggedLabItems(report: Report) {
+  return arr(report.clinical.labResults).flatMap((result: any) =>
+    arr(result.items)
+      .filter((item: any) => Boolean(item.abnormal || item.critical))
+      .map((item: any) => ({
+        id: String(item.id || result.id || item.test?.name || Math.random()),
+        name: item.test?.name || result.orderItem?.test?.name || "Laboratory result",
+        value: item.numericValue ?? item.textValue ?? item.booleanValue ?? "Value not recorded",
+        critical: Boolean(item.critical),
+        date: result.reportedAt || result.releasedAt,
+      })),
+  );
+}
+
+function HealthReportInsights({
+  report,
+  previousReport,
+  previousLoading,
+  previousFailed,
+}: {
+  report: Report;
+  previousReport: Report | null;
+  previousLoading: boolean;
+  previousFailed: boolean;
+}) {
+  const daysLogged = recordedDays(report).size;
+  const totalDays = periodDays(report);
+  const symptomCount = arr(report.activity.symptoms).length;
+  const workouts = arr(report.activity.workouts);
+  const workoutMinutes = workouts.reduce((sum: number, workout: any) => {
+    const seconds = finite(workout.durationSeconds);
+    return sum + (seconds === null ? 0 : seconds / 60);
+  }, 0);
+  const sleepSessions = arr(report.activity.sleepSessions).filter((session: any) => finite(session.durationMinutes) !== null && Number(session.durationMinutes) > 0);
+  const sleepHours = sleepSessions.map((session: any) => Number(session.durationMinutes) / 60);
+  const lowMood = lowMoodCounts(report);
+  const repeated = recurringSymptoms(report);
+  const association = routineAssociation(report);
+  const flaggedLabs = flaggedLabItems(report);
+  const clinicalCount = clinicalEvents(report);
+  const previousSymptomCount = arr(previousReport?.activity?.symptoms).length;
+  const symptomDifference = previousReport
+    ? symptomCount - previousSymptomCount
+    : null;
+  const vitalConfigs = [
+    { key: "systolic", label: "Systolic blood pressure", unit: "mmHg", digits: 0 },
+    { key: "diastolic", label: "Diastolic blood pressure", unit: "mmHg", digits: 0 },
+    { key: "heartRate", label: "Heart rate", unit: "bpm", digits: 0 },
+    { key: "weight", label: "Weight", unit: "kg", digits: 1 },
+    { key: "oxygen", label: "Oxygen saturation", unit: "%", digits: 1 },
+    { key: "temperature", label: "Temperature", unit: "°C", digits: 1 },
+    { key: "respiratory", label: "Respiratory rate", unit: "/min", digits: 0 },
+  ];
+  const activeVitals = vitalConfigs
+    .map((config) => ({
+      ...config,
+      current: vitalSeries(report, config.key),
+      previous: vitalSeries(previousReport, config.key),
+    }))
+    .filter((config) => config.current.length > 0);
+  const routineConfigs = [
+    { field: "sleepHours", label: "Self-reported sleep", subtitle: "Average sleep duration from your daily check-ins.", unit: "h", digits: 1, icon: Moon },
+    { field: "stressLevel", label: "Stress level", subtitle: "Your average self-reported stress score.", unit: "/10", digits: 1, icon: Activity },
+    { field: "waterIntakeMl", label: "Water intake", subtitle: "Average water logged per day.", unit: "ml", digits: 0, icon: Droplets },
+    { field: "exerciseMinutes", label: "Exercise logged", subtitle: "Average exercise minutes per day in your check-ins.", unit: "min", digits: 0, icon: Footprints },
+  ];
+  const routines = routineConfigs.map((config) => ({
+    ...config,
+    current: dailyMetric(report, config.field),
+    previous: dailyMetric(previousReport, config.field),
+  })).filter((config) => config.current.length > 0);
+  const routineCurrentDays = recordedDays(report);
+  const noAnalysisData = activeVitals.length === 0 && routines.length === 0 && symptomCount === 0 && sleepSessions.length === 0 && workouts.length === 0 && clinicalCount === 0;
+  const moodPattern = lowMood.total > 0
+    ? lowMood.low + " of " + lowMood.total + " mood check-ins were marked low or very low."
+    : "";
+  const symptomPattern = repeated.find((item) => item.count > 1);
+  const activityDelta = previousReport ? workouts.length - arr(previousReport.activity.workouts).length : null;
+  const sleepDelta = previousReport ? sleepSessions.length - arr(previousReport.activity.sleepSessions).length : null;
+
+  return (
+    <div className="mt-5 space-y-6">
+      <section>
+        <div className="mb-3 flex items-end justify-between gap-3"><div><p className="text-[10px] font-black uppercase tracking-[0.16em] text-[#24c1c4]">Period overview</p><h2 className="mt-1 text-xl font-black text-[#0b2d54]">The bigger picture</h2></div><span className="text-xs text-slate-400">{totalDays} days</span></div>
+        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+          <SummaryTile icon={CalendarDays} label="Days with entries" value={String(daysLogged) + "/" + String(totalDays)} detail={daysLogged === 0 ? "No dated health activity found." : Math.round(daysLogged / totalDays * 100) + "% of the period has at least one dated record."} />
+          <SummaryTile icon={Activity} label="Symptom records" value={String(symptomCount)} detail={symptomDifference === null ? "A comparison will appear when prior data loads." : symptomDifference === 0 ? "Same number as the previous period." : String(Math.abs(symptomDifference)) + " " + (symptomDifference > 0 ? "more" : "fewer") + " than the previous period."} />
+          <SummaryTile icon={HeartPulse} label="Measurement readings" value={String(activeVitals.reduce((sum, item) => sum + item.current.length, 0))} detail={activeVitals.length ? activeVitals.length + " measurement types have enough records to summarise." : "No comparable vital readings were found."} />
+          <SummaryTile icon={Footprints} label="Workout sessions" value={String(workouts.length)} detail={workouts.length ? formatNumber(workoutMinutes, 0) + " minutes logged in total." : "No workout sessions were recorded."} />
+        </div>
+      </section>
+
+      <section>
+        <div className="mb-3"><p className="text-[10px] font-black uppercase tracking-[0.16em] text-[#24c1c4]">Change over time</p><h2 className="mt-1 text-xl font-black text-[#0b2d54]">Measurement trends</h2><p className="mt-1 text-sm leading-6 text-slate-500">Averages and direction of change come from the readings saved in this period. They describe the data, not a diagnosis or a judgement that a change is good or bad.</p></div>
+        {activeVitals.length ? <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">{activeVitals.map((item) => <VitalTrendCard key={item.key} label={item.label} unit={item.unit} digits={item.digits} current={item.current} previous={item.previous} previousLoading={previousLoading} />)}</div> : <div className="rounded-2xl border border-dashed border-slate-300 bg-white p-5 text-sm leading-6 text-slate-500">No dated vital readings were found for this period. Blood pressure, heart rate, weight and other measurements will appear here after they have been recorded in Health Vitals or received from a connected device.</div>}
+      </section>
+
+      <section>
+        <div className="mb-3"><p className="text-[10px] font-black uppercase tracking-[0.16em] text-[#24c1c4]">Everyday routines</p><h2 className="mt-1 text-xl font-black text-[#0b2d54]">Habits and consistency</h2><p className="mt-1 text-sm leading-6 text-slate-500">These cards summarise daily check-ins instead of repeating the text of each journal entry.</p></div>
+        {routines.length ? <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">{routines.map((item) => <RoutineTrendCard key={item.field} icon={item.icon} title={item.label} subtitle={item.subtitle} current={item.current} previous={item.previous} unit={item.unit} digits={item.digits} previousLoading={previousLoading} />)}</div> : <div className="rounded-2xl border border-dashed border-slate-300 bg-white p-5 text-sm leading-6 text-slate-500">Daily sleep, stress, water and exercise trends will appear once those fields have been included in saved check-ins.</div>}
+        {(sleepSessions.length > 0 || arr(previousReport?.activity?.sleepSessions).length > 0 || workouts.length > 0 || arr(previousReport?.activity?.workouts).length > 0) && (
+          <div className="mt-3 grid gap-3 sm:grid-cols-2">
+            {(sleepSessions.length > 0 || arr(previousReport?.activity?.sleepSessions).length > 0) && <article className="rounded-2xl border border-slate-200 bg-white p-4"><div className="flex items-center gap-2"><Moon className="h-5 w-5 text-[#24c1c4]" /><h3 className="font-bold text-[#0b2d54]">Connected sleep</h3></div><p className="mt-3 text-2xl font-black text-[#0b2d54]">{sleepHours.length ? formatNumber(mean(sleepHours), 1) + " h" : "No sleep sessions"}</p><p className="mt-1 text-xs text-slate-500">{sleepSessions.length} recorded sessions in this period{previousLoading ? "; comparing periods…" : sleepDelta === null ? "." : "; " + String(Math.abs(sleepDelta)) + " " + (sleepDelta > 0 ? "more" : sleepDelta < 0 ? "fewer" : "same number of") + " sessions than the previous period."}</p><p className="mt-2 text-xs leading-5 text-slate-500">Average is calculated from wearable sleep sessions with a recorded duration.</p></article>}
+            {(workouts.length > 0 || arr(previousReport?.activity?.workouts).length > 0) && <article className="rounded-2xl border border-slate-200 bg-white p-4"><div className="flex items-center gap-2"><Footprints className="h-5 w-5 text-[#24c1c4]" /><h3 className="font-bold text-[#0b2d54]">Activity consistency</h3></div><p className="mt-3 text-2xl font-black text-[#0b2d54]">{workouts.length ? formatNumber(workoutMinutes, 0) + " min" : "No workouts"}</p><p className="mt-1 text-xs text-slate-500">{workouts.length} workouts across {new Set(workouts.map((item: any) => dateKey(item.startedAt || item.endedAt)).filter(Boolean)).size} days{previousLoading ? "; comparing periods…" : activityDelta === null ? "." : "; " + String(Math.abs(activityDelta)) + " " + (activityDelta > 0 ? "more" : activityDelta < 0 ? "fewer" : "same number of") + " sessions than the previous period."}</p><p className="mt-2 text-xs leading-5 text-slate-500">This reflects recorded sessions, not all movement during the day.</p></article>}
+          </div>
+        )}
+      </section>
+
+      <section>
+        <div className="mb-3"><p className="text-[10px] font-black uppercase tracking-[0.16em] text-[#24c1c4]">Patterns to review</p><h2 className="mt-1 text-xl font-black text-[#0b2d54]">What stands out</h2><p className="mt-1 text-sm leading-6 text-slate-500">These are observations from the records you saved, not proof of what caused a symptom.</p></div>
+        <div className="grid gap-3 md:grid-cols-2">
+          <article className="rounded-2xl border border-slate-200 bg-white p-5">
+            <div className="flex items-center gap-2"><Activity className="h-5 w-5 text-[#24c1c4]" /><h3 className="font-bold text-[#0b2d54]">Symptom recurrence</h3></div>
+            {symptomPattern ? <><p className="mt-3 text-lg font-black text-[#0b2d54]">{symptomPattern.label}</p><p className="mt-1 text-sm leading-6 text-slate-600">Recorded {symptomPattern.count} times in this period. Consider whether timing, triggers or severity are worth discussing with your healthcare professional.</p></> : <p className="mt-3 text-sm leading-6 text-slate-500">{symptomCount === 0 ? "No symptom logs were found in this period." : "No symptom label was repeated in the available records for this period."}</p>}
+            {repeated.length > 1 && <p className="mt-2 text-xs text-slate-500">Other repeated labels: {repeated.filter((item) => item.count > 1 && item.label !== symptomPattern?.label).slice(0, 2).map((item) => item.label + " (" + item.count + ")").join(" · ") || "None"}</p>}
+          </article>
+          <article className="rounded-2xl border border-slate-200 bg-white p-5">
+            <div className="flex items-center gap-2"><ClipboardList className="h-5 w-5 text-[#24c1c4]" /><h3 className="font-bold text-[#0b2d54]">Logging consistency</h3></div>
+            <p className="mt-3 text-lg font-black text-[#0b2d54]">{daysLogged} of {totalDays} days</p>
+            <p className="mt-1 text-sm leading-6 text-slate-600">{daysLogged === 0 ? "No dated entries were available to review." : daysLogged / totalDays < 0.5 ? "There are gaps in the available records. More regular check-ins can make comparisons more useful." : daysLogged / totalDays < 0.85 ? "There is a useful amount of data, with some days missing. Consistent entries will make future trends easier to interpret." : "Records cover most of the period, giving a clearer view of changes across days."}</p>
+          </article>
+          {moodPattern && <article className="rounded-2xl border border-slate-200 bg-white p-5"><div className="flex items-center gap-2"><HeartPulse className="h-5 w-5 text-[#24c1c4]" /><h3 className="font-bold text-[#0b2d54]">Mood check-ins</h3></div><p className="mt-3 text-sm leading-6 text-slate-600">{moodPattern} This is a self-reported signal, not a mental-health assessment.</p></article>}
+          {association && <article className="rounded-2xl border border-slate-200 bg-white p-5"><div className="flex items-center gap-2"><Moon className="h-5 w-5 text-[#24c1c4]" /><h3 className="font-bold text-[#0b2d54]">Sleep and stress together</h3></div><p className="mt-3 text-sm leading-6 text-slate-600">On days with shorter logged sleep, average stress was {formatNumber(association.shortStress, 1)}/10 versus {formatNumber(association.longStress, 1)}/10 on days with longer logged sleep ({association.shorterDays} and {association.longerDays} days respectively).</p><p className="mt-2 text-xs leading-5 text-slate-500">This is a pattern of records that occurred together, not evidence that one caused the other.</p></article>}
+        </div>
+      </section>
+
+      {(clinicalCount > 0 || flaggedLabs.length > 0) && (
+        <section>
+          <div className="mb-3"><p className="text-[10px] font-black uppercase tracking-[0.16em] text-[#24c1c4]">Clinical context</p><h2 className="mt-1 text-xl font-black text-[#0b2d54]">Updates worth keeping in view</h2><p className="mt-1 text-sm leading-6 text-slate-500">This is a concise overview of clinical activity, not a repeat of your full clinical record.</p></div>
+          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+            <SummaryTile icon={Stethoscope} label="Clinical visits" value={String(arr(report.clinical.encounters).length)} detail="Encounters dated in this period." />
+            <SummaryTile icon={FileText} label="Lab reports" value={String(arr(report.clinical.labResults).length)} detail="Laboratory result records released or reported in this period." />
+            <SummaryTile icon={ClipboardList} label="Care plan updates" value={String(arr(report.clinical.carePlans).length)} detail="Care plans created or updated in this period." />
+            <SummaryTile icon={ShieldCheck} label="Other clinical updates" value={String(arr(report.clinical.diagnoses).length + arr(report.clinical.prescriptions).length + arr(report.clinical.referrals).length + arr(report.clinical.procedures).length)} detail="Diagnoses, prescriptions, referrals and procedures recorded." />
+          </div>
+          {flaggedLabs.length > 0 && <div className="mt-3 rounded-2xl border border-amber-200 bg-amber-50 p-5"><div className="flex items-start gap-3"><AlertTriangle className="mt-0.5 h-5 w-5 shrink-0 text-amber-700" /><div className="min-w-0"><h3 className="font-bold text-amber-950">Results marked for review in the clinical record</h3><p className="mt-1 text-xs leading-5 text-amber-900">These items were marked abnormal or critical by the source record. Sympto is not re-interpreting them here; review the report with your clinician.</p><div className="mt-3 space-y-2">{flaggedLabs.slice(0, 4).map((item) => <div key={item.id} className="flex flex-wrap items-start justify-between gap-2 rounded-xl bg-white/80 p-3"><div><p className="text-sm font-bold text-[#0b2d54]">{item.name}</p><p className="mt-1 text-[11px] text-slate-500">{dateLabel(item.date)}</p></div><div className="flex items-center gap-2"><span className="text-sm font-bold text-[#0b2d54]">{String(item.value)}</span>{item.critical && <span className="rounded-full bg-rose-100 px-2 py-1 text-[9px] font-black uppercase text-rose-800">Critical</span>}{!item.critical && <span className="rounded-full bg-amber-100 px-2 py-1 text-[9px] font-black uppercase text-amber-800">Abnormal</span>}</div></div>)}</div><Link href="/health-records" className="mt-4 inline-flex min-h-10 items-center gap-2 rounded-xl bg-[#0b2d54] px-4 py-2 text-xs font-bold text-white">Review clinical records <ArrowRight className="h-4 w-4" /></Link></div></div></div>}
+        </section>
+      )}
+
+      {noAnalysisData && <section className="rounded-2xl border border-dashed border-slate-300 bg-white p-6"><div className="flex items-start gap-3"><Info className="mt-0.5 h-5 w-5 shrink-0 text-[#24c1c4]" /><div><h2 className="font-bold text-[#0b2d54]">More records are needed to uncover patterns</h2><p className="mt-1 text-sm leading-6 text-slate-500">As you record Health Vitals, daily check-ins, symptoms or connected-device sessions, future reports can compare these values across periods. This report intentionally avoids repeating individual journal entries.</p><Link href="/today" className="mt-4 inline-flex min-h-10 items-center gap-2 rounded-xl bg-[#0b2d54] px-4 py-2 text-xs font-bold text-white">Record today’s health <ArrowRight className="h-4 w-4" /></Link></div></div></section>}
+
+      <p className="rounded-2xl bg-slate-100 p-4 text-xs leading-5 text-slate-500">Report generated {dateLabel(report.generatedAt)}. Trends use only dated values available for the selected period. Missing records are not treated as zero. Use the Health Journal for individual entries and your clinician for medical interpretation.</p>
+    </div>
+  );
 }
 
 export default function HealthReportPage() {
   const params = useParams<{ kind: string }>();
   const searchParams = useSearchParams();
+  const requestedDate = searchParams.get("date");
+  const kind = params.kind?.toLowerCase();
   const [report, setReport] = useState<Report | null>(null);
+  const [previousReport, setPreviousReport] = useState<Report | null>(null);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(true);
+  const [previousLoading, setPreviousLoading] = useState(false);
+  const [previousFailed, setPreviousFailed] = useState(false);
 
   useEffect(() => {
-    const kind = params.kind?.toLowerCase();
+    let active = true;
+    setLoading(true);
+    setError("");
+    setReport(null);
+    setPreviousReport(null);
+    setPreviousFailed(false);
+
     if (kind !== "weekly" && kind !== "monthly") {
       setError("This health report could not be found.");
       setLoading(false);
-      return;
+      return () => { active = false; };
     }
-    const query = searchParams.get("date");
-    const url = "/health-reports/" + kind + (query ? "?date=" + encodeURIComponent(query) : "");
-    api
-      .get(url)
-      .then((response) => setReport(unwrap<Report>(response.data)))
-      .catch((err) => setError(err?.response?.data?.message || "This health report is not available."))
-      .finally(() => setLoading(false));
-  }, [params.kind, searchParams]);
+
+    const url = "/health-reports/" + kind + (requestedDate ? "?date=" + encodeURIComponent(requestedDate) : "");
+    api.get(url)
+      .then((response) => {
+        if (active) setReport(unwrap<Report>(response.data));
+      })
+      .catch((err) => {
+        if (active) setError(err?.response?.data?.message || "This health report is not available.");
+      })
+      .finally(() => {
+        if (active) setLoading(false);
+      });
+
+    return () => { active = false; };
+  }, [kind, requestedDate]);
+
+  useEffect(() => {
+    if (!report) return;
+    let active = true;
+    setPreviousLoading(true);
+    setPreviousFailed(false);
+    const anchorDate = dateKey(report.period.start);
+    if (!anchorDate) {
+      setPreviousReport(null);
+      setPreviousFailed(true);
+      setPreviousLoading(false);
+      return () => { active = false; };
+    }
+
+    api.get("/health-reports/" + report.type.toLowerCase() + "?date=" + encodeURIComponent(anchorDate))
+      .then((response) => {
+        if (active) setPreviousReport(unwrap<Report>(response.data));
+      })
+      .catch(() => {
+        if (active) {
+          setPreviousReport(null);
+          setPreviousFailed(true);
+        }
+      })
+      .finally(() => {
+        if (active) setPreviousLoading(false);
+      });
+
+    return () => { active = false; };
+  }, [report?.type, report?.period.start]);
+
+  const title = useMemo(() => kind === "weekly" ? "Weekly health report" : kind === "monthly" ? "Monthly health report" : "Health report", [kind]);
 
   if (loading) {
-    return (
-      <ProtectedRoute>
-        <main className="min-h-screen bg-[#f5f8fb] p-5">
-          <div className="mx-auto max-w-5xl space-y-4">
-            <div className="h-48 animate-pulse rounded-[32px] bg-white" />
-            <div className="grid gap-4 md:grid-cols-2">
-              <div className="h-56 animate-pulse rounded-3xl bg-white" />
-              <div className="h-56 animate-pulse rounded-3xl bg-white" />
-            </div>
-          </div>
-        </main>
-      </ProtectedRoute>
-    );
+    return <ProtectedRoute><main className="min-h-screen bg-[#f5f8fb] p-5"><div className="mx-auto max-w-6xl space-y-4"><div className="h-44 animate-pulse rounded-[30px] bg-white" /><div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">{[1, 2, 3, 4].map((value) => <div key={value} className="h-32 animate-pulse rounded-2xl bg-white" />)}</div><div className="h-72 animate-pulse rounded-[28px] bg-white" /></div></main></ProtectedRoute>;
   }
 
   if (error || !report) {
-    return (
-      <ProtectedRoute>
-        <main className="min-h-screen bg-[#f5f8fb] p-5">
-          <div className="mx-auto max-w-xl rounded-3xl bg-white p-8 text-center shadow-sm">
-            <FileText className="mx-auto h-10 w-10 text-slate-300" />
-            <h1 className="mt-4 text-xl font-bold text-[#0b2d54]">Health report unavailable</h1>
-            <p className="mt-2 text-sm text-slate-500">{error || "We could not load this report."}</p>
-            <Link href="/notifications" className="mt-5 inline-flex rounded-xl bg-[#0b2d54] px-5 py-3 text-sm font-bold text-white">Back to notifications</Link>
-          </div>
-        </main>
-      </ProtectedRoute>
-    );
+    return <ProtectedRoute><main className="min-h-screen bg-[#f5f8fb] p-5"><div className="mx-auto max-w-xl rounded-3xl border border-slate-200 bg-white p-8 text-center shadow-sm"><FileText className="mx-auto h-10 w-10 text-slate-300" /><h1 className="mt-4 text-xl font-bold text-[#0b2d54]">Health report unavailable</h1><p className="mt-2 text-sm leading-6 text-slate-500">{error || "We could not load this report."}</p><Link href="/notifications" className="mt-5 inline-flex min-h-11 items-center gap-2 rounded-xl bg-[#0b2d54] px-5 py-3 text-sm font-bold text-white"><ArrowLeft className="h-4 w-4" />Back to notifications</Link></div></main></ProtectedRoute>;
   }
-
-  const clinicalCount =
-    report.clinical.encounters.length +
-    report.clinical.diagnoses.length +
-    report.clinical.prescriptions.length +
-    report.clinical.notes.length +
-    report.clinical.vitals.length +
-    report.clinical.labResults.length +
-    report.clinical.imaging.length +
-    report.clinical.procedures.length +
-    report.clinical.carePlans.length +
-    report.clinical.referrals.length;
-
-  const activityCount =
-    report.activity.journalEntries.length +
-    report.activity.symptoms.length +
-    report.activity.appointments.length +
-    report.activity.patientVitals.length +
-    report.activity.deviceMeasurements.length +
-    report.activity.sleepSessions.length +
-    report.activity.workouts.length;
 
   return (
     <ProtectedRoute>
       <main className="min-h-screen bg-[#f5f8fb] pb-10 text-slate-800">
-        <div className="mx-auto max-w-5xl px-4 py-6 sm:px-6 sm:py-8">
-          <Link href="/notifications" className="inline-flex items-center gap-2 text-sm font-semibold text-[#0b2d54]">
-            <ArrowLeft className="h-4 w-4" /> Back to notifications
-          </Link>
+        <div className="mx-auto max-w-6xl px-4 py-6 sm:px-6 sm:py-8">
+          <Link href="/notifications" className="inline-flex min-h-10 items-center gap-2 rounded-xl px-2 text-sm font-semibold text-[#0b2d54] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#24c1c4]"><ArrowLeft className="h-4 w-4" />Back to notifications</Link>
 
-          <section className="mt-4 overflow-hidden rounded-[32px] bg-gradient-to-br from-[#0b2d54] to-[#24c1c4] p-6 text-white shadow-lg sm:p-8">
-            <div className="flex items-start justify-between gap-4">
-              <div>
-                <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-[0.18em] text-white/70">
-                  <ShieldCheck className="h-4 w-4" /> Sympto health report
-                </div>
-                <h1 className="mt-3 text-3xl font-black">{report.type === "WEEKLY" ? "Weekly" : "Monthly"} health report</h1>
-                <p className="mt-2 text-sm text-white/80">{report.period.label}</p>
-              </div>
-              <FileText className="h-8 w-8 text-white/80" />
+          <section className="mt-4 overflow-hidden rounded-[30px] bg-gradient-to-br from-[#0b2d54] to-[#0f5a62] p-6 text-white shadow-lg sm:p-8">
+            <div className="flex flex-col gap-5 sm:flex-row sm:items-start sm:justify-between">
+              <div><div className="flex items-center gap-2 text-[10px] font-black uppercase tracking-[0.18em] text-[#24c1c4]"><ShieldCheck className="h-4 w-4" />Sympto health intelligence</div><h1 className="mt-3 text-3xl font-black tracking-tight sm:text-4xl">{title}</h1><p className="mt-2 text-sm leading-6 text-white/75">{report.period.label}</p><p className="mt-3 max-w-2xl text-sm leading-6 text-white/85">A view of changes, recurring patterns and consistency across your health data—not a duplicate timeline of journal entries.</p></div>
+              <div className="flex shrink-0 items-center gap-2 rounded-2xl border border-white/15 bg-white/10 px-4 py-3"><CalendarDays className="h-5 w-5 text-[#24c1c4]" /><div><p className="text-[10px] font-bold uppercase tracking-wide text-white/60">Report period</p><p className="mt-1 text-sm font-bold">{report.type === "WEEKLY" ? "7-day view" : "Monthly view"}</p></div></div>
             </div>
-            <div className="mt-6 flex flex-wrap gap-2">
-              <span className="rounded-full bg-white/12 px-3 py-1.5 text-xs font-bold">{activityCount} health activity records</span>
-              <span className="rounded-full bg-white/12 px-3 py-1.5 text-xs font-bold">{clinicalCount} clinical records</span>
-            </div>
+            <div className="mt-6 flex flex-wrap items-center gap-2"><span className="rounded-full bg-white/10 px-3 py-1.5 text-xs font-bold">Generated {dateLabel(report.generatedAt)}</span><span className="rounded-full bg-white/10 px-3 py-1.5 text-xs font-bold">{previousLoading ? "Comparing with prior period…" : previousReport ? "Compared with previous period" : previousFailed ? "Prior-period data unavailable" : "Current-period insights"}</span></div>
           </section>
 
-          {activityCount > 0 && (
-            <div className="mt-5 grid gap-4 md:grid-cols-2">
-              {report.activity.journalEntries.length > 0 && (
-                <Section icon={FileText} title="Your journal" count={report.activity.journalEntries.length}>
-                  <div className="space-y-2">{report.activity.journalEntries.map((entry: any) => <div key={entry.id} className="rounded-2xl bg-slate-50 p-4"><p className="text-xs text-slate-400">{date(entry.createdAt)}</p><p className="mt-1 font-semibold text-[#0b2d54]">{text(entry.title, "Journal entry")}</p><p className="mt-1 whitespace-pre-wrap text-sm leading-5 text-slate-600">{text(entry.journal)}</p></div>)}</div>
-                </Section>
-              )}
-              {report.activity.symptoms.length > 0 && (
-                <Section icon={Activity} title="Symptoms recorded" count={report.activity.symptoms.length}>
-                  <div className="space-y-2">{report.activity.symptoms.map((item: any) => <div key={item.id} className="rounded-2xl bg-slate-50 p-4"><div className="flex flex-wrap items-center gap-2"><span className={item.source === "CLINICAL" ? "rounded-full bg-emerald-50 px-2 py-1 text-[9px] font-black uppercase text-emerald-700" : "rounded-full bg-blue-50 px-2 py-1 text-[9px] font-black uppercase text-blue-700"}>{item.source === "CLINICAL" ? "Clinical" : "Patient"}</span><span className="text-xs text-slate-400">{date(item.startedAt || item.createdAt)}</span></div><p className="mt-2 font-semibold text-[#0b2d54]">{text(item.title, "Symptom recorded")}</p><p className="mt-1 text-sm text-slate-600">{(item.symptoms || []).map((x: any) => x.symptom?.name || x.name).filter(Boolean).join(" · ") || text(item.description)}</p></div>)}</div>
-                </Section>
-              )}
-              {report.activity.patientVitals.length > 0 && (
-                <Section icon={HeartPulse} title="Vitals you recorded" count={report.activity.patientVitals.length}>
-                  <div className="space-y-2">{report.activity.patientVitals.map((v: any) => <div key={v.id} className="rounded-xl bg-slate-50 p-3"><p className="text-xs text-slate-400">{date(v.recordedAt)}</p><div className="mt-2 flex flex-wrap gap-2">{v.temperature != null && <span className="rounded-full bg-white px-2.5 py-1 text-xs font-semibold">Temp · {v.temperature} °C</span>}{v.bloodPressureSystolic != null || v.bloodPressureDiastolic != null ? <span className="rounded-full bg-white px-2.5 py-1 text-xs font-semibold">BP · {v.bloodPressureSystolic ?? "—"}/{v.bloodPressureDiastolic ?? "—"}</span> : null}{v.heartRate != null && <span className="rounded-full bg-white px-2.5 py-1 text-xs font-semibold">HR · {v.heartRate} bpm</span>}{v.oxygenSaturation != null && <span className="rounded-full bg-white px-2.5 py-1 text-xs font-semibold">O2 · {v.oxygenSaturation}%</span>}{v.respiratoryRate != null && <span className="rounded-full bg-white px-2.5 py-1 text-xs font-semibold">Resp · {v.respiratoryRate}/min</span>}{v.weightKg != null && <span className="rounded-full bg-white px-2.5 py-1 text-xs font-semibold">Weight · {v.weightKg} kg</span>}</div></div>)}</div>
-                </Section>
-              )}
-              {report.activity.appointments.length > 0 && (
-                <Section icon={CalendarDays} title="Appointments" count={report.activity.appointments.length}>
-                  <div className="space-y-2">{report.activity.appointments.map((a: any) => <div key={a.id} className="rounded-2xl bg-slate-50 p-4"><p className="font-semibold text-[#0b2d54]">{human(a.appointmentType)}</p><p className="mt-1 text-xs text-slate-500">{date(a.scheduledStart)} · {text(a.practitioner?.person ? a.practitioner.person.firstName + " " + a.practitioner.person.lastName : null)}</p>{a.reason && <p className="mt-1 text-sm text-slate-600">{a.reason}</p>}</div>)}</div>
-                </Section>
-              )}
-              {report.activity.sleepSessions.length > 0 && (
-                <Section icon={HeartPulse} title="Sleep" count={report.activity.sleepSessions.length}>
-                  <div className="space-y-2">{report.activity.sleepSessions.map((s: any) => <div key={s.id} className="rounded-2xl bg-slate-50 p-4"><p className="text-xs text-slate-400">{date(s.startedAt)}</p><p className="mt-1 font-semibold text-[#0b2d54]">{s.durationMinutes != null ? "Sleep · " + s.durationMinutes + " min" : "Sleep session"}</p>{s.sleepScore != null && <p className="mt-1 text-xs text-slate-500">Sleep score · {s.sleepScore}</p>}</div>)}</div>
-                </Section>
-              )}
-              {report.activity.workouts.length > 0 && (
-                <Section icon={Activity} title="Exercise" count={report.activity.workouts.length}>
-                  <div className="space-y-2">{report.activity.workouts.map((w: any) => <div key={w.id} className="rounded-2xl bg-slate-50 p-4"><p className="text-xs text-slate-400">{date(w.startedAt)}</p><p className="mt-1 font-semibold text-[#0b2d54]">{human(w.activityType || "Workout")}</p>{w.durationSeconds != null && <p className="mt-1 text-xs text-slate-500">Duration · {Math.round(Number(w.durationSeconds) / 60)} min</p>}{w.calories != null && <p className="mt-1 text-xs text-slate-500">Calories · {w.calories}</p>}{w.averageHeartRate != null && <p className="mt-1 text-xs text-slate-500">Average heart rate · {w.averageHeartRate} bpm</p>}</div>)}</div>
-                </Section>
-              )}
-              {report.activity.deviceMeasurements.length > 0 && (
-                <Section icon={HeartPulse} title="Connected measurements" count={report.activity.deviceMeasurements.length}>
-                  <div className="space-y-2">{report.activity.deviceMeasurements.map((m: any) => <div key={m.id} className="flex flex-wrap justify-between gap-2 rounded-xl bg-slate-50 p-3"><div><p className="text-sm font-semibold text-[#0b2d54]">{human(m.measurementType || m.metricKey || "Measurement")}</p><p className="text-xs text-slate-400">{date(m.measuredAt)} · {text(m.device ? [m.device.manufacturer, m.device.model].filter(Boolean).join(" · ") : null, "Connected device")}</p></div><strong className="text-sm text-[#0b2d54]">{m.value} {m.unit}</strong></div>)}</div>
-                </Section>
-              )}
-            </div>
-          )}
+          {previousFailed && <div className="mt-4 flex items-start gap-2 rounded-2xl border border-amber-200 bg-amber-50 p-4 text-xs leading-5 text-amber-900"><Info className="mt-0.5 h-4 w-4 shrink-0" />The current report is available, but the prior-period comparison could not be loaded. Current-period trends remain available; comparison labels will appear when historical data is accessible.</div>}
 
-          {clinicalCount > 0 && (
-            <div className="mt-5 grid gap-4 md:grid-cols-2">
-              {report.clinical.encounters.length > 0 && <Section icon={Stethoscope} title="Clinical visits" count={report.clinical.encounters.length}><div className="space-y-3">{report.clinical.encounters.map((e: any) => <div key={e.id} className="rounded-2xl bg-slate-50 p-4"><div className="flex flex-wrap items-center gap-2"><span className="rounded-full bg-emerald-50 px-2.5 py-1 text-[9px] font-black uppercase text-emerald-700">Clinical</span><p className="font-semibold text-[#0b2d54]">{text(e.encounterType?.name, "Clinical encounter")}</p></div><p className="mt-1 text-xs text-slate-500">{date(e.startedAt)} · {text(e.practitioner?.person ? e.practitioner.person.firstName + " " + e.practitioner.person.lastName : null, "Practitioner not recorded")}</p>{e.chiefComplaint && <p className="mt-3 text-sm leading-5 text-slate-700"><strong>Reason:</strong> {e.chiefComplaint}</p>}{e.assessment && <p className="mt-2 whitespace-pre-wrap text-sm leading-5 text-slate-700"><strong>Assessment:</strong> {e.assessment}</p>}{e.plan && <p className="mt-2 whitespace-pre-wrap text-sm leading-5 text-slate-700"><strong>Plan:</strong> {e.plan}</p>}{e.notes && <p className="mt-2 whitespace-pre-wrap text-sm leading-5 text-slate-600"><strong>Notes:</strong> {e.notes}</p>}</div>)}</div></Section>}
-              {report.clinical.diagnoses.length > 0 && <Section icon={ClipboardList} title="Diagnoses" count={report.clinical.diagnoses.length}><div className="space-y-2">{report.clinical.diagnoses.map((d: any) => <div key={d.id} className="rounded-xl bg-slate-50 p-3"><span className="rounded-full bg-emerald-50 px-2 py-1 text-[9px] font-black uppercase text-emerald-700">Clinical</span><p className="mt-2 font-semibold text-[#0b2d54]">{text(d.diagnosis?.name || d.name, "Diagnosis")}</p><p className="mt-1 text-xs text-slate-500">{d.diagnosedAt ? date(d.diagnosedAt) : "Date not recorded"} · {human(d.status)}</p>{d.treatmentPlan && <p className="mt-2 whitespace-pre-wrap text-sm text-slate-600">{d.treatmentPlan}</p>}</div>)}</div></Section>}
-              {report.clinical.prescriptions.length > 0 && <Section icon={Pill} title="Prescriptions" count={report.clinical.prescriptions.length}><div className="space-y-2">{report.clinical.prescriptions.map((p: any) => <div key={p.id} className="rounded-2xl bg-slate-50 p-4"><div className="flex flex-wrap items-center gap-2"><span className="rounded-full bg-emerald-50 px-2 py-1 text-[9px] font-black uppercase text-emerald-700">Clinical</span><span className="text-xs text-slate-400">{date(p.issuedAt)}</span></div>{(p.items || []).map((item: any) => <div key={item.id} className="mt-2"><p className="font-semibold text-[#0b2d54]">{text(item.medication?.name, "Medication")}</p><p className="text-xs text-slate-500">{text(item.dosage)} · {human(item.frequency)} · {human(item.route)}</p>{item.instructions && <p className="mt-1 text-sm text-slate-600">{item.instructions}</p>}</div>)}</div>)}</div></Section>}
-              {report.clinical.notes.length > 0 && <Section icon={FileText} title="Clinical notes" count={report.clinical.notes.length}><div className="space-y-2">{report.clinical.notes.map((n: any) => <div key={n.id} className="rounded-xl bg-slate-50 p-3"><div className="flex items-center gap-2"><span className="rounded-full bg-emerald-50 px-2 py-1 text-[9px] font-black uppercase text-emerald-700">Clinical</span><span className="text-xs text-slate-400">{date(n.createdAt)}</span></div><p className="mt-2 whitespace-pre-wrap text-sm leading-6 text-slate-700">{n.note}</p></div>)}</div></Section>}
-              {report.clinical.vitals.length > 0 && <Section icon={HeartPulse} title="Clinical vitals" count={report.clinical.vitals.length}><div className="space-y-2">{report.clinical.vitals.map((v: any) => <div key={v.id} className="flex justify-between gap-3 rounded-xl bg-slate-50 p-3"><span className="flex items-center gap-2"><span className="rounded-full bg-emerald-50 px-2 py-1 text-[9px] font-black uppercase text-emerald-700">Clinical</span>{text(v.vitalType?.name, "Vital")}</span><strong className="text-[#0b2d54]">{text(v.value)}</strong></div>)}</div></Section>}
-              {report.clinical.labResults.length > 0 && <Section icon={FlaskConical} title="Laboratory results" count={report.clinical.labResults.length}><div className="space-y-3">{report.clinical.labResults.map((r: any) => <div key={r.id} className="rounded-2xl bg-slate-50 p-4"><div className="flex flex-wrap items-center gap-2"><span className="rounded-full bg-emerald-50 px-2 py-1 text-[9px] font-black uppercase text-emerald-700">Clinical</span><p className="font-semibold text-[#0b2d54]">{text(r.orderItem?.test?.name, "Lab result")}</p><span className="text-xs text-slate-400">{date(r.reportedAt || r.releasedAt)}</span></div><div className="mt-3 space-y-2">{(r.items || []).map((item: any) => <div key={item.id} className="flex flex-wrap justify-between gap-2 rounded-xl bg-white p-3"><span className="text-xs font-semibold text-slate-600">{text(item.test?.name, "Test")}</span><span className="text-xs font-black text-[#0b2d54]">{item.numericValue ?? item.textValue ?? item.booleanValue ?? "Not recorded"}{item.abnormal ? " · Abnormal" : ""}{item.critical ? " · Critical" : ""}</span></div>)}</div></div>)}</div></Section>}
-              {report.clinical.imaging.length > 0 && <Section icon={FileText} title="Imaging" count={report.clinical.imaging.length}><div className="space-y-3">{report.clinical.imaging.map((study: any) => <div key={study.id} className="rounded-2xl bg-slate-50 p-4"><div className="flex flex-wrap items-center gap-2"><span className="rounded-full bg-emerald-50 px-2 py-1 text-[9px] font-black uppercase text-emerald-700">Clinical</span><p className="font-semibold text-[#0b2d54]">{text(study.studyType || study.modality, "Imaging study")}</p><span className="text-xs text-slate-400">{date(study.performedAt || study.reportedAt)}</span></div>{(study.reports || []).map((reportItem: any) => <div key={reportItem.id} className="mt-3 space-y-2"><p className="text-sm leading-5 text-slate-700"><strong>Findings:</strong> {text(reportItem.findings)}</p>{reportItem.impression && <p className="text-sm leading-5 text-slate-700"><strong>Impression:</strong> {reportItem.impression}</p>}{reportItem.recommendations && <p className="text-sm leading-5 text-slate-700"><strong>Recommendations:</strong> {reportItem.recommendations}</p>}</div>)}</div>)}</div></Section>}
-              {report.clinical.procedures.length > 0 && <Section icon={ClipboardList} title="Procedures" count={report.clinical.procedures.length}><div className="space-y-2">{report.clinical.procedures.map((p: any) => <div key={p.id} className="rounded-xl bg-slate-50 p-3"><span className="rounded-full bg-emerald-50 px-2 py-1 text-[9px] font-black uppercase text-emerald-700">Clinical</span><p className="mt-2 font-semibold text-[#0b2d54]">{text(p.procedure?.name || p.name, "Procedure")}</p><p className="mt-1 text-xs text-slate-500">{p.performedAt ? date(p.performedAt) : date(p.createdAt)} · {human(p.status)}</p>{p.outcome && <p className="mt-2 text-sm text-slate-600">{p.outcome}</p>}</div>)}</div></Section>}
-              {report.clinical.carePlans.length > 0 && <Section icon={ClipboardList} title="Care plans" count={report.clinical.carePlans.length}><div className="space-y-2">{report.clinical.carePlans.map((p: any) => <div key={p.id} className="rounded-2xl bg-slate-50 p-4"><span className="rounded-full bg-emerald-50 px-2 py-1 text-[9px] font-black uppercase text-emerald-700">Clinical</span><p className="mt-2 font-semibold text-[#0b2d54]">{text(p.title, "Care plan")}</p><p className="mt-1 text-xs text-slate-500">{human(p.status)} · {date(p.updatedAt || p.createdAt)}</p>{p.description && <p className="mt-2 whitespace-pre-wrap text-sm text-slate-600">{p.description}</p>}</div>)}</div></Section>}
-              {report.clinical.referrals.length > 0 && <Section icon={Stethoscope} title="Referrals" count={report.clinical.referrals.length}><div className="space-y-2">{report.clinical.referrals.map((r: any) => <div key={r.id} className="rounded-2xl bg-slate-50 p-4"><span className="rounded-full bg-emerald-50 px-2 py-1 text-[9px] font-black uppercase text-emerald-700">Clinical</span><p className="mt-2 font-semibold text-[#0b2d54]">{r.specialty || "Clinical referral"}</p><p className="mt-1 text-xs text-slate-500">{human(r.status)} · {date(r.requestedDate)}</p><p className="mt-2 text-sm leading-5 text-slate-600">{text(r.reason)}</p>{r.clinicalSummary && <p className="mt-2 text-sm leading-5 text-slate-600"><strong>Clinical summary:</strong> {r.clinicalSummary}</p>}</div>)}</div></Section>}
-            </div>
-          )}
-
-          {(report.currentSnapshot.conditions.length > 0 || report.currentSnapshot.allergies.length > 0 || report.currentSnapshot.medications.length > 0 || report.currentSnapshot.activeGoals.length > 0 || report.currentSnapshot.medicalRecord) && (
-            <>
-              {report.currentSnapshot.medicalRecord && <Section icon={FileText} title="Medical background" count={1}><div className="space-y-3">{["pastMedicalHistory","surgicalHistory","familyHistory","socialHistory","chronicConditions","currentMedications","immunizationNotes"].map((key) => report.currentSnapshot.medicalRecord?.[key] ? <div key={key}><p className="text-[10px] font-black uppercase tracking-wide text-slate-400">{key.replace(/([A-Z])/g, " $1")}</p><p className="mt-1 whitespace-pre-wrap text-sm leading-6 text-slate-700">{report.currentSnapshot.medicalRecord[key]}</p></div> : null)}</div></Section>}
-              {report.currentSnapshot.activeGoals.length > 0 && <Section icon={Activity} title="Active health goals" count={report.currentSnapshot.activeGoals.length}><div className="space-y-2">{report.currentSnapshot.activeGoals.map((goal: any) => <div key={goal.id} className="rounded-2xl bg-slate-50 p-4"><p className="font-semibold text-[#0b2d54]">{text(goal.title, "Health goal")}</p><p className="mt-1 text-xs text-slate-500">{human(goal.category)} · {human(goal.status)}</p>{goal.targetValue != null && <p className="mt-1 text-sm text-slate-600">Target · {goal.targetValue}{goal.unit ? " " + goal.unit : ""}</p>}{goal.progress?.[0] && <p className="mt-1 text-xs font-semibold text-[#0b2d54]">Latest progress · {text(goal.progress[0].progressPercent, "—")}%</p>}</div>)}</div></Section>}
-            <Section icon={ShieldCheck} title="Current clinical snapshot" count={report.currentSnapshot.conditions.length + report.currentSnapshot.allergies.length + report.currentSnapshot.medications.length}>
-              <div className="grid gap-4 md:grid-cols-3">
-                {report.currentSnapshot.conditions.length > 0 && <div><p className="text-xs font-black uppercase tracking-wide text-slate-400">Active conditions</p><div className="mt-2 space-y-2">{report.currentSnapshot.conditions.map((item: any) => <div key={item.id} className="rounded-xl bg-blue-50 p-3"><span className="rounded-full bg-emerald-50 px-2 py-1 text-[9px] font-black uppercase text-emerald-700">Clinical</span><p className="mt-2 text-sm font-semibold text-[#0b2d54]">{text(item.condition?.name || item.name)}</p></div>)}</div></div>}
-                {report.currentSnapshot.allergies.length > 0 && <div><p className="text-xs font-black uppercase tracking-wide text-slate-400">Active allergies</p><div className="mt-2 space-y-2">{report.currentSnapshot.allergies.map((item: any) => <div key={item.id} className="rounded-xl bg-rose-50 p-3"><span className="rounded-full bg-emerald-50 px-2 py-1 text-[9px] font-black uppercase text-emerald-700">Clinical</span><p className="mt-2 text-sm font-semibold text-[#0b2d54]">{text(item.allergy?.name || item.name)}</p></div>)}</div></div>}
-                {report.currentSnapshot.medications.length > 0 && <div><p className="text-xs font-black uppercase tracking-wide text-slate-400">Current medications</p><div className="mt-2 space-y-2">{report.currentSnapshot.medications.map((item: any) => <div key={item.id} className="rounded-xl bg-slate-50 p-3"><span className="rounded-full bg-emerald-50 px-2 py-1 text-[9px] font-black uppercase text-emerald-700">Clinical</span><p className="mt-2 text-sm font-semibold text-[#0b2d54]">{text(item.medication?.name || item.name)}</p><p className="mt-1 text-xs text-slate-500">{[item.dosage, item.frequency, item.route].filter(Boolean).join(" · ")}</p></div>)}</div></div>}
-              </div>
-            </Section>
-            </>
-          )}
-
-          <p className="mt-5 text-center text-xs text-slate-400">Report generated {date(report.generatedAt)}. Sections appear only when records are available.</p>
+          <HealthReportInsights report={report} previousReport={previousReport} previousLoading={previousLoading} previousFailed={previousFailed} />
         </div>
       </main>
     </ProtectedRoute>
