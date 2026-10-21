@@ -583,7 +583,7 @@ export default function TodaySupportedGoalCard({ goal, activeGoals = [], healthC
       }
     }
     return Array.from(byGoalId.values());
-  }, [goal?.connectedGoals]);
+  }, [goal]);
   const connectedExerciseGoal = Array.isArray(goal?.connectedGoals)
     ? goal.connectedGoals
         .map((relation: any) => relation?.goal)
@@ -612,10 +612,6 @@ export default function TodaySupportedGoalCard({ goal, activeGoals = [], healthC
 
   useEffect(() => {
     if (category !== "BLOOD_PRESSURE" || metricType !== "BLOOD_PRESSURE" || metricKey !== "blood_pressure.systolic") {
-      setLiveCurrent(null);
-      setBpLatestAt(null);
-      setBpGoalStats({ recordedDays: 0, targetDays: 0 });
-
       return;
     }
 
@@ -688,7 +684,6 @@ export default function TodaySupportedGoalCard({ goal, activeGoals = [], healthC
 
   useEffect(() => {
     if (category !== "HEART_RATE" || metricType !== "HEART_RATE" || metricKey !== "heart_rate.bpm") {
-      setHeartRateStats({ todayCurrent: null, todayAt: null, latestCurrent: null, latestAt: null, recordedDays: 0, targetDays: 0, days: [] });
       return;
     }
 
@@ -1235,7 +1230,7 @@ export default function TodaySupportedGoalCard({ goal, activeGoals = [], healthC
               <p className="mt-3 flex items-center gap-2 text-[10px] font-semibold text-[#71839a]">
                 <span className="h-1.5 w-1.5 rounded-full bg-[#b4c3ca]" />
                 No reading today
-                <span className="font-normal">· Add one to update today's status.</span>
+                <span className="font-normal">· Add one to update today&apos;s status.</span>
               </p>
             )}
 
