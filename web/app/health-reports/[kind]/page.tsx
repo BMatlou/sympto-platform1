@@ -428,6 +428,18 @@ function dailyMetric(report: Report | null, field: string): DailyValue[] {
     .sort((a, b) => a.date.localeCompare(b.date));
 }
 
+function preferPrimaryByDate(
+  primary: Array<{ date: string; value: number; unit?: string }>,
+  secondary: Array<{ date: string; value: number; unit?: string }>,
+) {
+  const byDate = new Map<string, { date: string; value: number; unit?: string }>();
+  primary.forEach((item) => byDate.set(item.date, item));
+  secondary.forEach((item) => {
+    if (!byDate.has(item.date)) byDate.set(item.date, item);
+  });
+  return Array.from(byDate.values()).sort((a, b) => a.date.localeCompare(b.date));
+}
+
 function dailyCategoricalMetric(
   report: Report | null,
   field: "mood" | "energyLevel" | "sleepQuality",
@@ -1637,8 +1649,8 @@ function PersonalisedInsights({
     signal("smoking", "Cigarettes logged", smokingCurrent, smokingPrevious, "cigarettes"),
     signal("alcohol", "Alcohol logged", alcoholCurrent, alcoholPrevious, "drinks"),
     signal("nutrition", "Nutrition / calories", nutritionCurrent, nutritionPrevious, ""),
-    signal("hydration", "Water intake", hydrationEventsCurrent.length ? hydrationEventsCurrent : hydrationChecksCurrent, hydrationEventsPrevious.length ? hydrationEventsPrevious : hydrationChecksPrevious, "ml"),
-    signal("exercise", "Exercise logged", exerciseEventsCurrent.length ? exerciseEventsCurrent : exerciseChecksCurrent, exerciseEventsPrevious.length ? exerciseEventsPrevious : exerciseChecksPrevious, "min"),
+    signal("hydration", "Water intake", preferPrimaryByDate(hydrationChecksCurrent, hydrationEventsCurrent), preferPrimaryByDate(hydrationChecksPrevious, hydrationEventsPrevious), "ml"),
+    signal("exercise", "Exercise logged", preferPrimaryByDate(exerciseChecksCurrent, exerciseEventsCurrent), preferPrimaryByDate(exerciseChecksPrevious, exerciseEventsPrevious), "min"),
     signal("workouts", "Workout sessions", workoutsCurrent, workoutsPrevious, "min/day"),
     signal("sleep-checkin", "Sleep check-ins", sleepChecksCurrent, sleepChecksPrevious, "hours"),
     signal("sleep-session", "Connected sleep", sleepSessionsCurrent, sleepSessionsPrevious, "hours/day"),
