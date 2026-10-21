@@ -1246,7 +1246,7 @@ function MiniTrend({
       </svg>
       <div className="mt-0.5 flex items-center justify-between gap-2 text-[10px] text-slate-400">
         <span>{chartSummary}</span>
-        <span>{unit ? "Values in " + unit : variant === "bar" ? "Daily totals" : "Recorded trend"}{digits === 0 ? "" : ""}</span>
+        <span>{unit ? formatNumber(minimum, digits) + "–" + formatNumber(maximum, digits) + " " + unit : variant === "bar" ? "Daily totals" : "Recorded trend"}</span>
       </div>
     </div>
   );
@@ -2405,7 +2405,7 @@ function HealthReportInsights({
   const currentStepValues = currentSteps.map((item) => item.value);
   const previousStepValues = previousSteps.map((item) => item.value);
   const hasCategoricalCheckIns = report.activity.journalEntries.some((entry) => Boolean(entry.mood || entry.energyLevel || entry.sleepQuality));
-  const noAnalysisData = activeVitals.length === 0 && routines.length === 0 && goalProgressItems.length === 0 && (report.goalMetricEvents ?? []).length === 0 && (report.activity.wellnessMetrics ?? []).length === 0 && !hasCategoricalCheckIns && symptomCount === 0 && sleepSessions.length === 0 && workouts.length === 0 && clinicalCount === 0;
+  const noAnalysisData = activeVitals.length === 0 && routines.length === 0 && currentSteps.length === 0 && goalProgressItems.length === 0 && (report.goalMetricEvents ?? []).length === 0 && (report.activity.wellnessMetrics ?? []).length === 0 && !hasCategoricalCheckIns && symptomCount === 0 && sleepSessions.length === 0 && workouts.length === 0 && clinicalCount === 0;
   const moodPattern = lowMood.total > 0
     ? lowMood.low + " of " + lowMood.total + " mood check-ins were marked low or very low."
     : "";
