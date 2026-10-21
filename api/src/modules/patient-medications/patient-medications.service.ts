@@ -315,6 +315,15 @@ export class PatientMedicationsService {
     const effectiveMeasuredAt = Number.isNaN(measuredAt.getTime()) ? new Date() : measuredAt;
     const source = 'medication-adherence';
     const sourceId = `${id}:${effectiveMeasuredAt.toISOString()}`;
+    // Preserve the dose outcome with the dated adherence measurement so Health Reports
+    // can compare TAKEN and SKIPPED actions instead of inferring them from a rolling percentage.
+    const adherenceMetadata = JSON.stringify({
+      action: dto.action,
+      patientMedicationId: id,
+      medicationName: existing.medication.name || existing.medication.genericName || 'Medication',
+      adherencePercentage,
+      missedDoses,
+    });
 
     const existingEvent = await this.prisma.$queryRaw<Array<{ id: string }>>`
       SELECT "id"
@@ -331,15 +340,16 @@ export class PatientMedicationsService {
         SET "metricType" = 'MEDICATION',
             "metricKey" = 'medication.adherence',
             "loggedValue" = ${adherencePercentage},
-            "occurredAt" = ${effectiveMeasuredAt}
+            "occurredAt" = ${effectiveMeasuredAt},
+            "metadata" = ${adherenceMetadata}::jsonb
         WHERE "id" = ${existingEvent[0].id}::uuid
       `;
     } else {
       await this.prisma.$executeRaw`
         INSERT INTO "HealthGoalMetricEvent"
-          ("id", "patientId", "metricType", "metricKey", "loggedValue", "occurredAt", "source", "sourceId")
+          ("id", "patientId", "metricType", "metricKey", "loggedValue", "occurredAt", "source", "sourceId", "metadata")
         VALUES
-          (gen_random_uuid(), ${patientId}, 'MEDICATION', 'medication.adherence', ${adherencePercentage}, ${effectiveMeasuredAt}, ${source}, ${sourceId})
+          (gen_random_uuid(), ${patientId}, 'MEDICATION', 'medication.adherence', ${adherencePercentage}, ${effectiveMeasuredAt}, ${source}, ${sourceId}, ${adherenceMetadata}::jsonb)
     `;
     }
 
