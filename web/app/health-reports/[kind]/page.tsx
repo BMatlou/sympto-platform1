@@ -1609,7 +1609,11 @@ function PersonalisedInsights({
     if (/weight|body.?mass/.test(normalized)) return has(weightCurrent, weightPrevious);
     if (/hba1c|a1c|glycat|glycosylat/.test(normalized)) return has(a1cLabCurrent, a1cLabPrevious);
     if (/glucose/.test(normalized)) return has(glucoseCurrent, glucosePrevious);
-    if (/cholesterol|lipid|triglyceride|\\bldl\\b|\\bhdl\\b/.test(normalized)) return anyLipidLab || has(cholesterolEventsCurrent, cholesterolEventsPrevious);
+    if (/\bldl\b|low.density.lipoprotein/.test(normalized)) return has(ldlCurrent, ldlPrevious);
+    if (/\bhdl\b|high.density.lipoprotein/.test(normalized)) return has(hdlCurrent, hdlPrevious);
+    if (/triglyceride/.test(normalized)) return has(triglyceridesCurrent, triglyceridesPrevious);
+    if (/total.cholesterol|cholesterol.total|serum.cholesterol|^cholesterol$/.test(normalized)) return has(totalCholesterolCurrent, totalCholesterolPrevious);
+    if (/cholesterol|lipid/.test(normalized)) return anyLipidLab || has(cholesterolEventsCurrent, cholesterolEventsPrevious);
     if (/smoking|tobacco|cigarette/.test(normalized)) return has(smokingCurrent, smokingPrevious);
     if (/alcohol|drink/.test(normalized)) return has(alcoholCurrent, alcoholPrevious);
     if (/medication|adherence/.test(normalized)) return doseCurrent.eventTotal > 0 || doseCurrent.legacyTotal > 0;
@@ -1618,8 +1622,8 @@ function PersonalisedInsights({
     if (/exercise|workout|fitness|active.minutes/.test(normalized)) return has(exerciseEventsCurrent, exerciseEventsPrevious, exerciseChecksCurrent, exerciseChecksPrevious, workoutsCurrent, workoutsPrevious);
     if (/sleep/.test(normalized)) return has(sleepChecksCurrent, sleepChecksPrevious, sleepSessionsCurrent, sleepSessionsPrevious);
     if (/stress/.test(normalized)) return has(stressCurrent, stressPrevious);
-    if (/heart.?rate|pulse|\\bbpm\\b/.test(normalized)) return has(vitalSeries(report, "heartRate"), vitalSeries(previousReport, "heartRate"));
-    if (/blood.?pressure|systolic|diastolic|\\bsbp\\b|\\bdbp\\b/.test(normalized)) return has(vitalSeries(report, "systolic"), vitalSeries(report, "diastolic"), vitalSeries(previousReport, "systolic"), vitalSeries(previousReport, "diastolic"));
+    if (/heart.?rate|pulse|\bbpm\b/.test(normalized)) return has(vitalSeries(report, "heartRate"), vitalSeries(previousReport, "heartRate"));
+    if (/blood.?pressure|systolic|diastolic|\bsbp\b|\bdbp\b/.test(normalized)) return has(vitalSeries(report, "systolic"), vitalSeries(report, "diastolic"), vitalSeries(previousReport, "systolic"), vitalSeries(previousReport, "diastolic"));
     if (/oxygen|spo2|temperature|respiratory|breathing/.test(normalized)) return has(
       vitalSeries(report, "oxygen"), vitalSeries(previousReport, "oxygen"),
       vitalSeries(report, "temperature"), vitalSeries(previousReport, "temperature"),
