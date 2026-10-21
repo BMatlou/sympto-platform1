@@ -413,23 +413,21 @@ export class HealthReportNotificationSchedulerService
         orderBy: [{ createdAt: 'asc' }, { updatedAt: 'asc' }],
       }),
       this.prisma.deviceMeasurement.findMany({
-        where: {
-          device: { patientId },
-          measuredAt: { gte: period.start, lt: period.end },
-        },
+        where: { device: { patientId }, OR: [
+          { measuredAt: { gte: period.start, lt: period.end } },
+          { receivedAt: { gte: period.start, lt: period.end } },
+        ] },
         orderBy: { measuredAt: 'asc' },
         include: {
-          device: {
-            select: {
-              manufacturer: true,
-              model: true,
-              deviceType: true,
-            },
-          },
+          device: { select: { manufacturer: true, model: true, deviceType: true } },
+          deviceAlerts: true,
         },
       }),
       this.prisma.wearableWellnessMetric.findMany({
-        where: { patientId, measuredAt: { gte: period.start, lt: period.end } },
+        where: { patientId, OR: [
+          { measuredAt: { gte: period.start, lt: period.end } },
+          { createdAt: { gte: period.start, lt: period.end } },
+        ] },
         orderBy: { measuredAt: 'asc' },
       }),
       this.prisma.sleepSession.findMany({
