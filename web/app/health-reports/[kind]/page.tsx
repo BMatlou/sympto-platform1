@@ -1207,7 +1207,6 @@ function medicationDoseTotals(report: Report | null) {
   if (!report) return { eventActions: [] as MedicationDoseAction[], legacyActions: [] as MedicationDoseAction[], eventTaken: 0, eventSkipped: 0, eventTotal: 0, eventAdherencePercent: null as number | null, legacyTaken: 0, legacySkipped: 0, legacyTotal: 0 };
   const eventActions: MedicationDoseAction[] = [];
   const legacyActions: MedicationDoseAction[] = [];
-  const eventDatesWithAction = new Set<string>();
 
   (report.goalMetricEvents ?? [])
     .filter((event) => String(event.metricType ?? "").toUpperCase() === "MEDICATION" &&
@@ -1224,7 +1223,6 @@ function medicationDoseTotals(report: Report | null) {
       const date = dateKey(event.occurredAt);
       if (!date || (action !== "TAKEN" && action !== "SKIPPED")) return;
       eventActions.push({ date, action, source: "event" });
-      eventDatesWithAction.add(date);
     });
 
   // Older journal projections hold the last status for a medication/day, not one
@@ -1235,7 +1233,7 @@ function medicationDoseTotals(report: Report | null) {
     const actionMatch = text.match(/dose marked (taken|skipped)/);
     if (!actionMatch) return;
     const date = dateKey(entry.createdAt || entry.recordedAt || entry.updatedAt);
-    if (!date || eventDatesWithAction.has(date)) return;
+    if (!date) return;
     legacyActions.push({ date, action: actionMatch[1].toUpperCase() as "TAKEN" | "SKIPPED", source: "journal" });
   });
 
