@@ -1221,6 +1221,17 @@ function wellnessMetricSeries(report: Report | null, metricKey: string): SeriesP
     .sort((a, b) => a.timestamp - b.timestamp);
 }
 
+function wellnessMetricSeriesMatching(report: Report | null, pattern: RegExp): SeriesPoint[] {
+  if (!report) return [];
+  const keys = Array.from(new Set(
+    report.activity.wellnessMetrics
+      .map((item) => String(item.metricKey ?? "").trim())
+      .filter((key) => key && pattern.test(key.toLowerCase())),
+  ));
+  return keys.flatMap((key) => wellnessMetricSeries(report, key))
+    .sort((a, b) => a.timestamp - b.timestamp);
+}
+
 function dailySessionSeries(report: Report | null, field: "sleep" | "workout"): DailyValue[] {
   if (!report) return [];
   const grouped = new Map<string, number>();
@@ -1390,11 +1401,34 @@ function PersonalisedInsights({
     signal("symptoms", "Symptom logs", dailySymptomSeries(report), dailySymptomSeries(previousReport), "logs/day"),
   ].filter((item) => item.current.length > 0 || item.previous.length > 0);
 
-  const alreadySummarisedWearableMetric = /weight|glucose|hba1c|a1c|cholesterol|lipid|triglyceride|smoking|tobacco|cigarette|alcohol|drink|medication|adherence|nutrition|calorie|hydration|water|exercise|workout|sleep|stress|symptom|blood.?pressure|systolic|diastolic|heart.?rate|pulse|oxygen|spo2|temperature|respiratory|breathing/i;
+  const wellnessKeyAlreadyRepresented = (key: string) => {
+    const normalized = key.toLowerCase();
+    const has = (...series: Array<{ length: number }>) => series.some((item) => item.length > 0);
+    if (/weight|body.?mass/.test(normalized)) return has(weightCurrent, weightPrevious);
+    if (/hba1c|a1c|glycat|glycosylat/.test(normalized)) return has(a1cLabCurrent, a1cLabPrevious);
+    if (/glucose/.test(normalized)) return has(glucoseCurrent, glucosePrevious);
+    if (/cholesterol|lipid|triglyceride|\\bldl\\b|\\bhdl\\b/.test(normalized)) return anyLipidLab || has(cholesterolEventsCurrent, cholesterolEventsPrevious);
+    if (/smoking|tobacco|cigarette/.test(normalized)) return has(smokingCurrent, smokingPrevious);
+    if (/alcohol|drink/.test(normalized)) return has(alcoholCurrent, alcoholPrevious);
+    if (/medication|adherence/.test(normalized)) return doseCurrent.eventTotal > 0 || doseCurrent.legacyTotal > 0;
+    if (/nutrition|calorie|energy.intake/.test(normalized)) return has(nutritionCurrent, nutritionPrevious);
+    if (/hydration|water/.test(normalized)) return has(hydrationEventsCurrent, hydrationEventsPrevious, hydrationChecksCurrent, hydrationChecksPrevious);
+    if (/exercise|workout|fitness|active.minutes/.test(normalized)) return has(exerciseEventsCurrent, exerciseEventsPrevious, exerciseChecksCurrent, exerciseChecksPrevious, workoutsCurrent, workoutsPrevious);
+    if (/sleep/.test(normalized)) return has(sleepChecksCurrent, sleepChecksPrevious, sleepSessionsCurrent, sleepSessionsPrevious);
+    if (/stress/.test(normalized)) return has(stressCurrent, stressPrevious);
+    if (/heart.?rate|pulse|\\bbpm\\b/.test(normalized)) return has(vitalSeries(report, "heartRate"), vitalSeries(previousReport, "heartRate"));
+    if (/blood.?pressure|systolic|diastolic|\\bsbp\\b|\\bdbp\\b/.test(normalized)) return has(vitalSeries(report, "systolic"), vitalSeries(report, "diastolic"), vitalSeries(previousReport, "systolic"), vitalSeries(previousReport, "diastolic"));
+    if (/oxygen|spo2|temperature|respiratory|breathing/.test(normalized)) return has(
+      vitalSeries(report, "oxygen"), vitalSeries(previousReport, "oxygen"),
+      vitalSeries(report, "temperature"), vitalSeries(previousReport, "temperature"),
+      vitalSeries(report, "respiratory"), vitalSeries(previousReport, "respiratory"),
+    );
+    return false;
+  };
   const wellnessKeys = Array.from(new Set([
     ...(report.activity.wellnessMetrics ?? []).map((item) => String(item.metricKey ?? "").trim()).filter(Boolean),
     ...(previousReport?.activity.wellnessMetrics ?? []).map((item) => String(item.metricKey ?? "").trim()).filter(Boolean),
-  ])).filter((key) => !alreadySummarisedWearableMetric.test(key));
+  ])).filter((key) => !wellnessKeyAlreadyRepresented(key));
   const wearableSignals = wellnessKeys.map((key) => {
     const current = wellnessMetricSeries(report, key);
     const previous = wellnessMetricSeries(previousReport, key);
