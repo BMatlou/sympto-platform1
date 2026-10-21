@@ -1793,55 +1793,13 @@ function HealthReportInsights({
     current: dailyMetric(report, config.field),
     previous: dailyMetric(previousReport, config.field),
   })).filter((config) => config.current.length > 0);
-  const noAnalysisData = activeVitals.length === 0 && routines.length === 0 && goalProgressItems.length === 0 && symptomCount === 0 && sleepSessions.length === 0 && workouts.length === 0 && clinicalCount === 0;
+  const noAnalysisData = activeVitals.length === 0 && routines.length === 0 && goalProgressItems.length === 0 && (report.goalMetricEvents ?? []).length === 0 && symptomCount === 0 && sleepSessions.length === 0 && workouts.length === 0 && clinicalCount === 0;
   const moodPattern = lowMood.total > 0
     ? lowMood.low + " of " + lowMood.total + " mood check-ins were marked low or very low."
     : "";
   const symptomPattern = repeated.find((item) => item.count > 1);
   const activityDelta = previousReport ? workouts.length - previousReport.activity.workouts.length : null;
   const sleepDelta = previousReport ? sleepSessions.length - previousReport.activity.sleepSessions.length : null;
-  const goalFollowUps = (report.currentSnapshot?.activeGoals ?? []).filter((goal) =>
-    ["DECLINING", "STAGNANT"].includes(String(goal.progress?.[0]?.status ?? "").toUpperCase()),
-  );
-  const nextSteps: { title: string; detail: string; href: string; linkLabel: string; tone: StatusTone }[] = [];
-  if (measurementReviews.length > 0) {
-    nextSteps.push({
-      title: "Check the flagged readings first",
-      detail: "Start with the warning cards above. Check the saved date, unit and source; repeat a current measurement when safe. Follow any urgent medical advice in the warning instead of waiting for the next report.",
-      href: "/today",
-      linkLabel: "Review Health Vitals",
-      tone: measurementReviews.some((item) => item.severity === "urgent") ? "critical" : "watch",
-    });
-  }
-  if (goalFollowUps.length > 0) {
-    const decliningGoals = goalFollowUps.filter((goal) => String(goal.progress?.[0]?.status ?? "").toUpperCase() === "DECLINING");
-    nextSteps.push({
-      title: "Review goals that need attention",
-      detail: String(goalFollowUps.length) + " of your saved goals have a latest recorded status of " + (decliningGoals.length > 0 ? "declining or stagnant" : "stagnant") + ". The report uses matching saved targets in the relevant measurement cards; review the underlying progress history for context, and do not change medicines or treatment based on this report alone.",
-      href: "/health-goals",
-      linkLabel: "Review health goals",
-      tone: decliningGoals.length > 0 ? "high" : "watch",
-    });
-  }
-  if (daysLogged < totalDays) {
-    nextSteps.push({
-      title: "Build a clearer picture next period",
-      detail: "You have saved records on " + daysLogged + " of " + totalDays + " days. Record check-ins when you can, and only enter values you actually know. Empty days remain unknown—not zero.",
-      href: "/today",
-      linkLabel: "Open Today",
-      tone: "info",
-    });
-  }
-  if (nextSteps.length === 0) {
-    nextSteps.push({
-      title: "Keep tracking against your saved goals",
-      detail: "Continue recording the measurements and daily routines that relate to your goals. Sympto will compare future periods as more dated records become available.",
-      href: "/health-goals",
-      linkLabel: "View health goals",
-      tone: "good",
-    });
-  }
-
   return (
     <div className="mt-5 space-y-6">
       <PersonalisedInsights report={report} previousReport={previousReport} previousLoading={previousLoading} coveragePercent={coveragePercent} daysLogged={daysLogged} totalDays={totalDays} />
@@ -1905,41 +1863,38 @@ function HealthReportInsights({
         </section>
       )}
 
-      <section>
-        <div className="mb-3"><p className="text-[10px] font-black uppercase tracking-[0.16em] text-[#24c1c4]">Patterns to review</p><h2 className="mt-1 text-xl font-black text-[#0b2d54]">What stands out</h2><p className="mt-1 text-sm leading-6 text-slate-500">These are observations from the records you saved, not proof of what caused a symptom.</p></div>
-        <div className="grid gap-3 md:grid-cols-2">
-          <article className="rounded-2xl border border-slate-200 bg-white p-5">
-            <div className="flex items-center gap-2"><Activity className="h-5 w-5 text-[#24c1c4]" /><h3 className="font-bold text-[#0b2d54]">Symptoms that came back</h3></div>
-            {symptomPattern ? <><p className="mt-3 text-lg font-black text-[#0b2d54]">{symptomPattern.label}</p><p className="mt-1 text-sm leading-6 text-slate-600">You logged this symptom {symptomPattern.count} times during this period. You may want to note when it happens and any possible triggers to discuss with your healthcare professional.</p></> : <p className="mt-3 text-sm leading-6 text-slate-500">{symptomCount === 0 ? "You did not log any symptoms during this period. This does not tell us whether you felt well on days without a log." : "No symptom name appeared more than once in the records available for this period."}</p>}
-            {repeated.length > 1 && <p className="mt-2 text-xs text-slate-500">Other repeated labels: {repeated.filter((item) => item.count > 1 && item.label !== symptomPattern?.label).slice(0, 2).map((item) => item.label + " (" + item.count + ")").join(" · ") || "None"}</p>}
-          </article>
-          <article className="rounded-2xl border border-slate-200 bg-white p-5">
-            <div className="flex items-center gap-2"><ClipboardList className="h-5 w-5 text-[#24c1c4]" /><h3 className="font-bold text-[#0b2d54]">Logging consistency</h3></div>
-            <p className="mt-3 text-lg font-black text-[#0b2d54]">{daysLogged} of {totalDays} days</p>
-            <p className="mt-1 text-sm leading-6 text-slate-600">{daysLogged === 0 ? "No dated records were available for this period." : "Records appear on " + daysLogged + " of " + totalDays + " days. There are " + (totalDays - daysLogged) + " days without a saved record. That does not mean something was wrong or right on those days; it only means there is no entry to compare."}</p>
-          </article>
-          {moodPattern && <article className="rounded-2xl border border-slate-200 bg-white p-5"><div className="flex items-center gap-2"><HeartPulse className="h-5 w-5 text-[#24c1c4]" /><h3 className="font-bold text-[#0b2d54]">Mood check-ins</h3></div><p className="mt-3 text-sm leading-6 text-slate-600">{moodPattern} These are the mood ratings you entered in your check-ins; they are not a diagnosis.</p></article>}
-          {association && <article className="rounded-2xl border border-slate-200 bg-white p-5"><div className="flex items-center gap-2"><Moon className="h-5 w-5 text-[#24c1c4]" /><h3 className="font-bold text-[#0b2d54]">Sleep and stress on the same days</h3></div><p className="mt-3 text-sm leading-6 text-slate-600">On your {association.shorterDays} days with shorter logged sleep, your average stress rating was {formatNumber(association.shortStress, 1)}/10. On your {association.longerDays} days with longer logged sleep, it was {formatNumber(association.longStress, 1)}/10.</p><p className="mt-2 text-xs leading-5 text-slate-500">These ratings happened on the same days; this small pattern does not show that sleep caused the stress ratings.</p></article>}
-        </div>
-      </section>
-
-      <section>
-        <div className="mb-3"><p className="text-[10px] font-black uppercase tracking-[0.16em] text-[#24c1c4]">Next steps</p><h2 className="mt-1 text-xl font-black text-[#0b2d54]">What to do next</h2><p className="mt-1 text-sm leading-6 text-slate-500">These suggestions use saved warnings, recorded goal status and data coverage. They do not replace your care plan or a clinician's advice.</p></div>
-        <div className="grid gap-3 md:grid-cols-2">
-          {nextSteps.map((step) => (
-            <article key={step.title} className={"rounded-2xl border bg-white p-4 " + toneStyles(step.tone).border}>
-              <div className="flex items-start gap-3">
-                <span className={"grid h-9 w-9 shrink-0 place-items-center rounded-full " + toneStyles(step.tone).surface + " " + toneStyles(step.tone).text}><span className="text-sm font-black">{step.tone === "good" ? "✓" : step.tone === "info" ? "i" : "!"}</span></span>
-                <div className="min-w-0 flex-1">
-                  <h3 className="text-sm font-black text-[#0b2d54]">{step.title}</h3>
-                  <p className="mt-1 text-xs leading-5 text-slate-600">{step.detail}</p>
-                  <Link href={step.href} className="mt-3 inline-flex min-h-9 items-center gap-1.5 rounded-xl bg-[#0b2d54] px-3 py-2 text-[10px] font-black text-white">{step.linkLabel} <ArrowRight className="h-3 w-3 text-[#24c1c4]" /></Link>
-                </div>
-              </div>
-            </article>
-          ))}
-        </div>
-      </section>
+      {(symptomCount > 0 || lowMood.total > 0 || association !== null || repeated.some((item) => item.count > 1)) && (
+        <section>
+          <div className="mb-3">
+            <p className="text-[10px] font-black uppercase tracking-[0.16em] text-[#24c1c4]">Detected patterns</p>
+            <h2 className="mt-1 text-xl font-black text-[#0b2d54]">Behaviour and symptom signals</h2>
+          </div>
+          <div className="grid gap-3 sm:grid-cols-2">
+            {symptomCount > 0 && (
+              <article className="rounded-2xl border border-slate-200 bg-white p-4">
+                <h3 className="text-sm font-bold text-[#0b2d54]">Symptom logs</h3>
+                <p className="mt-2 text-2xl font-black text-[#0b2d54]">{symptomCount}</p>
+                <p className="mt-1 text-xs text-slate-500">{previousReport ? (symptomDifference === 0 ? "No change vs previous period" : (symptomDifference > 0 ? "+" : "") + symptomDifference + " vs previous period") : "No prior-period comparison"}</p>
+                {symptomPattern && <p className="mt-2 text-xs font-semibold text-slate-600">Most repeated: {symptomPattern.label} ({symptomPattern.count})</p>}
+              </article>
+            )}
+            {lowMood.total > 0 && (
+              <article className="rounded-2xl border border-slate-200 bg-white p-4">
+                <h3 className="text-sm font-bold text-[#0b2d54]">Mood check-ins</h3>
+                <p className="mt-2 text-2xl font-black text-[#0b2d54]">{lowMood.low}/{lowMood.total}</p>
+                <p className="mt-1 text-xs text-slate-500">Low or very-low ratings / all mood entries</p>
+              </article>
+            )}
+            {association && (
+              <article className="rounded-2xl border border-slate-200 bg-white p-4 sm:col-span-2">
+                <h3 className="text-sm font-bold text-[#0b2d54]">Sleep and stress on the same days</h3>
+                <p className="mt-2 text-sm font-semibold text-[#0b2d54]">{association.shorterDays} shorter-sleep days: stress average {formatNumber(association.shortStress, 1)}/10 · {association.longerDays} longer-sleep days: {formatNumber(association.longStress, 1)}/10</p>
+                <p className="mt-1 text-[11px] text-slate-500">Same-day association only; this does not establish cause.</p>
+              </article>
+            )}
+          </div>
+        </section>
+      )}
 
       {(clinicalCount > 0 || flaggedLabs.length > 0) && (
         <section>
@@ -1956,7 +1911,7 @@ function HealthReportInsights({
 
       {noAnalysisData && <section className="rounded-2xl border border-dashed border-slate-300 bg-white p-6"><div className="flex items-start gap-3"><Info className="mt-0.5 h-5 w-5 shrink-0 text-[#24c1c4]" /><div><h2 className="font-bold text-[#0b2d54]">More records are needed to uncover patterns</h2><p className="mt-1 text-sm leading-6 text-slate-500">As you record Health Vitals, daily check-ins, symptoms or connected-device sessions, future reports can compare these values across periods. This report intentionally avoids repeating individual journal entries.</p><Link href="/today" className="mt-4 inline-flex min-h-10 items-center gap-2 rounded-xl bg-[#0b2d54] px-4 py-2 text-xs font-bold text-white">Record today’s health <ArrowRight className="h-4 w-4" /></Link></div></div></section>}
 
-      <p className="rounded-2xl bg-slate-100 p-4 text-xs leading-5 text-slate-500">Report generated {dateLabel(report.generatedAt)}. This summary uses dated information saved for the selected period. Open the Health Journal to see individual entries, and ask your healthcare professional how the results apply to you.</p>
+      <p className="rounded-2xl bg-slate-100 p-3 text-[11px] text-slate-500">Generated {dateLabel(report.generatedAt)} · Based on dated records · Not a diagnosis</p>
     </div>
   );
 }
