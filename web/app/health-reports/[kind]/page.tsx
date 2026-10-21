@@ -2086,16 +2086,14 @@ function StatusCircle({
   const styles = toneStyles(tone);
   const mark = tone === "good" ? "✓" : tone === "watch" ? "!" : tone === "high" ? "!!" : tone === "critical" ? "SOS" : "?";
   return (
-    <div className={"rounded-xl border px-3 py-2.5 " + styles.border + " " + styles.surface}>
-      <div className={"flex items-center gap-2 text-xs font-bold " + styles.text}>
-        <span aria-hidden="true" className="grid h-5 min-w-5 place-items-center rounded-full bg-white/80 px-1 text-[10px]">{mark}</span>
-        <span>{label}</span>
-      </div>
-      <p className={"mt-1 text-xs leading-5 " + styles.text}>{detail}</p>
+    <div className="flex flex-wrap items-start gap-2">
+      <span className={"inline-flex shrink-0 items-center gap-1 rounded-full border px-2.5 py-1 text-[10px] font-extrabold " + styles.border + " " + styles.surface + " " + styles.text} aria-label={label}>
+        <span aria-hidden="true">{mark}</span> {label}
+      </span>
+      <p className={"min-w-0 flex-1 pt-0.5 text-xs leading-5 " + styles.text}>{detail}</p>
     </div>
   );
 }
-
 
 function VitalTrendCard({
   label,
@@ -2118,7 +2116,6 @@ function VitalTrendCard({
   previousLoading: boolean;
   review: MeasurementReview | null;
   status: VitalStatusAssessment;
-  baselineValue: number | null;
   rawCurrent: SeriesPoint[];
 }) {
   const currentValues = current.map((item) => item.value);
@@ -2327,7 +2324,7 @@ function HealthReportInsights({
             label="Average daily steps"
             value={currentSteps.length ? formatNumber(mean(currentStepValues), 0) : "Not recorded"}
             detail={currentSteps.length
-              ? formatNumber(currentStepValues.length, 0) + " date(s) with recorded counts. " + compareText(currentStepValues, previousStepValues, "steps/day", 0, previousLoading)
+              ? formatNumber(currentStepValues.length, 0) + " date(s) recorded. " + periodMovement(currentStepValues, previousStepValues, "steps/day", 0).label + ". " + periodMovement(currentStepValues, previousStepValues, "steps/day", 0).detail
               : "No dated step-count values were found. The report does not estimate missing data."}
           />
           <SummaryTile
@@ -2371,26 +2368,6 @@ function HealthReportInsights({
         {activeVitals.length ? <div className="grid gap-4 md:grid-cols-2">{activeVitals.map((item) => <VitalTrendCard key={item.key} label={item.label} description={item.description} unit={item.unit} digits={item.digits} current={item.current} previous={item.previous} previousLoading={previousLoading} review={item.review} status={item.status} rawCurrent={item.rawCurrent} />)}</div> : <div className="rounded-2xl border border-dashed border-slate-300 bg-white p-5 text-sm leading-6 text-slate-500">No dated vital readings were found for this period. Once you save blood pressure, heart rate, weight or other measurements, they will appear here.</div>}
       </section>
 
-      {currentSteps.length > 0 && (
-        <section>
-          <div className="mb-3">
-            <p className="text-[10px] font-black uppercase tracking-[0.16em] text-[#24c1c4]">Daily activity</p>
-            <h2 className="mt-1 text-xl font-black text-[#0b2d54]">Step-count readings</h2>
-            <p className="mt-1 text-sm leading-6 text-slate-500">Average on {currentSteps.length} day(s) with a saved count. Missing days are not estimated.</p>
-          </div>
-          <article className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-            <div className="flex flex-wrap items-end justify-between gap-3">
-              <div>
-                <p className="text-3xl font-black tracking-tight text-[#0b2d54]">{formatNumber(mean(currentStepValues), 0)} <span className="text-sm font-bold text-slate-500">steps/day</span></p>
-                <p className="mt-1 text-sm text-slate-600">Average across {currentSteps.length} date(s) with a saved step count.</p>
-              </div>
-              <p className="text-sm font-semibold text-[#0b5a62]">{periodMovement(currentStepValues, previousStepValues, "steps/day", 0).label}</p>
-            </div>
-            <p className="mt-2 text-xs leading-5 text-slate-500">Sensor samples on the same date are not added together; the latest saved cumulative count is used.</p>
-          </article>
-        </section>
-      )}
-
       {(symptomCount > 0 || lowMood.total > 0 || association !== null || repeated.some((item) => item.count > 1) || symptomAnalytics.repeatedTriggers.length > 0 || symptomAnalytics.medicationEffects > 0 || symptomAnalytics.averageSeverityRank !== null) && (
         <section>
           <div className="mb-3">
@@ -2427,12 +2404,12 @@ function HealthReportInsights({
             )}
             {symptomSeverityPoints.length > 0 && (
               <article className="rounded-2xl border border-slate-200 bg-white p-4">
-                <h3 className="text-sm font-bold text-[#0b2d54]">Symptom severity readings</h3>
+                <h3 className="text-sm font-bold text-[#0b2d54]">Symptom severity pattern</h3>
                 <p className="mt-1 text-xs leading-5 text-slate-500">Daily average severity rank from dated symptom observations or symptom-level severity values.</p>
                 <p className="mt-2 text-2xl font-black text-[#0b2d54]">{formatNumber(mean(symptomSeverityPoints.map((item) => item.value)), 1)} <span className="text-xs font-bold text-slate-500">average severity rank / 4</span></p>
                 <p className="mt-2 text-xs leading-5 text-slate-600">{periodMovement(symptomSeverityPoints.map((item) => item.value), previousSymptomSeverityPoints.map((item) => item.value), "severity rank", 1).detail}</p>
                 <p className="mt-2 text-[10px] leading-4 text-slate-400">Mild = 1, moderate = 2, severe = 3, very severe = 4. Different symptoms can have different meanings; this summary is not a clinical score.</p>
-                {previousReport && previousSymptomSeverityPoints.length > 0 && <p className="mt-2 text-xs leading-5 text-slate-500">{compareText(symptomSeverityPoints.map((item) => item.value), previousSymptomSeverityPoints.map((item) => item.value), "severity rank", 1, previousLoading)}</p>}
+                
               </article>
             )}
             {lowMood.total > 0 && (
