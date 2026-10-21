@@ -426,7 +426,7 @@ function goalProgressTrendItems(report: Report, previousReport: Report | null): 
     }).sort((a, b) => a.timestamp - b.timestamp);
 
     const eventPoints = (report.goalMetricEvents ?? [])
-      .filter((event) => event.goalId === goal.id)
+      .filter((event) => event.goalId === goal.id && event.source !== "goal-baseline")
       .flatMap((event) => {
         const timestamp = new Date(event.occurredAt).getTime();
         const value = finite(event.loggedValue);
@@ -445,7 +445,7 @@ function goalProgressTrendItems(report: Report, previousReport: Report | null): 
       previousGoals.find((item) => String(item.category ?? "") === String(goal.category ?? "") &&
         String(item.title ?? "") === String(goal.title ?? ""));
     const previousEvents = (previousReport?.goalMetricEvents ?? [])
-      .filter((event) => event.goalId === goal.id)
+      .filter((event) => event.goalId === goal.id && event.source !== "goal-baseline")
       .flatMap((event) => {
         const timestamp = new Date(event.occurredAt).getTime();
         const value = finite(event.loggedValue);
@@ -1099,20 +1099,22 @@ function StatusCircle({ label, detail, tone }: { label: string; detail: string; 
   );
 }
 
-function goalProgressItemsForPattern(report: Report, pattern: RegExp): { value: number; date: string; timestamp: number }[] {
+type GoalHistoryValue = { value: number; date: string; timestamp: number; unit: string };
+
+function goalProgressItemsForPattern(report: Report, pattern: RegExp): GoalHistoryValue[] {
   const start = new Date(report.period.start).getTime();
   const end = new Date(report.period.end).getTime();
   const matchingGoals = (report.currentSnapshot?.activeGoals ?? [])
     .filter((goal) => pattern.test([goal.category, goal.title].filter(Boolean).join(" ").toLowerCase()));
   return matchingGoals.flatMap((goal) => {
     const events = (report.goalMetricEvents ?? [])
-      .filter((event) => event.goalId === goal.id)
+      .filter((event) => event.goalId === goal.id && event.source !== "goal-baseline")
       .flatMap((event) => {
         const timestamp = new Date(event.occurredAt).getTime();
         const value = finite(event.loggedValue);
         const date = dateKey(event.occurredAt);
         if (!Number.isFinite(timestamp) || timestamp < start || timestamp >= end || value === null || !date) return [];
-        return [{ value, date, timestamp }];
+        return [{ value, date, timestamp, unit: String(event.unit ?? goal.unit ?? "") }];
       })
       .sort((a, b) => a.timestamp - b.timestamp);
     if (events.length) return events;
@@ -1124,9 +1126,23 @@ function goalProgressItemsForPattern(report: Report, pattern: RegExp): { value: 
       const value = finite(item.currentValue);
       const date = dateKey(item.measuredAt);
       if (!Number.isFinite(timestamp) || timestamp < start || timestamp >= end || value === null || !date) return [];
-      return [{ value, date, timestamp }];
+      return [{ value, date, timestamp, unit: String(goal.unit ?? "") }];
     });
   }).sort((a, b) => a.timestamp - b.timestamp);
+}
+
+function describeGoalHistory(points: GoalHistoryValue[], fallbackUnit = "") {
+  if (!points.length) return "";
+  const first = points[0];
+  const latest = points[points.length - 1];
+  const unit = latest.unit || fallbackUnit;
+  const formatted = (value: number) => formatNumber(value, 1) + (unit ? " " + unit : "");
+  if (points.length === 1) {
+    return "One dated goal update was recorded: " + formatted(latest.value) + " on " + dateLabel(latest.date) + ". A within-period change cannot be calculated from one point.";
+  }
+  const delta = latest.value - first.value;
+  const change = delta === 0 ? "stayed the same" : (delta > 0 ? "increased by " : "decreased by ") + formatted(Math.abs(delta));
+  return points.length + " dated goal updates were recorded. The value changed from " + formatted(first.value) + " on " + dateLabel(first.date) + " to " + formatted(latest.value) + " on " + dateLabel(latest.date) + " (" + change + "). The average of recorded updates was " + formatted(mean(points.map((point) => point.value)) ?? latest.value) + ".";
 }
 function PersonalisedInsights({
   report,
@@ -1242,9 +1258,12 @@ function PersonalisedInsights({
     insights.push({
       title: "Weight is interpreted in your own context",
       detail: periodWeight !== null
-        ? hasAdultBmiContext
-          ? "This period's dated weight trend is interpreted alongside your saved weight target and adult height/weight screening context when available. BMI is only a screening measure; it is not a diagnosis and does not override your personal target or clinician's advice."
-          : "This period's dated weight trend is compared with your saved measurements and goal where available. The report does not label a single weight healthy or unhealthy, and adult BMI screening is not applied without age, height and weight context."
+        ? (weightGoalProgress.length
+          ? describeGoalHistory(weightGoalProgress, "kg") + " "
+          : "The latest dated Health Vitals weight in this period was " + formatNumber(periodWeight, 1) + " kg. ")
+          + (hasAdultBmiContext
+            ? "This is considered alongside your saved weight target and adult height/weight screening context when available. BMI is only a screening measure, not a diagnosis, and does not override your personal target or clinician's advice."
+            : "This is compared with your saved target where available; the report does not label a single weight healthy or unhealthy.")
         : "A weight-related goal is saved, but no dated weight measurement or numeric goal-progress value was found in this report period. Profile or baseline weight alone is not treated as progress during these dates.",
       tone: periodWeight !== null ? "info" : "watch",
       href: periodWeight !== null ? "/health-goals" : "/today",
@@ -1270,7 +1289,7 @@ function PersonalisedInsights({
       detail: hasGlucoseData
         ? "Diabetes is part of your recorded care context, and glucose-related measurements or laboratory results are available in this period. Review those values and any flagged lab results against the targets in your care plan; this report does not replace result-specific clinical interpretation."
         : glucoseGoalProgress.length
-          ? "Diabetes is part of your recorded care context, and " + glucoseGoalProgress.length + " dated glucose-goal progress update(s) were saved in this period. These updates are shown in Goal progress over time; they do not replace a glucose measurement or HbA1c laboratory result when those are part of your care plan."
+          ? "Diabetes is part of your recorded care context. " + describeGoalHistory(glucoseGoalProgress, "mmol/L") + " These are the values saved against your glucose goal, not a substitute for glucose measurements or HbA1c laboratory results when those are part of your care plan."
           : "Diabetes is part of your recorded care context, but no glucose- or HbA1c-labelled result or dated glucose-goal progress update was found in this report period. Glucose control cannot be assessed from unrelated measurements. Add or review glucose and laboratory results with your healthcare team when these are part of your care plan.",
       tone: hasGlucoseData ? "info" : glucoseGoalProgress.length ? "info" : "watch",
       href: hasGlucoseData ? "/health-records" : glucoseGoalProgress.length ? "/health-goals" : "/today",
@@ -1390,7 +1409,7 @@ function PersonalisedInsights({
     insights.push({
       title: lipidGoalProgress.length ? "Cholesterol goal progress is recorded" : "Cholesterol goal data is missing",
       detail: lipidGoalProgress.length
-        ? "There are " + lipidGoalProgress.length + " dated cholesterol-goal progress update(s) in this period, shown in Goal progress over time. No matching cholesterol, lipid, LDL, HDL or triglyceride laboratory result was found, so the goal log is not presented as a substitute for a lab result."
+        ? describeGoalHistory(lipidGoalProgress, "mmol/L") + " No matching cholesterol, lipid, LDL, HDL or triglyceride laboratory result was found in this period, so these goal-log values are not presented as a substitute for a laboratory result."
         : "A cholesterol-related goal is saved, but no cholesterol, lipid, LDL, HDL or triglyceride laboratory result or dated goal-progress update was found in this report period. The report cannot infer a change from unrelated measurements; review the dated laboratory results when available.",
       tone: lipidGoalProgress.length ? "info" : "watch",
       href: lipidGoalProgress.length ? "/health-goals" : "/health-records",
@@ -1400,13 +1419,9 @@ function PersonalisedInsights({
 
   const smokingProgress = goalProgressItemsForPattern(report, /smoking|tobacco|cigarette/);
   if (hasGoal(/smoking|tobacco|cigarette/)) {
-    const first = smokingProgress[0]?.value ?? null;
-    const latest = smokingProgress[smokingProgress.length - 1]?.value ?? null;
-    const trendDetail = first !== null && latest !== null && smokingProgress.length > 1
-      ? "Your goal has " + smokingProgress.length + " dated progress updates this period. The recorded value changed from " + formatNumber(first, 1) + " to " + formatNumber(latest, 1) + ". Whether that means improvement depends on the measure saved by the goal; the report does not assume that a higher or lower number is always better."
-      : "Your saved smoking context can help tailor this goal. " + (smokingProgress.length
-        ? "A dated progress value is available for this period, but there are not enough comparable updates to calculate a within-period trend."
-        : "No dated smoking-goal progress values were found for this period, so profile status alone is not treated as a trend.");
+    const trendDetail = smokingProgress.length
+      ? describeGoalHistory(smokingProgress, "cigarettes/day") + " Lower counts may reflect progress toward a cigarette-reduction goal, but the saved target and complete logging context matter."
+      : "Your saved smoking context can help tailor this goal, but no dated smoking-goal metric events or manual progress values were found for this period. Profile status alone is not treated as a trend.";
     insights.push({
       title: smokingProgress.length ? "Smoking-goal progress from saved updates" : "Smoking-related progress needs dated updates",
       detail: trendDetail,
@@ -1417,13 +1432,11 @@ function PersonalisedInsights({
   }
 
   if (hasGoal(/alcohol|drinking/) && Boolean(profile?.alcoholConsumption)) {
-    const first = alcoholGoalProgress[0]?.value ?? null;
-    const latest = alcoholGoalProgress[alcoholGoalProgress.length - 1]?.value ?? null;
     insights.push({
       title: alcoholGoalProgress.length > 1 ? "Alcohol-goal progress from saved updates" : "Alcohol-related progress needs dated updates",
-      detail: alcoholGoalProgress.length > 1 && first !== null && latest !== null
-        ? "Your goal has " + alcoholGoalProgress.length + " dated progress updates this period, changing from " + formatNumber(first, 1) + " to " + formatNumber(latest, 1) + ". The meaning depends on the measure saved for your goal; the report does not assume that higher or lower is automatically better."
-        : "Your saved alcohol-use context can help tailor this goal, but there are not enough dated numeric progress updates in this period to calculate a trend.",
+      detail: alcoholGoalProgress.length
+        ? describeGoalHistory(alcoholGoalProgress, "drinks/week") + " Compare this with your saved goal; this summary does not assume that the same number of drinks on every day or week has the same context."
+        : "Your saved alcohol-use context can help tailor this goal, but no dated alcohol-goal metric events or manual progress values were found in this period.",
       tone: alcoholGoalProgress.length > 1 ? "info" : "watch",
       href: "/health-goals",
       linkLabel: "Review goal progress",
