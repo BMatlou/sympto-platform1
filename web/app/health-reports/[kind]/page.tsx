@@ -1407,7 +1407,7 @@ function HealthReportInsights({
     const decliningGoals = goalFollowUps.filter((goal) => String(goal.progress?.[0]?.status ?? "").toUpperCase() === "DECLINING");
 nextSteps.push({
       title: "Review goals that need attention",
-      detail: String(goalFollowUps.length) + " of your saved goals have a latest recorded status of " + (decliningGoals.length > 0 ? "declining or stagnant" : "stagnant") + ". The report uses matching saved targets in the relevant measurement cards; review the underlying progress history for context, and do not change medicines or treatment based on this report alone."
+      detail: String(goalFollowUps.length) + " of your saved goals have a latest recorded status of " + (decliningGoals.length > 0 ? "declining or stagnant" : "stagnant") + ". The report uses matching saved targets in the relevant measurement cards; review the underlying progress history for context, and do not change medicines or treatment based on this report alone.",
       href: "/health-goals",
       linkLabel: "Review health goals",
       tone: decliningGoals.length > 0 ? "high" : "watch",
