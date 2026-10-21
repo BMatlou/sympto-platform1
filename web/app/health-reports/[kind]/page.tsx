@@ -78,6 +78,14 @@ type WorkoutRecord = {
   endedAt?: string | null;
   durationSeconds?: number | string | null;
 };
+type WellnessMetricRecord = {
+  metricKey?: string | null;
+  value?: number | string | null;
+  unit?: string | null;
+  measuredAt?: string | null;
+  source?: string | null;
+  metadata?: unknown;
+};
 type LabResultItem = {
   id?: string;
   test?: { name?: string | null; unit?: { name?: string | null; symbol?: string | null } | null } | null;
@@ -239,6 +247,7 @@ type Report = {
     appointments: unknown[];
     patientVitals: PatientVitalRecord[];
     deviceMeasurements: DeviceMeasurementRecord[];
+    wellnessMetrics: WellnessMetricRecord[];
     sleepSessions: SleepSessionRecord[];
     workouts: WorkoutRecord[];
   };
@@ -514,6 +523,7 @@ function recordedDays(report: Report) {
     add(item.recordedAt || item.createdAt);
   });
   report.activity.deviceMeasurements.forEach((item) => add(item.measuredAt));
+  report.activity.wellnessMetrics.forEach((item) => add(item.measuredAt));
   report.activity.sleepSessions.forEach((item) => add(item.startedAt || item.endedAt));
   report.activity.workouts.forEach((item) => add(item.startedAt || item.endedAt));
   (report.currentSnapshot?.activeGoals ?? []).forEach((goal) => {
@@ -643,6 +653,18 @@ function vitalSeries(report: Report | null, metric: string): SeriesPoint[] {
       item.measuredAt,
       "Connected device",
       item.unit || item.vitalType?.unit,
+    );
+  });
+
+  report.activity.wellnessMetrics.forEach((item) => {
+    addNamedVitalForMetric(
+      points,
+      metric,
+      item.metricKey,
+      item.value,
+      item.measuredAt,
+      "Connected wellness metric",
+      item.unit,
     );
   });
 
@@ -1245,6 +1267,20 @@ function clinicalLabSeries(report: Report | null, pattern: RegExp): LabSeriesPoi
   }).sort((a, b) => a.timestamp - b.timestamp);
 }
 
+function wellnessMetricSeries(report: Report | null, metricKey: string): SeriesPoint[] {
+  if (!report) return [];
+  return report.activity.wellnessMetrics
+    .filter((item) => String(item.metricKey ?? "") === metricKey)
+    .flatMap((item) => {
+      const value = finite(item.value);
+      const timestamp = item.measuredAt ? new Date(item.measuredAt).getTime() : Number.NaN;
+      const date = dateKey(item.measuredAt);
+      if (value === null || !date || !Number.isFinite(timestamp)) return [];
+      return [{ value, timestamp, date, source: item.source ?? "Connected wellness metric", unit: String(item.unit ?? "") }];
+    })
+    .sort((a, b) => a.timestamp - b.timestamp);
+}
+
 function dailySessionSeries(report: Report | null, field: "sleep" | "workout"): DailyValue[] {
   if (!report) return [];
   const grouped = new Map<string, number>();
@@ -1381,7 +1417,7 @@ function PersonalisedInsights({
     current: toDaily(currentPoints),
     previous: toDaily(previousPoints),
   });
-  const signals: Array<{ key: string; label: string; unit: string; current: DailyValue[]; previous: DailyValue[] }> = [
+  const baseSignals: Array<{ key: string; label: string; unit: string; current: DailyValue[]; previous: DailyValue[] }> = [
     signal("weight", "Weight", weightCurrent, weightPrevious, "kg"),
     signal("glucose", "Blood glucose", glucoseCurrent, glucosePrevious, glucoseLabCurrentSpecific.at(-1)?.unit || glucoseLabPreviousSpecific.at(-1)?.unit || "mmol/L"),
     ...(a1cLabCurrent.length || a1cLabPrevious.length ? [
@@ -1413,6 +1449,18 @@ function PersonalisedInsights({
     signal("stress", "Stress rating", stressCurrent, stressPrevious, "/10"),
     signal("symptoms", "Symptom logs", dailySymptomSeries(report), dailySymptomSeries(previousReport), "logs/day"),
   ].filter((item) => item.current.length > 0 || item.previous.length > 0);
+
+  const alreadySummarisedWearableMetric = /weight|glucose|hba1c|a1c|cholesterol|lipid|triglyceride|smoking|tobacco|cigarette|alcohol|drink|medication|adherence|nutrition|calorie|hydration|water|exercise|workout|sleep|stress|symptom|blood.?pressure|systolic|diastolic|heart.?rate|pulse|oxygen|spo2|temperature|respiratory|breathing/i;
+  const wellnessKeys = Array.from(new Set([
+    ...(report.activity.wellnessMetrics ?? []).map((item) => String(item.metricKey ?? "").trim()).filter(Boolean),
+    ...(previousReport?.activity.wellnessMetrics ?? []).map((item) => String(item.metricKey ?? "").trim()).filter(Boolean),
+  ])).filter((key) => !alreadySummarisedWearableMetric.test(key));
+  const wearableSignals = wellnessKeys.map((key) => {
+    const current = wellnessMetricSeries(report, key);
+    const previous = wellnessMetricSeries(previousReport, key);
+    return signal("wearable:" + key, human(key), current, previous, current.at(-1)?.unit || previous.at(-1)?.unit || "");
+  }).filter((item) => item.current.length > 0 || item.previous.length > 0);
+  const signals = [...baseSignals, ...wearableSignals];
 
   const recommendations: Array<{ title: string; evidence: string; action: string; tone: StatusTone; href: string; linkLabel: string }> = [];
   const urgentReviews = reviews.filter((item) => item.severity === "urgent");
