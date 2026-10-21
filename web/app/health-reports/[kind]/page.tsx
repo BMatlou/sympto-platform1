@@ -3196,7 +3196,7 @@ function LedgerFieldTree({ value }: { value: unknown }) {
   if (Array.isArray(value)) {
     return <div className="space-y-2">{value.map((entry, index) => {
       const object = ledgerObject(entry);
-      return <div key={String(object.id ?? object.createdAt ?? object.measuredAt ?? index)} className="rounded-lg border border-slate-100 bg-white p-3"><LedgerFieldTree value={entry} /></div>;
+      return <div key={String(object.id ?? object.createdAt ?? object.measuredAt ?? "entry") + "-" + index} className="rounded-lg border border-slate-100 bg-white p-3"><LedgerFieldTree value={entry} /></div>;
     })}</div>;
   }
   if (typeof value !== "object") return <p className="break-words text-xs leading-5 text-slate-700">{ledgerScalar(value)}</p>;
@@ -3229,7 +3229,9 @@ function LedgerGroup({ group }: { group: ReportLedgerGroup }) {
         const title = ledgerTitle(record, group.title.replace(/s$/, "") + " " + (index + 1));
         const summary = ledgerSummary(record);
         const date = ledgerDate(record);
-        const key = String(record.id ?? record.externalRecordId ?? record.sourceId ?? (group.key + "-" + index));
+        const identity = String(record.id ?? record.externalRecordId ?? record.sourceId ?? record.createdAt ?? record.measuredAt ?? "record");
+        // IDs/timestamps can legitimately repeat across merged sources; scope every rendered row to its group and position.
+        const key = group.key + "-" + identity + "-" + index;
         return <article key={key} className="overflow-hidden rounded-xl border border-slate-200 bg-white"><details>
           <summary className="flex cursor-pointer list-none items-start gap-3 px-3 py-3"><span className="mt-1 h-2 w-2 shrink-0 rounded-full bg-[#24c1c4]" /><span className="min-w-0 flex-1"><span className="block text-xs font-bold text-[#0b2d54]">{title}</span><span className="mt-1 block text-[10px] text-slate-500">{date}</span>{summary && <span className="mt-1 block break-words text-[11px] leading-4 text-slate-600">{summary}</span>}</span><span className="shrink-0 text-[10px] font-semibold text-slate-400">Details</span></summary>
           <div className="border-t border-slate-100 bg-[#fbfdfd] p-3"><LedgerFieldTree value={record} /></div>
