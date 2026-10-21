@@ -512,7 +512,11 @@ function goalProgressTrendItems(report: Report, previousReport: Report | null): 
           timestamp,
           value,
           unit: String(event.unit ?? ""),
-          aggregation: String(event.aggregation ?? "LATEST").toUpperCase(),
+          aggregation: String(event.aggregation ?? (
+          /hydration|water|exercise.minutes|nutrition.calories/.test(String(event.metricKey ?? "").toLowerCase())
+            ? "SUM"
+            : "LATEST"
+        )).toUpperCase(),
         };
         const dayPoints = byDate.get(date) ?? [];
         dayPoints.push(point);
