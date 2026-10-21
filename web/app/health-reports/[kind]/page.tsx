@@ -2203,7 +2203,8 @@ function HealthReportInsights({
     current: dailyMetric(report, config.field),
     previous: dailyMetric(previousReport, config.field),
   })).filter((config) => config.current.length > 0);
-  const noAnalysisData = activeVitals.length === 0 && routines.length === 0 && goalProgressItems.length === 0 && (report.goalMetricEvents ?? []).length === 0 && (report.activity.wellnessMetrics ?? []).length === 0 && symptomCount === 0 && sleepSessions.length === 0 && workouts.length === 0 && clinicalCount === 0;
+  const hasCategoricalCheckIns = report.activity.journalEntries.some((entry) => Boolean(entry.mood || entry.energyLevel || entry.sleepQuality));
+  const noAnalysisData = activeVitals.length === 0 && routines.length === 0 && goalProgressItems.length === 0 && (report.goalMetricEvents ?? []).length === 0 && (report.activity.wellnessMetrics ?? []).length === 0 && !hasCategoricalCheckIns && symptomCount === 0 && sleepSessions.length === 0 && workouts.length === 0 && clinicalCount === 0;
   const moodPattern = lowMood.total > 0
     ? lowMood.low + " of " + lowMood.total + " mood check-ins were marked low or very low."
     : "";
