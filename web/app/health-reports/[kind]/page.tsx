@@ -487,6 +487,7 @@ type GoalProgressTrendItem = {
   previous: DailyValue[];
   latestStatus: string;
   targetValue: number | null;
+  source: "metric-event" | "goal-progress";
 };
 
 function goalProgressTrendItems(report: Report, previousReport: Report | null): GoalProgressTrendItem[] {
@@ -585,6 +586,7 @@ function goalProgressTrendItems(report: Report, previousReport: Report | null): 
       previous: previousEvents.length ? previousEvents.map(({ date, value }) => ({ date, value })) : previousProgress,
       latestStatus: current[current.length - 1].status || String(goal.progress?.[0]?.status ?? ""),
       targetValue: finite(goal.targetValue),
+      source: eventPoints.length ? "metric-event" as const : "goal-progress" as const,
     }];
   });
 }
@@ -1517,6 +1519,7 @@ function PersonalisedInsights({
   totalDays: number;
 }) {
   const goals = report.currentSnapshot?.activeGoals ?? [];
+  const manualGoalTrends = goalProgressTrendItems(report, previousReport).filter((item) => item.source === "goal-progress");
   const age = ageAt(report.currentSnapshot?.person?.dateOfBirth, report.generatedAt);
   const reviews = reportMeasurementReviews(report, age);
   const flaggedLabs = flaggedLabItems(report);
@@ -1750,7 +1753,37 @@ function PersonalisedInsights({
     const label = current[0]?.testName || previous[0]?.testName || human(name);
     return signal("lab:" + key, label, current, previous, unit);
   }).filter((item) => item.current.length > 0 || item.previous.length > 0);
-  const signals = [...baseSignals, ...wearableSignals, ...genericLabSignals];
+  const hasDates = (...series: Array<{ length: number }>) => series.some((seriesItem) => seriesItem.length > 0);
+  const manualGoalSignals = manualGoalTrends.filter((item) => {
+    const category = item.category.toUpperCase().replace(/[\s-]+/g, "_");
+    if (category === "WEIGHT") return !hasDates(weightCurrent, weightPrevious);
+    if (category === "BLOOD_GLUCOSE" || category === "GLUCOSE") return !hasDates(glucoseCurrent, glucosePrevious);
+    if (category === "CHOLESTEROL") return !hasDates(totalCholesterolCurrent, totalCholesterolPrevious, ldlCurrent, ldlPrevious, hdlCurrent, hdlPrevious, triglyceridesCurrent, triglyceridesPrevious);
+    if (category === "SMOKING") return !hasDates(smokingCurrent, smokingPrevious);
+    if (category === "ALCOHOL") return !hasDates(alcoholCurrent, alcoholPrevious);
+    if (category === "MEDICATION") return doseCurrent.eventTotal === 0 && doseCurrent.legacyTotal === 0;
+    if (category === "HYDRATION") return !hasDates(hydrationChecksCurrent, hydrationChecksPrevious, hydrationEventsCurrent, hydrationEventsPrevious);
+    if (category === "EXERCISE") return !hasDates(exerciseChecksCurrent, exerciseChecksPrevious, exerciseEventsCurrent, exerciseEventsPrevious, workoutsCurrent, workoutsPrevious);
+    if (category === "SLEEP") return !hasDates(sleepChecksCurrent, sleepChecksPrevious, sleepSessionsCurrent, sleepSessionsPrevious);
+    if (category === "MENTAL_HEALTH") return !hasDates(stressCurrent, stressPrevious, moodRatingsCurrent, moodRatingsPrevious);
+    if (category === "BLOOD_PRESSURE") return !hasDates(vitalSeries(report, "systolic"), vitalSeries(report, "diastolic"), vitalSeries(previousReport, "systolic"), vitalSeries(previousReport, "diastolic"));
+    if (category === "HEART_RATE") return !hasDates(vitalSeries(report, "heartRate"), vitalSeries(previousReport, "heartRate"));
+    if (category === "NUTRITION") return !hasDates(nutritionCurrent, nutritionPrevious);
+    return true;
+  }).map((item) => ({
+    key: "goal-progress:" + item.key,
+    label: item.title,
+    unit: item.valueKind === "percent" ? "%" : item.unit,
+    current: item.current,
+    previous: item.previous,
+    targetValue: item.targetValue,
+  }));
+  const signals: Array<{ key: string; label: string; unit: string; current: DailyValue[]; previous: DailyValue[]; targetValue?: number | null }> = [
+    ...baseSignals,
+    ...wearableSignals,
+    ...genericLabSignals,
+    ...manualGoalSignals,
+  ];
 
   const recommendations: Array<{ title: string; evidence: string; action: string; tone: StatusTone; href: string; linkLabel: string }> = [];
   const urgentReviews = reviews.filter((item) => item.severity === "urgent");
@@ -1948,6 +1981,7 @@ function PersonalisedInsights({
                     <span className="text-[10px] font-semibold text-slate-400">average</span>
                   </div>
                   {latest && <p className="mt-1 text-[11px] text-slate-500">Latest {formatNumber(latest.value, 1)}{unit} · {dateLabel(latest.date)}</p>}
+                  {signal.targetValue !== undefined && signal.targetValue !== null && <p className="mt-1 text-[11px] font-semibold text-[#0b7b80]">Saved goal target {formatNumber(signal.targetValue, 1)}{unit}</p>}
                   <p className="mt-2 text-xs font-semibold text-slate-600">{signalChange(signal.current, signal.previous, signal.unit)}</p>
                   <MiniTrend values={signal.current.map((item) => item.value)} label={signal.label + " current-period trend"} />
                   <p className="mt-2 text-[10px] text-slate-400">{signal.current.length} current value(s){signal.previous.length ? " · " + signal.previous.length + " previous value(s)" : ""}</p>
