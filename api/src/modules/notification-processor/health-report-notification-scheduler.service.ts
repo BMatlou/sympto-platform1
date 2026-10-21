@@ -360,6 +360,10 @@ export class HealthReportNotificationSchedulerService
       goalHistoryEntries,
       periodRiskAssessments,
       clinicalEpisodes,
+      periodConditions,
+      periodAllergies,
+      periodMedications,
+      periodImmunizations,
     ] = await Promise.all([
       this.prisma.healthJournal.findMany({
         where: { patientId, OR: [
@@ -704,6 +708,46 @@ export class HealthReportNotificationSchedulerService
         orderBy: { startedAt: 'asc' },
         include: { practitioner: { include: { person: true } } },
       }),
+      this.prisma.patientCondition.findMany({
+        where: { healthPassport: { patientId }, OR: [
+          { createdAt: { gte: period.start, lt: period.end } },
+          { updatedAt: { gte: period.start, lt: period.end } },
+          { diagnosedAt: { gte: period.start, lt: period.end } },
+          { resolvedAt: { gte: period.start, lt: period.end } },
+        ] },
+        orderBy: { createdAt: 'asc' },
+        include: { condition: true },
+      }),
+      this.prisma.patientAllergy.findMany({
+        where: { healthPassport: { patientId }, OR: [
+          { createdAt: { gte: period.start, lt: period.end } },
+          { updatedAt: { gte: period.start, lt: period.end } },
+          { onsetDate: { gte: period.start, lt: period.end } },
+          { lastReaction: { gte: period.start, lt: period.end } },
+        ] },
+        orderBy: { createdAt: 'asc' },
+        include: { allergy: true },
+      }),
+      this.prisma.patientMedication.findMany({
+        where: { healthPassport: { patientId }, OR: [
+          { createdAt: { gte: period.start, lt: period.end } },
+          { updatedAt: { gte: period.start, lt: period.end } },
+          { startedAt: { gte: period.start, lt: period.end } },
+          { endedAt: { gte: period.start, lt: period.end } },
+        ] },
+        orderBy: { createdAt: 'asc' },
+        include: { medication: true },
+      }),
+      this.prisma.patientImmunization.findMany({
+        where: { healthPassport: { patientId }, OR: [
+          { createdAt: { gte: period.start, lt: period.end } },
+          { updatedAt: { gte: period.start, lt: period.end } },
+          { administeredAt: { gte: period.start, lt: period.end } },
+          { nextDueDate: { gte: period.start, lt: period.end } },
+        ] },
+        orderBy: { createdAt: 'asc' },
+        include: { immunization: true },
+      }),
     ]);
 
     // Goal-specific logs are stored in the metric-event stream, not necessarily in HealthGoalProgress.
@@ -890,6 +934,12 @@ export class HealthReportNotificationSchedulerService
         goalProgress: goalProgressEntries,
         goalHistory: goalHistoryEntries,
         riskAssessments: periodRiskAssessments,
+        healthPassportChanges: {
+          conditions: periodConditions,
+          allergies: periodAllergies,
+          medications: periodMedications,
+          immunizations: periodImmunizations,
+        },
       },
       generatedAt: new Date(),
     };
