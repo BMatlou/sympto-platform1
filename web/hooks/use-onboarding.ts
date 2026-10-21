@@ -113,7 +113,10 @@ export function useOnboarding() {
     }, []);
 
   useEffect(() => {
-    loadProgress();
+    const timer = window.setTimeout(() => {
+      void loadProgress();
+    }, 0);
+    return () => window.clearTimeout(timer);
   }, [loadProgress]);
 
   return {
