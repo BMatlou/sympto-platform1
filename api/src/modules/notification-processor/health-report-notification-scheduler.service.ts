@@ -651,10 +651,12 @@ export class HealthReportNotificationSchedulerService
 
     // Goal-specific logs are stored in the metric-event stream, not necessarily in HealthGoalProgress.
     // Join events to configured goals so the report analyses the data the goal trackers actually save.
+    // Read the entire patient metric stream; a metric log must not disappear just because no active goal uses it.
+    // Attach a matching goal when one exists, but keep unmatched values (for example medication adherence) too.
     const goalMetricEvents = await this.prisma.$queryRaw<Array<{
-      goalId: string;
-      goalTitle: string;
-      goalCategory: string;
+      goalId: string | null;
+      goalTitle: string | null;
+      goalCategory: string | null;
       unit: string | null;
       targetValue: unknown;
       metricType: string;
@@ -666,13 +668,13 @@ export class HealthReportNotificationSchedulerService
       metadata: unknown;
     }>>`
       SELECT
-        hg."id" AS "goalId",
-        hg."title" AS "goalTitle",
-        hg."category"::text AS "goalCategory",
-        hg."unit" AS "unit",
-        hg."targetValue" AS "targetValue",
-        hgm."metricType" AS "metricType",
-        hgm."metricKey" AS "metricKey",
+        goal."goalId" AS "goalId",
+        goal."goalTitle" AS "goalTitle",
+        goal."goalCategory" AS "goalCategory",
+        goal."unit" AS "unit",
+        goal."targetValue" AS "targetValue",
+        e."metricType" AS "metricType",
+        e."metricKey" AS "metricKey",
         e."loggedValue" AS "loggedValue",
         CASE
           WHEN e."source" = 'patient-smoking-log'
@@ -684,13 +686,28 @@ export class HealthReportNotificationSchedulerService
         e."sourceId" AS "sourceId",
         e."metadata" AS "metadata"
       FROM "HealthGoalMetricEvent" e
-      INNER JOIN "HealthGoalMetricConfig" hgm
-        ON UPPER(hgm."metricType") = UPPER(e."metricType")
-        AND hgm."metricKey" = e."metricKey"
-      INNER JOIN "HealthGoal" hg ON hg."id" = hgm."healthGoalId"
+      LEFT JOIN LATERAL (
+        SELECT
+          hg."id" AS "goalId",
+          hg."title" AS "goalTitle",
+          hg."category"::text AS "goalCategory",
+          hg."unit" AS "unit",
+          hg."targetValue" AS "targetValue"
+        FROM "HealthGoalMetricConfig" hgm
+        INNER JOIN "HealthGoal" hg ON hg."id" = hgm."healthGoalId"
+        WHERE hg."patientId" = e."patientId"
+          AND UPPER(hgm."metricType") = UPPER(e."metricType")
+          AND hgm."metricKey" = e."metricKey"
+        ORDER BY
+          CASE
+            WHEN UPPER(hg."status"::text) = 'ACTIVE' THEN 0
+            WHEN UPPER(hg."status"::text) = 'ON_HOLD' THEN 1
+            ELSE 2
+          END,
+          hg."updatedAt" DESC
+        LIMIT 1
+      ) goal ON TRUE
       WHERE e."patientId" = ${patientId}
-        AND hg."patientId" = ${patientId}
-        AND UPPER(hg."status"::text) IN ('ACTIVE', 'ON_HOLD', 'ACHIEVED')
         AND (
           CASE
             WHEN e."source" = 'patient-smoking-log'
