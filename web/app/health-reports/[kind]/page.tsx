@@ -3198,6 +3198,32 @@ function LedgerGroup({ group }: { group: ReportLedgerGroup }) {
     </div>
   </details>;
 }
+
+function ReportDataCoverage({ report }: { report: Report }) {
+  const activity = report.activity;
+  const clinical = report.clinical;
+  const events = report.goalMetricEvents ?? [];
+  const medicationEvents = events.filter((event) => /MEDICATION|medication|adherence/i.test([event.metricType, event.metricKey, event.source, event.goalTitle].filter(Boolean).join(" ")));
+  const counts = [
+    { title: "Daily check-ins", count: activity.journalEntries.length },
+    { title: "Symptoms", count: activity.symptoms.length },
+    { title: "Medication actions", count: medicationEvents.length },
+    { title: "Goal tracker entries", count: events.length - medicationEvents.length + ledgerArray(report.tracking?.goalProgress).length },
+    { title: "Appointments", count: activity.appointments.length },
+    { title: "Measurements", count: activity.deviceMeasurements.length + activity.wellnessMetrics.length + clinical.vitals.length },
+    { title: "Sleep & activity", count: activity.sleepSessions.length + activity.workouts.length },
+    { title: "Clinical records", count: clinical.encounters.length + clinical.diagnoses.length + clinical.prescriptions.length + clinical.notes.length + clinical.labResults.length + clinical.imaging.length + clinical.procedures.length + clinical.carePlans.length + clinical.referrals.length },
+  ].filter((item) => item.count > 0);
+  if (!counts.length) return null;
+  return <section aria-label="Data coverage for this report" className="mt-3 rounded-2xl border border-[#dcebed] bg-white px-4 py-3 shadow-sm sm:px-5">
+    <div className="flex flex-wrap items-baseline justify-between gap-2"><h2 className="text-xs font-extrabold text-[#0b2d54]">Data included in this report</h2><span className="text-[10px] font-semibold text-slate-500">{counts.length} data groups with records</span></div>
+    <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-4">
+      {counts.map((item) => <div key={item.title} className="flex min-w-0 items-center justify-between gap-2 rounded-xl bg-[#f5fafb] px-3 py-2"><span className="min-w-0 text-[11px] font-semibold text-slate-600">{item.title}</span><span className="shrink-0 text-sm font-black tabular-nums text-[#0b2d54]">{item.count}</span></div>)}
+    </div>
+    <p className="mt-2 text-[10px] leading-4 text-slate-400">Counts are grouped by source; a clinical event and its linked note may appear in separate groups.</p>
+  </section>;
+}
+
 function CompleteReportData({ report }: { report: Report }) {
   const activity = report.activity as unknown as ReportLedgerObject;
   const clinical = report.clinical as unknown as ReportLedgerObject;
@@ -3205,6 +3231,7 @@ function CompleteReportData({ report }: { report: Report }) {
   const medicationEvents = events.filter((event) => /MEDICATION|medication|adherence/i.test([event.metricType, event.metricKey, event.source, event.goalCategory, event.goalTitle].filter(Boolean).join(" ")));
   const otherGoalEvents = events.filter((event) => !medicationEvents.includes(event));
   const snapshot: HealthContextSnapshot = report.currentSnapshot ?? {};
+  const contextRows = (title: string, record: unknown) => ledgerHasValue(record) ? [{ title, record }] : [];
   const contextGroups: ReportLedgerGroup[] = [
     { key: "conditions", title: "Current conditions", description: "Saved conditions used to personalize this report", rows: ledgerArray(snapshot.conditions) },
     { key: "diagnoses-on-file", title: "Diagnoses on file", description: "Patient diagnosis history", rows: ledgerArray(snapshot.diagnoses) },
@@ -3213,7 +3240,13 @@ function CompleteReportData({ report }: { report: Report }) {
     { key: "immunizations", title: "Immunisations", description: "Immunisation history on file", rows: ledgerArray(snapshot.immunizations) },
     { key: "goals-on-file", title: "Active health goals", description: "Saved targets and latest goal progress", rows: ledgerArray(snapshot.activeGoals) },
     { key: "risk-context", title: "Risk assessments on file", description: "Available risk-assessment context", rows: ledgerArray(snapshot.riskAssessments) },
-    { key: "baseline-context", title: "Baseline and profile", description: "Profile and baseline values used when interpreting trends", rows: [snapshot.profile, snapshot.baseline, snapshot.medicalRecord].filter(ledgerHasValue) },
+    { key: "baseline-context", title: "Baseline and profile", description: "Profile and baseline values used when interpreting trends", rows: [
+      ...contextRows("Personal information", snapshot.person),
+      ...contextRows("Profile details", snapshot.profile),
+      ...contextRows("Baseline values", snapshot.baseline),
+      ...contextRows("Medical history", snapshot.medicalRecord),
+      ...contextRows("Blood group", { bloodType: snapshot.bloodType, rhesusFactor: snapshot.rhesusFactor }),
+    ] },
   ];
   const groups: ReportLedgerGroup[] = [
     { key: "check-ins", title: "Daily health check-ins", description: "Mood, stress, sleep, energy, water, exercise, notes and patient-recorded vitals", rows: ledgerArray(activity.journalEntries) },
@@ -3259,7 +3292,7 @@ function CompleteReportData({ report }: { report: Report }) {
 
 
 function ContextualHealthInsights({ report }: { report: Report }) {
-  const snapshot = report.currentSnapshot ?? {};
+  const snapshot: HealthContextSnapshot = report.currentSnapshot ?? {};
   const conditions = [
     ...ledgerArray(snapshot.conditions),
     ...ledgerArray(snapshot.diagnoses),
@@ -3469,6 +3502,8 @@ export default function HealthReportPage() {
             </div>
             <div className="mt-6 flex flex-wrap items-center gap-2"><span className="rounded-full bg-white/10 px-3 py-1.5 text-xs font-bold">Generated {dateLabel(report.generatedAt)}</span><span className="rounded-full bg-white/10 px-3 py-1.5 text-xs font-bold">{previousLoading ? "Comparing with prior period…" : previousReport ? "Compared with previous period" : previousFailed ? "Prior-period data unavailable" : "Current-period insights"}</span></div>
           </section>
+
+          <ReportDataCoverage report={report} />
 
           {previousFailed && <div className="mt-4 flex items-start gap-2 rounded-2xl border border-amber-200 bg-amber-50 p-4 text-xs leading-5 text-amber-900"><Info className="mt-0.5 h-4 w-4 shrink-0" />The current report is available, but the prior-period comparison could not be loaded. Current-period trends remain available; comparison labels will appear when historical data is accessible.</div>}
 
