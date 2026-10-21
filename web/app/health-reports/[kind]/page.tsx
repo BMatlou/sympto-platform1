@@ -2311,10 +2311,11 @@ function groupMedicationActions(actions: MedicationDoseAction[]) {
     else existing.skipped += 1;
     groups.set(key, existing);
   });
-  return new Map(Array.from(groups.entries()).map(([key, group]) => [
-    key,
-    { ...group, recordedDays: group.dates.size },
-  ]));
+  const result = new Map<string, MedicationActionGroup>();
+  groups.forEach((group, key) => {
+    result.set(key, { ...group, recordedDays: group.dates.size });
+  });
+  return result;
 }
 
 type MedicationPeriodSummary = {
@@ -2448,6 +2449,9 @@ function MedicationPeriodInsights({
       Array.from(currentGroups.values()).find((group) => group.name.trim().toLowerCase() === normalizedName);
     const previousGroup = previousGroups.get(actionKey) ??
       Array.from(previousGroups.values()).find((group) => group.name.trim().toLowerCase() === normalizedName);
+    // If a goal is not linked to a PatientMedication record, do not add a
+    // duplicate placeholder row when identifiable dose events already supply the medicine name.
+    if (!engine && !currentGroup && !previousGroup && (currentGroups.size > 0 || previousGroups.size > 0)) return;
     const target = finite(engine?.unified?.goalConfig?.targetAdherence) ??
       finite(engine?.analysis?.goalIntelligence?.targetAdherencePercent) ??
       finite(medicationGoals.find((goal) => String(goal.id) === item.goalId)?.targetValue);
