@@ -1178,9 +1178,10 @@ type LabSeriesPoint = SeriesPoint & { testName: string };
 
 type MedicationDoseAction = { date: string; action: "TAKEN" | "SKIPPED"; source: "event" | "journal" };
 
-function medicationDoseActions(report: Report | null): MedicationDoseAction[] {
-  if (!report) return [];
-  const actions: MedicationDoseAction[] = [];
+function medicationDoseTotals(report: Report | null) {
+  if (!report) return { eventActions: [] as MedicationDoseAction[], legacyActions: [] as MedicationDoseAction[], eventTaken: 0, eventSkipped: 0, eventTotal: 0, eventAdherencePercent: null as number | null, legacyTaken: 0, legacySkipped: 0, legacyTotal: 0 };
+  const eventActions: MedicationDoseAction[] = [];
+  const legacyActions: MedicationDoseAction[] = [];
   const eventDatesWithAction = new Set<string>();
 
   (report.goalMetricEvents ?? [])
@@ -1192,21 +1193,17 @@ function medicationDoseActions(report: Report | null): MedicationDoseAction[] {
       if (event.metadata && typeof event.metadata === "object") {
         metadata = event.metadata as Record<string, unknown>;
       } else if (typeof event.metadata === "string") {
-        try {
-          metadata = JSON.parse(event.metadata) as Record<string, unknown>;
-        } catch {
-          metadata = null;
-        }
+        try { metadata = JSON.parse(event.metadata) as Record<string, unknown>; } catch { metadata = null; }
       }
       const action = String(metadata?.action ?? "").toUpperCase();
       const date = dateKey(event.occurredAt);
       if (!date || (action !== "TAKEN" && action !== "SKIPPED")) return;
-      actions.push({ date, action, source: "event" });
+      eventActions.push({ date, action, source: "event" });
       eventDatesWithAction.add(date);
     });
 
-  // Legacy entries predate action metadata. They record one last status per
-  // medication/day, so only use them on dates with no dose-level event metadata.
+  // Older journal projections hold the last status for a medication/day, not one
+  // row per dose. Keep these separate from the complete dose-level event counts.
   report.activity.journalEntries.forEach((entry) => {
     const text = [entry.title, entry.journal, entry.notes].map((value) => String(value ?? "")).join(" ").toLowerCase();
     if (!/medication adherence|dose marked (taken|skipped)/.test(text)) return;
@@ -1214,36 +1211,22 @@ function medicationDoseActions(report: Report | null): MedicationDoseAction[] {
     if (!actionMatch) return;
     const date = dateKey(entry.createdAt || entry.recordedAt || entry.updatedAt);
     if (!date || eventDatesWithAction.has(date)) return;
-    actions.push({ date, action: actionMatch[1].toUpperCase() as "TAKEN" | "SKIPPED", source: "journal" });
+    legacyActions.push({ date, action: actionMatch[1].toUpperCase() as "TAKEN" | "SKIPPED", source: "journal" });
   });
 
-  return actions.sort((a, b) => a.date.localeCompare(b.date));
-}
-
-function medicationDoseTotals(report: Report | null) {
-  const actions = medicationDoseActions(report);
-  const taken = actions.filter((item) => item.action === "TAKEN").length;
-  const skipped = actions.filter((item) => item.action === "SKIPPED").length;
-  const total = taken + skipped;
-  const daily = new Map<string, { taken: number; skipped: number }>();
-  actions.forEach((item) => {
-    const current = daily.get(item.date) ?? { taken: 0, skipped: 0 };
-    current[item.action === "TAKEN" ? "taken" : "skipped"] += 1;
-    daily.set(item.date, current);
-  });
+  const eventTaken = eventActions.filter((item) => item.action === "TAKEN").length;
+  const eventSkipped = eventActions.filter((item) => item.action === "SKIPPED").length;
+  const legacyTaken = legacyActions.filter((item) => item.action === "TAKEN").length;
+  const legacySkipped = legacyActions.filter((item) => item.action === "SKIPPED").length;
+  const eventTotal = eventTaken + eventSkipped;
+  const legacyTotal = legacyTaken + legacySkipped;
   return {
-    actions,
-    taken,
-    skipped,
-    total,
-    adherencePercent: total ? (taken / total) * 100 : null,
-    daily: Array.from(daily.entries())
-      .map(([date, counts]) => ({ date, value: (counts.taken / (counts.taken + counts.skipped)) * 100 }))
-      .sort((a, b) => a.date.localeCompare(b.date)),
-    legacyCount: actions.filter((item) => item.source === "journal").length,
+    eventActions, legacyActions,
+    eventTaken, eventSkipped, eventTotal,
+    eventAdherencePercent: eventTotal ? (eventTaken / eventTotal) * 100 : null,
+    legacyTaken, legacySkipped, legacyTotal,
   };
 }
-
 function clinicalLabSeries(report: Report | null, pattern: RegExp): LabSeriesPoint[] {
   if (!report) return [];
   return report.clinical.labResults.flatMap((result) => {
