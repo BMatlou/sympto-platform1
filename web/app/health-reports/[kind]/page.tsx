@@ -492,16 +492,16 @@ function VitalTrendCard({
 }
 
 function clinicalEvents(report: Report) {
-  return arr(report.clinical.encounters).length +
-    arr(report.clinical.diagnoses).length +
-    arr(report.clinical.prescriptions).length +
-    arr(report.clinical.notes).length +
-    arr(report.clinical.vitals).length +
-    arr(report.clinical.labResults).length +
-    arr(report.clinical.imaging).length +
-    arr(report.clinical.procedures).length +
-    arr(report.clinical.carePlans).length +
-    arr(report.clinical.referrals).length;
+  return report.clinical.encounters.length +
+    report.clinical.diagnoses.length +
+    report.clinical.prescriptions.length +
+    report.clinical.notes.length +
+    report.clinical.vitals.length +
+    report.clinical.labResults.length +
+    report.clinical.imaging.length +
+    report.clinical.procedures.length +
+    report.clinical.carePlans.length +
+    report.clinical.referrals.length;
 }
 
 function flaggedLabItems(report: Report) {
@@ -633,10 +633,10 @@ function HealthReportInsights({
         <section>
           <div className="mb-3"><p className="text-[10px] font-black uppercase tracking-[0.16em] text-[#24c1c4]">Clinical context</p><h2 className="mt-1 text-xl font-black text-[#0b2d54]">Updates worth keeping in view</h2><p className="mt-1 text-sm leading-6 text-slate-500">This is a concise overview of clinical activity, not a repeat of your full clinical record.</p></div>
           <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-            <SummaryTile icon={Stethoscope} label="Clinical visits" value={String(arr(report.clinical.encounters).length)} detail="Encounters dated in this period." />
-            <SummaryTile icon={FileText} label="Lab reports" value={String(arr(report.clinical.labResults).length)} detail="Laboratory result records released or reported in this period." />
-            <SummaryTile icon={ClipboardList} label="Care plan updates" value={String(arr(report.clinical.carePlans).length)} detail="Care plans created or updated in this period." />
-            <SummaryTile icon={ShieldCheck} label="Other clinical updates" value={String(arr(report.clinical.diagnoses).length + arr(report.clinical.prescriptions).length + arr(report.clinical.referrals).length + arr(report.clinical.procedures).length)} detail="Diagnoses, prescriptions, referrals and procedures recorded." />
+            <SummaryTile icon={Stethoscope} label="Clinical visits" value={String(report.clinical.encounters.length)} detail="Encounters dated in this period." />
+            <SummaryTile icon={FileText} label="Lab reports" value={String(report.clinical.labResults.length)} detail="Laboratory result records released or reported in this period." />
+            <SummaryTile icon={ClipboardList} label="Care plan updates" value={String(report.clinical.carePlans.length)} detail="Care plans created or updated in this period." />
+            <SummaryTile icon={ShieldCheck} label="Other clinical updates" value={String(report.clinical.diagnoses.length + report.clinical.prescriptions.length + report.clinical.referrals.length + report.clinical.procedures.length)} detail="Diagnoses, prescriptions, referrals and procedures recorded." />
           </div>
           {flaggedLabs.length > 0 && <div className="mt-3 rounded-2xl border border-amber-200 bg-amber-50 p-5"><div className="flex items-start gap-3"><AlertTriangle className="mt-0.5 h-5 w-5 shrink-0 text-amber-700" /><div className="min-w-0"><h3 className="font-bold text-amber-950">Results marked for review in the clinical record</h3><p className="mt-1 text-xs leading-5 text-amber-900">These items were marked abnormal or critical by the source record. Sympto is not re-interpreting them here; review the report with your clinician.</p><div className="mt-3 space-y-2">{flaggedLabs.slice(0, 4).map((item) => <div key={item.id} className="flex flex-wrap items-start justify-between gap-2 rounded-xl bg-white/80 p-3"><div><p className="text-sm font-bold text-[#0b2d54]">{item.name}</p><p className="mt-1 text-[11px] text-slate-500">{dateLabel(item.date)}</p></div><div className="flex items-center gap-2"><span className="text-sm font-bold text-[#0b2d54]">{String(item.value)}</span>{item.critical && <span className="rounded-full bg-rose-100 px-2 py-1 text-[9px] font-black uppercase text-rose-800">Critical</span>}{!item.critical && <span className="rounded-full bg-amber-100 px-2 py-1 text-[9px] font-black uppercase text-amber-800">Abnormal</span>}</div></div>)}</div><Link href="/health-records" className="mt-4 inline-flex min-h-10 items-center gap-2 rounded-xl bg-[#0b2d54] px-4 py-2 text-xs font-bold text-white">Review clinical records <ArrowRight className="h-4 w-4" /></Link></div></div></div>}
         </section>
