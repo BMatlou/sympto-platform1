@@ -1276,7 +1276,7 @@ function PersonalisedInsights({
           <div className="min-w-0">
             <p className="text-[10px] font-black uppercase tracking-[0.15em] text-[#0b7b80]">Personalised interpretation</p>
             <h2 className="mt-1 text-lg font-black text-[#0b2d54]">What your records mean in context</h2>
-            <p className="mt-1 text-xs leading-5 text-slate-500">The report uses saved age, relevant care context, baselines, medicine-record measures and goal targets to tailor these observations. It does not reproduce your profile or list every goal.</p>
+            <p className="mt-1 text-xs leading-5 text-slate-500">Saved age, relevant care context, baselines, medicine-record measures and personal targets shape these observations when they change the interpretation or next step.</p>
             <p className="mt-1 text-[10px] leading-4 text-slate-500">{daysLogged} of {totalDays} days had records. Coverage describes logging consistency, not health status.</p>
           </div>
         </div>
@@ -1633,7 +1633,7 @@ export default function HealthReportPage() {
               <p><strong className="text-[#0b2d54]">Change:</strong> first-to-most-recent compares two readings. “Previous period” compares this report with the earlier week or month.</p>
               <p><strong className="text-[#0b2d54]">Missing entry:</strong> means no value was saved; it is not counted as zero.</p>
               <p><strong className="text-[#0b2d54]">Colour key:</strong> green = within a common reference; amber = recheck or monitor; orange = high; red = urgent; grey = personal or age-specific guidance needed.</p>
-              <p><strong className="text-[#0b2d54]">Goal ring:</strong> uses the progress percentage recorded for that goal. If no score was saved, it stays blank rather than guessing.</p>
+              <p><strong className="text-[#0b2d54]">Saved goal status:</strong> matching targets inform relevant measurement cards, while recorded progress status guides next steps. Missing progress is left unknown rather than guessed.</p>
             </div>
             <p className="mt-3 border-t border-slate-100 pt-3 text-xs leading-5 text-slate-500">The data-coverage score measures how much was logged, not your health. Sympto does not combine different measurements into one unvalidated overall health score. General adult reference ranges are guides, not personal targets; age, long-term conditions and clinician advice can change the interpretation.</p>
           </section>
