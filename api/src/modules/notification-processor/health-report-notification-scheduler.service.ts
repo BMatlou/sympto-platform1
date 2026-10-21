@@ -358,56 +358,55 @@ export class HealthReportNotificationSchedulerService
       currentRecord,
     ] = await Promise.all([
       this.prisma.healthJournal.findMany({
-        where: { patientId, createdAt: { gte: period.start, lt: period.end } },
-        orderBy: { createdAt: 'asc' },
+        where: { patientId, OR: [
+          { createdAt: { gte: period.start, lt: period.end } },
+          { updatedAt: { gte: period.start, lt: period.end } },
+        ] },
+        orderBy: [{ createdAt: 'asc' }, { updatedAt: 'asc' }],
         include: { practitioner: { include: { person: true } }, encounter: true },
       }),
       this.prisma.symptomLog.findMany({
-        where: {
-          clinicalEpisode: { patientId },
-          startedAt: { gte: period.start, lt: period.end },
-        },
+        where: { clinicalEpisode: { patientId }, OR: [
+          { startedAt: { gte: period.start, lt: period.end } },
+          { createdAt: { gte: period.start, lt: period.end } },
+          { updatedAt: { gte: period.start, lt: period.end } },
+          { observations: { some: { createdAt: { gte: period.start, lt: period.end } } } },
+          { monitorings: { some: { observedAt: { gte: period.start, lt: period.end } } } },
+        ] },
         orderBy: { startedAt: 'asc' },
         include: {
-          clinicalEpisode: {
-            include: {
-              practitioner: { include: { person: true } },
-            },
-          },
+          clinicalEpisode: { include: { practitioner: { include: { person: true } } } },
           symptoms: { include: { symptom: true } },
           triggers: true,
           observations: true,
+          monitorings: true,
+          attachments: { include: { attachment: true } },
           medicationEffects: { include: { medication: true } },
         },
       }),
       this.prisma.appointment.findMany({
-        where: {
-          patientId,
-          scheduledStart: { gte: period.start, lt: period.end },
-          status: { notIn: ['CANCELLED', 'NO_SHOW'] as const },
-        },
+        where: { patientId, OR: [
+          { scheduledStart: { gte: period.start, lt: period.end } },
+          { createdAt: { gte: period.start, lt: period.end } },
+          { updatedAt: { gte: period.start, lt: period.end } },
+        ] },
         orderBy: { scheduledStart: 'asc' },
-        include: {
-          practitioner: { include: { person: true } },
-          practice: true,
-          encounter: true,
-        },
+        include: { practitioner: { include: { person: true } }, practice: true, encounter: true },
       }),
       this.prisma.healthJournal.findMany({
-        where: {
-          patientId,
-          createdAt: { gte: period.start, lt: period.end },
-          OR: [
-            { temperature: { not: null } },
-            { bloodPressureSystolic: { not: null } },
-            { bloodPressureDiastolic: { not: null } },
-            { heartRate: { not: null } },
-            { oxygenSaturation: { not: null } },
-            { respiratoryRate: { not: null } },
+        where: { patientId, AND: [
+          { OR: [
+            { createdAt: { gte: period.start, lt: period.end } },
+            { updatedAt: { gte: period.start, lt: period.end } },
+          ] },
+          { OR: [
+            { temperature: { not: null } }, { bloodPressureSystolic: { not: null } },
+            { bloodPressureDiastolic: { not: null } }, { heartRate: { not: null } },
+            { oxygenSaturation: { not: null } }, { respiratoryRate: { not: null } },
             { weightKg: { not: null } },
-          ],
-        },
-        orderBy: { createdAt: 'asc' },
+          ] },
+        ] },
+        orderBy: [{ createdAt: 'asc' }, { updatedAt: 'asc' }],
       }),
       this.prisma.deviceMeasurement.findMany({
         where: {
@@ -489,37 +488,27 @@ export class HealthReportNotificationSchedulerService
         },
       }),
       this.prisma.clinicalNote.findMany({
-        where: {
-          encounter: {
-            medicalRecord: { patientId },
-            startedAt: { gte: period.start, lt: period.end },
-          },
-        },
+        where: { encounter: { medicalRecord: { patientId } }, OR: [
+          { createdAt: { gte: period.start, lt: period.end } },
+          { encounter: { startedAt: { gte: period.start, lt: period.end } } },
+        ] },
         orderBy: { createdAt: 'asc' },
-        include: {
-          encounter: {
-            include: {
-              practitioner: { include: { person: true } },
-              encounterType: true,
-            },
-          },
-        },
+        include: { encounter: { include: { practitioner: { include: { person: true } }, encounterType: true } } },
       }),
       this.prisma.clinicalVital.findMany({
-        where: {
-          encounter: {
-            medicalRecord: { patientId },
-            startedAt: { gte: period.start, lt: period.end },
-          },
-        },
+        where: { encounter: { medicalRecord: { patientId } }, OR: [
+          { measuredAt: { gte: period.start, lt: period.end } },
+          { encounter: { startedAt: { gte: period.start, lt: period.end } } },
+        ] },
         orderBy: { measuredAt: 'asc' },
-        include: { vitalType: true },
+        include: { vitalType: true, encounter: { select: { startedAt: true } } },
       }),
       this.prisma.labResult.findMany({
         where: {
           OR: [
             { reportedAt: { gte: period.start, lt: period.end } },
             { releasedAt: { gte: period.start, lt: period.end } },
+            { createdAt: { gte: period.start, lt: period.end } },
           ],
           orderItem: { order: { patientId } },
         },
@@ -547,6 +536,7 @@ export class HealthReportNotificationSchedulerService
           OR: [
             { performedAt: { gte: period.start, lt: period.end } },
             { reportedAt: { gte: period.start, lt: period.end } },
+            { createdAt: { gte: period.start, lt: period.end } },
           ],
         },
         orderBy: { performedAt: 'asc' },
@@ -639,6 +629,10 @@ export class HealthReportNotificationSchedulerService
               patientDiagnoses: {
                 orderBy: { diagnosedAt: 'desc' },
                 include: { diagnosis: true },
+              },
+              immunizations: {
+                orderBy: { administeredAt: 'desc' },
+                include: { immunization: true },
               },
             },
           },
@@ -763,6 +757,7 @@ export class HealthReportNotificationSchedulerService
           diagnoses: currentRecord.healthPassport?.patientDiagnoses ?? [],
           allergies: currentRecord.healthPassport?.allergies ?? [],
           medications: currentRecord.healthPassport?.medications ?? [],
+          immunizations: currentRecord.healthPassport?.immunizations ?? [],
           activeGoals: currentRecord.healthGoals ?? [],
         }
       : {
@@ -777,6 +772,7 @@ export class HealthReportNotificationSchedulerService
           diagnoses: [],
           allergies: [],
           medications: [],
+          immunizations: [],
           activeGoals: [],
         };
 
