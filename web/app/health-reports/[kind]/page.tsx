@@ -1158,346 +1158,317 @@ function describeGoalHistory(points: GoalHistoryValue[], fallbackUnit = "") {
   const change = delta === 0 ? "stayed the same" : (delta > 0 ? "increased by " : "decreased by ") + formatted(Math.abs(delta));
   return points.length + " dated goal updates were recorded. The value changed from " + formatted(first.value) + " on " + dateLabel(first.date) + " to " + formatted(latest.value) + " on " + dateLabel(latest.date) + " (" + change + "). The average of recorded updates was " + formatted(mean(points.map((point) => point.value)) ?? latest.value) + ".";
 }
+
+function goalMetricSeries(report: Report | null, pattern: RegExp): SeriesPoint[] {
+  return (report?.goalMetricEvents ?? [])
+    .filter((event) => event.source !== "goal-baseline" && pattern.test([
+      event.goalCategory, event.goalTitle, event.metricType, event.metricKey,
+    ].filter(Boolean).join(" ").toLowerCase()))
+    .flatMap((event) => {
+      const value = finite(event.loggedValue);
+      const timestamp = new Date(event.occurredAt).getTime();
+      const date = dateKey(event.occurredAt);
+      if (value === null || !Number.isFinite(timestamp) || !date) return [];
+      return [{ value, timestamp, date, source: "Health goal log" }];
+    })
+    .sort((a, b) => a.timestamp - b.timestamp);
+}
+
+function clinicalLabSeries(report: Report | null, pattern: RegExp): SeriesPoint[] {
+  if (!report) return [];
+  return report.clinical.labResults.flatMap((result) => {
+    const dateValue = result.reportedAt || result.releasedAt;
+    const timestamp = dateValue ? new Date(dateValue).getTime() : Number.NaN;
+    const date = dateKey(dateValue);
+    if (!date || !Number.isFinite(timestamp)) return [];
+    return (result.items ?? []).flatMap((item) => {
+      const name = String(item.test?.name || result.orderItem?.test?.name || "").toLowerCase();
+      const value = finite(item.numericValue);
+      if (!pattern.test(name) || value === null) return [];
+      return [{ value, timestamp, date, source: "Laboratory result" }];
+    });
+  }).sort((a, b) => a.timestamp - b.timestamp);
+}
+
+function dailySessionSeries(report: Report | null, field: "sleep" | "workout"): DailyValue[] {
+  if (!report) return [];
+  const grouped = new Map<string, number>();
+  if (field === "sleep") {
+    report.activity.sleepSessions.forEach((session) => {
+      const key = dateKey(session.startedAt || session.endedAt);
+      const minutes = finite(session.durationMinutes);
+      if (!key || minutes === null || minutes <= 0) return;
+      grouped.set(key, (grouped.get(key) ?? 0) + minutes / 60);
+    });
+  } else {
+    report.activity.workouts.forEach((session) => {
+      const key = dateKey(session.startedAt || session.endedAt);
+      const seconds = finite(session.durationSeconds);
+      if (!key || seconds === null || seconds <= 0) return;
+      grouped.set(key, (grouped.get(key) ?? 0) + seconds / 60);
+    });
+  }
+  return Array.from(grouped, ([date, value]) => ({ date, value }))
+    .sort((a, b) => a.date.localeCompare(b.date));
+}
+
+function dailySymptomSeries(report: Report | null): DailyValue[] {
+  if (!report) return [];
+  const grouped = new Map<string, number>();
+  report.activity.symptoms.forEach((item) => {
+    const key = dateKey(item.startedAt || item.createdAt);
+    if (!key) return;
+    grouped.set(key, (grouped.get(key) ?? 0) + 1);
+  });
+  return Array.from(grouped, ([date, value]) => ({ date, value }))
+    .sort((a, b) => a.date.localeCompare(b.date));
+}
+
+function signalChange(current: DailyValue[], previous: DailyValue[], unit: string) {
+  const currentAverage = mean(current.map((item) => item.value));
+  const previousAverage = mean(previous.map((item) => item.value));
+  if (currentAverage === null) {
+    return previousAverage === null
+      ? "No dated values"
+      : "No current values · previous average " + formatNumber(previousAverage, 1) + (unit ? " " + unit : "");
+  }
+  if (previousAverage === null) {
+    return "Current average " + formatNumber(currentAverage, 1) + (unit ? " " + unit : "") + " · no comparable prior values";
+  }
+  const delta = currentAverage - previousAverage;
+  const relative = previousAverage === 0 ? "" : " (" + (delta > 0 ? "+" : "") + formatNumber(delta / Math.abs(previousAverage) * 100, 1) + "%)";
+  return "vs previous average " + formatNumber(previousAverage, 1) + (unit ? " " + unit : "") + ": " +
+    (delta > 0 ? "+" : "") + formatNumber(delta, 1) + (unit ? " " + unit : "") + relative;
+}
+
 function PersonalisedInsights({
   report,
+  previousReport,
+  previousLoading,
   coveragePercent,
   daysLogged,
   totalDays,
 }: {
   report: Report;
+  previousReport: Report | null;
+  previousLoading: boolean;
   coveragePercent: number;
   daysLogged: number;
   totalDays: number;
 }) {
-  const snapshot = report.currentSnapshot;
-  const profile = snapshot?.profile;
-  const goals = snapshot?.activeGoals ?? [];
-  const weightGoalProgress = goalProgressItemsForPattern(report, /weight|body mass/);
-  const glucoseGoalProgress = goalProgressItemsForPattern(report, /blood glucose|glucose|hba1c|a1c|diabetes/);
-  const lipidGoalProgress = goalProgressItemsForPattern(report, /cholesterol|lipid|triglyceride|ldl|hdl/);
-  const exerciseGoalProgress = goalProgressItemsForPattern(report, /exercise|physical activity|workout|fitness/);
-  const sleepGoalProgress = goalProgressItemsForPattern(report, /sleep/);
-  const hydrationGoalProgress = goalProgressItemsForPattern(report, /hydration|water intake|drink more water/);
-  const wellbeingGoalProgress = goalProgressItemsForPattern(report, /mental health|stress|mood|wellbeing/);
-  const alcoholGoalProgress = goalProgressItemsForPattern(report, /alcohol|drinking/);
-  const conditions = [
-    ...(snapshot?.conditions ?? [])
-      .filter((item) => !["RESOLVED", "INACTIVE"].includes(String(item.status ?? "").toUpperCase()))
-      .map((item) => String(item.condition?.name ?? "")),
-    ...(snapshot?.diagnoses ?? [])
-      .filter((item) => !["RESOLVED", "INACTIVE"].includes(String(item.status ?? "").toUpperCase()))
-      .map((item) => String(item.diagnosis?.name ?? "")),
-  ].filter(Boolean).join(" ").toLowerCase();
+  const goals = report.currentSnapshot?.activeGoals ?? [];
+  const age = ageAt(report.currentSnapshot?.person?.dateOfBirth, report.generatedAt);
+  const reviews = reportMeasurementReviews(report, age);
+  const flaggedLabs = flaggedLabItems(report);
+  const symptomCount = report.activity.symptoms.length;
+  const previousSymptomCount = previousReport?.activity.symptoms.length ?? 0;
+  const repeated = recurringSymptoms(report);
 
-  const hasBloodPressureContext = /hypertension|hypertensive|high blood pressure|\bhtn\b/.test(conditions);
-  const hasDiabetesContext = /\bdiabetes\b|\bdiabetic\b/.test(conditions);
-  const hasRespiratoryContext = /\basthma\b|\bcopd\b|chronic obstructive|emphysema|pulmonary|lung disease|respiratory condition/.test(conditions);
+  const event = (reportValue: Report | null, pattern: RegExp) => goalMetricSeries(reportValue, pattern);
+  const toDaily = (points: Array<{ date: string; value: number }>) => points.slice().sort((a, b) => a.date.localeCompare(b.date));
+  const weightCurrentRaw = vitalSeries(report, "weight");
+  const weightPreviousRaw = vitalSeries(previousReport, "weight");
+  const weightCurrent = weightCurrentRaw.length ? weightCurrentRaw : event(report, /weight|body mass/);
+  const weightPrevious = weightPreviousRaw.length ? weightPreviousRaw : event(previousReport, /weight|body mass/);
+  const glucoseLabCurrent = clinicalLabSeries(report, /glucose|hba1c|a1c|glycated|glycosylated/);
+  const glucoseLabPrevious = clinicalLabSeries(previousReport, /glucose|hba1c|a1c|glycated|glycosylated/);
+  const glucoseCurrent = glucoseLabCurrent.length ? glucoseLabCurrent : event(report, /blood glucose|glucose|hba1c|a1c/);
+  const glucosePrevious = glucoseLabPrevious.length ? glucoseLabPrevious : event(previousReport, /blood glucose|glucose|hba1c|a1c/);
+  const lipidLabCurrent = clinicalLabSeries(report, /cholesterol|lipid|triglyceride|\bldl\b|\bhdl\b/);
+  const lipidLabPrevious = clinicalLabSeries(previousReport, /cholesterol|lipid|triglyceride|\bldl\b|\bhdl\b/);
+  const lipidCurrent = lipidLabCurrent.length ? lipidLabCurrent : event(report, /cholesterol|lipid|triglyceride|\bldl\b|\bhdl\b/);
+  const lipidPrevious = lipidLabPrevious.length ? lipidLabPrevious : event(previousReport, /cholesterol|lipid|triglyceride|\bldl\b|\bhdl\b/);
+  const smokingCurrent = event(report, /smoking|tobacco|cigarette/);
+  const smokingPrevious = event(previousReport, /smoking|tobacco|cigarette/);
+  const alcoholCurrent = event(report, /alcohol|drinking/);
+  const alcoholPrevious = event(previousReport, /alcohol|drinking/);
+  const medicationCurrent = event(report, /medication|adherence/);
+  const medicationPrevious = event(previousReport, /medication|adherence/);
+  const nutritionCurrent = event(report, /nutrition|calorie|energy intake/);
+  const nutritionPrevious = event(previousReport, /nutrition|calorie|energy intake/);
+  const hydrationEventsCurrent = event(report, /hydration|water intake/);
+  const hydrationEventsPrevious = event(previousReport, /hydration|water intake/);
+  const exerciseEventsCurrent = event(report, /exercise|physical activity|workout|fitness/);
+  const exerciseEventsPrevious = event(previousReport, /exercise|physical activity|workout|fitness/);
+  const sleepChecksCurrent = dailyMetric(report, "sleepHours");
+  const sleepChecksPrevious = dailyMetric(previousReport, "sleepHours");
+  const sleepSessionsCurrent = dailySessionSeries(report, "sleep");
+  const sleepSessionsPrevious = dailySessionSeries(previousReport, "sleep");
+  const exerciseChecksCurrent = dailyMetric(report, "exerciseMinutes");
+  const exerciseChecksPrevious = dailyMetric(previousReport, "exerciseMinutes");
+  const workoutsCurrent = dailySessionSeries(report, "workout");
+  const workoutsPrevious = dailySessionSeries(previousReport, "workout");
+  const stressCurrent = dailyMetric(report, "stressLevel");
+  const stressPrevious = dailyMetric(previousReport, "stressLevel");
+  const hydrationChecksCurrent = dailyMetric(report, "waterIntakeMl");
+  const hydrationChecksPrevious = dailyMetric(previousReport, "waterIntakeMl");
 
-  const systolic = vitalSeries(report, "systolic");
-  const diastolic = vitalSeries(report, "diastolic");
-  const oxygen = vitalSeries(report, "oxygen");
-  const breathing = vitalSeries(report, "respiratory");
-  const periodWeight = vitalSeries(report, "weight").at(-1)?.value ?? weightGoalProgress.at(-1)?.value ?? null;
-  const hasBloodPressureData = systolic.length > 0 || diastolic.length > 0;
-  const hasRespiratoryData = oxygen.length > 0 || breathing.length > 0;
-  const age = ageAt(snapshot?.person?.dateOfBirth, report.generatedAt);
-  const heightCm = finite(profile?.heightCm) ?? finite(snapshot?.baseline?.heightCm);
-  const contextualWeightKg = finite(profile?.weightKg) ?? finite(snapshot?.baseline?.weightKg) ?? periodWeight;
-  const hasAdultBmiContext = age !== null && age >= 18 && heightCm !== null && heightCm > 0 &&
-    contextualWeightKg !== null && contextualWeightKg > 0;
+  const signals: Array<{ key: string; label: string; unit: string; current: DailyValue[]; previous: DailyValue[] }> = [
+    { key: "weight", label: "Weight", unit: "kg", current: toDaily(weightCurrent), previous: toDaily(weightPrevious) },
+    { key: "glucose", label: "Glucose / HbA1c", unit: glucoseLabCurrent.length ? "" : "mmol/L", current: toDaily(glucoseCurrent), previous: toDaily(glucosePrevious) },
+    { key: "cholesterol", label: "Cholesterol / lipids", unit: lipidLabCurrent.length ? "" : "mmol/L", current: toDaily(lipidCurrent), previous: toDaily(lipidPrevious) },
+    { key: "smoking", label: "Cigarettes logged", unit: "per day", current: toDaily(smokingCurrent), previous: toDaily(smokingPrevious) },
+    { key: "alcohol", label: "Alcohol logged", unit: "drinks", current: toDaily(alcoholCurrent), previous: toDaily(alcoholPrevious) },
+    { key: "medication", label: "Medication adherence", unit: "%", current: toDaily(medicationCurrent), previous: toDaily(medicationPrevious) },
+    { key: "nutrition", label: "Nutrition / calories", unit: "", current: toDaily(nutritionCurrent), previous: toDaily(nutritionPrevious) },
+    { key: "hydration", label: "Water intake", unit: "ml", current: toDaily(hydrationEventsCurrent.length ? hydrationEventsCurrent : hydrationChecksCurrent), previous: toDaily(hydrationEventsPrevious.length ? hydrationEventsPrevious : hydrationChecksPrevious) },
+    { key: "exercise", label: "Exercise logged", unit: "min", current: toDaily(exerciseEventsCurrent.length ? exerciseEventsCurrent : exerciseChecksCurrent), previous: toDaily(exerciseEventsPrevious.length ? exerciseEventsPrevious : exerciseChecksPrevious) },
+    { key: "workouts", label: "Workout sessions", unit: "min/day", current: toDaily(workoutsCurrent), previous: toDaily(workoutsPrevious) },
+    { key: "sleep-checkin", label: "Sleep check-ins", unit: "hours", current: toDaily(sleepChecksCurrent), previous: toDaily(sleepChecksPrevious) },
+    { key: "sleep-session", label: "Connected sleep", unit: "hours/day", current: toDaily(sleepSessionsCurrent), previous: toDaily(sleepSessionsPrevious) },
+    { key: "stress", label: "Stress rating", unit: "/10", current: toDaily(stressCurrent), previous: toDaily(stressPrevious) },
+    { key: "symptoms", label: "Symptom logs", unit: "logs/day", current: toDaily(dailySymptomSeries(report)), previous: toDaily(dailySymptomSeries(previousReport)) },
+  ].filter((signal) => signal.current.length > 0 || signal.previous.length > 0);
 
-  const labNames = report.clinical.labResults.flatMap((item) => [
-    item.orderItem?.test?.name,
-    ...(item.items ?? []).map((result) => result.test?.name),
-  ]).filter(Boolean).join(" ").toLowerCase();
-  const glucoseDeviceData = report.activity.deviceMeasurements.some((item) =>
-    /glucose|hba1c|a1c|glycated|glycosylated/.test([
-      item.measurementType,
-      item.metricKey,
-      item.vitalType?.name,
-    ].filter(Boolean).join(" ").toLowerCase()),
-  );
-  const glucoseClinicalData = report.clinical.vitals.some((item) =>
-    /glucose|hba1c|a1c|glycated|glycosylated/.test([
-      item.vitalType?.code,
-      item.vitalType?.name,
-    ].filter(Boolean).join(" ").toLowerCase()),
-  );
-  const hasGlucoseData = /glucose|hba1c|a1c|glycated|glycosylated/.test(labNames) || glucoseDeviceData || glucoseClinicalData;
-  const lipidPattern = /cholesterol|lipid|triglyceride|\bldl\b|\bhdl\b/;
-  const hasLipidData = lipidPattern.test(labNames) ||
-    report.activity.deviceMeasurements.some((item) => lipidPattern.test([
-      item.measurementType,
-      item.metricKey,
-      item.vitalType?.name,
-    ].filter(Boolean).join(" ").toLowerCase())) ||
-    report.clinical.vitals.some((item) => lipidPattern.test([
-      item.vitalType?.code,
-      item.vitalType?.name,
-    ].filter(Boolean).join(" ").toLowerCase()));
-
-  const adherenceValues = (snapshot?.medications ?? [])
-    .filter((item) => String(item.status ?? "ACTIVE").toUpperCase() === "ACTIVE")
-    .map((item) => finite(item.adherencePercentage))
-    .filter((value): value is number => value !== null && value >= 0 && value <= 100);
-  const averageAdherence = mean(adherenceValues);
-
-  const validProgressStatuses = new Set(["ON_TRACK", "IMPROVING", "STAGNANT", "DECLINING", "ACHIEVED"]);
-  const ratedGoalStatuses = goals.map((goal) => {
-    const savedStatus = String(goal.progress?.[0]?.status ?? "").toUpperCase();
-    if (validProgressStatuses.has(savedStatus)) return savedStatus;
-    return String(goal.status ?? "").toUpperCase() === "ACHIEVED" ? "ACHIEVED" : "";
-  }).filter(Boolean);
-  const goalsNeedingAttention = ratedGoalStatuses.filter((status) => status === "DECLINING" || status === "STAGNANT").length;
-  const goalsMovingWell = ratedGoalStatuses.filter((status) => ["ON_TRACK", "IMPROVING", "ACHIEVED"].includes(status)).length;
-
-  const categoryText = (goal: SnapshotGoal) => [goal.category, goal.title].filter(Boolean).join(" ").toLowerCase();
-  const hasGoal = (pattern: RegExp) => goals.some((goal) => pattern.test(categoryText(goal)));
-  const exerciseEntries = dailyMetric(report, "exerciseMinutes");
-  const sleepEntries = dailyMetric(report, "sleepHours");
-  const waterEntries = dailyMetric(report, "waterIntakeMl");
-  const stressEntries = dailyMetric(report, "stressLevel");
-  const workoutCount = report.activity.workouts.length;
-  const sleepSessionCount = report.activity.sleepSessions.filter((item) => {
-    const minutes = finite(item.durationMinutes);
-    return minutes !== null && minutes > 0;
-  }).length;
-  const latestRiskAssessment = [...(snapshot?.riskAssessments ?? [])]
-    .filter((item) => item.assessedAt)
-    .sort((a, b) => new Date(String(b.assessedAt)).getTime() - new Date(String(a.assessedAt)).getTime())[0] ?? null;
-
-  const insights: { title: string; detail: string; tone: StatusTone; href: string; linkLabel: string }[] = [];
-
-  if (hasGoal(/weight|body mass/)) {
-    insights.push({
-      title: "Weight is interpreted in your own context",
-      detail: periodWeight !== null
-        ? (weightGoalProgress.length
-          ? describeGoalHistory(weightGoalProgress, "kg") + " "
-          : "The latest dated Health Vitals weight in this period was " + formatNumber(periodWeight, 1) + " kg. ")
-          + (hasAdultBmiContext
-            ? "This is considered alongside your saved weight target and adult height/weight screening context when available. BMI is only a screening measure, not a diagnosis, and does not override your personal target or clinician's advice."
-            : "This is compared with your saved target where available; the report does not label a single weight healthy or unhealthy.")
-        : "A weight-related goal is saved, but no dated weight measurement or numeric goal-progress value was found in this report period. Profile or baseline weight alone is not treated as progress during these dates.",
-      tone: periodWeight !== null ? "info" : "watch",
-      href: periodWeight !== null ? "/health-goals" : "/today",
-      linkLabel: periodWeight !== null ? "Review weight goal" : "Record a weight measurement",
-    });
-  }
-
-  if (hasBloodPressureContext) {
-    insights.push({
-      title: "Blood-pressure trends need the full picture",
-      detail: hasBloodPressureData
-        ? "A blood-pressure-related condition is part of your recorded care context. Read repeated systolic and diastolic measurements together and compare them with your clinician's plan. Where a saved systolic goal exists, the measurement card uses it; that goal does not replace review of the full reading."
-        : "A blood-pressure-related condition is part of your recorded care context, but no blood-pressure readings were saved for this period. The report cannot tell whether your pressure was controlled from missing data; record readings as directed by your clinician.",
-      tone: hasBloodPressureData ? "info" : "watch",
+  const recommendations: Array<{ title: string; evidence: string; action: string; tone: StatusTone; href: string; linkLabel: string }> = [];
+  const urgentReviews = reviews.filter((item) => item.severity === "urgent");
+  if (urgentReviews.length) {
+    const review = urgentReviews[0];
+    recommendations.push({
+      title: "Urgent measurement needs review",
+      evidence: review.label + ": " + formatNumber(review.value, review.key === "temperature" || review.key === "oxygen" ? 1 : 0) + " " + review.unit + " · " + dateLabel(new Date(review.timestamp).toISOString()),
+      action: review.key === "oxygen" ? "Recheck immediately and seek emergency help if it remains low; do not delay if unwell." : review.key === "temperature" ? "Verify the unit and measurement; seek urgent medical help if the reading is current and accurate." : review.key === "respiratory" ? "If this is your current resting rate, seek urgent medical advice; severe breathing difficulty needs emergency help." : "Repeat the measurement after resting; get urgent help for severe symptoms.",
+      tone: "critical",
       href: "/today",
-      linkLabel: hasBloodPressureData ? "Review readings" : "Record Health Vitals",
+      linkLabel: "Review measurement",
     });
   }
-
-  if (hasDiabetesContext) {
-    insights.push({
-      title: "Glucose monitoring context",
-      detail: hasGlucoseData
-        ? "Diabetes is part of your recorded care context, and glucose-related measurements or laboratory results are available in this period. Review those values and any flagged lab results against the targets in your care plan; this report does not replace result-specific clinical interpretation."
-        : glucoseGoalProgress.length
-          ? "Diabetes is part of your recorded care context. " + describeGoalHistory(glucoseGoalProgress, "mmol/L") + " These are the values saved against your glucose goal, not a substitute for glucose measurements or HbA1c laboratory results when those are part of your care plan."
-          : "Diabetes is part of your recorded care context, but no glucose- or HbA1c-labelled result or dated glucose-goal progress update was found in this report period. Glucose control cannot be assessed from unrelated measurements. Add or review glucose and laboratory results with your healthcare team when these are part of your care plan.",
-      tone: hasGlucoseData ? "info" : glucoseGoalProgress.length ? "info" : "watch",
-      href: hasGlucoseData ? "/health-records" : glucoseGoalProgress.length ? "/health-goals" : "/today",
-      linkLabel: hasGlucoseData ? "Review clinical results" : glucoseGoalProgress.length ? "Review glucose-goal progress" : "Update health records",
-    });
-  }
-
-  if (hasRespiratoryContext) {
-    insights.push({
-      title: "Use your personal breathing plan",
-      detail: hasRespiratoryData
-        ? "Your recorded respiratory care context can affect the oxygen or breathing-rate range that is right for you. The colours in this report are screening prompts, not a substitute for your clinician's personal threshold or action plan."
-        : "A respiratory condition is part of your recorded care context, but no oxygen-saturation or breathing-rate readings were found in this period. General ranges alone cannot describe your personal baseline; follow your clinician's plan for when to measure and when to seek help.",
-      tone: hasRespiratoryData ? "info" : "watch",
-      href: "/today",
-      linkLabel: hasRespiratoryData ? "Review measurements" : "Record Health Vitals",
-    });
-  }
-
-  if (averageAdherence !== null) {
-    insights.push({
-      title: "Medicine-record context",
-      detail: averageAdherence < 90
-        ? "The saved adherence figures average " + formatNumber(averageAdherence, 0) + "%. This reflects medicine records available to Sympto and may not match every dose actually taken. If timing, side effects or logging are difficult, discuss practical support with your care team; do not stop or change treatment based on this report."
-        : "The saved adherence figures average " + formatNumber(averageAdherence, 0) + "%. This is based on recorded information, not an independent check of every dose. Continue following the prescription and keep records up to date.",
-      tone: averageAdherence < 90 ? "watch" : "info",
-      href: "/today",
-      linkLabel: "Review today's medicines",
-    });
-  } else if (hasGoal(/medication|medicine|adherence/)) {
-    insights.push({
-      title: "Medicine-goal progress needs dose records",
-      detail: "A medicine-related goal is saved, but this report has no usable saved adherence percentage to compare. Its progress should not be inferred from the profile or from prescriptions alone; keep dose logs current and review the goal history.",
-      tone: "info",
-      href: "/today",
-      linkLabel: "Review today's medicines",
-    });
-  }
-
-  if (latestRiskAssessment && ["HIGH", "VERY_HIGH"].includes(String(latestRiskAssessment.overallRisk ?? "").toUpperCase())) {
-    const riskLevel = String(latestRiskAssessment.overallRisk).toUpperCase();
-    insights.push({
-      title: "Follow up a recorded risk assessment",
-      detail: "Your most recently saved " + human(latestRiskAssessment.assessmentType || "clinical") + " assessment was marked " + human(riskLevel) + (latestRiskAssessment.assessedAt ? " on " + dateLabel(latestRiskAssessment.assessedAt) : "") + ". This is a previously recorded assessment, not a new calculation from this report. Check its recorded advice with your healthcare professional and confirm whether it is still current.",
-      tone: riskLevel === "VERY_HIGH" ? "critical" : "high",
+  if (flaggedLabs.length > 0) {
+    recommendations.push({
+      title: "Follow up flagged laboratory results",
+      evidence: flaggedLabs.length + " result item(s) are marked abnormal or critical in the clinical record.",
+      action: "Review the dated result and its clinical interpretation with your healthcare professional.",
+      tone: flaggedLabs.some((item) => item.critical) ? "critical" : "watch",
       href: "/health-records",
-      linkLabel: "Review clinical records",
+      linkLabel: "Review lab results",
     });
   }
-
-  if (ratedGoalStatuses.length > 0) {
-    insights.push({
-      title: goalsNeedingAttention > 0 ? "Some goal progress needs a check-in" : "Your saved goal signals",
-      detail: goalsNeedingAttention > 0
-        ? goalsNeedingAttention + " of " + ratedGoalStatuses.length + " goals with a rated latest update are marked stagnant or moving away from their targets. The report uses matching saved targets in the relevant measurement cards and summarises broader goal status here rather than repeating your goal list."
-        : goalsMovingWell + " of " + ratedGoalStatuses.length + " goals with a rated latest update are marked on track, improving or achieved. This describes saved goal status only; it is not an overall health score.",
-      tone: goalsNeedingAttention > 0 ? "watch" : "good",
+  const symptomDelta = symptomCount - previousSymptomCount;
+  if (symptomCount >= 2 && symptomDelta > 0) {
+    const topSymptom = repeated.find((item) => item.count > 1);
+    recommendations.push({
+      title: "Symptom logging increased",
+      evidence: symptomCount + " symptom logs this period · +" + symptomDelta + " vs previous period" + (topSymptom ? " · repeated: " + topSymptom.label + " (" + topSymptom.count + ")" : ""),
+      action: "Review whether symptoms are recurring, worsening or affecting daily life, and discuss them with a healthcare professional when appropriate.",
+      tone: "watch",
+      href: "/health-journal",
+      linkLabel: "Review symptom history",
+    });
+  }
+  const latestGoalIssues = goals.filter((goal) => ["DECLINING", "STAGNANT"].includes(String(goal.progress?.[0]?.status ?? "").toUpperCase()));
+  if (latestGoalIssues.length) {
+    recommendations.push({
+      title: "Goal trend needs a check",
+      evidence: latestGoalIssues.length + " active goal(s) have a latest saved status of declining or stagnant.",
+      action: "Check the latest recorded values against each goal’s saved target; adjust the plan with your care team where needed.",
+      tone: "watch",
       href: "/health-goals",
-      linkLabel: "Review goal progress",
+      linkLabel: "Review goals",
     });
   }
-
-  if (hasGoal(/exercise|physical activity|workout|fitness/) && workoutCount === 0 && exerciseEntries.length === 0 && exerciseGoalProgress.length === 0) {
-    const usuallyInactive = /none|never|sedentary|rarely|inactive|low/.test(String(profile?.exerciseFrequency ?? "").toLowerCase());
-    insights.push({
-      title: "Not enough activity data to assess the trend",
-      detail: usuallyInactive
-        ? "Your saved usual-activity context suggests limited routine exercise, and this period contains no workout sessions or exercise check-ins. That does not prove you were inactive; it means the report cannot measure change. Keep any activity target realistic for your circumstances and care plan."
-        : "An activity-related goal is saved, but this period contains no workout sessions or exercise check-ins. That does not prove you were inactive; it means the report cannot measure change from the records available.",
-      tone: "info",
+  const stressAverage = mean(stressCurrent.map((item) => item.value));
+  const priorStressAverage = mean(stressPrevious.map((item) => item.value));
+  if (stressAverage !== null && stressAverage >= 7 && (stressAverage > (priorStressAverage ?? -Infinity) || stressAverage >= 8)) {
+    recommendations.push({
+      title: "High stress check-ins",
+      evidence: "Average stress rating " + formatNumber(stressAverage, 1) + "/10" + (priorStressAverage === null ? "" : " · previous " + formatNumber(priorStressAverage, 1) + "/10"),
+      action: "Prioritise a wellbeing check-in and seek support if this level persists or feels difficult to manage.",
+      tone: "watch",
       href: "/today",
-      linkLabel: "Log activity",
+      linkLabel: "Open check-in",
     });
   }
-
-  if (hasGoal(/sleep/) && sleepSessionCount === 0 && sleepEntries.length === 0 && sleepGoalProgress.length === 0) {
-    insights.push({
-      title: "Sleep progress cannot be compared yet",
-      detail: "A sleep-related goal is saved, but this period contains no sleep-session or sleep check-in data. Empty days are unknown, not zero hours; record sleep when practical so a future report can compare it with your goal.",
-      tone: "info",
+  const sleepAverage = mean((sleepChecksCurrent.length ? sleepChecksCurrent : sleepSessionsCurrent).map((item) => item.value));
+  if (sleepAverage !== null && sleepAverage < 6) {
+    recommendations.push({
+      title: "Short sleep recorded",
+      evidence: "Average recorded sleep " + formatNumber(sleepAverage, 1) + " hours on days with entries.",
+      action: "Review sleep consistency and consider discussing persistent sleep difficulties with a healthcare professional.",
+      tone: "watch",
       href: "/today",
-      linkLabel: "Record a check-in",
+      linkLabel: "Review check-in",
     });
   }
-
-  if (hasGoal(/hydration|water intake|drink more water/) && waterEntries.length === 0 && hydrationGoalProgress.length === 0) {
-    insights.push({
-      title: "Hydration progress cannot be compared yet",
-      detail: "A hydration-related goal is saved, but no dated water-intake check-ins were found in this period. The report cannot estimate progress from a missing entry; record water intake in your daily check-in when practical.",
-      tone: "info",
+  const medicineGoal = goals.find((goal) => /MEDICATION/.test(String(goal.category ?? "").toUpperCase()));
+  const adherenceAverage = mean(medicationCurrent.map((item) => item.value));
+  if (medicineGoal && adherenceAverage !== null && medicineGoal.targetValue != null && adherenceAverage < Number(medicineGoal.targetValue)) {
+    recommendations.push({
+      title: "Medication adherence below saved target",
+      evidence: "Recorded adherence average " + formatNumber(adherenceAverage, 1) + "% · goal " + formatNumber(Number(medicineGoal.targetValue), 1) + "%",
+      action: "Review missed or difficult-to-log doses with your care team; do not change a prescription based on this report.",
+      tone: "watch",
       href: "/today",
-      linkLabel: "Record water intake",
+      linkLabel: "Review medication logs",
     });
   }
 
-  if (hasGoal(/mental health|stress|mood|wellbeing/) && stressEntries.length === 0 && lowMoodCounts(report).total === 0 && wellbeingGoalProgress.length === 0) {
-    insights.push({
-      title: "Wellbeing progress needs check-in data",
-      detail: "A wellbeing-related goal is saved, but no stress ratings or mood check-ins were found in this period. The report will not infer how you felt on days without an entry.",
-      tone: "info",
-      href: "/today",
-      linkLabel: "Complete a check-in",
-    });
-  }
-
-  if (hasGoal(/blood glucose|glucose|diabetes/) && !hasGlucoseData && !hasDiabetesContext && !glucoseGoalProgress.length) {
-    insights.push({
-      title: "Glucose goal data is missing",
-      detail: "A glucose-related goal is saved, but no glucose- or HbA1c-labelled measure or dated goal-progress update was found in this report period. This is a data gap, not evidence that the goal was missed.",
-      tone: "info",
-      href: "/health-records",
-      linkLabel: "Review clinical records",
-    });
-  }
-
-  if (hasGoal(/cholesterol|lipid/) && !hasLipidData) {
-    insights.push({
-      title: lipidGoalProgress.length ? "Cholesterol goal progress is recorded" : "Cholesterol goal data is missing",
-      detail: lipidGoalProgress.length
-        ? describeGoalHistory(lipidGoalProgress, "mmol/L") + " No matching cholesterol, lipid, LDL, HDL or triglyceride laboratory result was found in this period, so these goal-log values are not presented as a substitute for a laboratory result."
-        : "A cholesterol-related goal is saved, but no cholesterol, lipid, LDL, HDL or triglyceride laboratory result or dated goal-progress update was found in this report period. The report cannot infer a change from unrelated measurements; review the dated laboratory results when available.",
-      tone: lipidGoalProgress.length ? "info" : "watch",
-      href: lipidGoalProgress.length ? "/health-goals" : "/health-records",
-      linkLabel: lipidGoalProgress.length ? "Review goal progress" : "Review clinical records",
-    });
-  }
-
-  const smokingProgress = goalProgressItemsForPattern(report, /smoking|tobacco|cigarette/);
-  if (hasGoal(/smoking|tobacco|cigarette/)) {
-    const trendDetail = smokingProgress.length
-      ? describeGoalHistory(smokingProgress, "cigarettes/day") + " Lower counts may reflect progress toward a cigarette-reduction goal, but the saved target and complete logging context matter."
-      : "Your saved smoking context can help tailor this goal, but no dated smoking-goal metric events or manual progress values were found for this period. Profile status alone is not treated as a trend.";
-    insights.push({
-      title: smokingProgress.length ? "Smoking-goal progress from saved updates" : "Smoking-related progress needs dated updates",
-      detail: trendDetail,
-      tone: smokingProgress.length > 1 ? "info" : "watch",
-      href: "/health-goals",
-      linkLabel: "Review goal progress",
-    });
-  }
-
-  if (hasGoal(/alcohol|drinking/) && Boolean(profile?.alcoholConsumption)) {
-    insights.push({
-      title: alcoholGoalProgress.length > 1 ? "Alcohol-goal progress from saved updates" : "Alcohol-related progress needs dated updates",
-      detail: alcoholGoalProgress.length
-        ? describeGoalHistory(alcoholGoalProgress, "drinks/week") + " Compare this with your saved goal; this summary does not assume that the same number of drinks on every day or week has the same context."
-        : "Your saved alcohol-use context can help tailor this goal, but no dated alcohol-goal metric events or manual progress values were found in this period.",
-      tone: alcoholGoalProgress.length > 1 ? "info" : "watch",
-      href: "/health-goals",
-      linkLabel: "Review goal progress",
-    });
-  }
-
+  const noPrior = previousReport === null;
   const coverageTone: StatusTone = coveragePercent >= 75 ? "good" : coveragePercent >= 40 ? "watch" : "high";
-  if (insights.length === 0) {
-    insights.push({
-      title: "Build the picture around your own targets",
-      detail: goals.length > 0
-        ? "Your saved targets and care context remain available to shape comparisons. More dated readings and check-ins will let the report assess relevant changes without treating missing values as zero."
-        : "As your saved care context, targets and dated readings build up, the report can tailor comparisons to your own circumstances instead of relying only on general reference ranges.",
-      tone: "info",
-      href: goals.length > 0 ? "/health-goals" : "/today",
-      linkLabel: goals.length > 0 ? "Review saved targets" : "Record today's health",
-    });
-  }
 
   return (
-    <section aria-label="Personalised interpretation" className="rounded-2xl border border-[#dcebed] bg-white p-4 shadow-sm sm:p-5">
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-center">
-        <div className="flex min-w-0 flex-1 items-center gap-3">
-          <ScoreRing percent={coveragePercent} label="Data coverage" tone={coverageTone} size={76} />
-          <div className="min-w-0">
-            <p className="text-[10px] font-black uppercase tracking-[0.15em] text-[#0b7b80]">Personalised interpretation</p>
-            <h2 className="mt-1 text-lg font-black text-[#0b2d54]">What your records mean in context</h2>
-            <p className="mt-1 text-xs leading-5 text-slate-500">Saved age, relevant care context, baselines, medicine-record measures and personal targets shape these observations when they change the interpretation or next step. Profile context may have been updated after this report period, so it is not always a historical snapshot.</p>
-            <p className="mt-1 text-[10px] leading-4 text-slate-500">{daysLogged} of {totalDays} days had records. Coverage describes logging consistency, not health status.</p>
+    <section aria-label="Health trends and recommendations" className="space-y-5">
+      <section className="rounded-2xl border border-[#dcebed] bg-white p-4 shadow-sm sm:p-5">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
+          <ScoreRing percent={coveragePercent} label="Days with records" tone={coverageTone} size={64} />
+          <div className="min-w-0 flex-1">
+            <p className="text-[10px] font-black uppercase tracking-[0.15em] text-[#0b7b80]">Period comparison</p>
+            <h2 className="mt-1 text-lg font-black text-[#0b2d54]">What changed</h2>
+            <p className="mt-1 text-xs text-slate-500">{daysLogged}/{totalDays} days with at least one saved record · {previousLoading ? "Comparing…" : noPrior ? "No previous-period report available" : "Current period vs previous period"}</p>
           </div>
         </div>
-      </div>
-      <div className="mt-4 grid gap-3 md:grid-cols-2">
-        {insights.map((insight) => (
-          <article key={insight.title} className={"rounded-xl border bg-white p-4 " + toneStyles(insight.tone).border}>
-            <div className="flex items-start gap-3">
-              <StatusCircle label={insight.tone === "good" ? "On track" : insight.tone === "critical" ? "Urgent" : insight.tone === "high" ? "Review" : insight.tone === "watch" ? "Monitor" : "Context"} detail="Personalised signal" tone={insight.tone} />
-              <div className="min-w-0 flex-1">
-                <h3 className="text-sm font-black text-[#0b2d54]">{insight.title}</h3>
-                <p className="mt-2 text-xs leading-5 text-slate-600">{insight.detail}</p>
-                <Link href={insight.href} className="mt-3 inline-flex min-h-9 items-center gap-1.5 rounded-xl bg-[#0b2d54] px-3 py-2 text-[10px] font-black text-white">{insight.linkLabel} <ArrowRight className="h-3 w-3 text-[#24c1c4]" /></Link>
+        {signals.length ? (
+          <div className="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+            {signals.map((signal) => {
+              const currentAverage = mean(signal.current.map((item) => item.value));
+              const previousAverage = mean(signal.previous.map((item) => item.value));
+              const latest = signal.current[signal.current.length - 1];
+              const unit = signal.unit ? " " + signal.unit : "";
+              return (
+                <article key={signal.key} className="min-w-0 rounded-xl border border-slate-200 bg-white p-4">
+                  <h3 className="text-sm font-black text-[#0b2d54]">{signal.label}</h3>
+                  <div className="mt-2 flex flex-wrap items-baseline gap-x-2 gap-y-1">
+                    <span className="text-2xl font-black text-[#0b2d54]">{currentAverage === null ? "—" : formatNumber(currentAverage, 1)}{unit}</span>
+                    <span className="text-[10px] font-semibold text-slate-400">average</span>
+                  </div>
+                  {latest && <p className="mt-1 text-[11px] text-slate-500">Latest {formatNumber(latest.value, 1)}{unit} · {dateLabel(latest.date)}</p>}
+                  <p className="mt-2 text-xs font-semibold text-slate-600">{signalChange(signal.current, signal.previous, signal.unit)}</p>
+                  <MiniTrend values={signal.current.map((item) => item.value)} label={signal.label + " current-period trend"} />
+                  <p className="mt-2 text-[10px] text-slate-400">{signal.current.length} current value(s){signal.previous.length ? " · " + signal.previous.length + " previous value(s)" : ""}</p>
+                </article>
+              );
+            })}
+          </div>
+        ) : (
+          <p className="mt-4 rounded-xl bg-slate-50 p-3 text-sm text-slate-500">No comparable numeric logs were returned for this period.</p>
+        )}
+      </section>
+
+      <section className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:p-5">
+        <div className="flex items-center justify-between gap-3">
+          <div>
+            <p className="text-[10px] font-black uppercase tracking-[0.15em] text-[#0b7b80]">Rule-based intelligence</p>
+            <h2 className="mt-1 text-lg font-black text-[#0b2d54]">Recommended actions</h2>
+          </div>
+          <span className="text-xs text-slate-400">{recommendations.length} signal(s)</span>
+        </div>
+        {recommendations.length ? (
+          <div className="mt-3 divide-y divide-slate-100">
+            {recommendations.slice(0, 5).map((item) => (
+              <div key={item.title} className="flex gap-3 py-3 first:pt-0 last:pb-0">
+                <span className={"mt-0.5 h-2.5 w-2.5 shrink-0 rounded-full " + (item.tone === "critical" ? "bg-rose-600" : item.tone === "high" ? "bg-orange-500" : item.tone === "watch" ? "bg-amber-500" : "bg-teal-500")} />
+                <div className="min-w-0 flex-1">
+                  <h3 className="text-sm font-bold text-[#0b2d54]">{item.title}</h3>
+                  <p className="mt-1 text-xs font-semibold text-slate-600">{item.evidence}</p>
+                  <p className="mt-1 text-xs leading-5 text-slate-500">{item.action}</p>
+                  <Link href={item.href} className="mt-2 inline-flex min-h-8 items-center gap-1 rounded-lg bg-[#0b2d54] px-3 py-1.5 text-[10px] font-bold text-white">{item.linkLabel} <ArrowRight className="h-3 w-3 text-[#24c1c4]" /></Link>
+                </div>
               </div>
-            </div>
-          </article>
-        ))}
-      </div>
-      <p className="mt-3 border-t border-slate-100 pt-3 text-[10px] leading-4 text-slate-500">These insights are based on saved information. Missing entries are not treated as zero, and none of these patterns establishes a diagnosis or a cause.</p>
+            ))}
+          </div>
+        ) : (
+          <p className="mt-3 text-sm text-slate-500">No rule-based follow-up was triggered by the available measurements, laboratory flags, symptom counts or goal-status records.</p>
+        )}
+      </section>
     </section>
   );
 }
@@ -1829,7 +1800,7 @@ function HealthReportInsights({
 
   return (
     <div className="mt-5 space-y-6">
-      <PersonalisedInsights report={report} coveragePercent={coveragePercent} daysLogged={daysLogged} totalDays={totalDays} />
+      <PersonalisedInsights report={report} previousReport={previousReport} previousLoading={previousLoading} coveragePercent={coveragePercent} daysLogged={daysLogged} totalDays={totalDays} />
       <section>
         <div className="mb-3 flex items-end justify-between gap-3"><div><p className="text-[10px] font-black uppercase tracking-[0.16em] text-[#24c1c4]">Period overview</p><h2 className="mt-1 text-xl font-black text-[#0b2d54]">The bigger picture</h2></div><span className="text-xs text-slate-400">{totalDays} days</span></div>
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
