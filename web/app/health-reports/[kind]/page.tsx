@@ -680,12 +680,34 @@ function reportMeasurementReviews(report: Report, age: number | null): Measureme
       value: highestBreathing.value, timestamp: highestBreathing.timestamp, severity: "review",
       message: "This saved rate is much faster than the typical adult resting range of 12–18 breaths per minute. Check whether it was recorded after activity and verify the original entry. If this is happening now, seek urgent medical advice.",
     });
-  } else if (age !== null && age >= 18 && latestBreathing && latestBreathing.value > 0 && latestBreathing.value < 8) {
+  } else if (age !== null && age >= 18 && lowestBreathing && lowestBreathing.value > 0 && lowestBreathing.value < 8) {
     reviews.push({
       key: "respiratory", label: "Breathing rate", unit: "breaths/min",
-      value: lowestBreathing?.value ?? latestBreathing.value,
-      timestamp: lowestBreathing?.timestamp ?? latestBreathing.timestamp, severity: "review",
-      message: "This is lower than the typical adult resting range. Confirm the rate and measurement context; seek urgent medical advice if this is current or you feel unwell.",
+      value: lowestBreathing.value,
+      timestamp: lowestBreathing.timestamp, severity: "review",
+      message: "A breathing rate below the typical adult resting range was saved during this period. Check whether it was measured at rest and verify the original entry; seek urgent advice if this is current or you feel unwell.",
+    });
+  }
+
+  const heartRateSeries = vitalSeries(report, "heartRate");
+  const invalidHeartRate = heartRateSeries.filter((point) => point.value <= 0 || point.value > 250).at(-1);
+  if (invalidHeartRate) {
+    reviews.push({
+      key: "heartRate", label: "Heart rate", unit: "bpm",
+      value: invalidHeartRate.value, timestamp: invalidHeartRate.timestamp,
+      ...originalUnitReviewFields(invalidHeartRate), severity: "review",
+      message: "This saved heart-rate value is outside a plausible measurement scale. Check the original entry, device and unit before using it in a trend.",
+    });
+  }
+
+  const weightSeries = vitalSeries(report, "weight");
+  const invalidWeight = weightSeries.filter((point) => point.value <= 0 || point.value >= 1000).at(-1);
+  if (invalidWeight) {
+    reviews.push({
+      key: "weight", label: "Weight", unit: "kg",
+      value: invalidWeight.value, timestamp: invalidWeight.timestamp,
+      ...originalUnitReviewFields(invalidWeight), severity: "review",
+      message: "This saved weight is outside the range used for this report's trend calculation. Check the original entry and unit before relying on the average.",
     });
   }
 
@@ -704,6 +726,25 @@ function reportMeasurementReviews(report: Report, age: number | null): Measureme
       unit: "mmHg", value: severeBloodPressure.value,
       timestamp: severeBloodPressure.timestamp, ...originalUnitReviewFields(severeBloodPressure), severity: "urgent",
       message: "This blood-pressure reading is very high. Repeat it after sitting quietly and seek prompt medical advice. If you also have chest pain, shortness of breath, weakness, numbness, vision changes or trouble speaking, call local emergency services.",
+    });
+  }
+
+  const lowSystolic = vitalSeries(report, "systolic").filter((point) => point.value < 40).at(-1);
+  const lowDiastolic = vitalSeries(report, "diastolic").filter((point) => point.value < 20).at(-1);
+  if (lowSystolic) {
+    reviews.push({
+      key: "systolic", label: "Systolic blood pressure", unit: "mmHg",
+      value: lowSystolic.value, timestamp: lowSystolic.timestamp,
+      ...originalUnitReviewFields(lowSystolic), severity: "review",
+      message: "This systolic value is outside the range used for this report's trend calculation. Check the saved unit and original reading.",
+    });
+  }
+  if (lowDiastolic) {
+    reviews.push({
+      key: "diastolic", label: "Diastolic blood pressure", unit: "mmHg",
+      value: lowDiastolic.value, timestamp: lowDiastolic.timestamp,
+      ...originalUnitReviewFields(lowDiastolic), severity: "review",
+      message: "This diastolic value is outside the range used for this report's trend calculation. Check the saved unit and original reading.",
     });
   }
 
