@@ -2207,6 +2207,8 @@ function HealthReportInsights({
   const lowMood = lowMoodCounts(report);
   const goalProgressItems = goalProgressTrendItems(report, previousReport);
   const repeated = recurringSymptoms(report);
+  const symptomAnalytics = symptomLogAnalytics(report);
+  const previousSymptomAnalytics = symptomLogAnalytics(previousReport);
   const association = routineAssociation(report);
   const flaggedLabs = flaggedLabItems(report);
   const clinicalCount = clinicalEvents(report);
