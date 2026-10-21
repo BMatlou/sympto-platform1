@@ -114,6 +114,25 @@ type SnapshotCondition = {
   chronic?: boolean | null;
   condition?: { name?: string | null; chronic?: boolean | null } | null;
 };
+type SnapshotDiagnosis = {
+  status?: string | null;
+  severity?: string | null;
+  stage?: string | null;
+  primaryDiagnosis?: boolean | null;
+  diagnosedAt?: string | null;
+  diagnosis?: { name?: string | null; chronic?: boolean | null } | null;
+};
+type SnapshotMedicalRecord = {
+  allergies?: string | null;
+  bloodType?: string | null;
+  chronicConditions?: string | null;
+  currentMedications?: string | null;
+  familyHistory?: string | null;
+  immunizationNotes?: string | null;
+  pastMedicalHistory?: string | null;
+  socialHistory?: string | null;
+  surgicalHistory?: string | null;
+};
 type SnapshotAllergy = {
   status?: string | null;
   severity?: string | null;
@@ -174,10 +193,22 @@ type HealthContextSnapshot = {
     heightCm?: number | string | null;
     weightKg?: number | string | null;
     bmi?: number | string | null;
+    systolicPressure?: number | string | null;
+    diastolicPressure?: number | string | null;
+    restingHeartRate?: number | string | null;
+    respiratoryRate?: number | string | null;
+    oxygenSaturation?: number | string | null;
+    bodyTemperature?: number | string | null;
+    bloodGlucose?: number | string | null;
+    cholesterol?: number | string | null;
     establishedAt?: string | null;
   } | null;
+  medicalRecord?: SnapshotMedicalRecord | null;
+  bloodType?: string | null;
+  rhesusFactor?: string | null;
   riskAssessments?: SnapshotRiskAssessment[];
   conditions?: SnapshotCondition[];
+  diagnoses?: SnapshotDiagnosis[];
   allergies?: SnapshotAllergy[];
   medications?: SnapshotMedication[];
   activeGoals?: SnapshotGoal[];
@@ -247,6 +278,21 @@ function ageAt(dateOfBirth: unknown, referenceDate: unknown): number | null {
     (reference.getMonth() === birth.getMonth() && reference.getDate() < birth.getDate())
   ) age -= 1;
   return age >= 0 && age < 125 ? age : null;
+}
+
+function baselineVitalValue(metric: string, snapshot: HealthContextSnapshot | null | undefined): number | null {
+  const baseline = snapshot?.baseline;
+  if (!baseline) return null;
+  const fields: Record<string, unknown> = {
+    systolic: baseline.systolicPressure,
+    diastolic: baseline.diastolicPressure,
+    heartRate: baseline.restingHeartRate,
+    weight: baseline.weightKg,
+    oxygen: baseline.oxygenSaturation,
+    temperature: baseline.bodyTemperature,
+    respiratory: baseline.respiratoryRate,
+  };
+  return finite(fields[metric]);
 }
 
 type StatusTone = "good" | "watch" | "high" | "critical" | "info";
