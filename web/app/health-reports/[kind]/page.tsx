@@ -485,6 +485,39 @@ function goalProgressTrendItems(report: Report, previousReport: Report | null): 
     return Number.isFinite(timestamp) && timestamp >= start && timestamp < end;
   };
   const previousGoals = previousReport?.currentSnapshot?.activeGoals ?? [];
+  const aggregatedMetricEvents = (targetReport: Report | null, goalId: string) => {
+    if (!targetReport) return [];
+    const byDate = new Map<string, Array<{ date: string; timestamp: number; value: number; unit: string; aggregation: string }>>();
+    (targetReport.goalMetricEvents ?? [])
+      .filter((event) => event.goalId === goalId && event.source !== "goal-baseline")
+      .forEach((event) => {
+        const timestamp = new Date(event.occurredAt).getTime();
+        const value = finite(event.loggedValue);
+        const date = dateKey(event.occurredAt);
+        if (!inPeriod(timestamp, targetReport) || value === null || !date) return;
+        const point = {
+          date,
+          timestamp,
+          value,
+          unit: String(event.unit ?? ""),
+          aggregation: String(event.aggregation ?? "LATEST").toUpperCase(),
+        };
+        const dayPoints = byDate.get(date) ?? [];
+        dayPoints.push(point);
+        byDate.set(date, dayPoints);
+      });
+    return Array.from(byDate.values()).map((dayPoints) => {
+      const ordered = dayPoints.sort((a, b) => a.timestamp - b.timestamp);
+      const latest = ordered[ordered.length - 1];
+      const values = ordered.map((item) => item.value);
+      const aggregate = latest.aggregation === "SUM" ? values.reduce((sum, value) => sum + value, 0)
+        : latest.aggregation === "AVERAGE" ? mean(values) ?? latest.value
+        : latest.aggregation === "MIN" ? Math.min(...values)
+        : latest.aggregation === "MAX" ? Math.max(...values)
+        : latest.value;
+      return { date: latest.date, timestamp: latest.timestamp, value: aggregate, unit: latest.unit, valueKind: "current" as const, status: "" };
+    }).sort((a, b) => a.timestamp - b.timestamp);
+  };
 
   return (report.currentSnapshot?.activeGoals ?? []).flatMap((goal) => {
     const progressPoints = (goal.progress ?? []).flatMap((item) => {
@@ -499,16 +532,7 @@ function goalProgressTrendItems(report: Report, previousReport: Report | null): 
       return [{ date, timestamp, value, valueKind: currentValue !== null ? "current" as const : "percent" as const, status: String(item.status ?? "").toUpperCase() }];
     }).sort((a, b) => a.timestamp - b.timestamp);
 
-    const eventPoints = (report.goalMetricEvents ?? [])
-      .filter((event) => event.goalId === goal.id && event.source !== "goal-baseline")
-      .flatMap((event) => {
-        const timestamp = new Date(event.occurredAt).getTime();
-        const value = finite(event.loggedValue);
-        const date = dateKey(event.occurredAt);
-        if (!inPeriod(timestamp, report) || value === null || !date) return [];
-        return [{ date, timestamp, value, valueKind: "current" as const, status: "" }];
-      })
-      .sort((a, b) => a.timestamp - b.timestamp);
+    const eventPoints = aggregatedMetricEvents(report, String(goal.id ?? ""));
 
     // Metric events are authoritative for metric-configured goals. Don't merge
     // them with progress projections, which can represent the same saved check-in.
@@ -518,16 +542,7 @@ function goalProgressTrendItems(report: Report, previousReport: Report | null): 
     const previousGoal = previousGoals.find((item) => item.id === goal.id) ??
       previousGoals.find((item) => String(item.category ?? "") === String(goal.category ?? "") &&
         String(item.title ?? "") === String(goal.title ?? ""));
-    const previousEvents = (previousReport?.goalMetricEvents ?? [])
-      .filter((event) => event.goalId === goal.id && event.source !== "goal-baseline")
-      .flatMap((event) => {
-        const timestamp = new Date(event.occurredAt).getTime();
-        const value = finite(event.loggedValue);
-        const date = dateKey(event.occurredAt);
-        if (!inPeriod(timestamp, previousReport) || value === null || !date) return [];
-        return [{ date, timestamp, value, valueKind: "current" as const }];
-      })
-      .sort((a, b) => a.timestamp - b.timestamp);
+    const previousEvents = aggregatedMetricEvents(previousReport, String(goal.id ?? ""));
 
     const previousProgress = (previousGoal?.progress ?? [])
       .flatMap((item) => {
