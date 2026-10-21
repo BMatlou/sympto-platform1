@@ -375,6 +375,81 @@ function dailyMetric(report: Report | null, field: string): DailyValue[] {
     .sort((a, b) => a.date.localeCompare(b.date));
 }
 
+type GoalProgressTrendItem = {
+  key: string;
+  title: string;
+  category: string;
+  unit: string;
+  valueKind: "current" | "percent";
+  current: DailyValue[];
+  previous: DailyValue[];
+  latestStatus: string;
+  targetValue: number | null;
+};
+
+function goalProgressTrendItems(report: Report, previousReport: Report | null): GoalProgressTrendItem[] {
+  const currentStart = new Date(report.period.start).getTime();
+  const currentEnd = new Date(report.period.end).getTime();
+  const previousStart = previousReport ? new Date(previousReport.period.start).getTime() : Number.NaN;
+  const previousEnd = previousReport ? new Date(previousReport.period.end).getTime() : Number.NaN;
+  const previousGoals = previousReport?.currentSnapshot?.activeGoals ?? [];
+
+  return (report.currentSnapshot?.activeGoals ?? []).flatMap((goal) => {
+    const progress = goal.progress ?? [];
+    const dated = progress.flatMap((item) => {
+      if (!item.measuredAt) return [];
+      const timestamp = new Date(item.measuredAt).getTime();
+      if (!Number.isFinite(timestamp)) return [];
+      const currentValue = finite(item.currentValue);
+      const percentValue = finite(item.progressPercent);
+      const value = currentValue !== null ? currentValue : percentValue;
+      if (value === null) return [];
+      return [{
+        date: dateKey(item.measuredAt),
+        timestamp,
+        value,
+        valueKind: currentValue !== null ? "current" as const : "percent" as const,
+        status: String(item.status ?? "").toUpperCase(),
+      }];
+    }).filter((item) => Boolean(item.date));
+
+    const current = dated
+      .filter((item) => item.timestamp >= currentStart && item.timestamp < currentEnd)
+      .sort((a, b) => a.timestamp - b.timestamp);
+    if (!current.length) return [];
+
+    const previousGoal = previousGoals.find((item) => item.id === goal.id) ??
+      previousGoals.find((item) => String(item.category ?? "") === String(goal.category ?? "") &&
+        String(item.title ?? "") === String(goal.title ?? ""));
+    const previous = (previousGoal?.progress ?? [])
+      .flatMap((item) => {
+        if (!item.measuredAt) return [];
+        const timestamp = new Date(item.measuredAt).getTime();
+        const currentValue = finite(item.currentValue);
+        const percentValue = finite(item.progressPercent);
+        const value = currentValue !== null ? currentValue : percentValue;
+        if (!Number.isFinite(timestamp) || timestamp < previousStart || timestamp >= previousEnd || value === null) return [];
+        const valueKind = currentValue !== null ? "current" as const : "percent" as const;
+        return [{ date: dateKey(item.measuredAt), value, valueKind, timestamp }];
+      })
+      .filter((item) => Boolean(item.date) && item.valueKind === current[0].valueKind)
+      .sort((a, b) => a.timestamp - b.timestamp)
+      .map(({ date, value }) => ({ date, value }));
+
+    return [{
+      key: String(goal.id ?? goal.category ?? goal.title ?? "goal"),
+      title: String(goal.title || human(goal.category) || "Health goal"),
+      category: String(goal.category ?? ""),
+      unit: current[0].valueKind === "percent" ? "%" : String(goal.unit ?? ""),
+      valueKind: current[0].valueKind,
+      current: current.filter((item) => item.valueKind === current[0].valueKind).map(({ date, value }) => ({ date, value })),
+      previous,
+      latestStatus: current[current.length - 1].status,
+      targetValue: finite(goal.targetValue),
+    }];
+  });
+}
+
 function recordedDays(report: Report) {
   const days = new Set<string>();
   const periodStart = new Date(report.period.start).getTime();
@@ -987,6 +1062,22 @@ function StatusCircle({ label, detail, tone }: { label: string; detail: string; 
   );
 }
 
+function goalProgressItemsForPattern(report: Report, pattern: RegExp): { value: number; date: string }[] {
+  const start = new Date(report.period.start).getTime();
+  const end = new Date(report.period.end).getTime();
+  return (report.currentSnapshot?.activeGoals ?? [])
+    .filter((goal) => pattern.test([goal.category, goal.title].filter(Boolean).join(" ").toLowerCase()))
+    .flatMap((goal) => (goal.progress ?? []).flatMap((item) => {
+      if (!item.measuredAt) return [];
+      const timestamp = new Date(item.measuredAt).getTime();
+      const value = finite(item.currentValue);
+      if (!Number.isFinite(timestamp) || timestamp < start || timestamp >= end || value === null) return [];
+      return [{ value, date: dateKey(item.measuredAt), timestamp }];
+    }))
+    .filter((item) => Boolean(item.date))
+    .sort((a, b) => a.timestamp - b.timestamp);
+}
+
 function PersonalisedInsights({
   report,
   coveragePercent,
@@ -1245,11 +1336,19 @@ function PersonalisedInsights({
     });
   }
 
-  if (hasGoal(/smoking|tobacco|cigarette/) && Boolean(profile?.smokingStatus)) {
+  const smokingProgress = goalProgressItemsForPattern(report, /smoking|tobacco|cigarette/);
+  if (hasGoal(/smoking|tobacco|cigarette/)) {
+    const first = smokingProgress[0]?.value ?? null;
+    const latest = smokingProgress[smokingProgress.length - 1]?.value ?? null;
+    const trendDetail = first !== null && latest !== null && smokingProgress.length > 1
+      ? "Your goal has " + smokingProgress.length + " dated progress updates this period. The recorded value changed from " + formatNumber(first, 1) + " to " + formatNumber(latest, 1) + ". Whether that means improvement depends on the measure saved by the goal; the report does not assume that a higher or lower number is always better."
+      : "Your saved smoking context can help tailor this goal. " + (smokingProgress.length
+        ? "A dated progress value is available for this period, but there are not enough comparable updates to calculate a within-period trend."
+        : "No dated smoking-goal progress values were found for this period, so profile status alone is not treated as a trend.");
     insights.push({
-      title: "Smoking-related progress needs dated updates",
-      detail: "Your saved smoking context can help tailor this goal, but this report does not build a dated smoking trend from profile status alone. No reduction or increase is inferred without comparable entries for the selected period.",
-      tone: "info",
+      title: smokingProgress.length ? "Smoking-goal progress from saved updates" : "Smoking-related progress needs dated updates",
+      detail: trendDetail,
+      tone: smokingProgress.length > 1 ? "info" : "watch",
       href: "/health-goals",
       linkLabel: "Review goal progress",
     });
@@ -1307,6 +1406,47 @@ function PersonalisedInsights({
       </div>
       <p className="mt-3 border-t border-slate-100 pt-3 text-[10px] leading-4 text-slate-500">These insights are based on saved information. Missing entries are not treated as zero, and none of these patterns establishes a diagnosis or a cause.</p>
     </section>
+  );
+}
+
+function GoalProgressTrendCard({ item, previousLoading }: { item: GoalProgressTrendItem; previousLoading: boolean }) {
+  const values = item.current.map((entry) => entry.value);
+  const currentMean = mean(values);
+  const first = item.current[0]?.value ?? null;
+  const latest = item.current[item.current.length - 1]?.value ?? null;
+  const change = first !== null && latest !== null ? latest - first : null;
+  const status = item.latestStatus ? human(item.latestStatus) : "Status not recorded";
+
+  return (
+    <article className="min-w-0 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0">
+          <p className="text-[10px] font-black uppercase tracking-[0.12em] text-[#0b7b80]">{human(item.category || "Health goal")}</p>
+          <h3 className="mt-1 font-bold text-[#0b2d54]">{item.title}</h3>
+          <p className="mt-1 text-xs leading-5 text-slate-500">{item.current.length} dated {item.current.length === 1 ? "update" : "updates"} in this period</p>
+        </div>
+        <ScoreRing percent={item.valueKind === "percent" ? latest : null} label={item.valueKind === "percent" ? "Latest progress" : "Recorded trend"} tone={item.latestStatus === "DECLINING" ? "watch" : item.latestStatus === "ACHIEVED" || item.latestStatus === "IMPROVING" || item.latestStatus === "ON_TRACK" ? "good" : "info"} size={64} />
+      </div>
+      <div className="mt-4 grid grid-cols-2 gap-3">
+        <div className="rounded-xl bg-slate-50 p-3">
+          <p className="text-[10px] font-bold uppercase tracking-wide text-slate-400">Latest recorded</p>
+          <p className="mt-1 text-xl font-black text-[#0b2d54]">{latest === null ? "—" : formatNumber(latest, 1)} <span className="text-xs font-bold text-slate-500">{item.unit}</span></p>
+          <p className="mt-1 text-[10px] text-slate-500">{dateLabel(item.current[item.current.length - 1]?.date)}</p>
+        </div>
+        <div className="rounded-xl bg-slate-50 p-3">
+          <p className="text-[10px] font-bold uppercase tracking-wide text-slate-400">Period average</p>
+          <p className="mt-1 text-xl font-black text-[#0b2d54]">{currentMean === null ? "—" : formatNumber(currentMean, 1)} <span className="text-xs font-bold text-slate-500">{item.unit}</span></p>
+          <p className="mt-1 text-[10px] text-slate-500">{status}</p>
+        </div>
+      </div>
+      <MiniTrend values={values} label={item.title + " saved goal progress trend"} />
+      <p className="mt-3 text-xs leading-5 text-slate-600">
+        {change === null ? "Only one dated value is available, so a within-period change cannot be calculated." :
+          "From the first to the latest dated update, the recorded value " + (change === 0 ? "stayed the same" : (change > 0 ? "increased by " : "decreased by ") + formatNumber(Math.abs(change), 1) + (item.unit ? " " + item.unit : "")) + "."}
+        {" "}{compareText(values, item.previous.map((entry) => entry.value), item.unit, 1, previousLoading)}
+      </p>
+      {item.targetValue !== null && item.valueKind === "current" && <p className="mt-2 text-[11px] leading-4 text-slate-500">Saved goal target: {formatNumber(item.targetValue, 1)} {item.unit}. Direction and clinical meaning depend on this goal&apos;s definition.</p>}
+    </article>
   );
 }
 
@@ -1491,6 +1631,7 @@ function HealthReportInsights({
   const sleepSessions = report.activity.sleepSessions.filter((session) => finite(session.durationMinutes) !== null && Number(session.durationMinutes) > 0);
   const sleepHours = sleepSessions.map((session) => Number(session.durationMinutes) / 60);
   const lowMood = lowMoodCounts(report);
+  const goalProgressItems = goalProgressTrendItems(report, previousReport);
   const repeated = recurringSymptoms(report);
   const association = routineAssociation(report);
   const flaggedLabs = flaggedLabItems(report);
@@ -1642,6 +1783,19 @@ function HealthReportInsights({
           </div>
         )}
       </section>
+
+      {goalProgressItems.length > 0 && (
+        <section>
+          <div className="mb-3">
+            <p className="text-[10px] font-black uppercase tracking-[0.16em] text-[#24c1c4]">Saved goal history</p>
+            <h2 className="mt-1 text-xl font-black text-[#0b2d54]">Goal progress over time</h2>
+            <p className="mt-1 text-sm leading-6 text-slate-500">These cards use dated progress updates saved against your goals. They compare the selected period with the previous period where comparable entries exist; missing dates are not treated as zero.</p>
+          </div>
+          <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+            {goalProgressItems.map((item) => <GoalProgressTrendCard key={item.key} item={item} previousLoading={previousLoading} />)}
+          </div>
+        </section>
+      )}
 
       <section>
         <div className="mb-3"><p className="text-[10px] font-black uppercase tracking-[0.16em] text-[#24c1c4]">Patterns to review</p><h2 className="mt-1 text-xl font-black text-[#0b2d54]">What stands out</h2><p className="mt-1 text-sm leading-6 text-slate-500">These are observations from the records you saved, not proof of what caused a symptom.</p></div>
