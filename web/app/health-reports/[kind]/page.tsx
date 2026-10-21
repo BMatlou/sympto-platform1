@@ -472,6 +472,7 @@ function addNamedVitalForMetric(
   value: unknown,
   at: unknown,
   source: string,
+  unitValue?: unknown,
 ) {
   const name = normaliseVitalName(nameValue);
   const rawValue = String(value ?? "").trim();
@@ -480,8 +481,14 @@ function addNamedVitalForMetric(
   // Some devices and clinical records store blood pressure as one "120/80" value.
   // Split it into the requested series so systolic values never pollute diastolic averages.
   if (/blood pressure|bloodpressure|\bbp\b/.test(name) && bloodPressurePair) {
-    if (metric === "systolic") addVital(output, bloodPressurePair[1], at, source);
-    if (metric === "diastolic") addVital(output, bloodPressurePair[2], at, source);
+    if (metric === "systolic") {
+      const standard = standardiseMeasurementValue(metric, bloodPressurePair[1], unitValue);
+      if (standard) addVital(output, standard.value, at, source, standard.convertedFrom);
+    }
+    if (metric === "diastolic") {
+      const standard = standardiseMeasurementValue(metric, bloodPressurePair[2], unitValue);
+      if (standard) addVital(output, standard.value, at, source, standard.convertedFrom);
+    }
     return;
   }
 
@@ -494,7 +501,10 @@ function addNamedVitalForMetric(
     (metric === "temperature" && /temperature|temp\b/.test(name)) ||
     (metric === "respiratory" && /respiratory|breathing rate/.test(name));
 
-  if (matchesMetric) addVital(output, value, at, source);
+  if (matchesMetric) {
+    const standard = standardiseMeasurementValue(metric, value, unitValue);
+    if (standard) addVital(output, standard.value, at, source, standard.convertedFrom);
+  }
 }
 
 function vitalSeries(report: Report | null, metric: string): SeriesPoint[] {
@@ -520,6 +530,7 @@ function vitalSeries(report: Report | null, metric: string): SeriesPoint[] {
       item.value,
       item.measuredAt,
       "Connected device",
+      item.unit || item.vitalType?.unit,
     );
   });
 
@@ -531,6 +542,7 @@ function vitalSeries(report: Report | null, metric: string): SeriesPoint[] {
       item.value,
       item.measuredAt || item.recordedAt,
       "Clinical record",
+      item.vitalType?.unit,
     );
   });
 
