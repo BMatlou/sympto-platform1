@@ -872,10 +872,14 @@ function StatusCircle({ label, detail, tone }: { label: string; detail: string; 
 function GoalProgressCard({ goal }: { goal: SnapshotGoal }) {
   const latest = goal.progress?.[0] ?? null;
   const rawPercent = finite(latest?.progressPercent);
-  const percent = rawPercent === null
-    ? (String(latest?.status ?? "").toUpperCase() === "ACHIEVED" || String(goal.status ?? "").toUpperCase() === "ACHIEVED" ? 100 : null)
-    : Math.max(0, Math.min(100, rawPercent));
-  const progressStatus = String(latest?.status ?? goal.status ?? "").toUpperCase();
+  const progressStatus = String(goal.status ?? "").toUpperCase() === "ACHIEVED"
+    ? "ACHIEVED"
+    : String(latest?.status ?? goal.status ?? "").toUpperCase();
+  const percent = progressStatus === "ACHIEVED"
+    ? 100
+    : rawPercent === null
+      ? null
+      : Math.max(0, Math.min(100, rawPercent));
   const tone: StatusTone = progressStatus === "DECLINING" ? "high"
     : progressStatus === "STAGNANT" ? "watch"
     : progressStatus === "ON_TRACK" || progressStatus === "IMPROVING" || progressStatus === "ACHIEVED" ? "good"
@@ -1288,7 +1292,7 @@ function HealthReportInsights({
       status: vitalStatus(report, config.key, age),
       baselineValue: baselineVitalValue(config.key, report.currentSnapshot),
     }))
-    .filter((config) => config.current.length > 0);
+    .filter((config) => config.rawCurrent.length > 0);
   const routineConfigs = [
     { field: "sleepHours", label: "Sleep", subtitle: "Average hours slept on days you completed a check-in.", unit: "hours", digits: 1, icon: Moon },
     { field: "stressLevel", label: "Stress rating", subtitle: "Your average stress rating on check-in days.", unit: "/10", digits: 1, icon: Activity },
