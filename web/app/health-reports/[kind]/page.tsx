@@ -682,7 +682,7 @@ function VitalTrendCard({
           )}
           <div className="mt-3 rounded-xl bg-[#f5fafb] p-3">
             <p className="text-[10px] font-bold uppercase tracking-wide text-[#71839a]">Compared with the previous period</p>
-            <p className="mt-1 text-xs leading-5 text-slate-600">{compareText(currentValues, previousValues, unit, digits, previousLoading)}</p>
+            <p className="mt-1 text-xs leading-5 text-slate-600">{review ? "Please verify these saved values before comparing this period with the previous one." : compareText(currentValues, previousValues, unit, digits, previousLoading)}</p>
           </div>
         </>
       )}
