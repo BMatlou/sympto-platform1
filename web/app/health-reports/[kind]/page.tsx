@@ -820,6 +820,7 @@ function GoalProgressCard({ goal }: { goal: SnapshotGoal }) {
           <p className="text-[9px] font-black uppercase tracking-[0.12em] text-[#0b7b80]">{human(goal.category)}</p>
           <h3 className="mt-1 text-sm font-black text-[#0b2d54]">{goal.title || "Health goal"}</h3>
           <p className={"mt-1 text-xs font-bold " + toneStyles(tone).text}>{statusText}</p>
+          {goal.priority && <p className={"mt-1 inline-flex rounded-full border px-2 py-1 text-[9px] font-black " + (String(goal.priority).toUpperCase() === "CRITICAL" ? "border-rose-200 bg-rose-50 text-rose-900" : String(goal.priority).toUpperCase() === "HIGH" ? "border-amber-200 bg-amber-50 text-amber-900" : "border-slate-200 bg-slate-50 text-slate-600")}>Priority: {human(goal.priority)}</p>}
           <p className="mt-1 text-[10px] leading-4 text-slate-500">{progressLabel}</p>
         </div>
       </div>
@@ -1145,6 +1146,48 @@ function HealthReportInsights({
   const symptomPattern = repeated.find((item) => item.count > 1);
   const activityDelta = previousReport ? workouts.length - previousReport.activity.workouts.length : null;
   const sleepDelta = previousReport ? sleepSessions.length - previousReport.activity.sleepSessions.length : null;
+  const goalFollowUps = (report.currentSnapshot?.activeGoals ?? []).filter((goal) =>
+    ["DECLINING", "STAGNANT"].includes(String(goal.progress?.[0]?.status ?? "").toUpperCase()),
+  );
+  const nextSteps: { title: string; detail: string; href: string; linkLabel: string; tone: StatusTone }[] = [];
+  if (measurementReviews.length > 0) {
+    nextSteps.push({
+      title: "Check the flagged readings first",
+      detail: "Start with the warning cards above. Check the saved date, unit and source; repeat a current measurement when safe. Follow any urgent medical advice in the warning instead of waiting for the next report.",
+      href: "/today",
+      linkLabel: "Review Health Vitals",
+      tone: measurementReviews.some((item) => item.severity === "urgent") ? "critical" : "watch",
+    });
+  }
+  if (goalFollowUps.length > 0) {
+    const decliningGoals = goalFollowUps.filter((goal) => String(goal.progress?.[0]?.status ?? "").toUpperCase() === "DECLINING");
+    const titles = goalFollowUps.slice(0, 2).map((goal) => String(goal.title || human(goal.category))).join(" and ");
+    nextSteps.push({
+      title: "Review goals that need attention",
+      detail: titles + (goalFollowUps.length > 2 ? " and " + String(goalFollowUps.length - 2) + " more" : "") + (goalFollowUps.length === 1 ? " has" : " have") + " a latest saved status of " + (decliningGoals.length > 0 ? "declining or stagnant" : "stagnant") + ". Review the latest entry and target; do not change medicines or treatment based on this report alone.",
+      href: "/health-goals",
+      linkLabel: "Review health goals",
+      tone: decliningGoals.length > 0 ? "high" : "watch",
+    });
+  }
+  if (daysLogged < totalDays) {
+    nextSteps.push({
+      title: "Build a clearer picture next period",
+      detail: "You have saved records on " + daysLogged + " of " + totalDays + " days. Record check-ins when you can, and only enter values you actually know. Empty days remain unknown—not zero.",
+      href: "/today",
+      linkLabel: "Open Today",
+      tone: "info",
+    });
+  }
+  if (nextSteps.length === 0) {
+    nextSteps.push({
+      title: "Keep tracking against your saved goals",
+      detail: "Continue recording the measurements and daily routines that relate to your goals. Sympto will compare future periods as more dated records become available.",
+      href: "/health-goals",
+      linkLabel: "View health goals",
+      tone: "good",
+    });
+  }
 
   return (
     <div className="mt-5 space-y-6">
@@ -1165,7 +1208,7 @@ function HealthReportInsights({
             <AlertTriangle className={"mt-0.5 h-5 w-5 shrink-0 " + (measurementReviews.some((item) => item.severity === "urgent") ? "text-rose-700" : "text-amber-700")} />
             <div className="min-w-0 flex-1">
               <h2 className={"font-black " + (measurementReviews.some((item) => item.severity === "urgent") ? "text-rose-950" : "text-amber-950")}>Readings to double-check</h2>
-              <p className={"mt-1 text-sm leading-6 " + (measurementReviews.some((item) => item.severity === "urgent") ? "text-rose-900" : "text-amber-900")}>Some saved values are far outside common adult reference ranges. Check the date, source, unit and original reading. Reference ranges vary with age, activity and health conditions. These flags do not diagnose a condition.</p>
+              <p className={"mt-1 text-sm leading-6 " + (measurementReviews.some((item) => item.severity === "urgent") ? "text-rose-900" : "text-amber-900")}>{age !== null && age >= 18 ? "Some saved values are far outside common adult reference ranges." : "Some saved values are outside a valid scale or need to be checked against personal, age-specific guidance."} Check the date, source, unit and original reading. These flags do not diagnose a condition.</p>
               <div className="mt-3 space-y-3">
                 {measurementReviews.map((item) => (
                   <div key={item.key} className="rounded-xl border border-black/5 bg-white/85 p-3">
@@ -1210,6 +1253,24 @@ function HealthReportInsights({
           </article>
           {moodPattern && <article className="rounded-2xl border border-slate-200 bg-white p-5"><div className="flex items-center gap-2"><HeartPulse className="h-5 w-5 text-[#24c1c4]" /><h3 className="font-bold text-[#0b2d54]">Mood check-ins</h3></div><p className="mt-3 text-sm leading-6 text-slate-600">{moodPattern} These are the mood ratings you entered in your check-ins; they are not a diagnosis.</p></article>}
           {association && <article className="rounded-2xl border border-slate-200 bg-white p-5"><div className="flex items-center gap-2"><Moon className="h-5 w-5 text-[#24c1c4]" /><h3 className="font-bold text-[#0b2d54]">Sleep and stress on the same days</h3></div><p className="mt-3 text-sm leading-6 text-slate-600">On your {association.shorterDays} days with shorter logged sleep, your average stress rating was {formatNumber(association.shortStress, 1)}/10. On your {association.longerDays} days with longer logged sleep, it was {formatNumber(association.longStress, 1)}/10.</p><p className="mt-2 text-xs leading-5 text-slate-500">These ratings happened on the same days; this small pattern does not show that sleep caused the stress ratings.</p></article>}
+        </div>
+      </section>
+
+      <section>
+        <div className="mb-3"><p className="text-[10px] font-black uppercase tracking-[0.16em] text-[#24c1c4]">Next steps</p><h2 className="mt-1 text-xl font-black text-[#0b2d54]">What to do next</h2><p className="mt-1 text-sm leading-6 text-slate-500">These suggestions use saved warnings, recorded goal status and data coverage. They do not replace your care plan or a clinician's advice.</p></div>
+        <div className="grid gap-3 md:grid-cols-2">
+          {nextSteps.map((step) => (
+            <article key={step.title} className={"rounded-2xl border bg-white p-4 " + toneStyles(step.tone).border}>
+              <div className="flex items-start gap-3">
+                <span className={"grid h-9 w-9 shrink-0 place-items-center rounded-full " + toneStyles(step.tone).surface + " " + toneStyles(step.tone).text}><span className="text-sm font-black">{step.tone === "good" ? "✓" : step.tone === "info" ? "i" : "!"}</span></span>
+                <div className="min-w-0 flex-1">
+                  <h3 className="text-sm font-black text-[#0b2d54]">{step.title}</h3>
+                  <p className="mt-1 text-xs leading-5 text-slate-600">{step.detail}</p>
+                  <Link href={step.href} className="mt-3 inline-flex min-h-9 items-center gap-1.5 rounded-xl bg-[#0b2d54] px-3 py-2 text-[10px] font-black text-white">{step.linkLabel} <ArrowRight className="h-3 w-3 text-[#24c1c4]" /></Link>
+                </div>
+              </div>
+            </article>
+          ))}
         </div>
       </section>
 
@@ -1337,8 +1398,10 @@ export default function HealthReportPage() {
               <p><strong className="text-[#0b2d54]">Most recent:</strong> the latest dated reading available.</p>
               <p><strong className="text-[#0b2d54]">Change:</strong> first-to-most-recent compares two readings. “Previous period” compares this report with the earlier week or month.</p>
               <p><strong className="text-[#0b2d54]">Missing entry:</strong> means no value was saved; it is not counted as zero.</p>
+              <p><strong className="text-[#0b2d54]">Colour key:</strong> green = within a common reference; amber = recheck or monitor; orange = high; red = urgent; grey = personal or age-specific guidance needed.</p>
+              <p><strong className="text-[#0b2d54]">Goal ring:</strong> uses the progress percentage recorded for that goal. If no score was saved, it stays blank rather than guessing.</p>
             </div>
-            <p className="mt-3 border-t border-slate-100 pt-3 text-xs leading-5 text-slate-500">General adult reference ranges are guides, not personal targets. Your age, activity, long-term conditions and clinician’s advice may change what is right for you.</p>
+            <p className="mt-3 border-t border-slate-100 pt-3 text-xs leading-5 text-slate-500">The data-coverage score measures how much was logged, not your health. Sympto does not combine different measurements into one unvalidated overall health score. General adult reference ranges are guides, not personal targets; age, long-term conditions and clinician advice can change the interpretation.</p>
           </section>
           <HealthReportInsights report={report} previousReport={previousReport} previousLoading={previousLoading} />
         </div>
