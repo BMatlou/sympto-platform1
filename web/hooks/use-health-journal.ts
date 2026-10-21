@@ -162,7 +162,10 @@ export function useHealthJournal() {
   );
 
   useEffect(() => {
-    loadEntries();
+    const timer = window.setTimeout(() => {
+      void loadEntries();
+    }, 0);
+    return () => window.clearTimeout(timer);
   }, [loadEntries]);
 
   return {
