@@ -356,6 +356,10 @@ export class HealthReportNotificationSchedulerService
       carePlans,
       referrals,
       currentRecord,
+      goalProgressEntries,
+      goalHistoryEntries,
+      periodRiskAssessments,
+      clinicalEpisodes,
     ] = await Promise.all([
       this.prisma.healthJournal.findMany({
         where: { patientId, OR: [
@@ -429,11 +433,24 @@ export class HealthReportNotificationSchedulerService
         orderBy: { measuredAt: 'asc' },
       }),
       this.prisma.sleepSession.findMany({
-        where: { patientId, startedAt: { gte: period.start, lt: period.end } },
+        where: { patientId, OR: [
+          { startedAt: { gte: period.start, lt: period.end } },
+          { endedAt: { gte: period.start, lt: period.end } },
+          { AND: [{ startedAt: { lt: period.start } }, { endedAt: { gte: period.start } }] },
+          { createdAt: { gte: period.start, lt: period.end } },
+          { updatedAt: { gte: period.start, lt: period.end } },
+        ] },
         orderBy: { startedAt: 'asc' },
+        include: { stages: { orderBy: { startedAt: 'asc' } } },
       }),
       this.prisma.workoutSession.findMany({
-        where: { patientId, startedAt: { gte: period.start, lt: period.end } },
+        where: { patientId, OR: [
+          { startedAt: { gte: period.start, lt: period.end } },
+          { endedAt: { gte: period.start, lt: period.end } },
+          { AND: [{ startedAt: { lt: period.start } }, { endedAt: { gte: period.start } }] },
+          { createdAt: { gte: period.start, lt: period.end } },
+          { updatedAt: { gte: period.start, lt: period.end } },
+        ] },
         orderBy: { startedAt: 'asc' },
       }),
       this.prisma.encounter.findMany({
@@ -646,6 +663,49 @@ export class HealthReportNotificationSchedulerService
           },
         },
       }),
+      this.prisma.healthGoalProgress.findMany({
+        where: { healthGoal: { patientId }, OR: [
+          { measuredAt: { gte: period.start, lt: period.end } },
+          { createdAt: { gte: period.start, lt: period.end } },
+        ] },
+        orderBy: [{ measuredAt: 'asc' }, { createdAt: 'asc' }],
+        include: { healthGoal: { select: { id: true, title: true, category: true, unit: true, targetValue: true, status: true } } },
+      }),
+      this.prisma.healthGoal.findMany({
+        where: { patientId, OR: [
+          { createdAt: { gte: period.start, lt: period.end } },
+          { updatedAt: { gte: period.start, lt: period.end } },
+          { achievedAt: { gte: period.start, lt: period.end } },
+        ] },
+        orderBy: [{ createdAt: 'asc' }, { updatedAt: 'asc' }],
+        include: {
+          patientMedication: { include: { medication: true } },
+          progress: { where: { OR: [
+            { measuredAt: { gte: period.start, lt: period.end } },
+            { createdAt: { gte: period.start, lt: period.end } },
+          ] }, orderBy: { measuredAt: 'asc' } },
+        },
+      }),
+      this.prisma.riskAssessment.findMany({
+        where: { patientId, OR: [
+          { assessedAt: { gte: period.start, lt: period.end } },
+          { createdAt: { gte: period.start, lt: period.end } },
+          { updatedAt: { gte: period.start, lt: period.end } },
+        ] },
+        orderBy: { assessedAt: 'asc' },
+        include: { results: true, practitioner: { include: { person: true } } },
+      }),
+      this.prisma.clinicalEpisode.findMany({
+        where: { patientId, OR: [
+          { startedAt: { gte: period.start, lt: period.end } },
+          { endedAt: { gte: period.start, lt: period.end } },
+          { resolvedAt: { gte: period.start, lt: period.end } },
+          { createdAt: { gte: period.start, lt: period.end } },
+          { updatedAt: { gte: period.start, lt: period.end } },
+        ] },
+        orderBy: { startedAt: 'asc' },
+        include: { practitioner: { include: { person: true } } },
+      }),
     ]);
 
     // Goal-specific logs are stored in the metric-event stream, not necessarily in HealthGoalProgress.
@@ -790,6 +850,7 @@ export class HealthReportNotificationSchedulerService
           ...item,
           source: item.clinicalEpisode?.practitionerId ? 'CLINICAL' : 'PATIENT',
         })),
+        clinicalEpisodes,
         appointments,
         patientVitals: patientVitals.map((entry) => ({
           id: entry.id,
@@ -827,6 +888,11 @@ export class HealthReportNotificationSchedulerService
         loggedValue: Number(event.loggedValue),
         occurredAt: event.occurredAt,
       })),
+      tracking: {
+        goalProgress: goalProgressEntries,
+        goalHistory: goalHistoryEntries,
+        riskAssessments: periodRiskAssessments,
+      },
       generatedAt: new Date(),
     };
   }
