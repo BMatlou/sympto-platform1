@@ -1516,7 +1516,7 @@ function signalDigits(key: string, unit: string) {
 function periodMovement(currentValues: number[], previousValues: number[], unit: string, digits = 1) {
   const current = mean(currentValues);
   const previous = mean(previousValues);
-  const suffix = unit ? (unit.startsWith("/") ? unit : " " + unit) : "";
+  const suffix = unit ? (unit.startsWith("/") ? unit : " " + unit) : " (unit not saved)";
   const display = (value: number) => formatNumber(value, digits) + suffix;
   if (current === null) return { state: "missing" as const, label: "No readings", detail: "No usable readings were saved for this period.", current, previous };
   if (previous === null) return { state: "new" as const, label: "No prior comparison", detail: "There are no comparable readings from the previous period.", current, previous };
@@ -2012,7 +2012,7 @@ function PersonalisedInsights({
         {previousLoading ? (
           <p className="mt-3 rounded-xl bg-[#f5fafb] px-3 py-2.5 text-xs font-semibold text-slate-600">Comparing this period with the previous one…</p>
         ) : hasComparableSignals ? (
-          <p className="mt-3 rounded-xl bg-[#f5fafb] px-3 py-2.5 text-xs leading-5 text-slate-700"><strong className="text-[#0b2d54]">Trend summary:</strong> {movementCounts.up} increased · {movementCounts.down} decreased · {movementCounts.steady} stayed about the same. A rise or fall is a change, not automatically an improvement or a problem.</p>
+          <p className="mt-3 rounded-xl bg-[#f5fafb] px-3 py-2.5 text-xs leading-5 text-slate-700"><strong className="text-[#0b2d54]">Routine and measure trends:</strong> {movementCounts.up} increased · {movementCounts.down} decreased · {movementCounts.steady} stayed about the same. A rise or fall is a change, not automatically an improvement or a problem.</p>
         ) : null}
         {signals.length ? (
           <div className="mt-4 grid gap-4 sm:grid-cols-2 xl:grid-cols-2">
