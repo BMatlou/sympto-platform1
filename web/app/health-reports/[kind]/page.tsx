@@ -6,12 +6,9 @@ import { useEffect, useMemo, useState } from "react";
 import {
   Activity,
   AlertTriangle,
-  ArrowDownRight,
   ArrowLeft,
   ArrowRight,
-  ArrowUpRight,
   CalendarDays,
-  CheckCircle2,
   ClipboardList,
   Droplets,
   FileText,
@@ -152,7 +149,6 @@ function recordedDays(report: Report) {
 
 function addVital(
   output: SeriesPoint[],
-  metric: string,
   value: unknown,
   at: unknown,
   source: string,
@@ -163,65 +159,77 @@ function addVital(
   output.push({ date: day, value: numeric, source });
 }
 
-function addNamedVital(
+function normaliseVitalName(value: unknown) {
+  return String(value ?? "").toLowerCase().replace(/[_-]+/g, " ").trim();
+}
+
+function addNamedVitalForMetric(
   output: SeriesPoint[],
+  metric: string,
   nameValue: unknown,
   value: unknown,
   at: unknown,
   source: string,
 ) {
-  const name = String(nameValue ?? "").toLowerCase().replace(/[_-]+/g, " ");
-  const raw = String(value ?? "").trim();
-  const bloodPressurePair = raw.match(/^(\d+(?:\.\d+)?)\s*\/\s*(\d+(?:\.\d+)?)$/);
-  if (/blood pressure|bloodpressure|\bbp\b/.test(name) && bloodPressurePair) {
-    addVital(output, "systolic", bloodPressurePair[1], at, source);
-    addVital(output, "diastolic", bloodPressurePair[2], at, source);
+  const name = normaliseVitalName(nameValue);
+  const rawValue = String(value ?? "").trim();
+  const bloodPressurePair = rawValue.match(/^(\\d+(?:\\.\\d+)?)\\s*\\/\\s*(\\d+(?:\\.\\d+)?)$/);
+
+  // Some devices and clinical records store blood pressure as one "120/80" value.
+  // Split it into the requested series so systolic values never pollute diastolic averages.
+  if (/blood pressure|bloodpressure|\\bbp\\b/.test(name) && bloodPressurePair) {
+    if (metric === "systolic") addVital(output, bloodPressurePair[1], at, source);
+    if (metric === "diastolic") addVital(output, bloodPressurePair[2], at, source);
     return;
   }
 
-  let metric = "";
-  if (/systolic|sys bp|sbp/.test(name)) metric = "systolic";
-  else if (/diastolic|dia bp|dbp/.test(name)) metric = "diastolic";
-  else if (/resting heart|heart rate|heartrate|\bpulse\b|\bhr\b/.test(name)) metric = "heartRate";
-  else if (/weight|body mass/.test(name)) metric = "weight";
-  else if (/oxygen|spo2|o2 saturation/.test(name)) metric = "oxygen";
-  else if (/temperature|temp\b/.test(name)) metric = "temperature";
-  else if (/respiratory|breathing rate/.test(name)) metric = "respiratory";
-  if (metric) addVital(output, metric, value, at, source);
+  const matchesMetric =
+    (metric === "systolic" && /systolic|sys bp|sbp/.test(name)) ||
+    (metric === "diastolic" && /diastolic|dia bp|dbp/.test(name)) ||
+    (metric === "heartRate" && /resting heart|heart rate|heartrate|\\bpulse\\b|\\bhr\\b/.test(name)) ||
+    (metric === "weight" && /weight|body mass/.test(name)) ||
+    (metric === "oxygen" && /oxygen|spo2|o2 saturation/.test(name)) ||
+    (metric === "temperature" && /temperature|temp\\b/.test(name)) ||
+    (metric === "respiratory" && /respiratory|breathing rate/.test(name));
+
+  if (matchesMetric) addVital(output, value, at, source);
 }
 
 function vitalSeries(report: Report | null, metric: string): SeriesPoint[] {
   if (!report) return [];
   const points: SeriesPoint[] = [];
+
   arr(report.activity?.patientVitals).forEach((item: any) => {
     const at = item.recordedAt || item.createdAt;
-    if (metric === "systolic") addVital(points, metric, item.bloodPressureSystolic, at, "Health Vitals");
-    if (metric === "diastolic") addVital(points, metric, item.bloodPressureDiastolic, at, "Health Vitals");
-    if (metric === "heartRate") addVital(points, metric, item.heartRate, at, "Health Vitals");
-    if (metric === "weight") addVital(points, metric, item.weightKg, at, "Health Vitals");
-    if (metric === "oxygen") addVital(points, metric, item.oxygenSaturation, at, "Health Vitals");
-    if (metric === "temperature") addVital(points, metric, item.temperature, at, "Health Vitals");
-    if (metric === "respiratory") addVital(points, metric, item.respiratoryRate, at, "Health Vitals");
+    if (metric === "systolic") addVital(points, item.bloodPressureSystolic, at, "Health Vitals");
+    if (metric === "diastolic") addVital(points, item.bloodPressureDiastolic, at, "Health Vitals");
+    if (metric === "heartRate") addVital(points, item.heartRate, at, "Health Vitals");
+    if (metric === "weight") addVital(points, item.weightKg, at, "Health Vitals");
+    if (metric === "oxygen") addVital(points, item.oxygenSaturation, at, "Health Vitals");
+    if (metric === "temperature") addVital(points, item.temperature, at, "Health Vitals");
+    if (metric === "respiratory") addVital(points, item.respiratoryRate, at, "Health Vitals");
   });
+
   arr(report.activity?.deviceMeasurements).forEach((item: any) => {
-    const before = points.length;
-    addNamedVital(points, item.measurementType || item.metricKey || item.vitalType?.name, item.value, item.measuredAt, "Connected device");
-    if (points.length > before && points[points.length - 1].date && points[points.length - 1].source === "Connected device") {
-      const matchesMetric = (
-        (metric === "systolic" && /systolic|sys bp|sbp/.test(String(item.measurementType || item.metricKey || item.vitalType?.name || "").toLowerCase().replace(/[_-]+/g, " "))) ||
-        (metric === "diastolic" && /diastolic|dia bp|dbp/.test(String(item.measurementType || item.metricKey || item.vitalType?.name || "").toLowerCase().replace(/[_-]+/g, " "))) ||
-        (metric === "heartRate" && /resting heart|heart rate|heartrate|\bpulse\b|\bhr\b/.test(String(item.measurementType || item.metricKey || item.vitalType?.name || "").toLowerCase().replace(/[_-]+/g, " "))) ||
-        (metric === "weight" && /weight|body mass/.test(String(item.measurementType || item.metricKey || item.vitalType?.name || "").toLowerCase().replace(/[_-]+/g, " "))) ||
-        (metric === "oxygen" && /oxygen|spo2|o2 saturation/.test(String(item.measurementType || item.metricKey || item.vitalType?.name || "").toLowerCase().replace(/[_-]+/g, " "))) ||
-        (metric === "temperature" && /temperature|temp\b/.test(String(item.measurementType || item.metricKey || item.vitalType?.name || "").toLowerCase().replace(/[_-]+/g, " "))) ||
-        (metric === "respiratory" && /respiratory|breathing rate/.test(String(item.measurementType || item.metricKey || item.vitalType?.name || "").toLowerCase().replace(/[_-]+/g, " ")))
-      );
-      if (matchesMetric) return;
-      points.splice(before);
-    }
+    addNamedVitalForMetric(
+      points,
+      metric,
+      item.measurementType || item.metricKey || item.vitalType?.name,
+      item.value,
+      item.measuredAt,
+      "Connected device",
+    );
   });
+
   arr(report.clinical?.vitals).forEach((item: any) => {
-    addNamedVital(points, item.vitalType?.code || item.vitalType?.name, item.value, item.measuredAt || item.recordedAt, "Clinical record");
+    addNamedVitalForMetric(
+      points,
+      metric,
+      item.vitalType?.code || item.vitalType?.name,
+      item.value,
+      item.measuredAt || item.recordedAt,
+      "Clinical record",
+    );
   });
 
   const deduped = new Map<string, SeriesPoint>();
@@ -353,7 +361,6 @@ function RoutineTrendCard({
   previousLoading: boolean;
 }) {
   const currentMean = mean(current.map((item) => item.value));
-  const previousMean = mean(previous.map((item) => item.value));
   const values = current.map((item) => item.value);
   return (
     <article className="min-w-0 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
@@ -428,16 +435,18 @@ function clinicalEvents(report: Report) {
 }
 
 function flaggedLabItems(report: Report) {
-  return arr(report.clinical.labResults).flatMap((result: any) =>
-    arr(result.items)
-      .filter((item: any) => Boolean(item.abnormal || item.critical))
-      .map((item: any) => ({
-        id: String(item.id || result.id || item.test?.name || Math.random()),
-        name: item.test?.name || result.orderItem?.test?.name || "Laboratory result",
-        value: item.numericValue ?? item.textValue ?? item.booleanValue ?? "Value not recorded",
-        critical: Boolean(item.critical),
-        date: result.reportedAt || result.releasedAt,
-      })),
+  return arr(report.clinical.labResults).flatMap((result: any, resultIndex: number) =>
+    arr(result.items).flatMap((item: any, itemIndex: number) =>
+      item.abnormal || item.critical
+        ? [{
+            id: String(item.id || `${result.id || "lab-result"}-${resultIndex}-${itemIndex}`),
+            name: item.test?.name || result.orderItem?.test?.name || "Laboratory result",
+            value: item.numericValue ?? item.textValue ?? item.booleanValue ?? "Value not recorded",
+            critical: Boolean(item.critical),
+            date: result.reportedAt || result.releasedAt,
+          }]
+        : [],
+    ),
   );
 }
 
@@ -445,12 +454,10 @@ function HealthReportInsights({
   report,
   previousReport,
   previousLoading,
-  previousFailed,
 }: {
   report: Report;
   previousReport: Report | null;
   previousLoading: boolean;
-  previousFailed: boolean;
 }) {
   const daysLogged = recordedDays(report).size;
   const totalDays = periodDays(report);
@@ -498,7 +505,6 @@ function HealthReportInsights({
     current: dailyMetric(report, config.field),
     previous: dailyMetric(previousReport, config.field),
   })).filter((config) => config.current.length > 0);
-  const routineCurrentDays = recordedDays(report);
   const noAnalysisData = activeVitals.length === 0 && routines.length === 0 && symptomCount === 0 && sleepSessions.length === 0 && workouts.length === 0 && clinicalCount === 0;
   const moodPattern = lowMood.total > 0
     ? lowMood.low + " of " + lowMood.total + " mood check-ins were marked low or very low."
@@ -670,7 +676,7 @@ export default function HealthReportPage() {
 
           {previousFailed && <div className="mt-4 flex items-start gap-2 rounded-2xl border border-amber-200 bg-amber-50 p-4 text-xs leading-5 text-amber-900"><Info className="mt-0.5 h-4 w-4 shrink-0" />The current report is available, but the prior-period comparison could not be loaded. Current-period trends remain available; comparison labels will appear when historical data is accessible.</div>}
 
-          <HealthReportInsights report={report} previousReport={previousReport} previousLoading={previousLoading} previousFailed={previousFailed} />
+          <HealthReportInsights report={report} previousReport={previousReport} previousLoading={previousLoading} />
         </div>
       </main>
     </ProtectedRoute>
