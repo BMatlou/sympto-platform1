@@ -1740,9 +1740,20 @@ function PersonalisedInsights({
     const unit = String(currentPoints.at(-1)?.unit || fallbackUnit || previousPoints.at(-1)?.unit || "").trim();
     const currentHasSourceUnits = currentPoints.some((point) => Boolean(point.unit?.trim()));
     const previousHasSourceUnits = previousPoints.some((point) => Boolean(point.unit?.trim()));
+    const normalizeComparableUnit = (value: unknown) => {
+      const normalized = String(value ?? "").trim().toLowerCase();
+      if (/^(ml|millilit(er|re)s?)$/.test(normalized)) return "ml";
+      if (/^(min|mins|minute|minutes)$/.test(normalized)) return "min";
+      return normalized;
+    };
     const filterComparableUnit = (points: SignalPoint[]) => {
       if (!unit || (!currentHasSourceUnits && !previousHasSourceUnits)) return points;
-      return points.filter((point) => String(point.unit ?? "").trim().toLowerCase() === unit.toLowerCase());
+      return points.filter((point) => {
+        const pointUnit = String(point.unit ?? "").trim();
+        // Journal hydration/exercise fields have implicit units in their field names.
+        if (!pointUnit && (key === "hydration" || key === "exercise")) return true;
+        return normalizeComparableUnit(pointUnit) === normalizeComparableUnit(unit);
+      });
     };
     const categoryCandidates = goalCategoryForSignal[key] ?? [];
     const normalizedCategory = (value: unknown) => String(value ?? "").toUpperCase().replace(/[\s-]+/g, "_");
