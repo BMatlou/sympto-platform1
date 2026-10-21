@@ -987,366 +987,316 @@ function StatusCircle({ label, detail, tone }: { label: string; detail: string; 
   );
 }
 
-function GoalProgressCard({ goal }: { goal: SnapshotGoal }) {
-  const latest = goal.progress?.[0] ?? null;
-  const rawPercent = finite(latest?.progressPercent);
-  const progressStatus = String(goal.status ?? "").toUpperCase() === "ACHIEVED"
-    ? "ACHIEVED"
-    : String(latest?.status ?? goal.status ?? "").toUpperCase();
-  const percent = progressStatus === "ACHIEVED"
-    ? 100
-    : rawPercent === null
-      ? null
-      : Math.max(0, Math.min(100, rawPercent));
-  const tone: StatusTone = progressStatus === "DECLINING" ? "high"
-    : progressStatus === "STAGNANT" ? "watch"
-    : progressStatus === "ON_TRACK" || progressStatus === "IMPROVING" || progressStatus === "ACHIEVED" ? "good"
-    : "info";
-  const statusLabel: Record<string, string> = {
-    ON_TRACK: "On track",
-    IMPROVING: "Improving",
-    STAGNANT: "Not changing yet",
-    DECLINING: "Moving away from target",
-    ACHIEVED: "Goal achieved",
-    ACTIVE: "Active goal",
-  };
-  const statusText = statusLabel[progressStatus] ?? "Progress not rated";
-  const targetValue = finite(goal.targetValue);
-  const currentValue = finite(latest?.currentValue ?? goal.currentValue);
-  const progressLabel = percent === null ? "No percentage saved yet" : Math.round(percent) + "% of goal journey";
-  return (
-    <article className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
-      <div className="flex items-start gap-3">
-        <ScoreRing percent={percent} label="Goal progress" tone={tone} size={74} />
-        <div className="min-w-0 flex-1">
-          <p className="text-[9px] font-black uppercase tracking-[0.12em] text-[#0b7b80]">{human(goal.category)}</p>
-          <h3 className="mt-1 text-sm font-black text-[#0b2d54]">{goal.title || "Health goal"}</h3>
-          <p className={"mt-1 text-xs font-bold " + toneStyles(tone).text}>{statusText}</p>
-          {goal.priority && <p className={"mt-1 inline-flex rounded-full border px-2 py-1 text-[9px] font-black " + (String(goal.priority).toUpperCase() === "CRITICAL" ? "border-rose-200 bg-rose-50 text-rose-900" : String(goal.priority).toUpperCase() === "HIGH" ? "border-amber-200 bg-amber-50 text-amber-900" : "border-slate-200 bg-slate-50 text-slate-600")}>Priority: {human(goal.priority)}</p>}
-          <p className="mt-1 text-[10px] leading-4 text-slate-500">{progressLabel}</p>
-        </div>
-      </div>
-      <div className="mt-3 h-2 overflow-hidden rounded-full bg-slate-100" role="progressbar" aria-label={(goal.title || "Health goal") + " progress"} aria-valuemin={0} aria-valuemax={100} aria-valuenow={percent === null ? undefined : Math.round(percent)}>
-        {percent !== null && <div className="h-full rounded-full transition-[width] duration-300" style={{ width: String(percent) + "%", backgroundColor: toneStyles(tone).ring }} />}
-      </div>
-      <div className="mt-3 flex flex-wrap gap-x-3 gap-y-1 text-[10px] text-slate-500">
-        {currentValue !== null && <span>Latest: <strong className="text-[#0b2d54]">{formatNumber(currentValue, 1)} {goal.unit || ""}</strong></span>}
-        {targetValue !== null && <span>Target: <strong className="text-[#0b2d54]">{formatNumber(targetValue, 1)} {goal.unit || ""}</strong></span>}
-        {latest?.measuredAt && <span>Updated {dateLabel(latest.measuredAt)}</span>}
-        {goal.targetDate && <span>Target date {dateLabel(goal.targetDate)}</span>}
-      </div>
-      {goal.description && <p className="mt-2 text-xs leading-5 text-slate-500">{goal.description}</p>}
-    </article>
-  );
-}
-
-function HealthContextSection({ report, coveragePercent, daysLogged, totalDays }: { report: Report; coveragePercent: number; daysLogged: number; totalDays: number }) {
+function PersonalisedInsights({
+  report,
+  coveragePercent,
+  daysLogged,
+  totalDays,
+}: {
+  report: Report;
+  coveragePercent: number;
+  daysLogged: number;
+  totalDays: number;
+}) {
   const snapshot = report.currentSnapshot;
-  const person = snapshot?.person;
   const profile = snapshot?.profile;
-  const baseline = snapshot?.baseline;
-  const age = ageAt(person?.dateOfBirth, report.generatedAt);
-  const heightCm = finite(profile?.heightCm) ?? finite(baseline?.heightCm);
-  const periodWeight = vitalSeries(report, "weight").at(-1)?.value ?? null;
-  const weightKg = finite(profile?.weightKg) ?? finite(baseline?.weightKg) ?? periodWeight;
-  const bmi = age !== null && age >= 18 && heightCm !== null && heightCm > 0 && weightKg !== null && weightKg > 0
-    ? weightKg / Math.pow(heightCm / 100, 2)
-    : null;
-  const allConditions = snapshot?.conditions ?? [];
-  const currentConditions = allConditions.filter((item) => !["RESOLVED"].includes(String(item.status ?? "").toUpperCase()));
-  const currentDiagnoses = (snapshot?.diagnoses ?? []).filter((item) => !["RESOLVED"].includes(String(item.status ?? "").toUpperCase()));
-  const conditionDisplayItems: { name: string; status?: string | null; severity?: string | null; stage?: string | null }[] = currentConditions.map((item) => ({
-    name: String(item.condition?.name || "Condition"),
-    status: item.status,
-    severity: item.severity,
-  }));
-  currentDiagnoses.forEach((item) => {
-    const name = String(item.diagnosis?.name ?? "").trim();
-    if (name && !conditionDisplayItems.some((condition) => condition.name.toLowerCase() === name.toLowerCase())) {
-      conditionDisplayItems.push({ name, status: item.status, severity: item.severity, stage: item.stage });
-    }
-  });
-  const currentAllergies = (snapshot?.allergies ?? []).filter((item) => !["INACTIVE", "RESOLVED"].includes(String(item.status ?? "").toUpperCase()));
-  const currentMedications = (snapshot?.medications ?? []).filter((item) => String(item.status ?? "ACTIVE").toUpperCase() === "ACTIVE");
   const goals = snapshot?.activeGoals ?? [];
-  const riskAssessments = snapshot?.riskAssessments ?? [];
-  const medicalRecord = snapshot?.medicalRecord;
-  const additionalHistory: { label: string; value: string }[] = [
-    { label: "Past medical history", value: medicalRecord?.pastMedicalHistory ?? "" },
-    { label: "Chronic conditions (free-text notes)", value: medicalRecord?.chronicConditions ?? "" },
-    { label: "Surgical history", value: medicalRecord?.surgicalHistory ?? "" },
-    { label: "Family history", value: medicalRecord?.familyHistory ?? "" },
-    { label: "Social history", value: medicalRecord?.socialHistory ?? "" },
-    { label: "Additional medication notes", value: medicalRecord?.currentMedications ?? "" },
-    { label: "Additional allergy notes", value: medicalRecord?.allergies ?? "" },
-    { label: "Immunisation notes", value: medicalRecord?.immunizationNotes ?? "" },
-  ].filter((item) => item.value.trim().length > 0);
-  const bloodTypeLabel = snapshot?.bloodType ? human(snapshot.bloodType) : snapshot?.rhesusFactor ? "Rhesus " + human(snapshot.rhesusFactor) : "";
+  const conditions = [
+    ...(snapshot?.conditions ?? [])
+      .filter((item) => !["RESOLVED", "INACTIVE"].includes(String(item.status ?? "").toUpperCase()))
+      .map((item) => String(item.condition?.name ?? "")),
+    ...(snapshot?.diagnoses ?? [])
+      .filter((item) => !["RESOLVED", "INACTIVE"].includes(String(item.status ?? "").toUpperCase()))
+      .map((item) => String(item.diagnosis?.name ?? "")),
+  ].filter(Boolean).join(" ").toLowerCase();
+
+  const hasBloodPressureContext = /hypertension|hypertensive|high blood pressure/.test(conditions);
+  const hasDiabetesContext = /\bdiabetes\b|\bdiabetic\b/.test(conditions);
+  const hasRespiratoryContext = /\basthma\b|\bcopd\b|chronic obstructive|emphysema|pulmonary|lung disease|respiratory condition/.test(conditions);
+
+  const systolic = vitalSeries(report, "systolic");
+  const diastolic = vitalSeries(report, "diastolic");
+  const oxygen = vitalSeries(report, "oxygen");
+  const breathing = vitalSeries(report, "respiratory");
+  const periodWeight = vitalSeries(report, "weight").at(-1)?.value ?? null;
+  const hasBloodPressureData = systolic.length > 0 || diastolic.length > 0;
+  const hasRespiratoryData = oxygen.length > 0 || breathing.length > 0;
+  const age = ageAt(snapshot?.person?.dateOfBirth, report.generatedAt);
+  const heightCm = finite(profile?.heightCm) ?? finite(snapshot?.baseline?.heightCm);
+  const contextualWeightKg = finite(profile?.weightKg) ?? finite(snapshot?.baseline?.weightKg) ?? periodWeight;
+  const hasAdultBmiContext = age !== null && age >= 18 && heightCm !== null && heightCm > 0 &&
+    contextualWeightKg !== null && contextualWeightKg > 0;
+
+  const labNames = report.clinical.labResults.flatMap((item) => [
+    item.orderItem?.test?.name,
+    ...(item.items ?? []).map((result) => result.test?.name),
+  ]).filter(Boolean).join(" ").toLowerCase();
+  const glucoseDeviceData = report.activity.deviceMeasurements.some((item) =>
+    /glucose|hba1c|a1c|glycated|glycosylated/.test([
+      item.measurementType,
+      item.metricKey,
+      item.vitalType?.name,
+    ].filter(Boolean).join(" ").toLowerCase()),
+  );
+  const glucoseClinicalData = report.clinical.vitals.some((item) =>
+    /glucose|hba1c|a1c|glycated|glycosylated/.test([
+      item.vitalType?.code,
+      item.vitalType?.name,
+    ].filter(Boolean).join(" ").toLowerCase()),
+  );
+  const hasGlucoseData = /glucose|hba1c|a1c|glycated|glycosylated/.test(labNames) || glucoseDeviceData || glucoseClinicalData;
+  const hasLipidData = /cholesterol|lipid|triglyceride|\bldl\b|\bhdl\b/.test(labNames);
+
+  const adherenceValues = (snapshot?.medications ?? [])
+    .filter((item) => String(item.status ?? "ACTIVE").toUpperCase() === "ACTIVE")
+    .map((item) => finite(item.adherencePercentage))
+    .filter((value): value is number => value !== null && value >= 0 && value <= 100);
+  const averageAdherence = mean(adherenceValues);
+
+  const validProgressStatuses = new Set(["ON_TRACK", "IMPROVING", "STAGNANT", "DECLINING", "ACHIEVED"]);
+  const ratedGoalStatuses = goals.map((goal) => {
+    const savedStatus = String(goal.progress?.[0]?.status ?? "").toUpperCase();
+    if (validProgressStatuses.has(savedStatus)) return savedStatus;
+    return String(goal.status ?? "").toUpperCase() === "ACHIEVED" ? "ACHIEVED" : "";
+  }).filter(Boolean);
+  const goalsNeedingAttention = ratedGoalStatuses.filter((status) => status === "DECLINING" || status === "STAGNANT").length;
+  const goalsMovingWell = ratedGoalStatuses.filter((status) => ["ON_TRACK", "IMPROVING", "ACHIEVED"].includes(status)).length;
+
+  const categoryText = (goal: SnapshotGoal) => [goal.category, goal.title].filter(Boolean).join(" ").toLowerCase();
+  const hasGoal = (pattern: RegExp) => goals.some((goal) => pattern.test(categoryText(goal)));
+  const exerciseEntries = dailyMetric(report, "exerciseMinutes");
+  const sleepEntries = dailyMetric(report, "sleepHours");
+  const waterEntries = dailyMetric(report, "waterIntakeMl");
+  const stressEntries = dailyMetric(report, "stressLevel");
+  const workoutCount = report.activity.workouts.length;
+  const sleepSessionCount = report.activity.sleepSessions.filter((item) => {
+    const minutes = finite(item.durationMinutes);
+    return minutes !== null && minutes > 0;
+  }).length;
+  const latestRiskAssessment = [...(snapshot?.riskAssessments ?? [])]
+    .filter((item) => item.assessedAt)
+    .sort((a, b) => new Date(String(b.assessedAt)).getTime() - new Date(String(a.assessedAt)).getTime())[0] ?? null;
+
+  const insights: { title: string; detail: string; tone: StatusTone; href: string; linkLabel: string }[] = [];
+
+  if (hasGoal(/weight|body mass/)) {
+    insights.push({
+      title: "Weight is interpreted in your own context",
+      detail: periodWeight !== null
+        ? hasAdultBmiContext
+          ? "This period's dated weight trend is interpreted alongside your saved weight target and adult height/weight screening context when available. BMI is only a screening measure; it is not a diagnosis and does not override your personal target or clinician's advice."
+          : "This period's dated weight trend is compared with your saved measurements and goal where available. The report does not label a single weight healthy or unhealthy, and adult BMI screening is not applied without age, height and weight context."
+        : "A weight-related goal is saved, but no dated weight reading was found in this report period. Profile or baseline weight alone is not treated as progress during these dates.",
+      tone: periodWeight !== null ? "info" : "watch",
+      href: periodWeight !== null ? "/health-goals" : "/today",
+      linkLabel: periodWeight !== null ? "Review weight goal" : "Record a weight measurement",
+    });
+  }
+
+  if (hasBloodPressureContext) {
+    insights.push({
+      title: "Blood-pressure trends need the full picture",
+      detail: hasBloodPressureData
+        ? "A blood-pressure-related condition is part of your recorded care context. Read repeated systolic and diastolic measurements together and compare them with your clinician's plan. Where a saved systolic goal exists, the measurement card uses it; that goal does not replace review of the full reading."
+        : "A blood-pressure-related condition is part of your recorded care context, but no blood-pressure readings were saved for this period. The report cannot tell whether your pressure was controlled from missing data; record readings as directed by your clinician.",
+      tone: hasBloodPressureData ? "info" : "watch",
+      href: "/today",
+      linkLabel: hasBloodPressureData ? "Review readings" : "Record Health Vitals",
+    });
+  }
+
+  if (hasDiabetesContext) {
+    insights.push({
+      title: "Glucose monitoring context",
+      detail: hasGlucoseData
+        ? "Diabetes is part of your recorded care context, and glucose-related measurements or laboratory results are available in this period. Review those values and any flagged lab results against the targets in your care plan; this report does not replace result-specific clinical interpretation."
+        : "Diabetes is part of your recorded care context, but no glucose- or HbA1c-labelled result was found in this report period. Glucose control cannot be assessed from unrelated measurements. Add or review glucose and laboratory results with your healthcare team when these are part of your care plan.",
+      tone: hasGlucoseData ? "info" : "watch",
+      href: hasGlucoseData ? "/health-records" : "/today",
+      linkLabel: hasGlucoseData ? "Review clinical results" : "Update health records",
+    });
+  }
+
+  if (hasRespiratoryContext) {
+    insights.push({
+      title: "Use your personal breathing plan",
+      detail: hasRespiratoryData
+        ? "Your recorded respiratory care context can affect the oxygen or breathing-rate range that is right for you. The colours in this report are screening prompts, not a substitute for your clinician's personal threshold or action plan."
+        : "A respiratory condition is part of your recorded care context, but no oxygen-saturation or breathing-rate readings were found in this period. General ranges alone cannot describe your personal baseline; follow your clinician's plan for when to measure and when to seek help.",
+      tone: hasRespiratoryData ? "info" : "watch",
+      href: "/today",
+      linkLabel: hasRespiratoryData ? "Review measurements" : "Record Health Vitals",
+    });
+  }
+
+  if (averageAdherence !== null) {
+    insights.push({
+      title: "Medicine-record context",
+      detail: averageAdherence < 90
+        ? "The saved adherence figures average " + formatNumber(averageAdherence, 0) + "%. This reflects medicine records available to Sympto and may not match every dose actually taken. If timing, side effects or logging are difficult, discuss practical support with your care team; do not stop or change treatment based on this report."
+        : "The saved adherence figures average " + formatNumber(averageAdherence, 0) + "%. This is based on recorded information, not an independent check of every dose. Continue following the prescription and keep records up to date.",
+      tone: averageAdherence < 90 ? "watch" : "info",
+      href: "/today",
+      linkLabel: "Review today's medicines",
+    });
+  } else if (hasGoal(/medication|medicine|adherence/)) {
+    insights.push({
+      title: "Medicine-goal progress needs dose records",
+      detail: "A medicine-related goal is saved, but this report has no usable saved adherence percentage to compare. Its progress should not be inferred from the profile or from prescriptions alone; keep dose logs current and review the goal history.",
+      tone: "info",
+      href: "/today",
+      linkLabel: "Review today's medicines",
+    });
+  }
+
+  if (latestRiskAssessment && ["HIGH", "VERY_HIGH"].includes(String(latestRiskAssessment.overallRisk ?? "").toUpperCase())) {
+    const riskLevel = String(latestRiskAssessment.overallRisk).toUpperCase();
+    insights.push({
+      title: "Follow up a recorded risk assessment",
+      detail: "Your most recently saved " + human(latestRiskAssessment.assessmentType || "clinical") + " assessment was marked " + human(riskLevel) + (latestRiskAssessment.assessedAt ? " on " + dateLabel(latestRiskAssessment.assessedAt) : "") + ". This is a previously recorded assessment, not a new calculation from this report. Check its recorded advice with your healthcare professional and confirm whether it is still current.",
+      tone: riskLevel === "VERY_HIGH" ? "critical" : "high",
+      href: "/health-records",
+      linkLabel: "Review clinical records",
+    });
+  }
+
+  if (ratedGoalStatuses.length > 0) {
+    insights.push({
+      title: goalsNeedingAttention > 0 ? "Some goal progress needs a check-in" : "Your saved goal signals",
+      detail: goalsNeedingAttention > 0
+        ? goalsNeedingAttention + " of " + ratedGoalStatuses.length + " goals with a rated latest update are marked stagnant or moving away from their targets. The report uses matching saved targets in the relevant measurement cards and summarises broader goal status here rather than repeating your goal list."
+        : goalsMovingWell + " of " + ratedGoalStatuses.length + " goals with a rated latest update are marked on track, improving or achieved. This describes saved goal status only; it is not an overall health score.",
+      tone: goalsNeedingAttention > 0 ? "watch" : "good",
+      href: "/health-goals",
+      linkLabel: "Review goal progress",
+    });
+  }
+
+  if (hasGoal(/exercise|physical activity|workout|fitness/) && workoutCount === 0 && exerciseEntries.length === 0) {
+    const usuallyInactive = /none|never|sedentary|rarely|inactive|low/.test(String(profile?.exerciseFrequency ?? "").toLowerCase());
+    insights.push({
+      title: "Not enough activity data to assess the trend",
+      detail: usuallyInactive
+        ? "Your saved usual-activity context suggests limited routine exercise, and this period contains no workout sessions or exercise check-ins. That does not prove you were inactive; it means the report cannot measure change. Keep any activity target realistic for your circumstances and care plan."
+        : "An activity-related goal is saved, but this period contains no workout sessions or exercise check-ins. That does not prove you were inactive; it means the report cannot measure change from the records available.",
+      tone: "info",
+      href: "/today",
+      linkLabel: "Log activity",
+    });
+  }
+
+  if (hasGoal(/sleep|rest/) && sleepSessionCount === 0 && sleepEntries.length === 0) {
+    insights.push({
+      title: "Sleep progress cannot be compared yet",
+      detail: "A sleep-related goal is saved, but this period contains no sleep-session or sleep check-in data. Empty days are unknown, not zero hours; record sleep when practical so a future report can compare it with your goal.",
+      tone: "info",
+      href: "/today",
+      linkLabel: "Record a check-in",
+    });
+  }
+
+  if (hasGoal(/hydration|water intake|drink more water/) && waterEntries.length === 0) {
+    insights.push({
+      title: "Hydration progress cannot be compared yet",
+      detail: "A hydration-related goal is saved, but no dated water-intake check-ins were found in this period. The report cannot estimate progress from a missing entry; record water intake in your daily check-in when practical.",
+      tone: "info",
+      href: "/today",
+      linkLabel: "Record water intake",
+    });
+  }
+
+  if (hasGoal(/mental health|stress|mood|wellbeing/) && stressEntries.length === 0 && lowMoodCounts(report).total === 0) {
+    insights.push({
+      title: "Wellbeing progress needs check-in data",
+      detail: "A wellbeing-related goal is saved, but no stress ratings or mood check-ins were found in this period. The report will not infer how you felt on days without an entry.",
+      tone: "info",
+      href: "/today",
+      linkLabel: "Complete a check-in",
+    });
+  }
+
+  if (hasGoal(/blood glucose|glucose|diabetes/) && !hasGlucoseData && !hasDiabetesContext) {
+    insights.push({
+      title: "Glucose goal data is missing",
+      detail: "A glucose-related goal is saved, but no glucose- or HbA1c-labelled measure was found in this report period. This is a data gap, not evidence that the goal was missed.",
+      tone: "info",
+      href: "/health-records",
+      linkLabel: "Review clinical records",
+    });
+  }
+
+  if (hasGoal(/cholesterol|lipid/) && !hasLipidData) {
+    insights.push({
+      title: "Cholesterol goal data is missing",
+      detail: "A cholesterol-related goal is saved, but no cholesterol, lipid, LDL, HDL or triglyceride lab name was found in this report period. The report cannot infer a change from other measurements; review the dated laboratory results when available.",
+      tone: "info",
+      href: "/health-records",
+      linkLabel: "Review clinical records",
+    });
+  }
+
+  if (hasGoal(/smoking|tobacco|cigarette/) && Boolean(profile?.smokingStatus)) {
+    insights.push({
+      title: "Smoking-related progress needs dated updates",
+      detail: "Your saved smoking context can help tailor this goal, but this report does not build a dated smoking trend from profile status alone. No reduction or increase is inferred without comparable entries for the selected period.",
+      tone: "info",
+      href: "/health-goals",
+      linkLabel: "Review goal progress",
+    });
+  }
+
+  if (hasGoal(/alcohol|drinking/) && Boolean(profile?.alcoholConsumption)) {
+    insights.push({
+      title: "Alcohol-related progress needs dated updates",
+      detail: "Your saved alcohol-use context can help tailor this goal, but this report does not build a dated consumption trend from profile status alone. No change is inferred without comparable entries for the selected period.",
+      tone: "info",
+      href: "/health-goals",
+      linkLabel: "Review goal progress",
+    });
+  }
+
   const coverageTone: StatusTone = coveragePercent >= 75 ? "good" : coveragePercent >= 40 ? "watch" : "high";
-  const displayName = person?.preferredName || person?.firstName || "Your profile";
+  if (insights.length === 0) {
+    insights.push({
+      title: "Build the picture around your own targets",
+      detail: goals.length > 0
+        ? "Your saved targets and care context remain available to shape comparisons. More dated readings and check-ins will let the report assess relevant changes without treating missing values as zero."
+        : "As your saved care context, targets and dated readings build up, the report can tailor comparisons to your own circumstances instead of relying only on general reference ranges.",
+      tone: "info",
+      href: goals.length > 0 ? "/health-goals" : "/today",
+      linkLabel: goals.length > 0 ? "Review saved targets" : "Record today's health",
+    });
+  }
+
   return (
-    <div className="mt-5 space-y-4">
-      <section className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:p-5">
-        <div className="flex flex-col gap-4 sm:flex-row sm:items-center">
-          <div className="flex min-w-0 flex-1 items-center gap-4">
-            <ScoreRing percent={coveragePercent} label="Data coverage" tone={coverageTone} size={82} />
-            <div className="min-w-0">
-              <p className="text-[10px] font-black uppercase tracking-[0.15em] text-[#0b7b80]">Monitoring summary</p>
-              <h2 className="mt-1 text-lg font-black text-[#0b2d54]">{daysLogged} of {totalDays} days with records</h2>
-              <p className="mt-1 text-xs leading-5 text-slate-500">{coveragePercent}% data coverage in this report. This is a measure of how much was logged—not a score for your overall health.</p>
-            </div>
-          </div>
-          <div className={"rounded-xl border px-3 py-2 text-xs font-bold " + toneStyles(coverageTone).surface + " " + toneStyles(coverageTone).border + " " + toneStyles(coverageTone).text}>
-            {coverageTone === "good" ? "Good coverage" : coverageTone === "watch" ? "Moderate coverage" : "Limited coverage"}
+    <section aria-label="Personalised interpretation" className="rounded-2xl border border-[#dcebed] bg-white p-4 shadow-sm sm:p-5">
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-center">
+        <div className="flex min-w-0 flex-1 items-center gap-3">
+          <ScoreRing percent={coveragePercent} label="Data coverage" tone={coverageTone} size={76} />
+          <div className="min-w-0">
+            <p className="text-[10px] font-black uppercase tracking-[0.15em] text-[#0b7b80]">Personalised interpretation</p>
+            <h2 className="mt-1 text-lg font-black text-[#0b2d54]">What your records mean in context</h2>
+            <p className="mt-1 text-xs leading-5 text-slate-500">The report uses saved age, relevant care context, baselines, medicine-record measures and goal targets to tailor these observations. It does not reproduce your profile or list every goal.</p>
+            <p className="mt-1 text-[10px] leading-4 text-slate-500">{daysLogged} of {totalDays} days had records. Coverage describes logging consistency, not health status.</p>
           </div>
         </div>
-      </section>
-
-      <section className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:p-5">
-        <div className="flex flex-wrap items-start justify-between gap-3">
-          <div>
-            <p className="text-[10px] font-black uppercase tracking-[0.15em] text-[#0b7b80]">Personal context</p>
-            <h2 className="mt-1 text-lg font-black text-[#0b2d54]">{displayName}</h2>
-            <p className="mt-1 text-xs leading-5 text-slate-500">Current profile and care context used to interpret this report. It may include information updated after the report period.</p>
-          </div>
-          <Link href="/health-passport" className="inline-flex min-h-9 items-center gap-1.5 rounded-xl border border-[#dcebed] px-3 py-2 text-[10px] font-black text-[#0b2d54] hover:bg-[#f4fbfb]">Review Health Passport <ArrowRight className="h-3 w-3" /></Link>
-        </div>
-        <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-          <div className="rounded-xl bg-[#f5fafb] p-3"><p className="text-[10px] font-bold uppercase tracking-wide text-slate-500">Age</p><p className="mt-1 text-lg font-black text-[#0b2d54]">{age === null ? "Not recorded" : age === 0 ? "Under 1 year" : String(age) + " years"}</p><p className="mt-1 text-[10px] leading-4 text-slate-500">{age === null ? "Add your date of birth for age-aware reference guidance." : age >= 18 ? "Adult reference guidance can be used as a general guide." : "Adult ranges are not applied to this report; age-specific guidance is needed."}</p></div>
-          <div className="rounded-xl bg-[#f5fafb] p-3"><p className="text-[10px] font-bold uppercase tracking-wide text-slate-500">Height</p><p className="mt-1 text-lg font-black text-[#0b2d54]">{heightCm === null ? "Not recorded" : formatNumber(heightCm, 1) + " cm"}</p></div>
-          <div className="rounded-xl bg-[#f5fafb] p-3"><p className="text-[10px] font-bold uppercase tracking-wide text-slate-500">Weight</p><p className="mt-1 text-lg font-black text-[#0b2d54]">{weightKg === null ? "Not recorded" : formatNumber(weightKg, 1) + " kg"}</p></div>
-          <div className="rounded-xl bg-[#f5fafb] p-3"><p className="text-[10px] font-bold uppercase tracking-wide text-slate-500">BMI · adult screening</p><p className="mt-1 text-lg font-black text-[#0b2d54]">{bmi === null ? "Not calculated" : formatNumber(bmi, 1)}</p><p className="mt-1 text-[10px] leading-4 text-slate-500">{bmi === null ? "Needs a recorded age of 18+ plus height and weight." : "A screening measure, not a diagnosis."}</p></div>
-        </div>
-        {bloodTypeLabel && <p className="mt-3 text-[10px] text-slate-500">Recorded blood group: <strong className="text-[#0b2d54]">{bloodTypeLabel}</strong></p>}
-        <div className="mt-4 grid gap-4 md:grid-cols-2">
-          <div>
-            <h3 className="text-xs font-black text-[#0b2d54]">Health conditions and diagnoses</h3>
-            {conditionDisplayItems.length ? <div className="mt-2 flex flex-wrap gap-2">{conditionDisplayItems.map((item) => <span key={item.name.toLowerCase()} title={["Health Passport condition or recorded diagnosis", item.status ? human(item.status) : "", item.severity ? human(item.severity) : ""].filter(Boolean).join(" · ")} className="rounded-full border border-[#dcebed] bg-[#f5fafb] px-3 py-1.5 text-[10px] font-bold text-[#0b2d54]">{item.name}{item.status && String(item.status).toUpperCase() !== "ACTIVE" ? " · " + human(item.status) : ""}{item.severity ? " · " + human(item.severity) : ""}{item.stage ? " · Stage " + item.stage : ""}</span>)}</div> : <p className="mt-1 text-xs leading-5 text-slate-500">No current conditions or diagnoses are recorded in the Health Passport.</p>}
-          </div>
-          <div>
-            <h3 className="text-xs font-black text-[#0b2d54]">Allergies</h3>
-            {currentAllergies.length ? <div className="mt-2 flex flex-wrap gap-2">{currentAllergies.map((item, index) => <span key={String(item.allergy?.name ?? index)} className={"rounded-full border px-3 py-1.5 text-[10px] font-bold " + (["SEVERE", "LIFE_THREATENING"].includes(String(item.severity).toUpperCase()) ? "border-rose-200 bg-rose-50 text-rose-900" : "border-[#dcebed] bg-[#f5fafb] text-[#0b2d54]")}>{item.allergy?.name || "Allergy"}{item.severity ? " · " + human(item.severity) : ""}</span>)}</div> : <p className="mt-1 text-xs leading-5 text-slate-500">No active allergies are recorded in the Health Passport.</p>}
-          </div>
-          <div>
-            <h3 className="text-xs font-black text-[#0b2d54]">Current medicines</h3>
-            {currentMedications.length ? <div className="mt-2 space-y-2">{currentMedications.slice(0, 6).map((item, index) => <div key={String(item.medication?.name ?? index)} className="rounded-xl bg-[#f5fafb] px-3 py-2"><p className="text-xs font-bold text-[#0b2d54]">{item.medication?.name || "Medicine"}{item.dosage ? " · " + item.dosage : ""}</p><p className="mt-0.5 text-[10px] leading-4 text-slate-500">{[item.frequency, item.indication].filter(Boolean).join(" · ") || "No schedule or reason recorded"}</p>{item.adherencePercentage != null && <p className="mt-1 text-[10px] font-bold text-[#0b7b80]">Saved adherence: {formatNumber(item.adherencePercentage, 0)}%</p>}</div>)}</div> : <p className="mt-1 text-xs leading-5 text-slate-500">No active medicines are recorded in the Health Passport.</p>}
-          </div>
-          <div>
-            <h3 className="text-xs font-black text-[#0b2d54]">Lifestyle context</h3>
-            <div className="mt-2 flex flex-wrap gap-2">{[
-              ["Smoking", profile?.smokingStatus],
-              ["Alcohol", profile?.alcoholConsumption],
-              ["Usual exercise", profile?.exerciseFrequency],
-            ].filter((item) => Boolean(item[1])).map(([label, value]) => <span key={String(label)} className="rounded-full border border-slate-200 bg-white px-3 py-1.5 text-[10px] font-bold text-slate-600">{String(label)}: {human(value)}</span>)}</div>
-            {![profile?.smokingStatus, profile?.alcoholConsumption, profile?.exerciseFrequency].some(Boolean) && <p className="mt-1 text-xs leading-5 text-slate-500">Lifestyle details are not fully recorded. The report will not infer them.</p>}
-          </div>
-        </div>
-        {additionalHistory.length > 0 && (
-          <details className="mt-4 rounded-xl border border-slate-200 bg-slate-50 p-3">
-            <summary className="cursor-pointer text-xs font-black text-[#0b2d54]">Additional medical history on file ({additionalHistory.length})</summary>
-            <p className="mt-1 text-[10px] leading-4 text-slate-500">These are notes already saved in your medical record. They may be free-text summaries; review them if they differ from the structured information above.</p>
-            <div className="mt-3 space-y-3">
-              {additionalHistory.map((item) => <div key={item.label}><p className="text-[10px] font-black uppercase tracking-wide text-slate-500">{item.label}</p><p className="mt-1 whitespace-pre-wrap text-xs leading-5 text-slate-700">{item.value}</p></div>)}
-            </div>
-          </details>
-        )}
-        {riskAssessments.length > 0 && (
-          <div className="mt-4 border-t border-slate-100 pt-4">
-            <h3 className="text-xs font-black text-[#0b2d54]">Recorded clinical risk assessments</h3>
-            <p className="mt-1 text-[10px] leading-4 text-slate-500">These are scores and risk levels recorded by an assessment in your health record. Sympto is displaying them as saved; it is not recalculating or diagnosing risk here.</p>
-            <div className="mt-3 grid gap-3 md:grid-cols-2">
-              {riskAssessments.map((assessment, index) => {
-                const level = String(assessment.overallRisk ?? "").toUpperCase();
-                const tone: StatusTone = level === "LOW" ? "good" : level === "MODERATE" ? "watch" : level === "HIGH" ? "high" : level === "VERY_HIGH" ? "critical" : "info";
-                const score = finite(assessment.score);
-                return (
-                  <article key={String(assessment.id ?? index)} className="rounded-xl border border-slate-200 bg-white p-3">
-                    <div className="flex items-start justify-between gap-3">
-                      <div className="min-w-0">
-                        <p className="text-xs font-black text-[#0b2d54]">{human(assessment.assessmentType || "Clinical assessment")}</p>
-                        <p className="mt-1 text-[10px] text-slate-500">{assessment.assessedAt ? "Assessed " + dateLabel(assessment.assessedAt) : "Assessment date not recorded"}</p>
-                      </div>
-                      <StatusCircle label={level ? human(level) : "Not rated"} detail="Saved risk level" tone={tone} />
-                    </div>
-                    {score !== null && <p className="mt-2 text-xs text-slate-600">Recorded score: <strong className="text-[#0b2d54]">{formatNumber(score, 1)}</strong></p>}
-                    {assessment.notes && <p className="mt-2 text-xs leading-5 text-slate-600">{assessment.notes}</p>}
-                    {(assessment.results ?? []).slice(0, 3).length > 0 && <div className="mt-2 space-y-1 border-t border-slate-100 pt-2">{(assessment.results ?? []).slice(0, 3).map((result, resultIndex) => <p key={String(result.factor ?? resultIndex)} className="text-[10px] leading-4 text-slate-500"><strong className="text-slate-700">{result.factor || "Factor"}:</strong> {result.value ?? (result.score == null ? "Not recorded" : String(result.score))}{result.recommendation ? " — " + result.recommendation : ""}</p>)}</div>}
-                  </article>
-                );
-              })}
-            </div>
-          </div>
-        )}
-      </section>
-
-      <section>
-        <div className="mb-3 flex flex-wrap items-end justify-between gap-3">
-          <div><p className="text-[10px] font-black uppercase tracking-[0.15em] text-[#0b7b80]">Your active plan</p><h2 className="mt-1 text-lg font-black text-[#0b2d54]">Health goals and progress</h2><p className="mt-1 text-xs leading-5 text-slate-500">Progress circles use the percentage saved for each goal. If no percentage has been recorded, it is shown as missing rather than guessed.</p></div>
-          <Link href="/health-goals" className="inline-flex min-h-9 items-center gap-1.5 rounded-xl border border-[#dcebed] px-3 py-2 text-[10px] font-black text-[#0b2d54] hover:bg-white">Manage health goals <ArrowRight className="h-3 w-3" /></Link>
-        </div>
-        {goals.length ? <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">{goals.map((goal, index) => <GoalProgressCard key={String(goal.id ?? goal.title ?? index)} goal={goal} />)}</div> : <div className="rounded-2xl border border-dashed border-slate-300 bg-white p-5 text-sm leading-6 text-slate-500">No active health goals are linked to this profile yet. Saved goals will appear here with their latest recorded progress.</div>}
-      </section>
-    </div>
-  );
-}
-
-function RoutineTrendCard({
-  icon: Icon,
-  title,
-  subtitle,
-  current,
-  previous,
-  unit,
-  digits = 1,
-  previousLoading,
-}: {
-  icon: typeof Activity;
-  title: string;
-  subtitle: string;
-  current: DailyValue[];
-  previous: DailyValue[];
-  unit: string;
-  digits?: number;
-  previousLoading: boolean;
-}) {
-  const currentMean = mean(current.map((item) => item.value));
-  const values = current.map((item) => item.value);
-  return (
-    <article className="min-w-0 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
-      <div className="flex items-start gap-3">
-        <span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-[#24c1c4]/10 text-[#0b2d54]"><Icon className="h-5 w-5" /></span>
-        <div className="min-w-0 flex-1"><h3 className="font-bold text-[#0b2d54]">{title}</h3><p className="mt-1 text-xs leading-5 text-slate-500">{subtitle}</p></div>
       </div>
-      {currentMean === null ? (
-        <div className="mt-4 rounded-xl bg-slate-50 p-3 text-sm text-slate-500">No entries for this measure in the selected period.</div>
-      ) : (
-        <>
-          <div className="mt-4 flex items-baseline gap-2"><p className="text-2xl font-black tracking-tight text-[#0b2d54]">{formatNumber(currentMean, digits)} <span className="text-sm font-bold text-slate-500">{unit}</span></p><span className="text-[10px] text-slate-400">{current.length} {current.length === 1 ? "day with an entry" : "days with entries"}</span></div>
-          <p className="mt-1 text-[11px] leading-4 text-slate-500">Average on days with a saved value. Days without an entry are not counted as zero.</p>
-          <MiniTrend values={values} label={title + " daily trend"} />
-          <p className="mt-3 text-xs leading-5 text-slate-500">{compareText(values, previous.map((item) => item.value), unit, digits, previousLoading)}</p>
-        </>
-      )}
-    </article>
-  );
-}
-
-function VitalTrendCard({
-  label,
-  description,
-  unit,
-  digits,
-  current,
-  previous,
-  previousLoading,
-  review,
-  status,
-  baselineValue,
-  rawCurrent,
-}: {
-  label: string;
-  description: string;
-  unit: string;
-  digits: number;
-  current: SeriesPoint[];
-  previous: SeriesPoint[];
-  previousLoading: boolean;
-  review: MeasurementReview | null;
-  status: VitalStatusAssessment;
-  baselineValue: number | null;
-  rawCurrent: SeriesPoint[];
-}) {
-  const currentValues = current.map((item) => item.value);
-  const previousValues = previous.map((item) => item.value);
-  const average = mean(currentValues);
-  const latest = rawCurrent[rawCurrent.length - 1] ?? current[current.length - 1];
-  const first = current[0];
-  const excludedCount = Math.max(0, rawCurrent.length - current.length);
-  const change = latest && first ? latest.value - first.value : null;
-  const changeText = change === null
-    ? "Not enough readings to compare."
-    : Math.abs(change) < 0.05
-      ? "The first and most recent readings were very similar."
-      : "From the first to the most recent reading: " + (change > 0 ? "+" : "") + formatNumber(change, digits) + " " + unit + ".";
-  const baselineDelta = latest && baselineValue !== null ? latest.value - baselineValue : null;
-  const baselineComparison = baselineDelta === null
-    ? null
-    : Math.abs(baselineDelta) < (digits === 0 ? 0.5 : 0.05)
-      ? "Your most recent reading is close to your recorded baseline of " + formatNumber(baselineValue, digits) + " " + unit + "."
-      : "Your most recent reading is " + formatNumber(Math.abs(baselineDelta), digits) + " " + unit + (baselineDelta > 0 ? " above" : " below") + " your recorded baseline of " + formatNumber(baselineValue, digits) + " " + unit + ". This difference alone does not show a cause or diagnosis.";
-  return (
-    <article className="min-w-0 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
-      <div className="flex items-start justify-between gap-3">
-        <div>
-          <p className="text-sm font-bold text-[#0b2d54]">{label}</p>
-          <p className="mt-1 text-[11px] text-slate-500">{rawCurrent.length} {rawCurrent.length === 1 ? "reading" : "readings"} saved in this period</p>
-          {excludedCount > 0 && <p className="mt-1 text-[10px] font-bold text-amber-800">{excludedCount} flagged or out-of-scale {excludedCount === 1 ? "value is" : "values are"} excluded from the trend average and shown in the review alerts.</p>}
-        </div>
-        <HeartPulse className="h-5 w-5 shrink-0 text-[#24c1c4]" />
+      <div className="mt-4 grid gap-3 md:grid-cols-2">
+        {insights.map((insight) => (
+          <article key={insight.title} className={"rounded-xl border bg-white p-4 " + toneStyles(insight.tone).border}>
+            <div className="flex items-start gap-3">
+              <StatusCircle label={insight.tone === "good" ? "On track" : insight.tone === "critical" ? "Urgent" : insight.tone === "high" ? "Review" : insight.tone === "watch" ? "Monitor" : "Context"} detail="Personalised signal" tone={insight.tone} />
+              <div className="min-w-0 flex-1">
+                <h3 className="text-sm font-black text-[#0b2d54]">{insight.title}</h3>
+                <p className="mt-2 text-xs leading-5 text-slate-600">{insight.detail}</p>
+                <Link href={insight.href} className="mt-3 inline-flex min-h-9 items-center gap-1.5 rounded-xl bg-[#0b2d54] px-3 py-2 text-[10px] font-black text-white">{insight.linkLabel} <ArrowRight className="h-3 w-3 text-[#24c1c4]" /></Link>
+              </div>
+            </div>
+          </article>
+        ))}
       </div>
-      <p className="mt-2 text-xs leading-5 text-slate-500">{description}</p>
-      <div className="mt-3"><StatusCircle label={status.label} detail={status.detail} tone={status.tone} /></div>
-      {average === null ? (
-        <p className="mt-4 text-sm text-slate-500">{rawCurrent.length > 0 ? "No values from this measure were used in the trend because the saved values need review. See the alert above." : "No readings were saved for this period."}</p>
-      ) : (
-        <>
-          <div className="mt-4">
-            <p className="text-[10px] font-bold uppercase tracking-wide text-slate-400">Average for this period</p>
-            <p className="mt-1 text-2xl font-black tracking-tight text-[#0b2d54]">
-              {formatNumber(average, digits)} <span className="text-sm font-bold text-slate-500">{unit}</span>
-            </p>
-            {latest && <p className="mt-1 text-xs text-slate-500">Most recent: {formatNumber(latest.value, digits)} {unit} · {dateLabel(new Date(latest.timestamp).toISOString())}</p>}
-            {latest?.convertedFrom && <p className="mt-1 text-[10px] leading-4 text-slate-500">Converted for this report from {formatNumber(latest.convertedFrom.value, 1)} {latest.convertedFrom.unit}.</p>}
-          </div>
-          <MiniTrend values={currentValues} label={label + " trend"} />
-          {review ? (
-            <p className="mt-3 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs leading-5 text-amber-950">
-              Check these saved values before interpreting the trend. See “Readings to double-check” above.
-            </p>
-          ) : (
-            <p className="mt-3 text-xs leading-5 text-slate-600">{changeText}</p>
-          )}
-          {baselineValue !== null && (
-            <p className="mt-3 rounded-xl border border-slate-100 bg-white px-3 py-2 text-xs leading-5 text-slate-600">
-              {review ? "Baseline comparison is paused until the flagged saved values are checked." : baselineComparison}
-            </p>
-          )}
-          <div className="mt-3 rounded-xl bg-[#f5fafb] p-3">
-            <p className="text-[10px] font-bold uppercase tracking-wide text-[#71839a]">Compared with the previous period</p>
-            <p className="mt-1 text-xs leading-5 text-slate-600">{review ? "Please verify these saved values before comparing this period with the previous one." : compareText(currentValues, previousValues, unit, digits, previousLoading)}</p>
-          </div>
-        </>
-      )}
-    </article>
-  );
-}
-
-function clinicalEvents(report: Report) {
-  return report.clinical.encounters.length +
-    report.clinical.diagnoses.length +
-    report.clinical.prescriptions.length +
-    report.clinical.notes.length +
-    report.clinical.vitals.length +
-    report.clinical.labResults.length +
-    report.clinical.imaging.length +
-    report.clinical.procedures.length +
-    report.clinical.carePlans.length +
-    report.clinical.referrals.length;
-}
-
-function flaggedLabItems(report: Report) {
-  return report.clinical.labResults.flatMap((result, resultIndex) =>
-    (result.items ?? []).flatMap((item, itemIndex) =>
-      item.abnormal || item.critical
-        ? [{
-            id: String(item.id || `${result.id || "lab-result"}-${resultIndex}-${itemIndex}`),
-            name: item.test?.name || result.orderItem?.test?.name || "Laboratory result",
-            value: item.numericValue ?? item.textValue ?? item.booleanValue ?? "Value not recorded",
-            critical: Boolean(item.critical),
-            date: result.reportedAt || result.releasedAt,
-          }]
-        : [],
-    ),
+      <p className="mt-3 border-t border-slate-100 pt-3 text-[10px] leading-4 text-slate-500">These insights are based on saved information. Missing entries are not treated as zero, and none of these patterns establishes a diagnosis or a cause.</p>
+    </section>
   );
 }
 
@@ -1445,10 +1395,9 @@ function HealthReportInsights({
   }
   if (goalFollowUps.length > 0) {
     const decliningGoals = goalFollowUps.filter((goal) => String(goal.progress?.[0]?.status ?? "").toUpperCase() === "DECLINING");
-    const titles = goalFollowUps.slice(0, 2).map((goal) => String(goal.title || human(goal.category))).join(" and ");
-    nextSteps.push({
+nextSteps.push({
       title: "Review goals that need attention",
-      detail: titles + (goalFollowUps.length > 2 ? " and " + String(goalFollowUps.length - 2) + " more" : "") + (goalFollowUps.length === 1 ? " has" : " have") + " a latest saved status of " + (decliningGoals.length > 0 ? "declining or stagnant" : "stagnant") + ". Review the latest entry and target; do not change medicines or treatment based on this report alone.",
+      detail: String(goalFollowUps.length) + " of your saved goals have a latest recorded status of " + (decliningGoals.length > 0 ? "declining or stagnant" : "stagnant") + ". The report uses matching saved targets in the relevant measurement cards; review the underlying progress history for context, and do not change medicines or treatment based on this report alone."
       href: "/health-goals",
       linkLabel: "Review health goals",
       tone: decliningGoals.length > 0 ? "high" : "watch",
@@ -1475,7 +1424,7 @@ function HealthReportInsights({
 
   return (
     <div className="mt-5 space-y-6">
-      <HealthContextSection report={report} coveragePercent={coveragePercent} daysLogged={daysLogged} totalDays={totalDays} />
+      <PersonalisedInsights report={report} coveragePercent={coveragePercent} daysLogged={daysLogged} totalDays={totalDays} />
       <section>
         <div className="mb-3 flex items-end justify-between gap-3"><div><p className="text-[10px] font-black uppercase tracking-[0.16em] text-[#24c1c4]">Period overview</p><h2 className="mt-1 text-xl font-black text-[#0b2d54]">The bigger picture</h2></div><span className="text-xs text-slate-400">{totalDays} days</span></div>
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
