@@ -625,6 +625,11 @@ export class HealthReportNotificationSchedulerService
           occupation: true,
           baseline: true,
           medicalRecord: true,
+          riskAssessments: {
+            orderBy: { assessedAt: 'desc' },
+            take: 5,
+            include: { results: true },
+          },
           healthPassport: {
             include: {
               conditions: { include: { condition: true } },
@@ -662,6 +667,7 @@ export class HealthReportNotificationSchedulerService
           },
           baseline: currentRecord.baseline,
           medicalRecord: currentRecord.medicalRecord,
+          riskAssessments: currentRecord.riskAssessments ?? [],
           conditions: currentRecord.healthPassport?.conditions ?? [],
           allergies: currentRecord.healthPassport?.allergies ?? [],
           medications: currentRecord.healthPassport?.medications ?? [],
@@ -672,6 +678,7 @@ export class HealthReportNotificationSchedulerService
           profile: null,
           baseline: null,
           medicalRecord: null,
+          riskAssessments: [],
           conditions: [],
           allergies: [],
           medications: [],
