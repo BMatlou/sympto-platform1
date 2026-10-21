@@ -300,6 +300,12 @@ type Report = {
     goalProgress?: unknown[];
     goalHistory?: unknown[];
     riskAssessments?: unknown[];
+    healthPassportChanges?: {
+      conditions?: unknown[];
+      allergies?: unknown[];
+      medications?: unknown[];
+      immunizations?: unknown[];
+    };
   };
   generatedAt: string;
 };
@@ -3213,6 +3219,7 @@ function ReportDataCoverage({ report }: { report: Report }) {
     { title: "Measurements", count: activity.deviceMeasurements.length + activity.wellnessMetrics.length + clinical.vitals.length },
     { title: "Sleep & activity", count: activity.sleepSessions.length + activity.workouts.length },
     { title: "Clinical records", count: clinical.encounters.length + clinical.diagnoses.length + clinical.prescriptions.length + clinical.notes.length + clinical.labResults.length + clinical.imaging.length + clinical.procedures.length + clinical.carePlans.length + clinical.referrals.length },
+    { title: "Health-profile changes", count: ledgerArray(report.tracking?.healthPassportChanges?.conditions).length + ledgerArray(report.tracking?.healthPassportChanges?.allergies).length + ledgerArray(report.tracking?.healthPassportChanges?.medications).length + ledgerArray(report.tracking?.healthPassportChanges?.immunizations).length },
   ].filter((item) => item.count > 0);
   if (!counts.length) return null;
   return <section aria-label="Data coverage for this report" className="mt-3 rounded-2xl border border-[#dcebed] bg-white px-4 py-3 shadow-sm sm:px-5">
@@ -3272,6 +3279,10 @@ function CompleteReportData({ report }: { report: Report }) {
     { key: "goal-progress", title: "Goal progress updates", description: "Progress submissions saved against health goals", rows: ledgerArray(report.tracking?.goalProgress) },
     { key: "goal-history", title: "Goals created or changed", description: "Goal creation, targets, statuses and completion dates", rows: ledgerArray(report.tracking?.goalHistory) },
     { key: "risk-history", title: "Risk assessments recorded this period", description: "Risk assessment results dated within the report range", rows: ledgerArray(report.tracking?.riskAssessments) },
+    { key: "condition-changes", title: "Conditions added or updated", description: "Condition history edited or dated in this period", rows: ledgerArray(report.tracking?.healthPassportChanges?.conditions) },
+    { key: "allergy-changes", title: "Allergies added or updated", description: "Allergy and reaction records added or edited in this period", rows: ledgerArray(report.tracking?.healthPassportChanges?.allergies) },
+    { key: "medication-record-changes", title: "Medication records changed", description: "Prescription profile details and status changes, separate from dose outcomes", rows: ledgerArray(report.tracking?.healthPassportChanges?.medications) },
+    { key: "immunization-changes", title: "Immunisations added or updated", description: "Administration, next-due and status changes during this period", rows: ledgerArray(report.tracking?.healthPassportChanges?.immunizations) },
   ].filter((group) => group.rows.length > 0);
   const context = contextGroups.filter((group) => group.rows.length > 0);
   const total = groups.reduce((sum, group) => sum + group.rows.length, 0);
