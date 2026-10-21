@@ -1502,13 +1502,22 @@ function PersonalisedInsights({
   const hydrationChecksPrevious = dailyMetric(previousReport, "waterIntakeMl");
 
   type SignalPoint = { date: string; value: number; unit?: string };
-  const signal = (key: string, label: string, currentPoints: SignalPoint[], previousPoints: SignalPoint[], fallbackUnit = "") => ({
-    key,
-    label,
-    unit: String(currentPoints.at(-1)?.unit || previousPoints.at(-1)?.unit || fallbackUnit),
-    current: toDaily(currentPoints),
-    previous: toDaily(previousPoints),
-  });
+  const signal = (key: string, label: string, currentPoints: SignalPoint[], previousPoints: SignalPoint[], fallbackUnit = "") => {
+    const unit = String(currentPoints.at(-1)?.unit || fallbackUnit || previousPoints.at(-1)?.unit || "").trim();
+    const currentHasSourceUnits = currentPoints.some((point) => Boolean(point.unit?.trim()));
+    const previousHasSourceUnits = previousPoints.some((point) => Boolean(point.unit?.trim()));
+    const filterComparableUnit = (points: SignalPoint[]) => {
+      if (!unit || (!currentHasSourceUnits && !previousHasSourceUnits)) return points;
+      return points.filter((point) => String(point.unit ?? "").trim().toLowerCase() === unit.toLowerCase());
+    };
+    return {
+      key,
+      label,
+      unit,
+      current: toDaily(filterComparableUnit(currentPoints)),
+      previous: toDaily(filterComparableUnit(previousPoints)),
+    };
+  };
   const baseSignals: Array<{ key: string; label: string; unit: string; current: DailyValue[]; previous: DailyValue[] }> = [
     signal("weight", "Weight", weightCurrent, weightPrevious, "kg"),
     signal("glucose", "Blood glucose", glucoseCurrent, glucosePrevious, glucoseLabCurrentSpecific.at(-1)?.unit || glucoseLabPreviousSpecific.at(-1)?.unit || "mmol/L"),
