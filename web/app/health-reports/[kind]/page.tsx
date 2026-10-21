@@ -1067,6 +1067,7 @@ function VitalTrendCard({
   previousLoading,
   review,
   status,
+  baselineValue,
 }: {
   label: string;
   description: string;
@@ -1077,6 +1078,7 @@ function VitalTrendCard({
   previousLoading: boolean;
   review: MeasurementReview | null;
   status: VitalStatusAssessment;
+  baselineValue: number | null;
 }) {
   const currentValues = current.map((item) => item.value);
   const previousValues = previous.map((item) => item.value);
@@ -1089,6 +1091,12 @@ function VitalTrendCard({
     : Math.abs(change) < 0.05
       ? "The first and most recent readings were very similar."
       : "From the first to the most recent reading: " + (change > 0 ? "+" : "") + formatNumber(change, digits) + " " + unit + ".";
+  const baselineDelta = latest && baselineValue !== null ? latest.value - baselineValue : null;
+  const baselineComparison = baselineDelta === null
+    ? null
+    : Math.abs(baselineDelta) < (digits === 0 ? 0.5 : 0.05)
+      ? "Your most recent reading is close to your recorded baseline of " + formatNumber(baselineValue, digits) + " " + unit + "."
+      : "Your most recent reading is " + formatNumber(Math.abs(baselineDelta), digits) + " " + unit + (baselineDelta > 0 ? " above" : " below") + " your recorded baseline of " + formatNumber(baselineValue, digits) + " " + unit + ". This difference alone does not show a cause or diagnosis.";
   return (
     <article className="min-w-0 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
       <div className="flex items-start justify-between gap-3">
@@ -1118,6 +1126,11 @@ function VitalTrendCard({
             </p>
           ) : (
             <p className="mt-3 text-xs leading-5 text-slate-600">{changeText}</p>
+          )}
+          {baselineValue !== null && (
+            <p className="mt-3 rounded-xl border border-slate-100 bg-white px-3 py-2 text-xs leading-5 text-slate-600">
+              {review ? "Baseline comparison is paused until the flagged saved values are checked." : baselineComparison}
+            </p>
           )}
           <div className="mt-3 rounded-xl bg-[#f5fafb] p-3">
             <p className="text-[10px] font-bold uppercase tracking-wide text-[#71839a]">Compared with the previous period</p>
@@ -1216,6 +1229,7 @@ function HealthReportInsights({
       previous: vitalSeries(previousReport, config.key),
       review: measurementReviews.find((review) => review.key === config.key) ?? null,
       status: vitalStatus(report, config.key, age),
+      baselineValue: baselineVitalValue(config.key, report.currentSnapshot),
     }))
     .filter((config) => config.current.length > 0);
   const routineConfigs = [
@@ -1314,7 +1328,7 @@ function HealthReportInsights({
 
       <section>
         <div className="mb-3"><p className="text-[10px] font-black uppercase tracking-[0.16em] text-[#24c1c4]">Change over time</p><h2 className="mt-1 text-xl font-black text-[#0b2d54]">Measurement trends</h2><p className="mt-1 text-sm leading-6 text-slate-500">Each card explains the measurement, shows the average of saved readings, and tells you how it compares with the previous period. A change by itself does not say what caused it or whether it is right for you.</p></div>
-        {activeVitals.length ? <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">{activeVitals.map((item) => <VitalTrendCard key={item.key} label={item.label} description={item.description} unit={item.unit} digits={item.digits} current={item.current} previous={item.previous} previousLoading={previousLoading} review={item.review} status={item.status} />)}</div> : <div className="rounded-2xl border border-dashed border-slate-300 bg-white p-5 text-sm leading-6 text-slate-500">No dated vital readings were found for this period. Once you save blood pressure, heart rate, weight or other measurements, they will appear here.</div>}
+        {activeVitals.length ? <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">{activeVitals.map((item) => <VitalTrendCard key={item.key} label={item.label} description={item.description} unit={item.unit} digits={item.digits} current={item.current} previous={item.previous} previousLoading={previousLoading} review={item.review} status={item.status} baselineValue={item.baselineValue} />)}</div> : <div className="rounded-2xl border border-dashed border-slate-300 bg-white p-5 text-sm leading-6 text-slate-500">No dated vital readings were found for this period. Once you save blood pressure, heart rate, weight or other measurements, they will appear here.</div>}
       </section>
 
       <section>
