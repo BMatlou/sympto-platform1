@@ -1661,16 +1661,10 @@ function PersonalisedInsights({
   report,
   previousReport,
   previousLoading,
-  coveragePercent,
-  daysLogged,
-  totalDays,
 }: {
   report: Report;
   previousReport: Report | null;
   previousLoading: boolean;
-  coveragePercent: number;
-  daysLogged: number;
-  totalDays: number;
 }) {
   const goals = report.currentSnapshot?.activeGoals ?? [];
   const manualGoalTrends = goalProgressTrendItems(report, previousReport).filter((item) => item.source === "goal-progress");
@@ -2164,7 +2158,6 @@ function PersonalisedInsights({
     "Medication dose records need review",
   ].includes(item.title)).slice(0, 3);
   const noPrior = previousReport === null;
-  const coverageTone: StatusTone = coveragePercent >= 75 ? "good" : coveragePercent >= 40 ? "watch" : "high";
 
   return (
     <section aria-label="Health trends and recommendations" className="space-y-5">
@@ -2858,8 +2851,6 @@ function HealthReportInsights({
   previousReport: Report | null;
   previousLoading: boolean;
 }) {
-  const daysLogged = recordedDays(report).size;
-  const totalDays = periodDays(report);
   const symptomCount = report.activity.symptoms.length;
   const workouts = report.activity.workouts;
   const workoutMinutes = workouts.reduce((sum: number, workout) => {
@@ -2891,7 +2882,6 @@ function HealthReportInsights({
       ? "No symptom logs were found for this period."
       : "The previous period is not available for comparison.";
   const age = ageAt(report.currentSnapshot?.person?.dateOfBirth, report.generatedAt);
-  const coveragePercent = Math.round(daysLogged / totalDays * 100);
   const measurementReviews = reportMeasurementReviews(report, age);
   const vitalConfigs = [
     { key: "systolic", label: "Systolic blood pressure", description: "The top number in a blood pressure reading. It measures pressure when your heart beats.", unit: "mmHg", digits: 0 },
@@ -2994,7 +2984,7 @@ function HealthReportInsights({
       )}
 
       <MedicationPeriodInsights report={report} previousReport={previousReport} previousLoading={previousLoading} />
-      <PersonalisedInsights report={report} previousReport={previousReport} previousLoading={previousLoading} coveragePercent={coveragePercent} daysLogged={daysLogged} totalDays={totalDays} />
+      <PersonalisedInsights report={report} previousReport={previousReport} previousLoading={previousLoading} />
       <section>
         <div className="mb-3"><p className="text-[10px] font-black uppercase tracking-[0.16em] text-[#24c1c4]">Reading history</p><h2 className="mt-1 text-xl font-black text-[#0b2d54]">Your measurements</h2><p className="mt-1 text-sm leading-6 text-slate-500">See the average, latest reading, reference status and change from the previous period. A trend alone does not show what caused a change.</p></div>
         {activeVitals.length ? <div className="grid gap-4 md:grid-cols-2">{activeVitals.map((item) => <VitalTrendCard key={item.key} label={item.label} description={item.description} unit={item.unit} digits={item.digits} current={item.current} previous={item.previous} previousLoading={previousLoading} review={item.review} status={item.status} rawCurrent={item.rawCurrent} />)}</div> : <div className="rounded-2xl border border-dashed border-slate-300 bg-white p-5 text-sm leading-6 text-slate-500">No dated vital readings were found for this period. Once you save blood pressure, heart rate, weight or other measurements, they will appear here.</div>}
