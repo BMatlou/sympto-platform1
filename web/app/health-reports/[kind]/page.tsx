@@ -667,6 +667,21 @@ function reportMeasurementReviews(report: Report, age: number | null): Measureme
 
 type VitalStatusAssessment = { label: string; detail: string; tone: StatusTone };
 
+function latestGoalCeiling(report: Report, category: string): SnapshotGoal | null {
+  const candidates = (report.currentSnapshot?.activeGoals ?? [])
+    .filter((goal) =>
+      String(goal.category ?? "").toUpperCase() === category &&
+      String(goal.status ?? "ACTIVE").toUpperCase() === "ACTIVE" &&
+      finite(goal.targetValue) !== null,
+    )
+    .sort((a, b) => {
+      const aTime = a.createdAt ? new Date(a.createdAt).getTime() : 0;
+      const bTime = b.createdAt ? new Date(b.createdAt).getTime() : 0;
+      return bTime - aTime;
+    });
+  return candidates[0] ?? null;
+}
+
 function vitalStatus(report: Report, metric: string, age: number | null): VitalStatusAssessment {
   const points = vitalSeries(report, metric);
   const latest = points[points.length - 1];
@@ -702,6 +717,16 @@ function vitalStatus(report: Report, metric: string, age: number | null): VitalS
     if ((sys !== null && sys > 180) || (dia !== null && dia > 120)) {
       return { label: "Very high", detail: "Repeat after sitting quietly. Seek prompt medical advice; with chest pain, breathlessness, weakness, vision or speech changes, call emergency services.", tone: "critical" };
     }
+    if (metric === "systolic") {
+      const bpGoal = latestGoalCeiling(report, "BLOOD_PRESSURE");
+      const bpCeiling = finite(bpGoal?.targetValue);
+      if (bpCeiling !== null) {
+        if (value <= bpCeiling) {
+          return { label: "Within your saved goal", detail: "Your latest systolic reading is at or below your saved target of " + formatNumber(bpCeiling, 0) + " mmHg. This checks only the top number; review the full blood-pressure pair and your clinician's advice too.", tone: "good" };
+        }
+        return { label: "Above your saved goal", detail: "Your latest systolic reading is " + formatNumber(value - bpCeiling, 0) + " mmHg above your saved target of " + formatNumber(bpCeiling, 0) + " mmHg. Recheck readings and discuss repeated results with your clinician.", tone: value >= 140 ? "high" : "watch" };
+      }
+    }
     if ((sys !== null && sys >= 140) || (dia !== null && dia >= 90)) {
       return { label: "High range", detail: "This is in a high adult reference category. Repeated readings and clinical review matter; one reading is not a diagnosis.", tone: "high" };
     }
@@ -720,6 +745,14 @@ function vitalStatus(report: Report, metric: string, age: number | null): VitalS
   if (metric === "heartRate") {
     if (age === null || age < 18) return { label: "Age-specific range needed", detail: "Heart-rate references vary by age and activity; adult ranges are not applied.", tone: "info" };
     if (value < 40 || value > 130) return { label: "Needs prompt review", detail: "Outside the typical adult resting range. Recheck at rest and seek advice if it persists or you feel unwell.", tone: "high" };
+    const heartRateGoal = latestGoalCeiling(report, "HEART_RATE");
+    const heartRateCeiling = finite(heartRateGoal?.targetValue);
+    if (heartRateCeiling !== null) {
+      if (value <= heartRateCeiling) {
+        return { label: "Within your saved goal", detail: "Your latest heart rate is at or below your saved goal of " + formatNumber(heartRateCeiling, 0) + " bpm. This comparison assumes a resting reading; activity and medicines can affect heart rate.", tone: "good" };
+      }
+      return { label: "Above your saved goal", detail: "Your latest heart rate is " + formatNumber(value - heartRateCeiling, 0) + " bpm above your saved goal of " + formatNumber(heartRateCeiling, 0) + " bpm. Confirm it at rest and discuss repeated readings with your clinician.", tone: value > 100 ? "high" : "watch" };
+    }
     if (value < 60 || value > 100) return { label: "Outside common range", detail: "The typical adult resting pulse range is 60–100 bpm; activity and medicines can affect it.", tone: "watch" };
     return { label: "Within common range", detail: "Within the typical adult resting pulse range of 60–100 bpm.", tone: "good" };
   }
