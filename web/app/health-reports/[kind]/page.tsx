@@ -3077,7 +3077,8 @@ function HealthReportInsights({
               <div className="grid gap-1 py-3 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center">
                 <div>
                   <p className="text-sm font-bold text-[#0b2d54]">Mood check-ins</p>
-                  <p className="mt-1 text-xs leading-5 text-slate-600">{lowMood.low} of {lowMood.total} entries were marked low or very low.</p>
+                  <p className="mt-1 text-xs leading-5 text-slate-600">{lowMood.low} of {lowMood.total} mood check-ins ({Math.round(lowMood.low / lowMood.total * 100)}%) were marked low or very low.</p>
+                {lowMood.low > 0 && <p className="mt-1 text-xs leading-5 text-slate-500">If low mood continues or feels difficult to manage, consider reaching out to someone you trust or a health professional.</p>}
                 </div>
                 <Link href="/today" className="text-xs font-bold text-[#0b7b80]">Open check-in <ArrowRight className="ml-1 inline h-3 w-3" /></Link>
               </div>
@@ -3086,6 +3087,7 @@ function HealthReportInsights({
               <div className="py-3">
                 <p className="text-sm font-bold text-[#0b2d54]">Sleep and stress on the same days</p>
                 <p className="mt-1 text-xs leading-5 text-slate-600">On {association.shorterDays} shorter-sleep day{association.shorterDays === 1 ? "" : "s"}, stress averaged {formatNumber(association.shortStress, 1)}/10; on {association.longerDays} longer-sleep day{association.longerDays === 1 ? "" : "s"}, it averaged {formatNumber(association.longStress, 1)}/10.</p>
+                <p className="mt-1 text-xs leading-5 text-slate-500">Worth monitoring: keep logging sleep and stress to see whether this repeats. A small same-day pattern cannot show that one caused the other.</p>
               </div>
             )}
             {symptomAnalytics.repeatedTriggers.length > 0 && (
@@ -3322,9 +3324,9 @@ function CompleteReportData({ report }: { report: Report }) {
   return <section id="full-report-data" aria-label="All health data in the report period" className="space-y-4">
     <div className="overflow-hidden rounded-[24px] border border-[#cfe5e8] bg-white shadow-sm">
       <div className="bg-gradient-to-r from-[#f0fbfb] to-white p-4 sm:p-5">
-        <p className="text-[10px] font-extrabold uppercase tracking-[0.16em] text-[#0b7b80]">Full record · {report.period.label}</p>
-        <div className="mt-1 flex flex-wrap items-end justify-between gap-3"><div><h2 className="text-xl font-black tracking-tight text-[#0b2d54]">Everything you logged</h2><p className="mt-1 text-xs leading-5 text-slate-600">Your trends, patterns, flags and next steps are summarised above. Open a category only when you need to inspect the source records.</p></div>
-          <div className="flex gap-2"><div className="rounded-xl border border-[#dcebed] bg-white px-3 py-2"><p className="text-xl font-black tabular-nums text-[#0b2d54]">{total}</p><p className="text-[10px] font-semibold text-slate-500">entries shown</p></div><div className="rounded-xl border border-[#dcebed] bg-white px-3 py-2"><p className="text-xl font-black tabular-nums text-[#0b2d54]">{groups.length}</p><p className="text-[10px] font-semibold text-slate-500">data categories</p></div></div>
+        <p className="text-[10px] font-extrabold uppercase tracking-[0.16em] text-[#0b7b80]">Supporting records · {report.period.label}</p>
+        <div className="mt-1 flex flex-wrap items-end justify-between gap-3"><div><h2 className="text-xl font-black tracking-tight text-[#0b2d54]">Browse underlying records</h2><p className="mt-1 text-xs leading-5 text-slate-600">Your trends, patterns, flags and next steps are summarised above. Open a category only when you need to inspect the source records.</p></div>
+          <div className="flex gap-2"><div className="rounded-xl border border-[#dcebed] bg-white px-3 py-2"><p className="text-xl font-black tabular-nums text-[#0b2d54]">{total}</p><p className="text-[10px] font-semibold text-slate-500">records available</p></div><div className="rounded-xl border border-[#dcebed] bg-white px-3 py-2"><p className="text-xl font-black tabular-nums text-[#0b2d54]">{groups.length}</p><p className="text-[10px] font-semibold text-slate-500">data categories</p></div></div>
         </div>
       </div>
       <div className="space-y-2 p-3 sm:p-4">{groups.length ? groups.map((group) => <LedgerGroup key={group.key} group={group} />) : <p className="rounded-xl border border-dashed border-slate-300 p-4 text-sm text-slate-500">No dated activity records were returned for this period.</p>}</div>
