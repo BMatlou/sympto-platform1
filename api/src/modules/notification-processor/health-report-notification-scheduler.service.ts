@@ -649,9 +649,8 @@ export class HealthReportNotificationSchedulerService
       }),
     ]);
 
-    // Goal-specific measurement logs are persisted in the metric-event stream,
-    // not necessarily in HealthGoalProgress. Join them to the configured goal so
-    // the report compares the same values the goal cards use.
+    // Goal-specific logs are stored in the metric-event stream, not necessarily in HealthGoalProgress.
+    // Join events to configured goals so the report analyses the data the goal trackers actually save.
     const goalMetricEvents = await this.prisma.$queryRaw<Array<{
       goalId: string;
       goalTitle: string;
