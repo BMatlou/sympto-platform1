@@ -1271,7 +1271,56 @@ function goalMetricSeries(report: Report | null, pattern: RegExp): SeriesPoint[]
 }
 type LabSeriesPoint = SeriesPoint & { testName: string };
 
-type MedicationDoseAction = { date: string; action: "TAKEN" | "SKIPPED"; source: "event" | "journal" };
+type MedicationDoseAction = {
+  date: string;
+  action: "TAKEN" | "SKIPPED";
+  source: "event" | "journal";
+  timestamp?: number;
+  medicationName?: string;
+  patientMedicationId?: string;
+};
+
+type MedicationInsightBucket = {
+  day: string;
+  expectedDoses?: number | string;
+  takenDoses?: number | string;
+  skippedDoses?: number | string;
+  recordedActions?: number | string;
+  unrecordedDoses?: number | string;
+  adherencePercent?: number | string;
+};
+
+type MedicationInsightPayload = {
+  unified?: {
+    goalConfig?: { healthGoalId?: string; targetAdherence?: number | string | null; status?: string | null };
+    medicationSchedule?: {
+      patientMedicationId?: string | null;
+      name?: string | null;
+      dosage?: string | null;
+      frequency?: string | null;
+      dosesPerDay?: number | string | null;
+      reminderSlots?: string[];
+      scheduleSource?: string | null;
+      status?: string | null;
+    };
+    adherenceStream?: Array<{ timestamp: string; action: "TAKEN" | "SKIPPED"; sourceId?: string | null }>;
+  };
+  analysis?: {
+    dailyBuckets?: MedicationInsightBucket[];
+    todayStatus?: { expectedDoses?: number; takenDoses?: number; skippedDoses?: number; remainingDoses?: number; status?: string };
+    journeyAdherence?: { takenDoses?: number; expectedScheduledDoses?: number; adherencePercent?: number; scheduledDays?: number };
+    trend?: { state?: string; daysAnalyzed?: number; daysWithExplicitActions?: number; baselinePercent?: number | null; recentPercent?: number | null; deltaPercentagePoints?: number | null };
+    goalIntelligence?: { status?: string; targetAdherencePercent?: number; currentAdherencePercent?: number; skippedDoses?: number; unrecordedDoses?: number; completedDays?: number; targetDays?: number; partialDays?: number; missedDays?: number; insight?: string | null };
+    clinicalIntelligence?: {
+      headline?: string | null;
+      secondaryInsights?: string[];
+      chronologicalInterference?: { label?: string; failureRatePercent?: number; failedDoses?: number; expectedDoses?: number; statement?: string | null } | null;
+      crossGoalAssociations?: Array<{ goalName?: string; goalCategory?: string; meaningful?: boolean; statement?: string | null; deltaPercentagePoints?: number | null }>;
+      behavioralClusters?: Array<{ statement?: string | null; goalNames?: string[] }>;
+      clinicalNarrative?: { pattern?: string | null; statisticalAssociationNote?: string | null; routineAnchor?: { statement?: string | null; actionStatement?: string | null } | null };
+    };
+  };
+};
 
 function medicationDoseTotals(report: Report | null) {
   if (!report) return { eventActions: [] as MedicationDoseAction[], legacyActions: [] as MedicationDoseAction[], eventTaken: 0, eventSkipped: 0, eventTotal: 0, eventAdherencePercent: null as number | null, legacyTaken: 0, legacySkipped: 0, legacyTotal: 0 };
@@ -1281,7 +1330,8 @@ function medicationDoseTotals(report: Report | null) {
   (report.goalMetricEvents ?? [])
     .filter((event) => String(event.metricType ?? "").toUpperCase() === "MEDICATION" &&
       String(event.metricKey ?? "").toLowerCase() === "medication.adherence" &&
-      event.source === "medication-adherence")
+      event.source === "medication-adherence" &&
+      withinReportPeriod(report, event.occurredAt))
     .forEach((event) => {
       let metadata: Record<string, unknown> | null = null;
       if (event.metadata && typeof event.metadata === "object") {
@@ -1291,8 +1341,16 @@ function medicationDoseTotals(report: Report | null) {
       }
       const action = String(metadata?.action ?? "").toUpperCase();
       const date = dateKey(event.occurredAt);
-      if (!date || (action !== "TAKEN" && action !== "SKIPPED")) return;
-      eventActions.push({ date, action, source: "event" });
+      const timestamp = new Date(event.occurredAt).getTime();
+      if (!date || !withinReportPeriod(report, timestamp) || (action !== "TAKEN" && action !== "SKIPPED")) return;
+      eventActions.push({
+        date,
+        timestamp,
+        action,
+        source: "event",
+        medicationName: String(metadata?.medicationName ?? "").trim() || undefined,
+        patientMedicationId: String(metadata?.patientMedicationId ?? "").trim() || undefined,
+      });
     });
 
   // Older journal projections hold the last status for a medication/day, not one
@@ -1302,9 +1360,19 @@ function medicationDoseTotals(report: Report | null) {
     if (!/medication adherence|dose marked (taken|skipped)/.test(text)) return;
     const actionMatch = text.match(/dose marked (taken|skipped)/);
     if (!actionMatch) return;
-    const date = dateKey(entry.createdAt || entry.recordedAt || entry.updatedAt);
+    const at = entry.createdAt || entry.recordedAt || entry.updatedAt;
+    if (!withinReportPeriod(report, at)) return;
+    const date = dateKey(at);
     if (!date) return;
-    legacyActions.push({ date, action: actionMatch[1].toUpperCase() as "TAKEN" | "SKIPPED", source: "journal" });
+    const titleMatch = String(entry.title ?? "").match(/medication adherence\s*[·:–-]\s*(.*?)\s*[·:–-]\s*\d{4}-\d{2}-\d{2}/i);
+    const timestamp = new Date(String(at)).getTime();
+    legacyActions.push({
+      date,
+      timestamp: Number.isFinite(timestamp) ? timestamp : undefined,
+      action: actionMatch[1].toUpperCase() as "TAKEN" | "SKIPPED",
+      source: "journal",
+      medicationName: titleMatch?.[1]?.trim() || undefined,
+    });
   });
 
   const eventTaken = eventActions.filter((item) => item.action === "TAKEN").length;
@@ -2100,33 +2168,6 @@ function PersonalisedInsights({
             <p className="mt-1 text-xs text-slate-500">{previousLoading ? "Comparing with the previous period…" : noPrior ? "No previous-period report available" : "Compared with the previous period"}</p>
           </div>
         </div>
-        {(doseCurrent.eventTotal > 0 || doseCurrent.legacyTotal > 0 || dosePrevious.eventTotal > 0 || dosePrevious.legacyTotal > 0) && (
-          <article className="mt-4 rounded-xl border border-slate-200 bg-[#f8fbfc] p-4">
-            <div className="flex flex-wrap items-start justify-between gap-3">
-              <div>
-                <h3 className="text-sm font-black text-[#0b2d54]">Medication dose outcomes</h3>
-                <p className="mt-1 text-[11px] text-slate-500">Recorded actions only; this is not an independent check that a dose was taken.</p>
-              </div>
-              {doseCurrent.eventTotal > 0 && <span className="rounded-full bg-white px-3 py-1 text-xs font-bold text-[#0b2d54]">{formatNumber(doseCurrent.eventAdherencePercent, 1)}% taken</span>}
-            </div>
-            {doseCurrent.eventTotal > 0 ? (
-              <>
-                <div className="mt-3 flex flex-wrap gap-x-6 gap-y-2 rounded-lg bg-white px-3 py-2.5">
-                  <p className="text-xs text-slate-600"><span className="font-bold text-emerald-700">{doseCurrent.eventTaken}</span> taken</p>
-                  <p className="text-xs text-slate-600"><span className="font-bold text-rose-700">{doseCurrent.eventSkipped}</span> skipped</p>
-                  <p className="text-xs text-slate-600"><span className="font-bold text-[#0b2d54]">{doseCurrent.eventTotal}</span> actions logged</p>
-                </div>
-                <div className="mt-3 h-2 overflow-hidden rounded-full bg-rose-100"><div className="h-full rounded-full bg-emerald-500" style={{ width: String(doseCurrent.eventAdherencePercent ?? 0) + "%" }} /></div>
-                <p className="mt-2 text-xs font-semibold text-slate-600">{dosePrevious.eventTotal > 0
-                  ? "Previous period: " + dosePrevious.eventTaken + " taken / " + dosePrevious.eventSkipped + " skipped (" + formatNumber(dosePrevious.eventAdherencePercent, 1) + "% taken). " + (doseCurrent.eventAdherencePercent !== null && dosePrevious.eventAdherencePercent !== null ? (doseCurrent.eventAdherencePercent - dosePrevious.eventAdherencePercent > 0 ? "+" : "") + formatNumber(doseCurrent.eventAdherencePercent - dosePrevious.eventAdherencePercent, 1) + " percentage points." : "")
-                  : "No dose-level action metadata available for the previous period."}</p>
-              </>
-            ) : (
-              <p className="mt-3 text-sm font-semibold text-[#0b2d54]">Older dated statuses: {doseCurrent.legacyTaken} marked taken · {doseCurrent.legacySkipped} marked skipped.</p>
-            )}
-            {doseCurrent.legacyTotal > 0 && doseCurrent.eventTotal > 0 && <p className="mt-2 text-[10px] text-slate-400">Also found {doseCurrent.legacyTotal} legacy day-status entries; excluded from the dose-level percentage to avoid mixing counting methods.</p>}
-          </article>
-        )}
         {previousLoading ? (
           <p className="mt-3 rounded-xl bg-[#f5fafb] px-3 py-2.5 text-xs font-semibold text-slate-600">Comparing this period with the previous one…</p>
         ) : hasComparableSignals ? (
@@ -2230,6 +2271,425 @@ function PersonalisedInsights({
       )}
     </section>
   );
+}
+
+
+type MedicationActionGroup = {
+  key: string;
+  name: string;
+  patientMedicationId?: string;
+  source: "event" | "journal";
+  actions: MedicationDoseAction[];
+  taken: number;
+  skipped: number;
+  total: number;
+  recordedDays: number;
+};
+
+function groupMedicationActions(actions: MedicationDoseAction[]) {
+  const groups = new Map<string, MedicationActionGroup & { dates: Set<string> }>();
+  actions.forEach((action) => {
+    const id = String(action.patientMedicationId ?? "").trim();
+    const name = String(action.medicationName ?? "").trim() || "Medication (name unavailable)";
+    const key = id ? "id:" + id : "name:" + name.toLowerCase();
+    const existing = groups.get(key) ?? {
+      key,
+      name,
+      patientMedicationId: id || undefined,
+      source: action.source,
+      actions: [],
+      taken: 0,
+      skipped: 0,
+      total: 0,
+      recordedDays: 0,
+      dates: new Set<string>(),
+    };
+    existing.actions.push(action);
+    existing.total += 1;
+    existing.dates.add(action.date);
+    if (action.action === "TAKEN") existing.taken += 1;
+    else existing.skipped += 1;
+    groups.set(key, existing);
+  });
+  return new Map(Array.from(groups.entries()).map(([key, group]) => [
+    key,
+    { ...group, recordedDays: group.dates.size },
+  ]));
+}
+
+type MedicationPeriodSummary = {
+  scheduledDoses: number;
+  takenDoses: number;
+  skippedDoses: number;
+  unrecordedDoses: number;
+  scheduledDays: number;
+  daysWithActions: number;
+  daysAtTarget: number;
+  completeDays: number;
+  adherencePercent: number | null;
+  todayExcluded: boolean;
+};
+
+function medicationPeriodSummary(
+  insight: MedicationInsightPayload,
+  report: Report | null,
+  targetAdherence: number,
+): MedicationPeriodSummary {
+  const buckets = (insight.analysis?.dailyBuckets ?? []).filter((bucket) => {
+    if (!bucket.day) return false;
+    const noon = new Date(String(bucket.day).slice(0, 10) + "T12:00:00.000Z").getTime();
+    return withinReportPeriod(report, noon);
+  });
+  const today = dateKey(new Date().toISOString());
+  const todayExcluded = buckets.some((bucket) => bucket.day === today);
+  const scheduled = buckets.filter((bucket) => bucket.day !== today && (finite(bucket.expectedDoses) ?? 0) > 0);
+  const sumField = (items: MedicationInsightBucket[], field: "expectedDoses" | "takenDoses" | "skippedDoses" | "unrecordedDoses" | "recordedActions") =>
+    items.reduce((sum, item) => sum + Math.max(0, finite(item[field]) ?? 0), 0);
+  const scheduledDoses = sumField(scheduled, "expectedDoses");
+  const takenDoses = sumField(scheduled, "takenDoses");
+  const skippedDoses = sumField(scheduled, "skippedDoses");
+  const unrecordedDoses = sumField(scheduled, "unrecordedDoses");
+  const daysWithActions = scheduled.filter((item) => (finite(item.recordedActions) ?? 0) > 0).length;
+  const daysAtTarget = scheduled.filter((item) => (finite(item.adherencePercent) ?? 0) >= targetAdherence).length;
+  const completeDays = scheduled.filter((item) => (finite(item.takenDoses) ?? 0) >= (finite(item.expectedDoses) ?? 0)).length;
+  return {
+    scheduledDoses,
+    takenDoses,
+    skippedDoses,
+    unrecordedDoses,
+    scheduledDays: scheduled.length,
+    daysWithActions,
+    daysAtTarget,
+    completeDays,
+    adherencePercent: scheduledDoses > 0 ? Number(((takenDoses / scheduledDoses) * 100).toFixed(1)) : null,
+    todayExcluded,
+  };
+}
+
+function MedicationPeriodInsights({
+  report,
+  previousReport,
+  previousLoading,
+}: {
+  report: Report;
+  previousReport: Report | null;
+  previousLoading: boolean;
+}) {
+  const medicationGoals = useMemo(
+    () => (report.currentSnapshot?.activeGoals ?? []).filter((goal) => {
+      const category = String(goal.category ?? "").toUpperCase().replace(/[\s-]+/g, "_");
+      const status = String(goal.status ?? "ACTIVE").toUpperCase();
+      return category === "MEDICATION" && Boolean(goal.id) && !["ACHIEVED", "COMPLETED", "CANCELLED", "ARCHIVED"].includes(status);
+    }),
+    [report.currentSnapshot?.activeGoals],
+  );
+  const [insights, setInsights] = useState<Array<{ goalId: string; goalTitle: string; insight?: MedicationInsightPayload; failed: boolean }>>([]);
+  const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    let active = true;
+    if (!medicationGoals.length) {
+      setInsights([]);
+      setLoading(false);
+      return () => { active = false; };
+    }
+    setLoading(true);
+    Promise.all(medicationGoals.map(async (goal) => {
+      const goalId = String(goal.id);
+      try {
+        const response = await api.get("/patient-health-goals/" + encodeURIComponent(goalId) + "/medication-insight");
+        const insight = unwrap<MedicationInsightPayload>(response.data);
+        return { goalId, goalTitle: String(goal.title || "Medication goal"), insight, failed: false };
+      } catch {
+        return { goalId, goalTitle: String(goal.title || "Medication goal"), failed: true };
+      }
+    })).then((results) => {
+      if (active) setInsights(results);
+    }).finally(() => {
+      if (active) setLoading(false);
+    });
+    return () => { active = false; };
+  }, [medicationGoals]);
+
+  const currentTotals = medicationDoseTotals(report);
+  const previousTotals = medicationDoseTotals(previousReport);
+  const currentActions = currentTotals.eventTotal > 0 ? currentTotals.eventActions : currentTotals.legacyActions;
+  const previousActions = previousTotals.eventTotal > 0 ? previousTotals.eventActions : previousTotals.legacyActions;
+  const currentGroups = groupMedicationActions(currentActions);
+  const previousGroups = groupMedicationActions(previousActions);
+  const medicationsOnFile = report.currentSnapshot?.medications ?? [];
+
+  type DisplayRow = {
+    key: string;
+    name: string;
+    dosage: string;
+    source: "schedule" | "events" | "legacy" | "empty";
+    current: MedicationPeriodSummary | null;
+    previous: MedicationPeriodSummary | null;
+    currentGroup?: MedicationActionGroup;
+    previousGroup?: MedicationActionGroup;
+    target: number | null;
+    currentDayInProgress: boolean;
+    engine?: MedicationInsightPayload;
+  };
+
+  const displayRows: DisplayRow[] = [];
+  const representedActionKeys = new Set<string>();
+  const representedNames = new Set<string>();
+
+  insights.forEach((item) => {
+    const engine = item.insight;
+    const schedule = engine?.unified?.medicationSchedule;
+    const name = String(schedule?.name || item.goalTitle || "Medication");
+    const patientMedicationId = String(schedule?.patientMedicationId ?? "").trim();
+    const normalizedName = name.trim().toLowerCase();
+    const actionKey = patientMedicationId ? "id:" + patientMedicationId : "name:" + normalizedName;
+    const currentGroup = currentGroups.get(actionKey) ??
+      Array.from(currentGroups.values()).find((group) => group.name.trim().toLowerCase() === normalizedName);
+    const previousGroup = previousGroups.get(actionKey) ??
+      Array.from(previousGroups.values()).find((group) => group.name.trim().toLowerCase() === normalizedName);
+    const target = finite(engine?.unified?.goalConfig?.targetAdherence) ??
+      finite(engine?.analysis?.goalIntelligence?.targetAdherencePercent) ??
+      finite(medicationGoals.find((goal) => String(goal.id) === item.goalId)?.targetValue);
+    const safeTarget = target !== null && target >= 1 && target <= 100 ? target : null;
+    const currentSummary = engine ? medicationPeriodSummary(engine, report, safeTarget ?? 90) : null;
+    const previousSummary = engine && previousReport ? medicationPeriodSummary(engine, previousReport, safeTarget ?? 90) : null;
+    const hasScheduledComparison =
+      (currentSummary?.scheduledDoses ?? 0) > 0 || (previousSummary?.scheduledDoses ?? 0) > 0;
+    if (currentGroup) representedActionKeys.add(currentGroup.key);
+    if (previousGroup) representedActionKeys.add(previousGroup.key);
+    representedNames.add(normalizedName);
+    displayRows.push({
+      key: "goal:" + item.goalId,
+      name,
+      dosage: [schedule?.dosage, schedule?.frequency || (finite(schedule?.dosesPerDay) !== null ? String(finite(schedule?.dosesPerDay)) + " dose(s)/day" : "")].filter(Boolean).join(" · "),
+      source: hasScheduledComparison ? "schedule" : currentGroup?.source === "journal" || previousGroup?.source === "journal" ? "legacy" : currentGroup?.total || previousGroup?.total ? "events" : "empty",
+      current: hasScheduledComparison ? currentSummary : null,
+      previous: hasScheduledComparison ? previousSummary : null,
+      currentGroup,
+      previousGroup,
+      target: safeTarget,
+      currentDayInProgress: Boolean(currentSummary?.todayExcluded),
+      engine,
+    });
+  });
+
+  const actionKeys = new Set([...currentGroups.keys(), ...previousGroups.keys()]);
+  actionKeys.forEach((key) => {
+    const currentGroup = currentGroups.get(key);
+    const previousGroup = previousGroups.get(key);
+    const group = currentGroup ?? previousGroup;
+    if (!group || representedActionKeys.has(key) || representedNames.has(group.name.trim().toLowerCase())) return;
+    const isLegacy = group.source === "journal" || currentGroup?.source === "journal" || previousGroup?.source === "journal";
+    displayRows.push({
+      key: "actions:" + key,
+      name: group.name,
+      dosage: "",
+      source: isLegacy ? "legacy" : "events",
+      current: null,
+      previous: null,
+      currentGroup,
+      previousGroup,
+      target: null,
+      currentDayInProgress: false,
+    });
+  });
+
+  const uniqueMedicationNames = Array.from(new Set(medicationsOnFile
+    .map((item) => String(item.medication?.name || item.medication?.genericName || item.medication?.brandName || "").trim())
+    .filter(Boolean)));
+
+  const patternNotes: Array<{ key: string; title: string; body: string }> = [];
+  const seenPatterns = new Set<string>();
+  insights.forEach((item) => {
+    const intelligence = item.insight?.analysis?.clinicalIntelligence;
+    const candidates = [
+      ...(intelligence?.secondaryInsights ?? []),
+      intelligence?.clinicalNarrative?.pattern ?? "",
+      intelligence?.clinicalNarrative?.routineAnchor?.statement ?? "",
+      intelligence?.headline ?? "",
+      item.insight?.analysis?.goalIntelligence?.insight ?? "",
+    ];
+    candidates.forEach((candidate) => {
+      const body = String(candidate ?? "").trim();
+      const normalized = body.toLowerCase();
+      if (!body || seenPatterns.has(normalized) || patternNotes.length >= 3) return;
+      seenPatterns.add(normalized);
+      patternNotes.push({ key: item.goalId + ":" + patternNotes.length, title: item.insight?.unified?.medicationSchedule?.name || item.goalTitle, body });
+    });
+  });
+
+  const hasReportContent = displayRows.length > 0 || medicationGoals.length > 0 ||
+    currentTotals.eventTotal > 0 || currentTotals.legacyTotal > 0 ||
+    previousTotals.eventTotal > 0 || previousTotals.legacyTotal > 0 ||
+    medicationsOnFile.length > 0 || loading;
+  if (!hasReportContent) return null;
+
+  const periodLabel = report.type === "WEEKLY" ? "this 7-day period" : "this month";
+  return (
+    <section aria-label="Medication trends and patterns" className="overflow-hidden rounded-2xl border border-[#dcebed] bg-white shadow-sm">
+      <div className="border-b border-slate-100 px-4 py-4 sm:px-5">
+        <p className="text-[10px] font-black uppercase tracking-[0.16em] text-[#0b7b80]">Treatment routine</p>
+        <div className="mt-1 flex flex-wrap items-baseline justify-between gap-3">
+          <h2 className="text-lg font-black text-[#0b2d54]">Medication trends and patterns</h2>
+          <span className="text-[11px] font-semibold text-slate-500">{report.period.label}</span>
+        </div>
+        <p className="mt-1 text-xs leading-5 text-slate-500">
+          {"Scheduled-dose outcomes for " + periodLabel + ". Skipped doses and doses with no recorded outcome are counted separately."}
+        </p>
+      </div>
+
+      {loading && (
+        <p className="border-b border-slate-100 px-4 py-3 text-xs font-semibold text-slate-500 sm:px-5">
+          Reading your saved medication schedules and adherence history…
+        </p>
+      )}
+
+      {displayRows.length > 0 && (
+        <div className="divide-y divide-slate-100">
+          {displayRows.map((row) => {
+            const currentRate = row.current?.adherencePercent ?? (
+              row.source === "events" && row.currentGroup?.total
+                ? row.currentGroup.taken / row.currentGroup.total * 100
+                : null
+            );
+            const comparableActionSources = row.currentGroup && row.previousGroup &&
+              row.currentGroup.source === "event" && row.previousGroup.source === "event";
+            const previousRate = row.previous?.adherencePercent ?? (
+              row.source === "events" && comparableActionSources && row.previousGroup?.total
+                ? row.previousGroup.taken / row.previousGroup.total * 100
+                : null
+            );
+            const currentActionsTotal = row.currentGroup?.total ?? 0;
+            const previousActionsTotal = row.previousGroup?.total ?? 0;
+            const delta = currentRate !== null && previousRate !== null ? currentRate - previousRate : null;
+            const movement = delta === null
+              ? row.source === "schedule" && previousLoading ? "Comparing…"
+                : currentRate === null ? "No period data"
+                  : "New baseline"
+              : delta > 1 ? "↑ " + formatNumber(delta, 1) + " percentage points"
+                : delta < -1 ? "↓ " + formatNumber(Math.abs(delta), 1) + " percentage points"
+                  : "Stable";
+            const meetsTarget = row.target !== null && currentRate !== null && currentRate >= row.target;
+            const adherenceTone = meetsTarget
+              ? "border-emerald-200 bg-emerald-50 text-emerald-800"
+              : currentRate === null ? "border-slate-200 bg-slate-50 text-slate-600"
+                : "border-amber-200 bg-amber-50 text-amber-900";
+            const movementTone = delta !== null && delta > 1
+              ? "bg-emerald-50 text-emerald-800"
+              : delta !== null && delta < -1
+                ? "bg-amber-50 text-amber-900"
+                : "bg-slate-50 text-slate-600";
+            return (
+              <article key={row.key} className="px-4 py-4 sm:px-5">
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                  <div className="min-w-0">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <h3 className="text-sm font-extrabold text-[#0b2d54]">{row.name}</h3>
+                      {row.source === "schedule" && row.target !== null && (
+                        <span className={"rounded-full border px-2 py-0.5 text-[10px] font-bold " + adherenceTone}>
+                          {currentRate === null ? "No completed days" : meetsTarget ? "Within goal" : "Below saved goal"}
+                        </span>
+                      )}
+                    </div>
+                    {row.dosage && <p className="mt-1 text-[11px] leading-5 text-slate-500">{row.dosage}</p>}
+                  </div>
+                  <div className="flex flex-wrap items-end gap-x-5 gap-y-2">
+                    <div>
+                      <p className="text-[10px] font-bold uppercase tracking-wide text-slate-400">{row.source === "schedule" ? "Period adherence" : row.source === "events" ? "Recorded outcomes taken" : row.source === "legacy" ? "Older daily statuses" : "Adherence"}</p>
+                      <p className="mt-0.5 text-xl font-black text-[#0b2d54]">
+                        {currentRate === null ? "—" : formatNumber(currentRate, 1) + "%"}
+                      </p>
+                    </div>
+                    <div className="max-w-[180px]">
+                      <span className={"inline-flex rounded-full px-2 py-1 text-[10px] font-bold " + movementTone}>{movement}</span>
+                      {row.target !== null && <p className="mt-1 text-[10px] font-semibold text-[#0b7b80]">Target {formatNumber(row.target, 0)}%</p>}
+                    </div>
+                  </div>
+                </div>
+
+                {row.source === "schedule" && row.current && (
+                  <>
+                    <div className="mt-3 h-1.5 overflow-hidden rounded-full bg-slate-100">
+                      <div className={"h-full rounded-full " + (meetsTarget ? "bg-emerald-500" : "bg-amber-400")} style={{ width: String(Math.max(0, Math.min(100, currentRate ?? 0))) + "%" }} />
+                    </div>
+                    <div className="mt-3 grid grid-cols-2 gap-x-4 gap-y-2 text-xs sm:grid-cols-4">
+                      <div><p className="text-slate-400">Taken</p><p className="mt-0.5 font-bold text-[#0b2d54]">{row.current.takenDoses}/{row.current.scheduledDoses} scheduled</p></div>
+                      <div><p className="text-slate-400">Skipped</p><p className="mt-0.5 font-bold text-[#0b2d54]">{row.current.skippedDoses}</p></div>
+                      <div><p className="text-slate-400">Not recorded</p><p className="mt-0.5 font-bold text-[#0b2d54]">{row.current.unrecordedDoses}</p></div>
+                      <div><p className="text-slate-400">Days at target</p><p className="mt-0.5 font-bold text-[#0b2d54]">{row.current.daysAtTarget}/{row.current.scheduledDays}</p></div>
+                    </div>
+                    {row.previous?.adherencePercent !== null && row.previous?.adherencePercent !== undefined && (
+                      <p className="mt-2 text-[11px] text-slate-500">Previous period: {formatNumber(row.previous.adherencePercent, 1)}% · {row.previous.takenDoses}/{row.previous.scheduledDoses} scheduled doses taken.</p>
+                    )}
+                  </>
+                )}
+                {row.source === "events" && (
+                  <p className="mt-2 text-[11px] leading-5 text-slate-500">
+                    {currentActionsTotal > 0
+                      ? currentGroupSummary(row.currentGroup)
+                      : "No explicit taken/skipped outcomes were returned for this period."}
+                    {row.previousGroup && comparableActionSources && previousActionsTotal > 0
+                      ? " Previous period: " + formatNumber(row.previousGroup.taken / row.previousGroup.total * 100, 1) + "% of explicit outcomes were marked taken."
+                      : row.previousGroup && previousActionsTotal > 0 ? " Previous records use a different logging format, so a trend is not calculated." : ""}
+                  </p>
+                )}
+                {row.source === "legacy" && (
+                  <p className="mt-2 text-[11px] leading-5 text-slate-500">
+                    {currentActionsTotal > 0
+                      ? row.currentGroup?.taken + " marked taken and " + row.currentGroup?.skipped + " marked skipped across " + row.currentGroup?.recordedDays + " older daily-status record(s)."
+                      : "No older daily-status records were found for this period."}
+                    {" These are legacy day statuses, not complete dose-level records; an adherence percentage is not estimated."}
+                  </p>
+                )}
+                {row.source === "empty" && (
+                  <p className="mt-2 text-[11px] leading-5 text-slate-500">
+                    No scheduled dose outcomes were available for this period. Check the saved schedule and link this goal to the correct medication record.
+                  </p>
+                )}
+                {row.currentDayInProgress && <p className="mt-2 text-[10px] leading-4 text-slate-400">Today is still in progress and is excluded from the period adherence rate.</p>}
+              </article>
+            );
+          })}
+        </div>
+      )}
+
+      {!displayRows.length && uniqueMedicationNames.length > 0 && (
+        <div className="px-4 py-4 sm:px-5">
+          <p className="text-sm font-semibold text-[#0b2d54]">{uniqueMedicationNames.length} medication record{uniqueMedicationNames.length === 1 ? "" : "s"} on file</p>
+          <p className="mt-1 text-xs leading-5 text-slate-500">No dated dose-level outcomes or linked medication-goal schedule were returned for this period, so an adherence trend cannot be calculated without guessing.</p>
+          <p className="mt-2 text-xs text-slate-600">{uniqueMedicationNames.join(" · ")}</p>
+        </div>
+      )}
+
+      {patternNotes.length > 0 && (
+        <div className="border-t border-slate-100 bg-[#f4fbfb] px-4 py-4 sm:px-5">
+          <div className="mb-2 flex items-center gap-2"><Activity className="h-4 w-4 text-[#0b7b80]" /><h3 className="text-sm font-bold text-[#0b2d54]">Longer-term patterns from Sympto&apos;s medication engine</h3></div>
+          <div className="space-y-3">
+            {patternNotes.slice(0, 2).map((note) => (
+              <div key={note.key}>
+                <p className="text-xs font-bold text-[#0b2d54]">{note.title}</p>
+                <p className="mt-1 text-xs leading-5 text-slate-600">{note.body}</p>
+              </div>
+            ))}
+          </div>
+          <p className="mt-3 text-[10px] leading-4 text-slate-400">Longer-term associations show patterns in your records and do not prove cause or justify changing a prescription. Discuss medicine concerns with your prescriber or pharmacist.</p>
+        </div>
+      )}
+
+      {currentTotals.legacyTotal > 0 && currentTotals.eventTotal === 0 && (
+        <p className="border-t border-amber-100 bg-amber-50 px-4 py-3 text-[11px] leading-5 text-amber-900 sm:px-5">
+          Legacy daily-status records are shown separately from scheduled-dose adherence because they do not represent every dose.
+        </p>
+      )}
+    </section>
+  );
+}
+
+function currentGroupSummary(group?: MedicationActionGroup) {
+  if (!group || group.total === 0) return "No explicit dose-level actions were found.";
+  return group.taken + " taken · " + group.skipped + " skipped · " + group.total + " explicit actions. Among recorded outcomes, " +
+    formatNumber(group.taken / group.total * 100, 1) + "% were marked taken; unlogged scheduled doses are not included in this rate.";
 }
 
 function StatusCircle({
@@ -2459,7 +2919,6 @@ function HealthReportInsights({
   const symptomPattern = repeated.find((item) => item.count > 1);
   return (
     <div className="mt-5 space-y-6">
-      <PersonalisedInsights report={report} previousReport={previousReport} previousLoading={previousLoading} coveragePercent={coveragePercent} daysLogged={daysLogged} totalDays={totalDays} />
       {measurementReviews.length > 0 && (
         <section aria-label="Readings to double-check" className={"rounded-2xl border p-4 sm:p-5 " + (measurementReviews.some((item) => item.severity === "urgent") ? "border-rose-300 bg-rose-50" : "border-amber-200 bg-amber-50")}>
           <div className="flex items-start gap-3">
@@ -2481,6 +2940,8 @@ function HealthReportInsights({
         </section>
       )}
 
+      <MedicationPeriodInsights report={report} previousReport={previousReport} previousLoading={previousLoading} />
+      <PersonalisedInsights report={report} previousReport={previousReport} previousLoading={previousLoading} coveragePercent={coveragePercent} daysLogged={daysLogged} totalDays={totalDays} />
       <section>
         <div className="mb-3"><p className="text-[10px] font-black uppercase tracking-[0.16em] text-[#24c1c4]">Reading history</p><h2 className="mt-1 text-xl font-black text-[#0b2d54]">Your measurements</h2><p className="mt-1 text-sm leading-6 text-slate-500">See the average, latest reading, reference status and change from the previous period. A trend alone does not show what caused a change.</p></div>
         {activeVitals.length ? <div className="grid gap-4 md:grid-cols-2">{activeVitals.map((item) => <VitalTrendCard key={item.key} label={item.label} description={item.description} unit={item.unit} digits={item.digits} current={item.current} previous={item.previous} previousLoading={previousLoading} review={item.review} status={item.status} rawCurrent={item.rawCurrent} />)}</div> : <div className="rounded-2xl border border-dashed border-slate-300 bg-white p-5 text-sm leading-6 text-slate-500">No dated vital readings were found for this period. Once you save blood pressure, heart rate, weight or other measurements, they will appear here.</div>}
@@ -2660,6 +3121,9 @@ export default function HealthReportPage() {
 
           {previousFailed && <div className="mt-4 flex items-start gap-2 rounded-2xl border border-amber-200 bg-amber-50 p-4 text-xs leading-5 text-amber-900"><Info className="mt-0.5 h-4 w-4 shrink-0" />The current report is available, but the prior-period comparison could not be loaded. Current-period trends remain available; comparison labels will appear when historical data is accessible.</div>}
 
+
+          <HealthReportInsights report={report} previousReport={previousReport} previousLoading={previousLoading} />
+
           <details aria-label="How to read this report" className="mt-4 rounded-2xl border border-[#dcebed] bg-white p-4 sm:p-5">
             <summary className="flex cursor-pointer list-none items-center justify-between gap-3 text-sm font-black text-[#0b2d54]">
               <span>How to read this report</span>
@@ -2676,7 +3140,6 @@ export default function HealthReportPage() {
               <p><strong className="text-[#0b2d54]">Data coverage:</strong> measures how much was logged, not how healthy you are. General reference ranges are not a substitute for personal or clinician guidance.</p>
             </div>
           </details>
-          <HealthReportInsights report={report} previousReport={previousReport} previousLoading={previousLoading} />
         </div>
       </main>
     </ProtectedRoute>
