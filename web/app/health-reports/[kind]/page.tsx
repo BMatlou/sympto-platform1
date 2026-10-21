@@ -1092,6 +1092,11 @@ function PersonalisedInsights({
   const snapshot = report.currentSnapshot;
   const profile = snapshot?.profile;
   const goals = snapshot?.activeGoals ?? [];
+  const weightGoalProgress = goalProgressItemsForPattern(report, /weight|body mass/);
+  const glucoseGoalProgress = goalProgressItemsForPattern(report, /blood glucose|glucose|hba1c|a1c|diabetes/);
+  const lipidGoalProgress = goalProgressItemsForPattern(report, /cholesterol|lipid|triglyceride|ldl|hdl/);
+  const smokingGoalProgress = goalProgressItemsForPattern(report, /smoking|tobacco|cigarette/);
+  const alcoholGoalProgress = goalProgressItemsForPattern(report, /alcohol|drinking/);
   const conditions = [
     ...(snapshot?.conditions ?? [])
       .filter((item) => !["RESOLVED", "INACTIVE"].includes(String(item.status ?? "").toUpperCase()))
@@ -1109,7 +1114,7 @@ function PersonalisedInsights({
   const diastolic = vitalSeries(report, "diastolic");
   const oxygen = vitalSeries(report, "oxygen");
   const breathing = vitalSeries(report, "respiratory");
-  const periodWeight = vitalSeries(report, "weight").at(-1)?.value ?? null;
+  const periodWeight = vitalSeries(report, "weight").at(-1)?.value ?? weightGoalProgress.at(-1)?.value ?? null;
   const hasBloodPressureData = systolic.length > 0 || diastolic.length > 0;
   const hasRespiratoryData = oxygen.length > 0 || breathing.length > 0;
   const age = ageAt(snapshot?.person?.dateOfBirth, report.generatedAt);
@@ -1187,7 +1192,7 @@ function PersonalisedInsights({
         ? hasAdultBmiContext
           ? "This period's dated weight trend is interpreted alongside your saved weight target and adult height/weight screening context when available. BMI is only a screening measure; it is not a diagnosis and does not override your personal target or clinician's advice."
           : "This period's dated weight trend is compared with your saved measurements and goal where available. The report does not label a single weight healthy or unhealthy, and adult BMI screening is not applied without age, height and weight context."
-        : "A weight-related goal is saved, but no dated weight reading was found in this report period. Profile or baseline weight alone is not treated as progress during these dates.",
+        : "A weight-related goal is saved, but no dated weight measurement or numeric goal-progress value was found in this report period. Profile or baseline weight alone is not treated as progress during these dates.",
       tone: periodWeight !== null ? "info" : "watch",
       href: periodWeight !== null ? "/health-goals" : "/today",
       linkLabel: periodWeight !== null ? "Review weight goal" : "Record a weight measurement",
@@ -1211,10 +1216,12 @@ function PersonalisedInsights({
       title: "Glucose monitoring context",
       detail: hasGlucoseData
         ? "Diabetes is part of your recorded care context, and glucose-related measurements or laboratory results are available in this period. Review those values and any flagged lab results against the targets in your care plan; this report does not replace result-specific clinical interpretation."
-        : "Diabetes is part of your recorded care context, but no glucose- or HbA1c-labelled result was found in this report period. Glucose control cannot be assessed from unrelated measurements. Add or review glucose and laboratory results with your healthcare team when these are part of your care plan.",
-      tone: hasGlucoseData ? "info" : "watch",
-      href: hasGlucoseData ? "/health-records" : "/today",
-      linkLabel: hasGlucoseData ? "Review clinical results" : "Update health records",
+        : glucoseGoalProgress.length
+          ? "Diabetes is part of your recorded care context, and " + glucoseGoalProgress.length + " dated glucose-goal progress update(s) were saved in this period. These updates are shown in Goal progress over time; they do not replace a glucose measurement or HbA1c laboratory result when those are part of your care plan."
+          : "Diabetes is part of your recorded care context, but no glucose- or HbA1c-labelled result or dated glucose-goal progress update was found in this report period. Glucose control cannot be assessed from unrelated measurements. Add or review glucose and laboratory results with your healthcare team when these are part of your care plan.",
+      tone: hasGlucoseData ? "info" : glucoseGoalProgress.length ? "info" : "watch",
+      href: hasGlucoseData ? "/health-records" : glucoseGoalProgress.length ? "/health-goals" : "/today",
+      linkLabel: hasGlucoseData ? "Review clinical results" : glucoseGoalProgress.length ? "Review glucose-goal progress" : "Update health records",
     });
   }
 
@@ -1316,10 +1323,10 @@ function PersonalisedInsights({
     });
   }
 
-  if (hasGoal(/blood glucose|glucose|diabetes/) && !hasGlucoseData && !hasDiabetesContext) {
+  if (hasGoal(/blood glucose|glucose|diabetes/) && !hasGlucoseData && !hasDiabetesContext && !glucoseGoalProgress.length) {
     insights.push({
       title: "Glucose goal data is missing",
-      detail: "A glucose-related goal is saved, but no glucose- or HbA1c-labelled measure was found in this report period. This is a data gap, not evidence that the goal was missed.",
+      detail: "A glucose-related goal is saved, but no glucose- or HbA1c-labelled measure or dated goal-progress update was found in this report period. This is a data gap, not evidence that the goal was missed.",
       tone: "info",
       href: "/health-records",
       linkLabel: "Review clinical records",
@@ -1328,11 +1335,13 @@ function PersonalisedInsights({
 
   if (hasGoal(/cholesterol|lipid/) && !hasLipidData) {
     insights.push({
-      title: "Cholesterol goal data is missing",
-      detail: "A cholesterol-related goal is saved, but no cholesterol, lipid, LDL, HDL or triglyceride lab name was found in this report period. The report cannot infer a change from other measurements; review the dated laboratory results when available.",
-      tone: "info",
-      href: "/health-records",
-      linkLabel: "Review clinical records",
+      title: lipidGoalProgress.length ? "Cholesterol goal progress is recorded" : "Cholesterol goal data is missing",
+      detail: lipidGoalProgress.length
+        ? "There are " + lipidGoalProgress.length + " dated cholesterol-goal progress update(s) in this period, shown in Goal progress over time. No matching cholesterol, lipid, LDL, HDL or triglyceride laboratory result was found, so the goal log is not presented as a substitute for a lab result."
+        : "A cholesterol-related goal is saved, but no cholesterol, lipid, LDL, HDL or triglyceride laboratory result or dated goal-progress update was found in this report period. The report cannot infer a change from unrelated measurements; review the dated laboratory results when available.",
+      tone: lipidGoalProgress.length ? "info" : "watch",
+      href: lipidGoalProgress.length ? "/health-goals" : "/health-records",
+      linkLabel: lipidGoalProgress.length ? "Review goal progress" : "Review clinical records",
     });
   }
 
@@ -1355,10 +1364,14 @@ function PersonalisedInsights({
   }
 
   if (hasGoal(/alcohol|drinking/) && Boolean(profile?.alcoholConsumption)) {
+    const first = alcoholGoalProgress[0]?.value ?? null;
+    const latest = alcoholGoalProgress[alcoholGoalProgress.length - 1]?.value ?? null;
     insights.push({
-      title: "Alcohol-related progress needs dated updates",
-      detail: "Your saved alcohol-use context can help tailor this goal, but this report does not build a dated consumption trend from profile status alone. No change is inferred without comparable entries for the selected period.",
-      tone: "info",
+      title: alcoholGoalProgress.length > 1 ? "Alcohol-goal progress from saved updates" : "Alcohol-related progress needs dated updates",
+      detail: alcoholGoalProgress.length > 1 && first !== null && latest !== null
+        ? "Your goal has " + alcoholGoalProgress.length + " dated progress updates this period, changing from " + formatNumber(first, 1) + " to " + formatNumber(latest, 1) + ". The meaning depends on the measure saved for your goal; the report does not assume that higher or lower is automatically better."
+        : "Your saved alcohol-use context can help tailor this goal, but there are not enough dated numeric progress updates in this period to calculate a trend.",
+      tone: alcoholGoalProgress.length > 1 ? "info" : "watch",
       href: "/health-goals",
       linkLabel: "Review goal progress",
     });
