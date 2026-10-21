@@ -595,11 +595,11 @@ function reportMeasurementReviews(report: Report, age: number | null): Measureme
       value: latestOxygen.value, timestamp: latestOxygen.timestamp, ...originalUnitReviewFields(latestOxygen), severity: "review",
       message: "This value is outside the valid 0–100% scale. Check the original entry, device and unit before relying on this trend.",
     });
-  } else if (latestOxygen && latestOxygen.value <= 88) {
+  } else if (latestOxygen && latestOxygen.value <= 92) {
     reviews.push({
       key: "oxygen", label: "Oxygen saturation", unit: "%",
       value: latestOxygen.value, timestamp: latestOxygen.timestamp, ...originalUnitReviewFields(latestOxygen), severity: "urgent",
-      message: "This is a very low saved oxygen reading. For most people, a home reading of 88% or lower needs emergency assessment. If a reading this low is happening now, seek emergency medical help. A device can be inaccurate, but do not delay help if you feel unwell.",
+      message: "For most people, a home oxygen reading of 92% or lower needs emergency assessment. Recheck it immediately; if it remains this low, seek emergency medical help. A device can be inaccurate, but do not delay help if you feel unwell.",
     });
   } else if (lowestOxygen && lowestOxygen.value <= 88) {
     reviews.push({
@@ -776,8 +776,7 @@ function vitalStatus(report: Report, metric: string, age: number | null): VitalS
 
   if (metric === "oxygen") {
     if (value <= 0 || value > 100) return { label: "Check entry", detail: "This is outside the valid 0–100% scale.", tone: "high" };
-    if (value <= 88) return { label: "Critical low", detail: "If this is current, seek emergency medical help. Check the original record too.", tone: "critical" };
-    if (value <= 92) return { label: "Urgent review", detail: "Repeat the reading and seek urgent medical advice; do not delay help if unwell.", tone: "high" };
+    if (value <= 92) return { label: "Critical low", detail: "For most people, a home reading at or below 92% needs emergency assessment. Recheck immediately and seek emergency help if it remains this low; do not delay if unwell.", tone: "critical" };
     if (age === null || age < 18) return { label: "Personal range needed", detail: "Age-specific oxygen guidance is needed; this is not rated against adult ranges.", tone: "info" };
     if (value < 95) return { label: "Recheck", detail: "This is below the common adult guide of 95–100%. Personal targets can differ.", tone: "watch" };
     return { label: "Within common guide", detail: "Within the common adult reference of 95–100%; follow your clinician's personal target.", tone: "good" };
