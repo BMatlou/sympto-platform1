@@ -1612,8 +1612,8 @@ function signalChange(current: DailyValue[], previous: DailyValue[], unit: strin
     return "The average is " + amount + (delta > 0 ? " higher" : " lower") + " than the previous period (" + value(previousAverage) + " previously → " + value(currentAverage) + " now).";
   }
   const difference = unit ? formatNumber(Math.abs(delta), digits) + " " + unit : formatNumber(Math.abs(delta), digits) + " (unit not saved)";
-  return "This period is " + difference + (delta > 0 ? " higher" : " lower") +
-    " than the previous-period average (" + value(previousAverage) + " previously → " + value(currentAverage) + " now).";
+  return "The current-period average is " + (delta > 0 ? "higher" : "lower") + " by " + difference +
+    " compared with the previous period (" + value(previousAverage) + " previously → " + value(currentAverage) + " now).";
 }
 function PersonalisedInsights({
   report,
@@ -2085,7 +2085,7 @@ function PersonalisedInsights({
               const currentAverage = mean(signal.current.map((item) => item.value));
               const latest = signal.current[signal.current.length - 1];
               const unitLabel = signal.unit || "unit not saved";
-              const unitSuffix = signal.unit ? " " + signal.unit : " (unit not saved)";
+              const unitSuffix = signal.unit ? (signal.unit.startsWith("/") ? signal.unit : " " + signal.unit) : " (unit not saved)";
               const digits = signalDigits(signal.key, signal.unit);
               return (
                 <article key={signal.key} className="min-w-0 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
@@ -2515,7 +2515,7 @@ function HealthReportInsights({
               <article className="rounded-2xl border border-slate-200 bg-white p-4">
                 <h3 className="text-sm font-bold text-[#0b2d54]">Symptom severity readings</h3>
                 <p className="mt-1 text-xs leading-5 text-slate-500">Daily average severity rank from dated symptom observations or symptom-level severity values.</p>
-                <RecordedReadings points={symptomSeverityPoints} label="Daily logged symptom severity rank over time" unit="severity rank" digits={1} />
+                <RecordedReadings points={symptomSeverityPoints} label="Daily logged symptom severity rank by date" unit="severity rank" digits={1} />
                 <p className="mt-2 text-[10px] leading-4 text-slate-400">Mild = 1, moderate = 2, severe = 3, very severe = 4. Different symptoms can have different meanings; this summary is not a clinical score.</p>
                 {previousReport && previousSymptomSeverityPoints.length > 0 && <p className="mt-2 text-xs leading-5 text-slate-500">{compareText(symptomSeverityPoints.map((item) => item.value), previousSymptomSeverityPoints.map((item) => item.value), "severity rank", 1, previousLoading)}</p>}
               </article>
