@@ -173,11 +173,11 @@ function addNamedVitalForMetric(
 ) {
   const name = normaliseVitalName(nameValue);
   const rawValue = String(value ?? "").trim();
-  const bloodPressurePair = rawValue.match(/^(\\d+(?:\\.\\d+)?)\\s*\\/\\s*(\\d+(?:\\.\\d+)?)$/);
+  const bloodPressurePair = rawValue.match(/^(\d+(?:\.\d+)?)\s*\/\s*(\d+(?:\.\d+)?)$/);
 
   // Some devices and clinical records store blood pressure as one "120/80" value.
   // Split it into the requested series so systolic values never pollute diastolic averages.
-  if (/blood pressure|bloodpressure|\\bbp\\b/.test(name) && bloodPressurePair) {
+  if (/blood pressure|bloodpressure|\bbp\b/.test(name) && bloodPressurePair) {
     if (metric === "systolic") addVital(output, bloodPressurePair[1], at, source);
     if (metric === "diastolic") addVital(output, bloodPressurePair[2], at, source);
     return;
@@ -186,10 +186,10 @@ function addNamedVitalForMetric(
   const matchesMetric =
     (metric === "systolic" && /systolic|sys bp|sbp/.test(name)) ||
     (metric === "diastolic" && /diastolic|dia bp|dbp/.test(name)) ||
-    (metric === "heartRate" && /resting heart|heart rate|heartrate|\\bpulse\\b|\\bhr\\b/.test(name)) ||
+    (metric === "heartRate" && /resting heart|heart rate|heartrate|\bpulse\b|\bhr\b/.test(name)) ||
     (metric === "weight" && /weight|body mass/.test(name)) ||
     (metric === "oxygen" && /oxygen|spo2|o2 saturation/.test(name)) ||
-    (metric === "temperature" && /temperature|temp\\b/.test(name)) ||
+    (metric === "temperature" && /temperature|temp\b/.test(name)) ||
     (metric === "respiratory" && /respiratory|breathing rate/.test(name));
 
   if (matchesMetric) addVital(output, value, at, source);
