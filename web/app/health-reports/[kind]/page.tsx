@@ -1484,8 +1484,10 @@ function PersonalisedInsights({
     namedClinicalDeviceSeries(previousReport, /total cholesterol|cholesterol total|serum cholesterol|^cholesterol$/i),
     wellnessMetricSeriesMatching(previousReport, /total.cholesterol|cholesterol.total/i),
   );
-  const totalCholesterolCurrent = totalCholesterolLabCurrent.length ? totalCholesterolLabCurrent : totalCholesterolMeasuredCurrent;
-  const totalCholesterolPrevious = totalCholesterolLabPrevious.length ? totalCholesterolLabPrevious : totalCholesterolMeasuredPrevious;
+  const totalCholesterolGoalCurrent = event(report, /cholesterol|lipid/);
+  const totalCholesterolGoalPrevious = event(previousReport, /cholesterol|lipid/);
+  const totalCholesterolCurrent = totalCholesterolLabCurrent.length ? totalCholesterolLabCurrent : totalCholesterolMeasuredCurrent.length ? totalCholesterolMeasuredCurrent : totalCholesterolGoalCurrent;
+  const totalCholesterolPrevious = totalCholesterolLabPrevious.length ? totalCholesterolLabPrevious : totalCholesterolMeasuredPrevious.length ? totalCholesterolMeasuredPrevious : totalCholesterolGoalPrevious;
 
   const ldlLabCurrent = clinicalLabSeries(report, /\bldl\b|low[- ]density lipoprotein/i);
   const ldlLabPrevious = clinicalLabSeries(previousReport, /\bldl\b|low[- ]density lipoprotein/i);
@@ -1508,6 +1510,7 @@ function PersonalisedInsights({
   const triglyceridesCurrent = triglyceridesLabCurrent.length ? triglyceridesLabCurrent : triglyceridesMeasuredCurrent;
   const triglyceridesPrevious = triglyceridesLabPrevious.length ? triglyceridesLabPrevious : triglyceridesMeasuredPrevious;
   const anyLipidLab = totalCholesterolLabCurrent.length + totalCholesterolLabPrevious.length + ldlLabCurrent.length + ldlLabPrevious.length + hdlLabCurrent.length + hdlLabPrevious.length + triglyceridesLabCurrent.length + triglyceridesLabPrevious.length > 0;
+  const anyLipidSeries = totalCholesterolCurrent.length + totalCholesterolPrevious.length + ldlCurrent.length + ldlPrevious.length + hdlCurrent.length + hdlPrevious.length + triglyceridesCurrent.length + triglyceridesPrevious.length > 0;
   const cholesterolEventsCurrent = event(report, /cholesterol|lipid|triglyceride|\bldl\b|\bhdl\b/);
   const cholesterolEventsPrevious = event(previousReport, /cholesterol|lipid|triglyceride|\bldl\b|\bhdl\b/);
 
@@ -1582,7 +1585,7 @@ function PersonalisedInsights({
     ...(triglyceridesCurrent.length || triglyceridesPrevious.length ? [
       signal("triglycerides", "Triglycerides", triglyceridesCurrent, triglyceridesPrevious, triglyceridesCurrent.at(-1)?.unit || triglyceridesPrevious.at(-1)?.unit || ""),
     ] : []),
-    ...(!anyLipidLab && (cholesterolEventsCurrent.length || cholesterolEventsPrevious.length) ? [
+    ...(!anyLipidSeries && !anyLipidLab && (cholesterolEventsCurrent.length || cholesterolEventsPrevious.length) ? [
       signal("cholesterol-goal", "Cholesterol goal log", cholesterolEventsCurrent, cholesterolEventsPrevious, "mmol/L"),
     ] : []),
     signal("smoking", "Cigarettes logged", smokingCurrent, smokingPrevious, "cigarettes"),
