@@ -1165,80 +1165,6 @@ function compareText(
   return "Your average was " + formatNumber(Math.abs(delta), digits) + (unit ? " " + unit : "") + (delta > 0 ? " higher" : " lower") + " than in the previous period.";
 }
 
-function RecordedReadings({
-  values,
-  points,
-  label,
-  unit = "",
-  digits = 1,
-}: {
-  values?: number[];
-  points?: Array<{ date: string; value: number; timestamp?: number }>;
-  label: string;
-  unit?: string;
-  digits?: number;
-}) {
-  const plotted = (points?.length
-    ? points
-        .filter((point) => Number.isFinite(point.value) && Boolean(point.date))
-        .slice()
-        .sort((a, b) => (a.timestamp ?? new Date(a.date).getTime()) - (b.timestamp ?? new Date(b.date).getTime()))
-    : (values ?? []).filter((value) => Number.isFinite(value)).map((value, index) => ({ date: "Reading " + String(index + 1), value })));
-
-  if (!plotted.length) {
-    return <div className="mt-3 rounded-xl border border-dashed border-slate-200 bg-slate-50 px-3 py-4 text-sm text-slate-500">No dated readings were saved for this period.</div>;
-  }
-
-  const formatReadingDate = (date: string) => {
-    if (date.startsWith("Reading ")) return date;
-    const parsed = /^\d{4}-\d{2}-\d{2}$/.test(date) ? new Date(date + "T12:00:00") : new Date(date);
-    if (!Number.isFinite(parsed.getTime())) return date;
-    return new Intl.DateTimeFormat("en-ZA", {
-      timeZone: "Africa/Johannesburg",
-      day: "numeric",
-      month: "short",
-      year: "numeric",
-    }).format(parsed);
-  };
-  const allValues = plotted.map((point) => point.value);
-  const minimum = Math.min(...allValues);
-  const maximum = Math.max(...allValues);
-  const displayUnit = unit.trim() || "unit not saved";
-  const earlier = plotted.length > 8 ? plotted.slice(0, plotted.length - 8) : [];
-  const visible = plotted.length > 8 ? plotted.slice(-8) : plotted;
-  const readingRows = (items: typeof plotted) => (
-    <div className="grid gap-2 sm:grid-cols-2">
-      {items.map((point, index) => (
-        <div key={point.date + "-" + index} className="flex min-w-0 items-center justify-between gap-3 rounded-xl border border-slate-100 bg-white px-3 py-2.5">
-          <span className="min-w-0 text-xs font-medium text-slate-600">{formatReadingDate(point.date)}</span>
-          <span className="shrink-0 text-sm font-extrabold tabular-nums text-[#0b2d54]">{formatNumber(point.value, digits)} <span className="font-semibold text-slate-500">{displayUnit}</span></span>
-        </div>
-      ))}
-    </div>
-  );
-
-  return (
-    <div className="mt-3 rounded-2xl border border-[#dcebed] bg-[#f5fafb] p-3" aria-label={label + " recorded readings"}>
-      <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
-        <span className="text-xs font-extrabold uppercase tracking-wide text-[#0b2d54]">Recorded readings</span>
-        <span className="rounded-full bg-white px-2.5 py-1 text-[11px] font-semibold text-slate-600">{plotted.length} {plotted.length === 1 ? "reading" : "readings"}</span>
-      </div>
-      {readingRows(visible)}
-      {earlier.length > 0 && (
-        <details className="mt-3 rounded-xl border border-slate-200 bg-white px-3 py-2">
-          <summary className="cursor-pointer text-xs font-bold text-[#0b2d54]">Show {earlier.length} earlier {earlier.length === 1 ? "reading" : "readings"}</summary>
-          <div className="mt-3">{readingRows(earlier)}</div>
-        </details>
-      )}
-      <div className="mt-3 border-t border-[#dcebed] pt-2 text-xs text-slate-600">
-        {Math.abs(maximum - minimum) < 0.000001
-          ? <>Recorded value: <strong className="text-[#0b2d54]">{formatNumber(minimum, digits)} {displayUnit}</strong></>
-          : <>Observed range: <strong className="text-[#0b2d54]">{formatNumber(minimum, digits)}–{formatNumber(maximum, digits)} {displayUnit}</strong></>}
-      </div>
-    </div>
-  );
-}
-
 function SummaryTile({ icon: Icon, label, value, detail }: { icon: typeof Activity; label: string; value: string; detail: string }) {
   return (
     <article className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
@@ -1587,33 +1513,29 @@ function signalDigits(key: string, unit: string) {
   return 1;
 }
 
-function signalChange(current: DailyValue[], previous: DailyValue[], unit: string, digits = 1) {
-  const currentAverage = mean(current.map((item) => item.value));
-  const previousAverage = mean(previous.map((item) => item.value));
-  const suffix = unit ? (unit.startsWith("/") ? unit : " " + unit) : " (unit not saved)";
-  const value = (amount: number) => formatNumber(amount, digits) + suffix;
-  const isRatingScale = unit === "/10" || unit === "/5";
-  if (currentAverage === null) {
-    return previousAverage === null
-      ? "No dated readings are available."
-      : "No readings in this period. Previous-period average: " + value(previousAverage) + ".";
-  }
-  if (previousAverage === null) {
-    return "Current-period average: " + value(currentAverage) + ". No comparable values were saved in the previous period.";
-  }
-  const delta = currentAverage - previousAverage;
+function periodMovement(currentValues: number[], previousValues: number[], unit: string, digits = 1) {
+  const current = mean(currentValues);
+  const previous = mean(previousValues);
+  const suffix = unit ? (unit.startsWith("/") ? unit : " " + unit) : "";
+  const display = (value: number) => formatNumber(value, digits) + suffix;
+  if (current === null) return { state: "missing" as const, label: "No readings", detail: "No usable readings were saved for this period.", current, previous };
+  if (previous === null) return { state: "new" as const, label: "No prior comparison", detail: "There are no comparable readings from the previous period.", current, previous };
+  const delta = current - previous;
   const tolerance = digits === 0 ? 0.5 : 0.05;
-  if (Math.abs(delta) < tolerance) {
-    return "About the same as the previous period: " + value(currentAverage) + " now vs " + value(previousAverage) + " previously.";
+  if (Math.abs(delta) < tolerance) return { state: "steady" as const, label: "About the same", detail: "Average: " + display(previous) + " previously → " + display(current) + " this period.", current, previous };
+  const up = delta > 0;
+  const arrow = up ? "↑" : "↓";
+  const state = up ? "up" as const : "down" as const;
+  if (unit === "/5" || unit === "/10") {
+    const points = formatNumber(Math.abs(delta), digits);
+    const pointWord = Math.abs(Math.abs(delta) - 1) < 0.000001 ? "point" : "points";
+    return { state, label: arrow + " " + points + " " + pointWord, detail: "Average rating: " + display(previous) + " previously → " + display(current) + " this period.", current, previous };
   }
-  if (isRatingScale) {
-    const absDelta = Math.abs(delta);
-    const amount = formatNumber(absDelta, digits) + (Math.abs(absDelta - 1) < 0.000001 ? " point" : " points");
-    return "The average is " + amount + (delta > 0 ? " higher" : " lower") + " than the previous period (" + value(previousAverage) + " previously → " + value(currentAverage) + " now).";
-  }
-  const difference = unit ? formatNumber(Math.abs(delta), digits) + " " + unit : formatNumber(Math.abs(delta), digits) + " (unit not saved)";
-  return "The current-period average is " + (delta > 0 ? "higher" : "lower") + " by " + difference +
-    " compared with the previous period (" + value(previousAverage) + " previously → " + value(currentAverage) + " now).";
+  if (Math.abs(previous) < 0.000001) return { state, label: up ? "Up from zero" : "Down from zero", detail: "Average changed from " + display(previous) + " to " + display(current) + ". A percentage cannot be calculated from zero.", current, previous };
+  const pct = Math.abs(delta / Math.abs(previous) * 100);
+  const pctDigits = pct >= 100 ? 0 : 1;
+  const absolute = formatNumber(Math.abs(delta), digits) + suffix;
+  return { state, label: arrow + " " + formatNumber(pct, pctDigits) + "%", detail: "Average changed by " + absolute + ": " + display(previous) + " previously → " + display(current) + " this period.", current, previous };
 }
 function PersonalisedInsights({
   report,
