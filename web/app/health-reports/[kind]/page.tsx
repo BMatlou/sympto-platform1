@@ -2319,7 +2319,7 @@ function HealthReportInsights({
         <div className="mb-3">
           <p className="text-[10px] font-black uppercase tracking-[0.16em] text-[#24c1c4]">Health overview</p>
           <h2 className="mt-1 text-xl font-black text-[#0b2d54]">Key health patterns</h2>
-          <p className="mt-1 text-sm leading-6 text-slate-500">A quick overview of steps, medication records and clinical activity. Saved readings and comparisons are shown below. Missing days are not estimated, and the same measure is kept in one place where possible.</p>
+          <p className="mt-1 text-sm leading-6 text-slate-500">A quick count of activity, medication records and clinical updates. The cards below highlight movement, review flags and patterns; unlogged days are not treated as zero.</p>
         </div>
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
           <SummaryTile
@@ -2367,7 +2367,7 @@ function HealthReportInsights({
       )}
 
       <section>
-        <div className="mb-3"><p className="text-[10px] font-black uppercase tracking-[0.16em] text-[#24c1c4]">Reading history</p><h2 className="mt-1 text-xl font-black text-[#0b2d54]">Your measurements</h2><p className="mt-1 text-sm leading-6 text-slate-500">Each card explains the measurement, shows the average of saved readings, and tells you how it compares with the previous period. A change by itself does not say what caused it or whether it is right for you.</p></div>
+        <div className="mb-3"><p className="text-[10px] font-black uppercase tracking-[0.16em] text-[#24c1c4]">Reading history</p><h2 className="mt-1 text-xl font-black text-[#0b2d54]">Your measurements</h2><p className="mt-1 text-sm leading-6 text-slate-500">See the average, latest reading, reference status and change from the previous period. A trend alone does not show what caused a change.</p></div>
         {activeVitals.length ? <div className="grid gap-4 md:grid-cols-2">{activeVitals.map((item) => <VitalTrendCard key={item.key} label={item.label} description={item.description} unit={item.unit} digits={item.digits} current={item.current} previous={item.previous} previousLoading={previousLoading} review={item.review} status={item.status} rawCurrent={item.rawCurrent} />)}</div> : <div className="rounded-2xl border border-dashed border-slate-300 bg-white p-5 text-sm leading-6 text-slate-500">No dated vital readings were found for this period. Once you save blood pressure, heart rate, weight or other measurements, they will appear here.</div>}
       </section>
 
@@ -2376,7 +2376,7 @@ function HealthReportInsights({
           <div className="mb-3">
             <p className="text-[10px] font-black uppercase tracking-[0.16em] text-[#24c1c4]">Daily activity</p>
             <h2 className="mt-1 text-xl font-black text-[#0b2d54]">Step-count readings</h2>
-            <p className="mt-1 text-sm leading-6 text-slate-500">Each entry shows the latest saved step count for that date. Days without a recorded count are not estimated.</p>
+            <p className="mt-1 text-sm leading-6 text-slate-500">Average on {currentSteps.length} day(s) with a saved count. Missing days are not estimated.</p>
           </div>
           <article className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
             <div className="flex flex-wrap items-end justify-between gap-3">
@@ -2384,9 +2384,8 @@ function HealthReportInsights({
                 <p className="text-3xl font-black tracking-tight text-[#0b2d54]">{formatNumber(mean(currentStepValues), 0)} <span className="text-sm font-bold text-slate-500">steps/day</span></p>
                 <p className="mt-1 text-sm text-slate-600">Average across {currentSteps.length} date(s) with a saved step count.</p>
               </div>
-              <p className="text-sm font-semibold text-slate-600">{compareText(currentStepValues, previousStepValues, "steps/day", 0, previousLoading)}</p>
+              <p className="text-sm font-semibold text-[#0b5a62]">{periodMovement(currentStepValues, previousStepValues, "steps/day", 0).label}</p>
             </div>
-            <RecordedReadings points={currentSteps} label="Daily steps across the report period" unit="steps" digits={0} />
             <p className="mt-2 text-xs leading-5 text-slate-500">Sensor samples on the same date are not added together; the latest saved cumulative count is used.</p>
           </article>
         </section>
@@ -2430,7 +2429,8 @@ function HealthReportInsights({
               <article className="rounded-2xl border border-slate-200 bg-white p-4">
                 <h3 className="text-sm font-bold text-[#0b2d54]">Symptom severity readings</h3>
                 <p className="mt-1 text-xs leading-5 text-slate-500">Daily average severity rank from dated symptom observations or symptom-level severity values.</p>
-                <RecordedReadings points={symptomSeverityPoints} label="Daily logged symptom severity rank by date" unit="severity rank" digits={1} />
+                <p className="mt-2 text-2xl font-black text-[#0b2d54]">{formatNumber(mean(symptomSeverityPoints.map((item) => item.value)), 1)} <span className="text-xs font-bold text-slate-500">average severity rank / 4</span></p>
+                <p className="mt-2 text-xs leading-5 text-slate-600">{periodMovement(symptomSeverityPoints.map((item) => item.value), previousSymptomSeverityPoints.map((item) => item.value), "severity rank", 1).detail}</p>
                 <p className="mt-2 text-[10px] leading-4 text-slate-400">Mild = 1, moderate = 2, severe = 3, very severe = 4. Different symptoms can have different meanings; this summary is not a clinical score.</p>
                 {previousReport && previousSymptomSeverityPoints.length > 0 && <p className="mt-2 text-xs leading-5 text-slate-500">{compareText(symptomSeverityPoints.map((item) => item.value), previousSymptomSeverityPoints.map((item) => item.value), "severity rank", 1, previousLoading)}</p>}
               </article>
@@ -2584,7 +2584,7 @@ export default function HealthReportPage() {
 
           <section className="mt-4 overflow-hidden rounded-[30px] bg-gradient-to-br from-[#0b2d54] to-[#0f5a62] p-6 text-white shadow-lg sm:p-8">
             <div className="flex flex-col gap-5 sm:flex-row sm:items-start sm:justify-between">
-              <div><div className="flex items-center gap-2 text-[10px] font-black uppercase tracking-[0.18em] text-[#24c1c4]"><ShieldCheck className="h-4 w-4" />Sympto health intelligence</div><h1 className="mt-3 text-3xl font-black tracking-tight sm:text-4xl">{title}</h1><p className="mt-2 text-sm leading-6 text-white/75">{report.period.label}</p><p className="mt-3 max-w-2xl text-sm leading-6 text-white/85">This report reviews the health data saved on {recordedDays(report).size} of {periodDays(report)} days. It compares measurements and daily routines, highlights values that need checking, and shows progress against your saved health goals. It is a summary of your records, not a diagnosis.</p></div>
+              <div><div className="flex items-center gap-2 text-[10px] font-black uppercase tracking-[0.18em] text-[#24c1c4]"><ShieldCheck className="h-4 w-4" />Sympto health intelligence</div><h1 className="mt-3 text-3xl font-black tracking-tight sm:text-4xl">{title}</h1><p className="mt-2 text-sm leading-6 text-white/75">{report.period.label}</p><p className="mt-3 max-w-2xl text-sm leading-6 text-white/85">A simple summary of what you logged, what went up or down since the previous period, patterns in your records, and readings that may need attention. This report is not a diagnosis.</p></div>
               <div className="flex shrink-0 items-center gap-2 rounded-2xl border border-white/15 bg-white/10 px-4 py-3"><CalendarDays className="h-5 w-5 text-[#24c1c4]" /><div><p className="text-[10px] font-bold uppercase tracking-wide text-white/60">Report period</p><p className="mt-1 text-sm font-bold">{report.type === "WEEKLY" ? "7-day view" : "Monthly view"}</p></div></div>
             </div>
             <div className="mt-6 flex flex-wrap items-center gap-2"><span className="rounded-full bg-white/10 px-3 py-1.5 text-xs font-bold">Generated {dateLabel(report.generatedAt)}</span><span className="rounded-full bg-white/10 px-3 py-1.5 text-xs font-bold">{previousLoading ? "Comparing with prior period…" : previousReport ? "Compared with previous period" : previousFailed ? "Prior-period data unavailable" : "Current-period insights"}</span></div>
@@ -2600,9 +2600,9 @@ export default function HealthReportPage() {
             <div className="mt-3 grid gap-2 border-t border-slate-100 pt-3 text-sm leading-6 text-slate-600 sm:grid-cols-2">
               <p><strong className="text-[#0b2d54]">Average:</strong> average of values recorded, not an estimate for every day.</p>
               <p><strong className="text-[#0b2d54]">Most recent:</strong> the latest dated value available.</p>
-              <p><strong className="text-[#0b2d54]">Change:</strong> the actual amount higher or lower than the previous period; distracting percentage swings are omitted.</p>
+              <p><strong className="text-[#0b2d54]">Trend:</strong> arrows and percentages compare this period with the previous one. Rating scales use points because percentages can be misleading.</p>
               <p><strong className="text-[#0b2d54]">Missing entry:</strong> no value was saved. It is not counted as zero.</p>
-              <p><strong className="text-[#0b2d54]">Recorded readings:</strong> each entry shows the date and value that was saved. Expand the earlier-readings list when a longer history is available.</p>
+              <p><strong className="text-[#0b2d54]">Status:</strong> clinical measures use available reference guidance or your saved goal. Other entries show a change, not a diagnosis.</p>
               <p><strong className="text-[#0b2d54]">Colour key:</strong> green = within a common reference; amber = recheck or monitor; orange = high; red = urgent; grey = personal or age-specific guidance needed.</p>
               <p><strong className="text-[#0b2d54]">Goal status:</strong> uses saved goal targets and recorded progress. Missing progress is not guessed.</p>
               <p><strong className="text-[#0b2d54]">Data coverage:</strong> measures how much was logged, not how healthy you are. General reference ranges are not a substitute for personal or clinician guidance.</p>
