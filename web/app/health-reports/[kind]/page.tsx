@@ -123,6 +123,15 @@ type Report = {
 
 type SeriesPoint = { date: string; value: number; timestamp: number; source?: string };
 type DailyValue = { date: string; value: number };
+type MeasurementReview = {
+  key: string;
+  label: string;
+  unit: string;
+  value: number;
+  timestamp: number;
+  severity: "urgent" | "review";
+  message: string;
+};
 
 function unwrap<T>(value: unknown): T {
   if (value && typeof value === "object" && "data" in value) {
@@ -347,6 +356,123 @@ function vitalSeries(report: Report | null, metric: string): SeriesPoint[] {
   return Array.from(deduped.values()).sort((a, b) => a.timestamp - b.timestamp);
 }
 
+function reportMeasurementReviews(report: Report): MeasurementReview[] {
+  const reviews: MeasurementReview[] = [];
+
+  const oxygen = vitalSeries(report, "oxygen");
+  const latestOxygen = oxygen[oxygen.length - 1];
+  const lowestOxygen = oxygen.reduce<SeriesPoint | null>(
+    (lowest, point) => !lowest || point.value < lowest.value ? point : lowest,
+    null,
+  );
+  if (latestOxygen && (latestOxygen.value <= 0 || latestOxygen.value > 100)) {
+    reviews.push({
+      key: "oxygen", label: "Oxygen saturation", unit: "%",
+      value: latestOxygen.value, timestamp: latestOxygen.timestamp, severity: "review",
+      message: "This value is outside the valid 0–100% scale. Check the original entry, device and unit before relying on this trend.",
+    });
+  } else if (latestOxygen && latestOxygen.value <= 88) {
+    reviews.push({
+      key: "oxygen", label: "Oxygen saturation", unit: "%",
+      value: latestOxygen.value, timestamp: latestOxygen.timestamp, severity: "urgent",
+      message: "This is a very low saved oxygen reading. For most people, a home reading of 88% or lower needs emergency assessment. If a reading this low is happening now, seek emergency medical help. A device can be inaccurate, but do not delay help if you feel unwell.",
+    });
+  } else if (lowestOxygen && lowestOxygen.value <= 92) {
+    const selected = latestOxygen && latestOxygen.value <= 92 ? latestOxygen : lowestOxygen;
+    reviews.push({
+      key: "oxygen", label: "Oxygen saturation", unit: "%",
+      value: selected.value, timestamp: selected.timestamp, severity: "review",
+      message: "This saved oxygen reading is lower than expected for most people. Confirm it and contact a healthcare professional for advice. Personal targets can differ, especially with some lung conditions.",
+    });
+  }
+
+  const temperatures = vitalSeries(report, "temperature");
+  const latestTemperature = temperatures[temperatures.length - 1];
+  const hottest = temperatures.reduce<SeriesPoint | null>(
+    (highest, point) => !highest || point.value > highest.value ? point : highest,
+    null,
+  );
+  const coldest = temperatures.reduce<SeriesPoint | null>(
+    (lowest, point) => !lowest || point.value < lowest.value ? point : lowest,
+    null,
+  );
+  if (hottest && hottest.value >= 43) {
+    reviews.push({
+      key: "temperature", label: "Temperature", unit: "°C",
+      value: hottest.value, timestamp: hottest.timestamp, severity: "review",
+      message: "This saved temperature is far outside usual body-temperature readings and may reflect an entry, device or unit problem. Check the original record. If a temperature around 40°C or higher is current and accurate, seek urgent medical advice; if you feel seriously unwell, seek emergency help.",
+    });
+  } else if (latestTemperature && latestTemperature.value >= 40) {
+    reviews.push({
+      key: "temperature", label: "Temperature", unit: "°C",
+      value: latestTemperature.value, timestamp: latestTemperature.timestamp, severity: "urgent",
+      message: "This is a very high reported temperature. Confirm it promptly with a reliable thermometer and seek urgent medical advice, especially if you feel very unwell.",
+    });
+  } else if (latestTemperature && latestTemperature.value < 35) {
+    reviews.push({
+      key: "temperature", label: "Temperature", unit: "°C",
+      value: latestTemperature.value, timestamp: latestTemperature.timestamp, severity: "review",
+      message: "This is a low reported body temperature. Check the measurement method and repeat the reading. If it is current and accurate, or you feel unwell, seek urgent medical advice.",
+    });
+  } else if (coldest && coldest.value < 35) {
+    reviews.push({
+      key: "temperature", label: "Temperature", unit: "°C",
+      value: coldest.value, timestamp: coldest.timestamp, severity: "review",
+      message: "A low temperature was saved during this period. Check the date, measurement method and original value before interpreting the trend.",
+    });
+  }
+
+  const breathing = vitalSeries(report, "respiratory");
+  const latestBreathing = breathing[breathing.length - 1];
+  const highestBreathing = breathing.reduce<SeriesPoint | null>(
+    (highest, point) => !highest || point.value > highest.value ? point : highest,
+    null,
+  );
+  const lowestBreathing = breathing.reduce<SeriesPoint | null>(
+    (lowest, point) => !lowest || point.value < lowest.value ? point : lowest,
+    null,
+  );
+  if (latestBreathing && latestBreathing.value > 30) {
+    reviews.push({
+      key: "respiratory", label: "Breathing rate", unit: "breaths/min",
+      value: latestBreathing.value, timestamp: latestBreathing.timestamp, severity: "urgent",
+      message: "This is much faster than the typical adult resting range of 12–18 breaths per minute. If this is your current rate, recheck while resting and seek urgent medical advice if it remains this high. Get emergency help for severe breathing difficulty.",
+    });
+  } else if (highestBreathing && highestBreathing.value > 30) {
+    reviews.push({
+      key: "respiratory", label: "Breathing rate", unit: "breaths/min",
+      value: highestBreathing.value, timestamp: highestBreathing.timestamp, severity: "review",
+      message: "This saved rate is much faster than the typical adult resting range of 12–18 breaths per minute. Check whether it was recorded after activity and verify the original entry. If this is happening now, seek urgent medical advice.",
+    });
+  } else if (latestBreathing && latestBreathing.value > 0 && latestBreathing.value < 8) {
+    reviews.push({
+      key: "respiratory", label: "Breathing rate", unit: "breaths/min",
+      value: lowestBreathing?.value ?? latestBreathing.value,
+      timestamp: lowestBreathing?.timestamp ?? latestBreathing.timestamp, severity: "review",
+      message: "This is lower than the typical adult resting range. Confirm the rate and measurement context; seek urgent medical advice if this is current or you feel unwell.",
+    });
+  }
+
+  const latestSystolic = vitalSeries(report, "systolic").at(-1);
+  const latestDiastolic = vitalSeries(report, "diastolic").at(-1);
+  const severeBloodPressure = latestSystolic && latestSystolic.value > 180
+    ? latestSystolic
+    : latestDiastolic && latestDiastolic.value > 120 ? latestDiastolic : null;
+  if (severeBloodPressure) {
+    const isSystolic = severeBloodPressure === latestSystolic;
+    reviews.push({
+      key: isSystolic ? "systolic" : "diastolic",
+      label: isSystolic ? "Systolic blood pressure" : "Diastolic blood pressure",
+      unit: "mmHg", value: severeBloodPressure.value,
+      timestamp: severeBloodPressure.timestamp, severity: "urgent",
+      message: "This blood-pressure reading is very high. Repeat it after sitting quietly and seek prompt medical advice. If you also have chest pain, shortness of breath, weakness, numbness, vision changes or trouble speaking, call local emergency services.",
+    });
+  }
+
+  return reviews;
+}
+
+
 function lowMoodCounts(report: Report | null) {
   const entries = (report?.activity.journalEntries ?? []).filter((entry) => Boolean(entry.mood));
   const low = entries.filter((entry) => ["VERY_BAD", "BAD", "VERY_LOW", "LOW"].includes(String(entry.mood).toUpperCase()));
@@ -490,38 +616,67 @@ function RoutineTrendCard({
 
 function VitalTrendCard({
   label,
+  description,
   unit,
   digits,
   current,
   previous,
   previousLoading,
+  review,
 }: {
   label: string;
+  description: string;
   unit: string;
   digits: number;
   current: SeriesPoint[];
   previous: SeriesPoint[];
   previousLoading: boolean;
+  review: MeasurementReview | null;
 }) {
   const currentValues = current.map((item) => item.value);
   const previousValues = previous.map((item) => item.value);
   const average = mean(currentValues);
   const latest = current[current.length - 1];
   const first = current[0];
-  const withinPeriod = current.length > 1
-    ? Math.abs(latest.value - first.value) < 0.05
-      ? "Little change between first and latest readings."
-      : "First-to-latest change: " + (latest.value > first.value ? "+" : "") + formatNumber(latest.value - first.value, digits) + " " + unit + "."
-    : "One reading is available; more readings are needed to show a trend.";
+  const change = latest && first ? latest.value - first.value : null;
+  const changeText = change === null
+    ? "Not enough readings to compare."
+    : Math.abs(change) < 0.05
+      ? "The first and most recent readings were very similar."
+      : "From the first to the most recent reading: " + (change > 0 ? "+" : "") + formatNumber(change, digits) + " " + unit + ".";
   return (
     <article className="min-w-0 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
-      <div className="flex items-start justify-between gap-3"><div><p className="text-sm font-bold text-[#0b2d54]">{label}</p><p className="mt-1 text-[11px] text-slate-500">{current.length} readings in this period</p></div><HeartPulse className="h-5 w-5 shrink-0 text-[#24c1c4]" /></div>
-      {average === null ? <p className="mt-4 text-sm text-slate-500">No readings in this period.</p> : (
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <p className="text-sm font-bold text-[#0b2d54]">{label}</p>
+          <p className="mt-1 text-[11px] text-slate-500">{current.length} {current.length === 1 ? "reading" : "readings"} saved in this period</p>
+        </div>
+        <HeartPulse className="h-5 w-5 shrink-0 text-[#24c1c4]" />
+      </div>
+      <p className="mt-2 text-xs leading-5 text-slate-500">{description}</p>
+      {average === null ? (
+        <p className="mt-4 text-sm text-slate-500">No readings were saved for this period.</p>
+      ) : (
         <>
-          <div className="mt-4 flex flex-wrap items-baseline gap-x-3 gap-y-1"><p className="text-2xl font-black tracking-tight text-[#0b2d54]">{formatNumber(average, digits)} <span className="text-sm font-bold text-slate-500">{unit}</span></p>{latest && <p className="text-xs text-slate-500">Latest {formatNumber(latest.value, digits)} {unit}</p>}</div>
+          <div className="mt-4">
+            <p className="text-[10px] font-bold uppercase tracking-wide text-slate-400">Average for this period</p>
+            <p className="mt-1 text-2xl font-black tracking-tight text-[#0b2d54]">
+              {formatNumber(average, digits)} <span className="text-sm font-bold text-slate-500">{unit}</span>
+            </p>
+            {latest && <p className="mt-1 text-xs text-slate-500">Most recent: {formatNumber(latest.value, digits)} {unit} · {dateLabel(new Date(latest.timestamp).toISOString())}</p>}
+          </div>
           <MiniTrend values={currentValues} label={label + " trend"} />
-          <p className="mt-3 text-xs leading-5 text-slate-500">{withinPeriod}</p>
-          <p className="mt-1 text-xs leading-5 text-slate-500">{compareText(currentValues, previousValues, unit, digits, previousLoading)}</p>
+          {review ? (
+            <p className="mt-3 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs leading-5 text-amber-950">
+              Check these saved values before interpreting the trend. See “Readings to double-check” above.
+            </p>
+          ) : (
+            <p className="mt-3 text-xs leading-5 text-slate-600">{changeText}</p>
+          )}
+          <div className="mt-3 rounded-xl bg-[#f5fafb] p-3">
+            <p className="text-[10px] font-bold uppercase tracking-wide text-[#71839a]">Compared with the previous period</p>
+            <p className="mt-1 text-xs leading-5 text-slate-600">{compareText(currentValues, previousValues, unit, digits, previousLoading)}</p>
+          </div>
         </>
       )}
     </article>
@@ -585,27 +740,40 @@ function HealthReportInsights({
   const symptomDifference = previousReport
     ? symptomCount - previousSymptomCount
     : null;
+  const symptomComparison = previousReport
+    ? symptomCount === 0 && previousSymptomCount === 0
+      ? "No symptom logs in either period."
+      : symptomCount === 0
+        ? "No symptoms were logged this period; " + previousSymptomCount + " in the previous period."
+        : symptomDifference === 0
+          ? "Same number as the previous period: " + symptomCount + "."
+          : String(Math.abs(symptomDifference)) + " " + (symptomDifference > 0 ? "more" : "fewer") + " symptom " + (Math.abs(symptomDifference) === 1 ? "record" : "records") + " than the previous period."
+    : symptomCount === 0
+      ? "No symptom logs were found for this period."
+      : "The previous period is not available for comparison.";
+  const measurementReviews = reportMeasurementReviews(report);
   const vitalConfigs = [
-    { key: "systolic", label: "Systolic blood pressure", unit: "mmHg", digits: 0 },
-    { key: "diastolic", label: "Diastolic blood pressure", unit: "mmHg", digits: 0 },
-    { key: "heartRate", label: "Heart rate", unit: "bpm", digits: 0 },
-    { key: "weight", label: "Weight", unit: "kg", digits: 1 },
-    { key: "oxygen", label: "Oxygen saturation", unit: "%", digits: 1 },
-    { key: "temperature", label: "Temperature", unit: "°C", digits: 1 },
-    { key: "respiratory", label: "Respiratory rate", unit: "/min", digits: 0 },
+    { key: "systolic", label: "Systolic blood pressure", description: "The top number in a blood pressure reading. It measures pressure when your heart beats.", unit: "mmHg", digits: 0 },
+    { key: "diastolic", label: "Diastolic blood pressure", description: "The bottom number in a blood pressure reading. It measures pressure between heartbeats.", unit: "mmHg", digits: 0 },
+    { key: "heartRate", label: "Heart rate", description: "How many times your heart beats in one minute. Activity, stress and some medicines can change it.", unit: "bpm", digits: 0 },
+    { key: "weight", label: "Weight", description: "Your body weight from measurements saved during this period.", unit: "kg", digits: 1 },
+    { key: "oxygen", label: "Oxygen saturation", description: "An estimate of the oxygen in your blood, usually shown as a percentage by a pulse oximeter.", unit: "%", digits: 1 },
+    { key: "temperature", label: "Temperature", description: "Your recorded body temperature. The measurement method and time of day can affect the result.", unit: "°C", digits: 1 },
+    { key: "respiratory", label: "Breathing rate", description: "How many breaths you take in one minute. Adult reference values generally refer to resting measurements.", unit: "breaths/min", digits: 0 },
   ];
   const activeVitals = vitalConfigs
     .map((config) => ({
       ...config,
       current: vitalSeries(report, config.key),
       previous: vitalSeries(previousReport, config.key),
+      review: measurementReviews.find((review) => review.key === config.key) ?? null,
     }))
     .filter((config) => config.current.length > 0);
   const routineConfigs = [
-    { field: "sleepHours", label: "Self-reported sleep", subtitle: "Average sleep duration from your daily check-ins.", unit: "h", digits: 1, icon: Moon },
-    { field: "stressLevel", label: "Stress level", subtitle: "Your average self-reported stress score.", unit: "/10", digits: 1, icon: Activity },
-    { field: "waterIntakeMl", label: "Water intake", subtitle: "Average water logged per day.", unit: "ml", digits: 0, icon: Droplets },
-    { field: "exerciseMinutes", label: "Exercise logged", subtitle: "Average exercise minutes per day in your check-ins.", unit: "min", digits: 0, icon: Footprints },
+    { field: "sleepHours", label: "Sleep", subtitle: "Average hours slept on days you completed a check-in.", unit: "hours", digits: 1, icon: Moon },
+    { field: "stressLevel", label: "Stress rating", subtitle: "Your average stress rating on check-in days.", unit: "/10", digits: 1, icon: Activity },
+    { field: "waterIntakeMl", label: "Water logged", subtitle: "Average water amount entered on check-in days.", unit: "ml", digits: 0, icon: Droplets },
+    { field: "exerciseMinutes", label: "Exercise logged", subtitle: "Average exercise minutes entered on check-in days.", unit: "min", digits: 0, icon: Footprints },
   ];
   const routines = routineConfigs.map((config) => ({
     ...config,
@@ -625,16 +793,36 @@ function HealthReportInsights({
       <section>
         <div className="mb-3 flex items-end justify-between gap-3"><div><p className="text-[10px] font-black uppercase tracking-[0.16em] text-[#24c1c4]">Period overview</p><h2 className="mt-1 text-xl font-black text-[#0b2d54]">The bigger picture</h2></div><span className="text-xs text-slate-400">{totalDays} days</span></div>
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-          <SummaryTile icon={CalendarDays} label="Days with entries" value={String(daysLogged) + "/" + String(totalDays)} detail={daysLogged === 0 ? "No dated health activity found." : Math.round(daysLogged / totalDays * 100) + "% of the period has at least one dated record."} />
-          <SummaryTile icon={Activity} label="Symptom records" value={String(symptomCount)} detail={symptomDifference === null ? "A comparison will appear when prior data loads." : symptomDifference === 0 ? "Same number as the previous period." : String(Math.abs(symptomDifference)) + " " + (symptomDifference > 0 ? "more" : "fewer") + " than the previous period."} />
-          <SummaryTile icon={HeartPulse} label="Measurement readings" value={String(activeVitals.reduce((sum, item) => sum + item.current.length, 0))} detail={activeVitals.length ? activeVitals.length + " measurement types have enough records to summarise." : "No comparable vital readings were found."} />
-          <SummaryTile icon={Footprints} label="Workout sessions" value={String(workouts.length)} detail={workouts.length ? formatNumber(workoutMinutes, 0) + " minutes logged in total." : "No workout sessions were recorded."} />
+          <SummaryTile icon={CalendarDays} label="Days with entries" value={String(daysLogged) + "/" + String(totalDays)} detail={daysLogged === 0 ? "No dated health records were found for these days." : "You saved at least one health record on " + daysLogged + " of " + totalDays + " days. Days without an entry are not counted as zero."} />
+          <SummaryTile icon={Activity} label="Symptom records" value={String(symptomCount)} detail={symptomComparison} />
+          <SummaryTile icon={HeartPulse} label="Vital readings" value={String(activeVitals.reduce((sum, item) => sum + item.current.length, 0))} detail={activeVitals.length ? "Readings across " + activeVitals.length + " measurement types." : "No dated vital readings were found for this period."} />
+          <SummaryTile icon={Footprints} label="Workout sessions" value={String(workouts.length)} detail={workouts.length ? formatNumber(workoutMinutes, 0) + " minutes recorded across these workouts." : "No workouts were logged. If you were active but did not record a workout, it will not appear here."} />
         </div>
       </section>
 
+      {measurementReviews.length > 0 && (
+        <section aria-label="Readings to double-check" className={"rounded-2xl border p-4 sm:p-5 " + (measurementReviews.some((item) => item.severity === "urgent") ? "border-rose-300 bg-rose-50" : "border-amber-200 bg-amber-50")}>
+          <div className="flex items-start gap-3">
+            <AlertTriangle className={"mt-0.5 h-5 w-5 shrink-0 " + (measurementReviews.some((item) => item.severity === "urgent") ? "text-rose-700" : "text-amber-700")} />
+            <div className="min-w-0 flex-1">
+              <h2 className={"font-black " + (measurementReviews.some((item) => item.severity === "urgent") ? "text-rose-950" : "text-amber-950")}>Readings to double-check</h2>
+              <p className={"mt-1 text-sm leading-6 " + (measurementReviews.some((item) => item.severity === "urgent") ? "text-rose-900" : "text-amber-900")}>Some saved values are far outside common adult reference ranges. Check the date, source, unit and original reading. Reference ranges vary with age, activity and health conditions. These flags do not diagnose a condition.</p>
+              <div className="mt-3 space-y-3">
+                {measurementReviews.map((item) => (
+                  <div key={item.key} className="rounded-xl border border-black/5 bg-white/85 p-3">
+                    <p className="text-sm font-black text-[#0b2d54]">{item.label}: {formatNumber(item.value, item.key === "temperature" || item.key === "oxygen" ? 1 : 0)} {item.unit} · {dateLabel(new Date(item.timestamp).toISOString())}</p>
+                    <p className="mt-1 text-sm leading-6 text-slate-700">{item.message}</p>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        </section>
+      )}
+
       <section>
-        <div className="mb-3"><p className="text-[10px] font-black uppercase tracking-[0.16em] text-[#24c1c4]">Change over time</p><h2 className="mt-1 text-xl font-black text-[#0b2d54]">Measurement trends</h2><p className="mt-1 text-sm leading-6 text-slate-500">Averages and direction of change come from the readings saved in this period. They describe the data, not a diagnosis or a judgement that a change is good or bad.</p></div>
-        {activeVitals.length ? <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">{activeVitals.map((item) => <VitalTrendCard key={item.key} label={item.label} unit={item.unit} digits={item.digits} current={item.current} previous={item.previous} previousLoading={previousLoading} />)}</div> : <div className="rounded-2xl border border-dashed border-slate-300 bg-white p-5 text-sm leading-6 text-slate-500">No dated vital readings were found for this period. Blood pressure, heart rate, weight and other measurements will appear here after they have been recorded in Health Vitals or received from a connected device.</div>}
+        <div className="mb-3"><p className="text-[10px] font-black uppercase tracking-[0.16em] text-[#24c1c4]">Change over time</p><h2 className="mt-1 text-xl font-black text-[#0b2d54]">Measurement trends</h2><p className="mt-1 text-sm leading-6 text-slate-500">Each card explains the measurement, shows the average of saved readings, and tells you how it compares with the previous period. A change by itself does not say what caused it or whether it is right for you.</p></div>
+        {activeVitals.length ? <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">{activeVitals.map((item) => <VitalTrendCard key={item.key} label={item.label} description={item.description} unit={item.unit} digits={item.digits} current={item.current} previous={item.previous} previousLoading={previousLoading} review={item.review} />)}</div> : <div className="rounded-2xl border border-dashed border-slate-300 bg-white p-5 text-sm leading-6 text-slate-500">No dated vital readings were found for this period. Once you save blood pressure, heart rate, weight or other measurements, they will appear here.</div>}
       </section>
 
       <section>
@@ -652,17 +840,17 @@ function HealthReportInsights({
         <div className="mb-3"><p className="text-[10px] font-black uppercase tracking-[0.16em] text-[#24c1c4]">Patterns to review</p><h2 className="mt-1 text-xl font-black text-[#0b2d54]">What stands out</h2><p className="mt-1 text-sm leading-6 text-slate-500">These are observations from the records you saved, not proof of what caused a symptom.</p></div>
         <div className="grid gap-3 md:grid-cols-2">
           <article className="rounded-2xl border border-slate-200 bg-white p-5">
-            <div className="flex items-center gap-2"><Activity className="h-5 w-5 text-[#24c1c4]" /><h3 className="font-bold text-[#0b2d54]">Symptom recurrence</h3></div>
-            {symptomPattern ? <><p className="mt-3 text-lg font-black text-[#0b2d54]">{symptomPattern.label}</p><p className="mt-1 text-sm leading-6 text-slate-600">Recorded {symptomPattern.count} times in this period. Consider whether timing, triggers or severity are worth discussing with your healthcare professional.</p></> : <p className="mt-3 text-sm leading-6 text-slate-500">{symptomCount === 0 ? "No symptom logs were found in this period." : "No symptom label was repeated in the available records for this period."}</p>}
+            <div className="flex items-center gap-2"><Activity className="h-5 w-5 text-[#24c1c4]" /><h3 className="font-bold text-[#0b2d54]">Symptoms that came back</h3></div>
+            {symptomPattern ? <><p className="mt-3 text-lg font-black text-[#0b2d54]">{symptomPattern.label}</p><p className="mt-1 text-sm leading-6 text-slate-600">You logged this symptom {symptomPattern.count} times during this period. You may want to note when it happens and any possible triggers to discuss with your healthcare professional.</p></> : <p className="mt-3 text-sm leading-6 text-slate-500">{symptomCount === 0 ? "You did not log any symptoms during this period. This does not tell us whether you felt well on days without a log." : "No symptom name appeared more than once in the records available for this period."}</p>}
             {repeated.length > 1 && <p className="mt-2 text-xs text-slate-500">Other repeated labels: {repeated.filter((item) => item.count > 1 && item.label !== symptomPattern?.label).slice(0, 2).map((item) => item.label + " (" + item.count + ")").join(" · ") || "None"}</p>}
           </article>
           <article className="rounded-2xl border border-slate-200 bg-white p-5">
             <div className="flex items-center gap-2"><ClipboardList className="h-5 w-5 text-[#24c1c4]" /><h3 className="font-bold text-[#0b2d54]">Logging consistency</h3></div>
             <p className="mt-3 text-lg font-black text-[#0b2d54]">{daysLogged} of {totalDays} days</p>
-            <p className="mt-1 text-sm leading-6 text-slate-600">{daysLogged === 0 ? "No dated entries were available to review." : daysLogged / totalDays < 0.5 ? "There are gaps in the available records. More regular check-ins can make comparisons more useful." : daysLogged / totalDays < 0.85 ? "There is a useful amount of data, with some days missing. Consistent entries will make future trends easier to interpret." : "Records cover most of the period, giving a clearer view of changes across days."}</p>
+            <p className="mt-1 text-sm leading-6 text-slate-600">{daysLogged === 0 ? "No dated records were available for this period." : "Records appear on " + daysLogged + " of " + totalDays + " days. There are " + (totalDays - daysLogged) + " days without a saved record. That does not mean something was wrong or right on those days; it only means there is no entry to compare."}</p>
           </article>
-          {moodPattern && <article className="rounded-2xl border border-slate-200 bg-white p-5"><div className="flex items-center gap-2"><HeartPulse className="h-5 w-5 text-[#24c1c4]" /><h3 className="font-bold text-[#0b2d54]">Mood check-ins</h3></div><p className="mt-3 text-sm leading-6 text-slate-600">{moodPattern} This is a self-reported signal, not a mental-health assessment.</p></article>}
-          {association && <article className="rounded-2xl border border-slate-200 bg-white p-5"><div className="flex items-center gap-2"><Moon className="h-5 w-5 text-[#24c1c4]" /><h3 className="font-bold text-[#0b2d54]">Sleep and stress together</h3></div><p className="mt-3 text-sm leading-6 text-slate-600">On days with shorter logged sleep, average stress was {formatNumber(association.shortStress, 1)}/10 versus {formatNumber(association.longStress, 1)}/10 on days with longer logged sleep ({association.shorterDays} and {association.longerDays} days respectively).</p><p className="mt-2 text-xs leading-5 text-slate-500">This is a pattern of records that occurred together, not evidence that one caused the other.</p></article>}
+          {moodPattern && <article className="rounded-2xl border border-slate-200 bg-white p-5"><div className="flex items-center gap-2"><HeartPulse className="h-5 w-5 text-[#24c1c4]" /><h3 className="font-bold text-[#0b2d54]">Mood check-ins</h3></div><p className="mt-3 text-sm leading-6 text-slate-600">{moodPattern} These are the mood ratings you entered in your check-ins; they are not a diagnosis.</p></article>}
+          {association && <article className="rounded-2xl border border-slate-200 bg-white p-5"><div className="flex items-center gap-2"><Moon className="h-5 w-5 text-[#24c1c4]" /><h3 className="font-bold text-[#0b2d54]">Sleep and stress on the same days</h3></div><p className="mt-3 text-sm leading-6 text-slate-600">On your {association.shorterDays} days with shorter logged sleep, your average stress rating was {formatNumber(association.shortStress, 1)}/10. On your {association.longerDays} days with longer logged sleep, it was {formatNumber(association.longStress, 1)}/10.</p><p className="mt-2 text-xs leading-5 text-slate-500">These ratings happened on the same days; this small pattern does not show that sleep caused the stress ratings.</p></article>}
         </div>
       </section>
 
@@ -681,7 +869,7 @@ function HealthReportInsights({
 
       {noAnalysisData && <section className="rounded-2xl border border-dashed border-slate-300 bg-white p-6"><div className="flex items-start gap-3"><Info className="mt-0.5 h-5 w-5 shrink-0 text-[#24c1c4]" /><div><h2 className="font-bold text-[#0b2d54]">More records are needed to uncover patterns</h2><p className="mt-1 text-sm leading-6 text-slate-500">As you record Health Vitals, daily check-ins, symptoms or connected-device sessions, future reports can compare these values across periods. This report intentionally avoids repeating individual journal entries.</p><Link href="/today" className="mt-4 inline-flex min-h-10 items-center gap-2 rounded-xl bg-[#0b2d54] px-4 py-2 text-xs font-bold text-white">Record today’s health <ArrowRight className="h-4 w-4" /></Link></div></div></section>}
 
-      <p className="rounded-2xl bg-slate-100 p-4 text-xs leading-5 text-slate-500">Report generated {dateLabel(report.generatedAt)}. Trends use only dated values available for the selected period. Missing records are not treated as zero. Use the Health Journal for individual entries and your clinician for medical interpretation.</p>
+      <p className="rounded-2xl bg-slate-100 p-4 text-xs leading-5 text-slate-500">Report generated {dateLabel(report.generatedAt)}. This summary uses dated information saved for the selected period. Open the Health Journal to see individual entries, and ask your healthcare professional how the results apply to you.</p>
     </div>
   );
 }
@@ -783,6 +971,16 @@ export default function HealthReportPage() {
 
           {previousFailed && <div className="mt-4 flex items-start gap-2 rounded-2xl border border-amber-200 bg-amber-50 p-4 text-xs leading-5 text-amber-900"><Info className="mt-0.5 h-4 w-4 shrink-0" />The current report is available, but the prior-period comparison could not be loaded. Current-period trends remain available; comparison labels will appear when historical data is accessible.</div>}
 
+          <section aria-label="How to read this report" className="mt-4 rounded-2xl border border-[#dcebed] bg-white p-4 sm:p-5">
+            <h2 className="text-sm font-black text-[#0b2d54]">How to read this report</h2>
+            <div className="mt-2 grid gap-2 text-xs leading-5 text-slate-600 sm:grid-cols-2">
+              <p><strong className="text-[#0b2d54]">Average:</strong> the average of the readings saved in this period, not a value for every day.</p>
+              <p><strong className="text-[#0b2d54]">Most recent:</strong> the latest dated reading available.</p>
+              <p><strong className="text-[#0b2d54]">Change:</strong> first-to-most-recent compares two readings. “Previous period” compares this report with the earlier week or month.</p>
+              <p><strong className="text-[#0b2d54]">Missing entry:</strong> means no value was saved; it is not counted as zero.</p>
+            </div>
+            <p className="mt-3 border-t border-slate-100 pt-3 text-xs leading-5 text-slate-500">General adult reference ranges are guides, not personal targets. Your age, activity, long-term conditions and clinician’s advice may change what is right for you.</p>
+          </section>
           <HealthReportInsights report={report} previousReport={previousReport} previousLoading={previousLoading} />
         </div>
       </main>
