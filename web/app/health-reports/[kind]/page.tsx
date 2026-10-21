@@ -121,7 +121,7 @@ type Report = {
   generatedAt: string;
 };
 
-type SeriesPoint = { date: string; value: number; source?: string };
+type SeriesPoint = { date: string; value: number; timestamp: number; source?: string };
 type DailyValue = { date: string; value: number };
 
 function unwrap<T>(value: unknown): T {
@@ -204,16 +204,50 @@ function dailyMetric(report: Report | null, field: string): DailyValue[] {
 
 function recordedDays(report: Report) {
   const days = new Set<string>();
+  const periodStart = new Date(report.period.start).getTime();
+  const periodEnd = new Date(report.period.end).getTime();
   const add = (value: unknown) => {
+    if (value === null || value === undefined || value === "") return;
+    const timestamp = new Date(String(value)).getTime();
+    if (!Number.isFinite(timestamp) || timestamp < periodStart || timestamp >= periodEnd) return;
     const key = dateKey(value);
     if (key) days.add(key);
   };
-  report.activity.journalEntries.forEach((item) => add(item.createdAt || item.recordedAt));
-  report.activity.symptoms.forEach((item) => add(item.startedAt || item.createdAt));
-  report.activity.patientVitals.forEach((item) => add(item.recordedAt || item.createdAt));
+  const addRecord = (item: unknown, fields: string[]) => {
+    if (!item || typeof item !== "object") return;
+    const record = item as Record<string, unknown>;
+    fields.forEach((field) => add(record[field]));
+    const encounter = record.encounter;
+    if (encounter && typeof encounter === "object") {
+      add((encounter as Record<string, unknown>).startedAt);
+    }
+  };
+
+  report.activity.journalEntries.forEach((item) => {
+    addRecord(item, ["createdAt", "recordedAt"]);
+  });
+  report.activity.symptoms.forEach((item) => {
+    add(item.startedAt || item.createdAt);
+  });
+  report.activity.patientVitals.forEach((item) => {
+    add(item.recordedAt || item.createdAt);
+  });
   report.activity.deviceMeasurements.forEach((item) => add(item.measuredAt));
   report.activity.sleepSessions.forEach((item) => add(item.startedAt || item.endedAt));
   report.activity.workouts.forEach((item) => add(item.startedAt || item.endedAt));
+
+  report.activity.appointments.forEach((item) => addRecord(item, ["scheduledStart", "scheduledEnd"]));
+  report.clinical.encounters.forEach((item) => addRecord(item, ["startedAt", "endedAt", "createdAt"]));
+  report.clinical.diagnoses.forEach((item) => addRecord(item, ["diagnosedAt", "createdAt"]));
+  report.clinical.prescriptions.forEach((item) => addRecord(item, ["issuedAt", "createdAt"]));
+  report.clinical.notes.forEach((item) => addRecord(item, ["createdAt", "updatedAt"]));
+  report.clinical.vitals.forEach((item) => addRecord(item, ["measuredAt", "recordedAt"]));
+  report.clinical.labResults.forEach((item) => addRecord(item, ["reportedAt", "releasedAt"]));
+  report.clinical.imaging.forEach((item) => addRecord(item, ["performedAt", "reportedAt", "createdAt"]));
+  report.clinical.procedures.forEach((item) => addRecord(item, ["performedAt", "createdAt"]));
+  report.clinical.carePlans.forEach((item) => addRecord(item, ["updatedAt", "createdAt"]));
+  report.clinical.referrals.forEach((item) => addRecord(item, ["updatedAt", "completedDate", "acceptedDate", "requestedDate"]));
+
   return days;
 }
 
@@ -225,8 +259,9 @@ function addVital(
 ) {
   const numeric = finite(value);
   const day = dateKey(at);
-  if (numeric === null || !day) return;
-  output.push({ date: day, value: numeric, source });
+  const timestamp = at ? new Date(String(at)).getTime() : Number.NaN;
+  if (numeric === null || !day || !Number.isFinite(timestamp)) return;
+  output.push({ date: day, value: numeric, timestamp, source });
 }
 
 function normaliseVitalName(value: unknown) {
@@ -304,10 +339,12 @@ function vitalSeries(report: Report | null, metric: string): SeriesPoint[] {
 
   const deduped = new Map<string, SeriesPoint>();
   for (const point of points) {
-    const key = point.date + "|" + point.value;
+    // Keep separate same-day readings, but collapse exact duplicates when the
+    // same measurement arrives through more than one source.
+    const key = point.timestamp + "|" + point.value;
     if (!deduped.has(key)) deduped.set(key, point);
   }
-  return Array.from(deduped.values()).sort((a, b) => a.date.localeCompare(b.date));
+  return Array.from(deduped.values()).sort((a, b) => a.timestamp - b.timestamp);
 }
 
 function lowMoodCounts(report: Report | null) {
