@@ -483,6 +483,9 @@ function recordedDays(report: Report) {
   report.activity.deviceMeasurements.forEach((item) => add(item.measuredAt));
   report.activity.sleepSessions.forEach((item) => add(item.startedAt || item.endedAt));
   report.activity.workouts.forEach((item) => add(item.startedAt || item.endedAt));
+  (report.currentSnapshot?.activeGoals ?? []).forEach((goal) => {
+    (goal.progress ?? []).forEach((item) => add(item.measuredAt));
+  });
 
   report.activity.appointments.forEach((item) => addRecord(item, ["scheduledStart", "scheduledEnd"]));
   report.clinical.encounters.forEach((item) => addRecord(item, ["startedAt", "endedAt", "createdAt"]));
@@ -1095,7 +1098,6 @@ function PersonalisedInsights({
   const weightGoalProgress = goalProgressItemsForPattern(report, /weight|body mass/);
   const glucoseGoalProgress = goalProgressItemsForPattern(report, /blood glucose|glucose|hba1c|a1c|diabetes/);
   const lipidGoalProgress = goalProgressItemsForPattern(report, /cholesterol|lipid|triglyceride|ldl|hdl/);
-  const smokingGoalProgress = goalProgressItemsForPattern(report, /smoking|tobacco|cigarette/);
   const alcoholGoalProgress = goalProgressItemsForPattern(report, /alcohol|drinking/);
   const conditions = [
     ...(snapshot?.conditions ?? [])
@@ -1698,7 +1700,7 @@ function HealthReportInsights({
     current: dailyMetric(report, config.field),
     previous: dailyMetric(previousReport, config.field),
   })).filter((config) => config.current.length > 0);
-  const noAnalysisData = activeVitals.length === 0 && routines.length === 0 && symptomCount === 0 && sleepSessions.length === 0 && workouts.length === 0 && clinicalCount === 0;
+  const noAnalysisData = activeVitals.length === 0 && routines.length === 0 && goalProgressItems.length === 0 && symptomCount === 0 && sleepSessions.length === 0 && workouts.length === 0 && clinicalCount === 0;
   const moodPattern = lowMood.total > 0
     ? lowMood.low + " of " + lowMood.total + " mood check-ins were marked low or very low."
     : "";
