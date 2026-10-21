@@ -653,7 +653,7 @@ export default function TodayWeightGoal({ goal, fallbackWeight, bmi: dashboardBm
               </div>
             )}
             {!goalCompleted && guidanceMessage && <p className="mt-1.5">{guidanceMessage}</p>}
-            {!goalCompleted && bmiChange != null && Math.abs(bmiChange) >= 0.1 && <p className="mt-1.5">BMI change since goal start: {bmiChange > 0 ? "+" : ""}{bmiChange.toFixed(1)}.</p>
+            {!goalCompleted && bmiChange != null && Math.abs(bmiChange) >= 0.1 && <p className="mt-1.5">BMI change since goal start: {bmiChange > 0 ? "+" : ""}{bmiChange.toFixed(1)}.</p>}
             {!goalCompleted && weeklyChangeKg != null && Math.abs(weeklyChangeKg) >= 0.1 && <p className="mt-1.5">Weight change across at least 7 days: {weeklyChangeKg > 0 ? "+" : ""}{weeklyChangeKg.toFixed(1)} kg.</p>}
             {!goalCompleted && gainTargetCaution && upperScreeningWeight != null && <p className="mt-1.5">At your recorded height, BMI 24.9 corresponds to about {formatKg(upperScreeningWeight)} kg. This is screening context, not a required target.</p>}
             {!goalCompleted && (bmiCaution || gainTargetCaution) && <>
