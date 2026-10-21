@@ -1063,7 +1063,7 @@ function vitalStatus(report: Report, metric: string, age: number | null): VitalS
       return { label: "Stage 1 range", detail: "This is above the normal adult reference. Compare repeated readings with your clinician's goal.", tone: "watch" };
     }
     if (sys !== null && dia !== null && sys >= 120 && dia < 80) {
-      return { label: "Elevated range", detail: "The top number is above the normal adult reference, while the bottom number is below 80.", tone: "watch" };
+      return { label: "Elevated range", detail: "Your paired reading has a top number of 120–129 mmHg and a bottom number below 80 mmHg. This is an elevated adult category; compare repeated readings with your clinician.", tone: "watch" };
     }
     if ((sys !== null && sys < 90) || (dia !== null && dia < 60)) {
       return { label: "Low reading", detail: "A low reading should be interpreted with symptoms, medicines and your usual baseline.", tone: "watch" };
@@ -1249,7 +1249,7 @@ function SummaryTile({ icon: Icon, label, value, detail }: { icon: typeof Activi
   );
 }
 
-function ScoreRing({ percent, label, tone, size = 68 }: { percent: number | null; label: string; tone: StatusTone; size?: number }) {
+function ScoreRing({ percent, label, size = 68 }: { percent: number | null; label: string; tone: StatusTone; size?: number }) {
   const safePercent = percent === null ? 0 : Math.max(0, Math.min(100, percent));
   const text = percent === null ? "—" : String(Math.round(safePercent)) + "%";
   return (
@@ -1611,7 +1611,8 @@ function signalChange(current: DailyValue[], previous: DailyValue[], unit: strin
     const amount = formatNumber(absDelta, digits) + (Math.abs(absDelta - 1) < 0.000001 ? " point" : " points");
     return "The average is " + amount + (delta > 0 ? " higher" : " lower") + " than the previous period (" + value(previousAverage) + " previously → " + value(currentAverage) + " now).";
   }
-  return "This period is " + formatNumber(Math.abs(delta), digits) + (unit ? " " + unit : "") + (delta > 0 ? " higher" : " lower") +
+  const difference = unit ? formatNumber(Math.abs(delta), digits) + " " + unit : formatNumber(Math.abs(delta), digits) + " (unit not saved)";
+  return "This period is " + difference + (delta > 0 ? " higher" : " lower") +
     " than the previous-period average (" + value(previousAverage) + " previously → " + value(currentAverage) + " now).";
 }
 function PersonalisedInsights({
