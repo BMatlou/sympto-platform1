@@ -560,11 +560,11 @@ function trendVitalSeries(report: Report | null, metric: string, age: number | n
   const points = vitalSeries(report, metric);
   return points.filter((point) => {
     const value = point.value;
-    // Keep raw values in vitalSeries for visible alerts. These narrow exclusions
-    // only protect trend averages from invalid scales or extreme likely entry/device
-    // errors; a legitimate warning remains visible and must be reviewed.
-    if (metric === "oxygen") return value > 0 && value <= 100 && value > 88;
-    if (metric === "temperature") return value >= 30 && value < 43;
+    // Keep raw values in vitalSeries for visible alerts. Exclude values that the
+    // report flags for review from trend averages, but never remove them from the
+    // original report data or warning panel.
+    if (metric === "oxygen") return value > 92 && value <= 100;
+    if (metric === "temperature") return value >= 35 && value < 40;
     if (metric === "respiratory" && age !== null && age >= 18) return value >= 8 && value <= 30;
     if (metric === "heartRate") return value > 0 && value <= 250;
     if (metric === "systolic") return value >= 40 && value <= 300;
@@ -1281,7 +1281,7 @@ function VitalTrendCard({
         <div>
           <p className="text-sm font-bold text-[#0b2d54]">{label}</p>
           <p className="mt-1 text-[11px] text-slate-500">{rawCurrent.length} {rawCurrent.length === 1 ? "reading" : "readings"} saved in this period</p>
-          {excludedCount > 0 && <p className="mt-1 text-[10px] font-bold text-amber-800">{excludedCount} extreme or invalid {excludedCount === 1 ? "value is" : "values are"} excluded from the trend average and shown in the review alerts.</p>}
+          {excludedCount > 0 && <p className="mt-1 text-[10px] font-bold text-amber-800">{excludedCount} flagged or out-of-scale {excludedCount === 1 ? "value is" : "values are"} excluded from the trend average and shown in the review alerts.</p>}
         </div>
         <HeartPulse className="h-5 w-5 shrink-0 text-[#24c1c4]" />
       </div>
