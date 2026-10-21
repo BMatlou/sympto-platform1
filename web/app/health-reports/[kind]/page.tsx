@@ -1531,6 +1531,81 @@ function latestValuesPerDay(points: SeriesPoint[]): DailyValue[] {
     .sort((a, b) => a.date.localeCompare(b.date));
 }
 
+function hydrationTrendPair(report: Report, previousReport: Report | null): {
+  current: DailyValue[];
+  previous: DailyValue[];
+  unit: string;
+  source: string;
+} {
+  const checkInsCurrent = dailyMetric(report, "waterIntakeMl");
+  const checkInsPrevious = dailyMetric(previousReport, "waterIntakeMl");
+  // Prefer the same source in both periods. Do not fill an absent check-in
+  // day with a different source, because that would silently mix methods.
+  if (checkInsCurrent.length > 0 || checkInsPrevious.length > 0) {
+    return { current: checkInsCurrent, previous: checkInsPrevious, unit: "ml", source: "Daily health check-ins" };
+  }
+
+  const goalOptions = goalProgressTrendItems(report, previousReport)
+    .filter((item) =>
+      /HYDRATION|WATER/.test(String(item.category ?? "").toUpperCase()) ||
+      /hydration|water intake|drink more water/i.test(item.title),
+    )
+    .sort((a, b) => (b.current.length + b.previous.length) - (a.current.length + a.previous.length));
+  if (goalOptions.length > 0) {
+    const item = goalOptions[0];
+    return {
+      current: item.current,
+      previous: item.previous,
+      unit: item.unit || "",
+      source: "Health goal logs",
+    };
+  }
+
+  const hydrationPattern = /hydration|water[._\s-]?intake|water.?consumed|fluid[._\s-]?intake/i;
+  const currentEvents = goalMetricSeries(report, hydrationPattern);
+  const previousEvents = goalMetricSeries(previousReport, hydrationPattern);
+  if (currentEvents.length > 0 || previousEvents.length > 0) {
+    const unit = String(currentEvents.at(-1)?.unit || previousEvents.at(-1)?.unit || "").trim();
+    const filterUnit = (points: SeriesPoint[]) => unit
+      ? points.filter((point) => String(point.unit ?? "").trim().toLowerCase() === unit.toLowerCase())
+      : points;
+    return {
+      current: latestValuesPerDay(filterUnit(currentEvents)),
+      previous: latestValuesPerDay(filterUnit(previousEvents)),
+      unit,
+      source: "Recorded hydration metric events",
+    };
+  }
+
+  const metricKeys = Array.from(new Set([
+    ...(report.activity.wellnessMetrics ?? []).map((item) => String(item.metricKey ?? "").trim()),
+    ...(report.activity.deviceMeasurements ?? []).map((item) => String(item.metricKey || item.measurementType || item.vitalType?.name || "").trim()),
+    ...(previousReport?.activity.wellnessMetrics ?? []).map((item) => String(item.metricKey ?? "").trim()),
+    ...(previousReport?.activity.deviceMeasurements ?? []).map((item) => String(item.metricKey || item.measurementType || item.vitalType?.name || "").trim()),
+  ])).filter((key) => key && hydrationPattern.test(key));
+
+  const connected = metricKeys.map((key) => ({
+    key,
+    current: combineDatedSeries(wellnessMetricSeries(report, key), deviceMetricSeries(report, key)),
+    previous: combineDatedSeries(wellnessMetricSeries(previousReport, key), deviceMetricSeries(previousReport, key)),
+  })).sort((a, b) => (b.current.length + b.previous.length) - (a.current.length + a.previous.length));
+  const best = connected[0];
+  if (best) {
+    const unit = String(best.current.at(-1)?.unit || best.previous.at(-1)?.unit || "").trim();
+    const filterUnit = (points: SeriesPoint[]) => unit
+      ? points.filter((point) => String(point.unit ?? "").trim().toLowerCase() === unit.toLowerCase())
+      : points;
+    return {
+      current: latestValuesPerDay(filterUnit(best.current)),
+      previous: latestValuesPerDay(filterUnit(best.previous)),
+      unit,
+      source: "Connected device or wellness data",
+    };
+  }
+
+  return { current: [], previous: [], unit: "", source: "" };
+}
+
 function symptomLogAnalytics(report: Report | null) {
   const logs = report?.activity.symptoms ?? [];
   const rank: Record<string, number> = { NONE: 0, MILD: 1, MODERATE: 2, SEVERE: 3, VERY_SEVERE: 4 };
@@ -2433,6 +2508,28 @@ function HealthReportInsights({
   const previousSteps = latestValuesPerDay(previousWellnessSteps.length ? previousWellnessSteps : previousDeviceSteps.length ? previousDeviceSteps : previousGoalSteps);
   const currentStepValues = currentSteps.map((item) => item.value);
   const previousStepValues = previousSteps.map((item) => item.value);
+  const hydrationTrend = hydrationTrendPair(report, previousReport);
+  const currentHydrationValues = hydrationTrend.current.map((item) => item.value);
+  const previousHydrationValues = hydrationTrend.previous.map((item) => item.value);
+  const hydrationDigits = /(^|[^a-z])ml([^a-z]|$)/i.test(hydrationTrend.unit) ? 0 : 1;
+  const medicationsOnFile = report.currentSnapshot?.medications ?? [];
+  const doseTotalsCurrent = medicationDoseTotals(report);
+  const doseTotalsPrevious = medicationDoseTotals(previousReport);
+  const clinicalCountPrevious = previousReport ? clinicalEvents(previousReport) : null;
+  const previousClinicalDetail = previousLoading
+    ? "Comparing with the previous period…"
+    : clinicalCountPrevious === null
+      ? "The previous period is not available for comparison."
+      : clinicalCountPrevious === clinicalCount
+        ? "Same number of clinical updates as the previous period."
+        : String(Math.abs(clinicalCount - clinicalCountPrevious)) + " " + (clinicalCount > clinicalCountPrevious ? "more" : "fewer") + " clinical updates than the previous period.";
+  const medicationDetail = doseTotalsCurrent.eventTotal > 0
+    ? doseTotalsCurrent.eventTaken + " marked taken · " + doseTotalsCurrent.eventSkipped + " marked skipped · " + formatNumber(doseTotalsCurrent.eventAdherencePercent, 1) + "% of logged dose actions marked taken."
+    : doseTotalsCurrent.legacyTotal > 0
+      ? doseTotalsCurrent.legacyTaken + " older entries marked taken · " + doseTotalsCurrent.legacySkipped + " marked skipped. These are day-status entries, not complete dose-level counts."
+      : medicationsOnFile.length > 0
+        ? "Medication records are available, but no dated dose outcomes were found for this period."
+        : "No medication records or dated dose outcomes were returned in this report.";
   const hasCategoricalCheckIns = report.activity.journalEntries.some((entry) => Boolean(entry.mood || entry.energyLevel || entry.sleepQuality));
   const noAnalysisData = activeVitals.length === 0 && routines.length === 0 && currentSteps.length === 0 && goalProgressItems.length === 0 && (report.goalMetricEvents ?? []).length === 0 && (report.activity.wellnessMetrics ?? []).length === 0 && !hasCategoricalCheckIns && symptomCount === 0 && sleepSessions.length === 0 && workouts.length === 0 && clinicalCount === 0;
   const moodPattern = lowMood.total > 0
@@ -2451,6 +2548,52 @@ function HealthReportInsights({
           <SummaryTile icon={Activity} label="Symptom records" value={String(symptomCount)} detail={symptomComparison} />
           <SummaryTile icon={HeartPulse} label="Readings used in trends" value={String(activeVitals.reduce((sum, item) => sum + item.current.length, 0))} detail={activeVitals.length ? "Valid trend values across " + activeVitals.length + " measurement types. Flagged extreme values are shown separately." : "No readings could be used for trend calculations in this period."} />
           <SummaryTile icon={Footprints} label="Workout sessions" value={String(workouts.length)} detail={workouts.length ? formatNumber(workoutMinutes, 0) + " minutes recorded across these workouts." : "No workouts were logged. If you were active but did not record a workout, it will not appear here."} />
+        </div>
+      </section>
+
+      <section aria-label="Health trends analysis">
+        <div className="mb-3">
+          <p className="text-[10px] font-black uppercase tracking-[0.16em] text-[#24c1c4]">Health trends analysis</p>
+          <h2 className="mt-1 text-xl font-black text-[#0b2d54]">Key health patterns</h2>
+          <p className="mt-1 text-sm leading-6 text-slate-500">A concise summary of the same key areas highlighted by Sympto’s comprehensive report: steps, hydration, symptoms, medicines and clinical activity. Averages use days with recorded values; missing days are not treated as zero.</p>
+        </div>
+        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+          <SummaryTile
+            icon={Footprints}
+            label="Average daily steps"
+            value={currentSteps.length ? formatNumber(mean(currentStepValues), 0) : "Not recorded"}
+            detail={currentSteps.length
+              ? formatNumber(currentStepValues.length, 0) + " day(s) with dated counts. " + compareText(currentStepValues, previousStepValues, "steps/day", 0, previousLoading)
+              : "No dated step-count values were found in this period."}
+          />
+          <SummaryTile
+            icon={Droplets}
+            label="Average daily water"
+            value={hydrationTrend.current.length
+              ? formatNumber(mean(currentHydrationValues), hydrationDigits) + (hydrationTrend.unit ? " " + hydrationTrend.unit : "")
+              : "Not recorded"}
+            detail={hydrationTrend.current.length
+              ? "Average across " + hydrationTrend.current.length + " day(s) with a saved water value. Source: " + hydrationTrend.source + ". " + compareText(currentHydrationValues, previousHydrationValues, hydrationTrend.unit, hydrationDigits, previousLoading)
+              : "No dated water-intake values were found in check-ins, hydration-goal records or connected wellness data."}
+          />
+          <SummaryTile
+            icon={Activity}
+            label="Symptoms reported"
+            value={String(symptomCount)}
+            detail={symptomComparison + (symptomPattern ? " Most repeated symptom: " + symptomPattern.label + " (" + symptomPattern.count + " logs)." : "")}
+          />
+          <SummaryTile
+            icon={ClipboardList}
+            label="Medication records"
+            value={String(medicationsOnFile.length)}
+            detail={medicationDetail}
+          />
+          <SummaryTile
+            icon={Stethoscope}
+            label="Clinical updates"
+            value={String(clinicalCount)}
+            detail={previousClinicalDetail}
+          />
         </div>
       </section>
 
