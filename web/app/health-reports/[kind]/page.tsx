@@ -424,7 +424,9 @@ function dailyLatestMetric(report: Report | null, field: string): DailyValue[] {
   if (!report) return [];
   const latestByDate = new Map<string, { date: string; value: number; timestamp: number }>();
   report.activity.journalEntries.forEach((entry) => {
-    const at = entry.createdAt || entry.recordedAt || entry.updatedAt;
+    // A daily cumulative check-in may be edited many times; prefer its latest
+    // modification timestamp so we do not report the original, stale total.
+    const at = entry.updatedAt || entry.recordedAt || entry.createdAt;
     if (!withinReportPeriod(report, at)) return;
     const date = dateKey(at);
     const value = finite(entry[field]);
