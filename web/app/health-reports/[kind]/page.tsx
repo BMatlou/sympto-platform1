@@ -794,7 +794,7 @@ function vitalSeries(report: Report | null, metric: string): SeriesPoint[] {
     temperature: ["temperature", "bodyTemperature", "body_temperature"],
     respiratory: ["respiratoryRate", "breathingRate", "respiratory_rate"],
   };
-  const aliases = journalVitalFields[metric] ?? [];
+  const aliases = (journalVitalFields[metric] ?? []).map((field) => field.toLowerCase());
   report.activity.journalEntries.forEach((item) => {
     const record = item as Record<string, unknown>;
     const at = item.recordedAt || item.createdAt || item.updatedAt;
