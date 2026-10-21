@@ -2063,6 +2063,18 @@ function PersonalisedInsights({
     return counts;
   }, { up: 0, down: 0, steady: 0 });
   const hasComparableSignals = movementCounts.up + movementCounts.down + movementCounts.steady > 0;
+  const followUpRecommendations = recommendations.filter((item) => ![
+    "Urgent measurement needs review",
+    "Follow up flagged laboratory results",
+    "Symptom logging increased",
+    "Worsening or severe symptoms recorded",
+    "Medication side effects recorded",
+    "High stress check-ins",
+    "Mood ratings are low or have declined",
+    "Poor sleep quality reported",
+    "Short sleep recorded",
+    "Medication dose records need review",
+  ].includes(item.title)).slice(0, 3);
   const noPrior = previousReport === null;
   const coverageTone: StatusTone = coveragePercent >= 75 ? "good" : coveragePercent >= 40 ? "watch" : "high";
 
@@ -2088,10 +2100,10 @@ function PersonalisedInsights({
             </div>
             {doseCurrent.eventTotal > 0 ? (
               <>
-                <div className="mt-3 grid grid-cols-3 gap-2">
-                  <div className="rounded-lg bg-white p-3"><p className="text-[10px] font-bold uppercase tracking-wide text-slate-400">Taken</p><p className="mt-1 text-xl font-black text-emerald-700">{doseCurrent.eventTaken}</p></div>
-                  <div className="rounded-lg bg-white p-3"><p className="text-[10px] font-bold uppercase tracking-wide text-slate-400">Skipped</p><p className="mt-1 text-xl font-black text-rose-700">{doseCurrent.eventSkipped}</p></div>
-                  <div className="rounded-lg bg-white p-3"><p className="text-[10px] font-bold uppercase tracking-wide text-slate-400">Total</p><p className="mt-1 text-xl font-black text-[#0b2d54]">{doseCurrent.eventTotal}</p></div>
+                <div className="mt-3 flex flex-wrap gap-x-6 gap-y-2 rounded-lg bg-white px-3 py-2.5">
+                  <p className="text-xs text-slate-600"><span className="font-bold text-emerald-700">{doseCurrent.eventTaken}</span> taken</p>
+                  <p className="text-xs text-slate-600"><span className="font-bold text-rose-700">{doseCurrent.eventSkipped}</span> skipped</p>
+                  <p className="text-xs text-slate-600"><span className="font-bold text-[#0b2d54]">{doseCurrent.eventTotal}</span> actions logged</p>
                 </div>
                 <div className="mt-3 h-2 overflow-hidden rounded-full bg-rose-100"><div className="h-full rounded-full bg-emerald-500" style={{ width: String(doseCurrent.eventAdherencePercent ?? 0) + "%" }} /></div>
                 <p className="mt-2 text-xs font-semibold text-slate-600">{dosePrevious.eventTotal > 0
@@ -2186,29 +2198,25 @@ function PersonalisedInsights({
         )}
       </section>
 
-      <section className="rounded-2xl border border-[#dcebed] bg-white p-4 sm:p-5">
-        <div>
+      {followUpRecommendations.length > 0 && (
+        <section className="rounded-2xl border border-[#dcebed] bg-white p-4 sm:p-5" aria-label="Recommended follow-up">
           <p className="text-[10px] font-black uppercase tracking-[0.15em] text-[#0b7b80]">Next steps</p>
           <h2 className="mt-1 text-lg font-black text-[#0b2d54]">What deserves attention</h2>
-        </div>
-        {recommendations.filter((item) => item.title !== "Urgent measurement needs review" && item.title !== "Follow up flagged laboratory results").length ? (
           <div className="mt-3 divide-y divide-slate-100">
-            {recommendations.filter((item) => item.title !== "Urgent measurement needs review" && item.title !== "Follow up flagged laboratory results").slice(0, 3).map((item) => (
+            {followUpRecommendations.map((item) => (
               <div key={item.title} className="flex gap-3 py-3 first:pt-0 last:pb-0">
-                <span className={"mt-0.5 h-2.5 w-2.5 shrink-0 rounded-full " + (item.tone === "critical" ? "bg-rose-600" : item.tone === "high" ? "bg-orange-500" : item.tone === "watch" ? "bg-amber-500" : "bg-teal-500")} />
+                <span className={"mt-1 h-2.5 w-2.5 shrink-0 rounded-full " + (item.tone === "critical" ? "bg-rose-600" : item.tone === "high" ? "bg-orange-500" : item.tone === "watch" ? "bg-amber-500" : "bg-teal-500")} />
                 <div className="min-w-0 flex-1">
                   <h3 className="text-sm font-bold text-[#0b2d54]">{item.title}</h3>
                   <p className="mt-1 text-xs font-semibold text-slate-600">{item.evidence}</p>
                   <p className="mt-1 text-xs leading-5 text-slate-500">{item.action}</p>
-                  <Link href={item.href} className="mt-2 inline-flex min-h-8 items-center gap-1 rounded-lg bg-[#0b2d54] px-3 py-1.5 text-[10px] font-bold text-white">{item.linkLabel} <ArrowRight className="h-3 w-3 text-[#24c1c4]" /></Link>
+                  <Link href={item.href} className="mt-2 inline-flex min-h-8 items-center gap-1 text-[11px] font-bold text-[#0b7b80]">{item.linkLabel} <ArrowRight className="h-3 w-3" /></Link>
                 </div>
               </div>
             ))}
           </div>
-        ) : (
-          <p className="mt-3 text-sm text-slate-500">No rule-based follow-up was triggered by the available measurements, laboratory flags, symptom counts or goal-status records.</p>
-        )}
-      </section>
+        </section>
+      )}
     </section>
   );
 }
@@ -2448,9 +2456,9 @@ function HealthReportInsights({
             <div className="min-w-0 flex-1">
               <h2 className={"font-black " + (measurementReviews.some((item) => item.severity === "urgent") ? "text-rose-950" : "text-amber-950")}>Readings to double-check</h2>
               <p className={"mt-1 text-sm leading-6 " + (measurementReviews.some((item) => item.severity === "urgent") ? "text-rose-900" : "text-amber-900")}>{age !== null && age >= 18 ? "Some saved values are far outside common adult reference ranges." : "Some saved values are outside a valid scale or need to be checked against personal, age-specific guidance."} Check the date, source, unit and original reading. These flags do not diagnose a condition.</p>
-              <div className="mt-3 space-y-3">
+              <div className="mt-3 divide-y divide-slate-200">
                 {measurementReviews.map((item) => (
-                  <div key={item.key} className="rounded-xl border border-black/5 bg-white/85 p-3">
+                  <div key={item.key} className="py-3 first:pt-0 last:pb-0">
                     <p className="text-sm font-black text-[#0b2d54]">{item.label}: {formatNumber(item.value, item.key === "temperature" || item.key === "oxygen" ? 1 : 0)} {item.unit} · {dateLabel(new Date(item.timestamp).toISOString())}</p>
                     {item.originalValue !== undefined && item.originalUnit && <p className="mt-1 text-xs font-semibold text-slate-600">Source entry: {formatNumber(item.originalValue, 1)} {item.originalUnit}. The value above is converted to the report&apos;s standard unit.</p>}
                     <p className="mt-1 text-sm leading-6 text-slate-700">{item.message}</p>
@@ -2467,98 +2475,71 @@ function HealthReportInsights({
         {activeVitals.length ? <div className="grid gap-4 md:grid-cols-2">{activeVitals.map((item) => <VitalTrendCard key={item.key} label={item.label} description={item.description} unit={item.unit} digits={item.digits} current={item.current} previous={item.previous} previousLoading={previousLoading} review={item.review} status={item.status} rawCurrent={item.rawCurrent} />)}</div> : <div className="rounded-2xl border border-dashed border-slate-300 bg-white p-5 text-sm leading-6 text-slate-500">No dated vital readings were found for this period. Once you save blood pressure, heart rate, weight or other measurements, they will appear here.</div>}
       </section>
 
-      {(symptomCount > 0 || lowMood.total > 0 || association !== null || repeated.some((item) => item.count > 1) || symptomAnalytics.repeatedTriggers.length > 0 || symptomAnalytics.medicationEffects > 0 || symptomAnalytics.averageSeverityRank !== null) && (
-        <section>
-          <div className="mb-3">
-            <p className="text-[10px] font-black uppercase tracking-[0.16em] text-[#24c1c4]">Detected patterns</p>
-            <h2 className="mt-1 text-xl font-black text-[#0b2d54]">Behaviour and symptom signals</h2>
-          </div>
-          <div className="grid gap-3 sm:grid-cols-2">
+      {(symptomCount > 0 || lowMood.total > 0 || association !== null || repeated.some((item) => item.count > 1) || symptomAnalytics.repeatedTriggers.length > 0 || symptomAnalytics.medicationEffects > 0 || symptomAnalytics.averageSeverityRank !== null || symptomAnalytics.worseningCount > 0 || symptomAnalytics.severeCount > 0) && (
+        <section className="rounded-2xl border border-[#dcebed] bg-white p-4 sm:p-5" aria-label="Health patterns">
+          <p className="text-[10px] font-black uppercase tracking-[0.16em] text-[#0b7b80]">Patterns</p>
+          <h2 className="mt-1 text-lg font-black text-[#0b2d54]">What your logs may be showing</h2>
+          <div className="mt-3 divide-y divide-slate-100">
             {symptomCount > 0 && (
-              <article className="rounded-2xl border border-slate-200 bg-white p-4">
-                <h3 className="text-sm font-bold text-[#0b2d54]">Symptom logs</h3>
-                <p className="mt-2 text-2xl font-black text-[#0b2d54]">{symptomCount}</p>
-                <p className="mt-1 text-xs text-slate-500">{previousReport ? (symptomDifference === 0 ? "No change vs previous period" : (symptomDifference > 0 ? "+" : "") + symptomDifference + " vs previous period") : "No prior-period comparison"}</p>
-                {symptomPattern && <p className="mt-2 text-xs font-semibold text-slate-600">Most repeated: {symptomPattern.label} ({symptomPattern.count})</p>}
-              </article>
-            )}
-            {recurringSymptomsOnly.length > 0 && (
-              <article className="rounded-2xl border border-slate-200 bg-white p-4">
-                <h3 className="text-sm font-bold text-[#0b2d54]">Most repeated symptoms</h3>
-                <p className="mt-1 text-xs leading-5 text-slate-500">Repeated symptom labels from your logs, not a diagnosis or cause.</p>
-                <div className="mt-3 space-y-3">
-                  {recurringSymptomsOnly.map((item) => (
-                    <div key={item.label}>
-                      <div className="flex items-baseline justify-between gap-3">
-                        <span className="min-w-0 text-xs font-semibold text-slate-700">{item.label}</span>
-                        <span className="shrink-0 text-[10px] font-bold text-slate-500">{item.count} logs</span>
-                      </div>
-                      <div className="mt-1.5 h-2 overflow-hidden rounded-full bg-slate-100">
-                        <div className="h-full rounded-full bg-[#24c1c4]" style={{ width: String(item.count / highestRecurringSymptomCount * 100) + "%" }} />
-                      </div>
-                    </div>
-                  ))}
+              <div className="grid gap-1 py-3 first:pt-0 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center">
+                <div>
+                  <p className="text-sm font-bold text-[#0b2d54]">Symptoms</p>
+                  <p className="mt-1 text-xs leading-5 text-slate-600">{symptomCount} record{symptomCount === 1 ? "" : "s"} this period{previousReport ? (symptomDifference === 0 ? " · unchanged from the previous period" : " · " + Math.abs(symptomDifference ?? 0) + (symptomDifference > 0 ? " more than" : " fewer than") + " the previous period") : " · no previous-period comparison"}.</p>
                 </div>
-              </article>
-            )}
-            {symptomSeverityPoints.length > 0 && (
-              <article className="rounded-2xl border border-slate-200 bg-white p-4">
-                <h3 className="text-sm font-bold text-[#0b2d54]">Symptom severity pattern</h3>
-                <p className="mt-1 text-xs leading-5 text-slate-500">Daily average severity rank from dated symptom observations or symptom-level severity values.</p>
-                <p className="mt-2 text-2xl font-black text-[#0b2d54]">{formatNumber(mean(symptomSeverityPoints.map((item) => item.value)), 1)} <span className="text-xs font-bold text-slate-500">average severity rank / 4</span></p>
-                <p className="mt-2 text-xs leading-5 text-slate-600">{periodMovement(symptomSeverityPoints.map((item) => item.value), previousSymptomSeverityPoints.map((item) => item.value), "severity rank", 1).detail}</p>
-                <p className="mt-2 text-[10px] leading-4 text-slate-400">Mild = 1, moderate = 2, severe = 3, very severe = 4. Different symptoms can have different meanings; this summary is not a clinical score.</p>
-                
-              </article>
-            )}
-            {lowMood.total > 0 && (
-              <article className="rounded-2xl border border-slate-200 bg-white p-4">
-                <h3 className="text-sm font-bold text-[#0b2d54]">Mood check-ins</h3>
-                <p className="mt-2 text-2xl font-black text-[#0b2d54]">{lowMood.low}/{lowMood.total}</p>
-                <p className="mt-1 text-xs text-slate-500">Low or very-low ratings / all mood entries</p>
-              </article>
+                {symptomPattern && <p className="text-xs font-semibold text-slate-600">Most repeated: {symptomPattern.label} ({symptomPattern.count})</p>}
+              </div>
             )}
             {(symptomAnalytics.averageSeverityRank !== null || symptomAnalytics.worseningCount > 0 || symptomAnalytics.severeCount > 0) && (
-              <article className="rounded-2xl border border-slate-200 bg-white p-4">
-                <h3 className="text-sm font-bold text-[#0b2d54]">Symptom severity and progression</h3>
-                <p className="mt-2 text-sm font-semibold text-[#0b2d54]">Average severity rank {symptomAnalytics.averageSeverityRank === null ? "—" : formatNumber(symptomAnalytics.averageSeverityRank, 1)}/4</p>
-                <p className="mt-1 text-xs text-slate-500">{symptomAnalytics.worseningCount} worsening · {symptomAnalytics.severeCount} severe/very severe</p>
-                {previousReport && <p className="mt-1 text-xs text-slate-500">Previous: avg rank {previousSymptomAnalytics.averageSeverityRank === null ? "—" : formatNumber(previousSymptomAnalytics.averageSeverityRank, 1)}/4 · {previousSymptomAnalytics.worseningCount} worsening</p>}
-              </article>
+              <div className="grid gap-1 py-3 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center">
+                <div>
+                  <p className="text-sm font-bold text-[#0b2d54]">Severity and progression</p>
+                  <p className="mt-1 text-xs leading-5 text-slate-600">{symptomAnalytics.averageSeverityRank === null ? "No severity scale was available." : "Average severity rank " + formatNumber(symptomAnalytics.averageSeverityRank, 1) + "/4"} · {symptomAnalytics.worseningCount} worsening · {symptomAnalytics.severeCount} severe or very severe.</p>
+                </div>
+                <Link href="/health-journal" className="text-xs font-bold text-[#0b7b80]">Review symptom history <ArrowRight className="ml-1 inline h-3 w-3" /></Link>
+              </div>
             )}
-            {symptomAnalytics.repeatedTriggers.slice(0, 2).map((trigger) => (
-              <article key={trigger.label} className="rounded-2xl border border-slate-200 bg-white p-4">
-                <h3 className="text-sm font-bold text-[#0b2d54]">Repeated symptom trigger label</h3>
-                <p className="mt-2 text-base font-black text-[#0b2d54]">{trigger.label}</p>
-                <p className="mt-1 text-xs text-slate-500">{trigger.count} records · {trigger.confirmed} confirmed</p>
-                <p className="mt-1 text-[10px] text-slate-400">Logged associations do not establish that a trigger caused a symptom.</p>
-              </article>
-            ))}
-            {symptomAnalytics.medicationEffects > 0 && (
-              <article className="rounded-2xl border border-slate-200 bg-white p-4">
-                <h3 className="text-sm font-bold text-[#0b2d54]">Medication effects in symptom logs</h3>
-                <p className="mt-2 text-sm text-slate-700">{symptomAnalytics.improvedEffects} reported improvement(s) · {symptomAnalytics.sideEffectReports} side-effect report(s) across {symptomAnalytics.medicationEffects} recorded effect(s)</p>
-              </article>
+            {lowMood.total > 0 && (
+              <div className="grid gap-1 py-3 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center">
+                <div>
+                  <p className="text-sm font-bold text-[#0b2d54]">Mood check-ins</p>
+                  <p className="mt-1 text-xs leading-5 text-slate-600">{lowMood.low} of {lowMood.total} entries were marked low or very low.</p>
+                </div>
+                <Link href="/today" className="text-xs font-bold text-[#0b7b80]">Open check-in <ArrowRight className="ml-1 inline h-3 w-3" /></Link>
+              </div>
             )}
             {association && (
-              <article className="rounded-2xl border border-slate-200 bg-white p-4 sm:col-span-2">
-                <h3 className="text-sm font-bold text-[#0b2d54]">Sleep and stress on the same days</h3>
-                <p className="mt-2 text-sm font-semibold text-[#0b2d54]">{association.shorterDays} shorter-sleep days: stress average {formatNumber(association.shortStress, 1)}/10 · {association.longerDays} longer-sleep days: {formatNumber(association.longStress, 1)}/10</p>
-                <p className="mt-1 text-[11px] text-slate-500">Same-day association only; this does not establish cause.</p>
-              </article>
+              <div className="py-3">
+                <p className="text-sm font-bold text-[#0b2d54]">Sleep and stress on the same days</p>
+                <p className="mt-1 text-xs leading-5 text-slate-600">On {association.shorterDays} shorter-sleep day{association.shorterDays === 1 ? "" : "s"}, stress averaged {formatNumber(association.shortStress, 1)}/10; on {association.longerDays} longer-sleep day{association.longerDays === 1 ? "" : "s"}, it averaged {formatNumber(association.longStress, 1)}/10.</p>
+              </div>
+            )}
+            {symptomAnalytics.repeatedTriggers.length > 0 && (
+              <div className="py-3">
+                <p className="text-sm font-bold text-[#0b2d54]">Repeated trigger label</p>
+                <p className="mt-1 text-xs leading-5 text-slate-600">{symptomAnalytics.repeatedTriggers[0].label} appeared in {symptomAnalytics.repeatedTriggers[0].count} records ({symptomAnalytics.repeatedTriggers[0].confirmed} confirmed).</p>
+              </div>
+            )}
+            {symptomAnalytics.medicationEffects > 0 && (
+              <div className="py-3">
+                <p className="text-sm font-bold text-[#0b2d54]">Medication effects recorded</p>
+                <p className="mt-1 text-xs leading-5 text-slate-600">{symptomAnalytics.improvedEffects} reported improvement(s) and {symptomAnalytics.sideEffectReports} side-effect report(s) in symptom logs.</p>
+              </div>
             )}
           </div>
+          <p className="mt-2 border-t border-slate-100 pt-3 text-[10px] leading-4 text-slate-400">These are patterns in your records, not proof of cause or a diagnosis. Seek clinical advice for persistent or worsening symptoms.</p>
         </section>
       )}
 
       {(clinicalCount > 0 || flaggedLabs.length > 0) && (
         <section>
           <div className="mb-3"><p className="text-[10px] font-black uppercase tracking-[0.16em] text-[#24c1c4]">Clinical context</p><h2 className="mt-1 text-xl font-black text-[#0b2d54]">Updates worth keeping in view</h2><p className="mt-1 text-sm leading-6 text-slate-500">This is a concise overview of clinical activity, not a repeat of your full clinical record.</p></div>
-          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-            <SummaryTile icon={Stethoscope} label="Clinical visits" value={String(report.clinical.encounters.length)} detail="Encounters dated in this period." />
-            <SummaryTile icon={FileText} label="Lab reports" value={String(report.clinical.labResults.length)} detail="Laboratory result records released or reported in this period." />
-            <SummaryTile icon={ClipboardList} label="Care plan updates" value={String(report.clinical.carePlans.length)} detail="Care plans created or updated in this period." />
-            <SummaryTile icon={ShieldCheck} label="Other clinical updates" value={String(report.clinical.diagnoses.length + report.clinical.prescriptions.length + report.clinical.referrals.length + report.clinical.procedures.length)} detail="Diagnoses, prescriptions, referrals and procedures recorded." />
+          <div className="rounded-xl border border-slate-200 bg-white px-4 py-3">
+            <div className="grid grid-cols-2 gap-3 sm:grid-cols-4 sm:divide-x sm:divide-slate-100">
+              <div><p className="text-[10px] font-bold uppercase tracking-wide text-slate-400">Visits</p><p className="mt-1 text-lg font-black text-[#0b2d54]">{report.clinical.encounters.length}</p></div>
+              <div className="sm:pl-4"><p className="text-[10px] font-bold uppercase tracking-wide text-slate-400">Lab reports</p><p className="mt-1 text-lg font-black text-[#0b2d54]">{report.clinical.labResults.length}</p></div>
+              <div className="sm:pl-4"><p className="text-[10px] font-bold uppercase tracking-wide text-slate-400">Care plans</p><p className="mt-1 text-lg font-black text-[#0b2d54]">{report.clinical.carePlans.length}</p></div>
+              <div className="sm:pl-4"><p className="text-[10px] font-bold uppercase tracking-wide text-slate-400">Other updates</p><p className="mt-1 text-lg font-black text-[#0b2d54]">{report.clinical.diagnoses.length + report.clinical.prescriptions.length + report.clinical.referrals.length + report.clinical.procedures.length}</p></div>
+            </div>
           </div>
           {flaggedLabs.length > 0 && <div className="mt-3 rounded-2xl border border-amber-200 bg-amber-50 p-5"><div className="flex items-start gap-3"><AlertTriangle className="mt-0.5 h-5 w-5 shrink-0 text-amber-700" /><div className="min-w-0"><h3 className="font-bold text-amber-950">Results marked for review in the clinical record</h3><p className="mt-1 text-xs leading-5 text-amber-900">These items were marked abnormal or critical by the source record. Sympto is not re-interpreting them here; review the report with your clinician.</p><div className="mt-3 space-y-2">{flaggedLabs.slice(0, 4).map((item) => <div key={item.id} className="flex flex-wrap items-start justify-between gap-2 rounded-xl bg-white/80 p-3"><div><p className="text-sm font-bold text-[#0b2d54]">{item.name}</p><p className="mt-1 text-[11px] text-slate-500">{dateLabel(item.date)}</p></div><div className="flex items-center gap-2"><span className="text-sm font-bold text-[#0b2d54]">{String(item.value)}</span>{item.critical && <span className="rounded-full bg-rose-100 px-2 py-1 text-[9px] font-black uppercase text-rose-800">Critical</span>}{!item.critical && <span className="rounded-full bg-amber-100 px-2 py-1 text-[9px] font-black uppercase text-amber-800">Abnormal</span>}</div></div>)}</div><Link href="/health-records" className="mt-4 inline-flex min-h-10 items-center gap-2 rounded-xl bg-[#0b2d54] px-4 py-2 text-xs font-bold text-white">Review clinical records <ArrowRight className="h-4 w-4" /></Link></div></div></div>}
         </section>
