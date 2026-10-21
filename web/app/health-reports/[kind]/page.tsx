@@ -1538,6 +1538,18 @@ function PersonalisedInsights({
   const glucoseLabPreviousSpecific = glucoseLabPrevious.filter((item) => !/hba1c|\ba1c\b|glycat|glycosylat/i.test(item.testName));
   const a1cLabCurrent = clinicalLabSeries(report, /hba1c|\ba1c\b|glycat|glycosylat/i);
   const a1cLabPrevious = clinicalLabSeries(previousReport, /hba1c|\ba1c\b|glycat|glycosylat/i);
+  const a1cMeasuredCurrent = combineDatedSeries(
+    namedClinicalDeviceSeries(report, /hba1c|\ba1c\b|glycat|glycosylat/i),
+    wellnessMetricSeriesMatching(report, /hba1c|\ba1c\b|glycat|glycosylat/i),
+  );
+  const a1cMeasuredPrevious = combineDatedSeries(
+    namedClinicalDeviceSeries(previousReport, /hba1c|\ba1c\b|glycat|glycosylat/i),
+    wellnessMetricSeriesMatching(previousReport, /hba1c|\ba1c\b|glycat|glycosylat/i),
+  );
+  const a1cEventsCurrent = event(report, /hba1c|\ba1c\b|glycat|glycosylat/);
+  const a1cEventsPrevious = event(previousReport, /hba1c|\ba1c\b|glycat|glycosylat/);
+  const a1cCurrent = a1cLabCurrent.length ? a1cLabCurrent : a1cMeasuredCurrent.length ? a1cMeasuredCurrent : a1cEventsCurrent;
+  const a1cPrevious = a1cLabPrevious.length ? a1cLabPrevious : a1cMeasuredPrevious.length ? a1cMeasuredPrevious : a1cEventsPrevious;
   const glucoseEventsCurrent = event(report, /blood glucose|glucose/);
   const glucoseEventsPrevious = event(previousReport, /blood glucose|glucose/);
   const glucoseMeasurementCurrent = combineDatedSeries(
@@ -1647,8 +1659,8 @@ function PersonalisedInsights({
   const baseSignals: Array<{ key: string; label: string; unit: string; current: DailyValue[]; previous: DailyValue[] }> = [
     signal("weight", "Weight", weightCurrent, weightPrevious, "kg"),
     signal("glucose", "Blood glucose", glucoseCurrent, glucosePrevious, glucoseLabCurrentSpecific.at(-1)?.unit || glucoseLabPreviousSpecific.at(-1)?.unit || "mmol/L"),
-    ...(a1cLabCurrent.length || a1cLabPrevious.length ? [
-      signal("hba1c", "HbA1c", a1cLabCurrent, a1cLabPrevious, a1cLabCurrent.at(-1)?.unit || a1cLabPrevious.at(-1)?.unit || "%"),
+    ...(a1cCurrent.length || a1cPrevious.length ? [
+      signal("hba1c", "HbA1c", a1cCurrent, a1cPrevious, a1cCurrent.at(-1)?.unit || a1cPrevious.at(-1)?.unit || "%"),
     ] : []),
     ...(totalCholesterolCurrent.length || totalCholesterolPrevious.length ? [
       signal("total-cholesterol", "Total cholesterol", totalCholesterolCurrent, totalCholesterolPrevious, totalCholesterolCurrent.at(-1)?.unit || totalCholesterolPrevious.at(-1)?.unit || ""),
@@ -1685,7 +1697,10 @@ function PersonalisedInsights({
     const normalized = key.toLowerCase();
     const has = (...series: Array<{ length: number }>) => series.some((item) => item.length > 0);
     if (/weight|body.?mass/.test(normalized)) return has(weightCurrent, weightPrevious);
-    if (/hba1c|a1c|glycat|glycosylat/.test(normalized)) return has(a1cLabCurrent, a1cLabPrevious);
+    if (/hba1c|a1c|glycat|glycosylat/.test(normalized)) return has(a1cCurrent, a1cPrevious);
+    if (/mood/.test(normalized)) return has(moodRatingsCurrent, moodRatingsPrevious);
+    if (/energy/.test(normalized)) return has(energyCurrent, energyPrevious);
+    if (/sleep.?quality|sleepquality/.test(normalized)) return has(sleepQualityCurrent, sleepQualityPrevious);
     if (/glucose/.test(normalized)) return has(glucoseCurrent, glucosePrevious);
     if (/\bldl\b|low.density.lipoprotein/.test(normalized)) return has(ldlCurrent, ldlPrevious);
     if (/\bhdl\b|high.density.lipoprotein/.test(normalized)) return has(hdlCurrent, hdlPrevious);
