@@ -80,7 +80,7 @@ type WorkoutRecord = {
 };
 type LabResultItem = {
   id?: string;
-  test?: { name?: string | null } | null;
+  test?: { name?: string | null; unit?: { name?: string | null; symbol?: string | null } | null } | null;
   numericValue?: string | number | boolean | null;
   textValue?: string | number | boolean | null;
   booleanValue?: string | number | boolean | null;
@@ -91,7 +91,7 @@ type LabResultRecord = {
   id?: string;
   reportedAt?: string | null;
   releasedAt?: string | null;
-  orderItem?: { test?: { name?: string | null } | null } | null;
+  orderItem?: { test?: { name?: string | null; unit?: { name?: string | null; symbol?: string | null } | null } | null } | null;
   items?: LabResultItem[] | null;
 };
 
@@ -259,7 +259,7 @@ type Report = {
   generatedAt: string;
 };
 
-type SeriesPoint = { date: string; value: number; timestamp: number; source?: string; convertedFrom?: { value: number; unit: string } };
+type SeriesPoint = { date: string; value: number; timestamp: number; source?: string; unit?: string; convertedFrom?: { value: number; unit: string } };
 type DailyValue = { date: string; value: number };
 type MeasurementReview = {
   key: string;
@@ -1169,12 +1169,14 @@ function goalMetricSeries(report: Report | null, pattern: RegExp): SeriesPoint[]
       const timestamp = new Date(event.occurredAt).getTime();
       const date = dateKey(event.occurredAt);
       if (value === null || !Number.isFinite(timestamp) || !date) return [];
-      return [{ value, timestamp, date, source: "Health goal log" }];
+      return [{ value, timestamp, date, source: "Health goal log", unit: String(event.unit ?? "") }];
     })
     .sort((a, b) => a.timestamp - b.timestamp);
 }
 
-function clinicalLabSeries(report: Report | null, pattern: RegExp): SeriesPoint[] {
+type LabSeriesPoint = SeriesPoint & { testName: string };
+
+function clinicalLabSeries(report: Report | null, pattern: RegExp): LabSeriesPoint[] {
   if (!report) return [];
   return report.clinical.labResults.flatMap((result) => {
     const dateValue = result.reportedAt || result.releasedAt;
@@ -1182,10 +1184,12 @@ function clinicalLabSeries(report: Report | null, pattern: RegExp): SeriesPoint[
     const date = dateKey(dateValue);
     if (!date || !Number.isFinite(timestamp)) return [];
     return (result.items ?? []).flatMap((item) => {
-      const name = String(item.test?.name || result.orderItem?.test?.name || "").toLowerCase();
+      const test = item.test || result.orderItem?.test;
+      const name = String(test?.name || "").trim();
       const value = finite(item.numericValue);
-      if (!pattern.test(name) || value === null) return [];
-      return [{ value, timestamp, date, source: "Laboratory result" }];
+      if (!pattern.test(name.toLowerCase()) || value === null) return [];
+      const unit = String(test?.unit?.symbol || test?.unit?.name || "");
+      return [{ value, timestamp, date, source: "Laboratory result", testName: name, unit }];
     });
   }).sort((a, b) => a.timestamp - b.timestamp);
 }
@@ -1270,14 +1274,29 @@ function PersonalisedInsights({
   const weightPreviousRaw = vitalSeries(previousReport, "weight");
   const weightCurrent = weightCurrentRaw.length ? weightCurrentRaw : event(report, /weight|body mass/);
   const weightPrevious = weightPreviousRaw.length ? weightPreviousRaw : event(previousReport, /weight|body mass/);
-  const glucoseLabCurrent = clinicalLabSeries(report, /glucose|hba1c|a1c|glycated|glycosylated/);
-  const glucoseLabPrevious = clinicalLabSeries(previousReport, /glucose|hba1c|a1c|glycated|glycosylated/);
-  const glucoseCurrent = glucoseLabCurrent.length ? glucoseLabCurrent : event(report, /blood glucose|glucose|hba1c|a1c/);
-  const glucosePrevious = glucoseLabPrevious.length ? glucoseLabPrevious : event(previousReport, /blood glucose|glucose|hba1c|a1c/);
-  const lipidLabCurrent = clinicalLabSeries(report, /cholesterol|lipid|triglyceride|\bldl\b|\bhdl\b/);
-  const lipidLabPrevious = clinicalLabSeries(previousReport, /cholesterol|lipid|triglyceride|\bldl\b|\bhdl\b/);
-  const lipidCurrent = lipidLabCurrent.length ? lipidLabCurrent : event(report, /cholesterol|lipid|triglyceride|\bldl\b|\bhdl\b/);
-  const lipidPrevious = lipidLabPrevious.length ? lipidLabPrevious : event(previousReport, /cholesterol|lipid|triglyceride|\bldl\b|\bhdl\b/);
+  const glucoseLabCurrent = clinicalLabSeries(report, /\bglucose\b/i);
+  const glucoseLabPrevious = clinicalLabSeries(previousReport, /\bglucose\b/i);
+  const glucoseLabCurrentSpecific = glucoseLabCurrent.filter((item) => !/hba1c|\ba1c\b|glycat|glycosylat/i.test(item.testName));
+  const glucoseLabPreviousSpecific = glucoseLabPrevious.filter((item) => !/hba1c|\ba1c\b|glycat|glycosylat/i.test(item.testName));
+  const a1cLabCurrent = clinicalLabSeries(report, /hba1c|\ba1c\b|glycat|glycosylat/i);
+  const a1cLabPrevious = clinicalLabSeries(previousReport, /hba1c|\ba1c\b|glycat|glycosylat/i);
+  const glucoseEventsCurrent = event(report, /blood glucose|glucose/);
+  const glucoseEventsPrevious = event(previousReport, /blood glucose|glucose/);
+  const glucoseCurrent = glucoseLabCurrentSpecific.length ? glucoseLabCurrentSpecific : glucoseEventsCurrent;
+  const glucosePrevious = glucoseLabPreviousSpecific.length ? glucoseLabPreviousSpecific : glucoseEventsPrevious;
+
+  const totalCholesterolCurrent = clinicalLabSeries(report, /total cholesterol|cholesterol total|serum cholesterol|^cholesterol$/i);
+  const totalCholesterolPrevious = clinicalLabSeries(previousReport, /total cholesterol|cholesterol total|serum cholesterol|^cholesterol$/i);
+  const ldlCurrent = clinicalLabSeries(report, /\bldl\b|low[- ]density lipoprotein/i);
+  const ldlPrevious = clinicalLabSeries(previousReport, /\bldl\b|low[- ]density lipoprotein/i);
+  const hdlCurrent = clinicalLabSeries(report, /\bhdl\b|high[- ]density lipoprotein/i);
+  const hdlPrevious = clinicalLabSeries(previousReport, /\bhdl\b|high[- ]density lipoprotein/i);
+  const triglyceridesCurrent = clinicalLabSeries(report, /triglyceride/i);
+  const triglyceridesPrevious = clinicalLabSeries(previousReport, /triglyceride/i);
+  const anyLipidLab = totalCholesterolCurrent.length + totalCholesterolPrevious.length + ldlCurrent.length + ldlPrevious.length + hdlCurrent.length + hdlPrevious.length + triglyceridesCurrent.length + triglyceridesPrevious.length > 0;
+  const cholesterolEventsCurrent = event(report, /cholesterol|lipid|triglyceride|\bldl\b|\bhdl\b/);
+  const cholesterolEventsPrevious = event(previousReport, /cholesterol|lipid|triglyceride|\bldl\b|\bhdl\b/);
+
   const smokingCurrent = event(report, /smoking|tobacco|cigarette/);
   const smokingPrevious = event(previousReport, /smoking|tobacco|cigarette/);
   const alcoholCurrent = event(report, /alcohol|drinking/);
@@ -1303,22 +1322,47 @@ function PersonalisedInsights({
   const hydrationChecksCurrent = dailyMetric(report, "waterIntakeMl");
   const hydrationChecksPrevious = dailyMetric(previousReport, "waterIntakeMl");
 
+  type SignalPoint = { date: string; value: number; unit?: string };
+  const signal = (key: string, label: string, currentPoints: SignalPoint[], previousPoints: SignalPoint[], fallbackUnit = "") => ({
+    key,
+    label,
+    unit: String(currentPoints.at(-1)?.unit || previousPoints.at(-1)?.unit || fallbackUnit),
+    current: toDaily(currentPoints),
+    previous: toDaily(previousPoints),
+  });
   const signals: Array<{ key: string; label: string; unit: string; current: DailyValue[]; previous: DailyValue[] }> = [
-    { key: "weight", label: "Weight", unit: "kg", current: toDaily(weightCurrent), previous: toDaily(weightPrevious) },
-    { key: "glucose", label: "Glucose / HbA1c", unit: glucoseLabCurrent.length ? "" : "mmol/L", current: toDaily(glucoseCurrent), previous: toDaily(glucosePrevious) },
-    { key: "cholesterol", label: "Cholesterol / lipids", unit: lipidLabCurrent.length ? "" : "mmol/L", current: toDaily(lipidCurrent), previous: toDaily(lipidPrevious) },
-    { key: "smoking", label: "Cigarettes logged", unit: "per day", current: toDaily(smokingCurrent), previous: toDaily(smokingPrevious) },
-    { key: "alcohol", label: "Alcohol logged", unit: "drinks", current: toDaily(alcoholCurrent), previous: toDaily(alcoholPrevious) },
-    { key: "medication", label: "Medication adherence", unit: "%", current: toDaily(medicationCurrent), previous: toDaily(medicationPrevious) },
-    { key: "nutrition", label: "Nutrition / calories", unit: "", current: toDaily(nutritionCurrent), previous: toDaily(nutritionPrevious) },
-    { key: "hydration", label: "Water intake", unit: "ml", current: toDaily(hydrationEventsCurrent.length ? hydrationEventsCurrent : hydrationChecksCurrent), previous: toDaily(hydrationEventsPrevious.length ? hydrationEventsPrevious : hydrationChecksPrevious) },
-    { key: "exercise", label: "Exercise logged", unit: "min", current: toDaily(exerciseEventsCurrent.length ? exerciseEventsCurrent : exerciseChecksCurrent), previous: toDaily(exerciseEventsPrevious.length ? exerciseEventsPrevious : exerciseChecksPrevious) },
-    { key: "workouts", label: "Workout sessions", unit: "min/day", current: toDaily(workoutsCurrent), previous: toDaily(workoutsPrevious) },
-    { key: "sleep-checkin", label: "Sleep check-ins", unit: "hours", current: toDaily(sleepChecksCurrent), previous: toDaily(sleepChecksPrevious) },
-    { key: "sleep-session", label: "Connected sleep", unit: "hours/day", current: toDaily(sleepSessionsCurrent), previous: toDaily(sleepSessionsPrevious) },
-    { key: "stress", label: "Stress rating", unit: "/10", current: toDaily(stressCurrent), previous: toDaily(stressPrevious) },
-    { key: "symptoms", label: "Symptom logs", unit: "logs/day", current: toDaily(dailySymptomSeries(report)), previous: toDaily(dailySymptomSeries(previousReport)) },
-  ].filter((signal) => signal.current.length > 0 || signal.previous.length > 0);
+    signal("weight", "Weight", weightCurrent, weightPrevious, "kg"),
+    signal("glucose", "Blood glucose", glucoseCurrent, glucosePrevious, glucoseLabCurrentSpecific.at(-1)?.unit || glucoseLabPreviousSpecific.at(-1)?.unit || "mmol/L"),
+    ...(a1cLabCurrent.length || a1cLabPrevious.length ? [
+      signal("hba1c", "HbA1c", a1cLabCurrent, a1cLabPrevious, a1cLabCurrent.at(-1)?.unit || a1cLabPrevious.at(-1)?.unit || "%"),
+    ] : []),
+    ...(totalCholesterolCurrent.length || totalCholesterolPrevious.length ? [
+      signal("total-cholesterol", "Total cholesterol", totalCholesterolCurrent, totalCholesterolPrevious, totalCholesterolCurrent.at(-1)?.unit || totalCholesterolPrevious.at(-1)?.unit || ""),
+    ] : []),
+    ...(ldlCurrent.length || ldlPrevious.length ? [
+      signal("ldl", "LDL cholesterol", ldlCurrent, ldlPrevious, ldlCurrent.at(-1)?.unit || ldlPrevious.at(-1)?.unit || ""),
+    ] : []),
+    ...(hdlCurrent.length || hdlPrevious.length ? [
+      signal("hdl", "HDL cholesterol", hdlCurrent, hdlPrevious, hdlCurrent.at(-1)?.unit || hdlPrevious.at(-1)?.unit || ""),
+    ] : []),
+    ...(triglyceridesCurrent.length || triglyceridesPrevious.length ? [
+      signal("triglycerides", "Triglycerides", triglyceridesCurrent, triglyceridesPrevious, triglyceridesCurrent.at(-1)?.unit || triglyceridesPrevious.at(-1)?.unit || ""),
+    ] : []),
+    ...(!anyLipidLab && (cholesterolEventsCurrent.length || cholesterolEventsPrevious.length) ? [
+      signal("cholesterol-goal", "Cholesterol goal log", cholesterolEventsCurrent, cholesterolEventsPrevious, "mmol/L"),
+    ] : []),
+    signal("smoking", "Cigarettes logged", smokingCurrent, smokingPrevious, "cigarettes"),
+    signal("alcohol", "Alcohol logged", alcoholCurrent, alcoholPrevious, "drinks"),
+    signal("medication", "Medication adherence", medicationCurrent, medicationPrevious, "%"),
+    signal("nutrition", "Nutrition / calories", nutritionCurrent, nutritionPrevious, ""),
+    signal("hydration", "Water intake", hydrationEventsCurrent.length ? hydrationEventsCurrent : hydrationChecksCurrent, hydrationEventsPrevious.length ? hydrationEventsPrevious : hydrationChecksPrevious, "ml"),
+    signal("exercise", "Exercise logged", exerciseEventsCurrent.length ? exerciseEventsCurrent : exerciseChecksCurrent, exerciseEventsPrevious.length ? exerciseEventsPrevious : exerciseChecksPrevious, "min"),
+    signal("workouts", "Workout sessions", workoutsCurrent, workoutsPrevious, "min/day"),
+    signal("sleep-checkin", "Sleep check-ins", sleepChecksCurrent, sleepChecksPrevious, "hours"),
+    signal("sleep-session", "Connected sleep", sleepSessionsCurrent, sleepSessionsPrevious, "hours/day"),
+    signal("stress", "Stress rating", stressCurrent, stressPrevious, "/10"),
+    signal("symptoms", "Symptom logs", dailySymptomSeries(report), dailySymptomSeries(previousReport), "logs/day"),
+  ].filter((item) => item.current.length > 0 || item.previous.length > 0);
 
   const recommendations: Array<{ title: string; evidence: string; action: string; tone: StatusTone; href: string; linkLabel: string }> = [];
   const urgentReviews = reviews.filter((item) => item.severity === "urgent");
