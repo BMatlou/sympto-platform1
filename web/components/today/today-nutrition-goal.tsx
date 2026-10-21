@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { ArrowRight, Check, Plus, Utensils } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 import GoalCardDisclosureButton from "@/components/today/goal-card-disclosure-button";
 import { healthGoalsService, type NutritionFood } from "@/services/health-goals.service";
@@ -223,7 +223,7 @@ export default function TodayNutritionGoal({ goal, onUpdated, detailsExpanded, o
   const draftProtein = draftItems.reduce((sum, item) => sum + Number(item.protein ?? 0), 0);
   const draftFibre = draftItems.reduce((sum, item) => sum + Number(item.fibre ?? 0), 0);
 
-  async function loadToday() {
+  const loadToday = useCallback(async () => {
     if (!goalId) return;
 
     try {
@@ -254,22 +254,25 @@ export default function TodayNutritionGoal({ goal, onUpdated, detailsExpanded, o
     } finally {
       setLoading(false);
     }
-  }
+  }, [goalId]);
 
   useEffect(() => {
-    void loadToday();
+    const initialLoadTimer = window.setTimeout(() => {
+      void loadToday();
+    }, 0);
 
     const handleUpdated = () => void loadToday();
     window.addEventListener("sympto:health-goal-updated", handleUpdated);
     window.addEventListener("sympto:today-action-updated", handleUpdated);
 
     return () => {
+      window.clearTimeout(initialLoadTimer);
       window.removeEventListener("sympto:health-goal-updated", handleUpdated);
       window.removeEventListener("sympto:today-action-updated", handleUpdated);
     };
-  }, [goalId]);
+  }, [loadToday]);
 
-  async function loadTodayCheckIn() {
+  const loadTodayCheckIn = useCallback(async () => {
     try {
       const response = await healthJournalService.getAll({ limit: 100 });
       const journals = Array.isArray(response.data) ? response.data : [];
@@ -288,18 +291,21 @@ export default function TodayNutritionGoal({ goal, onUpdated, detailsExpanded, o
     } catch {
       setTodayCheckIn(null);
     }
-  }
+  }, []);
 
   useEffect(() => {
-    void loadTodayCheckIn();
+    const initialLoadTimer = window.setTimeout(() => {
+      void loadTodayCheckIn();
+    }, 0);
 
     const handleCheckInUpdated = () => void loadTodayCheckIn();
     window.addEventListener("sympto:health-checkin-updated", handleCheckInUpdated);
 
     return () => {
+      window.clearTimeout(initialLoadTimer);
       window.removeEventListener("sympto:health-checkin-updated", handleCheckInUpdated);
     };
-  }, []);
+  }, [loadTodayCheckIn]);
 
   async function searchFood() {
     const parsed = extractFoodSearchTerm(query);
@@ -403,7 +409,7 @@ export default function TodayNutritionGoal({ goal, onUpdated, detailsExpanded, o
         loggedValue: draftCalories,
         occurredAt,
         source: "goal-manual",
-        sourceId: "goal-" + goalId + "-nutrition-meal-" + Date.now(),
+        sourceId: "goal-" + goalId + "-nutrition-meal-" + Date.parse(occurredAt),
         metadata: {
           kind: "nutrition-meal",
           mealType,
@@ -699,7 +705,7 @@ export default function TodayNutritionGoal({ goal, onUpdated, detailsExpanded, o
           <section className="mt-4">
             <div className="flex items-end justify-between gap-3">
               <div>
-                <p className="text-[9px] font-black uppercase tracking-[.15em] text-[#74859a]">Today's meals</p>
+                <p className="text-[9px] font-black uppercase tracking-[.15em] text-[#74859a]">Today&apos;s meals</p>
                 <h3 className="mt-1 text-base font-black text-[#0b2d54]">
                   {meals.length} detailed meal{meals.length === 1 ? "" : "s"}
                 </h3>
