@@ -1271,14 +1271,23 @@ function MiniTrend({
         {variant === "bar" ? plotted.map((point, index) => {
           const x = xAt(index) - barWidth / 2;
           const y = yAt(Math.max(0, point.value));
+          const valueLabelY = y - 7 < top + 9 ? y + 14 : y - 7;
           return (
-            <rect key={point.date + "-" + index} x={x} y={y} width={barWidth} height={Math.max(1, bottom - y)} rx="3" fill="#24c1c4" opacity="0.92" tabIndex={0}>
-              <title>{tickLabel(point.date)}: {formatNumber(point.value, digits)} {readableUnit}</title>
-            </rect>
+            <g key={point.date + "-" + index}>
+              <rect x={x} y={y} width={barWidth} height={Math.max(1, bottom - y)} rx="3" fill="#24c1c4" opacity="0.92" tabIndex={0}>
+                <title>{tickLabel(point.date)}: {formatNumber(point.value, digits)} {readableUnit}</title>
+              </rect>
+              {plotted.length <= 8 && <text x={xAt(index)} y={valueLabelY} textAnchor="middle" fontSize="11" fontWeight="700" fill="#0b2d54">{formatNumber(point.value, digits)}</text>}
+            </g>
           );
         }) : (
           <>
             <polyline points={polyline} fill="none" stroke="#177e89" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" />
+            {plotted.length <= 8 && plotted.map((point, index) => {
+              const pointY = yAt(point.value);
+              const valueLabelY = pointY - 10 >= top + 8 ? pointY - 10 : pointY + 18;
+              return <text key={"value-" + point.date + "-" + index} x={xAt(index)} y={valueLabelY} textAnchor="middle" fontSize="11" fontWeight="700" fill="#0b2d54">{formatNumber(point.value, digits)}</text>;
+            })}
             {plotted.map((point, index) => (
               <circle key={point.date + "-" + index} cx={xAt(index)} cy={yAt(point.value)} r={plotted.length > 18 ? 2.5 : 4} fill="#0b2d54" stroke="#ffffff" strokeWidth="1.5" tabIndex={0}>
                 <title>{tickLabel(point.date)}: {formatNumber(point.value, digits)} {readableUnit}</title>
