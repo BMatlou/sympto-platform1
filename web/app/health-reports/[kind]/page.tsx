@@ -10,12 +10,10 @@ import {
   ArrowRight,
   CalendarDays,
   ClipboardList,
-  Droplets,
   FileText,
   Footprints,
   HeartPulse,
   Info,
-  Moon,
   ShieldCheck,
   Stethoscope,
 } from "lucide-react";
@@ -1182,20 +1180,22 @@ function MiniTrend({
   unit?: string;
   digits?: number;
 }) {
+  const hasDatedPoints = Boolean(points?.length);
   const plotted = (points?.length
     ? points.filter((point) => Number.isFinite(point.value) && Boolean(point.date))
       .slice()
       .sort((a, b) => (a.timestamp ?? new Date(a.date).getTime()) - (b.timestamp ?? new Date(b.date).getTime()))
     : (values ?? []).filter((value) => Number.isFinite(value)).map((value, index) => ({ date: String(index + 1), value })));
   if (!plotted.length) {
-    return <div className="mt-3 flex h-20 items-center rounded-xl bg-slate-50 px-3 text-[11px] text-slate-400">No dated values to chart in this period.</div>;
+    return <div className="mt-3 flex h-24 items-center rounded-xl bg-slate-50 px-3 text-sm text-slate-500">No dated values are available to chart in this period.</div>;
   }
 
-  const width = 320;
-  const left = 12;
-  const right = 12;
-  const top = 8;
-  const bottom = 77;
+  // Reserve space for a readable value axis and date labels.
+  const width = 400;
+  const left = 62;
+  const right = 14;
+  const top = 22;
+  const bottom = 120;
   const usableWidth = width - left - right;
   const plottedValues = plotted.map((point) => point.value);
   const minimum = Math.min(...plottedValues);
@@ -1204,7 +1204,7 @@ function MiniTrend({
   const padding = variant === "bar" ? 0 : (rawRange || Math.max(Math.abs(maximum) * 0.05, 1)) * 0.12;
   const low = variant === "bar" ? Math.min(0, minimum) : minimum - padding;
   const high = Math.max(maximum + (variant === "bar" ? 0 : padding), low + 1);
-  const hasDatedPoints = Boolean(points?.length);
+
   const dateValues = plotted.map((point, index) => {
     if (!hasDatedPoints) return index;
     if (/^\d{4}-\d{2}-\d{2}$/.test(point.date)) return new Date(point.date + "T12:00:00").getTime();
@@ -1215,13 +1215,13 @@ function MiniTrend({
   const minimumDate = Math.min(...dateValues);
   const maximumDate = Math.max(...dateValues);
   const xAt = (index: number) => {
-    if (plotted.length === 1 || (useDateScale && minimumDate === maximumDate)) return width / 2;
+    if (plotted.length === 1 || (useDateScale && minimumDate === maximumDate)) return left + usableWidth / 2;
     if (useDateScale) return left + ((dateValues[index] - minimumDate) / (maximumDate - minimumDate)) * usableWidth;
     return left + index * usableWidth / (plotted.length - 1);
   };
   const yAt = (value: number) => bottom - ((value - low) / (high - low)) * (bottom - top);
   const polyline = plotted.map((point, index) => xAt(index) + "," + yAt(point.value)).join(" ");
-  const barWidth = Math.max(3, Math.min(18, usableWidth / Math.max(plotted.length, 1) * 0.56));
+  const barWidth = Math.max(4, Math.min(18, usableWidth / Math.max(plotted.length, 1) * 0.56));
   const tickLabel = (date: string) => {
     if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) return date;
     const parsed = new Date(date + "T12:00:00");
@@ -1248,34 +1248,53 @@ function MiniTrend({
   const visibleTickIndices = tickIndices.filter((index, position, all) =>
     all.findIndex((candidate) => tickLabel(plotted[candidate].date) === tickLabel(plotted[index].date)) === position
   );
-  const chartSummary = plotted.length === 1
-    ? "1 dated value"
-    : String(plotted.length) + " dated values";
+  const yTicks = [high, (high + low) / 2, low];
+  const chartSummary = plotted.length === 1 ? "1 dated data point" : String(plotted.length) + " dated data points";
+  const readableUnit = unit || "Unit not recorded";
+
   return (
-    <div className="mt-3 rounded-xl bg-[#f5fafb] px-3 py-2">
-      <svg viewBox="0 0 320 108" className="h-24 w-full" role="img" aria-label={label + ", " + chartSummary}>
-        {[top, (top + bottom) / 2, bottom].map((y) => (
-          <line key={y} x1={left} x2={width - right} y1={y} y2={y} stroke="#dbe7ea" strokeDasharray="3 4" strokeWidth="1" />
-        ))}
+    <div className="mt-3 rounded-xl border border-slate-100 bg-[#f5fafb] px-3 py-3">
+      <div className="mb-1 flex items-center justify-between gap-3 text-xs font-semibold text-slate-600">
+        <span>Value over time</span>
+        <span>{readableUnit}</span>
+      </div>
+      <svg viewBox="0 0 400 160" className="h-40 w-full" role="img" aria-label={label + ", " + chartSummary + ". Unit: " + readableUnit}>
+        {yTicks.map((tick, index) => {
+          const y = top + index * (bottom - top) / 2;
+          return (
+            <g key={index}>
+              <line x1={left} x2={width - right} y1={y} y2={y} stroke="#d5e1e6" strokeDasharray={index === 2 ? "0" : "4 4"} strokeWidth="1" />
+              <text x={left - 8} y={y + 4} textAnchor="end" fontSize="12" fontWeight={index === 1 ? "500" : "600"} fill="#475569">{formatNumber(tick, digits)}</text>
+            </g>
+          );
+        })}
         {variant === "bar" ? plotted.map((point, index) => {
           const x = xAt(index) - barWidth / 2;
           const y = yAt(Math.max(0, point.value));
-          return <rect key={point.date + "-" + index} x={x} y={y} width={barWidth} height={Math.max(1, bottom - y)} rx="2.5" fill="#24c1c4" opacity="0.92" />;
+          return (
+            <rect key={point.date + "-" + index} x={x} y={y} width={barWidth} height={Math.max(1, bottom - y)} rx="3" fill="#24c1c4" opacity="0.92" tabIndex={0}>
+              <title>{tickLabel(point.date)}: {formatNumber(point.value, digits)} {readableUnit}</title>
+            </rect>
+          );
         }) : (
           <>
-            <polyline points={polyline} fill="none" stroke="#177e89" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
-            {plotted.map((point, index) => <circle key={point.date + "-" + index} cx={xAt(index)} cy={yAt(point.value)} r={plotted.length > 18 ? 1.8 : 2.8} fill="#0b2d54" stroke="#ffffff" strokeWidth="1.2" />)}
+            <polyline points={polyline} fill="none" stroke="#177e89" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" />
+            {plotted.map((point, index) => (
+              <circle key={point.date + "-" + index} cx={xAt(index)} cy={yAt(point.value)} r={plotted.length > 18 ? 2.5 : 4} fill="#0b2d54" stroke="#ffffff" strokeWidth="1.5" tabIndex={0}>
+                <title>{tickLabel(point.date)}: {formatNumber(point.value, digits)} {readableUnit}</title>
+              </circle>
+            ))}
           </>
         )}
         {visibleTickIndices.map((index, position) => {
           const x = xAt(index);
           const anchor = visibleTickIndices.length === 1 ? "middle" : position === 0 ? "start" : position === visibleTickIndices.length - 1 ? "end" : "middle";
-          return <text key={plotted[index].date + "-" + index} x={x} y="99" textAnchor={anchor} fontSize="9" fill="#64748b">{tickLabel(plotted[index].date)}</text>;
+          return <text key={plotted[index].date + "-" + index} x={x} y="145" textAnchor={anchor} fontSize="11" fontWeight="500" fill="#475569">{tickLabel(plotted[index].date)}</text>;
         })}
       </svg>
-      <div className="mt-0.5 flex items-center justify-between gap-2 text-[10px] text-slate-400">
+      <div className="mt-1 flex flex-wrap items-center justify-between gap-2 border-t border-slate-200 pt-2 text-sm text-slate-600">
         <span>{chartSummary}</span>
-        <span>{unit ? formatNumber(minimum, digits) + "–" + formatNumber(maximum, digits) + " " + unit : variant === "bar" ? "Daily totals" : "Recorded trend"}</span>
+        <span className="font-semibold">Range: {formatNumber(minimum, digits)}–{formatNumber(maximum, digits)} {readableUnit}</span>
       </div>
     </div>
   );
@@ -1531,81 +1550,6 @@ function latestValuesPerDay(points: SeriesPoint[]): DailyValue[] {
     .sort((a, b) => a.date.localeCompare(b.date));
 }
 
-function hydrationTrendPair(report: Report, previousReport: Report | null): {
-  current: DailyValue[];
-  previous: DailyValue[];
-  unit: string;
-  source: string;
-} {
-  const checkInsCurrent = dailyMetric(report, "waterIntakeMl");
-  const checkInsPrevious = dailyMetric(previousReport, "waterIntakeMl");
-  // Prefer the same source in both periods. Do not fill an absent check-in
-  // day with a different source, because that would silently mix methods.
-  if (checkInsCurrent.length > 0 || checkInsPrevious.length > 0) {
-    return { current: checkInsCurrent, previous: checkInsPrevious, unit: "ml", source: "Daily health check-ins" };
-  }
-
-  const goalOptions = goalProgressTrendItems(report, previousReport)
-    .filter((item) =>
-      /HYDRATION|WATER/.test(String(item.category ?? "").toUpperCase()) ||
-      /hydration|water intake|drink more water/i.test(item.title),
-    )
-    .sort((a, b) => (b.current.length + b.previous.length) - (a.current.length + a.previous.length));
-  if (goalOptions.length > 0) {
-    const item = goalOptions[0];
-    return {
-      current: item.current,
-      previous: item.previous,
-      unit: item.unit || "",
-      source: "Health goal logs",
-    };
-  }
-
-  const hydrationPattern = /hydration|water[._\s-]?intake|water.?consumed|fluid[._\s-]?intake/i;
-  const currentEvents = goalMetricSeries(report, hydrationPattern);
-  const previousEvents = goalMetricSeries(previousReport, hydrationPattern);
-  if (currentEvents.length > 0 || previousEvents.length > 0) {
-    const unit = String(currentEvents.at(-1)?.unit || previousEvents.at(-1)?.unit || "").trim();
-    const filterUnit = (points: SeriesPoint[]) => unit
-      ? points.filter((point) => String(point.unit ?? "").trim().toLowerCase() === unit.toLowerCase())
-      : points;
-    return {
-      current: latestValuesPerDay(filterUnit(currentEvents)),
-      previous: latestValuesPerDay(filterUnit(previousEvents)),
-      unit,
-      source: "Recorded hydration metric events",
-    };
-  }
-
-  const metricKeys = Array.from(new Set([
-    ...(report.activity.wellnessMetrics ?? []).map((item) => String(item.metricKey ?? "").trim()),
-    ...(report.activity.deviceMeasurements ?? []).map((item) => String(item.metricKey || item.measurementType || item.vitalType?.name || "").trim()),
-    ...(previousReport?.activity.wellnessMetrics ?? []).map((item) => String(item.metricKey ?? "").trim()),
-    ...(previousReport?.activity.deviceMeasurements ?? []).map((item) => String(item.metricKey || item.measurementType || item.vitalType?.name || "").trim()),
-  ])).filter((key) => key && hydrationPattern.test(key));
-
-  const connected = metricKeys.map((key) => ({
-    key,
-    current: combineDatedSeries(wellnessMetricSeries(report, key), deviceMetricSeries(report, key)),
-    previous: combineDatedSeries(wellnessMetricSeries(previousReport, key), deviceMetricSeries(previousReport, key)),
-  })).sort((a, b) => (b.current.length + b.previous.length) - (a.current.length + a.previous.length));
-  const best = connected[0];
-  if (best) {
-    const unit = String(best.current.at(-1)?.unit || best.previous.at(-1)?.unit || "").trim();
-    const filterUnit = (points: SeriesPoint[]) => unit
-      ? points.filter((point) => String(point.unit ?? "").trim().toLowerCase() === unit.toLowerCase())
-      : points;
-    return {
-      current: latestValuesPerDay(filterUnit(best.current)),
-      previous: latestValuesPerDay(filterUnit(best.previous)),
-      unit,
-      source: "Connected device or wellness data",
-    };
-  }
-
-  return { current: [], previous: [], unit: "", source: "" };
-}
-
 function symptomLogAnalytics(report: Report | null) {
   const logs = report?.activity.symptoms ?? [];
   const rank: Record<string, number> = { NONE: 0, MILD: 1, MODERATE: 2, SEVERE: 3, VERY_SEVERE: 4 };
@@ -1694,21 +1638,36 @@ function dailySymptomSeries(report: Report | null): DailyValue[] {
     .sort((a, b) => a.date.localeCompare(b.date));
 }
 
-function signalChange(current: DailyValue[], previous: DailyValue[], unit: string) {
+function signalDigits(key: string, unit: string) {
+  const normalizedKey = key.toLowerCase();
+  const normalizedUnit = unit.trim().toLowerCase();
+  if (
+    ["ml", "min", "minutes", "steps", "cigarettes", "drinks", "kcal", "kilocalories", "mmhg", "bpm", "per day", "logs/day", "breaths/min"].includes(normalizedUnit) ||
+    /appointments|symptoms|steps/.test(normalizedKey)
+  ) return 0;
+  return 1;
+}
+
+function signalChange(current: DailyValue[], previous: DailyValue[], unit: string, digits = 1) {
   const currentAverage = mean(current.map((item) => item.value));
   const previousAverage = mean(previous.map((item) => item.value));
+  const suffix = unit ? " " + unit : " (unit not recorded)";
+  const value = (amount: number) => formatNumber(amount, digits) + suffix;
   if (currentAverage === null) {
     return previousAverage === null
-      ? "No dated values"
-      : "No current values · previous average " + formatNumber(previousAverage, 1) + (unit ? " " + unit : "");
+      ? "No dated values are available."
+      : "No values in this period. Previous-period average: " + value(previousAverage) + ".";
   }
   if (previousAverage === null) {
-    return "Current average " + formatNumber(currentAverage, 1) + (unit ? " " + unit : "") + " · no comparable prior values";
+    return "Current-period average: " + value(currentAverage) + ". No comparable values were found for the previous period.";
   }
   const delta = currentAverage - previousAverage;
-  const relative = previousAverage === 0 ? "" : " (" + (delta > 0 ? "+" : "") + formatNumber(delta / Math.abs(previousAverage) * 100, 1) + "%)";
-  return "vs previous average " + formatNumber(previousAverage, 1) + (unit ? " " + unit : "") + ": " +
-    (delta > 0 ? "+" : "") + formatNumber(delta, 1) + (unit ? " " + unit : "") + relative;
+  const tolerance = digits === 0 ? 0.5 : 0.05;
+  if (Math.abs(delta) < tolerance) {
+    return "About the same as the previous period: " + value(currentAverage) + " now vs " + value(previousAverage) + " previously.";
+  }
+  return "This period is " + value(Math.abs(delta)) + (delta > 0 ? " higher" : " lower") +
+    " than the previous-period average (" + value(previousAverage) + " previously → " + value(currentAverage) + " now).";
 }
 
 function PersonalisedInsights({
@@ -2175,24 +2134,28 @@ function PersonalisedInsights({
           </article>
         )}
         {signals.length ? (
-          <div className="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+          <div className="mt-4 grid gap-4 sm:grid-cols-2 xl:grid-cols-2">
             {signals.map((signal) => {
               const currentAverage = mean(signal.current.map((item) => item.value));
-              const previousAverage = mean(signal.previous.map((item) => item.value));
               const latest = signal.current[signal.current.length - 1];
-              const unit = signal.unit ? " " + signal.unit : "";
+              const unitLabel = signal.unit || "unit not recorded";
+              const unitSuffix = signal.unit ? " " + signal.unit : " (unit not recorded)";
+              const digits = signalDigits(signal.key, signal.unit);
               return (
-                <article key={signal.key} className="min-w-0 rounded-xl border border-slate-200 bg-white p-4">
-                  <h3 className="text-sm font-black text-[#0b2d54]">{signal.label}</h3>
-                  <div className="mt-2 flex flex-wrap items-baseline gap-x-2 gap-y-1">
-                    <span className="text-2xl font-black text-[#0b2d54]">{currentAverage === null ? "—" : formatNumber(currentAverage, 1)}{unit}</span>
-                    <span className="text-[10px] font-semibold text-slate-400">average</span>
+                <article key={signal.key} className="min-w-0 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+                  <div className="flex flex-wrap items-start justify-between gap-2">
+                    <h3 className="text-base font-black text-[#0b2d54]">{signal.label}</h3>
+                    <span className="rounded-full bg-slate-100 px-2.5 py-1 text-[11px] font-semibold text-slate-600">{signal.current.length} dated value(s)</span>
                   </div>
-                  {latest && <p className="mt-1 text-[11px] text-slate-500">Latest {formatNumber(latest.value, 1)}{unit} · {dateLabel(latest.date)}</p>}
-                  {signal.targetValue !== undefined && signal.targetValue !== null && <p className="mt-1 text-[11px] font-semibold text-[#0b7b80]">Saved goal target {formatNumber(signal.targetValue, 1)}{unit}</p>}
-                  <p className="mt-2 text-xs font-semibold text-slate-600">{signalChange(signal.current, signal.previous, signal.unit)}</p>
-                  <MiniTrend points={signal.current} label={signal.label + " current-period trend"} unit={signal.unit} digits={1} />
-                  <p className="mt-2 text-[10px] text-slate-400">{signal.current.length} current value(s){signal.previous.length ? " · " + signal.previous.length + " previous value(s)" : ""}</p>
+                  <div className="mt-3 flex flex-wrap items-baseline gap-x-2 gap-y-1">
+                    <span className="text-3xl font-black tracking-tight text-[#0b2d54]">{currentAverage === null ? "—" : formatNumber(currentAverage, digits)}{unitSuffix}</span>
+                    <span className="text-sm font-medium text-slate-500">average of recorded values</span>
+                  </div>
+                  {latest && <p className="mt-2 text-sm text-slate-600"><span className="font-semibold text-[#0b2d54]">Most recent:</span> {formatNumber(latest.value, digits)}{unitSuffix} · {dateLabel(latest.date)}</p>}
+                  {signal.targetValue !== undefined && signal.targetValue !== null && <p className="mt-2 text-sm font-semibold text-[#0b7b80]">Saved goal target: {formatNumber(signal.targetValue, digits)}{unitSuffix}</p>}
+                  <p className="mt-3 rounded-xl bg-slate-50 p-3 text-sm leading-6 text-slate-700">{signalChange(signal.current, signal.previous, signal.unit, digits)}</p>
+                  <MiniTrend points={signal.current} label={signal.label + " current-period trend"} unit={unitLabel} digits={digits} />
+                  {signal.previous.length > 0 && <p className="mt-2 text-xs text-slate-500">Previous period: {signal.previous.length} dated value(s).</p>}
                 </article>
               );
             })}
@@ -2254,140 +2217,6 @@ function StatusCircle({
   );
 }
 
-function RoutineTrendCard({
-  icon: Icon,
-  title,
-  subtitle,
-  current,
-  previous,
-  unit,
-  digits = 1,
-  chartType,
-  previousLoading,
-}: {
-  icon: typeof Activity;
-  title: string;
-  subtitle: string;
-  current: DailyValue[];
-  previous: DailyValue[];
-  unit: string;
-  digits?: number;
-  chartType: "line" | "bar";
-  previousLoading: boolean;
-}) {
-  const currentMean = mean(current.map((item) => item.value));
-  const values = current.map((item) => item.value);
-  return (
-    <article className="min-w-0 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
-      <div className="flex items-start gap-3">
-        <span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-[#24c1c4]/10 text-[#0b2d54]"><Icon className="h-5 w-5" /></span>
-        <div className="min-w-0 flex-1"><h3 className="font-bold text-[#0b2d54]">{title}</h3><p className="mt-1 text-xs leading-5 text-slate-500">{subtitle}</p></div>
-      </div>
-      {currentMean === null ? (
-        <div className="mt-4 rounded-xl bg-slate-50 p-3 text-sm text-slate-500">No entries for this measure in the selected period.</div>
-      ) : (
-        <>
-          <div className="mt-4 flex items-baseline gap-2"><p className="text-2xl font-black tracking-tight text-[#0b2d54]">{formatNumber(currentMean, digits)} <span className="text-sm font-bold text-slate-500">{unit}</span></p><span className="text-[10px] text-slate-400">{current.length} {current.length === 1 ? "day with an entry" : "days with entries"}</span></div>
-          <p className="mt-1 text-[11px] leading-4 text-slate-500">Average on days with a saved value. Days without an entry are not counted as zero.</p>
-          <MiniTrend points={current} label={title + " daily trend"} variant={chartType} unit={unit} digits={digits} />
-          <p className="mt-3 text-xs leading-5 text-slate-500">{compareText(values, previous.map((item) => item.value), unit, digits, previousLoading)}</p>
-        </>
-      )}
-    </article>
-  );
-}
-
-function VitalTrendCard({
-  label,
-  description,
-  unit,
-  digits,
-  current,
-  previous,
-  previousLoading,
-  review,
-  status,
-  baselineValue,
-  rawCurrent,
-}: {
-  label: string;
-  description: string;
-  unit: string;
-  digits: number;
-  current: SeriesPoint[];
-  previous: SeriesPoint[];
-  previousLoading: boolean;
-  review: MeasurementReview | null;
-  status: VitalStatusAssessment;
-  baselineValue: number | null;
-  rawCurrent: SeriesPoint[];
-}) {
-  const currentValues = current.map((item) => item.value);
-  const previousValues = previous.map((item) => item.value);
-  const average = mean(currentValues);
-  const latest = rawCurrent[rawCurrent.length - 1] ?? current[current.length - 1];
-  const first = current[0];
-  const excludedCount = Math.max(0, rawCurrent.length - current.length);
-  const change = latest && first ? latest.value - first.value : null;
-  const changeText = change === null
-    ? "Not enough readings to compare."
-    : Math.abs(change) < 0.05
-      ? "The first and most recent readings were very similar."
-      : "From the first to the most recent reading: " + (change > 0 ? "+" : "") + formatNumber(change, digits) + " " + unit + ".";
-  const baselineDelta = latest && baselineValue !== null ? latest.value - baselineValue : null;
-  const baselineComparison = baselineDelta === null
-    ? null
-    : Math.abs(baselineDelta) < (digits === 0 ? 0.5 : 0.05)
-      ? "Your most recent reading is close to your recorded baseline of " + formatNumber(baselineValue, digits) + " " + unit + "."
-      : "Your most recent reading is " + formatNumber(Math.abs(baselineDelta), digits) + " " + unit + (baselineDelta > 0 ? " above" : " below") + " your recorded baseline of " + formatNumber(baselineValue, digits) + " " + unit + ". This difference alone does not show a cause or diagnosis.";
-  return (
-    <article className="min-w-0 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
-      <div className="flex items-start justify-between gap-3">
-        <div>
-          <p className="text-sm font-bold text-[#0b2d54]">{label}</p>
-          <p className="mt-1 text-[11px] text-slate-500">{rawCurrent.length} {rawCurrent.length === 1 ? "reading" : "readings"} saved in this period</p>
-          {excludedCount > 0 && <p className="mt-1 text-[10px] font-bold text-amber-800">{excludedCount} flagged or out-of-scale {excludedCount === 1 ? "value is" : "values are"} excluded from the trend average and shown in the review alerts.</p>}
-        </div>
-        <HeartPulse className="h-5 w-5 shrink-0 text-[#24c1c4]" />
-      </div>
-      <p className="mt-2 text-xs leading-5 text-slate-500">{description}</p>
-      <div className="mt-3"><StatusCircle label={status.label} detail={status.detail} tone={status.tone} /></div>
-      {average === null ? (
-        <p className="mt-4 text-sm text-slate-500">{rawCurrent.length > 0 ? "No values from this measure were used in the trend because the saved values need review. See the alert above." : "No readings were saved for this period."}</p>
-      ) : (
-        <>
-          <div className="mt-4">
-            <p className="text-[10px] font-bold uppercase tracking-wide text-slate-400">Average for this period</p>
-            <p className="mt-1 text-2xl font-black tracking-tight text-[#0b2d54]">
-              {formatNumber(average, digits)} <span className="text-sm font-bold text-slate-500">{unit}</span>
-            </p>
-            {latest && <p className="mt-1 text-xs text-slate-500">Most recent: {formatNumber(latest.value, digits)} {unit} · {dateLabel(new Date(latest.timestamp).toISOString())}</p>}
-            {latest?.convertedFrom && <p className="mt-1 text-[10px] leading-4 text-slate-500">Converted for this report from {formatNumber(latest.convertedFrom.value, 1)} {latest.convertedFrom.unit}.</p>}
-          </div>
-          <MiniTrend points={current} label={label + " trend"} unit={unit} digits={digits} />
-          {review ? (
-            <p className="mt-3 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs leading-5 text-amber-950">
-              Check these saved values before interpreting the trend. See “Readings to double-check” above.
-            </p>
-          ) : (
-            <p className="mt-3 text-xs leading-5 text-slate-600">{changeText}</p>
-          )}
-          {baselineValue !== null && (
-            <p className="mt-3 rounded-xl border border-slate-100 bg-white px-3 py-2 text-xs leading-5 text-slate-600">
-              {review ? "Baseline comparison is paused until the flagged saved values are checked." : baselineComparison}
-            </p>
-          )}
-          <div className="mt-3 rounded-xl bg-[#f5fafb] p-3">
-            <p className="text-[10px] font-bold uppercase tracking-wide text-[#71839a]">Compared with the previous period</p>
-            <p className="mt-1 text-xs leading-5 text-slate-600">{review ? "Please verify these saved values before comparing this period with the previous one." : compareText(currentValues, previousValues, unit, digits, previousLoading)}</p>
-          </div>
-        </>
-      )}
-    </article>
-  );
-}
-
-
 function clinicalEvents(report: Report) {
   return report.clinical.encounters.length +
     report.clinical.diagnoses.length +
@@ -2435,7 +2264,6 @@ function HealthReportInsights({
     return sum + (seconds === null ? 0 : seconds / 60);
   }, 0);
   const sleepSessions = report.activity.sleepSessions.filter((session) => finite(session.durationMinutes) !== null && Number(session.durationMinutes) > 0);
-  const sleepHours = sleepSessions.map((session) => Number(session.durationMinutes) / 60);
   const lowMood = lowMoodCounts(report);
   const goalProgressItems = goalProgressTrendItems(report, previousReport);
   const repeated = recurringSymptoms(report);
@@ -2482,17 +2310,8 @@ function HealthReportInsights({
       baselineValue: baselineVitalValue(config.key, report.currentSnapshot),
     }))
     .filter((config) => config.rawCurrent.length > 0);
-  const routineConfigs = [
-    { field: "sleepHours", label: "Sleep", subtitle: "Average hours slept on days you completed a check-in.", unit: "hours", digits: 1, icon: Moon, chartType: "line" as const },
-    { field: "stressLevel", label: "Stress rating", subtitle: "Your average stress rating on check-in days.", unit: "/10", digits: 1, icon: Activity, chartType: "line" as const },
-    { field: "waterIntakeMl", label: "Water logged", subtitle: "Average water amount entered on check-in days.", unit: "ml", digits: 0, icon: Droplets, chartType: "bar" as const },
-    { field: "exerciseMinutes", label: "Exercise logged", subtitle: "Average exercise minutes entered on check-in days.", unit: "min", digits: 0, icon: Footprints, chartType: "bar" as const },
-  ];
-  const routines = routineConfigs.map((config) => ({
-    ...config,
-    current: dailyMetric(report, config.field),
-    previous: dailyMetric(previousReport, config.field),
-  })).filter((config) => config.current.length > 0);
+  const hasRoutineCheckIns = ["sleepHours", "stressLevel", "waterIntakeMl", "exerciseMinutes"]
+    .some((field) => dailyMetric(report, field).length > 0);
   const symptomSeverityPoints = symptomSeverityTimeline(report);
   const previousSymptomSeverityPoints = symptomSeverityTimeline(previousReport);
   const recurringSymptomsOnly = repeated.filter((item) => item.count > 1).slice(0, 4);
@@ -2508,13 +2327,8 @@ function HealthReportInsights({
   const previousSteps = latestValuesPerDay(previousWellnessSteps.length ? previousWellnessSteps : previousDeviceSteps.length ? previousDeviceSteps : previousGoalSteps);
   const currentStepValues = currentSteps.map((item) => item.value);
   const previousStepValues = previousSteps.map((item) => item.value);
-  const hydrationTrend = hydrationTrendPair(report, previousReport);
-  const currentHydrationValues = hydrationTrend.current.map((item) => item.value);
-  const previousHydrationValues = hydrationTrend.previous.map((item) => item.value);
-  const hydrationDigits = /(^|[^a-z])ml([^a-z]|$)/i.test(hydrationTrend.unit) ? 0 : 1;
   const medicationsOnFile = report.currentSnapshot?.medications ?? [];
   const doseTotalsCurrent = medicationDoseTotals(report);
-  const doseTotalsPrevious = medicationDoseTotals(previousReport);
   const clinicalCountPrevious = previousReport ? clinicalEvents(previousReport) : null;
   const previousClinicalDetail = previousLoading
     ? "Comparing with the previous period…"
@@ -2531,13 +2345,11 @@ function HealthReportInsights({
         ? "Medication records are available, but no dated dose outcomes were found for this period."
         : "No medication records or dated dose outcomes were returned in this report.";
   const hasCategoricalCheckIns = report.activity.journalEntries.some((entry) => Boolean(entry.mood || entry.energyLevel || entry.sleepQuality));
-  const noAnalysisData = activeVitals.length === 0 && routines.length === 0 && currentSteps.length === 0 && goalProgressItems.length === 0 && (report.goalMetricEvents ?? []).length === 0 && (report.activity.wellnessMetrics ?? []).length === 0 && !hasCategoricalCheckIns && symptomCount === 0 && sleepSessions.length === 0 && workouts.length === 0 && clinicalCount === 0;
+  const noAnalysisData = activeVitals.length === 0 && !hasRoutineCheckIns && currentSteps.length === 0 && goalProgressItems.length === 0 && (report.goalMetricEvents ?? []).length === 0 && (report.activity.wellnessMetrics ?? []).length === 0 && !hasCategoricalCheckIns && symptomCount === 0 && sleepSessions.length === 0 && workouts.length === 0 && clinicalCount === 0;
   const moodPattern = lowMood.total > 0
     ? lowMood.low + " of " + lowMood.total + " mood check-ins were marked low or very low."
     : "";
   const symptomPattern = repeated.find((item) => item.count > 1);
-  const activityDelta = previousReport ? workouts.length - previousReport.activity.workouts.length : null;
-  const sleepDelta = previousReport ? sleepSessions.length - previousReport.activity.sleepSessions.length : null;
   return (
     <div className="mt-5 space-y-6">
       <PersonalisedInsights report={report} previousReport={previousReport} previousLoading={previousLoading} coveragePercent={coveragePercent} daysLogged={daysLogged} totalDays={totalDays} />
@@ -2555,7 +2367,7 @@ function HealthReportInsights({
         <div className="mb-3">
           <p className="text-[10px] font-black uppercase tracking-[0.16em] text-[#24c1c4]">Health trends analysis</p>
           <h2 className="mt-1 text-xl font-black text-[#0b2d54]">Key health patterns</h2>
-          <p className="mt-1 text-sm leading-6 text-slate-500">A concise summary of the same key areas highlighted by Sympto’s comprehensive report: steps, hydration, symptoms, medicines and clinical activity. Averages use days with recorded values; missing days are not treated as zero.</p>
+          <p className="mt-1 text-sm leading-6 text-slate-500">A quick overview of steps, medication records and clinical activity. Detailed charts below show hydration, symptoms and other recorded measures without repeating the same cards.</p>
         </div>
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
           <SummaryTile
@@ -2563,24 +2375,8 @@ function HealthReportInsights({
             label="Average daily steps"
             value={currentSteps.length ? formatNumber(mean(currentStepValues), 0) : "Not recorded"}
             detail={currentSteps.length
-              ? formatNumber(currentStepValues.length, 0) + " day(s) with dated counts. " + compareText(currentStepValues, previousStepValues, "steps/day", 0, previousLoading)
-              : "No dated step-count values were found in this period."}
-          />
-          <SummaryTile
-            icon={Droplets}
-            label="Average daily water"
-            value={hydrationTrend.current.length
-              ? formatNumber(mean(currentHydrationValues), hydrationDigits) + (hydrationTrend.unit ? " " + hydrationTrend.unit : "")
-              : "Not recorded"}
-            detail={hydrationTrend.current.length
-              ? "Average across " + hydrationTrend.current.length + " day(s) with a saved water value. Source: " + hydrationTrend.source + ". " + compareText(currentHydrationValues, previousHydrationValues, hydrationTrend.unit, hydrationDigits, previousLoading)
-              : "No dated water-intake values were found in check-ins, hydration-goal records or connected wellness data."}
-          />
-          <SummaryTile
-            icon={Activity}
-            label="Symptoms reported"
-            value={String(symptomCount)}
-            detail={symptomComparison + (symptomPattern ? " Most repeated symptom: " + symptomPattern.label + " (" + symptomPattern.count + " logs)." : "")}
+              ? formatNumber(currentStepValues.length, 0) + " date(s) with recorded counts. " + compareText(currentStepValues, previousStepValues, "steps/day", 0, previousLoading)
+              : "No dated step-count values were found. The report does not estimate missing data."}
           />
           <SummaryTile
             icon={ClipboardList}
@@ -2623,36 +2419,26 @@ function HealthReportInsights({
         {activeVitals.length ? <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">{activeVitals.map((item) => <VitalTrendCard key={item.key} label={item.label} description={item.description} unit={item.unit} digits={item.digits} current={item.current} previous={item.previous} previousLoading={previousLoading} review={item.review} status={item.status} baselineValue={item.baselineValue} rawCurrent={item.rawCurrent} />)}</div> : <div className="rounded-2xl border border-dashed border-slate-300 bg-white p-5 text-sm leading-6 text-slate-500">No dated vital readings were found for this period. Once you save blood pressure, heart rate, weight or other measurements, they will appear here.</div>}
       </section>
 
-      <section>
-        <div className="mb-3"><p className="text-[10px] font-black uppercase tracking-[0.16em] text-[#24c1c4]">Everyday routines</p><h2 className="mt-1 text-xl font-black text-[#0b2d54]">Habits and consistency</h2><p className="mt-1 text-sm leading-6 text-slate-500">These cards summarise daily check-ins instead of repeating the text of each journal entry.</p></div>
-        {routines.length ? <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">{routines.map((item) => <RoutineTrendCard key={item.field} icon={item.icon} title={item.label} subtitle={item.subtitle} current={item.current} previous={item.previous} unit={item.unit} digits={item.digits} chartType={item.chartType} previousLoading={previousLoading} />)}</div> : <div className="rounded-2xl border border-dashed border-slate-300 bg-white p-5 text-sm leading-6 text-slate-500">Daily sleep, stress, water and exercise trends will appear once those fields have been included in saved check-ins.</div>}
-        {(currentSteps.length > 0 || previousSteps.length > 0) && (
-          <div className="mt-3 grid gap-3 sm:grid-cols-2">
-            <article className="rounded-2xl border border-slate-200 bg-white p-4">
-              <div className="flex items-center gap-2"><Footprints className="h-5 w-5 text-[#24c1c4]" /><h3 className="font-bold text-[#0b2d54]">Daily steps</h3></div>
-              {currentSteps.length > 0 ? (
-                <>
-                  <p className="mt-3 text-2xl font-black text-[#0b2d54]">{formatNumber(mean(currentStepValues), 0)} <span className="text-sm font-bold text-slate-500">steps/day</span></p>
-                  <p className="mt-1 text-xs text-slate-500">Average across {currentSteps.length} day(s) with a dated step count.</p>
-                  <MiniTrend points={currentSteps} label="Daily steps across the report period" variant="bar" unit="steps" digits={0} />
-                  <p className="mt-2 text-xs leading-5 text-slate-500">{compareText(currentStepValues, previousStepValues, "steps/day", 0, previousLoading)}</p>
-                </>
-              ) : (
-                <p className="mt-3 text-sm leading-6 text-slate-500">No dated step counts were found in this period. {previousSteps.length ? "The previous period has " + previousSteps.length + " day(s) with a step count." : ""}</p>
-              )}
-              <p className="mt-2 text-[10px] leading-4 text-slate-400">Daily values use the latest saved cumulative step count for each date; separate sensor samples are not added together.</p>
-            </article>
+      {currentSteps.length > 0 && (
+        <section>
+          <div className="mb-3">
+            <p className="text-[10px] font-black uppercase tracking-[0.16em] text-[#24c1c4]">Daily activity</p>
+            <h2 className="mt-1 text-xl font-black text-[#0b2d54]">Step-count trend</h2>
+            <p className="mt-1 text-sm leading-6 text-slate-500">Each bar shows the latest saved step count for that date. Days without a recorded count are not estimated.</p>
           </div>
-        )}
-        {(sleepSessions.length > 0 || (previousReport?.activity.sleepSessions.length ?? 0) > 0 || workouts.length > 0 || (previousReport?.activity.workouts.length ?? 0) > 0) && (
-          <div className="mt-3 grid gap-3 sm:grid-cols-2">
-            {(sleepSessions.length > 0 || (previousReport?.activity.sleepSessions.length ?? 0) > 0) && <article className="rounded-2xl border border-slate-200 bg-white p-4"><div className="flex items-center gap-2"><Moon className="h-5 w-5 text-[#24c1c4]" /><h3 className="font-bold text-[#0b2d54]">Connected sleep</h3></div><p className="mt-3 text-2xl font-black text-[#0b2d54]">{sleepHours.length ? formatNumber(mean(sleepHours), 1) + " h" : "No sleep sessions"}</p><p className="mt-1 text-xs text-slate-500">{sleepSessions.length} recorded sessions in this period{previousLoading ? "; comparing periods…" : sleepDelta === null ? "." : "; " + String(Math.abs(sleepDelta)) + " " + (sleepDelta > 0 ? "more" : sleepDelta < 0 ? "fewer" : "same number of") + " sessions than the previous period."}</p><p className="mt-2 text-xs leading-5 text-slate-500">Average is calculated from wearable sleep sessions with a recorded duration.</p></article>}
-            {(workouts.length > 0 || (previousReport?.activity.workouts.length ?? 0) > 0) && <article className="rounded-2xl border border-slate-200 bg-white p-4"><div className="flex items-center gap-2"><Footprints className="h-5 w-5 text-[#24c1c4]" /><h3 className="font-bold text-[#0b2d54]">Activity consistency</h3></div><p className="mt-3 text-2xl font-black text-[#0b2d54]">{workouts.length ? formatNumber(workoutMinutes, 0) + " min" : "No workouts"}</p><p className="mt-1 text-xs text-slate-500">{workouts.length} workouts across {new Set(workouts.map((item) => dateKey(item.startedAt || item.endedAt)).filter(Boolean)).size} days{previousLoading ? "; comparing periods…" : activityDelta === null ? "." : "; " + String(Math.abs(activityDelta)) + " " + (activityDelta > 0 ? "more" : activityDelta < 0 ? "fewer" : "same number of") + " sessions than the previous period."}</p><p className="mt-2 text-xs leading-5 text-slate-500">This reflects recorded sessions, not all movement during the day.</p></article>}
-          </div>
-        )}
-      </section>
-
-
+          <article className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+            <div className="flex flex-wrap items-end justify-between gap-3">
+              <div>
+                <p className="text-3xl font-black tracking-tight text-[#0b2d54]">{formatNumber(mean(currentStepValues), 0)} <span className="text-sm font-bold text-slate-500">steps/day</span></p>
+                <p className="mt-1 text-sm text-slate-600">Average across {currentSteps.length} date(s) with a saved step count.</p>
+              </div>
+              <p className="text-sm font-semibold text-slate-600">{compareText(currentStepValues, previousStepValues, "steps/day", 0, previousLoading)}</p>
+            </div>
+            <MiniTrend points={currentSteps} label="Daily steps across the report period" variant="bar" unit="steps" digits={0} />
+            <p className="mt-2 text-xs leading-5 text-slate-500">Sensor samples on the same date are not added together; the latest saved cumulative count is used.</p>
+          </article>
+        </section>
+      )}
 
       {(symptomCount > 0 || lowMood.total > 0 || association !== null || repeated.some((item) => item.count > 1) || symptomAnalytics.repeatedTriggers.length > 0 || symptomAnalytics.medicationEffects > 0 || symptomAnalytics.averageSeverityRank !== null) && (
         <section>
@@ -2854,18 +2640,22 @@ export default function HealthReportPage() {
 
           {previousFailed && <div className="mt-4 flex items-start gap-2 rounded-2xl border border-amber-200 bg-amber-50 p-4 text-xs leading-5 text-amber-900"><Info className="mt-0.5 h-4 w-4 shrink-0" />The current report is available, but the prior-period comparison could not be loaded. Current-period trends remain available; comparison labels will appear when historical data is accessible.</div>}
 
-          <section aria-label="How to read this report" className="mt-4 rounded-2xl border border-[#dcebed] bg-white p-4 sm:p-5">
-            <h2 className="text-sm font-black text-[#0b2d54]">How to read this report</h2>
-            <div className="mt-2 grid gap-2 text-xs leading-5 text-slate-600 sm:grid-cols-2">
-              <p><strong className="text-[#0b2d54]">Average:</strong> the average of the readings saved in this period, not a value for every day.</p>
-              <p><strong className="text-[#0b2d54]">Most recent:</strong> the latest dated reading available.</p>
-              <p><strong className="text-[#0b2d54]">Change:</strong> first-to-most-recent compares two readings. “Previous period” compares this report with the earlier week or month.</p>
-              <p><strong className="text-[#0b2d54]">Missing entry:</strong> means no value was saved; it is not counted as zero.</p>
+          <details aria-label="How to read this report" className="mt-4 rounded-2xl border border-[#dcebed] bg-white p-4 sm:p-5">
+            <summary className="flex cursor-pointer list-none items-center justify-between gap-3 text-sm font-black text-[#0b2d54]">
+              <span>How to read this report</span>
+              <span className="text-xs font-semibold text-[#0b7b80]">Open guide</span>
+            </summary>
+            <div className="mt-3 grid gap-2 border-t border-slate-100 pt-3 text-sm leading-6 text-slate-600 sm:grid-cols-2">
+              <p><strong className="text-[#0b2d54]">Average:</strong> average of values recorded, not an estimate for every day.</p>
+              <p><strong className="text-[#0b2d54]">Most recent:</strong> the latest dated value available.</p>
+              <p><strong className="text-[#0b2d54]">Change:</strong> the actual amount higher or lower than the previous period; distracting percentage swings are omitted.</p>
+              <p><strong className="text-[#0b2d54]">Missing entry:</strong> no value was saved. It is not counted as zero.</p>
+              <p><strong className="text-[#0b2d54]">Chart:</strong> dates run along the bottom; the numbered scale on the left shows values. Hover or focus a plotted point to inspect its date and value.</p>
               <p><strong className="text-[#0b2d54]">Colour key:</strong> green = within a common reference; amber = recheck or monitor; orange = high; red = urgent; grey = personal or age-specific guidance needed.</p>
-              <p><strong className="text-[#0b2d54]">Saved goal status:</strong> matching targets inform relevant measurement cards, while recorded progress status guides next steps. Missing progress is left unknown rather than guessed.</p>
+              <p><strong className="text-[#0b2d54]">Goal status:</strong> uses saved goal targets and recorded progress. Missing progress is not guessed.</p>
+              <p><strong className="text-[#0b2d54]">Data coverage:</strong> measures how much was logged, not how healthy you are. General reference ranges are not a substitute for personal or clinician guidance.</p>
             </div>
-            <p className="mt-3 border-t border-slate-100 pt-3 text-xs leading-5 text-slate-500">The data-coverage score measures how much was logged, not your health. Sympto does not combine different measurements into one unvalidated overall health score. General adult reference ranges are guides, not personal targets; age, long-term conditions and clinician advice can change the interpretation.</p>
-          </section>
+          </details>
           <HealthReportInsights report={report} previousReport={previousReport} previousLoading={previousLoading} />
         </div>
       </main>
