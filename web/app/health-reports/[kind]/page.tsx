@@ -574,6 +574,12 @@ function trendVitalSeries(report: Report | null, metric: string, age: number | n
   });
 }
 
+function originalUnitReviewFields(point: SeriesPoint | null | undefined) {
+  return point?.convertedFrom
+    ? { originalValue: point.convertedFrom.value, originalUnit: point.convertedFrom.unit }
+    : {};
+}
+
 function reportMeasurementReviews(report: Report, age: number | null): MeasurementReview[] {
   const reviews: MeasurementReview[] = [];
 
@@ -586,26 +592,26 @@ function reportMeasurementReviews(report: Report, age: number | null): Measureme
   if (latestOxygen && (latestOxygen.value <= 0 || latestOxygen.value > 100)) {
     reviews.push({
       key: "oxygen", label: "Oxygen saturation", unit: "%",
-      value: latestOxygen.value, timestamp: latestOxygen.timestamp, severity: "review",
+      value: latestOxygen.value, timestamp: latestOxygen.timestamp, ...originalUnitReviewFields(latestOxygen), severity: "review",
       message: "This value is outside the valid 0–100% scale. Check the original entry, device and unit before relying on this trend.",
     });
   } else if (latestOxygen && latestOxygen.value <= 88) {
     reviews.push({
       key: "oxygen", label: "Oxygen saturation", unit: "%",
-      value: latestOxygen.value, timestamp: latestOxygen.timestamp, severity: "urgent",
+      value: latestOxygen.value, timestamp: latestOxygen.timestamp, ...originalUnitReviewFields(latestOxygen), severity: "urgent",
       message: "This is a very low saved oxygen reading. For most people, a home reading of 88% or lower needs emergency assessment. If a reading this low is happening now, seek emergency medical help. A device can be inaccurate, but do not delay help if you feel unwell.",
     });
   } else if (lowestOxygen && lowestOxygen.value <= 88) {
     reviews.push({
       key: "oxygen", label: "Oxygen saturation", unit: "%",
-      value: lowestOxygen.value, timestamp: lowestOxygen.timestamp, severity: "review",
+      value: lowestOxygen.value, timestamp: lowestOxygen.timestamp, ...originalUnitReviewFields(lowestOxygen), severity: "review",
       message: "This period includes a very low saved oxygen reading. Check the original record and date. If a reading this low is happening now, seek emergency medical help. A device can be inaccurate, but do not delay help if you feel unwell.",
     });
   } else if (lowestOxygen && lowestOxygen.value <= 92) {
     const selected = latestOxygen && latestOxygen.value <= 92 ? latestOxygen : lowestOxygen;
     reviews.push({
       key: "oxygen", label: "Oxygen saturation", unit: "%",
-      value: selected.value, timestamp: selected.timestamp, severity: "review",
+      value: selected.value, timestamp: selected.timestamp, ...originalUnitReviewFields(selected), severity: "review",
       message: "This saved oxygen reading is lower than expected for most people. Confirm it and contact a healthcare professional for advice. Personal targets can differ, especially with some lung conditions.",
     });
   }
@@ -623,31 +629,31 @@ function reportMeasurementReviews(report: Report, age: number | null): Measureme
   if (latestTemperature && latestTemperature.value >= 43) {
     reviews.push({
       key: "temperature", label: "Temperature", unit: "°C",
-      value: latestTemperature.value, timestamp: latestTemperature.timestamp, severity: "review",
+      value: latestTemperature.value, timestamp: latestTemperature.timestamp, ...originalUnitReviewFields(latestTemperature), severity: "review",
       message: "This is far outside usual body-temperature readings and may be a unit, sensor or typing error. Check the original record promptly. If a temperature this high is current and accurate, seek emergency medical help.",
     });
   } else if (hottest && hottest.value >= 43) {
     reviews.push({
       key: "temperature", label: "Temperature", unit: "°C",
-      value: hottest.value, timestamp: hottest.timestamp, severity: "review",
+      value: hottest.value, timestamp: hottest.timestamp, ...originalUnitReviewFields(hottest), severity: "review",
       message: "This saved temperature is far outside usual body-temperature readings and may reflect an entry, device or unit problem. Check the original record. If a temperature around 40°C or higher is current and accurate, seek urgent medical advice; if you feel seriously unwell, seek emergency help.",
     });
   } else if (latestTemperature && latestTemperature.value >= 40) {
     reviews.push({
       key: "temperature", label: "Temperature", unit: "°C",
-      value: latestTemperature.value, timestamp: latestTemperature.timestamp, severity: "urgent",
+      value: latestTemperature.value, timestamp: latestTemperature.timestamp, ...originalUnitReviewFields(latestTemperature), severity: "urgent",
       message: "This is a very high reported temperature. Confirm it promptly with a reliable thermometer and seek urgent medical advice, especially if you feel very unwell.",
     });
   } else if (latestTemperature && latestTemperature.value < 35) {
     reviews.push({
       key: "temperature", label: "Temperature", unit: "°C",
-      value: latestTemperature.value, timestamp: latestTemperature.timestamp, severity: "review",
+      value: latestTemperature.value, timestamp: latestTemperature.timestamp, ...originalUnitReviewFields(latestTemperature), severity: "review",
       message: "This is a low reported body temperature. Check the measurement method and repeat the reading. If it is current and accurate, or you feel unwell, seek urgent medical advice.",
     });
   } else if (coldest && coldest.value < 35) {
     reviews.push({
       key: "temperature", label: "Temperature", unit: "°C",
-      value: coldest.value, timestamp: coldest.timestamp, severity: "review",
+      value: coldest.value, timestamp: coldest.timestamp, ...originalUnitReviewFields(coldest), severity: "review",
       message: "A low temperature was saved during this period. Check the date, measurement method and original value before interpreting the trend.",
     });
   }
@@ -696,7 +702,7 @@ function reportMeasurementReviews(report: Report, age: number | null): Measureme
       key: isSystolic ? "systolic" : "diastolic",
       label: isSystolic ? "Systolic blood pressure" : "Diastolic blood pressure",
       unit: "mmHg", value: severeBloodPressure.value,
-      timestamp: severeBloodPressure.timestamp, severity: "urgent",
+      timestamp: severeBloodPressure.timestamp, ...originalUnitReviewFields(severeBloodPressure), severity: "urgent",
       message: "This blood-pressure reading is very high. Repeat it after sitting quietly and seek prompt medical advice. If you also have chest pain, shortness of breath, weakness, numbness, vision changes or trouble speaking, call local emergency services.",
     });
   }
@@ -1250,6 +1256,7 @@ function VitalTrendCard({
               {formatNumber(average, digits)} <span className="text-sm font-bold text-slate-500">{unit}</span>
             </p>
             {latest && <p className="mt-1 text-xs text-slate-500">Most recent: {formatNumber(latest.value, digits)} {unit} · {dateLabel(new Date(latest.timestamp).toISOString())}</p>}
+            {latest?.convertedFrom && <p className="mt-1 text-[10px] leading-4 text-slate-500">Converted for this report from {formatNumber(latest.convertedFrom.value, 1)} {latest.convertedFrom.unit}.</p>}
           </div>
           <MiniTrend values={currentValues} label={label + " trend"} />
           {review ? (
@@ -1450,6 +1457,7 @@ function HealthReportInsights({
                 {measurementReviews.map((item) => (
                   <div key={item.key} className="rounded-xl border border-black/5 bg-white/85 p-3">
                     <p className="text-sm font-black text-[#0b2d54]">{item.label}: {formatNumber(item.value, item.key === "temperature" || item.key === "oxygen" ? 1 : 0)} {item.unit} · {dateLabel(new Date(item.timestamp).toISOString())}</p>
+                    {item.originalValue !== undefined && item.originalUnit && <p className="mt-1 text-xs font-semibold text-slate-600">Source entry: {formatNumber(item.originalValue, 1)} {item.originalUnit}. The value above is converted to the report&apos;s standard unit.</p>}
                     <p className="mt-1 text-sm leading-6 text-slate-700">{item.message}</p>
                   </div>
                 ))}
