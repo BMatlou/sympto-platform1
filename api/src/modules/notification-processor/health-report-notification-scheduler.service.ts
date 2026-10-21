@@ -223,7 +223,7 @@ export class HealthReportNotificationSchedulerService
         : 'Your monthly health report is ready';
 
     const summary = await this.buildSummary(patient.id, kind, period);
-    const body = `Your health overview for ${period.label} is ready. ${summary} Open your Health Journal to review your activity and progress.`;
+    const body = `Your health overview for ${period.label} is ready. ${summary} Open your Health Report to review your trends and patterns.`;
 
     const inAppEnabled = await this.isEnabled(
       patient.userId,
@@ -246,7 +246,7 @@ export class HealthReportNotificationSchedulerService
         title,
         body,
         actionUrl: '/health-reports/' + kind.toLowerCase() + '?date=' + period.scheduledFor.toISOString().slice(0, 10),
-        actionLabel: 'View health journal',
+        actionLabel: 'View health report',
         scheduledFor: period.scheduledFor,
       });
     }
@@ -259,7 +259,7 @@ export class HealthReportNotificationSchedulerService
         title,
         body: 'Your health report is ready to review.',
         actionUrl: '/health-reports/' + kind.toLowerCase() + '?date=' + period.scheduledFor.toISOString().slice(0, 10),
-        actionLabel: 'View health journal',
+        actionLabel: 'View health report',
         scheduledFor: period.scheduledFor,
       });
     }
