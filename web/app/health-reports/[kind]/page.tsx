@@ -2024,6 +2024,28 @@ function PersonalisedInsights({
   );
 }
 
+function StatusCircle({
+  label,
+  detail,
+  tone,
+}: {
+  label: string;
+  detail: string;
+  tone: StatusTone;
+}) {
+  const styles = toneStyles(tone);
+  const mark = tone === "good" ? "✓" : tone === "watch" ? "!" : tone === "high" ? "!!" : tone === "critical" ? "SOS" : "?";
+  return (
+    <div className={"rounded-xl border px-3 py-2.5 " + styles.border + " " + styles.surface}>
+      <div className={"flex items-center gap-2 text-xs font-bold " + styles.text}>
+        <span aria-hidden="true" className="grid h-5 min-w-5 place-items-center rounded-full bg-white/80 px-1 text-[10px]">{mark}</span>
+        <span>{label}</span>
+      </div>
+      <p className={"mt-1 text-xs leading-5 " + styles.text}>{detail}</p>
+    </div>
+  );
+}
+
 function RoutineTrendCard({
   icon: Icon,
   title,
