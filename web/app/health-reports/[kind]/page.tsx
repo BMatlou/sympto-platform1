@@ -56,14 +56,15 @@ type DeviceMeasurementRecord = {
   measurementType?: string | null;
   metricKey?: string | null;
   value?: number | string | null;
+  unit?: string | null;
   measuredAt?: string | null;
-  vitalType?: { name?: string | null } | null;
+  vitalType?: { name?: string | null; unit?: string | null } | null;
 };
 type ClinicalVitalRecord = {
   value?: number | string | null;
   measuredAt?: string | null;
   recordedAt?: string | null;
-  vitalType?: { code?: string | null; name?: string | null } | null;
+  vitalType?: { code?: string | null; name?: string | null; unit?: string | null } | null;
 };
 type SleepSessionRecord = {
   id?: string;
@@ -242,7 +243,7 @@ type Report = {
   generatedAt: string;
 };
 
-type SeriesPoint = { date: string; value: number; timestamp: number; source?: string };
+type SeriesPoint = { date: string; value: number; timestamp: number; source?: string; convertedFrom?: { value: number; unit: string } };
 type DailyValue = { date: string; value: number };
 type MeasurementReview = {
   key: string;
@@ -252,6 +253,8 @@ type MeasurementReview = {
   timestamp: number;
   severity: "urgent" | "review";
   message: string;
+  originalValue?: number;
+  originalUnit?: string;
 };
 
 function unwrap<T>(value: unknown): T {
@@ -426,12 +429,36 @@ function addVital(
   value: unknown,
   at: unknown,
   source: string,
+  convertedFrom?: { value: number; unit: string },
 ) {
   const numeric = finite(value);
   const day = dateKey(at);
   const timestamp = at ? new Date(String(at)).getTime() : Number.NaN;
   if (numeric === null || !day || !Number.isFinite(timestamp)) return;
-  output.push({ date: day, value: numeric, timestamp, source });
+  output.push({ date: day, value: numeric, timestamp, source, ...(convertedFrom ? { convertedFrom } : {}) });
+}
+
+function standardiseMeasurementValue(metric: string, value: unknown, unitValue: unknown): { value: number; convertedFrom?: { value: number; unit: string } } | null {
+  const numeric = finite(value);
+  if (numeric === null) return null;
+  const originalUnit = String(unitValue ?? "").trim();
+  const unit = originalUnit.toLowerCase().replace(/º/g, "°");
+  let converted = numeric;
+
+  if (metric === "temperature" && (unit.includes("fahrenheit") || /(^|[^a-z])°?f($|[^a-z])/.test(unit))) {
+    converted = (numeric - 32) * 5 / 9;
+  } else if (metric === "weight" && /(?:^|\s)(?:lb|lbs|pound|pounds)(?:$|\s)/.test(unit)) {
+    converted = numeric * 0.45359237;
+  } else if ((metric === "systolic" || metric === "diastolic") && /\bkpa\b/.test(unit)) {
+    converted = numeric * 7.50062;
+  } else if (metric === "oxygen" && (unit.includes("fraction") || unit.includes("ratio")) && numeric >= 0 && numeric <= 1) {
+    converted = numeric * 100;
+  }
+
+  return {
+    value: converted,
+    ...(converted !== numeric && originalUnit ? { convertedFrom: { value: numeric, unit: originalUnit } } : {}),
+  };
 }
 
 function normaliseVitalName(value: unknown) {
