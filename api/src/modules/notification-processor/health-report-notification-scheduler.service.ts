@@ -664,6 +664,8 @@ export class HealthReportNotificationSchedulerService
       goalCategory: string | null;
       unit: string | null;
       targetValue: unknown;
+      aggregation: string | null;
+      frequency: string | null;
       metricType: string;
       metricKey: string;
       loggedValue: unknown;
@@ -678,6 +680,8 @@ export class HealthReportNotificationSchedulerService
         goal."goalCategory" AS "goalCategory",
         goal."unit" AS "unit",
         goal."targetValue" AS "targetValue",
+        goal."aggregation" AS "aggregation",
+        goal."frequency" AS "frequency",
         e."metricType" AS "metricType",
         e."metricKey" AS "metricKey",
         e."loggedValue" AS "loggedValue",
@@ -697,7 +701,9 @@ export class HealthReportNotificationSchedulerService
           hg."title" AS "goalTitle",
           hg."category"::text AS "goalCategory",
           hg."unit" AS "unit",
-          hg."targetValue" AS "targetValue"
+          hg."targetValue" AS "targetValue",
+          hgm."aggregation"::text AS "aggregation",
+          hgm."frequency"::text AS "frequency"
         FROM "HealthGoalMetricConfig" hgm
         INNER JOIN "HealthGoal" hg ON hg."id" = hgm."healthGoalId"
         WHERE hg."patientId" = e."patientId"
