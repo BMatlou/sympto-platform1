@@ -1098,6 +1098,10 @@ function PersonalisedInsights({
   const weightGoalProgress = goalProgressItemsForPattern(report, /weight|body mass/);
   const glucoseGoalProgress = goalProgressItemsForPattern(report, /blood glucose|glucose|hba1c|a1c|diabetes/);
   const lipidGoalProgress = goalProgressItemsForPattern(report, /cholesterol|lipid|triglyceride|ldl|hdl/);
+  const exerciseGoalProgress = goalProgressItemsForPattern(report, /exercise|physical activity|workout|fitness/);
+  const sleepGoalProgress = goalProgressItemsForPattern(report, /sleep/);
+  const hydrationGoalProgress = goalProgressItemsForPattern(report, /hydration|water intake|drink more water/);
+  const wellbeingGoalProgress = goalProgressItemsForPattern(report, /mental health|stress|mood|wellbeing/);
   const alcoholGoalProgress = goalProgressItemsForPattern(report, /alcohol|drinking/);
   const conditions = [
     ...(snapshot?.conditions ?? [])
@@ -1282,7 +1286,7 @@ function PersonalisedInsights({
     });
   }
 
-  if (hasGoal(/exercise|physical activity|workout|fitness/) && workoutCount === 0 && exerciseEntries.length === 0) {
+  if (hasGoal(/exercise|physical activity|workout|fitness/) && workoutCount === 0 && exerciseEntries.length === 0 && exerciseGoalProgress.length === 0) {
     const usuallyInactive = /none|never|sedentary|rarely|inactive|low/.test(String(profile?.exerciseFrequency ?? "").toLowerCase());
     insights.push({
       title: "Not enough activity data to assess the trend",
@@ -1295,7 +1299,7 @@ function PersonalisedInsights({
     });
   }
 
-  if (hasGoal(/sleep/) && sleepSessionCount === 0 && sleepEntries.length === 0) {
+  if (hasGoal(/sleep/) && sleepSessionCount === 0 && sleepEntries.length === 0 && sleepGoalProgress.length === 0) {
     insights.push({
       title: "Sleep progress cannot be compared yet",
       detail: "A sleep-related goal is saved, but this period contains no sleep-session or sleep check-in data. Empty days are unknown, not zero hours; record sleep when practical so a future report can compare it with your goal.",
@@ -1305,7 +1309,7 @@ function PersonalisedInsights({
     });
   }
 
-  if (hasGoal(/hydration|water intake|drink more water/) && waterEntries.length === 0) {
+  if (hasGoal(/hydration|water intake|drink more water/) && waterEntries.length === 0 && hydrationGoalProgress.length === 0) {
     insights.push({
       title: "Hydration progress cannot be compared yet",
       detail: "A hydration-related goal is saved, but no dated water-intake check-ins were found in this period. The report cannot estimate progress from a missing entry; record water intake in your daily check-in when practical.",
@@ -1315,7 +1319,7 @@ function PersonalisedInsights({
     });
   }
 
-  if (hasGoal(/mental health|stress|mood|wellbeing/) && stressEntries.length === 0 && lowMoodCounts(report).total === 0) {
+  if (hasGoal(/mental health|stress|mood|wellbeing/) && stressEntries.length === 0 && lowMoodCounts(report).total === 0 && wellbeingGoalProgress.length === 0) {
     insights.push({
       title: "Wellbeing progress needs check-in data",
       detail: "A wellbeing-related goal is saved, but no stress ratings or mood check-ins were found in this period. The report will not infer how you felt on days without an entry.",
