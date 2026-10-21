@@ -1310,6 +1310,35 @@ function PersonalisedInsights({
   );
 }
 
+function clinicalEvents(report: Report) {
+  return report.clinical.encounters.length +
+    report.clinical.diagnoses.length +
+    report.clinical.prescriptions.length +
+    report.clinical.notes.length +
+    report.clinical.vitals.length +
+    report.clinical.labResults.length +
+    report.clinical.imaging.length +
+    report.clinical.procedures.length +
+    report.clinical.carePlans.length +
+    report.clinical.referrals.length;
+}
+
+function flaggedLabItems(report: Report) {
+  return report.clinical.labResults.flatMap((result, resultIndex) =>
+    (result.items ?? []).flatMap((item, itemIndex) =>
+      item.abnormal || item.critical
+        ? [{
+            id: String(item.id || `${result.id || "lab-result"}-${resultIndex}-${itemIndex}`),
+            name: item.test?.name || result.orderItem?.test?.name || "Laboratory result",
+            value: item.numericValue ?? item.textValue ?? item.booleanValue ?? "Value not recorded",
+            critical: Boolean(item.critical),
+            date: result.reportedAt || result.releasedAt,
+          }]
+        : [],
+    ),
+  );
+}
+
 function HealthReportInsights({
   report,
   previousReport,
