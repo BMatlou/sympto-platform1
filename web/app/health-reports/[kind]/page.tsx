@@ -1192,7 +1192,6 @@ function MiniTrend({
   }
 
   const width = 320;
-  const height = 108;
   const left = 12;
   const right = 12;
   const top = 8;
