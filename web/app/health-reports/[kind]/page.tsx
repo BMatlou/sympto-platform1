@@ -1204,20 +1204,50 @@ function MiniTrend({
   const padding = variant === "bar" ? 0 : (rawRange || Math.max(Math.abs(maximum) * 0.05, 1)) * 0.12;
   const low = variant === "bar" ? Math.min(0, minimum) : minimum - padding;
   const high = Math.max(maximum + (variant === "bar" ? 0 : padding), low + 1);
-  const xAt = (index: number) => plotted.length === 1 ? width / 2 : left + index * usableWidth / (plotted.length - 1);
+  const hasDatedPoints = Boolean(points?.length);
+  const dateValues = plotted.map((point, index) => {
+    if (!hasDatedPoints) return index;
+    if (/^\d{4}-\d{2}-\d{2}$/.test(point.date)) return new Date(point.date + "T12:00:00").getTime();
+    const parsed = new Date(point.date).getTime();
+    return Number.isFinite(parsed) ? parsed : index;
+  });
+  const useDateScale = hasDatedPoints && dateValues.every(Number.isFinite);
+  const minimumDate = Math.min(...dateValues);
+  const maximumDate = Math.max(...dateValues);
+  const xAt = (index: number) => {
+    if (plotted.length === 1 || (useDateScale && minimumDate === maximumDate)) return width / 2;
+    if (useDateScale) return left + ((dateValues[index] - minimumDate) / (maximumDate - minimumDate)) * usableWidth;
+    return left + index * usableWidth / (plotted.length - 1);
+  };
   const yAt = (value: number) => bottom - ((value - low) / (high - low)) * (bottom - top);
   const polyline = plotted.map((point, index) => xAt(index) + "," + yAt(point.value)).join(" ");
   const barWidth = Math.max(3, Math.min(18, usableWidth / Math.max(plotted.length, 1) * 0.56));
-  const tickCount = Math.min(5, plotted.length);
-  const tickIndices = Array.from(new Set(Array.from({ length: tickCount }, (_, index) =>
-    tickCount === 1 ? 0 : Math.round(index * (plotted.length - 1) / (tickCount - 1))
-  )));
   const tickLabel = (date: string) => {
     if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) return date;
     const parsed = new Date(date + "T12:00:00");
     if (!Number.isFinite(parsed.getTime())) return date;
     return new Intl.DateTimeFormat("en-ZA", { timeZone: "Africa/Johannesburg", day: "numeric", month: "short" }).format(parsed);
   };
+  const tickCount = Math.min(5, plotted.length);
+  const tickTargets = useDateScale && maximumDate > minimumDate
+    ? Array.from({ length: tickCount }, (_, index) => minimumDate + (maximumDate - minimumDate) * index / Math.max(1, tickCount - 1))
+    : [];
+  const tickIndices = useDateScale && maximumDate > minimumDate
+    ? Array.from(new Set(tickTargets.map((target) => {
+        let bestIndex = 0;
+        let bestDistance = Number.POSITIVE_INFINITY;
+        dateValues.forEach((value, index) => {
+          const distance = Math.abs(value - target);
+          if (distance < bestDistance) { bestDistance = distance; bestIndex = index; }
+        });
+        return bestIndex;
+      })))
+    : Array.from(new Set(Array.from({ length: tickCount }, (_, index) =>
+        tickCount === 1 ? 0 : Math.round(index * (plotted.length - 1) / (tickCount - 1))
+      )));
+  const visibleTickIndices = tickIndices.filter((index, position, all) =>
+    all.findIndex((candidate) => tickLabel(plotted[candidate].date) === tickLabel(plotted[index].date)) === position
+  );
   const chartSummary = plotted.length === 1
     ? "1 dated value"
     : String(plotted.length) + " dated values";
@@ -1237,9 +1267,9 @@ function MiniTrend({
             {plotted.map((point, index) => <circle key={point.date + "-" + index} cx={xAt(index)} cy={yAt(point.value)} r={plotted.length > 18 ? 1.8 : 2.8} fill="#0b2d54" stroke="#ffffff" strokeWidth="1.2" />)}
           </>
         )}
-        {tickIndices.map((index) => {
+        {visibleTickIndices.map((index, position) => {
           const x = xAt(index);
-          const anchor = tickIndices.length === 1 ? "middle" : index === tickIndices[0] ? "start" : index === tickIndices[tickIndices.length - 1] ? "end" : "middle";
+          const anchor = visibleTickIndices.length === 1 ? "middle" : position === 0 ? "start" : position === visibleTickIndices.length - 1 ? "end" : "middle";
           return <text key={plotted[index].date + "-" + index} x={x} y="99" textAnchor={anchor} fontSize="9" fill="#64748b">{tickLabel(plotted[index].date)}</text>;
         })}
       </svg>
