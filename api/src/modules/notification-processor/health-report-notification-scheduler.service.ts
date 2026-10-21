@@ -481,6 +481,8 @@ export class HealthReportNotificationSchedulerService
           healthPassport: { patientId },
           OR: [
             { diagnosedAt: { gte: period.start, lt: period.end } },
+            { createdAt: { gte: period.start, lt: period.end } },
+            { updatedAt: { gte: period.start, lt: period.end } },
             { encounter: { startedAt: { gte: period.start, lt: period.end } } },
           ],
         },
@@ -580,6 +582,7 @@ export class HealthReportNotificationSchedulerService
           OR: [
             { performedAt: { gte: period.start, lt: period.end } },
             { createdAt: { gte: period.start, lt: period.end } },
+            { updatedAt: { gte: period.start, lt: period.end } },
           ],
         },
         orderBy: { performedAt: 'asc' },
@@ -615,6 +618,7 @@ export class HealthReportNotificationSchedulerService
             { requestedDate: { gte: period.start, lt: period.end } },
             { acceptedDate: { gte: period.start, lt: period.end } },
             { completedDate: { gte: period.start, lt: period.end } },
+            { createdAt: { gte: period.start, lt: period.end } },
             { updatedAt: { gte: period.start, lt: period.end } },
           ],
         },
