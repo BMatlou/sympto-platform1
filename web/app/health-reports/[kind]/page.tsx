@@ -781,6 +781,38 @@ function vitalSeries(report: Report | null, metric: string): SeriesPoint[] {
   if (!report) return [];
   const points: SeriesPoint[] = [];
 
+  // Daily measurement check-ins are HealthJournal rows in this app. Their
+  // vital fields must feed the same trend and safety-review pipeline as the
+  // dedicated Health Vitals, device and clinical sources; otherwise a value
+  // is visible in the raw journal but invisible to trend cards and warnings.
+  const journalVitalFields: Record<string, string[]> = {
+    systolic: ["bloodPressureSystolic", "systolicBloodPressure", "systolic", "blood_pressure_systolic"],
+    diastolic: ["bloodPressureDiastolic", "diastolicBloodPressure", "diastolic", "blood_pressure_diastolic"],
+    heartRate: ["heartRate", "restingHeartRate", "pulse", "heart_rate"],
+    weight: ["weightKg", "weight", "weight_kg"],
+    oxygen: ["oxygenSaturation", "spo2", "oxygen_saturation"],
+    temperature: ["temperature", "bodyTemperature", "body_temperature"],
+    respiratory: ["respiratoryRate", "breathingRate", "respiratory_rate"],
+  };
+  const aliases = journalVitalFields[metric] ?? [];
+  report.activity.journalEntries.forEach((item) => {
+    const record = item as Record<string, unknown>;
+    const at = item.recordedAt || item.createdAt || item.updatedAt;
+    const matchingKey = Object.keys(record).find((key) =>
+      aliases.includes(key.toLowerCase()),
+    );
+    if (!matchingKey) return;
+    const unitKey =
+      metric === "temperature" ? "temperatureUnit" :
+      metric === "weight" ? "weightUnit" :
+      metric === "systolic" || metric === "diastolic" ? "bloodPressureUnit" :
+      metric === "oxygen" ? "oxygenSaturationUnit" :
+      metric === "respiratory" ? "respiratoryRateUnit" :
+      "heartRateUnit";
+    const standard = standardiseMeasurementValue(metric, record[matchingKey], record[unitKey]);
+    if (standard) addVital(points, standard.value, at, "Daily health check-in", standard.convertedFrom);
+  });
+
   report.activity.patientVitals.forEach((item) => {
     const at = item.recordedAt || item.createdAt;
     if (metric === "systolic") addVital(points, item.bloodPressureSystolic, at, "Health Vitals");
@@ -3183,7 +3215,7 @@ function LedgerFieldTree({ value }: { value: unknown }) {
 function LedgerGroup({ group }: { group: ReportLedgerGroup }) {
   if (!group.rows.length) return null;
   const latest = ledgerObject(group.rows[group.rows.length - 1]);
-  return <details id={group.key} open={group.key === "check-ins"} className="group overflow-hidden rounded-2xl border border-slate-200 bg-white">
+  return <details id={group.key} className="group overflow-hidden rounded-2xl border border-slate-200 bg-white">
     <summary className="flex cursor-pointer list-none items-center gap-3 px-4 py-3.5 transition hover:bg-[#f7fbfc] sm:px-5">
       <span className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-[#eafafa] text-xs font-black tabular-nums text-[#0b5a62]">{group.rows.length}</span>
       <span className="min-w-0 flex-1"><span className="block text-sm font-bold text-[#0b2d54]">{group.title}</span><span className="mt-0.5 block truncate text-[11px] text-slate-500">{group.description} · Latest: {ledgerTitle(latest, "Record")}</span></span>
@@ -3291,7 +3323,7 @@ function CompleteReportData({ report }: { report: Report }) {
     <div className="overflow-hidden rounded-[24px] border border-[#cfe5e8] bg-white shadow-sm">
       <div className="bg-gradient-to-r from-[#f0fbfb] to-white p-4 sm:p-5">
         <p className="text-[10px] font-extrabold uppercase tracking-[0.16em] text-[#0b7b80]">Full record · {report.period.label}</p>
-        <div className="mt-1 flex flex-wrap items-end justify-between gap-3"><div><h2 className="text-xl font-black tracking-tight text-[#0b2d54]">Everything you logged</h2><p className="mt-1 text-xs leading-5 text-slate-600">Open a category to review each returned record and its underlying detail fields.</p></div>
+        <div className="mt-1 flex flex-wrap items-end justify-between gap-3"><div><h2 className="text-xl font-black tracking-tight text-[#0b2d54]">Everything you logged</h2><p className="mt-1 text-xs leading-5 text-slate-600">Your trends, patterns, flags and next steps are summarised above. Open a category only when you need to inspect the source records.</p></div>
           <div className="flex gap-2"><div className="rounded-xl border border-[#dcebed] bg-white px-3 py-2"><p className="text-xl font-black tabular-nums text-[#0b2d54]">{total}</p><p className="text-[10px] font-semibold text-slate-500">entries shown</p></div><div className="rounded-xl border border-[#dcebed] bg-white px-3 py-2"><p className="text-xl font-black tabular-nums text-[#0b2d54]">{groups.length}</p><p className="text-[10px] font-semibold text-slate-500">data categories</p></div></div>
         </div>
       </div>
