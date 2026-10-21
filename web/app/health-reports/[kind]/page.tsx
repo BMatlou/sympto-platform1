@@ -1352,8 +1352,8 @@ function PersonalisedInsights({
   const smokingPrevious = event(previousReport, /smoking|tobacco|cigarette/);
   const alcoholCurrent = event(report, /alcohol|drinking/);
   const alcoholPrevious = event(previousReport, /alcohol|drinking/);
-  const medicationCurrent = event(report, /medication|adherence/);
-  const medicationPrevious = event(previousReport, /medication|adherence/);
+  const doseCurrent = medicationDoseTotals(report);
+  const dosePrevious = medicationDoseTotals(previousReport);
   const nutritionCurrent = event(report, /nutrition|calorie|energy intake/);
   const nutritionPrevious = event(previousReport, /nutrition|calorie|energy intake/);
   const hydrationEventsCurrent = event(report, /hydration|water intake/);
@@ -1404,7 +1404,6 @@ function PersonalisedInsights({
     ] : []),
     signal("smoking", "Cigarettes logged", smokingCurrent, smokingPrevious, "cigarettes"),
     signal("alcohol", "Alcohol logged", alcoholCurrent, alcoholPrevious, "drinks"),
-    signal("medication", "Medication adherence", medicationCurrent, medicationPrevious, "%"),
     signal("nutrition", "Nutrition / calories", nutritionCurrent, nutritionPrevious, ""),
     signal("hydration", "Water intake", hydrationEventsCurrent.length ? hydrationEventsCurrent : hydrationChecksCurrent, hydrationEventsPrevious.length ? hydrationEventsPrevious : hydrationChecksPrevious, "ml"),
     signal("exercise", "Exercise logged", exerciseEventsCurrent.length ? exerciseEventsCurrent : exerciseChecksCurrent, exerciseEventsPrevious.length ? exerciseEventsPrevious : exerciseChecksPrevious, "min"),
@@ -1485,12 +1484,15 @@ function PersonalisedInsights({
     });
   }
   const medicineGoal = goals.find((goal) => /MEDICATION/.test(String(goal.category ?? "").toUpperCase()));
-  const adherenceAverage = mean(medicationCurrent.map((item) => item.value));
-  if (medicineGoal && adherenceAverage !== null && medicineGoal.targetValue != null && adherenceAverage < Number(medicineGoal.targetValue)) {
+  const doseTarget = finite(medicineGoal?.targetValue);
+  if (doseCurrent.eventSkipped > 0 || doseCurrent.legacySkipped > 0 ||
+      (doseCurrent.eventAdherencePercent !== null && doseTarget !== null && doseCurrent.eventAdherencePercent < doseTarget)) {
     recommendations.push({
-      title: "Medication adherence below saved target",
-      evidence: "Recorded adherence average " + formatNumber(adherenceAverage, 1) + "% · goal " + formatNumber(Number(medicineGoal.targetValue), 1) + "%",
-      action: "Review missed or difficult-to-log doses with your care team; do not change a prescription based on this report.",
+      title: "Medication dose records need review",
+      evidence: doseCurrent.eventTotal > 0
+        ? doseCurrent.eventTaken + " marked taken · " + doseCurrent.eventSkipped + " marked skipped · " + formatNumber(doseCurrent.eventAdherencePercent, 1) + "% of logged doses taken" + (doseTarget !== null ? " · goal " + formatNumber(doseTarget, 1) + "%" : "")
+        : doseCurrent.legacyTotal + " older dated status entries · " + doseCurrent.legacyTaken + " marked taken · " + doseCurrent.legacySkipped + " marked skipped",
+      action: "Review skipped or difficult-to-log doses with your care team; do not change a prescription based on this report.",
       tone: "watch",
       href: "/today",
       linkLabel: "Review medication logs",
@@ -1511,6 +1513,33 @@ function PersonalisedInsights({
             <p className="mt-1 text-xs text-slate-500">{daysLogged}/{totalDays} days with at least one saved record · {previousLoading ? "Comparing…" : noPrior ? "No previous-period report available" : "Current period vs previous period"}</p>
           </div>
         </div>
+        {(doseCurrent.eventTotal > 0 || doseCurrent.legacyTotal > 0 || dosePrevious.eventTotal > 0 || dosePrevious.legacyTotal > 0) && (
+          <article className="mt-4 rounded-xl border border-slate-200 bg-[#f8fbfc] p-4">
+            <div className="flex flex-wrap items-start justify-between gap-3">
+              <div>
+                <h3 className="text-sm font-black text-[#0b2d54]">Medication dose outcomes</h3>
+                <p className="mt-1 text-[11px] text-slate-500">Recorded actions only; this is not an independent check that a dose was taken.</p>
+              </div>
+              {doseCurrent.eventTotal > 0 && <span className="rounded-full bg-white px-3 py-1 text-xs font-bold text-[#0b2d54]">{formatNumber(doseCurrent.eventAdherencePercent, 1)}% taken</span>}
+            </div>
+            {doseCurrent.eventTotal > 0 ? (
+              <>
+                <div className="mt-3 grid grid-cols-3 gap-2">
+                  <div className="rounded-lg bg-white p-3"><p className="text-[10px] font-bold uppercase tracking-wide text-slate-400">Taken</p><p className="mt-1 text-xl font-black text-emerald-700">{doseCurrent.eventTaken}</p></div>
+                  <div className="rounded-lg bg-white p-3"><p className="text-[10px] font-bold uppercase tracking-wide text-slate-400">Skipped</p><p className="mt-1 text-xl font-black text-rose-700">{doseCurrent.eventSkipped}</p></div>
+                  <div className="rounded-lg bg-white p-3"><p className="text-[10px] font-bold uppercase tracking-wide text-slate-400">Total</p><p className="mt-1 text-xl font-black text-[#0b2d54]">{doseCurrent.eventTotal}</p></div>
+                </div>
+                <div className="mt-3 h-2 overflow-hidden rounded-full bg-rose-100"><div className="h-full rounded-full bg-emerald-500" style={{ width: String(doseCurrent.eventAdherencePercent ?? 0) + "%" }} /></div>
+                <p className="mt-2 text-xs font-semibold text-slate-600">{dosePrevious.eventTotal > 0
+                  ? "Previous period: " + dosePrevious.eventTaken + " taken / " + dosePrevious.eventSkipped + " skipped (" + formatNumber(dosePrevious.eventAdherencePercent, 1) + "% taken). " + (doseCurrent.eventAdherencePercent !== null && dosePrevious.eventAdherencePercent !== null ? (doseCurrent.eventAdherencePercent - dosePrevious.eventAdherencePercent > 0 ? "+" : "") + formatNumber(doseCurrent.eventAdherencePercent - dosePrevious.eventAdherencePercent, 1) + " percentage points." : "")
+                  : "No dose-level action metadata available for the previous period."}</p>
+              </>
+            ) : (
+              <p className="mt-3 text-sm font-semibold text-[#0b2d54]">Older dated statuses: {doseCurrent.legacyTaken} marked taken · {doseCurrent.legacySkipped} marked skipped.</p>
+            )}
+            {doseCurrent.legacyTotal > 0 && doseCurrent.eventTotal > 0 && <p className="mt-2 text-[10px] text-slate-400">Also found {doseCurrent.legacyTotal} legacy day-status entries; excluded from the dose-level percentage to avoid mixing counting methods.</p>}
+          </article>
+        )}
         {signals.length ? (
           <div className="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
             {signals.map((signal) => {
