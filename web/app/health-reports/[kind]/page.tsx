@@ -2543,7 +2543,6 @@ function MedicationPeriodInsights({
     medicationsOnFile.length > 0 || loading;
   if (!hasReportContent) return null;
 
-  const periodLabel = report.type === "WEEKLY" ? "this 7-day period" : "this month";
   return (
     <section aria-label="Medication trends and patterns" className="overflow-hidden rounded-2xl border border-[#dcebed] bg-white shadow-sm">
       <div className="border-b border-slate-100 px-4 py-4 sm:px-5">
@@ -2552,9 +2551,6 @@ function MedicationPeriodInsights({
           <h2 className="text-lg font-black text-[#0b2d54]">Medication trends and patterns</h2>
           <span className="text-[11px] font-semibold text-slate-500">{report.period.label}</span>
         </div>
-        <p className="mt-1 text-xs leading-5 text-slate-500">
-Dose adherence · {periodLabel}
-        </p>
       </div>
 
       {loading && (
@@ -2944,8 +2940,7 @@ function HealthReportInsights({
             <div className="flex min-w-0 items-center gap-3">
               <span className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-amber-50 text-amber-700"><AlertTriangle className="h-4 w-4" /></span>
               <div className="min-w-0">
-                <p className="text-[10px] font-extrabold uppercase tracking-[0.15em] text-amber-700">Needs attention</p>
-                <h2 className="mt-0.5 text-base font-black text-[#0b2d54]">Readings to review</h2>
+                <h2 className="text-base font-black text-[#0b2d54]">Readings to review</h2>
               </div>
             </div>
             <span className="shrink-0 rounded-full bg-slate-100 px-2.5 py-1 text-[11px] font-bold text-slate-600">{measurementReviews.length} flagged</span>
@@ -3171,7 +3166,7 @@ export default function HealthReportPage() {
           <Link href="/notifications" className="inline-flex min-h-10 items-center gap-2 rounded-xl px-2 text-sm font-semibold text-[#0b2d54] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#24c1c4]"><ArrowLeft className="h-4 w-4" />Back to notifications</Link>
 
           <section className="mt-4 overflow-hidden rounded-[28px] bg-gradient-to-br from-[#0b2d54] via-[#0b3e60] to-[#0f5a62] p-5 text-white shadow-[0_18px_55px_-30px_rgba(11,45,84,0.55)] sm:p-7">
-            <div className="flex flex-col gap-5 sm:flex-row sm:items-start sm:justify-between">
+            <div className="flex flex-col gap-5 sm:flex-row sm:items-center sm:justify-between">
               <div><div className="flex items-center gap-2 text-[10px] font-black uppercase tracking-[0.18em] text-[#24c1c4]"><ShieldCheck className="h-4 w-4" />Sympto · Health intelligence</div><h1 className="mt-3 text-3xl font-black tracking-tight sm:text-4xl">{title}</h1><p className="mt-2 text-sm leading-6 text-white/75">{report.period.label}</p><p className="mt-3 text-sm leading-5 text-white/80">Your health, at a glance.</p></div>
               <div className="flex shrink-0 flex-wrap items-center gap-3 rounded-2xl border border-white/15 bg-white/10 p-3 sm:gap-4 sm:p-4">
                 <ScoreRing
