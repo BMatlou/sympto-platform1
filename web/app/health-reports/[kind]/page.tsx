@@ -1185,7 +1185,7 @@ function PersonalisedInsights({
     });
   }
 
-  if (hasGoal(/sleep|rest/) && sleepSessionCount === 0 && sleepEntries.length === 0) {
+  if (hasGoal(/sleep/) && sleepSessionCount === 0 && sleepEntries.length === 0) {
     insights.push({
       title: "Sleep progress cannot be compared yet",
       detail: "A sleep-related goal is saved, but this period contains no sleep-session or sleep check-in data. Empty days are unknown, not zero hours; record sleep when practical so a future report can compare it with your goal.",
@@ -1276,7 +1276,7 @@ function PersonalisedInsights({
           <div className="min-w-0">
             <p className="text-[10px] font-black uppercase tracking-[0.15em] text-[#0b7b80]">Personalised interpretation</p>
             <h2 className="mt-1 text-lg font-black text-[#0b2d54]">What your records mean in context</h2>
-            <p className="mt-1 text-xs leading-5 text-slate-500">Saved age, relevant care context, baselines, medicine-record measures and personal targets shape these observations when they change the interpretation or next step.</p>
+            <p className="mt-1 text-xs leading-5 text-slate-500">Saved age, relevant care context, baselines, medicine-record measures and personal targets shape these observations when they change the interpretation or next step. Profile context may have been updated after this report period, so it is not always a historical snapshot.</p>
             <p className="mt-1 text-[10px] leading-4 text-slate-500">{daysLogged} of {totalDays} days had records. Coverage describes logging consistency, not health status.</p>
           </div>
         </div>
