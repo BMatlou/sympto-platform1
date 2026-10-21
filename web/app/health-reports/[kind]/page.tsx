@@ -22,36 +22,101 @@ import {
 import ProtectedRoute from "@/components/auth/protected-route";
 import { api } from "@/lib/api";
 
+type JournalEntry = {
+  id?: string;
+  createdAt?: string | null;
+  recordedAt?: string | null;
+  updatedAt?: string | null;
+  mood?: string | null;
+  [key: string]: unknown;
+};
+
+type SymptomName = { name?: string | null; symptom?: { name?: string | null } | null };
+type SymptomRecord = {
+  id?: string;
+  title?: string | null;
+  description?: string | null;
+  startedAt?: string | null;
+  createdAt?: string | null;
+  symptoms?: SymptomName[] | null;
+};
+type PatientVitalRecord = {
+  id?: string;
+  recordedAt?: string | null;
+  createdAt?: string | null;
+  temperature?: number | string | null;
+  bloodPressureSystolic?: number | string | null;
+  bloodPressureDiastolic?: number | string | null;
+  heartRate?: number | string | null;
+  oxygenSaturation?: number | string | null;
+  respiratoryRate?: number | string | null;
+  weightKg?: number | string | null;
+};
+type DeviceMeasurementRecord = {
+  measurementType?: string | null;
+  metricKey?: string | null;
+  value?: number | string | null;
+  measuredAt?: string | null;
+  vitalType?: { name?: string | null } | null;
+};
+type ClinicalVitalRecord = {
+  value?: number | string | null;
+  measuredAt?: string | null;
+  recordedAt?: string | null;
+  vitalType?: { code?: string | null; name?: string | null } | null;
+};
+type SleepSessionRecord = {
+  id?: string;
+  startedAt?: string | null;
+  endedAt?: string | null;
+  durationMinutes?: number | string | null;
+};
+type WorkoutRecord = {
+  id?: string;
+  startedAt?: string | null;
+  endedAt?: string | null;
+  durationSeconds?: number | string | null;
+};
+type LabResultItem = {
+  id?: string;
+  test?: { name?: string | null } | null;
+  numericValue?: string | number | boolean | null;
+  textValue?: string | number | boolean | null;
+  booleanValue?: string | number | boolean | null;
+  abnormal?: boolean | null;
+  critical?: boolean | null;
+};
+type LabResultRecord = {
+  id?: string;
+  reportedAt?: string | null;
+  releasedAt?: string | null;
+  orderItem?: { test?: { name?: string | null } | null } | null;
+  items?: LabResultItem[] | null;
+};
+
 type Report = {
   type: "WEEKLY" | "MONTHLY";
   period: { start: string; end: string; label: string; scheduledFor: string };
   activity: {
-    journalEntries: any[];
-    symptoms: any[];
-    appointments: any[];
-    patientVitals: any[];
-    deviceMeasurements: any[];
-    sleepSessions: any[];
-    workouts: any[];
+    journalEntries: JournalEntry[];
+    symptoms: SymptomRecord[];
+    appointments: unknown[];
+    patientVitals: PatientVitalRecord[];
+    deviceMeasurements: DeviceMeasurementRecord[];
+    sleepSessions: SleepSessionRecord[];
+    workouts: WorkoutRecord[];
   };
   clinical: {
-    encounters: any[];
-    diagnoses: any[];
-    prescriptions: any[];
-    notes: any[];
-    vitals: any[];
-    labResults: any[];
-    imaging: any[];
-    procedures: any[];
-    carePlans: any[];
-    referrals: any[];
-  };
-  currentSnapshot: {
-    medicalRecord: any;
-    conditions: any[];
-    allergies: any[];
-    medications: any[];
-    activeGoals: any[];
+    encounters: unknown[];
+    diagnoses: unknown[];
+    prescriptions: unknown[];
+    notes: unknown[];
+    vitals: ClinicalVitalRecord[];
+    labResults: LabResultRecord[];
+    imaging: unknown[];
+    procedures: unknown[];
+    carePlans: unknown[];
+    referrals: unknown[];
   };
   generatedAt: string;
 };
@@ -59,8 +124,13 @@ type Report = {
 type SeriesPoint = { date: string; value: number; source?: string };
 type DailyValue = { date: string; value: number };
 
-const unwrap = <T,>(value: any): T => value?.data ?? value;
-const arr = (value: unknown): any[] => Array.isArray(value) ? value : [];
+function unwrap<T>(value: unknown): T {
+  if (value && typeof value === "object" && "data" in value) {
+    const payload = (value as { data?: unknown }).data;
+    return (payload ?? value) as T;
+  }
+  return value as T;
+}
 const finite = (value: unknown): number | null => {
   if (value === null || value === undefined || value === "") return null;
   const number = Number(value);
@@ -118,7 +188,7 @@ function periodDays(report: Report) {
 function dailyMetric(report: Report | null, field: string): DailyValue[] {
   if (!report) return [];
   const grouped = new Map<string, { total: number; count: number }>();
-  arr(report.activity?.journalEntries).forEach((entry: any) => {
+  report.activity.journalEntries.forEach((entry) => {
     const key = dateKey(entry.createdAt || entry.recordedAt || entry.updatedAt);
     const value = finite(entry[field]);
     if (!key || value === null) return;
@@ -138,12 +208,12 @@ function recordedDays(report: Report) {
     const key = dateKey(value);
     if (key) days.add(key);
   };
-  arr(report.activity.journalEntries).forEach((item: any) => add(item.createdAt || item.recordedAt));
-  arr(report.activity.symptoms).forEach((item: any) => add(item.startedAt || item.createdAt));
-  arr(report.activity.patientVitals).forEach((item: any) => add(item.recordedAt || item.createdAt));
-  arr(report.activity.deviceMeasurements).forEach((item: any) => add(item.measuredAt));
-  arr(report.activity.sleepSessions).forEach((item: any) => add(item.startedAt || item.endedAt));
-  arr(report.activity.workouts).forEach((item: any) => add(item.startedAt || item.endedAt));
+  report.activity.journalEntries.forEach((item) => add(item.createdAt || item.recordedAt));
+  report.activity.symptoms.forEach((item) => add(item.startedAt || item.createdAt));
+  report.activity.patientVitals.forEach((item) => add(item.recordedAt || item.createdAt));
+  report.activity.deviceMeasurements.forEach((item) => add(item.measuredAt));
+  report.activity.sleepSessions.forEach((item) => add(item.startedAt || item.endedAt));
+  report.activity.workouts.forEach((item) => add(item.startedAt || item.endedAt));
   return days;
 }
 
@@ -199,7 +269,7 @@ function vitalSeries(report: Report | null, metric: string): SeriesPoint[] {
   if (!report) return [];
   const points: SeriesPoint[] = [];
 
-  arr(report.activity?.patientVitals).forEach((item: any) => {
+  report.activity.patientVitals.forEach((item) => {
     const at = item.recordedAt || item.createdAt;
     if (metric === "systolic") addVital(points, item.bloodPressureSystolic, at, "Health Vitals");
     if (metric === "diastolic") addVital(points, item.bloodPressureDiastolic, at, "Health Vitals");
@@ -210,7 +280,7 @@ function vitalSeries(report: Report | null, metric: string): SeriesPoint[] {
     if (metric === "respiratory") addVital(points, item.respiratoryRate, at, "Health Vitals");
   });
 
-  arr(report.activity?.deviceMeasurements).forEach((item: any) => {
+  report.activity.deviceMeasurements.forEach((item) => {
     addNamedVitalForMetric(
       points,
       metric,
@@ -221,7 +291,7 @@ function vitalSeries(report: Report | null, metric: string): SeriesPoint[] {
     );
   });
 
-  arr(report.clinical?.vitals).forEach((item: any) => {
+  report.clinical.vitals.forEach((item) => {
     addNamedVitalForMetric(
       points,
       metric,
@@ -241,17 +311,17 @@ function vitalSeries(report: Report | null, metric: string): SeriesPoint[] {
 }
 
 function lowMoodCounts(report: Report | null) {
-  const entries = arr(report?.activity?.journalEntries).filter((entry: any) => Boolean(entry.mood));
-  const low = entries.filter((entry: any) => ["VERY_BAD", "BAD", "VERY_LOW", "LOW"].includes(String(entry.mood).toUpperCase()));
+  const entries = (report?.activity.journalEntries ?? []).filter((entry) => Boolean(entry.mood));
+  const low = entries.filter((entry) => ["VERY_BAD", "BAD", "VERY_LOW", "LOW"].includes(String(entry.mood).toUpperCase()));
   return { low: low.length, total: entries.length };
 }
 
 function recurringSymptoms(report: Report | null) {
   const counts = new Map<string, { label: string; count: number }>();
-  arr(report?.activity?.symptoms).forEach((item: any) => {
-    const labels = arr(item.symptoms)
-      .map((symptom: any) => symptom.symptom?.name || symptom.name)
-      .filter(Boolean);
+  (report?.activity.symptoms ?? []).forEach((item) => {
+    const labels = (item.symptoms ?? [])
+      .map((symptom) => symptom.symptom?.name || symptom.name)
+      .filter((name): name is string => Boolean(name));
     if (!labels.length && item.title && !["symptom recorded", "symptom log"].includes(String(item.title).toLowerCase())) {
       labels.push(item.title);
     }
@@ -435,8 +505,8 @@ function clinicalEvents(report: Report) {
 }
 
 function flaggedLabItems(report: Report) {
-  return arr(report.clinical.labResults).flatMap((result: any, resultIndex: number) =>
-    arr(result.items).flatMap((item: any, itemIndex: number) =>
+  return report.clinical.labResults.flatMap((result, resultIndex) =>
+    (result.items ?? []).flatMap((item, itemIndex) =>
       item.abnormal || item.critical
         ? [{
             id: String(item.id || `${result.id || "lab-result"}-${resultIndex}-${itemIndex}`),
@@ -461,20 +531,20 @@ function HealthReportInsights({
 }) {
   const daysLogged = recordedDays(report).size;
   const totalDays = periodDays(report);
-  const symptomCount = arr(report.activity.symptoms).length;
-  const workouts = arr(report.activity.workouts);
-  const workoutMinutes = workouts.reduce((sum: number, workout: any) => {
+  const symptomCount = report.activity.symptoms.length;
+  const workouts = report.activity.workouts;
+  const workoutMinutes = workouts.reduce((sum: number, workout) => {
     const seconds = finite(workout.durationSeconds);
     return sum + (seconds === null ? 0 : seconds / 60);
   }, 0);
-  const sleepSessions = arr(report.activity.sleepSessions).filter((session: any) => finite(session.durationMinutes) !== null && Number(session.durationMinutes) > 0);
-  const sleepHours = sleepSessions.map((session: any) => Number(session.durationMinutes) / 60);
+  const sleepSessions = report.activity.sleepSessions.filter((session) => finite(session.durationMinutes) !== null && Number(session.durationMinutes) > 0);
+  const sleepHours = sleepSessions.map((session) => Number(session.durationMinutes) / 60);
   const lowMood = lowMoodCounts(report);
   const repeated = recurringSymptoms(report);
   const association = routineAssociation(report);
   const flaggedLabs = flaggedLabItems(report);
   const clinicalCount = clinicalEvents(report);
-  const previousSymptomCount = arr(previousReport?.activity?.symptoms).length;
+  const previousSymptomCount = previousReport?.activity.symptoms.length ?? 0;
   const symptomDifference = previousReport
     ? symptomCount - previousSymptomCount
     : null;
@@ -510,8 +580,8 @@ function HealthReportInsights({
     ? lowMood.low + " of " + lowMood.total + " mood check-ins were marked low or very low."
     : "";
   const symptomPattern = repeated.find((item) => item.count > 1);
-  const activityDelta = previousReport ? workouts.length - arr(previousReport.activity.workouts).length : null;
-  const sleepDelta = previousReport ? sleepSessions.length - arr(previousReport.activity.sleepSessions).length : null;
+  const activityDelta = previousReport ? workouts.length - previousReport.activity.workouts.length : null;
+  const sleepDelta = previousReport ? sleepSessions.length - previousReport.activity.sleepSessions.length : null;
 
   return (
     <div className="mt-5 space-y-6">
@@ -533,10 +603,10 @@ function HealthReportInsights({
       <section>
         <div className="mb-3"><p className="text-[10px] font-black uppercase tracking-[0.16em] text-[#24c1c4]">Everyday routines</p><h2 className="mt-1 text-xl font-black text-[#0b2d54]">Habits and consistency</h2><p className="mt-1 text-sm leading-6 text-slate-500">These cards summarise daily check-ins instead of repeating the text of each journal entry.</p></div>
         {routines.length ? <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">{routines.map((item) => <RoutineTrendCard key={item.field} icon={item.icon} title={item.label} subtitle={item.subtitle} current={item.current} previous={item.previous} unit={item.unit} digits={item.digits} previousLoading={previousLoading} />)}</div> : <div className="rounded-2xl border border-dashed border-slate-300 bg-white p-5 text-sm leading-6 text-slate-500">Daily sleep, stress, water and exercise trends will appear once those fields have been included in saved check-ins.</div>}
-        {(sleepSessions.length > 0 || arr(previousReport?.activity?.sleepSessions).length > 0 || workouts.length > 0 || arr(previousReport?.activity?.workouts).length > 0) && (
+        {(sleepSessions.length > 0 || (previousReport?.activity.sleepSessions.length ?? 0) > 0 || workouts.length > 0 || (previousReport?.activity.workouts.length ?? 0) > 0) && (
           <div className="mt-3 grid gap-3 sm:grid-cols-2">
-            {(sleepSessions.length > 0 || arr(previousReport?.activity?.sleepSessions).length > 0) && <article className="rounded-2xl border border-slate-200 bg-white p-4"><div className="flex items-center gap-2"><Moon className="h-5 w-5 text-[#24c1c4]" /><h3 className="font-bold text-[#0b2d54]">Connected sleep</h3></div><p className="mt-3 text-2xl font-black text-[#0b2d54]">{sleepHours.length ? formatNumber(mean(sleepHours), 1) + " h" : "No sleep sessions"}</p><p className="mt-1 text-xs text-slate-500">{sleepSessions.length} recorded sessions in this period{previousLoading ? "; comparing periods…" : sleepDelta === null ? "." : "; " + String(Math.abs(sleepDelta)) + " " + (sleepDelta > 0 ? "more" : sleepDelta < 0 ? "fewer" : "same number of") + " sessions than the previous period."}</p><p className="mt-2 text-xs leading-5 text-slate-500">Average is calculated from wearable sleep sessions with a recorded duration.</p></article>}
-            {(workouts.length > 0 || arr(previousReport?.activity?.workouts).length > 0) && <article className="rounded-2xl border border-slate-200 bg-white p-4"><div className="flex items-center gap-2"><Footprints className="h-5 w-5 text-[#24c1c4]" /><h3 className="font-bold text-[#0b2d54]">Activity consistency</h3></div><p className="mt-3 text-2xl font-black text-[#0b2d54]">{workouts.length ? formatNumber(workoutMinutes, 0) + " min" : "No workouts"}</p><p className="mt-1 text-xs text-slate-500">{workouts.length} workouts across {new Set(workouts.map((item: any) => dateKey(item.startedAt || item.endedAt)).filter(Boolean)).size} days{previousLoading ? "; comparing periods…" : activityDelta === null ? "." : "; " + String(Math.abs(activityDelta)) + " " + (activityDelta > 0 ? "more" : activityDelta < 0 ? "fewer" : "same number of") + " sessions than the previous period."}</p><p className="mt-2 text-xs leading-5 text-slate-500">This reflects recorded sessions, not all movement during the day.</p></article>}
+            {(sleepSessions.length > 0 || (previousReport?.activity.sleepSessions.length ?? 0) > 0) && <article className="rounded-2xl border border-slate-200 bg-white p-4"><div className="flex items-center gap-2"><Moon className="h-5 w-5 text-[#24c1c4]" /><h3 className="font-bold text-[#0b2d54]">Connected sleep</h3></div><p className="mt-3 text-2xl font-black text-[#0b2d54]">{sleepHours.length ? formatNumber(mean(sleepHours), 1) + " h" : "No sleep sessions"}</p><p className="mt-1 text-xs text-slate-500">{sleepSessions.length} recorded sessions in this period{previousLoading ? "; comparing periods…" : sleepDelta === null ? "." : "; " + String(Math.abs(sleepDelta)) + " " + (sleepDelta > 0 ? "more" : sleepDelta < 0 ? "fewer" : "same number of") + " sessions than the previous period."}</p><p className="mt-2 text-xs leading-5 text-slate-500">Average is calculated from wearable sleep sessions with a recorded duration.</p></article>}
+            {(workouts.length > 0 || (previousReport?.activity.workouts.length ?? 0) > 0) && <article className="rounded-2xl border border-slate-200 bg-white p-4"><div className="flex items-center gap-2"><Footprints className="h-5 w-5 text-[#24c1c4]" /><h3 className="font-bold text-[#0b2d54]">Activity consistency</h3></div><p className="mt-3 text-2xl font-black text-[#0b2d54]">{workouts.length ? formatNumber(workoutMinutes, 0) + " min" : "No workouts"}</p><p className="mt-1 text-xs text-slate-500">{workouts.length} workouts across {new Set(workouts.map((item) => dateKey(item.startedAt || item.endedAt)).filter(Boolean)).size} days{previousLoading ? "; comparing periods…" : activityDelta === null ? "." : "; " + String(Math.abs(activityDelta)) + " " + (activityDelta > 0 ? "more" : activityDelta < 0 ? "fewer" : "same number of") + " sessions than the previous period."}</p><p className="mt-2 text-xs leading-5 text-slate-500">This reflects recorded sessions, not all movement during the day.</p></article>}
           </div>
         )}
       </section>
