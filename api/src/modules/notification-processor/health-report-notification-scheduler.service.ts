@@ -617,12 +617,8 @@ export class HealthReportNotificationSchedulerService
         where: { id: patientId },
         include: {
           person: true,
-          heightCm: true,
-          weightKg: true,
-          smokingStatus: true,
-          alcoholConsumption: true,
-          exerciseFrequency: true,
-          occupation: true,
+          // Patient scalar profile fields (height, weight and lifestyle) are
+          // returned by Prisma automatically when relations are included.
           baseline: true,
           medicalRecord: true,
           riskAssessments: {
