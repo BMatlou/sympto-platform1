@@ -3203,7 +3203,7 @@ function CompleteReportData({ report }: { report: Report }) {
   const events = report.goalMetricEvents ?? [];
   const medicationEvents = events.filter((event) => /MEDICATION|medication|adherence/i.test([event.metricType, event.metricKey, event.source, event.goalCategory, event.goalTitle].filter(Boolean).join(" ")));
   const otherGoalEvents = events.filter((event) => !medicationEvents.includes(event));
-  const snapshot = report.currentSnapshot ?? {};
+  const snapshot: HealthContextSnapshot = report.currentSnapshot ?? {};
   const contextGroups: ReportLedgerGroup[] = [
     { key: "conditions", title: "Current conditions", description: "Saved conditions used to personalize this report", rows: ledgerArray(snapshot.conditions) },
     { key: "diagnoses-on-file", title: "Diagnoses on file", description: "Patient diagnosis history", rows: ledgerArray(snapshot.diagnoses) },
@@ -3247,7 +3247,7 @@ function CompleteReportData({ report }: { report: Report }) {
       <div className="bg-gradient-to-r from-[#f0fbfb] to-white p-4 sm:p-5">
         <p className="text-[10px] font-extrabold uppercase tracking-[0.16em] text-[#0b7b80]">Full record · {report.period.label}</p>
         <div className="mt-1 flex flex-wrap items-end justify-between gap-3"><div><h2 className="text-xl font-black tracking-tight text-[#0b2d54]">Everything you logged</h2><p className="mt-1 text-xs leading-5 text-slate-600">Open a category to review each returned record and its underlying detail fields.</p></div>
-          <div className="flex gap-2"><div className="rounded-xl border border-[#dcebed] bg-white px-3 py-2"><p className="text-xl font-black tabular-nums text-[#0b2d54]">{total}</p><p className="text-[10px] font-semibold text-slate-500">period records</p></div><div className="rounded-xl border border-[#dcebed] bg-white px-3 py-2"><p className="text-xl font-black tabular-nums text-[#0b2d54]">{groups.length}</p><p className="text-[10px] font-semibold text-slate-500">data categories</p></div></div>
+          <div className="flex gap-2"><div className="rounded-xl border border-[#dcebed] bg-white px-3 py-2"><p className="text-xl font-black tabular-nums text-[#0b2d54]">{total}</p><p className="text-[10px] font-semibold text-slate-500">entries shown</p></div><div className="rounded-xl border border-[#dcebed] bg-white px-3 py-2"><p className="text-xl font-black tabular-nums text-[#0b2d54]">{groups.length}</p><p className="text-[10px] font-semibold text-slate-500">data categories</p></div></div>
         </div>
       </div>
       <div className="space-y-2 p-3 sm:p-4">{groups.length ? groups.map((group) => <LedgerGroup key={group.key} group={group} />) : <p className="rounded-xl border border-dashed border-slate-300 p-4 text-sm text-slate-500">No dated activity records were returned for this period.</p>}</div>
