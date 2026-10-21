@@ -426,6 +426,43 @@ function dailyMetric(report: Report | null, field: string): DailyValue[] {
     .sort((a, b) => a.date.localeCompare(b.date));
 }
 
+function dailyCategoricalMetric(
+  report: Report | null,
+  field: "mood" | "energyLevel" | "sleepQuality",
+  scores: Record<string, number>,
+): DailyValue[] {
+  if (!report) return [];
+  const grouped = new Map<string, { total: number; count: number }>();
+  report.activity.journalEntries.forEach((entry) => {
+    const date = dateKey(entry.createdAt || entry.recordedAt || entry.updatedAt);
+    const raw = String(entry[field] ?? "").toUpperCase();
+    const score = scores[raw];
+    if (!date || score === undefined) return;
+    const current = grouped.get(date) ?? { total: 0, count: 0 };
+    current.total += score;
+    current.count += 1;
+    grouped.set(date, current);
+  });
+  return Array.from(grouped.entries())
+    .map(([date, group]) => ({ date, value: group.total / group.count }))
+    .sort((a, b) => a.date.localeCompare(b.date));
+}
+
+function dailyAppointmentSeries(report: Report | null): DailyValue[] {
+  if (!report) return [];
+  const grouped = new Map<string, number>();
+  report.activity.appointments.forEach((value) => {
+    if (!value || typeof value !== "object") return;
+    const item = value as Record<string, unknown>;
+    const date = dateKey(item.scheduledStart);
+    if (!date) return;
+    grouped.set(date, (grouped.get(date) ?? 0) + 1);
+  });
+  return Array.from(grouped.entries())
+    .map(([date, value]) => ({ date, value }))
+    .sort((a, b) => a.date.localeCompare(b.date));
+}
+
 type GoalProgressTrendItem = {
   key: string;
   title: string;
@@ -1498,6 +1535,17 @@ function PersonalisedInsights({
   const workoutsPrevious = dailySessionSeries(previousReport, "workout");
   const stressCurrent = dailyMetric(report, "stressLevel");
   const stressPrevious = dailyMetric(previousReport, "stressLevel");
+  const moodScores = { VERY_BAD: 1, BAD: 2, NEUTRAL: 3, GOOD: 4, VERY_GOOD: 5 };
+  const energyScores = { VERY_LOW: 1, LOW: 2, NORMAL: 3, HIGH: 4, VERY_HIGH: 5 };
+  const sleepQualityScores = { VERY_POOR: 1, POOR: 2, FAIR: 3, GOOD: 4, EXCELLENT: 5 };
+  const moodRatingsCurrent = dailyCategoricalMetric(report, "mood", moodScores);
+  const moodRatingsPrevious = dailyCategoricalMetric(previousReport, "mood", moodScores);
+  const energyCurrent = dailyCategoricalMetric(report, "energyLevel", energyScores);
+  const energyPrevious = dailyCategoricalMetric(previousReport, "energyLevel", energyScores);
+  const sleepQualityCurrent = dailyCategoricalMetric(report, "sleepQuality", sleepQualityScores);
+  const sleepQualityPrevious = dailyCategoricalMetric(previousReport, "sleepQuality", sleepQualityScores);
+  const appointmentsCurrent = dailyAppointmentSeries(report);
+  const appointmentsPrevious = dailyAppointmentSeries(previousReport);
   const hydrationChecksCurrent = dailyMetric(report, "waterIntakeMl");
   const hydrationChecksPrevious = dailyMetric(previousReport, "waterIntakeMl");
 
@@ -1548,6 +1596,10 @@ function PersonalisedInsights({
     signal("sleep-checkin", "Sleep check-ins", sleepChecksCurrent, sleepChecksPrevious, "hours"),
     signal("sleep-session", "Connected sleep", sleepSessionsCurrent, sleepSessionsPrevious, "hours/day"),
     signal("stress", "Stress rating", stressCurrent, stressPrevious, "/10"),
+    signal("mood", "Mood rating", moodRatingsCurrent, moodRatingsPrevious, "1–5"),
+    signal("energy", "Energy level", energyCurrent, energyPrevious, "1–5"),
+    signal("sleep-quality", "Sleep quality", sleepQualityCurrent, sleepQualityPrevious, "1–5"),
+    signal("appointments", "Appointments", appointmentsCurrent, appointmentsPrevious, "per day"),
     signal("symptoms", "Symptom logs", dailySymptomSeries(report), dailySymptomSeries(previousReport), "logs/day"),
   ].filter((item) => item.current.length > 0 || item.previous.length > 0);
 
@@ -1663,6 +1715,40 @@ function PersonalisedInsights({
       tone: "watch",
       href: "/today",
       linkLabel: "Open check-in",
+    });
+  }
+  const moodAverage = mean(moodRatingsCurrent.map((item) => item.value));
+  const previousMoodAverage = mean(moodRatingsPrevious.map((item) => item.value));
+  if (moodAverage !== null && (moodAverage <= 2.2 || (previousMoodAverage !== null && moodAverage <= previousMoodAverage - 0.8))) {
+    recommendations.push({
+      title: "Mood ratings are low or have declined",
+      evidence: "Current average " + formatNumber(moodAverage, 1) + "/5" + (previousMoodAverage === null ? "" : " · previous " + formatNumber(previousMoodAverage, 1) + "/5"),
+      action: "Check in with yourself and reach out to someone you trust or a health professional if low mood persists or feels hard to manage.",
+      tone: "watch",
+      href: "/today",
+      linkLabel: "Review wellbeing check-in",
+    });
+  }
+  const energyAverage = mean(energyCurrent.map((item) => item.value));
+  if (energyAverage !== null && energyAverage <= 2) {
+    recommendations.push({
+      title: "Low energy ratings",
+      evidence: "Average energy rating " + formatNumber(energyAverage, 1) + "/5 on days with entries.",
+      action: "Review this alongside sleep and symptoms; discuss persistent or unexplained fatigue with a healthcare professional.",
+      tone: "watch",
+      href: "/health-journal",
+      linkLabel: "Review daily logs",
+    });
+  }
+  const sleepQualityAverage = mean(sleepQualityCurrent.map((item) => item.value));
+  if (sleepQualityAverage !== null && sleepQualityAverage <= 2) {
+    recommendations.push({
+      title: "Poor sleep quality reported",
+      evidence: "Average sleep-quality rating " + formatNumber(sleepQualityAverage, 1) + "/5.",
+      action: "Compare sleep-quality ratings with logged sleep duration and stress; seek support if problems persist.",
+      tone: "watch",
+      href: "/today",
+      linkLabel: "Review sleep check-in",
     });
   }
   const sleepAverage = mean((sleepChecksCurrent.length ? sleepChecksCurrent : sleepSessionsCurrent).map((item) => item.value));
