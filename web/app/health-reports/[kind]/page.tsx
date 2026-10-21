@@ -152,6 +152,21 @@ type SnapshotGoal = {
   createdAt?: string | null;
   progress?: GoalProgressRecord[] | null;
 };
+type SnapshotRiskResult = {
+  factor?: string | null;
+  value?: string | null;
+  score?: number | string | null;
+  recommendation?: string | null;
+};
+type SnapshotRiskAssessment = {
+  id?: string;
+  assessmentType?: string | null;
+  overallRisk?: string | null;
+  score?: number | string | null;
+  notes?: string | null;
+  assessedAt?: string | null;
+  results?: SnapshotRiskResult[] | null;
+};
 type HealthContextSnapshot = {
   person?: SnapshotPerson | null;
   profile?: SnapshotProfile | null;
@@ -161,6 +176,7 @@ type HealthContextSnapshot = {
     bmi?: number | string | null;
     establishedAt?: string | null;
   } | null;
+  riskAssessments?: SnapshotRiskAssessment[];
   conditions?: SnapshotCondition[];
   allergies?: SnapshotAllergy[];
   medications?: SnapshotMedication[];
@@ -855,6 +871,7 @@ function HealthContextSection({ report, coveragePercent, daysLogged, totalDays }
   const currentAllergies = (snapshot?.allergies ?? []).filter((item) => !["INACTIVE", "RESOLVED"].includes(String(item.status ?? "").toUpperCase()));
   const currentMedications = (snapshot?.medications ?? []).filter((item) => String(item.status ?? "ACTIVE").toUpperCase() === "ACTIVE");
   const goals = snapshot?.activeGoals ?? [];
+  const riskAssessments = snapshot?.riskAssessments ?? [];
   const coverageTone: StatusTone = coveragePercent >= 75 ? "good" : coveragePercent >= 40 ? "watch" : "high";
   const displayName = person?.preferredName || person?.firstName || "Your profile";
   return (
@@ -913,6 +930,33 @@ function HealthContextSection({ report, coveragePercent, daysLogged, totalDays }
             {![profile?.smokingStatus, profile?.alcoholConsumption, profile?.exerciseFrequency].some(Boolean) && <p className="mt-1 text-xs leading-5 text-slate-500">Lifestyle details are not fully recorded. The report will not infer them.</p>}
           </div>
         </div>
+        {riskAssessments.length > 0 && (
+          <div className="mt-4 border-t border-slate-100 pt-4">
+            <h3 className="text-xs font-black text-[#0b2d54]">Recorded clinical risk assessments</h3>
+            <p className="mt-1 text-[10px] leading-4 text-slate-500">These are scores and risk levels recorded by an assessment in your health record. Sympto is displaying them as saved; it is not recalculating or diagnosing risk here.</p>
+            <div className="mt-3 grid gap-3 md:grid-cols-2">
+              {riskAssessments.map((assessment, index) => {
+                const level = String(assessment.overallRisk ?? "").toUpperCase();
+                const tone: StatusTone = level === "LOW" ? "good" : level === "MODERATE" ? "watch" : level === "HIGH" ? "high" : level === "VERY_HIGH" ? "critical" : "info";
+                const score = finite(assessment.score);
+                return (
+                  <article key={String(assessment.id ?? index)} className="rounded-xl border border-slate-200 bg-white p-3">
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="min-w-0">
+                        <p className="text-xs font-black text-[#0b2d54]">{human(assessment.assessmentType || "Clinical assessment")}</p>
+                        <p className="mt-1 text-[10px] text-slate-500">{assessment.assessedAt ? "Assessed " + dateLabel(assessment.assessedAt) : "Assessment date not recorded"}</p>
+                      </div>
+                      <StatusCircle label={level ? human(level) : "Not rated"} detail="Saved risk level" tone={tone} />
+                    </div>
+                    {score !== null && <p className="mt-2 text-xs text-slate-600">Recorded score: <strong className="text-[#0b2d54]">{formatNumber(score, 1)}</strong></p>}
+                    {assessment.notes && <p className="mt-2 text-xs leading-5 text-slate-600">{assessment.notes}</p>}
+                    {(assessment.results ?? []).slice(0, 3).length > 0 && <div className="mt-2 space-y-1 border-t border-slate-100 pt-2">{(assessment.results ?? []).slice(0, 3).map((result, resultIndex) => <p key={String(result.factor ?? resultIndex)} className="text-[10px] leading-4 text-slate-500"><strong className="text-slate-700">{result.factor || "Factor"}:</strong> {result.value ?? (result.score == null ? "Not recorded" : String(result.score))}{result.recommendation ? " — " + result.recommendation : ""}</p>)}</div>}
+                  </article>
+                );
+              })}
+            </div>
+          </div>
+        )}
       </section>
 
       <section>
