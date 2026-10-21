@@ -396,7 +396,7 @@ function mean(values: number[]) {
 
 function formatNumber(value: number | null, digits = 1) {
   if (value === null || !Number.isFinite(value)) return "—";
-  return new Intl.NumberFormat("en-ZA", {
+  return new Intl.NumberFormat("en-GB", {
     minimumFractionDigits: digits,
     maximumFractionDigits: digits,
   }).format(value);
@@ -1165,149 +1165,80 @@ function compareText(
   return "Your average was " + formatNumber(Math.abs(delta), digits) + (unit ? " " + unit : "") + (delta > 0 ? " higher" : " lower") + " than in the previous period.";
 }
 
-function MiniTrend({
+function RecordedReadings({
   values,
   points,
   label,
-  variant = "line",
   unit = "",
   digits = 1,
 }: {
   values?: number[];
   points?: Array<{ date: string; value: number; timestamp?: number }>;
   label: string;
-  variant?: "line" | "bar";
   unit?: string;
   digits?: number;
 }) {
-  const hasDatedPoints = Boolean(points?.length);
   const plotted = (points?.length
-    ? points.filter((point) => Number.isFinite(point.value) && Boolean(point.date))
-      .slice()
-      .sort((a, b) => (a.timestamp ?? new Date(a.date).getTime()) - (b.timestamp ?? new Date(b.date).getTime()))
-    : (values ?? []).filter((value) => Number.isFinite(value)).map((value, index) => ({ date: String(index + 1), value })));
+    ? points
+        .filter((point) => Number.isFinite(point.value) && Boolean(point.date))
+        .slice()
+        .sort((a, b) => (a.timestamp ?? new Date(a.date).getTime()) - (b.timestamp ?? new Date(b.date).getTime()))
+    : (values ?? []).filter((value) => Number.isFinite(value)).map((value, index) => ({ date: "Reading " + String(index + 1), value })));
+
   if (!plotted.length) {
-    return <div className="mt-3 flex h-24 items-center rounded-xl bg-slate-50 px-3 text-sm text-slate-500">No dated values are available to chart in this period.</div>;
+    return <div className="mt-3 rounded-xl border border-dashed border-slate-200 bg-slate-50 px-3 py-4 text-sm text-slate-500">No dated readings were saved for this period.</div>;
   }
 
-  // Reserve space for a readable value axis and date labels.
-  const width = 400;
-  const left = 62;
-  const right = 14;
-  const top = 22;
-  const bottom = 120;
-  const usableWidth = width - left - right;
-  const plottedValues = plotted.map((point) => point.value);
-  const minimum = Math.min(...plottedValues);
-  const maximum = Math.max(...plottedValues);
-  const rawRange = maximum - minimum;
-  const padding = variant === "bar" ? 0 : (rawRange || Math.max(Math.abs(maximum) * 0.05, 1)) * 0.12;
-  const low = variant === "bar" ? Math.min(0, minimum) : minimum - padding;
-  const high = Math.max(maximum + (variant === "bar" ? 0 : padding), low + 1);
-
-  const dateValues = plotted.map((point, index) => {
-    if (!hasDatedPoints) return index;
-    if (/^\d{4}-\d{2}-\d{2}$/.test(point.date)) return new Date(point.date + "T12:00:00").getTime();
-    const parsed = new Date(point.date).getTime();
-    return Number.isFinite(parsed) ? parsed : index;
-  });
-  const useDateScale = hasDatedPoints && dateValues.every(Number.isFinite);
-  const minimumDate = Math.min(...dateValues);
-  const maximumDate = Math.max(...dateValues);
-  const xAt = (index: number) => {
-    if (plotted.length === 1 || (useDateScale && minimumDate === maximumDate)) return left + usableWidth / 2;
-    if (useDateScale) return left + ((dateValues[index] - minimumDate) / (maximumDate - minimumDate)) * usableWidth;
-    return left + index * usableWidth / (plotted.length - 1);
-  };
-  const yAt = (value: number) => bottom - ((value - low) / (high - low)) * (bottom - top);
-  const polyline = plotted.map((point, index) => xAt(index) + "," + yAt(point.value)).join(" ");
-  const barWidth = Math.max(4, Math.min(18, usableWidth / Math.max(plotted.length, 1) * 0.56));
-  const tickLabel = (date: string) => {
-    if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) return date;
-    const parsed = new Date(date + "T12:00:00");
+  const formatReadingDate = (date: string) => {
+    if (date.startsWith("Reading ")) return date;
+    const parsed = /^\d{4}-\d{2}-\d{2}$/.test(date) ? new Date(date + "T12:00:00") : new Date(date);
     if (!Number.isFinite(parsed.getTime())) return date;
-    return new Intl.DateTimeFormat("en-ZA", { timeZone: "Africa/Johannesburg", day: "numeric", month: "short" }).format(parsed);
+    return new Intl.DateTimeFormat("en-ZA", {
+      timeZone: "Africa/Johannesburg",
+      day: "numeric",
+      month: "short",
+      year: "numeric",
+    }).format(parsed);
   };
-  const tickCount = Math.min(5, plotted.length);
-  const tickTargets = useDateScale && maximumDate > minimumDate
-    ? Array.from({ length: tickCount }, (_, index) => minimumDate + (maximumDate - minimumDate) * index / Math.max(1, tickCount - 1))
-    : [];
-  const tickIndices = useDateScale && maximumDate > minimumDate
-    ? Array.from(new Set(tickTargets.map((target) => {
-        let bestIndex = 0;
-        let bestDistance = Number.POSITIVE_INFINITY;
-        dateValues.forEach((value, index) => {
-          const distance = Math.abs(value - target);
-          if (distance < bestDistance) { bestDistance = distance; bestIndex = index; }
-        });
-        return bestIndex;
-      })))
-    : Array.from(new Set(Array.from({ length: tickCount }, (_, index) =>
-        tickCount === 1 ? 0 : Math.round(index * (plotted.length - 1) / (tickCount - 1))
-      )));
-  const visibleTickIndices = tickIndices.filter((index, position, all) =>
-    all.findIndex((candidate) => tickLabel(plotted[candidate].date) === tickLabel(plotted[index].date)) === position
+  const allValues = plotted.map((point) => point.value);
+  const minimum = Math.min(...allValues);
+  const maximum = Math.max(...allValues);
+  const displayUnit = unit.trim() || "unit not saved";
+  const earlier = plotted.length > 8 ? plotted.slice(0, plotted.length - 8) : [];
+  const visible = plotted.length > 8 ? plotted.slice(-8) : plotted;
+  const readingRows = (items: typeof plotted) => (
+    <div className="grid gap-2 sm:grid-cols-2">
+      {items.map((point, index) => (
+        <div key={point.date + "-" + index} className="flex min-w-0 items-center justify-between gap-3 rounded-xl border border-slate-100 bg-white px-3 py-2.5">
+          <span className="min-w-0 text-xs font-medium text-slate-600">{formatReadingDate(point.date)}</span>
+          <span className="shrink-0 text-sm font-extrabold tabular-nums text-[#0b2d54]">{formatNumber(point.value, digits)} <span className="font-semibold text-slate-500">{displayUnit}</span></span>
+        </div>
+      ))}
+    </div>
   );
-  const yTicks = [high, (high + low) / 2, low];
-  const chartSummary = plotted.length === 1 ? "1 dated data point" : String(plotted.length) + " dated data points";
-  const readableUnit = unit || "Unit not recorded";
 
   return (
-    <div className="mt-3 rounded-xl border border-slate-100 bg-[#f5fafb] px-3 py-3">
-      <div className="mb-1 flex items-center justify-between gap-3 text-xs font-semibold text-slate-600">
-        <span>Value over time</span>
-        <span>{readableUnit}</span>
+    <div className="mt-3 rounded-2xl border border-[#dcebed] bg-[#f5fafb] p-3" aria-label={label + " recorded readings"}>
+      <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+        <span className="text-xs font-extrabold uppercase tracking-wide text-[#0b2d54]">Recorded readings</span>
+        <span className="rounded-full bg-white px-2.5 py-1 text-[11px] font-semibold text-slate-600">{plotted.length} {plotted.length === 1 ? "reading" : "readings"}</span>
       </div>
-      <svg viewBox="0 0 400 160" className="h-40 w-full" role="img" aria-label={label + ", " + chartSummary + ". Unit: " + readableUnit}>
-        {yTicks.map((tick, index) => {
-          const y = top + index * (bottom - top) / 2;
-          return (
-            <g key={index}>
-              <line x1={left} x2={width - right} y1={y} y2={y} stroke="#d5e1e6" strokeDasharray={index === 2 ? "0" : "4 4"} strokeWidth="1" />
-              <text x={left - 8} y={y + 4} textAnchor="end" fontSize="12" fontWeight={index === 1 ? "500" : "600"} fill="#475569">{formatNumber(tick, digits)}</text>
-            </g>
-          );
-        })}
-        {variant === "bar" ? plotted.map((point, index) => {
-          const x = xAt(index) - barWidth / 2;
-          const y = yAt(Math.max(0, point.value));
-          const valueLabelY = y - 7 < top + 9 ? y + 14 : y - 7;
-          return (
-            <g key={point.date + "-" + index}>
-              <rect x={x} y={y} width={barWidth} height={Math.max(1, bottom - y)} rx="3" fill="#24c1c4" opacity="0.92" tabIndex={0}>
-                <title>{tickLabel(point.date)}: {formatNumber(point.value, digits)} {readableUnit}</title>
-              </rect>
-              {plotted.length <= 8 && <text x={xAt(index)} y={valueLabelY} textAnchor="middle" fontSize="11" fontWeight="700" fill="#0b2d54">{formatNumber(point.value, digits)}</text>}
-            </g>
-          );
-        }) : (
-          <>
-            <polyline points={polyline} fill="none" stroke="#177e89" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" />
-            {plotted.length <= 8 && plotted.map((point, index) => {
-              const pointY = yAt(point.value);
-              const valueLabelY = pointY - 10 >= top + 8 ? pointY - 10 : pointY + 18;
-              return <text key={"value-" + point.date + "-" + index} x={xAt(index)} y={valueLabelY} textAnchor="middle" fontSize="11" fontWeight="700" fill="#0b2d54">{formatNumber(point.value, digits)}</text>;
-            })}
-            {plotted.map((point, index) => (
-              <circle key={point.date + "-" + index} cx={xAt(index)} cy={yAt(point.value)} r={plotted.length > 18 ? 2.5 : 4} fill="#0b2d54" stroke="#ffffff" strokeWidth="1.5" tabIndex={0}>
-                <title>{tickLabel(point.date)}: {formatNumber(point.value, digits)} {readableUnit}</title>
-              </circle>
-            ))}
-          </>
-        )}
-        {visibleTickIndices.map((index, position) => {
-          const x = xAt(index);
-          const anchor = visibleTickIndices.length === 1 ? "middle" : position === 0 ? "start" : position === visibleTickIndices.length - 1 ? "end" : "middle";
-          return <text key={plotted[index].date + "-" + index} x={x} y="145" textAnchor={anchor} fontSize="11" fontWeight="500" fill="#475569">{tickLabel(plotted[index].date)}</text>;
-        })}
-      </svg>
-      <div className="mt-1 flex flex-wrap items-center justify-between gap-2 border-t border-slate-200 pt-2 text-sm text-slate-600">
-        <span>{chartSummary}</span>
-        <span className="font-semibold">Range: {formatNumber(minimum, digits)}–{formatNumber(maximum, digits)} {readableUnit}</span>
+      {readingRows(visible)}
+      {earlier.length > 0 && (
+        <details className="mt-3 rounded-xl border border-slate-200 bg-white px-3 py-2">
+          <summary className="cursor-pointer text-xs font-bold text-[#0b2d54]">Show {earlier.length} earlier {earlier.length === 1 ? "reading" : "readings"}</summary>
+          <div className="mt-3">{readingRows(earlier)}</div>
+        </details>
+      )}
+      <div className="mt-3 border-t border-[#dcebed] pt-2 text-xs text-slate-600">
+        {Math.abs(maximum - minimum) < 0.000001
+          ? <>Recorded value: <strong className="text-[#0b2d54]">{formatNumber(minimum, digits)} {displayUnit}</strong></>
+          : <>Observed range: <strong className="text-[#0b2d54]">{formatNumber(minimum, digits)}–{formatNumber(maximum, digits)} {displayUnit}</strong></>}
       </div>
     </div>
   );
 }
+
 function SummaryTile({ icon: Icon, label, value, detail }: { icon: typeof Activity; label: string; value: string; detail: string }) {
   return (
     <article className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
@@ -1319,18 +1250,17 @@ function SummaryTile({ icon: Icon, label, value, detail }: { icon: typeof Activi
 }
 
 function ScoreRing({ percent, label, tone, size = 68 }: { percent: number | null; label: string; tone: StatusTone; size?: number }) {
-  const styles = toneStyles(tone);
-  const radius = 25;
-  const circumference = 2 * Math.PI * radius;
   const safePercent = percent === null ? 0 : Math.max(0, Math.min(100, percent));
+  const text = percent === null ? "—" : String(Math.round(safePercent)) + "%";
   return (
-    <div className="flex shrink-0 flex-col items-center gap-1" role="img" aria-label={percent === null ? label + ": not scored yet" : label + ": " + Math.round(safePercent) + " percent"}>
-      <svg width={size} height={size} viewBox="0 0 64 64" className="block">
-        <circle cx="32" cy="32" r={radius} fill="none" stroke={styles.track} strokeWidth="6" />
-        {percent !== null && <circle cx="32" cy="32" r={radius} fill="none" stroke={styles.ring} strokeWidth="6" strokeLinecap="round" strokeDasharray={String(circumference)} strokeDashoffset={String(circumference * (1 - safePercent / 100))} transform="rotate(-90 32 32)" />}
-        <text x="32" y="35" textAnchor="middle" fontSize={percent === null ? "16" : "13"} fontWeight="800" fill={styles.ring}>{percent === null ? "—" : Math.round(safePercent) + "%"}</text>
-      </svg>
-      <span className="text-center text-[9px] font-bold leading-3 text-slate-500">{label}</span>
+    <div
+      className="flex shrink-0 items-center justify-center rounded-2xl border border-[#ccebed] bg-[#effafa] text-xl font-black tabular-nums text-[#0b2d54]"
+      style={{ width: size, height: size }}
+      role="img"
+      aria-label={percent === null ? label + ": not scored yet" : label + ": " + Math.round(safePercent) + " percent"}
+      title={label}
+    >
+      {text}
     </div>
   );
 }
@@ -1660,25 +1590,30 @@ function signalDigits(key: string, unit: string) {
 function signalChange(current: DailyValue[], previous: DailyValue[], unit: string, digits = 1) {
   const currentAverage = mean(current.map((item) => item.value));
   const previousAverage = mean(previous.map((item) => item.value));
-  const suffix = unit ? " " + unit : " (unit not recorded)";
+  const suffix = unit ? (unit.startsWith("/") ? unit : " " + unit) : " (unit not saved)";
   const value = (amount: number) => formatNumber(amount, digits) + suffix;
+  const isRatingScale = unit === "/10" || unit === "/5";
   if (currentAverage === null) {
     return previousAverage === null
-      ? "No dated values are available."
-      : "No values in this period. Previous-period average: " + value(previousAverage) + ".";
+      ? "No dated readings are available."
+      : "No readings in this period. Previous-period average: " + value(previousAverage) + ".";
   }
   if (previousAverage === null) {
-    return "Current-period average: " + value(currentAverage) + ". No comparable values were found for the previous period.";
+    return "Current-period average: " + value(currentAverage) + ". No comparable values were saved in the previous period.";
   }
   const delta = currentAverage - previousAverage;
   const tolerance = digits === 0 ? 0.5 : 0.05;
   if (Math.abs(delta) < tolerance) {
     return "About the same as the previous period: " + value(currentAverage) + " now vs " + value(previousAverage) + " previously.";
   }
-  return "This period is " + value(Math.abs(delta)) + (delta > 0 ? " higher" : " lower") +
+  if (isRatingScale) {
+    const absDelta = Math.abs(delta);
+    const amount = formatNumber(absDelta, digits) + (Math.abs(absDelta - 1) < 0.000001 ? " point" : " points");
+    return "The average is " + amount + (delta > 0 ? " higher" : " lower") + " than the previous period (" + value(previousAverage) + " previously → " + value(currentAverage) + " now).";
+  }
+  return "This period is " + formatNumber(Math.abs(delta), digits) + (unit ? " " + unit : "") + (delta > 0 ? " higher" : " lower") +
     " than the previous-period average (" + value(previousAverage) + " previously → " + value(currentAverage) + " now).";
 }
-
 function PersonalisedInsights({
   report,
   previousReport,
@@ -1858,16 +1793,16 @@ function PersonalisedInsights({
     ] : []),
     signal("smoking", "Cigarettes logged", smokingCurrent, smokingPrevious, "cigarettes"),
     signal("alcohol", "Alcohol logged", alcoholCurrent, alcoholPrevious, "drinks"),
-    signal("nutrition", "Nutrition / calories", nutritionCurrent, nutritionPrevious, ""),
+    signal("nutrition", "Nutrition / calories", nutritionCurrent, nutritionPrevious, "kcal"),
     signal("hydration", "Water intake", preferPrimaryByDate(hydrationChecksCurrent, hydrationEventsCurrent), preferPrimaryByDate(hydrationChecksPrevious, hydrationEventsPrevious), "ml"),
     signal("exercise", "Exercise logged", preferPrimaryByDate(exerciseChecksCurrent, exerciseEventsCurrent), preferPrimaryByDate(exerciseChecksPrevious, exerciseEventsPrevious), "min"),
     signal("workouts", "Workout sessions", workoutsCurrent, workoutsPrevious, "min/day"),
     signal("sleep-checkin", "Sleep check-ins", sleepChecksCurrent, sleepChecksPrevious, "hours"),
     signal("sleep-session", "Connected sleep", sleepSessionsCurrent, sleepSessionsPrevious, "hours/day"),
     signal("stress", "Stress rating", stressCurrent, stressPrevious, "/10"),
-    signal("mood", "Mood rating", moodRatingsCurrent, moodRatingsPrevious, "1–5"),
-    signal("energy", "Energy level", energyCurrent, energyPrevious, "1–5"),
-    signal("sleep-quality", "Sleep quality", sleepQualityCurrent, sleepQualityPrevious, "1–5"),
+    signal("mood", "Mood rating", moodRatingsCurrent, moodRatingsPrevious, "/5"),
+    signal("energy", "Energy level", energyCurrent, energyPrevious, "/5"),
+    signal("sleep-quality", "Sleep quality", sleepQualityCurrent, sleepQualityPrevious, "/5"),
     signal("appointments", "Appointments", appointmentsCurrent, appointmentsPrevious, "per day"),
     signal("symptoms", "Symptom logs", dailySymptomSeries(report), dailySymptomSeries(previousReport), "logs/day"),
   ].filter((item) => item.current.length > 0 || item.previous.length > 0);
@@ -1954,12 +1889,13 @@ function PersonalisedInsights({
     previous: item.previous,
     targetValue: item.targetValue,
   }));
+  const hasWeightVitalHistory = vitalSeries(report, "weight").length > 0 || vitalSeries(previousReport, "weight").length > 0;
   const signals: Array<{ key: string; label: string; unit: string; current: DailyValue[]; previous: DailyValue[]; targetValue?: number | null }> = [
     ...baseSignals,
     ...wearableSignals,
     ...genericLabSignals,
     ...manualGoalSignals,
-  ];
+  ].filter((item) => item.key !== "weight" || !hasWeightVitalHistory);
 
   const recommendations: Array<{ title: string; evidence: string; action: string; tone: StatusTone; href: string; linkLabel: string }> = [];
   const urgentReviews = reviews.filter((item) => item.severity === "urgent");
@@ -2147,8 +2083,8 @@ function PersonalisedInsights({
             {signals.map((signal) => {
               const currentAverage = mean(signal.current.map((item) => item.value));
               const latest = signal.current[signal.current.length - 1];
-              const unitLabel = signal.unit || "unit not recorded";
-              const unitSuffix = signal.unit ? " " + signal.unit : " (unit not recorded)";
+              const unitLabel = signal.unit || "unit not saved";
+              const unitSuffix = signal.unit ? " " + signal.unit : " (unit not saved)";
               const digits = signalDigits(signal.key, signal.unit);
               return (
                 <article key={signal.key} className="min-w-0 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
@@ -2163,7 +2099,7 @@ function PersonalisedInsights({
                   {latest && <p className="mt-2 text-sm text-slate-600"><span className="font-semibold text-[#0b2d54]">Most recent:</span> {formatNumber(latest.value, digits)}{unitSuffix} · {dateLabel(latest.date)}</p>}
                   {signal.targetValue !== undefined && signal.targetValue !== null && <p className="mt-2 text-sm font-semibold text-[#0b7b80]">Saved goal target: {formatNumber(signal.targetValue, digits)}{unitSuffix}</p>}
                   <p className="mt-3 rounded-xl bg-slate-50 p-3 text-sm leading-6 text-slate-700">{signalChange(signal.current, signal.previous, signal.unit, digits)}</p>
-                  <MiniTrend points={signal.current} label={signal.label + " current-period trend"} unit={unitLabel} digits={digits} />
+                  <RecordedReadings points={signal.current} label={signal.label + " current-period trend"} unit={unitLabel} digits={digits} />
                   {signal.previous.length > 0 && <p className="mt-2 text-xs text-slate-500">Previous period: {signal.previous.length} dated value(s).</p>}
                 </article>
               );
@@ -2271,7 +2207,7 @@ function VitalTrendCard({
       ? "Your most recent reading is close to your recorded baseline of " + formatNumber(baselineValue, digits) + " " + unit + "."
       : "Your most recent reading is " + formatNumber(Math.abs(baselineDelta), digits) + " " + unit + (baselineDelta > 0 ? " above" : " below") + " your recorded baseline of " + formatNumber(baselineValue, digits) + " " + unit + ". This difference alone does not show a cause or diagnosis.";
   return (
-    <article className="min-w-0 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+    <article className="min-w-0 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
       <div className="flex items-start justify-between gap-3">
         <div>
           <p className="text-sm font-bold text-[#0b2d54]">{label}</p>
@@ -2294,7 +2230,7 @@ function VitalTrendCard({
             {latest && <p className="mt-1 text-xs text-slate-500">Most recent: {formatNumber(latest.value, digits)} {unit} · {dateLabel(new Date(latest.timestamp).toISOString())}</p>}
             {latest?.convertedFrom && <p className="mt-1 text-[10px] leading-4 text-slate-500">Converted for this report from {formatNumber(latest.convertedFrom.value, 1)} {latest.convertedFrom.unit}.</p>}
           </div>
-          <MiniTrend points={current} label={label + " trend"} unit={unit} digits={digits} />
+          <RecordedReadings points={current} label={label + " trend"} unit={unit} digits={digits} />
           {review ? (
             <p className="mt-3 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs leading-5 text-amber-950">
               Check these saved values before interpreting the trend. See “Readings to double-check” above.
@@ -2458,16 +2394,16 @@ function HealthReportInsights({
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
           <SummaryTile icon={CalendarDays} label="Days with entries" value={String(daysLogged) + "/" + String(totalDays)} detail={daysLogged === 0 ? "No dated health records were found for these days." : "You saved at least one health record on " + daysLogged + " of " + totalDays + " days. Days without an entry are not counted as zero."} />
           <SummaryTile icon={Activity} label="Symptom records" value={String(symptomCount)} detail={symptomComparison} />
-          <SummaryTile icon={HeartPulse} label="Readings used in trends" value={String(activeVitals.reduce((sum, item) => sum + item.current.length, 0))} detail={activeVitals.length ? "Valid trend values across " + activeVitals.length + " measurement types. Flagged extreme values are shown separately." : "No readings could be used for trend calculations in this period."} />
+          <SummaryTile icon={HeartPulse} label="Readings included" value={String(activeVitals.reduce((sum, item) => sum + item.current.length, 0))} detail={activeVitals.length ? "Valid readings across " + activeVitals.length + " measurement types. Flagged extreme values are shown separately." : "No readings could be included for this period."} />
           <SummaryTile icon={Footprints} label="Workout sessions" value={String(workouts.length)} detail={workouts.length ? formatNumber(workoutMinutes, 0) + " minutes recorded across these workouts." : "No workouts were logged. If you were active but did not record a workout, it will not appear here."} />
         </div>
       </section>
 
-      <section aria-label="Health trends analysis">
+      <section aria-label="Health overview">
         <div className="mb-3">
-          <p className="text-[10px] font-black uppercase tracking-[0.16em] text-[#24c1c4]">Health trends analysis</p>
+          <p className="text-[10px] font-black uppercase tracking-[0.16em] text-[#24c1c4]">Health overview</p>
           <h2 className="mt-1 text-xl font-black text-[#0b2d54]">Key health patterns</h2>
-          <p className="mt-1 text-sm leading-6 text-slate-500">A quick overview of steps, medication records and clinical activity. Detailed charts below show hydration, symptoms and other recorded measures without repeating the same cards.</p>
+          <p className="mt-1 text-sm leading-6 text-slate-500">A quick overview of steps, medication records and clinical activity. Saved readings and comparisons are shown below. Missing days are not estimated, and the same measure is kept in one place where possible.</p>
         </div>
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
           <SummaryTile
@@ -2515,16 +2451,16 @@ function HealthReportInsights({
       )}
 
       <section>
-        <div className="mb-3"><p className="text-[10px] font-black uppercase tracking-[0.16em] text-[#24c1c4]">Change over time</p><h2 className="mt-1 text-xl font-black text-[#0b2d54]">Measurement trends</h2><p className="mt-1 text-sm leading-6 text-slate-500">Each card explains the measurement, shows the average of saved readings, and tells you how it compares with the previous period. A change by itself does not say what caused it or whether it is right for you.</p></div>
-        {activeVitals.length ? <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">{activeVitals.map((item) => <VitalTrendCard key={item.key} label={item.label} description={item.description} unit={item.unit} digits={item.digits} current={item.current} previous={item.previous} previousLoading={previousLoading} review={item.review} status={item.status} baselineValue={item.baselineValue} rawCurrent={item.rawCurrent} />)}</div> : <div className="rounded-2xl border border-dashed border-slate-300 bg-white p-5 text-sm leading-6 text-slate-500">No dated vital readings were found for this period. Once you save blood pressure, heart rate, weight or other measurements, they will appear here.</div>}
+        <div className="mb-3"><p className="text-[10px] font-black uppercase tracking-[0.16em] text-[#24c1c4]">Reading history</p><h2 className="mt-1 text-xl font-black text-[#0b2d54]">Your measurements</h2><p className="mt-1 text-sm leading-6 text-slate-500">Each card explains the measurement, shows the average of saved readings, and tells you how it compares with the previous period. A change by itself does not say what caused it or whether it is right for you.</p></div>
+        {activeVitals.length ? <div className="grid gap-4 md:grid-cols-2">{activeVitals.map((item) => <VitalTrendCard key={item.key} label={item.label} description={item.description} unit={item.unit} digits={item.digits} current={item.current} previous={item.previous} previousLoading={previousLoading} review={item.review} status={item.status} baselineValue={item.baselineValue} rawCurrent={item.rawCurrent} />)}</div> : <div className="rounded-2xl border border-dashed border-slate-300 bg-white p-5 text-sm leading-6 text-slate-500">No dated vital readings were found for this period. Once you save blood pressure, heart rate, weight or other measurements, they will appear here.</div>}
       </section>
 
       {currentSteps.length > 0 && (
         <section>
           <div className="mb-3">
             <p className="text-[10px] font-black uppercase tracking-[0.16em] text-[#24c1c4]">Daily activity</p>
-            <h2 className="mt-1 text-xl font-black text-[#0b2d54]">Step-count trend</h2>
-            <p className="mt-1 text-sm leading-6 text-slate-500">Each bar shows the latest saved step count for that date. Days without a recorded count are not estimated.</p>
+            <h2 className="mt-1 text-xl font-black text-[#0b2d54]">Step-count readings</h2>
+            <p className="mt-1 text-sm leading-6 text-slate-500">Each entry shows the latest saved step count for that date. Days without a recorded count are not estimated.</p>
           </div>
           <article className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
             <div className="flex flex-wrap items-end justify-between gap-3">
@@ -2534,7 +2470,7 @@ function HealthReportInsights({
               </div>
               <p className="text-sm font-semibold text-slate-600">{compareText(currentStepValues, previousStepValues, "steps/day", 0, previousLoading)}</p>
             </div>
-            <MiniTrend points={currentSteps} label="Daily steps across the report period" variant="bar" unit="steps" digits={0} />
+            <RecordedReadings points={currentSteps} label="Daily steps across the report period" unit="steps" digits={0} />
             <p className="mt-2 text-xs leading-5 text-slate-500">Sensor samples on the same date are not added together; the latest saved cumulative count is used.</p>
           </article>
         </section>
@@ -2576,9 +2512,9 @@ function HealthReportInsights({
             )}
             {symptomSeverityPoints.length > 0 && (
               <article className="rounded-2xl border border-slate-200 bg-white p-4">
-                <h3 className="text-sm font-bold text-[#0b2d54]">Symptom severity over time</h3>
-                <p className="mt-1 text-xs leading-5 text-slate-500">Daily average rank from dated symptom observations or symptom-level severity values.</p>
-                <MiniTrend points={symptomSeverityPoints} label="Daily logged symptom severity rank over time" unit="severity rank" digits={1} />
+                <h3 className="text-sm font-bold text-[#0b2d54]">Symptom severity readings</h3>
+                <p className="mt-1 text-xs leading-5 text-slate-500">Daily average severity rank from dated symptom observations or symptom-level severity values.</p>
+                <RecordedReadings points={symptomSeverityPoints} label="Daily logged symptom severity rank over time" unit="severity rank" digits={1} />
                 <p className="mt-2 text-[10px] leading-4 text-slate-400">Mild = 1, moderate = 2, severe = 3, very severe = 4. Different symptoms can have different meanings; this summary is not a clinical score.</p>
                 {previousReport && previousSymptomSeverityPoints.length > 0 && <p className="mt-2 text-xs leading-5 text-slate-500">{compareText(symptomSeverityPoints.map((item) => item.value), previousSymptomSeverityPoints.map((item) => item.value), "severity rank", 1, previousLoading)}</p>}
               </article>
@@ -2750,7 +2686,7 @@ export default function HealthReportPage() {
               <p><strong className="text-[#0b2d54]">Most recent:</strong> the latest dated value available.</p>
               <p><strong className="text-[#0b2d54]">Change:</strong> the actual amount higher or lower than the previous period; distracting percentage swings are omitted.</p>
               <p><strong className="text-[#0b2d54]">Missing entry:</strong> no value was saved. It is not counted as zero.</p>
-              <p><strong className="text-[#0b2d54]">Chart:</strong> dates run along the bottom; the numbered scale on the left shows values. Hover or focus a plotted point to inspect its date and value.</p>
+              <p><strong className="text-[#0b2d54]">Recorded readings:</strong> each entry shows the date and value that was saved. Expand the earlier-readings list when a longer history is available.</p>
               <p><strong className="text-[#0b2d54]">Colour key:</strong> green = within a common reference; amber = recheck or monitor; orange = high; red = urgent; grey = personal or age-specific guidance needed.</p>
               <p><strong className="text-[#0b2d54]">Goal status:</strong> uses saved goal targets and recorded progress. Missing progress is not guessed.</p>
               <p><strong className="text-[#0b2d54]">Data coverage:</strong> measures how much was logged, not how healthy you are. General reference ranges are not a substitute for personal or clinician guidance.</p>
