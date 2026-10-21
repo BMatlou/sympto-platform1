@@ -409,11 +409,42 @@ function periodDays(report: Report) {
   return Math.max(1, Math.round((end - start) / 86_400_000));
 }
 
+function withinReportPeriod(report: Report | null, value: unknown) {
+  if (!report || value === null || value === undefined || value === "") return false;
+  const timestamp = new Date(String(value)).getTime();
+  const start = new Date(report.period.start).getTime();
+  const end = new Date(report.period.end).getTime();
+  return Number.isFinite(timestamp) && Number.isFinite(start) && Number.isFinite(end) &&
+    timestamp >= start && timestamp < end;
+}
+
+// Water intake is cumulative by day. Keep the latest saved total rather than
+// averaging intermediate updates made on the same calendar day.
+function dailyLatestMetric(report: Report | null, field: string): DailyValue[] {
+  if (!report) return [];
+  const latestByDate = new Map<string, { date: string; value: number; timestamp: number }>();
+  report.activity.journalEntries.forEach((entry) => {
+    const at = entry.createdAt || entry.recordedAt || entry.updatedAt;
+    if (!withinReportPeriod(report, at)) return;
+    const date = dateKey(at);
+    const value = finite(entry[field]);
+    const timestamp = new Date(String(at)).getTime();
+    if (!date || value === null || !Number.isFinite(timestamp)) return;
+    const current = latestByDate.get(date);
+    if (!current || timestamp >= current.timestamp) latestByDate.set(date, { date, value, timestamp });
+  });
+  return Array.from(latestByDate.values())
+    .map(({ date, value }) => ({ date, value }))
+    .sort((a, b) => a.date.localeCompare(b.date));
+}
+
 function dailyMetric(report: Report | null, field: string): DailyValue[] {
   if (!report) return [];
   const grouped = new Map<string, { total: number; count: number }>();
   report.activity.journalEntries.forEach((entry) => {
-    const key = dateKey(entry.createdAt || entry.recordedAt || entry.updatedAt);
+    const at = entry.createdAt || entry.recordedAt || entry.updatedAt;
+    if (!withinReportPeriod(report, at)) return;
+    const key = dateKey(at);
     const value = finite(entry[field]);
     if (!key || value === null) return;
     const current = grouped.get(key) ?? { total: 0, count: 0 };
@@ -446,7 +477,9 @@ function dailyCategoricalMetric(
   if (!report) return [];
   const grouped = new Map<string, { total: number; count: number }>();
   report.activity.journalEntries.forEach((entry) => {
-    const date = dateKey(entry.createdAt || entry.recordedAt || entry.updatedAt);
+    const at = entry.createdAt || entry.recordedAt || entry.updatedAt;
+    if (!withinReportPeriod(report, at)) return;
+    const date = dateKey(at);
     const raw = String(entry[field] ?? "").toUpperCase();
     const score = scores[raw];
     if (!date || score === undefined) return;
@@ -466,6 +499,7 @@ function dailyAppointmentSeries(report: Report | null): DailyValue[] {
   report.activity.appointments.forEach((value) => {
     if (!value || typeof value !== "object") return;
     const item = value as Record<string, unknown>;
+    if (!withinReportPeriod(report, item.scheduledStart)) return;
     const date = dateKey(item.scheduledStart);
     if (!date) return;
     grouped.set(date, (grouped.get(date) ?? 0) + 1);
@@ -795,7 +829,7 @@ function vitalSeries(report: Report | null, metric: string): SeriesPoint[] {
     // Keep separate same-day readings, but collapse exact duplicates when the
     // same measurement arrives through more than one source.
     const key = point.timestamp + "|" + point.value;
-    if (!deduped.has(key)) deduped.set(key, point);
+    if (withinReportPeriod(report, point.timestamp) && !deduped.has(key)) deduped.set(key, point);
   }
   return Array.from(deduped.values()).sort((a, b) => a.timestamp - b.timestamp);
 }
@@ -1200,7 +1234,7 @@ function goalMetricSeries(report: Report | null, pattern: RegExp): SeriesPoint[]
       const value = finite(event.loggedValue);
       const timestamp = new Date(event.occurredAt).getTime();
       const date = dateKey(event.occurredAt);
-      if (value === null || !Number.isFinite(timestamp) || !date) return [];
+      if (value === null || !Number.isFinite(timestamp) || !date || !withinReportPeriod(report, timestamp)) return [];
       return [{
         value,
         timestamp,
@@ -1292,7 +1326,7 @@ function clinicalLabSeries(report: Report | null, pattern: RegExp): LabSeriesPoi
     const dateValue = result.reportedAt || result.releasedAt;
     const timestamp = dateValue ? new Date(dateValue).getTime() : Number.NaN;
     const date = dateKey(dateValue);
-    if (!date || !Number.isFinite(timestamp)) return [];
+    if (!date || !Number.isFinite(timestamp) || !withinReportPeriod(report, timestamp)) return [];
     return (result.items ?? []).flatMap((item) => {
       const test = item.test || result.orderItem?.test;
       const name = String(test?.name || "").trim();
@@ -1317,7 +1351,7 @@ function namedClinicalDeviceSeries(
     const value = finite(item.value);
     const timestamp = item.measuredAt ? new Date(item.measuredAt).getTime() : Number.NaN;
     const date = dateKey(item.measuredAt);
-    if (value === null || !date || !Number.isFinite(timestamp)) return;
+    if (value === null || !date || !Number.isFinite(timestamp) || !withinReportPeriod(report, timestamp)) return;
     points.push({ value, timestamp, date, source: "Connected device", unit: String(item.unit || item.vitalType?.unit || "") });
   });
   report.clinical.vitals.forEach((item) => {
@@ -1327,7 +1361,7 @@ function namedClinicalDeviceSeries(
     const measuredAt = item.measuredAt || item.recordedAt;
     const timestamp = measuredAt ? new Date(measuredAt).getTime() : Number.NaN;
     const date = dateKey(measuredAt);
-    if (value === null || !date || !Number.isFinite(timestamp)) return;
+    if (value === null || !date || !Number.isFinite(timestamp) || !withinReportPeriod(report, timestamp)) return;
     points.push({ value, timestamp, date, source: "Clinical measurement", unit: String(item.vitalType?.unit || "") });
   });
   return points.sort((a, b) => a.timestamp - b.timestamp);
@@ -1350,7 +1384,7 @@ function wellnessMetricSeries(report: Report | null, metricKey: string): SeriesP
       const value = finite(item.value);
       const timestamp = item.measuredAt ? new Date(item.measuredAt).getTime() : Number.NaN;
       const date = dateKey(item.measuredAt);
-      if (value === null || !date || !Number.isFinite(timestamp)) return [];
+      if (value === null || !date || !Number.isFinite(timestamp) || !withinReportPeriod(report, timestamp)) return [];
       return [{ value, timestamp, date, source: item.source ?? "Connected wellness metric", unit: String(item.unit ?? "") }];
     })
     .sort((a, b) => a.timestamp - b.timestamp);
@@ -1365,7 +1399,7 @@ function deviceMetricSeries(report: Report | null, metricKey: string): SeriesPoi
       const value = finite(item.value);
       const timestamp = item.measuredAt ? new Date(item.measuredAt).getTime() : Number.NaN;
       const date = dateKey(item.measuredAt);
-      if (value === null || !date || !Number.isFinite(timestamp)) return [];
+      if (value === null || !date || !Number.isFinite(timestamp) || !withinReportPeriod(report, timestamp)) return [];
       return [{ value, timestamp, date, source: "Connected device", unit: String(item.unit || item.vitalType?.unit || "") }];
     })
     .sort((a, b) => a.timestamp - b.timestamp);
@@ -1387,14 +1421,18 @@ function dailySessionSeries(report: Report | null, field: "sleep" | "workout"): 
   const grouped = new Map<string, number>();
   if (field === "sleep") {
     report.activity.sleepSessions.forEach((session) => {
-      const key = dateKey(session.startedAt || session.endedAt);
+      const at = session.startedAt || session.endedAt;
+      if (!withinReportPeriod(report, at)) return;
+      const key = dateKey(at);
       const minutes = finite(session.durationMinutes);
       if (!key || minutes === null || minutes <= 0) return;
       grouped.set(key, (grouped.get(key) ?? 0) + minutes / 60);
     });
   } else {
     report.activity.workouts.forEach((session) => {
-      const key = dateKey(session.startedAt || session.endedAt);
+      const at = session.startedAt || session.endedAt;
+      if (!withinReportPeriod(report, at)) return;
+      const key = dateKey(at);
       const seconds = finite(session.durationSeconds);
       if (!key || seconds === null || seconds <= 0) return;
       grouped.set(key, (grouped.get(key) ?? 0) + seconds / 60);
@@ -1472,6 +1510,7 @@ function symptomSeverityTimeline(report: Report | null): DailyValue[] {
   report.activity.symptoms.forEach((log) => {
     const perLogDate = new Map<string, number>();
     (log.observations ?? []).forEach((observation) => {
+      if (!withinReportPeriod(report, observation.observedAt)) return;
       const date = dateKey(observation.observedAt);
       const severity = rank[String(observation.severity ?? "").toUpperCase()];
       if (!date || severity === undefined) return;
@@ -1481,7 +1520,9 @@ function symptomSeverityTimeline(report: Report | null): DailyValue[] {
       perLogDate.forEach((severity, date) => add(date, severity));
       return;
     }
-    const date = dateKey(log.startedAt || log.createdAt);
+    const at = log.startedAt || log.createdAt;
+    if (!withinReportPeriod(report, at)) return;
+    const date = dateKey(at);
     const severity = rank[String(log.overallSeverity ?? "").toUpperCase()];
     if (date && severity !== undefined) add(date, severity);
   });
@@ -1495,7 +1536,9 @@ function dailySymptomSeries(report: Report | null): DailyValue[] {
   if (!report) return [];
   const grouped = new Map<string, number>();
   report.activity.symptoms.forEach((item) => {
-    const key = dateKey(item.startedAt || item.createdAt);
+    const at = item.startedAt || item.createdAt;
+    if (!withinReportPeriod(report, at)) return;
+    const key = dateKey(at);
     if (!key) return;
     grouped.set(key, (grouped.get(key) ?? 0) + 1);
   });
@@ -1673,10 +1716,26 @@ function PersonalisedInsights({
   const sleepQualityPrevious = dailyCategoricalMetric(previousReport, "sleepQuality", sleepQualityScores);
   const appointmentsCurrent = dailyAppointmentSeries(report);
   const appointmentsPrevious = dailyAppointmentSeries(previousReport);
-  const hydrationChecksCurrent = dailyMetric(report, "waterIntakeMl");
-  const hydrationChecksPrevious = dailyMetric(previousReport, "waterIntakeMl");
+  const hydrationChecksCurrent = dailyLatestMetric(report, "waterIntakeMl");
+  const hydrationChecksPrevious = dailyLatestMetric(previousReport, "waterIntakeMl");
 
   type SignalPoint = { date: string; value: number; unit?: string };
+  const goalCategoryForSignal: Record<string, string[]> = {
+    weight: ["WEIGHT"],
+    glucose: ["BLOOD_GLUCOSE", "GLUCOSE"],
+    "total-cholesterol": ["CHOLESTEROL"],
+    "cholesterol-goal": ["CHOLESTEROL"],
+    smoking: ["SMOKING"],
+    alcohol: ["ALCOHOL"],
+    nutrition: ["NUTRITION"],
+    hydration: ["HYDRATION"],
+    exercise: ["EXERCISE"],
+    workouts: ["EXERCISE"],
+    "sleep-checkin": ["SLEEP"],
+    "sleep-session": ["SLEEP"],
+    stress: ["MENTAL_HEALTH"],
+    mood: ["MENTAL_HEALTH"],
+  };
   const signal = (key: string, label: string, currentPoints: SignalPoint[], previousPoints: SignalPoint[], fallbackUnit = "") => {
     const unit = String(currentPoints.at(-1)?.unit || fallbackUnit || previousPoints.at(-1)?.unit || "").trim();
     const currentHasSourceUnits = currentPoints.some((point) => Boolean(point.unit?.trim()));
@@ -1685,15 +1744,29 @@ function PersonalisedInsights({
       if (!unit || (!currentHasSourceUnits && !previousHasSourceUnits)) return points;
       return points.filter((point) => String(point.unit ?? "").trim().toLowerCase() === unit.toLowerCase());
     };
+    const categoryCandidates = goalCategoryForSignal[key] ?? [];
+    const normalizedCategory = (value: unknown) => String(value ?? "").toUpperCase().replace(/[\s-]+/g, "_");
+    const categoryAllowed =
+      !((key === "workouts" && (exerciseChecksCurrent.length > 0 || exerciseEventsCurrent.length > 0)) ||
+        (key === "sleep-session" && sleepChecksCurrent.length > 0) ||
+        ((key === "mood" || key === "energy") && stressCurrent.length > 0) ||
+        (key === "mood" && energyCurrent.length > 0));
+    const savedGoal = categoryAllowed && categoryCandidates.length
+      ? goals.find((goal) => categoryCandidates.includes(normalizedCategory(goal.category)))
+      : undefined;
     return {
       key,
       label,
       unit,
       current: toDaily(filterComparableUnit(currentPoints)),
       previous: toDaily(filterComparableUnit(previousPoints)),
+      targetValue: finite(savedGoal?.targetValue),
+      targetTitle: savedGoal?.title || undefined,
+      targetUnit: savedGoal?.unit || unit,
+      goalCategory: savedGoal?.category || undefined,
     };
   };
-  const baseSignals: Array<{ key: string; label: string; unit: string; current: DailyValue[]; previous: DailyValue[] }> = [
+  const baseSignals: Array<{ key: string; label: string; unit: string; current: DailyValue[]; previous: DailyValue[]; targetValue?: number | null; targetTitle?: string; targetUnit?: string; goalCategory?: string }> = [
     signal("weight", "Weight", weightCurrent, weightPrevious, "kg"),
     signal("glucose", "Blood glucose", glucoseCurrent, glucosePrevious, glucoseLabCurrentSpecific.at(-1)?.unit || glucoseLabPreviousSpecific.at(-1)?.unit || "mmol/L"),
     ...(a1cCurrent.length || a1cPrevious.length ? [
@@ -1811,9 +1884,12 @@ function PersonalisedInsights({
     current: item.current,
     previous: item.previous,
     targetValue: item.targetValue,
+    targetTitle: item.title,
+    targetUnit: item.unit,
+    goalCategory: item.category,
   }));
   const hasWeightVitalHistory = vitalSeries(report, "weight").length > 0 || vitalSeries(previousReport, "weight").length > 0;
-  const signals: Array<{ key: string; label: string; unit: string; current: DailyValue[]; previous: DailyValue[]; targetValue?: number | null }> = [
+  const signals: Array<{ key: string; label: string; unit: string; current: DailyValue[]; previous: DailyValue[]; targetValue?: number | null; targetTitle?: string; targetUnit?: string; goalCategory?: string }> = [
     ...baseSignals,
     ...wearableSignals,
     ...genericLabSignals,
@@ -1960,7 +2036,26 @@ function PersonalisedInsights({
     });
   }
 
-  const movementCounts = signals.reduce((counts, item) => {
+  const reportSignals = signals.filter((item) => {
+    if (item.key === "appointments" || item.key === "symptoms") return false;
+    if (item.key === "workouts" && signals.some((candidate) => candidate.key === "exercise" && candidate.current.length > 0)) return false;
+    if (item.key === "sleep-session" && signals.some((candidate) => candidate.key === "sleep-checkin" && candidate.current.length > 0)) return false;
+    return true;
+  });
+  const signalPriority = (item: typeof reportSignals[number]) => {
+    const currentAverage = mean(item.current.map((entry) => entry.value));
+    const previousAverage = mean(item.previous.map((entry) => entry.value));
+    const hasTarget = item.targetValue !== null && item.targetValue !== undefined ? 100 : 0;
+    if (currentAverage === null || previousAverage === null) return hasTarget;
+    const delta = Math.abs(currentAverage - previousAverage);
+    const isRating = item.unit === "/5" || item.unit === "/10";
+    const changeScore = isRating ? delta * 5 : Math.abs(previousAverage) > 0.000001 ? Math.min(40, delta / Math.abs(previousAverage) * 100) : Math.min(40, delta);
+    return hasTarget + changeScore;
+  };
+  const rankedSignals = reportSignals.slice().sort((left, right) => signalPriority(right) - signalPriority(left));
+  const featuredSignals = rankedSignals.slice(0, 6);
+  const remainingSignals = rankedSignals.slice(6);
+  const movementCounts = featuredSignals.reduce((counts, item) => {
     const movement = periodMovement(item.current.map((entry) => entry.value), item.previous.map((entry) => entry.value), item.unit, signalDigits(item.key, item.unit));
     if (movement.state === "up") counts.up += 1;
     else if (movement.state === "down") counts.down += 1;
@@ -1979,7 +2074,7 @@ function PersonalisedInsights({
           <div className="min-w-0 flex-1">
             <p className="text-[10px] font-black uppercase tracking-[0.15em] text-[#0b7b80]">Period comparison</p>
             <h2 className="mt-1 text-lg font-black text-[#0b2d54]">What changed</h2>
-            <p className="mt-1 text-xs text-slate-500">{daysLogged}/{totalDays} days with at least one saved record · {previousLoading ? "Comparing…" : noPrior ? "No previous-period report available" : "Current period vs previous period"}</p>
+            <p className="mt-1 text-xs text-slate-500">{previousLoading ? "Comparing with the previous period…" : noPrior ? "No previous-period report available" : "Compared with the previous period"}</p>
           </div>
         </div>
         {(doseCurrent.eventTotal > 0 || doseCurrent.legacyTotal > 0 || dosePrevious.eventTotal > 0 || dosePrevious.legacyTotal > 0) && (
@@ -2014,47 +2109,91 @@ function PersonalisedInsights({
         ) : hasComparableSignals ? (
           <p className="mt-3 rounded-xl bg-[#f5fafb] px-3 py-2.5 text-xs leading-5 text-slate-700"><strong className="text-[#0b2d54]">Routine and measure trends:</strong> {movementCounts.up} increased · {movementCounts.down} decreased · {movementCounts.steady} stayed about the same. A rise or fall is a change, not automatically an improvement or a problem.</p>
         ) : null}
-        {signals.length ? (
-          <div className="mt-4 grid gap-4 sm:grid-cols-2 xl:grid-cols-2">
-            {signals.map((signal) => {
-              const currentAverage = mean(signal.current.map((item) => item.value));
-              const latest = signal.current[signal.current.length - 1];
-              const unitSuffix = signal.unit ? (signal.unit.startsWith("/") ? signal.unit : " " + signal.unit) : " (unit not saved)";
-              const digits = signalDigits(signal.key, signal.unit);
-              const movement = previousLoading ? null : periodMovement(signal.current.map((item) => item.value), signal.previous.map((item) => item.value), signal.unit, digits);
-              return (
-                <article key={signal.key} className="min-w-0 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-                  <div className="flex flex-wrap items-start justify-between gap-2">
-                    <h3 className="text-base font-black text-[#0b2d54]">{signal.label}</h3>
-                    <span className={"rounded-full px-2.5 py-1 text-[11px] font-bold " + (movement?.state === "steady" || movement?.state === "missing" ? "bg-slate-100 text-slate-600" : "bg-[#e8f8f8] text-[#0b5a62]")}>{movement?.label ?? "Comparing…"}</span>
+        {featuredSignals.length ? (
+          <>
+            <div className="mt-4 overflow-hidden rounded-2xl border border-slate-200 bg-white">
+              {featuredSignals.map((signal, index) => {
+                const currentAverage = mean(signal.current.map((item) => item.value));
+                const previousAverage = mean(signal.previous.map((item) => item.value));
+                const digits = signalDigits(signal.key, signal.unit);
+                const unitSuffix = signal.unit ? (signal.unit.startsWith("/") ? signal.unit : " " + signal.unit) : "";
+                const targetValue = finite(signal.targetValue);
+                const targetUnit = String(signal.targetUnit || signal.unit || "");
+                const movement = previousLoading ? null : periodMovement(signal.current.map((item) => item.value), signal.previous.map((item) => item.value), signal.unit, digits);
+                const isDailyHydrationGoal = signal.key === "hydration" && targetValue !== null && targetValue > 0 &&
+                  /^(ml|millilit(er|re)s?)$/i.test(signal.unit.trim()) && /^(ml|millilit(er|re)s?)$/i.test(targetUnit.trim());
+                const hydrationPercent = isDailyHydrationGoal && currentAverage !== null ? currentAverage / targetValue * 100 : null;
+                const hydrationDaysMet = isDailyHydrationGoal ? signal.current.filter((item) => item.value >= targetValue).length : 0;
+                const pillTone = movement?.state === "up" || movement?.state === "down"
+                  ? "border-slate-200 bg-slate-50 text-slate-700"
+                  : "border-slate-200 bg-white text-slate-500";
+                return (
+                  <div key={signal.key} className={"grid gap-2 px-4 py-4 sm:grid-cols-[minmax(0,1.2fr)_minmax(0,1fr)] sm:items-center " + (index < featuredSignals.length - 1 ? "border-b border-slate-100" : "")}>
+                    <div className="min-w-0">
+                      <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
+                        <p className="text-sm font-bold text-[#0b2d54]">{signal.label}</p>
+                        <p className="text-lg font-black tracking-tight text-[#0b2d54]">{currentAverage === null ? "—" : formatNumber(currentAverage, digits)}{unitSuffix}</p>
+                      </div>
+                      <p className="mt-1 text-[11px] text-slate-500">{signal.current.length} recorded day{signal.current.length === 1 ? "" : "s"} in this period</p>
+                    </div>
+                    <div className="min-w-0 sm:text-right">
+                      <span className={"inline-flex rounded-full border px-2.5 py-1 text-[10px] font-bold " + pillTone}>{movement?.label ?? (previousLoading ? "Comparing…" : "No comparison")}</span>
+                      <p className="mt-1 text-[11px] leading-5 text-slate-500">{previousAverage === null ? "No comparable previous-period average." : "Previous average " + formatNumber(previousAverage, digits) + unitSuffix + "."}</p>
+                      {targetValue !== null && <p className="mt-1 text-[11px] font-semibold leading-5 text-[#0b7b80]">{signal.targetTitle || "Saved goal"} · target {formatNumber(targetValue, signalDigits(signal.key, targetUnit))}{targetUnit ? (targetUnit.startsWith("/") ? targetUnit : " " + targetUnit) : ""}</p>}
+                      {isDailyHydrationGoal && hydrationPercent !== null && currentAverage !== null && (
+                        <div className="mt-2 sm:ml-auto sm:max-w-xs">
+                          <div className="flex items-center justify-between gap-2 text-[10px] font-semibold text-slate-600">
+                            <span>{formatNumber(hydrationPercent, 0)}% of daily target</span>
+                            <span>{hydrationDaysMet}/{signal.current.length} days met</span>
+                          </div>
+                          <div className="mt-1.5 h-1.5 overflow-hidden rounded-full bg-slate-100">
+                            <div className="h-full rounded-full bg-[#24c1c4]" style={{ width: String(Math.max(0, Math.min(100, hydrationPercent))) + "%" }} />
+                          </div>
+                          <p className="mt-1 text-[10px] leading-4 text-slate-500">Recorded days only; missing days are not treated as zero.</p>
+                        </div>
+                      )}
+                    </div>
                   </div>
-                  <div className="mt-3 flex flex-wrap items-baseline gap-x-2 gap-y-1">
-                    <span className="text-3xl font-black tracking-tight text-[#0b2d54]">{currentAverage === null ? "—" : formatNumber(currentAverage, digits)}{unitSuffix}</span>
-                    <span className="text-sm font-medium text-slate-500">average this period</span>
-                  </div>
-                  {latest && <p className="mt-2 text-sm text-slate-600"><span className="font-semibold text-[#0b2d54]">Most recent:</span> {formatNumber(latest.value, digits)}{unitSuffix} · {dateLabel(latest.date)}</p>}
-                  {signal.targetValue !== undefined && signal.targetValue !== null && <p className="mt-2 text-sm font-semibold text-[#0b7b80]">Saved goal target: {formatNumber(signal.targetValue, digits)}{unitSuffix}</p>}
-                  <p className="mt-3 border-t border-slate-100 pt-3 text-xs leading-5 text-slate-600">{movement?.detail ?? "Comparing this period with the previous period."}</p>
-                </article>
-              );
-            })}
-          </div>
+                );
+              })}
+            </div>
+            {remainingSignals.length > 0 && (
+              <details className="mt-3 rounded-xl border border-slate-200 bg-white px-4 py-3">
+                <summary className="flex cursor-pointer list-none items-center justify-between gap-3 text-xs font-bold text-[#0b2d54]">
+                  <span>Other tracked measures</span><span className="text-[10px] font-semibold text-slate-500">{remainingSignals.length} more</span>
+                </summary>
+                <div className="mt-2 divide-y divide-slate-100 border-t border-slate-100">
+                  {remainingSignals.map((signal) => {
+                    const currentAverage = mean(signal.current.map((item) => item.value));
+                    const previousAverage = mean(signal.previous.map((item) => item.value));
+                    const digits = signalDigits(signal.key, signal.unit);
+                    const unitSuffix = signal.unit ? (signal.unit.startsWith("/") ? signal.unit : " " + signal.unit) : "";
+                    const movement = previousLoading ? null : periodMovement(signal.current.map((item) => item.value), signal.previous.map((item) => item.value), signal.unit, digits);
+                    return (
+                      <div key={signal.key} className="grid gap-1 py-3 sm:grid-cols-[minmax(0,1fr)_auto_auto] sm:items-center sm:gap-4">
+                        <p className="text-xs font-semibold text-[#0b2d54]">{signal.label}<span className="ml-2 text-[10px] font-normal text-slate-400">{signal.current.length} day(s)</span></p>
+                        <p className="text-xs font-bold text-[#0b2d54]">{currentAverage === null ? "No current-period readings" : formatNumber(currentAverage, digits) + unitSuffix}</p>
+                        <p className="text-[10px] font-semibold text-slate-500">{movement?.label ?? (previousLoading ? "Comparing…" : previousAverage === null ? "No prior comparison" : "Previous " + formatNumber(previousAverage, digits) + unitSuffix)}</p>
+                      </div>
+                    );
+                  })}
+                </div>
+              </details>
+            )}
+          </>
         ) : (
           <p className="mt-4 rounded-xl bg-slate-50 p-3 text-sm text-slate-500">No comparable numeric logs were returned for this period.</p>
         )}
       </section>
 
-      <section className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:p-5">
-        <div className="flex items-center justify-between gap-3">
-          <div>
-            <p className="text-[10px] font-black uppercase tracking-[0.15em] text-[#0b7b80]">Rule-based intelligence</p>
-            <h2 className="mt-1 text-lg font-black text-[#0b2d54]">Recommended actions</h2>
-          </div>
-          <span className="text-xs text-slate-400">{recommendations.length} signal(s)</span>
+      <section className="rounded-2xl border border-[#dcebed] bg-white p-4 sm:p-5">
+        <div>
+          <p className="text-[10px] font-black uppercase tracking-[0.15em] text-[#0b7b80]">Next steps</p>
+          <h2 className="mt-1 text-lg font-black text-[#0b2d54]">What deserves attention</h2>
         </div>
-        {recommendations.length ? (
+        {recommendations.filter((item) => item.title !== "Urgent measurement needs review" && item.title !== "Follow up flagged laboratory results").length ? (
           <div className="mt-3 divide-y divide-slate-100">
-            {recommendations.slice(0, 5).map((item) => (
+            {recommendations.filter((item) => item.title !== "Urgent measurement needs review" && item.title !== "Follow up flagged laboratory results").slice(0, 3).map((item) => (
               <div key={item.title} className="flex gap-3 py-3 first:pt-0 last:pb-0">
                 <span className={"mt-0.5 h-2.5 w-2.5 shrink-0 rounded-full " + (item.tone === "critical" ? "bg-rose-600" : item.tone === "high" ? "bg-orange-500" : item.tone === "watch" ? "bg-amber-500" : "bg-teal-500")} />
                 <div className="min-w-0 flex-1">
@@ -2302,46 +2441,6 @@ function HealthReportInsights({
   return (
     <div className="mt-5 space-y-6">
       <PersonalisedInsights report={report} previousReport={previousReport} previousLoading={previousLoading} coveragePercent={coveragePercent} daysLogged={daysLogged} totalDays={totalDays} />
-      <section>
-        <div className="mb-3 flex items-end justify-between gap-3"><div><p className="text-[10px] font-black uppercase tracking-[0.16em] text-[#24c1c4]">Period overview</p><h2 className="mt-1 text-xl font-black text-[#0b2d54]">The bigger picture</h2></div><span className="text-xs text-slate-400">{totalDays} days</span></div>
-        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-          <SummaryTile icon={CalendarDays} label="Days with entries" value={String(daysLogged) + "/" + String(totalDays)} detail={daysLogged === 0 ? "No dated health records were found for these days." : "You saved at least one health record on " + daysLogged + " of " + totalDays + " days. Days without an entry are not counted as zero."} />
-          <SummaryTile icon={Activity} label="Symptom records" value={String(symptomCount)} detail={symptomComparison} />
-          <SummaryTile icon={HeartPulse} label="Readings included" value={String(activeVitals.reduce((sum, item) => sum + item.current.length, 0))} detail={activeVitals.length ? "Valid readings across " + activeVitals.length + " measurement types. Flagged extreme values are shown separately." : "No readings could be included for this period."} />
-          <SummaryTile icon={Footprints} label="Workout sessions" value={String(workouts.length)} detail={workouts.length ? formatNumber(workoutMinutes, 0) + " minutes recorded across these workouts." : "No workouts were logged. If you were active but did not record a workout, it will not appear here."} />
-        </div>
-      </section>
-
-      <section aria-label="Health overview">
-        <div className="mb-3">
-          <p className="text-[10px] font-black uppercase tracking-[0.16em] text-[#24c1c4]">Health overview</p>
-          <h2 className="mt-1 text-xl font-black text-[#0b2d54]">Key health patterns</h2>
-          <p className="mt-1 text-sm leading-6 text-slate-500">A quick count of activity, medication records and clinical updates. The cards below highlight movement, review flags and patterns; unlogged days are not treated as zero.</p>
-        </div>
-        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-          <SummaryTile
-            icon={Footprints}
-            label="Average daily steps"
-            value={currentSteps.length ? formatNumber(mean(currentStepValues), 0) : "Not recorded"}
-            detail={currentSteps.length
-              ? formatNumber(currentStepValues.length, 0) + " date(s) recorded. " + periodMovement(currentStepValues, previousStepValues, "steps/day", 0).label + ". " + periodMovement(currentStepValues, previousStepValues, "steps/day", 0).detail
-              : "No dated step-count values were found. The report does not estimate missing data."}
-          />
-          <SummaryTile
-            icon={ClipboardList}
-            label="Medication records"
-            value={String(medicationsOnFile.length)}
-            detail={medicationDetail}
-          />
-          <SummaryTile
-            icon={Stethoscope}
-            label="Clinical updates"
-            value={String(clinicalCount)}
-            detail={previousClinicalDetail}
-          />
-        </div>
-      </section>
-
       {measurementReviews.length > 0 && (
         <section aria-label="Readings to double-check" className={"rounded-2xl border p-4 sm:p-5 " + (measurementReviews.some((item) => item.severity === "urgent") ? "border-rose-300 bg-rose-50" : "border-amber-200 bg-amber-50")}>
           <div className="flex items-start gap-3">
