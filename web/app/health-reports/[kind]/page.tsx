@@ -1045,7 +1045,17 @@ function PersonalisedInsights({
     ].filter(Boolean).join(" ").toLowerCase()),
   );
   const hasGlucoseData = /glucose|hba1c|a1c|glycated|glycosylated/.test(labNames) || glucoseDeviceData || glucoseClinicalData;
-  const hasLipidData = /cholesterol|lipid|triglyceride|\bldl\b|\bhdl\b/.test(labNames);
+  const lipidPattern = /cholesterol|lipid|triglyceride|\bldl\b|\bhdl\b/;
+  const hasLipidData = lipidPattern.test(labNames) ||
+    report.activity.deviceMeasurements.some((item) => lipidPattern.test([
+      item.measurementType,
+      item.metricKey,
+      item.vitalType?.name,
+    ].filter(Boolean).join(" ").toLowerCase())) ||
+    report.clinical.vitals.some((item) => lipidPattern.test([
+      item.vitalType?.code,
+      item.vitalType?.name,
+    ].filter(Boolean).join(" ").toLowerCase()));
 
   const adherenceValues = (snapshot?.medications ?? [])
     .filter((item) => String(item.status ?? "ACTIVE").toUpperCase() === "ACTIVE")
