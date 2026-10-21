@@ -2217,7 +2217,7 @@ function PersonalisedInsights({
                     <div className="min-w-0 sm:text-right">
                       <span className={"inline-flex rounded-full border px-2.5 py-1 text-[10px] font-bold " + pillTone}>{movement?.label ?? (previousLoading ? "Comparing…" : "No comparison")}</span>
                       <p className="mt-1 text-[11px] leading-5 text-slate-500">{previousAverage === null ? "No comparable previous-period average." : "Previous average " + formatNumber(previousAverage, digits) + unitSuffix + "."}</p>
-                      {targetValue !== null && <p className="mt-1 text-[11px] font-semibold leading-5 text-[#0b7b80]">{isDailyHydrationGoal ? "Drink more water · target " + formatNumber(targetValue / 1000, 1) + " L/day" : (signal.targetTitle || "Saved goal") + " · target " + formatNumber(targetValue, signalDigits(signal.key, targetUnit)) + (targetUnit ? (targetUnit.startsWith("/") ? targetUnit : " " + targetUnit) : "")}</p>}
+                      {targetValue !== null && <p className="mt-1 text-[11px] font-semibold leading-5 text-[#0b7b80]">{isDailyHydrationGoal ? "Drink more water · target " + formatNumber(targetValue / 1000, 1) + " L/day" : (signal.targetTitle || "Saved goal") + " · target " + formatNumber(targetValue, Number.isInteger(targetValue) ? 0 : signalDigits(signal.key, targetUnit)) + (targetUnit ? (targetUnit.startsWith("/") ? targetUnit : " " + targetUnit) : "")}</p>}
                       {isDailyHydrationGoal && hydrationPercent !== null && currentAverage !== null && (
                         <div className="mt-2 sm:ml-auto sm:max-w-xs">
                           <div className="flex items-center justify-between gap-2 text-[10px] font-semibold text-slate-600">
@@ -2662,7 +2662,7 @@ Dose adherence · {periodLabel}
                 )}
                 {row.source === "empty" && (
                   <p className="mt-2 text-[11px] leading-5 text-slate-500">
-                    No scheduled dose outcomes were available for this period. Check the saved schedule and link this goal to the correct medication record.
+                    No scheduled outcomes found. Check the saved medication schedule link.
                   </p>
                 )}
                 {row.currentDayInProgress && <p className="mt-2 text-[10px] leading-4 text-slate-400">Today is still in progress and is excluded from the period adherence rate.</p>}
@@ -2675,7 +2675,7 @@ Dose adherence · {periodLabel}
       {!displayRows.length && uniqueMedicationNames.length > 0 && (
         <div className="px-4 py-4 sm:px-5">
           <p className="text-sm font-semibold text-[#0b2d54]">{uniqueMedicationNames.length} medication record{uniqueMedicationNames.length === 1 ? "" : "s"} on file</p>
-          <p className="mt-1 text-xs leading-5 text-slate-500">No dated dose-level outcomes or linked medication-goal schedule were returned for this period, so an adherence trend cannot be calculated without guessing.</p>
+          <p className="mt-1 text-xs leading-5 text-slate-500">No scheduled dose history is available for this period; adherence is not estimated.</p>
           <p className="mt-2 text-xs text-slate-600">{uniqueMedicationNames.join(" · ")}</p>
         </div>
       )}
@@ -2704,8 +2704,7 @@ Dose adherence · {periodLabel}
 
 function currentGroupSummary(group?: MedicationActionGroup) {
   if (!group || group.total === 0) return "No explicit dose-level actions were found.";
-  return group.taken + " taken · " + group.skipped + " skipped · " + group.total + " explicit actions. Among recorded outcomes, " +
-    formatNumber(group.taken / group.total * 100, 1) + "% were marked taken; unlogged scheduled doses are not included in this rate.";
+  return group.taken + " taken · " + group.skipped + " skipped · " + group.total + " outcomes logged. Adherence here covers logged actions only.";
 }
 
 function StatusCircle({
@@ -2768,21 +2767,18 @@ function VitalTrendCard({
         </div>
         <HeartPulse className="h-5 w-5 shrink-0 text-[#24c1c4]" />
       </div>
-      <div className="mt-2"><StatusCircle label={status.label} detail={verificationSensitive ? "Verify saved entries before reading the trend." : /within your saved goal/i.test(status.label) ? (label.toLowerCase().includes("blood pressure") ? "Systolic target only; review both numbers." : "Latest reading is within your saved target.") : /elevated/i.test(status.label) ? "Discuss repeated readings with your clinician." : label === "Weight" ? "Shown against your saved measurements and goals." : status.detail} tone={status.tone} /></div>
-      {excludedCount > 0 && <p className="mt-2 text-xs font-semibold text-amber-800">{excludedCount} saved {excludedCount === 1 ? "reading needs" : "readings need"} checking and is excluded from the average.</p>}
+      <div className="mt-2"><StatusCircle label={verificationSensitive ? "Review flagged entries" : status.label} detail={verificationSensitive ? "" : /within your saved goal/i.test(status.label) ? (label.toLowerCase().includes("blood pressure") ? "Systolic target only; review both numbers." : "Latest reading is within your saved target.") : /elevated/i.test(status.label) ? "Discuss repeated readings with your clinician." : label === "Weight" ? "Shown against your saved measurements and goals." : status.detail} tone={verificationSensitive ? "watch" : status.tone} /></div>
+      {excludedCount > 0 && <p className="mt-2 text-[11px] font-semibold text-amber-800">{excludedCount} {excludedCount === 1 ? "reading needs" : "readings need"} review and {excludedCount === 1 ? "is" : "are"} excluded from averages.</p>}
       {verificationSensitive ? (
-        <div className="mt-3 rounded-xl border border-slate-200 bg-slate-50 p-4">
-          <div className="flex items-start gap-3">
-            <ShieldCheck className="mt-0.5 h-5 w-5 shrink-0 text-slate-500" />
-            <div className="min-w-0">
-              <p className="text-sm font-extrabold text-slate-700">Averages hidden pending verification</p>
-              <p className="mt-1 text-xs leading-5 text-slate-600">A saved value needs checking, so Sympto is withholding this average and trend rather than blending it with valid readings.</p>
-              <Link href="/today" className="mt-2 inline-flex min-h-9 items-center gap-1.5 rounded-lg bg-[#0b2d54] px-3 py-2 text-[11px] font-bold text-white">Review entries <ArrowRight className="h-3.5 w-3.5 text-[#24c1c4]" /></Link>
-            </div>
+        <div className="mt-3 flex items-center justify-between gap-3 rounded-xl border border-slate-200 bg-slate-50 px-3 py-3">
+          <div className="min-w-0">
+            <p className="text-xs font-extrabold text-slate-700">Average withheld</p>
+            <p className="mt-0.5 text-[11px] text-slate-500">Review flagged readings first.</p>
           </div>
+          <Link href="/today" className="inline-flex min-h-9 shrink-0 items-center gap-1.5 rounded-lg bg-[#0b2d54] px-3 py-2 text-[11px] font-bold text-white">Review <ArrowRight className="h-3.5 w-3.5 text-[#24c1c4]" /></Link>
         </div>
       ) : average === null ? (
-        <p className="mt-3 text-sm text-slate-500">{rawCurrent.length > 0 ? "These values need checking before a useful average can be shown. See the warning above." : "No readings were saved for this period."}</p>
+        <p className="mt-3 text-sm text-slate-500">{rawCurrent.length > 0 ? "Review flagged entries before interpreting an average." : "No readings were saved for this period."}</p>
       ) : (
         <>
           <div className="mt-3 grid grid-cols-2 gap-3">
@@ -2802,7 +2798,7 @@ function VitalTrendCard({
               <p className="text-[10px] font-bold uppercase tracking-wide text-slate-400">Compared with previous period</p>
               <span className={"rounded-full px-2.5 py-1 text-xs font-extrabold " + (movement?.state === "steady" || movement?.state === "missing" ? "bg-slate-100 text-slate-600" : "bg-[#e8f8f8] text-[#0b5a62]")}>{movement?.label ?? "Comparing…"}</span>
             </div>
-            <p className="mt-1 text-xs leading-5 text-slate-600">{review ? "Please verify the flagged readings before relying on this comparison." : movement?.detail ?? "Comparing this period with the previous period."}</p>
+            <p className="mt-1 text-xs leading-5 text-slate-600">{review ? "Verify flagged readings first." : movement?.detail ?? "Comparing this period with the previous period."}</p>
           </div>
         </>
       )}
@@ -3007,7 +3003,7 @@ function HealthReportInsights({
       <PersonalisedInsights report={report} previousReport={previousReport} previousLoading={previousLoading} />
       <section>
         <div className="mb-3"><p className="text-[10px] font-black uppercase tracking-[0.16em] text-[#24c1c4]">Reading history</p><h2 className="mt-1 text-xl font-black text-[#0b2d54]">Your measurements</h2><p className="mt-1 text-sm leading-6 text-slate-500">Period average, latest reading and change from last period.</p></div>
-        {activeVitals.length ? <div className="grid gap-4 md:grid-cols-2">{activeVitals.map((item) => <VitalTrendCard key={item.key} label={item.label} description={item.description} unit={item.unit} digits={item.digits} current={item.current} previous={item.previous} previousLoading={previousLoading} review={item.review} status={item.status} rawCurrent={item.rawCurrent} />)}</div> : <div className="rounded-2xl border border-dashed border-slate-300 bg-white p-5 text-sm leading-6 text-slate-500">No dated vital readings were found for this period. Once you save blood pressure, heart rate, weight or other measurements, they will appear here.</div>}
+        {activeVitals.length ? <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">{activeVitals.map((item) => <VitalTrendCard key={item.key} label={item.label} description={item.description} unit={item.unit} digits={item.digits} current={item.current} previous={item.previous} previousLoading={previousLoading} review={item.review} status={item.status} rawCurrent={item.rawCurrent} />)}</div> : <div className="rounded-2xl border border-dashed border-slate-300 bg-white p-5 text-sm leading-6 text-slate-500">No dated vital readings were found for this period. Once you save blood pressure, heart rate, weight or other measurements, they will appear here.</div>}
       </section>
 
       {(symptomCount > 0 || lowMood.total > 0 || association !== null || repeated.some((item) => item.count > 1) || symptomAnalytics.repeatedTriggers.length > 0 || symptomAnalytics.medicationEffects > 0 || symptomAnalytics.averageSeverityRank !== null || symptomAnalytics.worseningCount > 0 || symptomAnalytics.severeCount > 0) && (
