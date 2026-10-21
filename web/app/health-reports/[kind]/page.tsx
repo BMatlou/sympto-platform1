@@ -3004,6 +3004,7 @@ function HealthReportInsights({
         </section>
       )}
 
+      <ContextualHealthInsights report={report} />
       <MedicationPeriodInsights report={report} previousReport={previousReport} previousLoading={previousLoading} />
       <PersonalisedInsights report={report} previousReport={previousReport} previousLoading={previousLoading} />
       <section>
@@ -3254,6 +3255,112 @@ function CompleteReportData({ report }: { report: Report }) {
     </div>
     {context.length > 0 && <div className="overflow-hidden rounded-[24px] border border-slate-200 bg-white shadow-sm"><div className="border-b border-slate-100 px-4 py-4 sm:px-5"><p className="text-[10px] font-extrabold uppercase tracking-[0.16em] text-[#0b7b80]">Personalisation context</p><h2 className="mt-1 text-lg font-black tracking-tight text-[#0b2d54]">Your health context</h2><p className="mt-1 text-xs leading-5 text-slate-500">Saved context can pre-date the selected period and is shown separately from that period’s activity.</p></div><div className="space-y-2 p-3 sm:p-4">{context.map((group) => <LedgerGroup key={group.key} group={group} />)}</div></div>}
   </section>;
+}
+
+
+function ContextualHealthInsights({ report }: { report: Report }) {
+  const snapshot = report.currentSnapshot ?? {};
+  const conditions = [
+    ...ledgerArray(snapshot.conditions),
+    ...ledgerArray(snapshot.diagnoses),
+  ].map((item) => {
+    const record = ledgerObject(item);
+    const relation = ledgerObject(record.condition ?? record.diagnosis);
+    return {
+      name: ledgerScalar(relation.name ?? record.name, "name"),
+      status: String(record.status ?? "ACTIVE").toUpperCase(),
+      resolved: Boolean(record.resolvedAt),
+    };
+  }).filter((item) => item.name && !item.resolved && !/RESOLVED|INACTIVE|CANCELLED/.test(item.status));
+  const conditionNames = conditions.map((item) => item.name.toLowerCase()).join(" ");
+  const events = report.goalMetricEvents ?? [];
+  const medicationEvents = events.filter((item) => /MEDICATION|medication|adherence/i.test([item.metricType, item.metricKey, item.source, item.goalTitle].filter(Boolean).join(" ")));
+  const glucoseEvents = events.filter((item) => /glucose|blood.sugar|glycaemia|glycemia|hba1c|a1c/i.test([item.metricType, item.metricKey, item.goalTitle].filter(Boolean).join(" ")));
+  const glucoseLabs = clinicalLabSeries(report, /glucose|hba1c|\ba1c\b|glycat|glycosylat/i).length;
+  const systolic = vitalSeries(report, "systolic");
+  const diastolic = vitalSeries(report, "diastolic");
+  const oxygen = vitalSeries(report, "oxygen");
+  const breathing = vitalSeries(report, "respiratory");
+  const symptoms = report.activity.symptoms ?? [];
+  const respiratorySymptoms = symptoms.filter((item) => /asthma|breath|wheez|cough|chest|respirat|shortness of breath/i.test([
+    item.title, item.description, ...(item.symptoms ?? []).map((entry) => entry.name ?? entry.symptom?.name),
+  ].filter(Boolean).join(" ")));
+  const goals = snapshot.activeGoals ?? [];
+  const trackedGoalIds = new Set<string>([
+    ...events.map((event) => String(event.goalId ?? "")).filter(Boolean),
+    ...ledgerArray(report.tracking?.goalProgress).map((item) => String(ledgerObject(ledgerObject(item).healthGoal).id ?? "" )).filter(Boolean),
+  ]);
+  const trackedGoals = goals.filter((goal) => goal.id && trackedGoalIds.has(String(goal.id)));
+  const insights: Array<{ title: string; headline: string; detail: string; href?: string }> = [];
+  if (/diabet|prediabet/.test(conditionNames)) {
+    insights.push({
+      title: "Diabetes-related tracking",
+      headline: glucoseEvents.length + " glucose tracker entries · " + glucoseLabs + " numeric glucose/HbA1c lab values",
+      detail: glucoseEvents.length || glucoseLabs
+        ? "Review the dated glucose and laboratory records alongside your saved medication routine and your clinician's targets."
+        : "No dated glucose tracker entries or numeric glucose/HbA1c lab values were returned for this period. They will not be inferred from other measurements.",
+      href: "/today",
+    });
+  }
+  if (/hypertension|high blood pressure/.test(conditionNames)) {
+    insights.push({
+      title: "Blood-pressure context",
+      headline: systolic.length + " systolic · " + diastolic.length + " diastolic readings",
+      detail: systolic.length && diastolic.length
+        ? "The full record includes the dated pressure values. Compare repeated pairs with your saved target and clinician's advice."
+        : "Blood-pressure measurements were sparse or not recorded in this period. Check the full record for readings saved through other sources.",
+      href: "/today",
+    });
+  }
+  if (/asthma|copd|chronic obstructive|respiratory condition/.test(conditionNames)) {
+    insights.push({
+      title: "Breathing and respiratory context",
+      headline: oxygen.length + " oxygen readings · " + breathing.length + " breathing-rate readings · " + respiratorySymptoms.length + " related symptom logs",
+      detail: "Readings, symptom follow-ups and any verification flags are kept together in this report so you can review the dates and source records.",
+      href: "/today",
+    });
+  }
+  if (goals.length) {
+    insights.push({
+      title: "Progress against your saved goals",
+      headline: trackedGoals.length + " of " + goals.length + " active goals have linked tracker entries in this period",
+      detail: trackedGoals.length
+        ? "The goal history below keeps each dated entry visible; goals without a linked event are not treated as zero progress."
+        : "No linked goal-progress events were returned for active goals in this period. Daily check-ins and measurements are shown separately and are not counted as goal completion.",
+      href: "/health-goals",
+    });
+  }
+  const distinctContext = new Set(conditions.map((item) => item.name.toLowerCase()));
+  if (!insights.length && events.length) {
+    insights.push({
+      title: "Your recorded health activity",
+      headline: events.length + " health-goal tracker entries across " + distinctContext.size + " named condition(s) on file",
+      detail: "The report compares dated tracker entries with check-ins, connected readings and clinical records. Expand the record groups below to review each entry.",
+      href: "/health-goals",
+    });
+  }
+  if (!insights.length) return null;
+  return (
+    <section aria-label="Insights personalised to saved health context" className="overflow-hidden rounded-[24px] border border-[#dcebed] bg-white shadow-sm">
+      <div className="border-b border-slate-100 px-4 py-4 sm:px-5">
+        <p className="text-[10px] font-extrabold uppercase tracking-[0.15em] text-[#0b7b80]">Personalised context</p>
+        <h2 className="mt-1 text-lg font-black tracking-tight text-[#0b2d54]">How this period relates to your health</h2>
+        <p className="mt-1 text-xs leading-5 text-slate-500">Based on saved conditions, goals and dated records—not assumptions about missing data.</p>
+      </div>
+      <div className="divide-y divide-slate-100">
+        {insights.map((item) => (
+          <article key={item.title} className="grid gap-2 px-4 py-3.5 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center sm:px-5">
+            <div className="min-w-0">
+              <h3 className="text-sm font-bold text-[#0b2d54]">{item.title}</h3>
+              <p className="mt-1 text-xs font-semibold text-[#0b5a62]">{item.headline}</p>
+              <p className="mt-1 text-xs leading-5 text-slate-600">{item.detail}</p>
+            </div>
+            {item.href && <Link href={item.href} className="inline-flex min-h-8 items-center gap-1 self-start text-[11px] font-bold text-[#0b7b80]">Review records <ArrowRight className="h-3 w-3" /></Link>}
+          </article>
+        ))}
+      </div>
+    </section>
+  );
 }
 
 export default function HealthReportPage() {
