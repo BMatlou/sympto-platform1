@@ -32,13 +32,39 @@ type JournalEntry = {
 };
 
 type SymptomName = { name?: string | null; symptom?: { name?: string | null } | null };
+type SymptomObservationRecord = {
+  observedAt?: string | null;
+  severity?: string | null;
+  progression?: string | null;
+  stillPresent?: boolean | null;
+  painScore?: number | string | null;
+};
+type SymptomTriggerRecord = {
+  trigger?: string | null;
+  suspected?: boolean | null;
+  confirmed?: boolean | null;
+  exposureAt?: string | null;
+};
+type SymptomMedicationEffectRecord = {
+  medication?: { name?: string | null } | null;
+  reportedMedicationName?: string | null;
+  improved?: boolean | null;
+  effectiveness?: number | string | null;
+  sideEffects?: string | null;
+};
 type SymptomRecord = {
   id?: string;
   title?: string | null;
   description?: string | null;
   startedAt?: string | null;
   createdAt?: string | null;
+  resolvedAt?: string | null;
+  overallSeverity?: string | null;
+  progression?: string | null;
   symptoms?: SymptomName[] | null;
+  observations?: SymptomObservationRecord[] | null;
+  triggers?: SymptomTriggerRecord[] | null;
+  medicationEffects?: SymptomMedicationEffectRecord[] | null;
 };
 type PatientVitalRecord = {
   id?: string;
@@ -1254,6 +1280,48 @@ function dailySessionSeries(report: Report | null, field: "sleep" | "workout"): 
     .sort((a, b) => a.date.localeCompare(b.date));
 }
 
+function symptomLogAnalytics(report: Report | null) {
+  const logs = report?.activity.symptoms ?? [];
+  const rank: Record<string, number> = { NONE: 0, MILD: 1, MODERATE: 2, SEVERE: 3, VERY_SEVERE: 4 };
+  const severityValues = logs.flatMap((log) => {
+    const recorded = [
+      log.overallSeverity,
+      ...(log.observations ?? []).map((item) => item.severity),
+    ].map((value) => rank[String(value ?? "").toUpperCase()]).filter((value) => value !== undefined);
+    return recorded.length ? [Math.max(...recorded)] : [];
+  });
+  const worseningCount = logs.filter((log) =>
+    String(log.progression ?? "").toUpperCase() === "WORSENING" ||
+    (log.observations ?? []).some((item) => String(item.progression ?? "").toUpperCase() === "WORSENING"),
+  ).length;
+  const severeCount = logs.filter((log) => {
+    const all = [log.overallSeverity, ...(log.observations ?? []).map((item) => item.severity)]
+      .map((value) => String(value ?? "").toUpperCase());
+    return all.some((value) => value === "SEVERE" || value === "VERY_SEVERE");
+  }).length;
+  const triggers = new Map<string, { label: string; count: number; confirmed: number }>();
+  logs.forEach((log) => (log.triggers ?? []).forEach((trigger) => {
+    const label = String(trigger.trigger ?? "").trim();
+    if (!label) return;
+    const key = label.toLowerCase();
+    const existing = triggers.get(key) ?? { label, count: 0, confirmed: 0 };
+    existing.count += 1;
+    if (trigger.confirmed) existing.confirmed += 1;
+    triggers.set(key, existing);
+  }));
+  const effects = logs.flatMap((log) => log.medicationEffects ?? []);
+  return {
+    logCount: logs.length,
+    averageSeverityRank: mean(severityValues),
+    severeCount,
+    worseningCount,
+    repeatedTriggers: Array.from(triggers.values()).filter((item) => item.count > 1).sort((a, b) => b.count - a.count),
+    medicationEffects: effects.length,
+    improvedEffects: effects.filter((item) => item.improved === true).length,
+    sideEffectReports: effects.filter((item) => Boolean(String(item.sideEffects ?? "").trim())).length,
+  };
+}
+
 function dailySymptomSeries(report: Report | null): DailyValue[] {
   if (!report) return [];
   const grouped = new Map<string, number>();
@@ -1305,6 +1373,8 @@ function PersonalisedInsights({
   const symptomCount = report.activity.symptoms.length;
   const previousSymptomCount = previousReport?.activity.symptoms.length ?? 0;
   const repeated = recurringSymptoms(report);
+  const symptomAnalytics = symptomLogAnalytics(report);
+  const previousSymptomAnalytics = symptomLogAnalytics(previousReport);
 
   const event = (reportValue: Report | null, pattern: RegExp) => goalMetricSeries(reportValue, pattern);
   const toDaily = (points: Array<{ date: string; value: number }>) => points.slice().sort((a, b) => a.date.localeCompare(b.date));
@@ -1469,6 +1539,27 @@ function PersonalisedInsights({
       tone: "watch",
       href: "/health-journal",
       linkLabel: "Review symptom history",
+    });
+  }
+  if (symptomAnalytics.worseningCount > 0 || symptomAnalytics.severeCount > 0) {
+    recommendations.push({
+      title: "Worsening or severe symptoms recorded",
+      evidence: symptomAnalytics.worseningCount + " log(s) with worsening progression · " + symptomAnalytics.severeCount + " log(s) with severe/very severe ratings" +
+        (previousReport ? " · previous period: " + previousSymptomAnalytics.worseningCount + " worsening" : ""),
+      action: "Review the symptom timeline. Seek prompt medical advice for severe or worsening symptoms; use emergency services for emergency symptoms.",
+      tone: symptomAnalytics.severeCount > 0 ? "high" : "watch",
+      href: "/health-journal",
+      linkLabel: "Review symptom timeline",
+    });
+  }
+  if (symptomAnalytics.sideEffectReports > 0) {
+    recommendations.push({
+      title: "Medication side effects recorded",
+      evidence: symptomAnalytics.sideEffectReports + " symptom log(s) include a reported medication side effect.",
+      action: "Discuss these reports with the prescriber or pharmacist before changing a medicine.",
+      tone: "watch",
+      href: "/health-journal",
+      linkLabel: "Review symptom and medication notes",
     });
   }
   const latestGoalIssues = goals.filter((goal) => ["DECLINING", "STAGNANT"].includes(String(goal.progress?.[0]?.status ?? "").toUpperCase()));
@@ -1965,7 +2056,7 @@ function HealthReportInsights({
         </section>
       )}
 
-      {(symptomCount > 0 || lowMood.total > 0 || association !== null || repeated.some((item) => item.count > 1)) && (
+      {(symptomCount > 0 || lowMood.total > 0 || association !== null || repeated.some((item) => item.count > 1) || symptomAnalytics.repeatedTriggers.length > 0 || symptomAnalytics.medicationEffects > 0 || symptomAnalytics.averageSeverityRank !== null) && (
         <section>
           <div className="mb-3">
             <p className="text-[10px] font-black uppercase tracking-[0.16em] text-[#24c1c4]">Detected patterns</p>
@@ -1985,6 +2076,28 @@ function HealthReportInsights({
                 <h3 className="text-sm font-bold text-[#0b2d54]">Mood check-ins</h3>
                 <p className="mt-2 text-2xl font-black text-[#0b2d54]">{lowMood.low}/{lowMood.total}</p>
                 <p className="mt-1 text-xs text-slate-500">Low or very-low ratings / all mood entries</p>
+              </article>
+            )}
+            {(symptomAnalytics.averageSeverityRank !== null || symptomAnalytics.worseningCount > 0 || symptomAnalytics.severeCount > 0) && (
+              <article className="rounded-2xl border border-slate-200 bg-white p-4">
+                <h3 className="text-sm font-bold text-[#0b2d54]">Symptom severity and progression</h3>
+                <p className="mt-2 text-sm font-semibold text-[#0b2d54]">Average severity rank {symptomAnalytics.averageSeverityRank === null ? "—" : formatNumber(symptomAnalytics.averageSeverityRank, 1)}/4</p>
+                <p className="mt-1 text-xs text-slate-500">{symptomAnalytics.worseningCount} worsening · {symptomAnalytics.severeCount} severe/very severe</p>
+                {previousReport && <p className="mt-1 text-xs text-slate-500">Previous: avg rank {previousSymptomAnalytics.averageSeverityRank === null ? "—" : formatNumber(previousSymptomAnalytics.averageSeverityRank, 1)}/4 · {previousSymptomAnalytics.worseningCount} worsening</p>}
+              </article>
+            )}
+            {symptomAnalytics.repeatedTriggers.slice(0, 2).map((trigger) => (
+              <article key={trigger.label} className="rounded-2xl border border-slate-200 bg-white p-4">
+                <h3 className="text-sm font-bold text-[#0b2d54]">Repeated symptom trigger label</h3>
+                <p className="mt-2 text-base font-black text-[#0b2d54]">{trigger.label}</p>
+                <p className="mt-1 text-xs text-slate-500">{trigger.count} records · {trigger.confirmed} confirmed</p>
+                <p className="mt-1 text-[10px] text-slate-400">Logged associations do not establish that a trigger caused a symptom.</p>
+              </article>
+            ))}
+            {symptomAnalytics.medicationEffects > 0 && (
+              <article className="rounded-2xl border border-slate-200 bg-white p-4">
+                <h3 className="text-sm font-bold text-[#0b2d54]">Medication effects in symptom logs</h3>
+                <p className="mt-2 text-sm text-slate-700">{symptomAnalytics.improvedEffects} reported improvement(s) · {symptomAnalytics.sideEffectReports} side-effect report(s) across {symptomAnalytics.medicationEffects} recorded effect(s)</p>
               </article>
             )}
             {association && (
