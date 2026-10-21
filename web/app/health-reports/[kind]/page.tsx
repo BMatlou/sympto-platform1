@@ -1378,6 +1378,21 @@ function wellnessMetricSeries(report: Report | null, metricKey: string): SeriesP
     .sort((a, b) => a.timestamp - b.timestamp);
 }
 
+function deviceMetricSeries(report: Report | null, metricKey: string): SeriesPoint[] {
+  if (!report) return [];
+  const normalise = (value: unknown) => String(value ?? "").trim().toLowerCase();
+  return report.activity.deviceMeasurements
+    .filter((item) => normalise(item.metricKey || item.measurementType || item.vitalType?.name) === normalise(metricKey))
+    .flatMap((item) => {
+      const value = finite(item.value);
+      const timestamp = item.measuredAt ? new Date(item.measuredAt).getTime() : Number.NaN;
+      const date = dateKey(item.measuredAt);
+      if (value === null || !date || !Number.isFinite(timestamp)) return [];
+      return [{ value, timestamp, date, source: "Connected device", unit: String(item.unit || item.vitalType?.unit || "") }];
+    })
+    .sort((a, b) => a.timestamp - b.timestamp);
+}
+
 function wellnessMetricSeriesMatching(report: Report | null, pattern: RegExp): SeriesPoint[] {
   if (!report) return [];
   const keys = Array.from(new Set(
@@ -1693,13 +1708,30 @@ function PersonalisedInsights({
   const wellnessKeys = Array.from(new Set([
     ...(report.activity.wellnessMetrics ?? []).map((item) => String(item.metricKey ?? "").trim()).filter(Boolean),
     ...(previousReport?.activity.wellnessMetrics ?? []).map((item) => String(item.metricKey ?? "").trim()).filter(Boolean),
-  ])).filter((key) => !wellnessKeyAlreadyRepresented(key));
+    ...(report.activity.deviceMeasurements ?? []).map((item) => String(item.metricKey || item.measurementType || item.vitalType?.name || "").trim()).filter(Boolean),
+    ...(previousReport?.activity.deviceMeasurements ?? []).map((item) => String(item.metricKey || item.measurementType || item.vitalType?.name || "").trim()).filter(Boolean),
+  ])).filter((key) => key && !wellnessKeyAlreadyRepresented(key));
   const wearableSignals = wellnessKeys.map((key) => {
-    const current = wellnessMetricSeries(report, key);
-    const previous = wellnessMetricSeries(previousReport, key);
+    const current = combineDatedSeries(wellnessMetricSeries(report, key), deviceMetricSeries(report, key));
+    const previous = combineDatedSeries(wellnessMetricSeries(previousReport, key), deviceMetricSeries(previousReport, key));
     return signal("wearable:" + key, human(key), current, previous, current.at(-1)?.unit || previous.at(-1)?.unit || "");
   }).filter((item) => item.current.length > 0 || item.previous.length > 0);
-  const signals = [...baseSignals, ...wearableSignals];
+
+  const knownLabAnalyte = /glucose|hba1c|\ba1c\b|glycat|glycosylat|total cholesterol|cholesterol total|serum cholesterol|^cholesterol$|\bldl\b|low[- ]density lipoprotein|\bhdl\b|high[- ]density lipoprotein|triglyceride/i;
+  const allLabCurrent = clinicalLabSeries(report, /.+/i).filter((point) => !knownLabAnalyte.test(point.testName));
+  const allLabPrevious = clinicalLabSeries(previousReport, /.+/i).filter((point) => !knownLabAnalyte.test(point.testName));
+  const genericLabKeys = Array.from(new Set([
+    ...allLabCurrent.map((point) => point.testName.trim().toLowerCase() + "|" + point.unit.trim().toLowerCase()),
+    ...allLabPrevious.map((point) => point.testName.trim().toLowerCase() + "|" + point.unit.trim().toLowerCase()),
+  ]));
+  const genericLabSignals = genericLabKeys.map((key) => {
+    const [name, unit] = key.split("|");
+    const current = allLabCurrent.filter((point) => point.testName.trim().toLowerCase() + "|" + point.unit.trim().toLowerCase() === key);
+    const previous = allLabPrevious.filter((point) => point.testName.trim().toLowerCase() + "|" + point.unit.trim().toLowerCase() === key);
+    const label = current[0]?.testName || previous[0]?.testName || human(name);
+    return signal("lab:" + key, label, current, previous, unit);
+  }).filter((item) => item.current.length > 0 || item.previous.length > 0);
+  const signals = [...baseSignals, ...wearableSignals, ...genericLabSignals];
 
   const recommendations: Array<{ title: string; evidence: string; action: string; tone: StatusTone; href: string; linkLabel: string }> = [];
   const urgentReviews = reviews.filter((item) => item.severity === "urgent");
