@@ -1121,66 +1121,6 @@ function ScoreRing({ percent, label, tone, size = 68 }: { percent: number | null
   );
 }
 
-function StatusCircle({ label, detail, tone }: { label: string; detail: string; tone: StatusTone }) {
-  const styles = toneStyles(tone);
-  const mark = tone === "good" ? "✓" : tone === "watch" ? "!" : tone === "high" ? "!!" : tone === "critical" ? "SOS" : "?";
-  return (
-    <div className="flex min-w-0 items-center gap-2.5">
-      <span aria-hidden="true" className={"grid h-11 w-11 shrink-0 place-items-center rounded-full border-[3px] bg-white text-xs font-black " + styles.border + " " + styles.text}>{mark}</span>
-      <span className="min-w-0">
-        <span className={"block text-xs font-black " + styles.text}>{label}</span>
-        <span className="mt-0.5 block text-[10px] leading-4 text-slate-500">{detail}</span>
-      </span>
-    </div>
-  );
-}
-
-type GoalHistoryValue = { value: number; date: string; timestamp: number; unit: string };
-
-function goalProgressItemsForPattern(report: Report, pattern: RegExp): GoalHistoryValue[] {
-  const start = new Date(report.period.start).getTime();
-  const end = new Date(report.period.end).getTime();
-  const matchingGoals = (report.currentSnapshot?.activeGoals ?? [])
-    .filter((goal) => pattern.test([goal.category, goal.title].filter(Boolean).join(" ").toLowerCase()));
-  return matchingGoals.flatMap((goal) => {
-    const events = (report.goalMetricEvents ?? [])
-      .filter((event) => event.goalId === goal.id && event.source !== "goal-baseline")
-      .flatMap((event) => {
-        const timestamp = new Date(event.occurredAt).getTime();
-        const value = finite(event.loggedValue);
-        const date = dateKey(event.occurredAt);
-        if (!Number.isFinite(timestamp) || timestamp < start || timestamp >= end || value === null || !date) return [];
-        return [{ value, date, timestamp, unit: String(event.unit ?? goal.unit ?? "") }];
-      })
-      .sort((a, b) => a.timestamp - b.timestamp);
-    if (events.length) return events;
-
-    // Legacy/manual progress is still supported when this goal has no metric events.
-    return (goal.progress ?? []).flatMap((item) => {
-      if (!item.measuredAt) return [];
-      const timestamp = new Date(item.measuredAt).getTime();
-      const value = finite(item.currentValue);
-      const date = dateKey(item.measuredAt);
-      if (!Number.isFinite(timestamp) || timestamp < start || timestamp >= end || value === null || !date) return [];
-      return [{ value, date, timestamp, unit: String(goal.unit ?? "") }];
-    });
-  }).sort((a, b) => a.timestamp - b.timestamp);
-}
-
-function describeGoalHistory(points: GoalHistoryValue[], fallbackUnit = "") {
-  if (!points.length) return "";
-  const first = points[0];
-  const latest = points[points.length - 1];
-  const unit = latest.unit || fallbackUnit;
-  const formatted = (value: number) => formatNumber(value, 1) + (unit ? " " + unit : "");
-  if (points.length === 1) {
-    return "One dated goal update was recorded: " + formatted(latest.value) + " on " + dateLabel(latest.date) + ". A within-period change cannot be calculated from one point.";
-  }
-  const delta = latest.value - first.value;
-  const change = delta === 0 ? "stayed the same" : (delta > 0 ? "increased by " : "decreased by ") + formatted(Math.abs(delta));
-  return points.length + " dated goal updates were recorded. The value changed from " + formatted(first.value) + " on " + dateLabel(first.date) + " to " + formatted(latest.value) + " on " + dateLabel(latest.date) + " (" + change + "). The average of recorded updates was " + formatted(mean(points.map((point) => point.value)) ?? latest.value) + ".";
-}
-
 function goalMetricSeries(report: Report | null, pattern: RegExp): SeriesPoint[] {
   return (report?.goalMetricEvents ?? [])
     .filter((event) => event.source !== "goal-baseline" && pattern.test([
