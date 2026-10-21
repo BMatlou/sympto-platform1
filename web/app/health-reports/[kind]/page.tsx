@@ -1167,31 +1167,90 @@ function compareText(
   return "Your average was " + formatNumber(Math.abs(delta), digits) + (unit ? " " + unit : "") + (delta > 0 ? " higher" : " lower") + " than in the previous period.";
 }
 
-function MiniTrend({ values, label }: { values: number[]; label: string }) {
-  if (values.length < 2) {
-    return <div className="mt-3 flex h-12 items-center rounded-xl bg-slate-50 px-3 text-[11px] text-slate-400">Add more readings to reveal a trend.</div>;
+function MiniTrend({
+  values,
+  points,
+  label,
+  variant = "line",
+  unit = "",
+  digits = 1,
+}: {
+  values?: number[];
+  points?: Array<{ date: string; value: number; timestamp?: number }>;
+  label: string;
+  variant?: "line" | "bar";
+  unit?: string;
+  digits?: number;
+}) {
+  const plotted = (points?.length
+    ? points.filter((point) => Number.isFinite(point.value) && Boolean(point.date))
+      .slice()
+      .sort((a, b) => (a.timestamp ?? new Date(a.date).getTime()) - (b.timestamp ?? new Date(b.date).getTime()))
+    : (values ?? []).filter((value) => Number.isFinite(value)).map((value, index) => ({ date: String(index + 1), value })));
+  if (!plotted.length) {
+    return <div className="mt-3 flex h-20 items-center rounded-xl bg-slate-50 px-3 text-[11px] text-slate-400">No dated values to chart in this period.</div>;
   }
-  const width = 180;
-  const height = 42;
-  const padding = 4;
-  const minimum = Math.min(...values);
-  const maximum = Math.max(...values);
-  const range = maximum - minimum || 1;
-  const coordinates = values.map((value, index) => {
-    const x = padding + index * (width - padding * 2) / (values.length - 1);
-    const y = height - padding - ((value - minimum) / range) * (height - padding * 2);
-    return String(x) + "," + String(y);
-  }).join(" ");
+
+  const width = 320;
+  const height = 108;
+  const left = 12;
+  const right = 12;
+  const top = 8;
+  const bottom = 77;
+  const usableWidth = width - left - right;
+  const plottedValues = plotted.map((point) => point.value);
+  const minimum = Math.min(...plottedValues);
+  const maximum = Math.max(...plottedValues);
+  const rawRange = maximum - minimum;
+  const padding = variant === "bar" ? 0 : (rawRange || Math.max(Math.abs(maximum) * 0.05, 1)) * 0.12;
+  const low = variant === "bar" ? Math.min(0, minimum) : minimum - padding;
+  const high = Math.max(maximum + (variant === "bar" ? 0 : padding), low + 1);
+  const xAt = (index: number) => plotted.length === 1 ? width / 2 : left + index * usableWidth / (plotted.length - 1);
+  const yAt = (value: number) => bottom - ((value - low) / (high - low)) * (bottom - top);
+  const polyline = plotted.map((point, index) => xAt(index) + "," + yAt(point.value)).join(" ");
+  const barWidth = Math.max(3, Math.min(18, usableWidth / Math.max(plotted.length, 1) * 0.56));
+  const tickCount = Math.min(5, plotted.length);
+  const tickIndices = Array.from(new Set(Array.from({ length: tickCount }, (_, index) =>
+    tickCount === 1 ? 0 : Math.round(index * (plotted.length - 1) / (tickCount - 1))
+  )));
+  const tickLabel = (date: string) => {
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) return date;
+    const parsed = new Date(date + "T12:00:00");
+    if (!Number.isFinite(parsed.getTime())) return date;
+    return new Intl.DateTimeFormat("en-ZA", { timeZone: "Africa/Johannesburg", day: "numeric", month: "short" }).format(parsed);
+  };
+  const chartSummary = plotted.length === 1
+    ? "1 dated value"
+    : String(plotted.length) + " dated values";
   return (
     <div className="mt-3 rounded-xl bg-[#f5fafb] px-3 py-2">
-      <svg viewBox="0 0 180 42" className="h-12 w-full" role="img" aria-label={label}>
-        <polyline points={coordinates} fill="none" stroke="#24c1c4" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
+      <svg viewBox="0 0 320 108" className="h-24 w-full" role="img" aria-label={label + ", " + chartSummary}>
+        {[top, (top + bottom) / 2, bottom].map((y) => (
+          <line key={y} x1={left} x2={width - right} y1={y} y2={y} stroke="#dbe7ea" strokeDasharray="3 4" strokeWidth="1" />
+        ))}
+        {variant === "bar" ? plotted.map((point, index) => {
+          const x = xAt(index) - barWidth / 2;
+          const y = yAt(Math.max(0, point.value));
+          return <rect key={point.date + "-" + index} x={x} y={y} width={barWidth} height={Math.max(1, bottom - y)} rx="2.5" fill="#24c1c4" opacity="0.92" />;
+        }) : (
+          <>
+            <polyline points={polyline} fill="none" stroke="#177e89" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
+            {plotted.map((point, index) => <circle key={point.date + "-" + index} cx={xAt(index)} cy={yAt(point.value)} r={plotted.length > 18 ? 1.8 : 2.8} fill="#0b2d54" stroke="#ffffff" strokeWidth="1.2" />)}
+          </>
+        )}
+        {tickIndices.map((index) => {
+          const x = xAt(index);
+          const anchor = tickIndices.length === 1 ? "middle" : index === tickIndices[0] ? "start" : index === tickIndices[tickIndices.length - 1] ? "end" : "middle";
+          return <text key={plotted[index].date + "-" + index} x={x} y="99" textAnchor={anchor} fontSize="9" fill="#64748b">{tickLabel(plotted[index].date)}</text>;
+        })}
       </svg>
-      <div className="mt-1 flex justify-between text-[10px] text-slate-400"><span>Earlier in period</span><span>Later in period</span></div>
+      <div className="mt-0.5 flex items-center justify-between gap-2 text-[10px] text-slate-400">
+        <span>{chartSummary}</span>
+        <span>{unit ? "Values in " + unit : variant === "bar" ? "Daily totals" : "Recorded trend"}{digits === 0 ? "" : ""}</span>
+      </div>
     </div>
   );
 }
-
 function SummaryTile({ icon: Icon, label, value, detail }: { icon: typeof Activity; label: string; value: string; detail: string }) {
   return (
     <article className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
@@ -1432,6 +1491,17 @@ function dailySessionSeries(report: Report | null, field: "sleep" | "workout"): 
     .sort((a, b) => a.date.localeCompare(b.date));
 }
 
+function latestValuesPerDay(points: SeriesPoint[]): DailyValue[] {
+  const latest = new Map<string, SeriesPoint>();
+  points.slice().sort((a, b) => a.timestamp - b.timestamp).forEach((point) => {
+    if (!point.date || !Number.isFinite(point.value)) return;
+    latest.set(point.date, point);
+  });
+  return Array.from(latest.values())
+    .map((point) => ({ date: point.date, value: point.value }))
+    .sort((a, b) => a.date.localeCompare(b.date));
+}
+
 function symptomLogAnalytics(report: Report | null) {
   const logs = report?.activity.symptoms ?? [];
   const rank: Record<string, number> = { NONE: 0, MILD: 1, MODERATE: 2, SEVERE: 3, VERY_SEVERE: 4 };
@@ -1472,6 +1542,40 @@ function symptomLogAnalytics(report: Report | null) {
     improvedEffects: effects.filter((item) => item.improved === true).length,
     sideEffectReports: effects.filter((item) => Boolean(String(item.sideEffects ?? "").trim())).length,
   };
+}
+
+function symptomSeverityTimeline(report: Report | null): DailyValue[] {
+  if (!report) return [];
+  const rank: Record<string, number> = { NONE: 0, MILD: 1, MODERATE: 2, SEVERE: 3, VERY_SEVERE: 4 };
+  const daily = new Map<string, { total: number; count: number }>();
+  const add = (date: string, value: number) => {
+    if (!date || !Number.isFinite(value)) return;
+    const current = daily.get(date) ?? { total: 0, count: 0 };
+    current.total += value;
+    current.count += 1;
+    daily.set(date, current);
+  };
+
+  report.activity.symptoms.forEach((log) => {
+    const perLogDate = new Map<string, number>();
+    (log.observations ?? []).forEach((observation) => {
+      const date = dateKey(observation.observedAt);
+      const severity = rank[String(observation.severity ?? "").toUpperCase()];
+      if (!date || severity === undefined) return;
+      perLogDate.set(date, Math.max(perLogDate.get(date) ?? severity, severity));
+    });
+    if (perLogDate.size) {
+      perLogDate.forEach((severity, date) => add(date, severity));
+      return;
+    }
+    const date = dateKey(log.startedAt || log.createdAt);
+    const severity = rank[String(log.overallSeverity ?? "").toUpperCase()];
+    if (date && severity !== undefined) add(date, severity);
+  });
+
+  return Array.from(daily.entries())
+    .map(([date, group]) => ({ date, value: group.total / group.count }))
+    .sort((a, b) => a.date.localeCompare(b.date));
 }
 
 function dailySymptomSeries(report: Report | null): DailyValue[] {
@@ -1983,7 +2087,7 @@ function PersonalisedInsights({
                   {latest && <p className="mt-1 text-[11px] text-slate-500">Latest {formatNumber(latest.value, 1)}{unit} · {dateLabel(latest.date)}</p>}
                   {signal.targetValue !== undefined && signal.targetValue !== null && <p className="mt-1 text-[11px] font-semibold text-[#0b7b80]">Saved goal target {formatNumber(signal.targetValue, 1)}{unit}</p>}
                   <p className="mt-2 text-xs font-semibold text-slate-600">{signalChange(signal.current, signal.previous, signal.unit)}</p>
-                  <MiniTrend values={signal.current.map((item) => item.value)} label={signal.label + " current-period trend"} />
+                  <MiniTrend points={signal.current} label={signal.label + " current-period trend"} unit={signal.unit} digits={1} />
                   <p className="mt-2 text-[10px] text-slate-400">{signal.current.length} current value(s){signal.previous.length ? " · " + signal.previous.length + " previous value(s)" : ""}</p>
                 </article>
               );
@@ -2054,6 +2158,7 @@ function RoutineTrendCard({
   previous,
   unit,
   digits = 1,
+  chartType,
   previousLoading,
 }: {
   icon: typeof Activity;
@@ -2063,6 +2168,7 @@ function RoutineTrendCard({
   previous: DailyValue[];
   unit: string;
   digits?: number;
+  chartType: "line" | "bar";
   previousLoading: boolean;
 }) {
   const currentMean = mean(current.map((item) => item.value));
@@ -2079,7 +2185,7 @@ function RoutineTrendCard({
         <>
           <div className="mt-4 flex items-baseline gap-2"><p className="text-2xl font-black tracking-tight text-[#0b2d54]">{formatNumber(currentMean, digits)} <span className="text-sm font-bold text-slate-500">{unit}</span></p><span className="text-[10px] text-slate-400">{current.length} {current.length === 1 ? "day with an entry" : "days with entries"}</span></div>
           <p className="mt-1 text-[11px] leading-4 text-slate-500">Average on days with a saved value. Days without an entry are not counted as zero.</p>
-          <MiniTrend values={values} label={title + " daily trend"} />
+          <MiniTrend points={current} label={title + " daily trend"} variant={chartType} unit={unit} digits={digits} />
           <p className="mt-3 text-xs leading-5 text-slate-500">{compareText(values, previous.map((item) => item.value), unit, digits, previousLoading)}</p>
         </>
       )}
@@ -2154,7 +2260,7 @@ function VitalTrendCard({
             {latest && <p className="mt-1 text-xs text-slate-500">Most recent: {formatNumber(latest.value, digits)} {unit} · {dateLabel(new Date(latest.timestamp).toISOString())}</p>}
             {latest?.convertedFrom && <p className="mt-1 text-[10px] leading-4 text-slate-500">Converted for this report from {formatNumber(latest.convertedFrom.value, 1)} {latest.convertedFrom.unit}.</p>}
           </div>
-          <MiniTrend values={currentValues} label={label + " trend"} />
+          <MiniTrend points={current} label={label + " trend"} unit={unit} digits={digits} />
           {review ? (
             <p className="mt-3 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs leading-5 text-amber-950">
               Check these saved values before interpreting the trend. See “Readings to double-check” above.
@@ -2273,16 +2379,31 @@ function HealthReportInsights({
     }))
     .filter((config) => config.rawCurrent.length > 0);
   const routineConfigs = [
-    { field: "sleepHours", label: "Sleep", subtitle: "Average hours slept on days you completed a check-in.", unit: "hours", digits: 1, icon: Moon },
-    { field: "stressLevel", label: "Stress rating", subtitle: "Your average stress rating on check-in days.", unit: "/10", digits: 1, icon: Activity },
-    { field: "waterIntakeMl", label: "Water logged", subtitle: "Average water amount entered on check-in days.", unit: "ml", digits: 0, icon: Droplets },
-    { field: "exerciseMinutes", label: "Exercise logged", subtitle: "Average exercise minutes entered on check-in days.", unit: "min", digits: 0, icon: Footprints },
+    { field: "sleepHours", label: "Sleep", subtitle: "Average hours slept on days you completed a check-in.", unit: "hours", digits: 1, icon: Moon, chartType: "line" as const },
+    { field: "stressLevel", label: "Stress rating", subtitle: "Your average stress rating on check-in days.", unit: "/10", digits: 1, icon: Activity, chartType: "line" as const },
+    { field: "waterIntakeMl", label: "Water logged", subtitle: "Average water amount entered on check-in days.", unit: "ml", digits: 0, icon: Droplets, chartType: "bar" as const },
+    { field: "exerciseMinutes", label: "Exercise logged", subtitle: "Average exercise minutes entered on check-in days.", unit: "min", digits: 0, icon: Footprints, chartType: "bar" as const },
   ];
   const routines = routineConfigs.map((config) => ({
     ...config,
     current: dailyMetric(report, config.field),
     previous: dailyMetric(previousReport, config.field),
   })).filter((config) => config.current.length > 0);
+  const symptomSeverityPoints = symptomSeverityTimeline(report);
+  const previousSymptomSeverityPoints = symptomSeverityTimeline(previousReport);
+  const recurringSymptomsOnly = repeated.filter((item) => item.count > 1).slice(0, 4);
+  const highestRecurringSymptomCount = Math.max(1, ...recurringSymptomsOnly.map((item) => item.count));
+  const stepPattern = /(^|[._\s-])(steps?|stepcount|step_count)([._\s-]|$)|daily.?steps|step.?count/i;
+  const wellnessSteps = wellnessMetricSeriesMatching(report, stepPattern);
+  const deviceSteps = namedClinicalDeviceSeries(report, stepPattern);
+  const goalSteps = goalMetricSeries(report, stepPattern);
+  const currentSteps = latestValuesPerDay(wellnessSteps.length ? wellnessSteps : deviceSteps.length ? deviceSteps : goalSteps);
+  const previousWellnessSteps = wellnessMetricSeriesMatching(previousReport, stepPattern);
+  const previousDeviceSteps = namedClinicalDeviceSeries(previousReport, stepPattern);
+  const previousGoalSteps = goalMetricSeries(previousReport, stepPattern);
+  const previousSteps = latestValuesPerDay(previousWellnessSteps.length ? previousWellnessSteps : previousDeviceSteps.length ? previousDeviceSteps : previousGoalSteps);
+  const currentStepValues = currentSteps.map((item) => item.value);
+  const previousStepValues = previousSteps.map((item) => item.value);
   const hasCategoricalCheckIns = report.activity.journalEntries.some((entry) => Boolean(entry.mood || entry.energyLevel || entry.sleepQuality));
   const noAnalysisData = activeVitals.length === 0 && routines.length === 0 && goalProgressItems.length === 0 && (report.goalMetricEvents ?? []).length === 0 && (report.activity.wellnessMetrics ?? []).length === 0 && !hasCategoricalCheckIns && symptomCount === 0 && sleepSessions.length === 0 && workouts.length === 0 && clinicalCount === 0;
   const moodPattern = lowMood.total > 0
@@ -2332,7 +2453,25 @@ function HealthReportInsights({
 
       <section>
         <div className="mb-3"><p className="text-[10px] font-black uppercase tracking-[0.16em] text-[#24c1c4]">Everyday routines</p><h2 className="mt-1 text-xl font-black text-[#0b2d54]">Habits and consistency</h2><p className="mt-1 text-sm leading-6 text-slate-500">These cards summarise daily check-ins instead of repeating the text of each journal entry.</p></div>
-        {routines.length ? <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">{routines.map((item) => <RoutineTrendCard key={item.field} icon={item.icon} title={item.label} subtitle={item.subtitle} current={item.current} previous={item.previous} unit={item.unit} digits={item.digits} previousLoading={previousLoading} />)}</div> : <div className="rounded-2xl border border-dashed border-slate-300 bg-white p-5 text-sm leading-6 text-slate-500">Daily sleep, stress, water and exercise trends will appear once those fields have been included in saved check-ins.</div>}
+        {routines.length ? <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">{routines.map((item) => <RoutineTrendCard key={item.field} icon={item.icon} title={item.label} subtitle={item.subtitle} current={item.current} previous={item.previous} unit={item.unit} digits={item.digits} chartType={item.chartType} previousLoading={previousLoading} />)}</div> : <div className="rounded-2xl border border-dashed border-slate-300 bg-white p-5 text-sm leading-6 text-slate-500">Daily sleep, stress, water and exercise trends will appear once those fields have been included in saved check-ins.</div>}
+        {(currentSteps.length > 0 || previousSteps.length > 0) && (
+          <div className="mt-3 grid gap-3 sm:grid-cols-2">
+            <article className="rounded-2xl border border-slate-200 bg-white p-4">
+              <div className="flex items-center gap-2"><Footprints className="h-5 w-5 text-[#24c1c4]" /><h3 className="font-bold text-[#0b2d54]">Daily steps</h3></div>
+              {currentSteps.length > 0 ? (
+                <>
+                  <p className="mt-3 text-2xl font-black text-[#0b2d54]">{formatNumber(mean(currentStepValues), 0)} <span className="text-sm font-bold text-slate-500">steps/day</span></p>
+                  <p className="mt-1 text-xs text-slate-500">Average across {currentSteps.length} day(s) with a dated step count.</p>
+                  <MiniTrend points={currentSteps} label="Daily steps across the report period" variant="bar" unit="steps" digits={0} />
+                  <p className="mt-2 text-xs leading-5 text-slate-500">{compareText(currentStepValues, previousStepValues, "steps/day", 0, previousLoading)}</p>
+                </>
+              ) : (
+                <p className="mt-3 text-sm leading-6 text-slate-500">No dated step counts were found in this period. {previousSteps.length ? "The previous period has " + previousSteps.length + " day(s) with a step count." : ""}</p>
+              )}
+              <p className="mt-2 text-[10px] leading-4 text-slate-400">Daily values use the latest saved cumulative step count for each date; separate sensor samples are not added together.</p>
+            </article>
+          </div>
+        )}
         {(sleepSessions.length > 0 || (previousReport?.activity.sleepSessions.length ?? 0) > 0 || workouts.length > 0 || (previousReport?.activity.workouts.length ?? 0) > 0) && (
           <div className="mt-3 grid gap-3 sm:grid-cols-2">
             {(sleepSessions.length > 0 || (previousReport?.activity.sleepSessions.length ?? 0) > 0) && <article className="rounded-2xl border border-slate-200 bg-white p-4"><div className="flex items-center gap-2"><Moon className="h-5 w-5 text-[#24c1c4]" /><h3 className="font-bold text-[#0b2d54]">Connected sleep</h3></div><p className="mt-3 text-2xl font-black text-[#0b2d54]">{sleepHours.length ? formatNumber(mean(sleepHours), 1) + " h" : "No sleep sessions"}</p><p className="mt-1 text-xs text-slate-500">{sleepSessions.length} recorded sessions in this period{previousLoading ? "; comparing periods…" : sleepDelta === null ? "." : "; " + String(Math.abs(sleepDelta)) + " " + (sleepDelta > 0 ? "more" : sleepDelta < 0 ? "fewer" : "same number of") + " sessions than the previous period."}</p><p className="mt-2 text-xs leading-5 text-slate-500">Average is calculated from wearable sleep sessions with a recorded duration.</p></article>}
@@ -2356,6 +2495,34 @@ function HealthReportInsights({
                 <p className="mt-2 text-2xl font-black text-[#0b2d54]">{symptomCount}</p>
                 <p className="mt-1 text-xs text-slate-500">{previousReport ? (symptomDifference === 0 ? "No change vs previous period" : (symptomDifference > 0 ? "+" : "") + symptomDifference + " vs previous period") : "No prior-period comparison"}</p>
                 {symptomPattern && <p className="mt-2 text-xs font-semibold text-slate-600">Most repeated: {symptomPattern.label} ({symptomPattern.count})</p>}
+              </article>
+            )}
+            {recurringSymptomsOnly.length > 0 && (
+              <article className="rounded-2xl border border-slate-200 bg-white p-4">
+                <h3 className="text-sm font-bold text-[#0b2d54]">Most repeated symptoms</h3>
+                <p className="mt-1 text-xs leading-5 text-slate-500">Repeated symptom labels from your logs, not a diagnosis or cause.</p>
+                <div className="mt-3 space-y-3">
+                  {recurringSymptomsOnly.map((item) => (
+                    <div key={item.label}>
+                      <div className="flex items-baseline justify-between gap-3">
+                        <span className="min-w-0 text-xs font-semibold text-slate-700">{item.label}</span>
+                        <span className="shrink-0 text-[10px] font-bold text-slate-500">{item.count} logs</span>
+                      </div>
+                      <div className="mt-1.5 h-2 overflow-hidden rounded-full bg-slate-100">
+                        <div className="h-full rounded-full bg-[#24c1c4]" style={{ width: String(item.count / highestRecurringSymptomCount * 100) + "%" }} />
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </article>
+            )}
+            {symptomSeverityPoints.length > 0 && (
+              <article className="rounded-2xl border border-slate-200 bg-white p-4">
+                <h3 className="text-sm font-bold text-[#0b2d54]">Symptom severity over time</h3>
+                <p className="mt-1 text-xs leading-5 text-slate-500">Daily average rank from dated symptom observations or symptom-level severity values.</p>
+                <MiniTrend points={symptomSeverityPoints} label="Daily logged symptom severity rank over time" unit="severity rank" digits={1} />
+                <p className="mt-2 text-[10px] leading-4 text-slate-400">Mild = 1, moderate = 2, severe = 3, very severe = 4. Different symptoms can have different meanings; this summary is not a clinical score.</p>
+                {previousReport && previousSymptomSeverityPoints.length > 0 && <p className="mt-2 text-xs leading-5 text-slate-500">{compareText(symptomSeverityPoints.map((item) => item.value), previousSymptomSeverityPoints.map((item) => item.value), "severity rank", 1, previousLoading)}</p>}
               </article>
             )}
             {lowMood.total > 0 && (
