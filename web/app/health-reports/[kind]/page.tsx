@@ -1362,7 +1362,7 @@ function symptomLogAnalytics(report: Report | null) {
     const recorded = [
       log.overallSeverity,
       ...(log.observations ?? []).map((item) => item.severity),
-    ].map((value) => rank[String(value ?? "").toUpperCase()]).filter((value) => value !== undefined);
+    ].map((value) => rank[String(value ?? "").toUpperCase()]).filter((value): value is number => value !== undefined);
     return recorded.length ? [Math.max(...recorded)] : [];
   });
   const worseningCount = logs.filter((log) =>
@@ -1535,9 +1535,9 @@ function PersonalisedInsights({
   const workoutsPrevious = dailySessionSeries(previousReport, "workout");
   const stressCurrent = dailyMetric(report, "stressLevel");
   const stressPrevious = dailyMetric(previousReport, "stressLevel");
-  const moodScores = { VERY_BAD: 1, BAD: 2, NEUTRAL: 3, GOOD: 4, VERY_GOOD: 5 };
-  const energyScores = { VERY_LOW: 1, LOW: 2, NORMAL: 3, HIGH: 4, VERY_HIGH: 5 };
-  const sleepQualityScores = { VERY_POOR: 1, POOR: 2, FAIR: 3, GOOD: 4, EXCELLENT: 5 };
+  const moodScores: Record<string, number> = { VERY_BAD: 1, BAD: 2, NEUTRAL: 3, GOOD: 4, VERY_GOOD: 5 };
+  const energyScores: Record<string, number> = { VERY_LOW: 1, LOW: 2, NORMAL: 3, HIGH: 4, VERY_HIGH: 5 };
+  const sleepQualityScores: Record<string, number> = { VERY_POOR: 1, POOR: 2, FAIR: 3, GOOD: 4, EXCELLENT: 5 };
   const moodRatingsCurrent = dailyCategoricalMetric(report, "mood", moodScores);
   const moodRatingsPrevious = dailyCategoricalMetric(previousReport, "mood", moodScores);
   const energyCurrent = dailyCategoricalMetric(report, "energyLevel", energyScores);
