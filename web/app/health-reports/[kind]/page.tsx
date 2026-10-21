@@ -658,6 +658,20 @@ function vitalSeries(report: Report | null, metric: string): SeriesPoint[] {
     );
   });
 
+  // Some goal-card measurements are saved to HealthGoalMetricEvent rather than the
+  // HealthJournal/device streams. Bring them into the matching trend series.
+  (report.goalMetricEvents ?? []).forEach((event) => {
+    if (event.source === "goal-baseline") return;
+    const metricType = String(event.metricType ?? "").toUpperCase();
+    const metricKey = String(event.metricKey ?? "").toLowerCase();
+    const matches =
+      (metric === "systolic" && metricType === "BLOOD_PRESSURE" && metricKey === "blood_pressure.systolic") ||
+      (metric === "diastolic" && metricType === "BLOOD_PRESSURE" && metricKey === "blood_pressure.diastolic") ||
+      (metric === "heartRate" && metricType === "HEART_RATE" && metricKey === "heart_rate.bpm") ||
+      (metric === "weight" && metricType === "WEIGHT" && metricKey === "weight.kg");
+    if (matches) addVital(points, event.loggedValue, event.occurredAt, "Health goal log");
+  });
+
   const deduped = new Map<string, SeriesPoint>();
   for (const point of points) {
     // Keep separate same-day readings, but collapse exact duplicates when the
