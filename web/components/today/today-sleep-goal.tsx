@@ -67,7 +67,7 @@ export default function TodaySleepGoal({ goal, detailsExpanded, onToggleDetails 
       day: Number.isFinite(startOrdinal) ? Math.max(1, todayOrdinal - startOrdinal + 1) : 1,
       daysLeft: Number.isFinite(endOrdinal) ? Math.max(0, endOrdinal - todayOrdinal) : null,
     };
-  }, [goal?.createdAt, goal?.targetDate]);
+  }, [goal]);
 
   const loadSleep = useCallback(async () => {
     const now = new Date();
