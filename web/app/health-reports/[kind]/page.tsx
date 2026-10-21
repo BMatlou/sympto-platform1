@@ -517,6 +517,24 @@ function vitalSeries(report: Report | null, metric: string): SeriesPoint[] {
   return Array.from(deduped.values()).sort((a, b) => a.timestamp - b.timestamp);
 }
 
+function trendVitalSeries(report: Report | null, metric: string, age: number | null): SeriesPoint[] {
+  const points = vitalSeries(report, metric);
+  return points.filter((point) => {
+    const value = point.value;
+    // Keep raw values in vitalSeries for visible alerts. These narrow exclusions
+    // only protect trend averages from invalid scales or extreme likely entry/device
+    // errors; a legitimate warning remains visible and must be reviewed.
+    if (metric === "oxygen") return value > 0 && value <= 100 && value > 88;
+    if (metric === "temperature") return value >= 30 && value < 43;
+    if (metric === "respiratory" && age !== null && age >= 18) return value >= 8 && value <= 30;
+    if (metric === "heartRate") return value > 0 && value <= 250;
+    if (metric === "systolic") return value >= 40 && value <= 300;
+    if (metric === "diastolic") return value >= 20 && value <= 200;
+    if (metric === "weight") return value > 0 && value < 1000;
+    return true;
+  });
+}
+
 function reportMeasurementReviews(report: Report, age: number | null): MeasurementReview[] {
   const reviews: MeasurementReview[] = [];
 
@@ -1102,6 +1120,7 @@ function VitalTrendCard({
   review,
   status,
   baselineValue,
+  rawCurrent,
 }: {
   label: string;
   description: string;
@@ -1113,12 +1132,14 @@ function VitalTrendCard({
   review: MeasurementReview | null;
   status: VitalStatusAssessment;
   baselineValue: number | null;
+  rawCurrent: SeriesPoint[];
 }) {
   const currentValues = current.map((item) => item.value);
   const previousValues = previous.map((item) => item.value);
   const average = mean(currentValues);
-  const latest = current[current.length - 1];
+  const latest = rawCurrent[rawCurrent.length - 1] ?? current[current.length - 1];
   const first = current[0];
+  const excludedCount = Math.max(0, rawCurrent.length - current.length);
   const change = latest && first ? latest.value - first.value : null;
   const changeText = change === null
     ? "Not enough readings to compare."
@@ -1136,14 +1157,15 @@ function VitalTrendCard({
       <div className="flex items-start justify-between gap-3">
         <div>
           <p className="text-sm font-bold text-[#0b2d54]">{label}</p>
-          <p className="mt-1 text-[11px] text-slate-500">{current.length} {current.length === 1 ? "reading" : "readings"} saved in this period</p>
+          <p className="mt-1 text-[11px] text-slate-500">{rawCurrent.length} {rawCurrent.length === 1 ? "reading" : "readings"} saved in this period</p>
+          {excludedCount > 0 && <p className="mt-1 text-[10px] font-bold text-amber-800">{excludedCount} extreme or invalid {excludedCount === 1 ? "value is" : "values are"} excluded from the trend average and shown in the review alerts.</p>}
         </div>
         <HeartPulse className="h-5 w-5 shrink-0 text-[#24c1c4]" />
       </div>
       <p className="mt-2 text-xs leading-5 text-slate-500">{description}</p>
       <div className="mt-3"><StatusCircle label={status.label} detail={status.detail} tone={status.tone} /></div>
       {average === null ? (
-        <p className="mt-4 text-sm text-slate-500">No readings were saved for this period.</p>
+        <p className="mt-4 text-sm text-slate-500">{rawCurrent.length > 0 ? "No values from this measure were used in the trend because the saved values need review. See the alert above." : "No readings were saved for this period."}</p>
       ) : (
         <>
           <div className="mt-4">
@@ -1259,8 +1281,9 @@ function HealthReportInsights({
   const activeVitals = vitalConfigs
     .map((config) => ({
       ...config,
-      current: vitalSeries(report, config.key),
-      previous: vitalSeries(previousReport, config.key),
+      current: trendVitalSeries(report, config.key, age),
+      previous: trendVitalSeries(previousReport, config.key, age),
+      rawCurrent: vitalSeries(report, config.key),
       review: measurementReviews.find((review) => review.key === config.key) ?? null,
       status: vitalStatus(report, config.key, age),
       baselineValue: baselineVitalValue(config.key, report.currentSnapshot),
@@ -1335,7 +1358,7 @@ function HealthReportInsights({
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
           <SummaryTile icon={CalendarDays} label="Days with entries" value={String(daysLogged) + "/" + String(totalDays)} detail={daysLogged === 0 ? "No dated health records were found for these days." : "You saved at least one health record on " + daysLogged + " of " + totalDays + " days. Days without an entry are not counted as zero."} />
           <SummaryTile icon={Activity} label="Symptom records" value={String(symptomCount)} detail={symptomComparison} />
-          <SummaryTile icon={HeartPulse} label="Vital readings" value={String(activeVitals.reduce((sum, item) => sum + item.current.length, 0))} detail={activeVitals.length ? "Readings across " + activeVitals.length + " measurement types." : "No dated vital readings were found for this period."} />
+          <SummaryTile icon={HeartPulse} label="Readings used in trends" value={String(activeVitals.reduce((sum, item) => sum + item.current.length, 0))} detail={activeVitals.length ? "Valid trend values across " + activeVitals.length + " measurement types. Flagged extreme values are shown separately." : "No readings could be used for trend calculations in this period."} />
           <SummaryTile icon={Footprints} label="Workout sessions" value={String(workouts.length)} detail={workouts.length ? formatNumber(workoutMinutes, 0) + " minutes recorded across these workouts." : "No workouts were logged. If you were active but did not record a workout, it will not appear here."} />
         </div>
       </section>
@@ -1362,7 +1385,7 @@ function HealthReportInsights({
 
       <section>
         <div className="mb-3"><p className="text-[10px] font-black uppercase tracking-[0.16em] text-[#24c1c4]">Change over time</p><h2 className="mt-1 text-xl font-black text-[#0b2d54]">Measurement trends</h2><p className="mt-1 text-sm leading-6 text-slate-500">Each card explains the measurement, shows the average of saved readings, and tells you how it compares with the previous period. A change by itself does not say what caused it or whether it is right for you.</p></div>
-        {activeVitals.length ? <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">{activeVitals.map((item) => <VitalTrendCard key={item.key} label={item.label} description={item.description} unit={item.unit} digits={item.digits} current={item.current} previous={item.previous} previousLoading={previousLoading} review={item.review} status={item.status} baselineValue={item.baselineValue} />)}</div> : <div className="rounded-2xl border border-dashed border-slate-300 bg-white p-5 text-sm leading-6 text-slate-500">No dated vital readings were found for this period. Once you save blood pressure, heart rate, weight or other measurements, they will appear here.</div>}
+        {activeVitals.length ? <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">{activeVitals.map((item) => <VitalTrendCard key={item.key} label={item.label} description={item.description} unit={item.unit} digits={item.digits} current={item.current} previous={item.previous} previousLoading={previousLoading} review={item.review} status={item.status} baselineValue={item.baselineValue} rawCurrent={item.rawCurrent} />)}</div> : <div className="rounded-2xl border border-dashed border-slate-300 bg-white p-5 text-sm leading-6 text-slate-500">No dated vital readings were found for this period. Once you save blood pressure, heart rate, weight or other measurements, they will appear here.</div>}
       </section>
 
       <section>
