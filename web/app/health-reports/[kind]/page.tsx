@@ -1010,7 +1010,7 @@ function PersonalisedInsights({
       .map((item) => String(item.diagnosis?.name ?? "")),
   ].filter(Boolean).join(" ").toLowerCase();
 
-  const hasBloodPressureContext = /hypertension|hypertensive|high blood pressure/.test(conditions);
+  const hasBloodPressureContext = /hypertension|hypertensive|high blood pressure|\bhtn\b/.test(conditions);
   const hasDiabetesContext = /\bdiabetes\b|\bdiabetic\b/.test(conditions);
   const hasRespiratoryContext = /\basthma\b|\bcopd\b|chronic obstructive|emphysema|pulmonary|lung disease|respiratory condition/.test(conditions);
 
@@ -1405,7 +1405,7 @@ function HealthReportInsights({
   }
   if (goalFollowUps.length > 0) {
     const decliningGoals = goalFollowUps.filter((goal) => String(goal.progress?.[0]?.status ?? "").toUpperCase() === "DECLINING");
-nextSteps.push({
+    nextSteps.push({
       title: "Review goals that need attention",
       detail: String(goalFollowUps.length) + " of your saved goals have a latest recorded status of " + (decliningGoals.length > 0 ? "declining or stagnant" : "stagnant") + ". The report uses matching saved targets in the relevant measurement cards; review the underlying progress history for context, and do not change medicines or treatment based on this report alone.",
       href: "/health-goals",
