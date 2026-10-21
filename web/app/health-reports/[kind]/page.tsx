@@ -215,6 +215,21 @@ type HealthContextSnapshot = {
   activeGoals?: SnapshotGoal[];
 };
 
+type GoalMetricEventRecord = {
+  goalId: string;
+  goalTitle: string;
+  goalCategory: string;
+  unit?: string | null;
+  targetValue?: number | string | null;
+  metricType: string;
+  metricKey: string;
+  loggedValue: number | string;
+  occurredAt: string;
+  source: string;
+  sourceId?: string | null;
+  metadata?: unknown;
+};
+
 type Report = {
   type: "WEEKLY" | "MONTHLY";
   period: { start: string; end: string; label: string; scheduledFor: string };
@@ -240,6 +255,7 @@ type Report = {
     referrals: unknown[];
   };
   currentSnapshot?: HealthContextSnapshot | null;
+  goalMetricEvents?: GoalMetricEventRecord[];
   generatedAt: string;
 };
 
@@ -388,51 +404,69 @@ type GoalProgressTrendItem = {
 };
 
 function goalProgressTrendItems(report: Report, previousReport: Report | null): GoalProgressTrendItem[] {
-  const currentStart = new Date(report.period.start).getTime();
-  const currentEnd = new Date(report.period.end).getTime();
-  const previousStart = previousReport ? new Date(previousReport.period.start).getTime() : Number.NaN;
-  const previousEnd = previousReport ? new Date(previousReport.period.end).getTime() : Number.NaN;
+  const inPeriod = (timestamp: number, periodReport: Report | null) => {
+    if (!periodReport) return false;
+    const start = new Date(periodReport.period.start).getTime();
+    const end = new Date(periodReport.period.end).getTime();
+    return Number.isFinite(timestamp) && timestamp >= start && timestamp < end;
+  };
   const previousGoals = previousReport?.currentSnapshot?.activeGoals ?? [];
 
   return (report.currentSnapshot?.activeGoals ?? []).flatMap((goal) => {
-    const progress = goal.progress ?? [];
-    const dated = progress.flatMap((item) => {
+    const progressPoints = (goal.progress ?? []).flatMap((item) => {
       if (!item.measuredAt) return [];
       const timestamp = new Date(item.measuredAt).getTime();
-      if (!Number.isFinite(timestamp)) return [];
       const currentValue = finite(item.currentValue);
       const percentValue = finite(item.progressPercent);
       const value = currentValue !== null ? currentValue : percentValue;
-      if (value === null) return [];
-      return [{
-        date: dateKey(item.measuredAt),
-        timestamp,
-        value,
-        valueKind: currentValue !== null ? "current" as const : "percent" as const,
-        status: String(item.status ?? "").toUpperCase(),
-      }];
-    }).filter((item) => Boolean(item.date));
+      if (!inPeriod(timestamp, report) || value === null) return [];
+      const date = dateKey(item.measuredAt);
+      if (!date) return [];
+      return [{ date, timestamp, value, valueKind: currentValue !== null ? "current" as const : "percent" as const, status: String(item.status ?? "").toUpperCase() }];
+    }).sort((a, b) => a.timestamp - b.timestamp);
 
-    const current = dated
-      .filter((item) => item.timestamp >= currentStart && item.timestamp < currentEnd)
+    const eventPoints = (report.goalMetricEvents ?? [])
+      .filter((event) => event.goalId === goal.id)
+      .flatMap((event) => {
+        const timestamp = new Date(event.occurredAt).getTime();
+        const value = finite(event.loggedValue);
+        const date = dateKey(event.occurredAt);
+        if (!inPeriod(timestamp, report) || value === null || !date) return [];
+        return [{ date, timestamp, value, valueKind: "current" as const, status: "" }];
+      })
       .sort((a, b) => a.timestamp - b.timestamp);
+
+    // Metric events are authoritative for metric-configured goals. Don't merge
+    // them with progress projections, which can represent the same saved check-in.
+    const current = eventPoints.length ? eventPoints : progressPoints;
     if (!current.length) return [];
 
     const previousGoal = previousGoals.find((item) => item.id === goal.id) ??
       previousGoals.find((item) => String(item.category ?? "") === String(goal.category ?? "") &&
         String(item.title ?? "") === String(goal.title ?? ""));
-    const previous = (previousGoal?.progress ?? [])
+    const previousEvents = (previousReport?.goalMetricEvents ?? [])
+      .filter((event) => event.goalId === goal.id)
+      .flatMap((event) => {
+        const timestamp = new Date(event.occurredAt).getTime();
+        const value = finite(event.loggedValue);
+        const date = dateKey(event.occurredAt);
+        if (!inPeriod(timestamp, previousReport) || value === null || !date) return [];
+        return [{ date, timestamp, value, valueKind: "current" as const }];
+      })
+      .sort((a, b) => a.timestamp - b.timestamp);
+
+    const previousProgress = (previousGoal?.progress ?? [])
       .flatMap((item) => {
         if (!item.measuredAt) return [];
         const timestamp = new Date(item.measuredAt).getTime();
         const currentValue = finite(item.currentValue);
         const percentValue = finite(item.progressPercent);
         const value = currentValue !== null ? currentValue : percentValue;
-        if (!Number.isFinite(timestamp) || timestamp < previousStart || timestamp >= previousEnd || value === null) return [];
-        const valueKind = currentValue !== null ? "current" as const : "percent" as const;
-        return [{ date: dateKey(item.measuredAt), value, valueKind, timestamp }];
+        const date = dateKey(item.measuredAt);
+        if (!inPeriod(timestamp, previousReport) || value === null || !date) return [];
+        return [{ date, timestamp, value, valueKind: currentValue !== null ? "current" as const : "percent" as const }];
       })
-      .filter((item) => Boolean(item.date) && item.valueKind === current[0].valueKind)
+      .filter((item) => item.valueKind === current[0].valueKind)
       .sort((a, b) => a.timestamp - b.timestamp)
       .map(({ date, value }) => ({ date, value }));
 
@@ -440,16 +474,15 @@ function goalProgressTrendItems(report: Report, previousReport: Report | null): 
       key: String(goal.id ?? goal.category ?? goal.title ?? "goal"),
       title: String(goal.title || human(goal.category) || "Health goal"),
       category: String(goal.category ?? ""),
-      unit: current[0].valueKind === "percent" ? "%" : String(goal.unit ?? ""),
+      unit: current[0].valueKind === "percent" ? "%" : String(goal.unit ?? (eventPoints.length ? (report.goalMetricEvents ?? []).find((event) => event.goalId === goal.id)?.unit : "") ?? ""),
       valueKind: current[0].valueKind,
-      current: current.filter((item) => item.valueKind === current[0].valueKind).map(({ date, value }) => ({ date, value })),
-      previous,
-      latestStatus: current[current.length - 1].status,
+      current: current.map(({ date, value }) => ({ date, value })),
+      previous: previousEvents.length ? previousEvents.map(({ date, value }) => ({ date, value })) : previousProgress,
+      latestStatus: current[current.length - 1].status || String(goal.progress?.[0]?.status ?? ""),
       targetValue: finite(goal.targetValue),
     }];
   });
 }
-
 function recordedDays(report: Report) {
   const days = new Set<string>();
   const periodStart = new Date(report.period.start).getTime();
@@ -486,6 +519,7 @@ function recordedDays(report: Report) {
   (report.currentSnapshot?.activeGoals ?? []).forEach((goal) => {
     (goal.progress ?? []).forEach((item) => add(item.measuredAt));
   });
+  (report.goalMetricEvents ?? []).forEach((event) => add(event.occurredAt));
 
   report.activity.appointments.forEach((item) => addRecord(item, ["scheduledStart", "scheduledEnd"]));
   report.clinical.encounters.forEach((item) => addRecord(item, ["startedAt", "endedAt", "createdAt"]));
@@ -1065,22 +1099,35 @@ function StatusCircle({ label, detail, tone }: { label: string; detail: string; 
   );
 }
 
-function goalProgressItemsForPattern(report: Report, pattern: RegExp): { value: number; date: string }[] {
+function goalProgressItemsForPattern(report: Report, pattern: RegExp): { value: number; date: string; timestamp: number }[] {
   const start = new Date(report.period.start).getTime();
   const end = new Date(report.period.end).getTime();
-  return (report.currentSnapshot?.activeGoals ?? [])
-    .filter((goal) => pattern.test([goal.category, goal.title].filter(Boolean).join(" ").toLowerCase()))
-    .flatMap((goal) => (goal.progress ?? []).flatMap((item) => {
+  const matchingGoals = (report.currentSnapshot?.activeGoals ?? [])
+    .filter((goal) => pattern.test([goal.category, goal.title].filter(Boolean).join(" ").toLowerCase()));
+  return matchingGoals.flatMap((goal) => {
+    const events = (report.goalMetricEvents ?? [])
+      .filter((event) => event.goalId === goal.id)
+      .flatMap((event) => {
+        const timestamp = new Date(event.occurredAt).getTime();
+        const value = finite(event.loggedValue);
+        const date = dateKey(event.occurredAt);
+        if (!Number.isFinite(timestamp) || timestamp < start || timestamp >= end || value === null || !date) return [];
+        return [{ value, date, timestamp }];
+      })
+      .sort((a, b) => a.timestamp - b.timestamp);
+    if (events.length) return events;
+
+    // Legacy/manual progress is still supported when this goal has no metric events.
+    return (goal.progress ?? []).flatMap((item) => {
       if (!item.measuredAt) return [];
       const timestamp = new Date(item.measuredAt).getTime();
       const value = finite(item.currentValue);
-      if (!Number.isFinite(timestamp) || timestamp < start || timestamp >= end || value === null) return [];
-      return [{ value, date: dateKey(item.measuredAt), timestamp }];
-    }))
-    .filter((item) => Boolean(item.date))
-    .sort((a, b) => a.timestamp - b.timestamp);
+      const date = dateKey(item.measuredAt);
+      if (!Number.isFinite(timestamp) || timestamp < start || timestamp >= end || value === null || !date) return [];
+      return [{ value, date, timestamp }];
+    });
+  }).sort((a, b) => a.timestamp - b.timestamp);
 }
-
 function PersonalisedInsights({
   report,
   coveragePercent,
