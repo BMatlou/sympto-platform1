@@ -1310,6 +1310,138 @@ function PersonalisedInsights({
   );
 }
 
+function RoutineTrendCard({
+  icon: Icon,
+  title,
+  subtitle,
+  current,
+  previous,
+  unit,
+  digits = 1,
+  previousLoading,
+}: {
+  icon: typeof Activity;
+  title: string;
+  subtitle: string;
+  current: DailyValue[];
+  previous: DailyValue[];
+  unit: string;
+  digits?: number;
+  previousLoading: boolean;
+}) {
+  const currentMean = mean(current.map((item) => item.value));
+  const values = current.map((item) => item.value);
+  return (
+    <article className="min-w-0 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+      <div className="flex items-start gap-3">
+        <span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-[#24c1c4]/10 text-[#0b2d54]"><Icon className="h-5 w-5" /></span>
+        <div className="min-w-0 flex-1"><h3 className="font-bold text-[#0b2d54]">{title}</h3><p className="mt-1 text-xs leading-5 text-slate-500">{subtitle}</p></div>
+      </div>
+      {currentMean === null ? (
+        <div className="mt-4 rounded-xl bg-slate-50 p-3 text-sm text-slate-500">No entries for this measure in the selected period.</div>
+      ) : (
+        <>
+          <div className="mt-4 flex items-baseline gap-2"><p className="text-2xl font-black tracking-tight text-[#0b2d54]">{formatNumber(currentMean, digits)} <span className="text-sm font-bold text-slate-500">{unit}</span></p><span className="text-[10px] text-slate-400">{current.length} {current.length === 1 ? "day with an entry" : "days with entries"}</span></div>
+          <p className="mt-1 text-[11px] leading-4 text-slate-500">Average on days with a saved value. Days without an entry are not counted as zero.</p>
+          <MiniTrend values={values} label={title + " daily trend"} />
+          <p className="mt-3 text-xs leading-5 text-slate-500">{compareText(values, previous.map((item) => item.value), unit, digits, previousLoading)}</p>
+        </>
+      )}
+    </article>
+  );
+}
+
+function VitalTrendCard({
+  label,
+  description,
+  unit,
+  digits,
+  current,
+  previous,
+  previousLoading,
+  review,
+  status,
+  baselineValue,
+  rawCurrent,
+}: {
+  label: string;
+  description: string;
+  unit: string;
+  digits: number;
+  current: SeriesPoint[];
+  previous: SeriesPoint[];
+  previousLoading: boolean;
+  review: MeasurementReview | null;
+  status: VitalStatusAssessment;
+  baselineValue: number | null;
+  rawCurrent: SeriesPoint[];
+}) {
+  const currentValues = current.map((item) => item.value);
+  const previousValues = previous.map((item) => item.value);
+  const average = mean(currentValues);
+  const latest = rawCurrent[rawCurrent.length - 1] ?? current[current.length - 1];
+  const first = current[0];
+  const excludedCount = Math.max(0, rawCurrent.length - current.length);
+  const change = latest && first ? latest.value - first.value : null;
+  const changeText = change === null
+    ? "Not enough readings to compare."
+    : Math.abs(change) < 0.05
+      ? "The first and most recent readings were very similar."
+      : "From the first to the most recent reading: " + (change > 0 ? "+" : "") + formatNumber(change, digits) + " " + unit + ".";
+  const baselineDelta = latest && baselineValue !== null ? latest.value - baselineValue : null;
+  const baselineComparison = baselineDelta === null
+    ? null
+    : Math.abs(baselineDelta) < (digits === 0 ? 0.5 : 0.05)
+      ? "Your most recent reading is close to your recorded baseline of " + formatNumber(baselineValue, digits) + " " + unit + "."
+      : "Your most recent reading is " + formatNumber(Math.abs(baselineDelta), digits) + " " + unit + (baselineDelta > 0 ? " above" : " below") + " your recorded baseline of " + formatNumber(baselineValue, digits) + " " + unit + ". This difference alone does not show a cause or diagnosis.";
+  return (
+    <article className="min-w-0 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <p className="text-sm font-bold text-[#0b2d54]">{label}</p>
+          <p className="mt-1 text-[11px] text-slate-500">{rawCurrent.length} {rawCurrent.length === 1 ? "reading" : "readings"} saved in this period</p>
+          {excludedCount > 0 && <p className="mt-1 text-[10px] font-bold text-amber-800">{excludedCount} flagged or out-of-scale {excludedCount === 1 ? "value is" : "values are"} excluded from the trend average and shown in the review alerts.</p>}
+        </div>
+        <HeartPulse className="h-5 w-5 shrink-0 text-[#24c1c4]" />
+      </div>
+      <p className="mt-2 text-xs leading-5 text-slate-500">{description}</p>
+      <div className="mt-3"><StatusCircle label={status.label} detail={status.detail} tone={status.tone} /></div>
+      {average === null ? (
+        <p className="mt-4 text-sm text-slate-500">{rawCurrent.length > 0 ? "No values from this measure were used in the trend because the saved values need review. See the alert above." : "No readings were saved for this period."}</p>
+      ) : (
+        <>
+          <div className="mt-4">
+            <p className="text-[10px] font-bold uppercase tracking-wide text-slate-400">Average for this period</p>
+            <p className="mt-1 text-2xl font-black tracking-tight text-[#0b2d54]">
+              {formatNumber(average, digits)} <span className="text-sm font-bold text-slate-500">{unit}</span>
+            </p>
+            {latest && <p className="mt-1 text-xs text-slate-500">Most recent: {formatNumber(latest.value, digits)} {unit} · {dateLabel(new Date(latest.timestamp).toISOString())}</p>}
+            {latest?.convertedFrom && <p className="mt-1 text-[10px] leading-4 text-slate-500">Converted for this report from {formatNumber(latest.convertedFrom.value, 1)} {latest.convertedFrom.unit}.</p>}
+          </div>
+          <MiniTrend values={currentValues} label={label + " trend"} />
+          {review ? (
+            <p className="mt-3 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs leading-5 text-amber-950">
+              Check these saved values before interpreting the trend. See “Readings to double-check” above.
+            </p>
+          ) : (
+            <p className="mt-3 text-xs leading-5 text-slate-600">{changeText}</p>
+          )}
+          {baselineValue !== null && (
+            <p className="mt-3 rounded-xl border border-slate-100 bg-white px-3 py-2 text-xs leading-5 text-slate-600">
+              {review ? "Baseline comparison is paused until the flagged saved values are checked." : baselineComparison}
+            </p>
+          )}
+          <div className="mt-3 rounded-xl bg-[#f5fafb] p-3">
+            <p className="text-[10px] font-bold uppercase tracking-wide text-[#71839a]">Compared with the previous period</p>
+            <p className="mt-1 text-xs leading-5 text-slate-600">{review ? "Please verify these saved values before comparing this period with the previous one." : compareText(currentValues, previousValues, unit, digits, previousLoading)}</p>
+          </div>
+        </>
+      )}
+    </article>
+  );
+}
+
+
 function clinicalEvents(report: Report) {
   return report.clinical.encounters.length +
     report.clinical.diagnoses.length +
