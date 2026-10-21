@@ -27,15 +27,21 @@ function formatDate(value: unknown) {
   return new Intl.DateTimeFormat("en-ZA", { day: "2-digit", month: "short", year: "numeric" }).format(date);
 }
 
-function journeyFor(goal: any, journeyStartAt?: unknown) {
+function journeyFor(goal: any, journeyStartAt: unknown, referenceTime: number) {
   const startDate = new Date(
     String(journeyStartAt ?? goal?.createdAt ?? ""),
   );
   const targetDate = new Date(String(goal?.targetDate ?? ""));
-  const now = Date.now();
-  const journeyDay = Number.isNaN(startDate.getTime()) ? 1 : Math.max(1, Math.floor((now - startDate.getTime()) / 86400000) + 1);
-  const daysLeft = Number.isNaN(targetDate.getTime()) ? null : Math.max(0, Math.ceil((targetDate.getTime() - now) / 86400000));
-  const totalDays = !Number.isNaN(startDate.getTime()) && !Number.isNaN(targetDate.getTime()) ? Math.max(1, Math.ceil((targetDate.getTime() - startDate.getTime()) / 86400000)) : null;
+  const hasReferenceTime = referenceTime > 0;
+  const journeyDay = !hasReferenceTime || Number.isNaN(startDate.getTime())
+    ? 1
+    : Math.max(1, Math.floor((referenceTime - startDate.getTime()) / 86400000) + 1);
+  const daysLeft = !hasReferenceTime || Number.isNaN(targetDate.getTime())
+    ? null
+    : Math.max(0, Math.ceil((targetDate.getTime() - referenceTime) / 86400000));
+  const totalDays = !Number.isNaN(startDate.getTime()) && !Number.isNaN(targetDate.getTime())
+    ? Math.max(1, Math.ceil((targetDate.getTime() - startDate.getTime()) / 86400000))
+    : null;
   return { startDate, targetDate, journeyDay, daysLeft, totalDays };
 }
 
@@ -54,6 +60,7 @@ export default function TodayWeightGoal({ goal, fallbackWeight, bmi: dashboardBm
   const [events, setEvents] = useState<WeightEvent[]>([]);
   const [baselineWeight, setBaselineWeight] = useState<number | null>(null);
   const [journeyStartAt, setJourneyStartAt] = useState<string | null>(null);
+  const [referenceTime, setReferenceTime] = useState(0);
   const [intelligence, setIntelligence] = useState<any>(null);
   const [loading, setLoading] = useState(true);
 
@@ -61,6 +68,7 @@ export default function TodayWeightGoal({ goal, fallbackWeight, bmi: dashboardBm
     let active = true;
     const load = async () => {
       setLoading(true);
+      setReferenceTime(Date.now());
       try {
         const goalId = String(goal?.id ?? "");
         const response = await healthGoalsService.getMetricEvents("WEIGHT", "weight.kg", new Date(0), new Date());
@@ -171,11 +179,11 @@ export default function TodayWeightGoal({ goal, fallbackWeight, bmi: dashboardBm
       window.removeEventListener("sympto:health-goal-updated", onGoalUpdated);
       window.removeEventListener("sympto:health-checkin-updated", onWeightUpdated);
     };
-  }, [goal?.id, goal?.createdAt]);
+  }, [goal?.id, goal?.createdAt, goal?.progress]);
 
   const journey = useMemo(
-    () => journeyFor(goal, journeyStartAt ?? intelligence?.goal?.createdAt),
-    [goal, journeyStartAt, intelligence?.goal?.createdAt],
+    () => journeyFor(goal, journeyStartAt ?? intelligence?.goal?.createdAt, referenceTime),
+    [goal, journeyStartAt, intelligence?.goal?.createdAt, referenceTime],
   );
   const comparison = String(goal?.metricConfig?.comparison ?? goal?.comparison ?? intelligence?.goal?.comparison ?? "CLOSEST").toUpperCase();
   const isMaintenanceGoal = comparison === "CLOSEST";
@@ -207,8 +215,7 @@ export default function TodayWeightGoal({ goal, fallbackWeight, bmi: dashboardBm
   const changeKg = startingWeight != null && journeyWeight != null ? journeyWeight - startingWeight : null;
   const lostKg = comparison === "DECREASE_TO" && startingWeight != null && journeyWeight != null ? Math.max(startingWeight - journeyWeight, 0) : null;
   const gainedKg = comparison === "INCREASE_TO" && startingWeight != null && journeyWeight != null ? Math.max(journeyWeight - startingWeight, 0) : null;
-  const actualChange = comparison === "DECREASE_TO" ? lostKg : comparison === "INCREASE_TO" ? gainedKg : null;
-  const weekAgo = Date.now() - 7 * 86400000;
+  const weekAgo = referenceTime > 0 ? referenceTime - 7 * 86400000 : Number.POSITIVE_INFINITY;
   const olderThanWeek = [...events].reverse().find((event) => new Date(event.occurredAt).getTime() <= weekAgo);
   const weeklyChangeKg = olderThanWeek && currentWeight != null ? currentWeight - olderThanWeek.loggedValue : null;
   const expectedProgress = journey.totalDays != null && journey.totalDays > 0 ? Math.min(100, Math.max(0, ((journey.journeyDay - 1) / journey.totalDays) * 100)) : null;
@@ -646,7 +653,8 @@ export default function TodayWeightGoal({ goal, fallbackWeight, bmi: dashboardBm
               </div>
             )}
             {!goalCompleted && guidanceMessage && <p className="mt-1.5">{guidanceMessage}</p>}
-            {!goalCompleted && bmiChange != null && Math.abs(bmiChange) >= 0.1 && <p className="mt-1.5">BMI change since goal start: {bmiChange > 0 ? "+" : ""}{bmiChange.toFixed(1)}.</p>}
+            {!goalCompleted && bmiChange != null && Math.abs(bmiChange) >= 0.1 && <p className="mt-1.5">BMI change since goal start: {bmiChange > 0 ? "+" : ""}{bmiChange.toFixed(1)}.</p>
+            {!goalCompleted && weeklyChangeKg != null && Math.abs(weeklyChangeKg) >= 0.1 && <p className="mt-1.5">Weight change across at least 7 days: {weeklyChangeKg > 0 ? "+" : ""}{weeklyChangeKg.toFixed(1)} kg.</p>}
             {!goalCompleted && gainTargetCaution && upperScreeningWeight != null && <p className="mt-1.5">At your recorded height, BMI 24.9 corresponds to about {formatKg(upperScreeningWeight)} kg. This is screening context, not a required target.</p>}
             {!goalCompleted && (bmiCaution || gainTargetCaution) && <>
               <p className="mt-1.5">{bmiCaution ? `The planned target BMI is ${targetBmi?.toFixed(1)}, below 18.5. The goal remains saved while you review what to do next.` : `The planned target BMI is ${targetBmi?.toFixed(1)}, outside the adult healthy-weight screening range${gainTargetObesityRange ? " and in the obesity screening category" : ""}. The goal remains saved while you review what to do next.`}</p>
