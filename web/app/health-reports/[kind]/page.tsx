@@ -455,7 +455,7 @@ function vitalSeries(report: Report | null, metric: string): SeriesPoint[] {
   return Array.from(deduped.values()).sort((a, b) => a.timestamp - b.timestamp);
 }
 
-function reportMeasurementReviews(report: Report): MeasurementReview[] {
+function reportMeasurementReviews(report: Report, age: number | null): MeasurementReview[] {
   const reviews: MeasurementReview[] = [];
 
   const oxygen = vitalSeries(report, "oxygen");
@@ -501,7 +501,13 @@ function reportMeasurementReviews(report: Report): MeasurementReview[] {
     (lowest, point) => !lowest || point.value < lowest.value ? point : lowest,
     null,
   );
-  if (hottest && hottest.value >= 43) {
+  if (latestTemperature && latestTemperature.value >= 43) {
+    reviews.push({
+      key: "temperature", label: "Temperature", unit: "°C",
+      value: latestTemperature.value, timestamp: latestTemperature.timestamp, severity: "review",
+      message: "This is far outside usual body-temperature readings and may be a unit, sensor or typing error. Check the original record promptly. If a temperature this high is current and accurate, seek emergency medical help.",
+    });
+  } else if (hottest && hottest.value >= 43) {
     reviews.push({
       key: "temperature", label: "Temperature", unit: "°C",
       value: hottest.value, timestamp: hottest.timestamp, severity: "review",
@@ -537,19 +543,19 @@ function reportMeasurementReviews(report: Report): MeasurementReview[] {
     (lowest, point) => !lowest || point.value < lowest.value ? point : lowest,
     null,
   );
-  if (latestBreathing && latestBreathing.value > 30) {
+  if (age !== null && age >= 18 && latestBreathing && latestBreathing.value > 30) {
     reviews.push({
       key: "respiratory", label: "Breathing rate", unit: "breaths/min",
       value: latestBreathing.value, timestamp: latestBreathing.timestamp, severity: "urgent",
       message: "This is much faster than the typical adult resting range of 12–18 breaths per minute. If this is your current rate, recheck while resting and seek urgent medical advice if it remains this high. Get emergency help for severe breathing difficulty.",
     });
-  } else if (highestBreathing && highestBreathing.value > 30) {
+  } else if (age !== null && age >= 18 && highestBreathing && highestBreathing.value > 30) {
     reviews.push({
       key: "respiratory", label: "Breathing rate", unit: "breaths/min",
       value: highestBreathing.value, timestamp: highestBreathing.timestamp, severity: "review",
       message: "This saved rate is much faster than the typical adult resting range of 12–18 breaths per minute. Check whether it was recorded after activity and verify the original entry. If this is happening now, seek urgent medical advice.",
     });
-  } else if (latestBreathing && latestBreathing.value > 0 && latestBreathing.value < 8) {
+  } else if (age !== null && age >= 18 && latestBreathing && latestBreathing.value > 0 && latestBreathing.value < 8) {
     reviews.push({
       key: "respiratory", label: "Breathing rate", unit: "breaths/min",
       value: lowestBreathing?.value ?? latestBreathing.value,
@@ -560,9 +566,11 @@ function reportMeasurementReviews(report: Report): MeasurementReview[] {
 
   const latestSystolic = vitalSeries(report, "systolic").at(-1);
   const latestDiastolic = vitalSeries(report, "diastolic").at(-1);
-  const severeBloodPressure = latestSystolic && latestSystolic.value > 180
-    ? latestSystolic
-    : latestDiastolic && latestDiastolic.value > 120 ? latestDiastolic : null;
+  const severeBloodPressure = age !== null && age >= 18
+    ? latestSystolic && latestSystolic.value > 180
+      ? latestSystolic
+      : latestDiastolic && latestDiastolic.value > 120 ? latestDiastolic : null
+    : null;
   if (severeBloodPressure) {
     const isSystolic = severeBloodPressure === latestSystolic;
     reviews.push({
@@ -575,6 +583,77 @@ function reportMeasurementReviews(report: Report): MeasurementReview[] {
   }
 
   return reviews;
+}
+
+type VitalStatusAssessment = { label: string; detail: string; tone: StatusTone };
+
+function vitalStatus(report: Report, metric: string, age: number | null): VitalStatusAssessment {
+  const points = vitalSeries(report, metric);
+  const latest = points[points.length - 1];
+  if (!latest) return { label: "No reading", detail: "There is no saved value to assess.", tone: "info" };
+  const value = latest.value;
+
+  if (metric === "oxygen") {
+    if (value <= 0 || value > 100) return { label: "Check entry", detail: "This is outside the valid 0–100% scale.", tone: "high" };
+    if (value <= 88) return { label: "Critical low", detail: "If this is current, seek emergency medical help. Check the original record too.", tone: "critical" };
+    if (value <= 92) return { label: "Urgent review", detail: "Repeat the reading and seek urgent medical advice; do not delay help if unwell.", tone: "high" };
+    if (age === null || age < 18) return { label: "Personal range needed", detail: "Age-specific oxygen guidance is needed; this is not rated against adult ranges.", tone: "info" };
+    if (value < 95) return { label: "Recheck", detail: "This is below the common adult guide of 95–100%. Personal targets can differ.", tone: "watch" };
+    return { label: "Within common guide", detail: "Within the common adult reference of 95–100%; follow your clinician's personal target.", tone: "good" };
+  }
+
+  if (metric === "temperature") {
+    if (value >= 43) return { label: "Verify urgently", detail: "This value is far outside usual body-temperature readings. Check the unit and source.", tone: "high" };
+    if (value >= 40) return { label: "Very high", detail: "If current and accurate, seek urgent medical advice; emergency symptoms need emergency help.", tone: "critical" };
+    if (value < 35) return { label: "Very low", detail: "If current and accurate, seek urgent medical advice.", tone: "high" };
+    if (value >= 38) return { label: "Raised", detail: "A raised temperature can need clinical advice, depending on age and symptoms.", tone: "watch" };
+    if (age === null || age < 18) return { label: "Personal range needed", detail: "Age-specific temperature guidance is needed for this profile.", tone: "info" };
+    if (value < 36.5 || value > 37.5) return { label: "Outside common guide", detail: "Compare with how and when it was measured, and check your personal guidance.", tone: "watch" };
+    return { label: "Within common guide", detail: "Within a common adult resting reference; temperature varies by method and time of day.", tone: "good" };
+  }
+
+  if (metric === "systolic" || metric === "diastolic") {
+    if (age === null || age < 18) return { label: "Age-specific range needed", detail: "Adult blood-pressure categories are not applied without a recorded adult age.", tone: "info" };
+    const systolic = vitalSeries(report, "systolic").at(-1);
+    const diastolic = vitalSeries(report, "diastolic").at(-1);
+    const paired = Boolean(systolic && diastolic && Math.abs(systolic.timestamp - diastolic.timestamp) <= 15 * 60 * 1000);
+    const sys = paired && systolic ? systolic.value : metric === "systolic" ? value : null;
+    const dia = paired && diastolic ? diastolic.value : metric === "diastolic" ? value : null;
+    if ((sys !== null && sys > 180) || (dia !== null && dia > 120)) {
+      return { label: "Very high", detail: "Repeat after sitting quietly. Seek prompt medical advice; with chest pain, breathlessness, weakness, vision or speech changes, call emergency services.", tone: "critical" };
+    }
+    if ((sys !== null && sys >= 140) || (dia !== null && dia >= 90)) {
+      return { label: "High range", detail: "This is in a high adult reference category. Repeated readings and clinical review matter; one reading is not a diagnosis.", tone: "high" };
+    }
+    if ((sys !== null && sys >= 130) || (dia !== null && dia >= 80)) {
+      return { label: "Stage 1 range", detail: "This is above the normal adult reference. Compare repeated readings with your clinician's goal.", tone: "watch" };
+    }
+    if (sys !== null && dia !== null && sys >= 120 && dia < 80) {
+      return { label: "Elevated range", detail: "The top number is above the normal adult reference, while the bottom number is below 80.", tone: "watch" };
+    }
+    if ((sys !== null && sys < 90) || (dia !== null && dia < 60)) {
+      return { label: "Low reading", detail: "A low reading should be interpreted with symptoms, medicines and your usual baseline.", tone: "watch" };
+    }
+    return { label: "Within adult guide", detail: "Within common adult categories. Use your saved Health Goal and clinician-set target if different.", tone: "good" };
+  }
+
+  if (metric === "heartRate") {
+    if (age === null || age < 18) return { label: "Age-specific range needed", detail: "Heart-rate references vary by age and activity; adult ranges are not applied.", tone: "info" };
+    if (value < 40 || value > 130) return { label: "Needs prompt review", detail: "Outside the typical adult resting range. Recheck at rest and seek advice if it persists or you feel unwell.", tone: "high" };
+    if (value < 60 || value > 100) return { label: "Outside common range", detail: "The typical adult resting pulse range is 60–100 bpm; activity and medicines can affect it.", tone: "watch" };
+    return { label: "Within common range", detail: "Within the typical adult resting pulse range of 60–100 bpm.", tone: "good" };
+  }
+
+  if (metric === "respiratory") {
+    if (age === null || age < 18) return { label: "Age-specific range needed", detail: "Breathing-rate references vary substantially by age; adult ranges are not applied.", tone: "info" };
+    if (value > 30) return { label: "Urgent review", detail: "Far above the typical adult resting range of 12–18 breaths/min. If current or accompanied by breathing difficulty, seek urgent help.", tone: "critical" };
+    if (value < 8) return { label: "Low rate", detail: "Below the typical adult resting range. Recheck and seek prompt medical advice if current or unwell.", tone: "high" };
+    if (value < 12 || value > 18) return { label: "Outside resting range", detail: "The typical adult resting range is 12–18 breaths/min; activity and illness can affect it.", tone: "watch" };
+    return { label: "Within resting range", detail: "Within the typical adult resting range of 12–18 breaths/min.", tone: "good" };
+  }
+
+  if (metric === "weight") return { label: "Trend only", detail: "Weight is shown against saved measurements and goals; a single value is not labelled healthy or unhealthy.", tone: "info" };
+  return { label: "Reference needed", detail: "Use your personal target or clinician guidance for this measure.", tone: "info" };
 }
 
 
@@ -896,6 +975,7 @@ function VitalTrendCard({
   previous,
   previousLoading,
   review,
+  status,
 }: {
   label: string;
   description: string;
@@ -905,6 +985,7 @@ function VitalTrendCard({
   previous: SeriesPoint[];
   previousLoading: boolean;
   review: MeasurementReview | null;
+  status: VitalStatusAssessment;
 }) {
   const currentValues = current.map((item) => item.value);
   const previousValues = previous.map((item) => item.value);
@@ -927,6 +1008,7 @@ function VitalTrendCard({
         <HeartPulse className="h-5 w-5 shrink-0 text-[#24c1c4]" />
       </div>
       <p className="mt-2 text-xs leading-5 text-slate-500">{description}</p>
+      <div className="mt-3"><StatusCircle label={status.label} detail={status.detail} tone={status.tone} /></div>
       {average === null ? (
         <p className="mt-4 text-sm text-slate-500">No readings were saved for this period.</p>
       ) : (
@@ -1024,7 +1106,9 @@ function HealthReportInsights({
     : symptomCount === 0
       ? "No symptom logs were found for this period."
       : "The previous period is not available for comparison.";
-  const measurementReviews = reportMeasurementReviews(report);
+  const age = ageAt(report.currentSnapshot?.person?.dateOfBirth, report.generatedAt);
+  const coveragePercent = Math.round(daysLogged / totalDays * 100);
+  const measurementReviews = reportMeasurementReviews(report, age);
   const vitalConfigs = [
     { key: "systolic", label: "Systolic blood pressure", description: "The top number in a blood pressure reading. It measures pressure when your heart beats.", unit: "mmHg", digits: 0 },
     { key: "diastolic", label: "Diastolic blood pressure", description: "The bottom number in a blood pressure reading. It measures pressure between heartbeats.", unit: "mmHg", digits: 0 },
@@ -1040,6 +1124,7 @@ function HealthReportInsights({
       current: vitalSeries(report, config.key),
       previous: vitalSeries(previousReport, config.key),
       review: measurementReviews.find((review) => review.key === config.key) ?? null,
+      status: vitalStatus(report, config.key, age),
     }))
     .filter((config) => config.current.length > 0);
   const routineConfigs = [
@@ -1063,6 +1148,7 @@ function HealthReportInsights({
 
   return (
     <div className="mt-5 space-y-6">
+      <HealthContextSection report={report} coveragePercent={coveragePercent} daysLogged={daysLogged} totalDays={totalDays} />
       <section>
         <div className="mb-3 flex items-end justify-between gap-3"><div><p className="text-[10px] font-black uppercase tracking-[0.16em] text-[#24c1c4]">Period overview</p><h2 className="mt-1 text-xl font-black text-[#0b2d54]">The bigger picture</h2></div><span className="text-xs text-slate-400">{totalDays} days</span></div>
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
@@ -1095,7 +1181,7 @@ function HealthReportInsights({
 
       <section>
         <div className="mb-3"><p className="text-[10px] font-black uppercase tracking-[0.16em] text-[#24c1c4]">Change over time</p><h2 className="mt-1 text-xl font-black text-[#0b2d54]">Measurement trends</h2><p className="mt-1 text-sm leading-6 text-slate-500">Each card explains the measurement, shows the average of saved readings, and tells you how it compares with the previous period. A change by itself does not say what caused it or whether it is right for you.</p></div>
-        {activeVitals.length ? <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">{activeVitals.map((item) => <VitalTrendCard key={item.key} label={item.label} description={item.description} unit={item.unit} digits={item.digits} current={item.current} previous={item.previous} previousLoading={previousLoading} review={item.review} />)}</div> : <div className="rounded-2xl border border-dashed border-slate-300 bg-white p-5 text-sm leading-6 text-slate-500">No dated vital readings were found for this period. Once you save blood pressure, heart rate, weight or other measurements, they will appear here.</div>}
+        {activeVitals.length ? <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">{activeVitals.map((item) => <VitalTrendCard key={item.key} label={item.label} description={item.description} unit={item.unit} digits={item.digits} current={item.current} previous={item.previous} previousLoading={previousLoading} review={item.review} status={item.status} />)}</div> : <div className="rounded-2xl border border-dashed border-slate-300 bg-white p-5 text-sm leading-6 text-slate-500">No dated vital readings were found for this period. Once you save blood pressure, heart rate, weight or other measurements, they will appear here.</div>}
       </section>
 
       <section>
