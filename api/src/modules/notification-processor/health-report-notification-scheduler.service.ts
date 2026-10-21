@@ -522,7 +522,7 @@ export class HealthReportNotificationSchedulerService
         include: {
           orderItem: {
             include: {
-              test: true,
+              test: { include: { unit: true } },
               order: {
                 include: {
                   laboratory: true,
@@ -531,7 +531,7 @@ export class HealthReportNotificationSchedulerService
               },
             },
           },
-          items: { include: { test: true } },
+          items: { include: { test: { include: { unit: true } } } },
           specimen: true,
           criticalResults: true,
         },
