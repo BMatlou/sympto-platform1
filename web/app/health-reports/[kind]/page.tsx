@@ -3177,7 +3177,7 @@ function LedgerFieldTree({ value }: { value: unknown }) {
 function LedgerGroup({ group }: { group: ReportLedgerGroup }) {
   if (!group.rows.length) return null;
   const latest = ledgerObject(group.rows[group.rows.length - 1]);
-  return <details className="group overflow-hidden rounded-2xl border border-slate-200 bg-white">
+  return <details id={group.key} open={group.key === "check-ins"} className="group overflow-hidden rounded-2xl border border-slate-200 bg-white">
     <summary className="flex cursor-pointer list-none items-center gap-3 px-4 py-3.5 transition hover:bg-[#f7fbfc] sm:px-5">
       <span className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-[#eafafa] text-xs font-black tabular-nums text-[#0b5a62]">{group.rows.length}</span>
       <span className="min-w-0 flex-1"><span className="block text-sm font-bold text-[#0b2d54]">{group.title}</span><span className="mt-0.5 block truncate text-[11px] text-slate-500">{group.description} · Latest: {ledgerTitle(latest, "Record")}</span></span>
@@ -3216,7 +3216,7 @@ function ReportDataCoverage({ report }: { report: Report }) {
   ].filter((item) => item.count > 0);
   if (!counts.length) return null;
   return <section aria-label="Data coverage for this report" className="mt-3 rounded-2xl border border-[#dcebed] bg-white px-4 py-3 shadow-sm sm:px-5">
-    <div className="flex flex-wrap items-baseline justify-between gap-2"><h2 className="text-xs font-extrabold text-[#0b2d54]">Data included in this report</h2><span className="text-[10px] font-semibold text-slate-500">{counts.length} data groups with records</span></div>
+    <div className="flex flex-wrap items-baseline justify-between gap-2"><h2 className="text-xs font-extrabold text-[#0b2d54]">Data included in this report</h2><div className="flex items-center gap-3"><span className="text-[10px] font-semibold text-slate-500">{counts.length} data groups with records</span><a href="#full-report-data" className="inline-flex items-center gap-1 text-[11px] font-bold text-[#0b7b80]">Browse all records <ArrowRight className="h-3 w-3" /></a></div></div>
     <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-4">
       {counts.map((item) => <div key={item.title} className="flex min-w-0 items-center justify-between gap-2 rounded-xl bg-[#f5fafb] px-3 py-2"><span className="min-w-0 text-[11px] font-semibold text-slate-600">{item.title}</span><span className="shrink-0 text-sm font-black tabular-nums text-[#0b2d54]">{item.count}</span></div>)}
     </div>
@@ -3276,7 +3276,7 @@ function CompleteReportData({ report }: { report: Report }) {
   const context = contextGroups.filter((group) => group.rows.length > 0);
   const total = groups.reduce((sum, group) => sum + group.rows.length, 0);
   if (!total && !context.length) return null;
-  return <section aria-label="All health data in the report period" className="space-y-4">
+  return <section id="full-report-data" aria-label="All health data in the report period" className="space-y-4">
     <div className="overflow-hidden rounded-[24px] border border-[#cfe5e8] bg-white shadow-sm">
       <div className="bg-gradient-to-r from-[#f0fbfb] to-white p-4 sm:p-5">
         <p className="text-[10px] font-extrabold uppercase tracking-[0.16em] text-[#0b7b80]">Full record · {report.period.label}</p>
