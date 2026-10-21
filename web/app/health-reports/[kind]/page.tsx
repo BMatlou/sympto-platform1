@@ -94,6 +94,79 @@ type LabResultRecord = {
   items?: LabResultItem[] | null;
 };
 
+type SnapshotPerson = {
+  firstName?: string | null;
+  preferredName?: string | null;
+  dateOfBirth?: string | null;
+  gender?: string | null;
+};
+type SnapshotProfile = {
+  heightCm?: number | string | null;
+  weightKg?: number | string | null;
+  smokingStatus?: string | null;
+  alcoholConsumption?: string | null;
+  exerciseFrequency?: string | null;
+  occupation?: string | null;
+};
+type SnapshotCondition = {
+  status?: string | null;
+  severity?: string | null;
+  chronic?: boolean | null;
+  condition?: { name?: string | null; chronic?: boolean | null } | null;
+};
+type SnapshotAllergy = {
+  status?: string | null;
+  severity?: string | null;
+  reaction?: string | null;
+  allergy?: { name?: string | null } | null;
+};
+type SnapshotMedication = {
+  status?: string | null;
+  ongoing?: boolean | null;
+  dosage?: string | null;
+  frequency?: string | null;
+  indication?: string | null;
+  adherencePercentage?: number | null;
+  missedDoses?: number | null;
+  medication?: { name?: string | null; genericName?: string | null; brandName?: string | null } | null;
+};
+type GoalProgressRecord = {
+  progressPercent?: number | string | null;
+  status?: string | null;
+  currentValue?: number | string | null;
+  measuredAt?: string | null;
+  notes?: string | null;
+};
+type SnapshotGoal = {
+  id?: string;
+  title?: string | null;
+  description?: string | null;
+  category?: string | null;
+  priority?: string | null;
+  status?: string | null;
+  currentValue?: number | string | null;
+  targetValue?: number | string | null;
+  unit?: string | null;
+  targetDate?: string | null;
+  achievedAt?: string | null;
+  createdAt?: string | null;
+  progress?: GoalProgressRecord[] | null;
+};
+type HealthContextSnapshot = {
+  person?: SnapshotPerson | null;
+  profile?: SnapshotProfile | null;
+  baseline?: {
+    heightCm?: number | string | null;
+    weightKg?: number | string | null;
+    bmi?: number | string | null;
+    establishedAt?: string | null;
+  } | null;
+  conditions?: SnapshotCondition[];
+  allergies?: SnapshotAllergy[];
+  medications?: SnapshotMedication[];
+  activeGoals?: SnapshotGoal[];
+};
+
 type Report = {
   type: "WEEKLY" | "MONTHLY";
   period: { start: string; end: string; label: string; scheduledFor: string };
@@ -118,6 +191,7 @@ type Report = {
     carePlans: unknown[];
     referrals: unknown[];
   };
+  currentSnapshot?: HealthContextSnapshot | null;
   generatedAt: string;
 };
 
@@ -145,6 +219,31 @@ const finite = (value: unknown): number | null => {
   const number = Number(value);
   return Number.isFinite(number) ? number : null;
 };
+
+function ageAt(dateOfBirth: unknown, referenceDate: unknown): number | null {
+  if (!dateOfBirth || !referenceDate) return null;
+  const birth = new Date(String(dateOfBirth));
+  const reference = new Date(String(referenceDate));
+  if (!Number.isFinite(birth.getTime()) || !Number.isFinite(reference.getTime()) || birth > reference) return null;
+  let age = reference.getFullYear() - birth.getFullYear();
+  if (
+    reference.getMonth() < birth.getMonth() ||
+    (reference.getMonth() === birth.getMonth() && reference.getDate() < birth.getDate())
+  ) age -= 1;
+  return age >= 0 && age < 125 ? age : null;
+}
+
+type StatusTone = "good" | "watch" | "high" | "critical" | "info";
+
+function toneStyles(tone: StatusTone) {
+  switch (tone) {
+    case "good": return { ring: "#15803d", track: "#dcfce7", text: "text-emerald-800", surface: "bg-emerald-50", border: "border-emerald-200" };
+    case "watch": return { ring: "#d97706", track: "#fef3c7", text: "text-amber-900", surface: "bg-amber-50", border: "border-amber-200" };
+    case "high": return { ring: "#ea580c", track: "#ffedd5", text: "text-orange-900", surface: "bg-orange-50", border: "border-orange-200" };
+    case "critical": return { ring: "#be123c", track: "#ffe4e6", text: "text-rose-900", surface: "bg-rose-50", border: "border-rose-200" };
+    default: return { ring: "#64748b", track: "#e2e8f0", text: "text-slate-700", surface: "bg-slate-50", border: "border-slate-200" };
+  }
+}
 
 function dateKey(value: unknown) {
   if (!value) return "";
@@ -577,6 +676,173 @@ function SummaryTile({ icon: Icon, label, value, detail }: { icon: typeof Activi
       <p className="mt-3 text-2xl font-black tracking-tight text-[#0b2d54]">{value}</p>
       <p className="mt-1 text-xs leading-5 text-slate-500">{detail}</p>
     </article>
+  );
+}
+
+function ScoreRing({ percent, label, tone, size = 68 }: { percent: number | null; label: string; tone: StatusTone; size?: number }) {
+  const styles = toneStyles(tone);
+  const radius = 25;
+  const circumference = 2 * Math.PI * radius;
+  const safePercent = percent === null ? 0 : Math.max(0, Math.min(100, percent));
+  return (
+    <div className="flex shrink-0 flex-col items-center gap-1" role="img" aria-label={percent === null ? label + ": not scored yet" : label + ": " + Math.round(safePercent) + " percent"}>
+      <svg width={size} height={size} viewBox="0 0 64 64" className="block">
+        <circle cx="32" cy="32" r={radius} fill="none" stroke={styles.track} strokeWidth="6" />
+        {percent !== null && <circle cx="32" cy="32" r={radius} fill="none" stroke={styles.ring} strokeWidth="6" strokeLinecap="round" strokeDasharray={String(circumference)} strokeDashoffset={String(circumference * (1 - safePercent / 100))} transform="rotate(-90 32 32)" />}
+        <text x="32" y="35" textAnchor="middle" fontSize={percent === null ? "16" : "13"} fontWeight="800" fill={styles.ring}>{percent === null ? "—" : Math.round(safePercent) + "%"}</text>
+      </svg>
+      <span className="text-center text-[9px] font-bold leading-3 text-slate-500">{label}</span>
+    </div>
+  );
+}
+
+function StatusCircle({ label, detail, tone }: { label: string; detail: string; tone: StatusTone }) {
+  const styles = toneStyles(tone);
+  const mark = tone === "good" ? "✓" : tone === "watch" ? "!" : tone === "high" ? "!!" : tone === "critical" ? "SOS" : "?";
+  return (
+    <div className="flex min-w-0 items-center gap-2.5">
+      <span aria-hidden="true" className={"grid h-11 w-11 shrink-0 place-items-center rounded-full border-[3px] bg-white text-xs font-black " + styles.border + " " + styles.text}>{mark}</span>
+      <span className="min-w-0">
+        <span className={"block text-xs font-black " + styles.text}>{label}</span>
+        <span className="mt-0.5 block text-[10px] leading-4 text-slate-500">{detail}</span>
+      </span>
+    </div>
+  );
+}
+
+function GoalProgressCard({ goal }: { goal: SnapshotGoal }) {
+  const latest = goal.progress?.[0] ?? null;
+  const rawPercent = finite(latest?.progressPercent);
+  const percent = rawPercent === null
+    ? (String(latest?.status ?? "").toUpperCase() === "ACHIEVED" || String(goal.status ?? "").toUpperCase() === "ACHIEVED" ? 100 : null)
+    : Math.max(0, Math.min(100, rawPercent));
+  const progressStatus = String(latest?.status ?? goal.status ?? "").toUpperCase();
+  const tone: StatusTone = progressStatus === "DECLINING" ? "high"
+    : progressStatus === "STAGNANT" ? "watch"
+    : progressStatus === "ON_TRACK" || progressStatus === "IMPROVING" || progressStatus === "ACHIEVED" ? "good"
+    : "info";
+  const statusLabel: Record<string, string> = {
+    ON_TRACK: "On track",
+    IMPROVING: "Improving",
+    STAGNANT: "Not changing yet",
+    DECLINING: "Moving away from target",
+    ACHIEVED: "Goal achieved",
+    ACTIVE: "Active goal",
+  };
+  const statusText = statusLabel[progressStatus] ?? "Progress not rated";
+  const targetValue = finite(goal.targetValue);
+  const currentValue = finite(latest?.currentValue ?? goal.currentValue);
+  const progressLabel = percent === null ? "No percentage saved yet" : Math.round(percent) + "% of goal journey";
+  return (
+    <article className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+      <div className="flex items-start gap-3">
+        <ScoreRing percent={percent} label="Goal progress" tone={tone} size={74} />
+        <div className="min-w-0 flex-1">
+          <p className="text-[9px] font-black uppercase tracking-[0.12em] text-[#0b7b80]">{human(goal.category)}</p>
+          <h3 className="mt-1 text-sm font-black text-[#0b2d54]">{goal.title || "Health goal"}</h3>
+          <p className={"mt-1 text-xs font-bold " + toneStyles(tone).text}>{statusText}</p>
+          <p className="mt-1 text-[10px] leading-4 text-slate-500">{progressLabel}</p>
+        </div>
+      </div>
+      <div className="mt-3 h-2 overflow-hidden rounded-full bg-slate-100" role="progressbar" aria-label={(goal.title || "Health goal") + " progress"} aria-valuemin={0} aria-valuemax={100} aria-valuenow={percent === null ? undefined : Math.round(percent)}>
+        {percent !== null && <div className="h-full rounded-full transition-[width] duration-300" style={{ width: String(percent) + "%", backgroundColor: toneStyles(tone).ring }} />}
+      </div>
+      <div className="mt-3 flex flex-wrap gap-x-3 gap-y-1 text-[10px] text-slate-500">
+        {currentValue !== null && <span>Latest: <strong className="text-[#0b2d54]">{formatNumber(currentValue, 1)} {goal.unit || ""}</strong></span>}
+        {targetValue !== null && <span>Target: <strong className="text-[#0b2d54]">{formatNumber(targetValue, 1)} {goal.unit || ""}</strong></span>}
+        {latest?.measuredAt && <span>Updated {dateLabel(latest.measuredAt)}</span>}
+        {goal.targetDate && <span>Target date {dateLabel(goal.targetDate)}</span>}
+      </div>
+      {goal.description && <p className="mt-2 text-xs leading-5 text-slate-500">{goal.description}</p>}
+    </article>
+  );
+}
+
+function HealthContextSection({ report, coveragePercent, daysLogged, totalDays }: { report: Report; coveragePercent: number; daysLogged: number; totalDays: number }) {
+  const snapshot = report.currentSnapshot;
+  const person = snapshot?.person;
+  const profile = snapshot?.profile;
+  const baseline = snapshot?.baseline;
+  const age = ageAt(person?.dateOfBirth, report.generatedAt);
+  const heightCm = finite(profile?.heightCm) ?? finite(baseline?.heightCm);
+  const periodWeight = vitalSeries(report, "weight").at(-1)?.value ?? null;
+  const weightKg = finite(profile?.weightKg) ?? finite(baseline?.weightKg) ?? periodWeight;
+  const bmi = age !== null && age >= 18 && heightCm !== null && heightCm > 0 && weightKg !== null && weightKg > 0
+    ? weightKg / Math.pow(heightCm / 100, 2)
+    : null;
+  const allConditions = snapshot?.conditions ?? [];
+  const currentConditions = allConditions.filter((item) => !["RESOLVED"].includes(String(item.status ?? "").toUpperCase()));
+  const currentAllergies = (snapshot?.allergies ?? []).filter((item) => !["INACTIVE", "RESOLVED"].includes(String(item.status ?? "").toUpperCase()));
+  const currentMedications = (snapshot?.medications ?? []).filter((item) => String(item.status ?? "ACTIVE").toUpperCase() === "ACTIVE");
+  const goals = snapshot?.activeGoals ?? [];
+  const coverageTone: StatusTone = coveragePercent >= 75 ? "good" : coveragePercent >= 40 ? "watch" : "high";
+  const displayName = person?.preferredName || person?.firstName || "Your profile";
+  return (
+    <div className="mt-5 space-y-4">
+      <section className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:p-5">
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-center">
+          <div className="flex min-w-0 flex-1 items-center gap-4">
+            <ScoreRing percent={coveragePercent} label="Data coverage" tone={coverageTone} size={82} />
+            <div className="min-w-0">
+              <p className="text-[10px] font-black uppercase tracking-[0.15em] text-[#0b7b80]">Monitoring summary</p>
+              <h2 className="mt-1 text-lg font-black text-[#0b2d54]">{daysLogged} of {totalDays} days with records</h2>
+              <p className="mt-1 text-xs leading-5 text-slate-500">{coveragePercent}% data coverage in this report. This is a measure of how much was logged—not a score for your overall health.</p>
+            </div>
+          </div>
+          <div className={"rounded-xl border px-3 py-2 text-xs font-bold " + toneStyles(coverageTone).surface + " " + toneStyles(coverageTone).border + " " + toneStyles(coverageTone).text}>
+            {coverageTone === "good" ? "Good coverage" : coverageTone === "watch" ? "Moderate coverage" : "Limited coverage"}
+          </div>
+        </div>
+      </section>
+
+      <section className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:p-5">
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div>
+            <p className="text-[10px] font-black uppercase tracking-[0.15em] text-[#0b7b80]">Personal context</p>
+            <h2 className="mt-1 text-lg font-black text-[#0b2d54]">{displayName}</h2>
+            <p className="mt-1 text-xs leading-5 text-slate-500">Current profile and care context used to interpret this report. It may include information updated after the report period.</p>
+          </div>
+          <Link href="/health-passport" className="inline-flex min-h-9 items-center gap-1.5 rounded-xl border border-[#dcebed] px-3 py-2 text-[10px] font-black text-[#0b2d54] hover:bg-[#f4fbfb]">Review Health Passport <ArrowRight className="h-3 w-3" /></Link>
+        </div>
+        <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+          <div className="rounded-xl bg-[#f5fafb] p-3"><p className="text-[10px] font-bold uppercase tracking-wide text-slate-500">Age</p><p className="mt-1 text-lg font-black text-[#0b2d54]">{age === null ? "Not recorded" : age === 0 ? "Under 1 year" : String(age) + " years"}</p><p className="mt-1 text-[10px] leading-4 text-slate-500">{age === null ? "Add your date of birth for age-aware reference guidance." : age >= 18 ? "Adult reference guidance can be used as a general guide." : "Adult ranges are not applied to this report; age-specific guidance is needed."}</p></div>
+          <div className="rounded-xl bg-[#f5fafb] p-3"><p className="text-[10px] font-bold uppercase tracking-wide text-slate-500">Height</p><p className="mt-1 text-lg font-black text-[#0b2d54]">{heightCm === null ? "Not recorded" : formatNumber(heightCm, 1) + " cm"}</p></div>
+          <div className="rounded-xl bg-[#f5fafb] p-3"><p className="text-[10px] font-bold uppercase tracking-wide text-slate-500">Weight</p><p className="mt-1 text-lg font-black text-[#0b2d54]">{weightKg === null ? "Not recorded" : formatNumber(weightKg, 1) + " kg"}</p></div>
+          <div className="rounded-xl bg-[#f5fafb] p-3"><p className="text-[10px] font-bold uppercase tracking-wide text-slate-500">BMI · adult screening</p><p className="mt-1 text-lg font-black text-[#0b2d54]">{bmi === null ? "Not calculated" : formatNumber(bmi, 1)}</p><p className="mt-1 text-[10px] leading-4 text-slate-500">{bmi === null ? "Needs a recorded age of 18+ plus height and weight." : "A screening measure, not a diagnosis."}</p></div>
+        </div>
+        <div className="mt-4 grid gap-4 md:grid-cols-2">
+          <div>
+            <h3 className="text-xs font-black text-[#0b2d54]">Health conditions</h3>
+            {currentConditions.length ? <div className="mt-2 flex flex-wrap gap-2">{currentConditions.map((item, index) => <span key={String(item.condition?.name ?? index)} className="rounded-full border border-[#dcebed] bg-[#f5fafb] px-3 py-1.5 text-[10px] font-bold text-[#0b2d54]">{item.condition?.name || "Condition"}{item.status && String(item.status).toUpperCase() !== "ACTIVE" ? " · " + human(item.status) : ""}{item.severity ? " · " + human(item.severity) : ""}</span>)}</div> : <p className="mt-1 text-xs leading-5 text-slate-500">No current conditions are recorded in the Health Passport.</p>}
+          </div>
+          <div>
+            <h3 className="text-xs font-black text-[#0b2d54]">Allergies</h3>
+            {currentAllergies.length ? <div className="mt-2 flex flex-wrap gap-2">{currentAllergies.map((item, index) => <span key={String(item.allergy?.name ?? index)} className={"rounded-full border px-3 py-1.5 text-[10px] font-bold " + (["SEVERE", "LIFE_THREATENING"].includes(String(item.severity).toUpperCase()) ? "border-rose-200 bg-rose-50 text-rose-900" : "border-[#dcebed] bg-[#f5fafb] text-[#0b2d54]")}>{item.allergy?.name || "Allergy"}{item.severity ? " · " + human(item.severity) : ""}</span>)}</div> : <p className="mt-1 text-xs leading-5 text-slate-500">No active allergies are recorded in the Health Passport.</p>}
+          </div>
+          <div>
+            <h3 className="text-xs font-black text-[#0b2d54]">Current medicines</h3>
+            {currentMedications.length ? <div className="mt-2 space-y-2">{currentMedications.slice(0, 6).map((item, index) => <div key={String(item.medication?.name ?? index)} className="rounded-xl bg-[#f5fafb] px-3 py-2"><p className="text-xs font-bold text-[#0b2d54]">{item.medication?.name || "Medicine"}{item.dosage ? " · " + item.dosage : ""}</p><p className="mt-0.5 text-[10px] leading-4 text-slate-500">{[item.frequency, item.indication].filter(Boolean).join(" · ") || "No schedule or reason recorded"}</p>{item.adherencePercentage != null && <p className="mt-1 text-[10px] font-bold text-[#0b7b80]">Saved adherence: {formatNumber(item.adherencePercentage, 0)}%</p>}</div>)}</div> : <p className="mt-1 text-xs leading-5 text-slate-500">No active medicines are recorded in the Health Passport.</p>}
+          </div>
+          <div>
+            <h3 className="text-xs font-black text-[#0b2d54]">Lifestyle context</h3>
+            <div className="mt-2 flex flex-wrap gap-2">{[
+              ["Smoking", profile?.smokingStatus],
+              ["Alcohol", profile?.alcoholConsumption],
+              ["Usual exercise", profile?.exerciseFrequency],
+            ].filter((item) => Boolean(item[1])).map(([label, value]) => <span key={String(label)} className="rounded-full border border-slate-200 bg-white px-3 py-1.5 text-[10px] font-bold text-slate-600">{String(label)}: {human(value)}</span>)}</div>
+            {![profile?.smokingStatus, profile?.alcoholConsumption, profile?.exerciseFrequency].some(Boolean) && <p className="mt-1 text-xs leading-5 text-slate-500">Lifestyle details are not fully recorded. The report will not infer them.</p>}
+          </div>
+        </div>
+      </section>
+
+      <section>
+        <div className="mb-3 flex flex-wrap items-end justify-between gap-3">
+          <div><p className="text-[10px] font-black uppercase tracking-[0.15em] text-[#0b7b80]">Your active plan</p><h2 className="mt-1 text-lg font-black text-[#0b2d54]">Health goals and progress</h2><p className="mt-1 text-xs leading-5 text-slate-500">Progress circles use the percentage saved for each goal. If no percentage has been recorded, it is shown as missing rather than guessed.</p></div>
+          <Link href="/health-goals" className="inline-flex min-h-9 items-center gap-1.5 rounded-xl border border-[#dcebed] px-3 py-2 text-[10px] font-black text-[#0b2d54] hover:bg-white">Manage health goals <ArrowRight className="h-3 w-3" /></Link>
+        </div>
+        {goals.length ? <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">{goals.map((goal, index) => <GoalProgressCard key={String(goal.id ?? goal.title ?? index)} goal={goal} />)}</div> : <div className="rounded-2xl border border-dashed border-slate-300 bg-white p-5 text-sm leading-6 text-slate-500">No active health goals are linked to this profile yet. Saved goals will appear here with their latest recorded progress.</div>}
+      </section>
+    </div>
   );
 }
 
