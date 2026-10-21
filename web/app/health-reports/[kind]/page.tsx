@@ -411,7 +411,7 @@ function periodDays(report: Report) {
 
 function withinReportPeriod(report: Report | null, value: unknown) {
   if (!report || value === null || value === undefined || value === "") return false;
-  const timestamp = new Date(String(value)).getTime();
+  const timestamp = typeof value === "number" ? value : new Date(String(value)).getTime();
   const start = new Date(report.period.start).getTime();
   const end = new Date(report.period.end).getTime();
   return Number.isFinite(timestamp) && Number.isFinite(start) && Number.isFinite(end) &&
