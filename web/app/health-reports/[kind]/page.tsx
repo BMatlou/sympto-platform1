@@ -377,6 +377,12 @@ function reportMeasurementReviews(report: Report): MeasurementReview[] {
       value: latestOxygen.value, timestamp: latestOxygen.timestamp, severity: "urgent",
       message: "This is a very low saved oxygen reading. For most people, a home reading of 88% or lower needs emergency assessment. If a reading this low is happening now, seek emergency medical help. A device can be inaccurate, but do not delay help if you feel unwell.",
     });
+  } else if (lowestOxygen && lowestOxygen.value <= 88) {
+    reviews.push({
+      key: "oxygen", label: "Oxygen saturation", unit: "%",
+      value: lowestOxygen.value, timestamp: lowestOxygen.timestamp, severity: "review",
+      message: "This period includes a very low saved oxygen reading. Check the original record and date. If a reading this low is happening now, seek emergency medical help. A device can be inaccurate, but do not delay help if you feel unwell.",
+    });
   } else if (lowestOxygen && lowestOxygen.value <= 92) {
     const selected = latestOxygen && latestOxygen.value <= 92 ? latestOxygen : lowestOxygen;
     reviews.push({
@@ -534,9 +540,9 @@ function compareText(
   if (previous === null) return "No comparable readings were available in the previous period.";
   const delta = current - previous;
   if (Math.abs(delta) < 0.05) {
-    return "Average " + formatNumber(current, digits) + (unit ? " " + unit : "") + " — broadly unchanged from the previous period.";
+    return "Your average stayed about the same as the previous period (" + formatNumber(current, digits) + (unit ? " " + unit : "") + ").";
   }
-  return "Average " + (delta > 0 ? "rose " : "fell ") + formatNumber(Math.abs(delta), digits) + (unit ? " " + unit : "") + " compared with the previous period.";
+  return "Your average was " + formatNumber(Math.abs(delta), digits) + (unit ? " " + unit : "") + (delta > 0 ? " higher" : " lower") + " than in the previous period.";
 }
 
 function MiniTrend({ values, label }: { values: number[]; label: string }) {
@@ -559,7 +565,7 @@ function MiniTrend({ values, label }: { values: number[]; label: string }) {
       <svg viewBox="0 0 180 42" className="h-12 w-full" role="img" aria-label={label}>
         <polyline points={coordinates} fill="none" stroke="#24c1c4" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
       </svg>
-      <div className="mt-1 flex justify-between text-[10px] text-slate-400"><span>Earlier</span><span>Latest</span></div>
+      <div className="mt-1 flex justify-between text-[10px] text-slate-400"><span>Earlier in period</span><span>Later in period</span></div>
     </div>
   );
 }
@@ -605,7 +611,8 @@ function RoutineTrendCard({
         <div className="mt-4 rounded-xl bg-slate-50 p-3 text-sm text-slate-500">No entries for this measure in the selected period.</div>
       ) : (
         <>
-          <div className="mt-4 flex items-baseline gap-2"><p className="text-2xl font-black tracking-tight text-[#0b2d54]">{formatNumber(currentMean, digits)} <span className="text-sm font-bold text-slate-500">{unit}</span></p><span className="text-[10px] text-slate-400">{current.length} {current.length === 1 ? "day" : "days"}</span></div>
+          <div className="mt-4 flex items-baseline gap-2"><p className="text-2xl font-black tracking-tight text-[#0b2d54]">{formatNumber(currentMean, digits)} <span className="text-sm font-bold text-slate-500">{unit}</span></p><span className="text-[10px] text-slate-400">{current.length} {current.length === 1 ? "day with an entry" : "days with entries"}</span></div>
+          <p className="mt-1 text-[11px] leading-4 text-slate-500">Average on days with a saved value. Days without an entry are not counted as zero.</p>
           <MiniTrend values={values} label={title + " daily trend"} />
           <p className="mt-3 text-xs leading-5 text-slate-500">{compareText(values, previous.map((item) => item.value), unit, digits, previousLoading)}</p>
         </>
@@ -963,7 +970,7 @@ export default function HealthReportPage() {
 
           <section className="mt-4 overflow-hidden rounded-[30px] bg-gradient-to-br from-[#0b2d54] to-[#0f5a62] p-6 text-white shadow-lg sm:p-8">
             <div className="flex flex-col gap-5 sm:flex-row sm:items-start sm:justify-between">
-              <div><div className="flex items-center gap-2 text-[10px] font-black uppercase tracking-[0.18em] text-[#24c1c4]"><ShieldCheck className="h-4 w-4" />Sympto health intelligence</div><h1 className="mt-3 text-3xl font-black tracking-tight sm:text-4xl">{title}</h1><p className="mt-2 text-sm leading-6 text-white/75">{report.period.label}</p><p className="mt-3 max-w-2xl text-sm leading-6 text-white/85">A view of changes, recurring patterns and consistency across your health data—not a duplicate timeline of journal entries.</p></div>
+              <div><div className="flex items-center gap-2 text-[10px] font-black uppercase tracking-[0.18em] text-[#24c1c4]"><ShieldCheck className="h-4 w-4" />Sympto health intelligence</div><h1 className="mt-3 text-3xl font-black tracking-tight sm:text-4xl">{title}</h1><p className="mt-2 text-sm leading-6 text-white/75">{report.period.label}</p><p className="mt-3 max-w-2xl text-sm leading-6 text-white/85">See how your saved measurements and daily routines changed, which symptoms appeared more than once, and where records are missing. This is a summary of your records, not a diagnosis.</p></div>
               <div className="flex shrink-0 items-center gap-2 rounded-2xl border border-white/15 bg-white/10 px-4 py-3"><CalendarDays className="h-5 w-5 text-[#24c1c4]" /><div><p className="text-[10px] font-bold uppercase tracking-wide text-white/60">Report period</p><p className="mt-1 text-sm font-bold">{report.type === "WEEKLY" ? "7-day view" : "Monthly view"}</p></div></div>
             </div>
             <div className="mt-6 flex flex-wrap items-center gap-2"><span className="rounded-full bg-white/10 px-3 py-1.5 text-xs font-bold">Generated {dateLabel(report.generatedAt)}</span><span className="rounded-full bg-white/10 px-3 py-1.5 text-xs font-bold">{previousLoading ? "Comparing with prior period…" : previousReport ? "Compared with previous period" : previousFailed ? "Prior-period data unavailable" : "Current-period insights"}</span></div>
