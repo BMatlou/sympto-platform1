@@ -95,6 +95,9 @@ type SleepSessionRecord = {
   startedAt?: string | null;
   endedAt?: string | null;
   durationMinutes?: number | string | null;
+  sleepScore?: number | string | null;
+  source?: string | null;
+  stages?: Array<{ stage?: string | null; startedAt?: string | null; endedAt?: string | null; durationMinutes?: number | string | null }>;
 };
 type WorkoutRecord = {
   id?: string;
@@ -244,6 +247,7 @@ type HealthContextSnapshot = {
   diagnoses?: SnapshotDiagnosis[];
   allergies?: SnapshotAllergy[];
   medications?: SnapshotMedication[];
+  immunizations?: unknown[];
   activeGoals?: SnapshotGoal[];
 };
 
@@ -276,6 +280,7 @@ type Report = {
     wellnessMetrics: WellnessMetricRecord[];
     sleepSessions: SleepSessionRecord[];
     workouts: WorkoutRecord[];
+    clinicalEpisodes?: unknown[];
   };
   clinical: {
     encounters: unknown[];
@@ -291,6 +296,11 @@ type Report = {
   };
   currentSnapshot?: HealthContextSnapshot | null;
   goalMetricEvents?: GoalMetricEventRecord[];
+  tracking?: {
+    goalProgress?: unknown[];
+    goalHistory?: unknown[];
+    riskAssessments?: unknown[];
+  };
   generatedAt: string;
 };
 
@@ -3073,9 +3083,177 @@ function HealthReportInsights({
 
       {noAnalysisData && <section className="rounded-2xl border border-dashed border-slate-300 bg-white p-6"><div className="flex items-start gap-3"><Info className="mt-0.5 h-5 w-5 shrink-0 text-[#24c1c4]" /><div><h2 className="font-bold text-[#0b2d54]">More records are needed to uncover patterns</h2><p className="mt-1 text-sm leading-6 text-slate-500">As you record Health Vitals, daily check-ins, symptoms or connected-device sessions, future reports can compare these values across periods. This report intentionally avoids repeating individual journal entries.</p><Link href="/today" className="mt-4 inline-flex min-h-10 items-center gap-2 rounded-xl bg-[#0b2d54] px-4 py-2 text-xs font-bold text-white">Record today’s health <ArrowRight className="h-4 w-4" /></Link></div></div></section>}
 
+      <CompleteReportData report={report} />
+
       <p className="rounded-2xl bg-slate-100 p-3 text-[11px] text-slate-500">Generated {dateLabel(report.generatedAt)} · Based on dated records · Not a diagnosis</p>
     </div>
   );
+}
+
+
+type ReportLedgerObject = Record<string, unknown>;
+type ReportLedgerGroup = { key: string; title: string; description: string; rows: unknown[] };
+
+function ledgerObject(value: unknown): ReportLedgerObject {
+  return value && typeof value === "object" && !Array.isArray(value) ? value as ReportLedgerObject : {};
+}
+function ledgerArray(value: unknown): unknown[] { return Array.isArray(value) ? value : []; }
+function ledgerHasValue(value: unknown): boolean {
+  if (value === null || value === undefined || value === "") return false;
+  if (Array.isArray(value)) return value.length > 0;
+  return true;
+}
+function ledgerScalar(value: unknown, key = ""): string {
+  if (value === null || value === undefined || value === "") return "";
+  if (typeof value === "boolean") return value ? "Yes" : "No";
+  if (typeof value === "number") return Number.isFinite(value) ? String(value) : "";
+  if (typeof value === "string") {
+    const raw = value.trim();
+    if (!raw) return "";
+    if (/(At|Date|date|started|ended|resolved|reported|issued|scheduled)$/i.test(key) && /^\d{4}-\d{2}-\d{2}T/.test(raw)) {
+      const date = new Date(raw);
+      return Number.isNaN(date.getTime()) ? raw : date.toLocaleString("en-ZA", { timeZone: "Africa/Johannesburg", dateStyle: "medium", timeStyle: "short" });
+    }
+    return /^[A-Z][A-Z0-9_ -]{2,}$/.test(raw) ? human(raw) : raw;
+  }
+  if (value instanceof Date) return value.toLocaleString("en-ZA", { timeZone: "Africa/Johannesburg", dateStyle: "medium", timeStyle: "short" });
+  if (Array.isArray(value)) return value.map((item) => ledgerScalar(item)).filter(Boolean).join(" · ");
+  const object = ledgerObject(value);
+  for (const field of ["name", "title", "displayName", "label", "code", "status", "description", "value"]) {
+    if (ledgerHasValue(object[field]) && (typeof object[field] === "string" || typeof object[field] === "number")) return String(object[field]);
+  }
+  return "";
+}
+function ledgerDate(record: ReportLedgerObject): string {
+  for (const field of ["measuredAt", "recordedAt", "occurredAt", "startedAt", "resolvedAt", "reportedAt", "releasedAt", "administeredAt", "issuedAt", "requestedDate", "scheduledStart", "performedAt", "assessedAt", "observedAt", "createdAt", "updatedAt", "date", "at"]) {
+    if (!ledgerHasValue(record[field])) continue;
+    const date = record[field] instanceof Date ? record[field] as Date : new Date(String(record[field]));
+    if (!Number.isNaN(date.getTime())) return date.toLocaleString("en-ZA", { timeZone: "Africa/Johannesburg", dateStyle: "medium", timeStyle: "short" });
+  }
+  return "Date not recorded";
+}
+function ledgerTitle(record: ReportLedgerObject, fallback: string): string {
+  for (const field of ["title", "name", "activityType", "metricKey", "measurementType", "goalTitle", "testName", "assessmentType", "type", "chiefComplaint", "reason", "specialty"]) {
+    const label = ledgerScalar(record[field], field);
+    if (label) return label;
+  }
+  for (const field of ["medication", "symptom", "vitalType", "test", "diagnosis", "procedure", "immunization", "encounterType"]) {
+    const label = ledgerScalar(record[field], field);
+    if (label) return label;
+  }
+  return fallback;
+}
+function ledgerSummary(record: ReportLedgerObject): string {
+  const fields = ["status", "severity", "progression", "mood", "sleepQuality", "durationMinutes", "value", "unit", "secondaryValue", "secondaryUnit", "numericValue", "textValue", "booleanValue", "abnormal", "critical", "dosage", "frequency", "currentValue", "targetValue", "progressPercent", "overallRisk", "score", "source"];
+  return fields.filter((field) => ledgerHasValue(record[field])).map((field) => {
+    const value = ledgerScalar(record[field], field);
+    return value ? (["value", "numericValue", "textValue"].includes(field) ? value : human(field) + ": " + value) : "";
+  }).filter(Boolean).slice(0, 5).join(" · ");
+}
+function LedgerFieldTree({ value }: { value: unknown }) {
+  if (!ledgerHasValue(value)) return null;
+  if (Array.isArray(value)) {
+    return <div className="space-y-2">{value.map((entry, index) => {
+      const object = ledgerObject(entry);
+      return <div key={String(object.id ?? object.createdAt ?? object.measuredAt ?? index)} className="rounded-lg border border-slate-100 bg-white p-3"><LedgerFieldTree value={entry} /></div>;
+    })}</div>;
+  }
+  if (typeof value !== "object") return <p className="break-words text-xs leading-5 text-slate-700">{ledgerScalar(value)}</p>;
+  const record = ledgerObject(value);
+  const internal = /^(id|.*Id|.*Ids|patient|user|healthPassport|medicalRecord|connection|createdByUserId|practitionerId)$/i;
+  const entries = Object.entries(record).filter(([key, fieldValue]) => !internal.test(key) && ledgerHasValue(fieldValue));
+  return <dl className="grid min-w-0 gap-2 sm:grid-cols-2">{entries.map(([key, fieldValue]) => {
+    const label = human(key);
+    const complex = typeof fieldValue === "object" && fieldValue !== null;
+    if (complex) {
+      const count = Array.isArray(fieldValue) ? fieldValue.length : null;
+      const heading = ledgerScalar(fieldValue);
+      return <div key={key} className="min-w-0 rounded-lg border border-slate-100 bg-white px-3 py-2 sm:col-span-2"><details><summary className="cursor-pointer text-xs font-bold text-[#0b2d54]">{label}{count !== null ? " (" + count + ")" : heading ? " · " + heading : ""}</summary><div className="mt-2 border-t border-slate-100 pt-2"><LedgerFieldTree value={fieldValue} /></div></details></div>;
+    }
+    return <div key={key} className="min-w-0"><dt className="text-[10px] font-semibold uppercase tracking-wide text-slate-400">{label}</dt><dd className="mt-0.5 break-words text-xs leading-5 text-slate-700">{ledgerScalar(fieldValue, key)}</dd></div>;
+  })}</dl>;
+}
+function LedgerGroup({ group }: { group: ReportLedgerGroup }) {
+  if (!group.rows.length) return null;
+  const latest = ledgerObject(group.rows[group.rows.length - 1]);
+  return <details className="group overflow-hidden rounded-2xl border border-slate-200 bg-white">
+    <summary className="flex cursor-pointer list-none items-center gap-3 px-4 py-3.5 transition hover:bg-[#f7fbfc] sm:px-5">
+      <span className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-[#eafafa] text-xs font-black tabular-nums text-[#0b5a62]">{group.rows.length}</span>
+      <span className="min-w-0 flex-1"><span className="block text-sm font-bold text-[#0b2d54]">{group.title}</span><span className="mt-0.5 block truncate text-[11px] text-slate-500">{group.description} · Latest: {ledgerTitle(latest, "Record")}</span></span>
+      <span className="shrink-0 text-xs font-bold text-[#0b7b80] group-open:hidden">View records</span><span className="hidden shrink-0 text-xs font-bold text-[#0b7b80] group-open:inline">Hide</span>
+    </summary>
+    <div className="space-y-2 border-t border-slate-100 bg-[#f8fbfc] p-3 sm:p-4">
+      {group.rows.map((item, index) => {
+        const record = ledgerObject(item);
+        const title = ledgerTitle(record, group.title.replace(/s$/, "") + " " + (index + 1));
+        const summary = ledgerSummary(record);
+        const date = ledgerDate(record);
+        const key = String(record.id ?? record.externalRecordId ?? record.sourceId ?? (group.key + "-" + index));
+        return <article key={key} className="overflow-hidden rounded-xl border border-slate-200 bg-white"><details>
+          <summary className="flex cursor-pointer list-none items-start gap-3 px-3 py-3"><span className="mt-1 h-2 w-2 shrink-0 rounded-full bg-[#24c1c4]" /><span className="min-w-0 flex-1"><span className="block text-xs font-bold text-[#0b2d54]">{title}</span><span className="mt-1 block text-[10px] text-slate-500">{date}</span>{summary && <span className="mt-1 block break-words text-[11px] leading-4 text-slate-600">{summary}</span>}</span><span className="shrink-0 text-[10px] font-semibold text-slate-400">Details</span></summary>
+          <div className="border-t border-slate-100 bg-[#fbfdfd] p-3"><LedgerFieldTree value={record} /></div>
+        </details></article>;
+      })}
+    </div>
+  </details>;
+}
+function CompleteReportData({ report }: { report: Report }) {
+  const activity = report.activity as unknown as ReportLedgerObject;
+  const clinical = report.clinical as unknown as ReportLedgerObject;
+  const events = report.goalMetricEvents ?? [];
+  const medicationEvents = events.filter((event) => /MEDICATION|medication|adherence/i.test([event.metricType, event.metricKey, event.source, event.goalCategory, event.goalTitle].filter(Boolean).join(" ")));
+  const otherGoalEvents = events.filter((event) => !medicationEvents.includes(event));
+  const snapshot = report.currentSnapshot ?? {};
+  const contextGroups: ReportLedgerGroup[] = [
+    { key: "conditions", title: "Current conditions", description: "Saved conditions used to personalize this report", rows: ledgerArray(snapshot.conditions) },
+    { key: "diagnoses-on-file", title: "Diagnoses on file", description: "Patient diagnosis history", rows: ledgerArray(snapshot.diagnoses) },
+    { key: "allergies", title: "Allergies", description: "Saved allergens and reactions", rows: ledgerArray(snapshot.allergies) },
+    { key: "medicines-on-file", title: "Current medicines", description: "Saved medicines and instructions", rows: ledgerArray(snapshot.medications) },
+    { key: "immunizations", title: "Immunisations", description: "Immunisation history on file", rows: ledgerArray(snapshot.immunizations) },
+    { key: "goals-on-file", title: "Active health goals", description: "Saved targets and latest goal progress", rows: ledgerArray(snapshot.activeGoals) },
+    { key: "risk-context", title: "Risk assessments on file", description: "Available risk-assessment context", rows: ledgerArray(snapshot.riskAssessments) },
+    { key: "baseline-context", title: "Baseline and profile", description: "Profile and baseline values used when interpreting trends", rows: [snapshot.profile, snapshot.baseline, snapshot.medicalRecord].filter(ledgerHasValue) },
+  ];
+  const groups: ReportLedgerGroup[] = [
+    { key: "check-ins", title: "Daily health check-ins", description: "Mood, stress, sleep, energy, water, exercise, notes and patient-recorded vitals", rows: ledgerArray(activity.journalEntries) },
+    { key: "symptoms", title: "Symptoms and follow-ups", description: "Severity, progression, observations, triggers, attachments and medicine effects", rows: ledgerArray(activity.symptoms) },
+    { key: "clinical-episodes", title: "Clinical episodes", description: "Episodes associated with the selected period", rows: ledgerArray(activity.clinicalEpisodes) },
+    { key: "medication-events", title: "Medication log events", description: "Dose outcomes and medication tracker logs", rows: medicationEvents },
+    { key: "goal-events", title: "Goal tracker entries", description: "Individual metrics recorded against goals", rows: otherGoalEvents },
+    { key: "appointments", title: "Appointments", description: "Appointments scheduled, created or changed in the period", rows: ledgerArray(activity.appointments) },
+    { key: "device-measurements", title: "Connected-device readings", description: "Dated readings imported from connected devices", rows: ledgerArray(activity.deviceMeasurements) },
+    { key: "wellness-metrics", title: "Wellness metrics", description: "Dated wellness values with their source", rows: ledgerArray(activity.wellnessMetrics) },
+    { key: "sleep-sessions", title: "Sleep sessions", description: "Connected sleep records and sleep stages", rows: ledgerArray(activity.sleepSessions) },
+    { key: "workouts", title: "Exercise and workout sessions", description: "Activity, duration, distance, calories and heart rate", rows: ledgerArray(activity.workouts) },
+    { key: "encounters", title: "Clinical encounters", description: "Consultations, assessments, notes and plans", rows: ledgerArray(clinical.encounters) },
+    { key: "clinical-diagnoses", title: "Clinical diagnoses", description: "Diagnosis records created or addressed in this period", rows: ledgerArray(clinical.diagnoses) },
+    { key: "prescriptions", title: "Prescriptions", description: "Medicine and prescription instructions", rows: ledgerArray(clinical.prescriptions) },
+    { key: "clinical-notes", title: "Clinical notes", description: "Notes authored during this period or linked to period encounters", rows: ledgerArray(clinical.notes) },
+    { key: "clinical-vitals", title: "Clinical vital readings", description: "Measurements captured in clinical encounters", rows: ledgerArray(clinical.vitals) },
+    { key: "lab-results", title: "Laboratory results", description: "Results, units, comments and abnormal/critical flags", rows: ledgerArray(clinical.labResults) },
+    { key: "imaging", title: "Imaging studies and reports", description: "Studies, findings, impressions and recommendations", rows: ledgerArray(clinical.imaging) },
+    { key: "procedures", title: "Procedures", description: "Procedures recorded in the clinical record", rows: ledgerArray(clinical.procedures) },
+    { key: "care-plans", title: "Care plans", description: "Plans, goals, tasks and notes", rows: ledgerArray(clinical.carePlans) },
+    { key: "referrals", title: "Referrals", description: "Reasons, status and follow-up information", rows: ledgerArray(clinical.referrals) },
+    { key: "goal-progress", title: "Goal progress updates", description: "Progress submissions saved against health goals", rows: ledgerArray(report.tracking?.goalProgress) },
+    { key: "goal-history", title: "Goals created or changed", description: "Goal creation, targets, statuses and completion dates", rows: ledgerArray(report.tracking?.goalHistory) },
+    { key: "risk-history", title: "Risk assessments recorded this period", description: "Risk assessment results dated within the report range", rows: ledgerArray(report.tracking?.riskAssessments) },
+  ].filter((group) => group.rows.length > 0);
+  const context = contextGroups.filter((group) => group.rows.length > 0);
+  const total = groups.reduce((sum, group) => sum + group.rows.length, 0);
+  if (!total && !context.length) return null;
+  return <section aria-label="All health data in the report period" className="space-y-4">
+    <div className="overflow-hidden rounded-[24px] border border-[#cfe5e8] bg-white shadow-sm">
+      <div className="bg-gradient-to-r from-[#f0fbfb] to-white p-4 sm:p-5">
+        <p className="text-[10px] font-extrabold uppercase tracking-[0.16em] text-[#0b7b80]">Full record · {report.period.label}</p>
+        <div className="mt-1 flex flex-wrap items-end justify-between gap-3"><div><h2 className="text-xl font-black tracking-tight text-[#0b2d54]">Everything you logged</h2><p className="mt-1 text-xs leading-5 text-slate-600">Open a category to review each returned record and its underlying detail fields.</p></div>
+          <div className="flex gap-2"><div className="rounded-xl border border-[#dcebed] bg-white px-3 py-2"><p className="text-xl font-black tabular-nums text-[#0b2d54]">{total}</p><p className="text-[10px] font-semibold text-slate-500">period records</p></div><div className="rounded-xl border border-[#dcebed] bg-white px-3 py-2"><p className="text-xl font-black tabular-nums text-[#0b2d54]">{groups.length}</p><p className="text-[10px] font-semibold text-slate-500">data categories</p></div></div>
+        </div>
+      </div>
+      <div className="space-y-2 p-3 sm:p-4">{groups.length ? groups.map((group) => <LedgerGroup key={group.key} group={group} />) : <p className="rounded-xl border border-dashed border-slate-300 p-4 text-sm text-slate-500">No dated activity records were returned for this period.</p>}</div>
+    </div>
+    {context.length > 0 && <div className="overflow-hidden rounded-[24px] border border-slate-200 bg-white shadow-sm"><div className="border-b border-slate-100 px-4 py-4 sm:px-5"><p className="text-[10px] font-extrabold uppercase tracking-[0.16em] text-[#0b7b80]">Personalisation context</p><h2 className="mt-1 text-lg font-black tracking-tight text-[#0b2d54]">Your health context</h2><p className="mt-1 text-xs leading-5 text-slate-500">Saved context can pre-date the selected period and is shown separately from that period’s activity.</p></div><div className="space-y-2 p-3 sm:p-4">{context.map((group) => <LedgerGroup key={group.key} group={group} />)}</div></div>}
+  </section>;
 }
 
 export default function HealthReportPage() {
