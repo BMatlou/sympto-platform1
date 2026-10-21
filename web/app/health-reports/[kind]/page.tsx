@@ -731,7 +731,7 @@ function reportMeasurementReviews(report: Report, age: number | null): Measureme
 
   const lowSystolic = vitalSeries(report, "systolic").filter((point) => point.value < 40).at(-1);
   const lowDiastolic = vitalSeries(report, "diastolic").filter((point) => point.value < 20).at(-1);
-  if (lowSystolic) {
+  if (lowSystolic && !(severeBloodPressure && severeBloodPressure === latestSystolic)) {
     reviews.push({
       key: "systolic", label: "Systolic blood pressure", unit: "mmHg",
       value: lowSystolic.value, timestamp: lowSystolic.timestamp,
@@ -739,7 +739,7 @@ function reportMeasurementReviews(report: Report, age: number | null): Measureme
       message: "This systolic value is outside the range used for this report's trend calculation. Check the saved unit and original reading.",
     });
   }
-  if (lowDiastolic) {
+  if (lowDiastolic && !(severeBloodPressure && severeBloodPressure === latestDiastolic)) {
     reviews.push({
       key: "diastolic", label: "Diastolic blood pressure", unit: "mmHg",
       value: lowDiastolic.value, timestamp: lowDiastolic.timestamp,
@@ -1651,7 +1651,7 @@ export default function HealthReportPage() {
     return () => { active = false; };
   }, [report?.type, report?.period.start]);
 
-  const title = useMemo(() => kind === "weekly" ? "Weekly health report" : kind === "monthly" ? "Monthly health report" : "Health report", [kind]);
+  const title = useMemo(() => kind === "weekly" ? "Weekly Health Insights" : kind === "monthly" ? "Monthly Health Insights" : "Health Insights", [kind]);
 
   if (loading) {
     return <ProtectedRoute><main className="min-h-screen bg-[#f5f8fb] p-5"><div className="mx-auto max-w-6xl space-y-4"><div className="h-44 animate-pulse rounded-[30px] bg-white" /><div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">{[1, 2, 3, 4].map((value) => <div key={value} className="h-32 animate-pulse rounded-2xl bg-white" />)}</div><div className="h-72 animate-pulse rounded-[28px] bg-white" /></div></main></ProtectedRoute>;
@@ -1669,7 +1669,7 @@ export default function HealthReportPage() {
 
           <section className="mt-4 overflow-hidden rounded-[30px] bg-gradient-to-br from-[#0b2d54] to-[#0f5a62] p-6 text-white shadow-lg sm:p-8">
             <div className="flex flex-col gap-5 sm:flex-row sm:items-start sm:justify-between">
-              <div><div className="flex items-center gap-2 text-[10px] font-black uppercase tracking-[0.18em] text-[#24c1c4]"><ShieldCheck className="h-4 w-4" />Sympto health intelligence</div><h1 className="mt-3 text-3xl font-black tracking-tight sm:text-4xl">{title}</h1><p className="mt-2 text-sm leading-6 text-white/75">{report.period.label}</p><p className="mt-3 max-w-2xl text-sm leading-6 text-white/85">See how your saved measurements and daily routines changed, which symptoms appeared more than once, and where records are missing. This is a summary of your records, not a diagnosis.</p></div>
+              <div><div className="flex items-center gap-2 text-[10px] font-black uppercase tracking-[0.18em] text-[#24c1c4]"><ShieldCheck className="h-4 w-4" />Sympto health intelligence</div><h1 className="mt-3 text-3xl font-black tracking-tight sm:text-4xl">{title}</h1><p className="mt-2 text-sm leading-6 text-white/75">{report.period.label}</p><p className="mt-3 max-w-2xl text-sm leading-6 text-white/85">This report reviews the health data saved on {recordedDays(report).size} of {periodDays(report)} days. It compares measurements and daily routines, highlights values that need checking, and shows progress against your saved health goals. It is a summary of your records, not a diagnosis.</p></div>
               <div className="flex shrink-0 items-center gap-2 rounded-2xl border border-white/15 bg-white/10 px-4 py-3"><CalendarDays className="h-5 w-5 text-[#24c1c4]" /><div><p className="text-[10px] font-bold uppercase tracking-wide text-white/60">Report period</p><p className="mt-1 text-sm font-bold">{report.type === "WEEKLY" ? "7-day view" : "Monthly view"}</p></div></div>
             </div>
             <div className="mt-6 flex flex-wrap items-center gap-2"><span className="rounded-full bg-white/10 px-3 py-1.5 text-xs font-bold">Generated {dateLabel(report.generatedAt)}</span><span className="rounded-full bg-white/10 px-3 py-1.5 text-xs font-bold">{previousLoading ? "Comparing with prior period…" : previousReport ? "Compared with previous period" : previousFailed ? "Prior-period data unavailable" : "Current-period insights"}</span></div>
