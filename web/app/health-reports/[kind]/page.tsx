@@ -255,6 +255,8 @@ type GoalMetricEventRecord = {
   goalCategory?: string | null;
   unit?: string | null;
   targetValue?: number | string | null;
+  aggregation?: string | null;
+  frequency?: string | null;
   metricType: string;
   metricKey: string;
   loggedValue: number | string;
@@ -1185,7 +1187,7 @@ function ScoreRing({ percent, label, tone, size = 68 }: { percent: number | null
 }
 
 function goalMetricSeries(report: Report | null, pattern: RegExp): SeriesPoint[] {
-  return (report?.goalMetricEvents ?? [])
+  const events = (report?.goalMetricEvents ?? [])
     .filter((event) => event.source !== "goal-baseline" && pattern.test([
       event.goalCategory, event.goalTitle, event.metricType, event.metricKey,
     ].filter(Boolean).join(" ").toLowerCase()))
@@ -1194,11 +1196,40 @@ function goalMetricSeries(report: Report | null, pattern: RegExp): SeriesPoint[]
       const timestamp = new Date(event.occurredAt).getTime();
       const date = dateKey(event.occurredAt);
       if (value === null || !Number.isFinite(timestamp) || !date) return [];
-      return [{ value, timestamp, date, source: "Health goal log", unit: String(event.unit ?? "") }];
-    })
-    .sort((a, b) => a.timestamp - b.timestamp);
-}
+      return [{
+        value,
+        timestamp,
+        date,
+        source: "Health goal log",
+        unit: String(event.unit ?? ""),
+        goalKey: String(event.goalId ?? event.metricType + ":" + event.metricKey),
+        metricKey: String(event.metricKey ?? ""),
+        aggregation: String(event.aggregation ?? "LATEST").toUpperCase(),
+      }];
+    });
 
+  // Apply the goal's saved aggregation to each date: e.g. water and exercise
+  // session amounts add up within a day, while weight/glucose use the latest value.
+  const grouped = new Map<string, typeof events>();
+  events.forEach((point) => {
+    const key = [point.goalKey, point.metricKey, point.date, point.unit.toLowerCase()].join("|");
+    const list = grouped.get(key) ?? [];
+    list.push(point);
+    grouped.set(key, list);
+  });
+  return Array.from(grouped.values()).map((points) => {
+    const ordered = points.slice().sort((a, b) => a.timestamp - b.timestamp);
+    const aggregation = ordered[ordered.length - 1].aggregation;
+    const values = ordered.map((point) => point.value);
+    const value = aggregation === "SUM" ? values.reduce((sum, entry) => sum + entry, 0)
+      : aggregation === "AVERAGE" ? mean(values) ?? values[values.length - 1]
+      : aggregation === "MIN" ? Math.min(...values)
+      : aggregation === "MAX" ? Math.max(...values)
+      : values[values.length - 1];
+    const latest = ordered[ordered.length - 1];
+    return { value, timestamp: latest.timestamp, date: latest.date, source: latest.source, unit: latest.unit };
+  }).sort((a, b) => a.timestamp - b.timestamp);
+}
 type LabSeriesPoint = SeriesPoint & { testName: string };
 
 type MedicationDoseAction = { date: string; action: "TAKEN" | "SKIPPED"; source: "event" | "journal" };
