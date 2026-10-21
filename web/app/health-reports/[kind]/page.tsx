@@ -1233,6 +1233,44 @@ function clinicalLabSeries(report: Report | null, pattern: RegExp): LabSeriesPoi
   }).sort((a, b) => a.timestamp - b.timestamp);
 }
 
+function namedClinicalDeviceSeries(
+  report: Report | null,
+  pattern: RegExp,
+  exclude?: RegExp,
+): SeriesPoint[] {
+  if (!report) return [];
+  const points: SeriesPoint[] = [];
+  report.activity.deviceMeasurements.forEach((item) => {
+    const name = [item.measurementType, item.metricKey, item.vitalType?.name].filter(Boolean).join(" ").toLowerCase();
+    if (!pattern.test(name) || (exclude && exclude.test(name))) return;
+    const value = finite(item.value);
+    const timestamp = item.measuredAt ? new Date(item.measuredAt).getTime() : Number.NaN;
+    const date = dateKey(item.measuredAt);
+    if (value === null || !date || !Number.isFinite(timestamp)) return;
+    points.push({ value, timestamp, date, source: "Connected device", unit: String(item.unit || item.vitalType?.unit || "") });
+  });
+  report.clinical.vitals.forEach((item) => {
+    const name = [item.vitalType?.code, item.vitalType?.name].filter(Boolean).join(" ").toLowerCase();
+    if (!pattern.test(name) || (exclude && exclude.test(name))) return;
+    const value = finite(item.value);
+    const measuredAt = item.measuredAt || item.recordedAt;
+    const timestamp = measuredAt ? new Date(measuredAt).getTime() : Number.NaN;
+    const date = dateKey(measuredAt);
+    if (value === null || !date || !Number.isFinite(timestamp)) return;
+    points.push({ value, timestamp, date, source: "Clinical measurement", unit: String(item.vitalType?.unit || "") });
+  });
+  return points.sort((a, b) => a.timestamp - b.timestamp);
+}
+
+function combineDatedSeries(...series: SeriesPoint[][]): SeriesPoint[] {
+  const byIdentity = new Map<string, SeriesPoint>();
+  series.flat().forEach((point) => {
+    const key = point.timestamp + "|" + point.value + "|" + String(point.unit ?? "").toLowerCase();
+    if (!byIdentity.has(key)) byIdentity.set(key, point);
+  });
+  return Array.from(byIdentity.values()).sort((a, b) => a.timestamp - b.timestamp);
+}
+
 function wellnessMetricSeries(report: Report | null, metricKey: string): SeriesPoint[] {
   if (!report) return [];
   return report.activity.wellnessMetrics
@@ -1390,18 +1428,51 @@ function PersonalisedInsights({
   const a1cLabPrevious = clinicalLabSeries(previousReport, /hba1c|\ba1c\b|glycat|glycosylat/i);
   const glucoseEventsCurrent = event(report, /blood glucose|glucose/);
   const glucoseEventsPrevious = event(previousReport, /blood glucose|glucose/);
-  const glucoseCurrent = glucoseLabCurrentSpecific.length ? glucoseLabCurrentSpecific : glucoseEventsCurrent;
-  const glucosePrevious = glucoseLabPreviousSpecific.length ? glucoseLabPreviousSpecific : glucoseEventsPrevious;
+  const glucoseMeasurementCurrent = combineDatedSeries(
+    namedClinicalDeviceSeries(report, /glucose|blood.sugar|glycaemia|glycemia/i, /hba1c|\ba1c\b|glycat|glycosylat/i),
+    wellnessMetricSeriesMatching(report, /glucose|blood.sugar/i),
+  );
+  const glucoseMeasurementPrevious = combineDatedSeries(
+    namedClinicalDeviceSeries(previousReport, /glucose|blood.sugar|glycaemia|glycemia/i, /hba1c|\ba1c\b|glycat|glycosylat/i),
+    wellnessMetricSeriesMatching(previousReport, /glucose|blood.sugar/i),
+  );
+  const glucoseCurrent = glucoseLabCurrentSpecific.length ? glucoseLabCurrentSpecific : glucoseMeasurementCurrent.length ? glucoseMeasurementCurrent : glucoseEventsCurrent;
+  const glucosePrevious = glucoseLabPreviousSpecific.length ? glucoseLabPreviousSpecific : glucoseMeasurementPrevious.length ? glucoseMeasurementPrevious : glucoseEventsPrevious;
 
-  const totalCholesterolCurrent = clinicalLabSeries(report, /total cholesterol|cholesterol total|serum cholesterol|^cholesterol$/i);
-  const totalCholesterolPrevious = clinicalLabSeries(previousReport, /total cholesterol|cholesterol total|serum cholesterol|^cholesterol$/i);
-  const ldlCurrent = clinicalLabSeries(report, /\bldl\b|low[- ]density lipoprotein/i);
-  const ldlPrevious = clinicalLabSeries(previousReport, /\bldl\b|low[- ]density lipoprotein/i);
-  const hdlCurrent = clinicalLabSeries(report, /\bhdl\b|high[- ]density lipoprotein/i);
-  const hdlPrevious = clinicalLabSeries(previousReport, /\bhdl\b|high[- ]density lipoprotein/i);
-  const triglyceridesCurrent = clinicalLabSeries(report, /triglyceride/i);
-  const triglyceridesPrevious = clinicalLabSeries(previousReport, /triglyceride/i);
-  const anyLipidLab = totalCholesterolCurrent.length + totalCholesterolPrevious.length + ldlCurrent.length + ldlPrevious.length + hdlCurrent.length + hdlPrevious.length + triglyceridesCurrent.length + triglyceridesPrevious.length > 0;
+  const totalCholesterolLabCurrent = clinicalLabSeries(report, /total cholesterol|cholesterol total|serum cholesterol|^cholesterol$/i);
+  const totalCholesterolLabPrevious = clinicalLabSeries(previousReport, /total cholesterol|cholesterol total|serum cholesterol|^cholesterol$/i);
+  const totalCholesterolMeasuredCurrent = combineDatedSeries(
+    namedClinicalDeviceSeries(report, /total cholesterol|cholesterol total|serum cholesterol|^cholesterol$/i),
+    wellnessMetricSeriesMatching(report, /total.cholesterol|cholesterol.total/i),
+  );
+  const totalCholesterolMeasuredPrevious = combineDatedSeries(
+    namedClinicalDeviceSeries(previousReport, /total cholesterol|cholesterol total|serum cholesterol|^cholesterol$/i),
+    wellnessMetricSeriesMatching(previousReport, /total.cholesterol|cholesterol.total/i),
+  );
+  const totalCholesterolCurrent = totalCholesterolLabCurrent.length ? totalCholesterolLabCurrent : totalCholesterolMeasuredCurrent;
+  const totalCholesterolPrevious = totalCholesterolLabPrevious.length ? totalCholesterolLabPrevious : totalCholesterolMeasuredPrevious;
+
+  const ldlLabCurrent = clinicalLabSeries(report, /\bldl\b|low[- ]density lipoprotein/i);
+  const ldlLabPrevious = clinicalLabSeries(previousReport, /\bldl\b|low[- ]density lipoprotein/i);
+  const ldlMeasuredCurrent = combineDatedSeries(namedClinicalDeviceSeries(report, /\bldl\b|low[- ]density lipoprotein/i), wellnessMetricSeriesMatching(report, /\bldl\b|low.density.lipoprotein/i));
+  const ldlMeasuredPrevious = combineDatedSeries(namedClinicalDeviceSeries(previousReport, /\bldl\b|low[- ]density lipoprotein/i), wellnessMetricSeriesMatching(previousReport, /\bldl\b|low.density.lipoprotein/i));
+  const ldlCurrent = ldlLabCurrent.length ? ldlLabCurrent : ldlMeasuredCurrent;
+  const ldlPrevious = ldlLabPrevious.length ? ldlLabPrevious : ldlMeasuredPrevious;
+
+  const hdlLabCurrent = clinicalLabSeries(report, /\bhdl\b|high[- ]density lipoprotein/i);
+  const hdlLabPrevious = clinicalLabSeries(previousReport, /\bhdl\b|high[- ]density lipoprotein/i);
+  const hdlMeasuredCurrent = combineDatedSeries(namedClinicalDeviceSeries(report, /\bhdl\b|high[- ]density lipoprotein/i), wellnessMetricSeriesMatching(report, /\bhdl\b|high.density.lipoprotein/i));
+  const hdlMeasuredPrevious = combineDatedSeries(namedClinicalDeviceSeries(previousReport, /\bhdl\b|high[- ]density lipoprotein/i), wellnessMetricSeriesMatching(previousReport, /\bhdl\b|high.density.lipoprotein/i));
+  const hdlCurrent = hdlLabCurrent.length ? hdlLabCurrent : hdlMeasuredCurrent;
+  const hdlPrevious = hdlLabPrevious.length ? hdlLabPrevious : hdlMeasuredPrevious;
+
+  const triglyceridesLabCurrent = clinicalLabSeries(report, /triglyceride/i);
+  const triglyceridesLabPrevious = clinicalLabSeries(previousReport, /triglyceride/i);
+  const triglyceridesMeasuredCurrent = combineDatedSeries(namedClinicalDeviceSeries(report, /triglyceride/i), wellnessMetricSeriesMatching(report, /triglyceride/i));
+  const triglyceridesMeasuredPrevious = combineDatedSeries(namedClinicalDeviceSeries(previousReport, /triglyceride/i), wellnessMetricSeriesMatching(previousReport, /triglyceride/i));
+  const triglyceridesCurrent = triglyceridesLabCurrent.length ? triglyceridesLabCurrent : triglyceridesMeasuredCurrent;
+  const triglyceridesPrevious = triglyceridesLabPrevious.length ? triglyceridesLabPrevious : triglyceridesMeasuredPrevious;
+  const anyLipidLab = totalCholesterolLabCurrent.length + totalCholesterolLabPrevious.length + ldlLabCurrent.length + ldlLabPrevious.length + hdlLabCurrent.length + hdlLabPrevious.length + triglyceridesLabCurrent.length + triglyceridesLabPrevious.length > 0;
   const cholesterolEventsCurrent = event(report, /cholesterol|lipid|triglyceride|\bldl\b|\bhdl\b/);
   const cholesterolEventsPrevious = event(previousReport, /cholesterol|lipid|triglyceride|\bldl\b|\bhdl\b/);
 
