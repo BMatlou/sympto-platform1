@@ -2024,47 +2024,6 @@ function PersonalisedInsights({
   );
 }
 
-function GoalProgressTrendCard({ item, previousLoading }: { item: GoalProgressTrendItem; previousLoading: boolean }) {
-  const values = item.current.map((entry) => entry.value);
-  const currentMean = mean(values);
-  const first = item.current[0]?.value ?? null;
-  const latest = item.current[item.current.length - 1]?.value ?? null;
-  const change = first !== null && latest !== null ? latest - first : null;
-  const status = item.latestStatus ? human(item.latestStatus) : "Status not recorded";
-
-  return (
-    <article className="min-w-0 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
-      <div className="flex items-start justify-between gap-3">
-        <div className="min-w-0">
-          <p className="text-[10px] font-black uppercase tracking-[0.12em] text-[#0b7b80]">{human(item.category || "Health goal")}</p>
-          <h3 className="mt-1 font-bold text-[#0b2d54]">{item.title}</h3>
-          <p className="mt-1 text-xs leading-5 text-slate-500">{item.current.length} dated {item.current.length === 1 ? "update" : "updates"} in this period</p>
-        </div>
-        <ScoreRing percent={item.valueKind === "percent" ? latest : null} label={item.valueKind === "percent" ? "Latest progress" : "Recorded trend"} tone={item.latestStatus === "DECLINING" ? "watch" : item.latestStatus === "ACHIEVED" || item.latestStatus === "IMPROVING" || item.latestStatus === "ON_TRACK" ? "good" : "info"} size={64} />
-      </div>
-      <div className="mt-4 grid grid-cols-2 gap-3">
-        <div className="rounded-xl bg-slate-50 p-3">
-          <p className="text-[10px] font-bold uppercase tracking-wide text-slate-400">Latest recorded</p>
-          <p className="mt-1 text-xl font-black text-[#0b2d54]">{latest === null ? "—" : formatNumber(latest, 1)} <span className="text-xs font-bold text-slate-500">{item.unit}</span></p>
-          <p className="mt-1 text-[10px] text-slate-500">{dateLabel(item.current[item.current.length - 1]?.date)}</p>
-        </div>
-        <div className="rounded-xl bg-slate-50 p-3">
-          <p className="text-[10px] font-bold uppercase tracking-wide text-slate-400">Period average</p>
-          <p className="mt-1 text-xl font-black text-[#0b2d54]">{currentMean === null ? "—" : formatNumber(currentMean, 1)} <span className="text-xs font-bold text-slate-500">{item.unit}</span></p>
-          <p className="mt-1 text-[10px] text-slate-500">{status}</p>
-        </div>
-      </div>
-      <MiniTrend values={values} label={item.title + " saved goal progress trend"} />
-      <p className="mt-3 text-xs leading-5 text-slate-600">
-        {change === null ? "Only one dated value is available, so a within-period change cannot be calculated." :
-          "From the first to the latest dated update, the recorded value " + (change === 0 ? "stayed the same" : (change > 0 ? "increased by " : "decreased by ") + formatNumber(Math.abs(change), 1) + (item.unit ? " " + item.unit : "")) + "."}
-        {" "}{compareText(values, item.previous.map((entry) => entry.value), item.unit, 1, previousLoading)}
-      </p>
-      {item.targetValue !== null && item.valueKind === "current" && <p className="mt-2 text-[11px] leading-4 text-slate-500">Saved goal target: {formatNumber(item.targetValue, 1)} {item.unit}. Direction and clinical meaning depend on this goal&apos;s definition.</p>}
-    </article>
-  );
-}
-
 function RoutineTrendCard({
   icon: Icon,
   title,
@@ -2358,18 +2317,7 @@ function HealthReportInsights({
         )}
       </section>
 
-      {goalProgressItems.length > 0 && (
-        <section>
-          <div className="mb-3">
-            <p className="text-[10px] font-black uppercase tracking-[0.16em] text-[#24c1c4]">Saved goal history</p>
-            <h2 className="mt-1 text-xl font-black text-[#0b2d54]">Goal progress over time</h2>
-            <p className="mt-1 text-sm leading-6 text-slate-500">These cards use dated progress updates saved against your goals. They compare the selected period with the previous period where comparable entries exist; missing dates are not treated as zero.</p>
-          </div>
-          <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
-            {goalProgressItems.map((item) => <GoalProgressTrendCard key={item.key} item={item} previousLoading={previousLoading} />)}
-          </div>
-        </section>
-      )}
+
 
       {(symptomCount > 0 || lowMood.total > 0 || association !== null || repeated.some((item) => item.count > 1) || symptomAnalytics.repeatedTriggers.length > 0 || symptomAnalytics.medicationEffects > 0 || symptomAnalytics.averageSeverityRank !== null) && (
         <section>
