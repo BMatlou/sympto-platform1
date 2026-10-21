@@ -617,6 +617,13 @@ export class HealthReportNotificationSchedulerService
         where: { id: patientId },
         include: {
           person: true,
+          heightCm: true,
+          weightKg: true,
+          smokingStatus: true,
+          alcoholConsumption: true,
+          exerciseFrequency: true,
+          occupation: true,
+          baseline: true,
           medicalRecord: true,
           healthPassport: {
             include: {
@@ -639,6 +646,21 @@ export class HealthReportNotificationSchedulerService
 
     const currentSnapshot = currentRecord
       ? {
+          person: {
+            firstName: currentRecord.person.firstName,
+            preferredName: currentRecord.person.preferredName,
+            dateOfBirth: currentRecord.person.dateOfBirth,
+            gender: currentRecord.person.gender,
+          },
+          profile: {
+            heightCm: currentRecord.heightCm,
+            weightKg: currentRecord.weightKg,
+            smokingStatus: currentRecord.smokingStatus,
+            alcoholConsumption: currentRecord.alcoholConsumption,
+            exerciseFrequency: currentRecord.exerciseFrequency,
+            occupation: currentRecord.occupation,
+          },
+          baseline: currentRecord.baseline,
           medicalRecord: currentRecord.medicalRecord,
           conditions: currentRecord.healthPassport?.conditions ?? [],
           allergies: currentRecord.healthPassport?.allergies ?? [],
@@ -646,6 +668,9 @@ export class HealthReportNotificationSchedulerService
           activeGoals: currentRecord.healthGoals ?? [],
         }
       : {
+          person: null,
+          profile: null,
+          baseline: null,
           medicalRecord: null,
           conditions: [],
           allergies: [],
