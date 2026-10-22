@@ -1072,7 +1072,7 @@ export class HealthReportIntelligenceService {
     };
     const eventRows = rows(report.goalMetricEvents);
     const progressRows = rows(tracking.goalProgress);
-    const activeGoalSummaries: Array<PersonalisedHealthInsight & { hasData: boolean }> = activeGoals.slice(0, 12).map((goal, index) => {
+    const activeGoalSummaries: Array<PersonalisedHealthInsight & { hasData: boolean; hasExplicitLinks: boolean }> = activeGoals.map((goal, index) => {
       const id = stringValue(goal.id);
       const category = String(goal.category ?? '').toUpperCase().replace(/[\s-]+/g, '_');
       const metrics = goalMetricMap[category] ?? [];
@@ -1090,7 +1090,8 @@ export class HealthReportIntelligenceService {
         (stringValue(goal.unit) ? ' ' + stringValue(goal.unit) : '') + '.';
       const summaryText = metricSummary.summaries.length ? metricSummary.summaries.join(' · ') : '';
       const linkedCount = directEvents.length + goalProgress.length;
-      const hasData = evidenceCount > 0 || linkedCount > 0;
+      const hasExplicitLinks = linkedCount > 0;
+      const hasData = evidenceCount > 0 || hasExplicitLinks;
       return {
         key: 'goal:' + (id ?? String(index)),
         group: 'GOAL',
@@ -1104,6 +1105,7 @@ export class HealthReportIntelligenceService {
             : 'No matching period evidence was returned. Missing evidence is unknown, not zero progress.'),
         status: metricSummary.matching.some((item) => item.quality.status !== 'ACCEPTED' || item.quality.safetySignals.length > 0) ? 'REVIEW' : 'INFO',
         hasData,
+        hasExplicitLinks,
       };
     });
     if (activeGoalSummaries.length) {
@@ -1117,16 +1119,17 @@ export class HealthReportIntelligenceService {
         key: 'goals:period-summary',
         group: 'GOAL',
         title: 'Progress against your saved goals',
-        headline: goalsWithEvidence.length + ' of ' + activeGoalSummaries.length + ' active goals have relevant period records',
-        detail: (goalsWithEvidence.length
-          ? 'Matched period evidence: ' + namesForSummary(goalsWithEvidence) + '. '
-          : 'No period measurements or explicitly linked tracker records matched the active goals. ') +
+        headline: goalsWithEvidence.length + ' of ' + activeGoalSummaries.length + ' active goals have relevant period evidence',
+        detail: (goalsWithEvidence.length ? 'Relevant readings or explicitly linked tracker entries were found for ' +
+          goalsWithEvidence.length + ' goal(s). ' : 'No matching period evidence was found for the active goals. ') +
           (goalsWithoutEvidence.length
-            ? 'No direct evidence matched: ' + namesForSummary(goalsWithoutEvidence) + '. Missing evidence is not zero progress; daily check-ins and vital readings are shown as evidence, not automatically treated as goal completion.'
-            : 'Each matched measure is evidence for context, not automatic goal completion.'),
+            ? goalsWithoutEvidence.length + ' goal(s) have no direct evidence in this period. Missing evidence is not zero progress; measurements are supporting context, not automatic goal completion.'
+            : 'The matching records provide context, not automatic proof of goal completion.'),
         status: 'INFO',
       });
-      personalisedInsights.push(...goalsWithEvidence.slice(0, 8).map((item) => ({
+      // Category-matched measurements are surfaced in trend/measurement analysis;
+      // this section only expands goals that have explicitly linked tracker events or progress.
+      personalisedInsights.push(...goalsWithEvidence.filter((item) => item.hasExplicitLinks).slice(0, 5).map((item) => ({
         key: item.key,
         group: item.group,
         title: item.title,
