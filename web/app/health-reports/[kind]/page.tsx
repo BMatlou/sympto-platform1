@@ -2808,6 +2808,16 @@ function VitalTrendCard({
   const previousAverage = mean(previousValues);
   const comparisonScale = Math.max(Math.abs(average ?? 0), Math.abs(previousAverage ?? 0), 0.000001);
   const movement = verificationSensitive || previousLoading ? null : periodMovement(currentValues, previousValues, unit, digits);
+  const chartPoints = verificationSensitive ? [] : current.slice(-7);
+  const chartValues = chartPoints.map((item) => item.value);
+  const chartMin = chartValues.length ? Math.min(...chartValues) : 0;
+  const chartMax = chartValues.length ? Math.max(...chartValues) : 0;
+  const chartSpan = chartMax - chartMin || 1;
+  const chartPolyline = chartPoints.map((item, index) => {
+    const x = chartPoints.length <= 1 ? 50 : index / (chartPoints.length - 1) * 100;
+    const y = 30 - ((item.value - chartMin) / chartSpan) * 23;
+    return x.toFixed(1) + "," + y.toFixed(1);
+  }).join(" ");
 
   return (
     <article className="min-w-0 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:p-5">
@@ -2847,6 +2857,15 @@ function VitalTrendCard({
           {previousAverage !== null && average !== null && <div className="mt-3 space-y-2 rounded-xl bg-[#f5fafb] p-3" aria-label={label + " period comparison bars"}>
             <div className="flex items-center gap-2"><span className="w-[72px] shrink-0 text-[9px] font-bold text-slate-500">This period</span><div className="h-2 min-w-0 flex-1 overflow-hidden rounded-full bg-slate-200"><div className="h-full rounded-full bg-[#24c1c4]" style={{ width: String(Math.max(3, Math.min(100, Math.abs(average) / comparisonScale * 100))) + "%" }} /></div><span className="w-14 text-right text-[10px] font-bold text-[#0b2d54]">{formatNumber(average, digits)}</span></div>
             <div className="flex items-center gap-2"><span className="w-[72px] shrink-0 text-[9px] font-bold text-slate-500">Previous</span><div className="h-2 min-w-0 flex-1 overflow-hidden rounded-full bg-slate-200"><div className="h-full rounded-full bg-[#0b2d54]/65" style={{ width: String(Math.max(3, Math.min(100, Math.abs(previousAverage) / comparisonScale * 100))) + "%" }} /></div><span className="w-14 text-right text-[10px] font-bold text-[#0b2d54]">{formatNumber(previousAverage, digits)}</span></div>
+          </div>}
+          {chartPoints.length >= 2 && <div className="mt-3 rounded-xl border border-[#e3f0f1] bg-[#f7fbfb] px-3 py-2.5">
+            <div className="flex items-center justify-between gap-2"><p className="text-[10px] font-bold uppercase tracking-wide text-slate-500">Reading trend</p><p className="text-[9px] font-medium text-slate-400">Last {chartPoints.length} valid readings</p></div>
+            <svg viewBox="0 0 100 34" preserveAspectRatio="none" role="img" aria-label={label + " trend across " + chartPoints.length + " valid readings"} className="mt-2 h-12 w-full overflow-visible">
+              <line x1="0" y1="31" x2="100" y2="31" stroke="#dcebed" strokeWidth="0.8" />
+              <polyline points={chartPolyline} fill="none" stroke="#24c1c4" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" vectorEffect="non-scaling-stroke" />
+              {chartPoints.map((point, index) => <circle key={point.date + "-" + index} cx={chartPoints.length <= 1 ? 50 : index / (chartPoints.length - 1) * 100} cy={30 - ((point.value - chartMin) / chartSpan) * 23} r="1.8" fill="#0b2d54" />)}
+            </svg>
+            <div className="mt-1 flex justify-between gap-1 text-[9px] text-slate-400"><span>{dateLabel(new Date(chartPoints[0].timestamp).toISOString())}</span><span>{dateLabel(new Date(chartPoints[chartPoints.length - 1].timestamp).toISOString())}</span></div>
           </div>}
           <div className="mt-3 border-t border-slate-100 pt-3">
             <div className="flex flex-wrap items-center justify-between gap-2">
@@ -3560,7 +3579,7 @@ export default function HealthReportPage() {
                 </div>
               </div>
             </div>
-            <div className="mt-6 flex flex-wrap items-center gap-2"><span className="rounded-full border border-[#dcebed] bg-[#f5fafb] px-3 py-1.5 text-xs font-bold text-slate-600">Generated {dateLabel(report.generatedAt)}</span><span className="rounded-full bg-white/10 px-3 py-1.5 text-xs font-bold">{previousLoading ? "Comparing with prior period…" : previousReport ? "Compared with previous period" : previousFailed ? "Prior-period data unavailable" : "Current-period insights"}</span></div>
+            <div className="mt-6 flex flex-wrap items-center gap-2"><span className="rounded-full border border-[#dcebed] bg-[#f5fafb] px-3 py-1.5 text-xs font-bold text-slate-600">Generated {dateLabel(report.generatedAt)}</span><span className="rounded-full border border-[#dcebed] bg-[#f5fafb] px-3 py-1.5 text-xs font-bold text-slate-600">{previousLoading ? "Comparing with prior period…" : previousReport ? "Compared with previous period" : previousFailed ? "Prior-period data unavailable" : "Current-period insights"}</span></div>
           </section>
 
           <ReportDataCoverage report={report} />
