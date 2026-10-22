@@ -1720,6 +1720,59 @@ export class HealthReportIntelligenceService {
         ].filter((id): id is string => Boolean(id)),
       });
     }
+
+    // Compare newly-started symptoms across the two matched windows. Older symptom
+    // records that are merely followed up in the current window are not counted as new.
+    const labelForSymptom = (item: Row) => {
+      const linkedNames = rows(item.symptoms)
+        .map((entry) => stringValue(row(entry.symptom).name ?? entry.name))
+        .filter((name): name is string => Boolean(name));
+      return stringValue(item.title) ?? (linkedNames.join(', ') || 'Recorded symptom');
+    };
+    const countSymptomStarts = (items: Row[], fromValue: string | null, toValue: string | null) => {
+      const counts = new Map<string, { label: string; dates: string[]; ids: string[] }>();
+      for (const item of items) {
+        const at = isoDate(item.startedAt ?? item.createdAt);
+        if (!at || !fromValue || !toValue) continue;
+        const timestamp = new Date(at).getTime();
+        if (timestamp < new Date(fromValue).getTime() || timestamp >= new Date(toValue).getTime()) continue;
+        const label = labelForSymptom(item);
+        const key = label.toLowerCase().replace(/\\s+/g, ' ').trim();
+        const current = counts.get(key) ?? { label, dates: [], ids: [] };
+        current.dates.push(localDay(at) ?? at.slice(0, 10));
+        const id = stringValue(item.id);
+        if (id) current.ids.push(id);
+        counts.set(key, current);
+      }
+      return counts;
+    };
+    if (hasPriorWindow) {
+      const priorSymptomRows = rows(row(longitudinal.activity).symptoms);
+      const priorStarts = countSymptomStarts(priorSymptomRows, isoDate(priorPeriod.start), isoDate(priorPeriod.end));
+      const currentStarts = countSymptomStarts(symptomRows, periodStart, periodEnd);
+      for (const [key, current] of currentStarts) {
+        const previous = priorStarts.get(key);
+        const currentCount = current.dates.length;
+        const previousCount = previous?.dates.length ?? 0;
+        if (currentCount < 2 || currentCount <= previousCount) continue;
+        addFinding({
+          key: 'symptom-frequency:' + key.replace(/[^a-z0-9]+/g, '-'),
+          priority: 'WATCH',
+          title: current.label + ' was recorded more often this period',
+          change: currentCount + ' newly-started symptom record(s) this period versus ' + previousCount + ' in the matched previous window.',
+          pattern: 'The comparison counts new symptom starts with the same saved label across equal-length periods. Follow-up edits to older symptoms are not treated as new starts.',
+          personalContext: 'More entries may represent increased symptoms or more consistent logging; the count alone cannot distinguish between them.',
+          whyItMatters: 'Repeated records are useful to review alongside severity, duration, recorded triggers, medicines and any reported relief or side effects. The count does not establish a cause.',
+          nextStep: 'Continue recording severity, duration and relevant context. Discuss a persistent, worsening or concerning symptom pattern with your clinician.',
+          confidence: currentCount >= 3 && previousCount > 0 ? 'MODERATE' : 'LIMITED',
+          evidence: [
+            'Current window: ' + current.dates.sort().join(', '),
+            'Previous window: ' + (previous?.dates.sort().join(', ') || 'no matching symptom starts recorded'),
+          ],
+          sourceRecordIds: current.ids.slice(0, 5),
+        });
+      }
+    }
     findings.sort((a, b) => {
       const rank: Record<HealthReportNarrativeFinding['priority'], number> = { SAFETY: 0, REVIEW: 1, WATCH: 2, INSIGHT: 3 };
       return rank[a.priority] - rank[b.priority];
