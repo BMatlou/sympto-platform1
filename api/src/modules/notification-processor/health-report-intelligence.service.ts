@@ -511,14 +511,39 @@ export class HealthReportIntelligenceService {
       }
     }
 
+    // Health Vitals entries are a separate patient-facing source from the
+    // dedicated manual-vitals journal. Include them explicitly rather than merely
+    // counting them in the report's source ledger.
+    for (const item of rows(activity.patientVitals)) {
+      const at = item.recordedAt ?? item.createdAt;
+      const basis = item.recordedAt ? 'SOURCE_EVENT_TIME' : item.createdAt ? 'RECORD_TIME_FALLBACK' : 'UNKNOWN';
+      const actor: ObservationActor = String(item.source ?? 'PATIENT').toUpperCase() === 'CLINICAL' ? 'CLINICIAN' : 'PATIENT';
+      const fields: Array<[string, unknown, string | null]> = [
+        ['bp.systolic', item.bloodPressureSystolic, 'mmHg'],
+        ['bp.diastolic', item.bloodPressureDiastolic, 'mmHg'],
+        ['heart_rate', item.heartRate, 'bpm'],
+        ['weight', item.weightKg, 'kg'],
+        ['oxygen_saturation', item.oxygenSaturation, '%'],
+        ['body_temperature', item.temperature, '°C'],
+        ['respiratory_rate', item.respiratoryRate, 'breaths/min'],
+      ];
+      for (const [metric, value, unit] of fields) {
+        if (numericValue(value) === null) continue;
+        add({ metric, value, unit, observedAt: at, capturedAt: item.createdAt,
+          sourceType: 'MANUAL_VITAL', sourceId: item.id, metricPath: metric,
+          actor, sourceName: 'Health Vitals', observedAtBasis: basis });
+      }
+    }
+
     for (const item of rows(activity.deviceMeasurements)) {
       const device = row(item.device);
       const rawType = item.measurementType ?? item.metricKey ?? row(item.vitalType).name;
       const metric = normalizeMetric(rawType, item.metricKey);
-      const at = item.measuredAt;
+      const at = item.measuredAt ?? item.createdAt;
       const common = { observedAt: at, capturedAt: item.receivedAt ?? item.createdAt,
         sourceType: 'WEARABLE_DEVICE' as const, sourceId: item.id, actor: 'DEVICE' as const,
-        sourceName: device.model ?? device.manufacturer ?? item.source, observedAtBasis: at ? 'SOURCE_EVENT_TIME' as const : 'UNKNOWN' as const };
+        sourceName: device.model ?? device.manufacturer ?? item.source,
+        observedAtBasis: item.measuredAt ? 'SOURCE_EVENT_TIME' as const : item.createdAt ? 'RECORD_TIME_FALLBACK' as const : 'UNKNOWN' as const };
       if (String(rawType ?? '').toUpperCase().includes('BLOOD_PRESSURE') ||
           String(item.metricKey ?? '').toLowerCase().includes('blood_pressure')) {
         add({ ...common, metric: 'bp.systolic', value: item.value, unit: item.unit ?? 'mmHg', metricPath: 'value' });
@@ -537,7 +562,8 @@ export class HealthReportIntelligenceService {
     for (const item of rows(activity.wellnessMetrics)) {
       const metric = normalizeMetric(item.metricKey, item.metricKey);
       if (!metric || numericValue(item.value) === null) continue;
-      add({ metric, value: item.value, unit: item.unit ?? unitFor(metric), observedAt: item.measuredAt,
+      const at = item.measuredAt ?? item.createdAt;
+      add({ metric, value: item.value, unit: item.unit, observedAt: at,
         capturedAt: item.createdAt, sourceType: 'WELLNESS_METRIC', sourceId: item.id,
         metricPath: 'value', actor: 'DEVICE', sourceName: item.source,
         observedAtBasis: item.measuredAt ? 'SOURCE_EVENT_TIME' : item.createdAt ? 'RECORD_TIME_FALLBACK' : 'UNKNOWN' });
@@ -545,18 +571,20 @@ export class HealthReportIntelligenceService {
 
     for (const item of rows(activity.sleepSessions)) {
       if (numericValue(item.durationMinutes) !== null) {
-        add({ metric: 'sleep.duration', value: item.durationMinutes, unit: 'minutes', observedAt: item.startedAt,
+        const at = item.startedAt ?? item.endedAt ?? item.createdAt;
+        add({ metric: 'sleep.duration', value: item.durationMinutes, unit: 'minutes', observedAt: at,
           capturedAt: item.createdAt, sourceType: 'SLEEP_SESSION', sourceId: item.id,
           metricPath: 'durationMinutes', actor: 'DEVICE', sourceName: item.source,
-          observedAtBasis: item.startedAt ? 'SOURCE_EVENT_TIME' : item.createdAt ? 'RECORD_TIME_FALLBACK' : 'UNKNOWN' });
+          observedAtBasis: item.startedAt || item.endedAt ? 'SOURCE_EVENT_TIME' : item.createdAt ? 'RECORD_TIME_FALLBACK' : 'UNKNOWN' });
       }
     }
     for (const item of rows(activity.workouts)) {
       if (numericValue(item.durationSeconds) !== null) {
-        add({ metric: 'exercise.duration', value: item.durationSeconds, unit: 'seconds', observedAt: item.startedAt,
+        const at = item.startedAt ?? item.endedAt ?? item.createdAt;
+        add({ metric: 'exercise.duration', value: item.durationSeconds, unit: 'seconds', observedAt: at,
           capturedAt: item.createdAt, sourceType: 'WORKOUT_SESSION', sourceId: item.id,
           metricPath: 'durationSeconds', actor: item.source ? 'DEVICE' : 'PATIENT', sourceName: item.activityType,
-          observedAtBasis: item.startedAt ? 'SOURCE_EVENT_TIME' : item.createdAt ? 'RECORD_TIME_FALLBACK' : 'UNKNOWN' });
+          observedAtBasis: item.startedAt || item.endedAt ? 'SOURCE_EVENT_TIME' : item.createdAt ? 'RECORD_TIME_FALLBACK' : 'UNKNOWN' });
       }
     }
 
@@ -564,7 +592,7 @@ export class HealthReportIntelligenceService {
       const vitalType = row(item.vitalType);
       const metric = normalizeMetric(vitalType.code ?? vitalType.name, vitalType.code);
       if (!metric || numericValue(item.value) === null) continue;
-      add({ metric, value: item.value, unit: vitalType.unit, observedAt: item.measuredAt ?? item.recordedAt,
+      add({ metric, value: item.value, unit: vitalType.unit, observedAt: item.measuredAt ?? item.recordedAt ?? item.createdAt,
         capturedAt: item.createdAt, sourceType: 'CLINICAL_VITAL', sourceId: item.id,
         metricPath: 'value', actor: 'CLINICIAN', sourceName: vitalType.name ?? vitalType.code,
         observedAtBasis: item.measuredAt || item.recordedAt ? 'SOURCE_EVENT_TIME' : item.createdAt ? 'RECORD_TIME_FALLBACK' : 'UNKNOWN' });
