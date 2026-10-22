@@ -53,8 +53,20 @@ export interface HealthObservation {
   };
 }
 
+export interface PersonalisedHealthInsight {
+  key: string;
+  group: 'CONDITION' | 'GOAL' | 'BASELINE';
+  title: string;
+  headline: string;
+  detail: string;
+  status: 'INFO' | 'WATCH' | 'REVIEW';
+}
+
 export interface HealthReportIntelligence {
   version: 'shadow-v1';
+  personalisedContext: {
+    insights: PersonalisedHealthInsight[];
+  };
   generatedAt: string;
   medicationAdherence?: MedicationReportAdherenceSummary | null;
   coverage: {
@@ -816,16 +828,199 @@ export class HealthReportIntelligenceService {
 
     const person = row(snapshot.person);
     const context = row(snapshot);
-    const conditionNames = [
-      ...rows(context.conditions).map((item) => stringValue(row(item.condition).name ?? item.name)),
-      ...rows(context.diagnoses).map((item) => stringValue(row(item.diagnosis).name ?? item.name)),
-    ].filter((item): item is string => Boolean(item));
+    const isInactive = (item: Row) =>
+      Boolean(item.resolvedAt) ||
+      /RESOLVED|INACTIVE|CANCELLED|DISCONTINUED|STOPPED|ARCHIVED|COMPLETED/.test(String(item.status ?? '').toUpperCase());
+    const currentConditionRows = [
+      ...rows(context.conditions).filter((item) => !isInactive(item)).map((item) => {
+        const relation = row(item.condition);
+        return { name: stringValue(relation.name ?? item.name), status: String(item.status ?? relation.status ?? 'ACTIVE') };
+      }),
+      ...rows(context.diagnoses).filter((item) => !isInactive(item)).map((item) => {
+        const relation = row(item.diagnosis);
+        return { name: stringValue(relation.name ?? item.name), status: String(item.status ?? relation.status ?? 'ACTIVE') };
+      }),
+    ].filter((item): item is { name: string; status: string } => Boolean(item.name))
+      .filter((item, index, all) => all.findIndex((other) => other.name.toLowerCase() === item.name.toLowerCase()) === index);
+    const conditionNames = currentConditionRows.map((item) => item.name);
     const activeMedications = rows(context.medications).filter((item) =>
-      !/RESOLVED|INACTIVE|CANCELLED|DISCONTINUED|STOPPED/.test(String(item.status ?? '').toUpperCase()) &&
-      item.ongoing !== false && !item.endedAt);
+      !isInactive(item) && item.ongoing !== false && !item.endedAt);
+    const activeGoals = rows(context.activeGoals).filter((item) => !isInactive(item));
     const referenceDate = isoDate(row(report.period).end) ?? isoDate(report.generatedAt);
-    const allergies = rows(context.allergies).filter((item) =>
-      !/RESOLVED|INACTIVE|CANCELLED/.test(String(item.status ?? '').toUpperCase()) && !item.resolvedAt);
+    const allergies = rows(context.allergies).filter((item) => !isInactive(item));
+
+    const metricLabel: Record<string, string> = {
+      'bp.systolic': 'Systolic blood pressure', 'bp.diastolic': 'Diastolic blood pressure',
+      heart_rate: 'Heart rate', weight: 'Weight', oxygen_saturation: 'Oxygen saturation',
+      respiratory_rate: 'Breathing rate', body_temperature: 'Temperature',
+      blood_glucose: 'Blood glucose', 'lab.hba1c': 'HbA1c', 'cholesterol.total': 'Total cholesterol',
+      'cholesterol.ldl': 'LDL cholesterol', 'cholesterol.hdl': 'HDL cholesterol',
+      'cholesterol.triglycerides': 'Triglycerides', 'sleep.duration': 'Sleep',
+      'sleep.quality': 'Sleep quality', 'stress.score': 'Stress', mood: 'Mood',
+      'energy.level': 'Energy', 'hydration.volume': 'Water intake',
+      'exercise.duration': 'Exercise', 'activity.steps': 'Steps',
+      'smoking.cigarettes': 'Cigarettes', 'smoking.frequency': 'Smoking',
+      'alcohol.units': 'Alcohol', 'alcohol.frequency': 'Alcohol frequency',
+      'medication.dose_action': 'Medication dose actions',
+    };
+    const metricUnits = (metric: string, items: HealthObservation[]) =>
+      items.find((item) => item.unit)?.unit ?? unitFor(metric) ?? '';
+    const formatNumber = (value: number, digits = 1) => Number(value.toFixed(digits)).toString();
+    const summarizeMetrics = (metrics: string[]) => {
+      const matching = observations.filter((item) => metrics.includes(item.metric) && item.value !== null);
+      const summaries = metrics.map((metric) => {
+        const values = matching.filter((item) => item.metric === metric);
+        if (!values.length) return null;
+        const accepted = values.filter((item) => item.quality.status === 'ACCEPTED');
+        const latest = values.slice().sort((a, b) =>
+          String(a.observedAt ?? '').localeCompare(String(b.observedAt ?? ''))).at(-1);
+        const flagged = values.length - accepted.length;
+        const unit = metricUnits(metric, values);
+        const latestText = latest?.value === null || latest?.value === undefined
+          ? '' : '; latest ' + formatNumber(latest.value, metric === 'heart_rate' || metric.startsWith('bp.') || metric === 'respiratory_rate' ? 0 : 1) + (unit ? ' ' + unit : '') +
+            (latest.observedAt ? ' on ' + String(latest.observedAt).slice(0, 10) : '');
+        return (metricLabel[metric] ?? metric) + ': ' + values.length + ' dated value(s)' + latestText +
+          (flagged ? '; ' + flagged + ' require verification and are not treated as reliable trend evidence' : '');
+      }).filter((item): item is string => Boolean(item));
+      return { matching, summaries, accepted: matching.filter((item) => item.quality.status === 'ACCEPTED') };
+    };
+
+    const personalisedInsights: PersonalisedHealthInsight[] = [];
+    for (const condition of currentConditionRows.slice(0, 6)) {
+      const name = condition.name;
+      const token = name.toLowerCase();
+      let metrics: string[] = [];
+      if (/diabet|prediabet/.test(token)) metrics = ['blood_glucose', 'lab.hba1c'];
+      else if (/hypertension|high blood pressure/.test(token)) metrics = ['bp.systolic', 'bp.diastolic'];
+      else if (/asthma|copd|chronic obstructive|respiratory condition/.test(token)) metrics = ['oxygen_saturation', 'respiratory_rate'];
+      else if (/cardiovascular|heart failure|coronary|ischaemic heart|ischemic heart/.test(token)) metrics = ['bp.systolic', 'bp.diastolic', 'heart_rate'];
+      const summary = summarizeMetrics(metrics);
+      const relatedSymptomCount = rows(activity.symptoms).filter((item) => {
+        const text = [item.title, item.description, ...rows(item.symptoms).map((entry) =>
+          stringValue(row(entry.symptom).name ?? entry.name))].filter(Boolean).join(' ').toLowerCase();
+        if (/respiratory condition|asthma|copd|chronic obstructive/.test(token)) return /breath|wheez|cough|chest|respirat|asthma/.test(text);
+        if (/diabet|prediabet/.test(token)) return /thirst|urination|blurred vision|blood sugar|glucose/.test(text);
+        if (/hypertension|high blood pressure/.test(token)) return /blood pressure|headache|dizz|vision/.test(text);
+        return text.includes(token);
+      }).length;
+      const hasDirectMetricRule = metrics.length > 0;
+      const reviewCount = summary.matching.filter((item) => item.quality.status !== 'ACCEPTED' || item.quality.safetySignals.length > 0).length;
+      personalisedInsights.push({
+        key: 'condition:' + token.replace(/[^a-z0-9]+/g, '-'),
+        group: 'CONDITION',
+        title: name + ' · period context',
+        headline: summary.summaries.length
+          ? summary.summaries.join(' · ')
+          : relatedSymptomCount
+            ? relatedSymptomCount + ' potentially related symptom log(s) in this period'
+            : 'No directly linked measurements identified in this period',
+        detail: hasDirectMetricRule
+          ? summary.summaries.length
+            ? 'These period records are shown in the context of your saved condition. ' +
+              (reviewCount ? reviewCount + ' reading(s) need verification before interpreting a trend. ' : '') +
+              'Compare readings and any laboratory results with your personal care plan and clinician-set targets; this summary does not diagnose or infer control.'
+            : 'No blood glucose/HbA1c, blood-pressure, or respiratory measurements mapped to this condition were returned for this period. Missing measurements do not mean the condition is stable.'
+          : relatedSymptomCount
+            ? 'The symptom wording overlaps with your saved condition. This is a record association for review, not proof that the condition caused the symptoms.'
+            : 'This condition is saved in your health context, but current report intelligence has no specific measurement mapping for it. No conclusion about condition activity is inferred from missing data.',
+        status: summary.matching.some((item) => item.quality.status !== 'ACCEPTED' || item.quality.safetySignals.length > 0) ? 'REVIEW' : 'INFO',
+      });
+    }
+
+    const goalMetricMap: Record<string, string[]> = {
+      WEIGHT: ['weight'], BODY_WEIGHT: ['weight'],
+      BLOOD_PRESSURE: ['bp.systolic', 'bp.diastolic'], BP: ['bp.systolic', 'bp.diastolic'],
+      HEART_RATE: ['heart_rate'], RESTING_HEART_RATE: ['heart_rate'],
+      BLOOD_GLUCOSE: ['blood_glucose', 'lab.hba1c'], GLUCOSE: ['blood_glucose', 'lab.hba1c'],
+      CHOLESTEROL: ['cholesterol.total', 'cholesterol.ldl', 'cholesterol.hdl', 'cholesterol.triglycerides'],
+      EXERCISE: ['exercise.duration', 'activity.steps'], PHYSICAL_ACTIVITY: ['exercise.duration', 'activity.steps'],
+      HYDRATION: ['hydration.volume'], WATER: ['hydration.volume'],
+      SLEEP: ['sleep.duration', 'sleep.quality'], MENTAL_HEALTH: ['stress.score', 'mood', 'energy.level'],
+      STRESS: ['stress.score'], MOOD: ['mood'],
+      SMOKING: ['smoking.cigarettes', 'smoking.frequency'], ALCOHOL: ['alcohol.units', 'alcohol.frequency'],
+      NUTRITION: ['nutrition.calories', 'nutrition.protein', 'nutrition.carbohydrates', 'nutrition.fat', 'nutrition.intake'],
+      MEDICATION: ['medication.dose_action'],
+    };
+    const eventRows = rows(report.goalMetricEvents);
+    const progressRows = rows(tracking.goalProgress);
+    const activeGoalSummaries: PersonalisedHealthInsight[] = activeGoals.slice(0, 12).map((goal, index) => {
+      const id = stringValue(goal.id);
+      const category = String(goal.category ?? '').toUpperCase().replace(/[\s-]+/g, '_');
+      const metrics = goalMetricMap[category] ?? [];
+      const directEvents = eventRows.filter((event) =>
+        (id && String(event.goalId ?? '') === id) ||
+        rows(event.goalAssociations).some((association) => id && String(association.goalId ?? '') === id));
+      const goalProgress = progressRows.filter((item) => {
+        const record = row(item);
+        return id && String(row(record.healthGoal).id ?? record.healthGoalId ?? record.goalId ?? '') === id;
+      });
+      const metricSummary = summarizeMetrics(metrics);
+      const evidenceCount = metricSummary.matching.length;
+      const target = numericValue(goal.targetValue);
+      const targetText = target === null ? '' : ' Saved goal target: ' + formatNumber(target, Number.isInteger(target) ? 0 : 1) +
+        (stringValue(goal.unit) ? ' ' + stringValue(goal.unit) : '') + '.';
+      const summaryText = metricSummary.summaries.length ? metricSummary.summaries.join(' · ') : '';
+      const linkedCount = directEvents.length + goalProgress.length;
+      const hasData = evidenceCount > 0 || linkedCount > 0;
+      return {
+        key: 'goal:' + (id ?? String(index)),
+        group: 'GOAL',
+        title: stringValue(goal.title) ?? (category ? category.replace(/_/g, ' ') : 'Saved health goal'),
+        headline: summaryText || (linkedCount
+          ? linkedCount + ' explicitly linked tracker/progress record(s) in this period'
+          : 'No directly matched measurement or linked tracker entry in this period'),
+        detail: (targetText ? targetText + ' ' : '') +
+          (hasData
+            ? 'Period measurements are matched to this goal by category as well as explicit goal links. A measurement is not automatically counted as goal completion unless the goal tracker records it.'
+            : 'No matching period evidence was returned. Missing evidence is unknown, not zero progress.'),
+        status: metricSummary.matching.some((item) => item.quality.status !== 'ACCEPTED' || item.quality.safetySignals.length > 0) ? 'REVIEW' : 'INFO',
+      };
+    });
+    personalisedInsights.push(...activeGoalSummaries);
+
+    const baseline = row(context.baseline);
+    const baselineFields: Array<{ key: string; metric: string; label: string; field: string; unit: string }> = [
+      { key: 'weight', metric: 'weight', label: 'Weight', field: 'weightKg', unit: 'kg' },
+      { key: 'systolic', metric: 'bp.systolic', label: 'Systolic blood pressure', field: 'systolicPressure', unit: 'mmHg' },
+      { key: 'diastolic', metric: 'bp.diastolic', label: 'Diastolic blood pressure', field: 'diastolicPressure', unit: 'mmHg' },
+      { key: 'heart-rate', metric: 'heart_rate', label: 'Resting heart rate', field: 'restingHeartRate', unit: 'bpm' },
+      { key: 'oxygen', metric: 'oxygen_saturation', label: 'Oxygen saturation', field: 'oxygenSaturation', unit: '%' },
+      { key: 'temperature', metric: 'body_temperature', label: 'Temperature', field: 'bodyTemperature', unit: '°C' },
+      { key: 'respiratory', metric: 'respiratory_rate', label: 'Breathing rate', field: 'respiratoryRate', unit: 'breaths/min' },
+      { key: 'glucose', metric: 'blood_glucose', label: 'Blood glucose', field: 'bloodGlucose', unit: 'mmol/L' },
+      { key: 'cholesterol', metric: 'cholesterol.total', label: 'Total cholesterol', field: 'cholesterol', unit: 'mmol/L' },
+    ];
+    for (const field of baselineFields) {
+      const baselineValue = numericValue(baseline[field.field]);
+      if (baselineValue === null) continue;
+      const values = observations.filter((item) => item.metric === field.metric && item.value !== null);
+      if (!values.length) continue;
+      const acceptedValues = values.filter((item) => item.quality.status === 'ACCEPTED');
+      const comparisonValues = acceptedValues.length ? acceptedValues : [];
+      const latest = values.slice().sort((a, b) => String(a.observedAt ?? '').localeCompare(String(b.observedAt ?? ''))).at(-1);
+      if (!comparisonValues.length) {
+        personalisedInsights.push({
+          key: 'baseline:' + field.key,
+          group: 'BASELINE',
+          title: field.label + ' · saved baseline',
+          headline: latest ? 'Period reading(s) require verification before comparison' : 'No usable period value',
+          detail: 'Saved baseline: ' + formatNumber(baselineValue, 1) + ' ' + field.unit + '. Flagged readings are not used to calculate a baseline difference.',
+          status: 'REVIEW',
+        });
+        continue;
+      }
+      const average = comparisonValues.reduce((sum, item) => sum + (item.value ?? 0), 0) / comparisonValues.length;
+      const change = average - baselineValue;
+      personalisedInsights.push({
+        key: 'baseline:' + field.key,
+        group: 'BASELINE',
+        title: field.label + ' · compared with your baseline',
+        headline: 'Period average ' + formatNumber(average, 1) + ' ' + field.unit + ' · saved baseline ' + formatNumber(baselineValue, 1) + ' ' + field.unit,
+        detail: 'Difference from saved baseline: ' + (change > 0 ? '+' : '') + formatNumber(change, 1) + ' ' + field.unit +
+          '. This describes change from your recorded starting point, not whether the value is clinically safe or unsafe.',
+        status: values.some((item) => item.quality.status !== 'ACCEPTED' || item.quality.safetySignals.length > 0) ? 'REVIEW' : 'INFO',
+      });
+    }
 
     const start = isoDate(row(report.period).start);
     const end = isoDate(row(report.period).end);
@@ -861,6 +1056,9 @@ export class HealthReportIntelligenceService {
         policy: 'Counts unique Africa/Johannesburg calendar days with patient-owned check-ins, symptom entries/follow-ups, patient vitals, manual-vital logs, explicit medication actions or patient smoking logs. Excludes updatedAt-only changes, clinician/administrative activity, profile edits and device-only syncs.',
       },
       crossSignals: { sleepStress },
+      personalisedContext: {
+        insights: personalisedInsights,
+      },
       clinicalContext: {
         ageAtReport: ageAt(person.dateOfBirth, referenceDate),
         gender: stringValue(person.gender),
