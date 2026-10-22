@@ -3447,7 +3447,7 @@ function ServerHealthIntelligenceSummary({ report }: { report: Report }) {
 function MedicationAdherenceSummary({ report }: { report: Report }) {
   const data = report.intelligence?.medicationAdherence;
   if (!data) return null;
-  const hasEvidence = data.expectedDoses > 0 || data.legacyEventsNotUsed > 0 || data.explicitActionCount > 0;
+  const hasEvidence = data.medications.length > 0 || data.expectedDoses > 0 || data.legacyEventsNotUsed > 0 || data.explicitActionCount > 0;
   const statusLabel = data.status === "CALCULATED" ? "Calculated from schedules"
     : data.status === "PARTIAL" ? "Partial schedule coverage"
     : "Insufficient schedule data";
