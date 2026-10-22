@@ -711,4 +711,48 @@ describe('HealthReportIntelligenceService', () => {
     expect(allergy?.whyItMatters).toContain('cannot verify an allergic reaction or its cause');
   });
 
+
+  it('connects repeated symptom dates with explicit skipped-dose dates without claiming causation', () => {
+    const base = fixture();
+    const report = fixture({
+      currentSnapshot: {
+        ...base.currentSnapshot,
+        medications: [{
+          id: 'patient-medication-1',
+          status: 'ACTIVE',
+          ongoing: true,
+          medication: { name: 'Example medicine', genericName: 'Example medicine' },
+        }],
+      },
+      activity: {
+        ...base.activity,
+        symptoms: [
+          { id: 'symptom-a', title: 'Headache', startedAt: '2026-10-13T08:00:00.000Z', overallSeverity: 'MILD', monitorings: [] },
+          { id: 'symptom-b', title: 'Nausea', startedAt: '2026-10-14T08:00:00.000Z', overallSeverity: 'MILD', monitorings: [] },
+        ],
+      },
+      goalMetricEvents: [
+        {
+          metricType: 'MEDICATION', metricKey: 'medication.adherence', loggedValue: 0,
+          occurredAt: '2026-10-13T09:00:00.000Z', source: 'medication-adherence',
+          sourceId: 'patient-medication-1:action-1', metadata: { action: 'SKIPPED', patientMedicationId: 'patient-medication-1' },
+        },
+        {
+          metricType: 'MEDICATION', metricKey: 'medication.adherence', loggedValue: 0,
+          occurredAt: '2026-10-14T09:00:00.000Z', source: 'medication-adherence',
+          sourceId: 'patient-medication-1:action-2', metadata: { action: 'SKIPPED', patientMedicationId: 'patient-medication-1' },
+        },
+      ],
+    });
+
+    const result = service.analyze(report, 'patient-1');
+    const finding = result.findings.find((item) => item.key === 'cross:symptoms-medication-actions');
+
+    expect(finding).toBeDefined();
+    expect(finding?.change).toContain('2 separate day(s)');
+    expect(finding?.pattern).toContain('Example medicine');
+    expect(finding?.whyItMatters).toContain('does not show that skipped doses caused symptoms');
+    expect(finding?.nextStep).toContain('do not change or double a dose');
+  });
+
 });
