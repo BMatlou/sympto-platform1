@@ -475,7 +475,7 @@ export default function TodayMentalHealthGoal({
         : Array.isArray(medicalRecord?.conditions)
           ? medicalRecord.conditions
           : [];
-    return source.filter((record) => activeRecord(record) && conditionName(record)).slice(0, 6);
+    return source.filter((record: any) => activeRecord(record) && conditionName(record)).slice(0, 6);
   }, [conditions, healthPassport?.conditions, medicalRecord?.conditions]);
 
   const activeMedications = useMemo(() => {
@@ -486,7 +486,7 @@ export default function TodayMentalHealthGoal({
         : Array.isArray(medicalRecord?.medications)
           ? medicalRecord.medications
           : [];
-    return source.filter((record) => activeRecord(record) && medicationName(record)).slice(0, 6);
+    return source.filter((record: any) => activeRecord(record) && medicationName(record)).slice(0, 6);
   }, [medications, healthPassport?.medications, medicalRecord?.medications]);
 
   const activeSymptoms = useMemo(() => {
@@ -505,11 +505,11 @@ export default function TodayMentalHealthGoal({
 
   const profileRecommendation = useMemo(() => {
     const stressNeedsAttention = (target != null && recent.recentAverage != null && recent.recentAverage > target) || recent.trend === "HIGHER";
-    const longTermCondition = activeConditions.find((item) => {
+    const longTermCondition = activeConditions.find((item: any) => {
       const name = conditionName(item).toLowerCase();
       return item?.chronic === true || item?.isChronic === true || /diabet|hypertension|asthma|heart disease|cardiovascular|epilep|arthritis|kidney disease/.test(name);
     });
-    const reportedMedicationEffect = activeMedications.find((item) => {
+    const reportedMedicationEffect = activeMedications.find((item: any) => {
       const effect = String(item?.sideEffects ?? item?.sideEffect ?? item?.adverseEffects ?? item?.reportedSideEffects ?? "").trim();
       return Boolean(effect) && !["NONE", "NO", "N/A", "NA", "UNKNOWN", "FALSE", "NOT RECORDED"].includes(effect.toUpperCase());
     });
