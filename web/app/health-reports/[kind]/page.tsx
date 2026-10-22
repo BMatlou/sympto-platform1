@@ -3408,7 +3408,7 @@ function ReportDataCoverage({ report }: { report: Report }) {
 
 function NarrativeFindingsSummary({ report }: { report: Report }) {
   const findings = report.intelligence?.findings ?? [];
-  const priorityLabel: Record<NonNullable<Report["intelligence"]>["findings"] extends Array<infer T> ? T extends { priority: infer P } ? P & string : never : never, string> = {
+  const priorityLabel: Record<string, string> = {
     SAFETY: "Safety review",
     REVIEW: "Verify",
     WATCH: "Monitor",
