@@ -3198,7 +3198,9 @@ function HealthReportInsights({
       </section>
 
       {(symptomCount > 0 || lowMood.total > 0 || repeated.some((item) => item.count > 1) || symptomAnalytics.repeatedTriggers.length > 0 || symptomAnalytics.medicationEffects > 0 || symptomAnalytics.averageSeverityRank !== null || symptomAnalytics.worseningCount > 0 || symptomAnalytics.severeCount > 0) && (
-        <section className="rounded-2xl border border-[#dcebed] bg-white p-4 sm:p-5" aria-label="Health patterns">
+        <details aria-label="Supporting health pattern counts" className="rounded-2xl border border-[#dcebed] bg-white p-4 sm:p-5">
+          <summary className="cursor-pointer list-none text-sm font-black text-[#0b2d54]">Supporting symptom, mood and trigger counts from this period</summary>
+          <section className="mt-3 border-t border-slate-100 pt-3" aria-label="Health patterns">
           <p className="text-[10px] font-black uppercase tracking-[0.16em] text-[#0b7b80]">Patterns</p>
           <h2 className="mt-1 text-lg font-black text-[#0b2d54]">Patterns across your logs</h2>
           <div className="mt-3 divide-y divide-slate-100">
@@ -3245,6 +3247,7 @@ function HealthReportInsights({
           </div>
           <p className="mt-2 border-t border-slate-100 pt-3 text-[10px] leading-4 text-slate-400">These are patterns in your records, not proof of cause or a diagnosis. Seek clinical advice for persistent or worsening symptoms.</p>
         </section>
+        </details>
       )}
 
       {(clinicalCount > 0 || flaggedLabs.length > 0) && (
@@ -3426,6 +3429,9 @@ function NarrativeFindingsSummary({ report }: { report: Report }) {
     MODERATE: "Some timing uncertainty",
     LIMITED: "Limited evidence",
   };
+  const attentionCount = findings.filter((finding) => finding.priority === "SAFETY" || finding.priority === "REVIEW").length;
+  const monitorCount = findings.filter((finding) => finding.priority === "WATCH").length;
+  const insightCount = findings.filter((finding) => finding.priority === "INSIGHT").length;
 
   return (
     <section aria-label="Personalised health narrative" className="mt-5 rounded-2xl border border-[#dcebed] bg-white p-4 sm:p-6">
@@ -3436,6 +3442,24 @@ function NarrativeFindingsSummary({ report }: { report: Report }) {
           Findings are prioritised from dated observations, reporting-period comparisons and your saved health context. Relationships are described as associations unless the records establish more; missing data is not treated as zero or proof of improvement.
         </p>
       </div>
+      <div className="mt-4 grid grid-cols-3 gap-2">
+        <div className="rounded-xl border border-rose-100 bg-rose-50/60 p-3">
+          <p className="text-[10px] font-bold uppercase tracking-wide text-rose-800">Needs attention</p>
+          <p className="mt-1 text-2xl font-black tabular-nums text-[#0b2d54]">{attentionCount}</p>
+          <p className="text-[10px] text-slate-500">Safety and review signals</p>
+        </div>
+        <div className="rounded-xl border border-amber-100 bg-amber-50/60 p-3">
+          <p className="text-[10px] font-bold uppercase tracking-wide text-amber-800">Monitor</p>
+          <p className="mt-1 text-2xl font-black tabular-nums text-[#0b2d54]">{monitorCount}</p>
+          <p className="text-[10px] text-slate-500">Patterns worth following</p>
+        </div>
+        <div className="rounded-xl border border-slate-200 bg-slate-50 p-3">
+          <p className="text-[10px] font-bold uppercase tracking-wide text-slate-600">Insights</p>
+          <p className="mt-1 text-2xl font-black tabular-nums text-[#0b2d54]">{insightCount}</p>
+          <p className="text-[10px] text-slate-500">Other supported findings</p>
+        </div>
+      </div>
+      <p className="mt-2 text-[10px] text-slate-400">These counts summarise this report’s evidence signals; they are not a diagnosis or a numerical health-risk score.</p>
       {findings.length ? (
         <div className="divide-y divide-slate-200">
           {findings.map((finding) => (
@@ -3447,21 +3471,15 @@ function NarrativeFindingsSummary({ report }: { report: Report }) {
                 </span>
               </div>
               <p className="mt-2 text-sm font-semibold leading-6 text-[#0b5a62]">{finding.change}</p>
-              <div className="mt-3 grid gap-x-6 gap-y-3 md:grid-cols-2">
-                <div>
-                  <p className="text-[10px] font-black uppercase tracking-[0.12em] text-slate-400">Pattern detected</p>
-                  <p className="mt-1 text-sm leading-6 text-slate-700">{finding.pattern}</p>
-                </div>
-                <div>
-                  <p className="text-[10px] font-black uppercase tracking-[0.12em] text-slate-400">Your health context</p>
+              <p className="mt-3 text-sm leading-6 text-slate-600">{finding.pattern}</p>
+              <div className="mt-3 grid gap-3 md:grid-cols-2">
+                <div className="rounded-xl bg-[#f5fafb] p-3">
+                  <p className="text-[10px] font-black uppercase tracking-[0.12em] text-[#0b7b80]">Why this matters to you</p>
                   <p className="mt-1 text-sm leading-6 text-slate-700">{finding.personalContext}</p>
+                  <p className="mt-2 text-sm leading-6 text-slate-600">{finding.whyItMatters}</p>
                 </div>
-                <div>
-                  <p className="text-[10px] font-black uppercase tracking-[0.12em] text-slate-400">Why it matters</p>
-                  <p className="mt-1 text-sm leading-6 text-slate-700">{finding.whyItMatters}</p>
-                </div>
-                <div>
-                  <p className="text-[10px] font-black uppercase tracking-[0.12em] text-slate-400">What to do next</p>
+                <div className="rounded-xl border border-[#dcebed] p-3">
+                  <p className="text-[10px] font-black uppercase tracking-[0.12em] text-[#0b7b80]">Recommended next step</p>
                   <p className="mt-1 text-sm leading-6 text-slate-700">{finding.nextStep}</p>
                 </div>
               </div>
