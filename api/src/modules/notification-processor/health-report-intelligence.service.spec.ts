@@ -78,6 +78,35 @@ describe('HealthReportIntelligenceService', () => {
     expect(observations[0].observedAt).toBe('2026-10-14T08:00:00.000Z');
   });
 
+  it('normalizes dedicated Health Vitals records and marks missing event time as inferred', () => {
+    const report = fixture({
+      activity: {
+        ...fixture().activity,
+        patientVitals: [{
+          id: 'vitals-1',
+          source: 'PATIENT',
+          recordedAt: '2026-10-14T08:00:00.000Z',
+          bloodPressureSystolic: 128,
+          bloodPressureDiastolic: 78,
+          heartRate: 74,
+        }, {
+          id: 'vitals-legacy',
+          source: 'PATIENT',
+          createdAt: '2026-10-15T08:00:00.000Z',
+          oxygenSaturation: 70,
+        }],
+      },
+    });
+
+    const observations = service.normalize(report, 'patient-1');
+    expect(observations.filter((item) => item.source.recordId === 'vitals-1')).toHaveLength(3);
+    const oxygen = observations.find((item) => item.source.recordId === 'vitals-legacy');
+    expect(oxygen?.metric).toBe('oxygen_saturation');
+    expect(oxygen?.observedAtBasis).toBe('RECORD_TIME_FALLBACK');
+    expect(oxygen?.quality.safetySignals).toContain('LOW_OXYGEN_REQUIRES_URGENT_RECHECK');
+    expect(oxygen?.patientId).toBe('patient-1');
+  });
+
   it('keeps plausible extreme readings distinct from invalid entry values', () => {
     const report = fixture({
       activity: {
