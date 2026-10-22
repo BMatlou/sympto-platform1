@@ -1237,7 +1237,7 @@ export class HealthReportIntelligenceService {
       stringValue(row(item.medication).name),
       stringValue(row(item.medication).genericName),
       stringValue(row(item.medication).brandName),
-    ].filter((name): name is string => Boolean(name) && name.length >= 3));
+    ].filter((name): name is string => typeof name === 'string' && name.length >= 3));
     const medicationEffectMatches = savedMedicationNames.map((name) => ({
       name,
       symptoms: symptomRows.filter((symptom) =>
@@ -2068,7 +2068,11 @@ export class HealthReportIntelligenceService {
       });
     }
 
-    if (sleepStress.status === 'SUPPORTED_PATTERN') {
+    if (
+      sleepStress.status === 'SUPPORTED_PATTERN' &&
+      sleepStress.meanStressOnShorterSleepDays !== null &&
+      sleepStress.meanStressOnLongerSleepDays !== null
+    ) {
       addFinding({
         key: 'cross:sleep-stress',
         priority: 'WATCH',
