@@ -2,6 +2,7 @@ import { Module } from '@nestjs/common';
 
 import { DatabaseModule } from '../../database/database.module';
 import { NotificationsModule } from '../notifications/notifications.module';
+import { HealthGoalsModule } from '../health-goals/health-goals.module';
 
 import { NotificationProcessorService } from './notification-processor.service';
 import { MedicationReminderSchedulerService } from './medication-reminder-scheduler.service';
@@ -10,7 +11,7 @@ import { HealthReportIntelligenceService } from './health-report-intelligence.se
 import { HealthReportController } from './health-report.controller';
 
 @Module({
-  imports: [DatabaseModule, NotificationsModule],
+  imports: [DatabaseModule, NotificationsModule, HealthGoalsModule],
   controllers: [HealthReportController],
   providers: [
     NotificationProcessorService,
