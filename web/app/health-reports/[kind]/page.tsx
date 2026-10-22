@@ -2149,7 +2149,7 @@ function PersonalisedInsights({
     ...manualGoalSignals,
   ].filter((item) => item.key !== "weight" || !hasWeightVitalHistory);
 
-  const recommendations: Array<{ title: string; evidence: string; action: string; tone: StatusTone; href: string; linkLabel: string }> = [];
+  const recommendations: Array<{ title: string; evidence: string; action: string; tone: StatusTone }> = [];
   const urgentReviews = reviews.filter((item) => item.severity === "urgent");
   if (urgentReviews.length) {
     const review = urgentReviews[0];
@@ -2158,8 +2158,6 @@ function PersonalisedInsights({
       evidence: review.label + ": " + formatNumber(review.value, review.key === "temperature" || review.key === "oxygen" ? 1 : 0) + " " + review.unit + " · " + dateLabel(new Date(review.timestamp).toISOString()),
       action: review.key === "oxygen" ? "Recheck immediately and seek emergency help if it remains low; do not delay if unwell." : review.key === "temperature" ? "Verify the unit and measurement; seek urgent medical help if the reading is current and accurate." : review.key === "respiratory" ? "If this is your current resting rate, seek urgent medical advice; severe breathing difficulty needs emergency help." : "Repeat the measurement after resting; get urgent help for severe symptoms.",
       tone: "critical",
-      href: "#full-report-data",
-      linkLabel: "Review measurement",
     });
   }
   if (flaggedLabs.length > 0) {
@@ -2168,8 +2166,6 @@ function PersonalisedInsights({
       evidence: flaggedLabs.length + " result item(s) are marked abnormal or critical in the clinical record.",
       action: "Review the dated result and its clinical interpretation with your healthcare professional.",
       tone: flaggedLabs.some((item) => item.critical) ? "critical" : "watch",
-      href: "/health-records",
-      linkLabel: "Review lab results",
     });
   }
   const symptomDelta = symptomCount - previousSymptomCount;
@@ -2180,8 +2176,6 @@ function PersonalisedInsights({
       evidence: symptomCount + " symptom logs this period · +" + symptomDelta + " vs previous period" + (topSymptom ? " · repeated: " + topSymptom.label + " (" + topSymptom.count + ")" : ""),
       action: "Review whether symptoms are recurring, worsening or affecting daily life, and discuss them with a healthcare professional when appropriate.",
       tone: "watch",
-      href: "/health-journal",
-      linkLabel: "Review symptom history",
     });
   }
   if (symptomAnalytics.worseningCount > 0 || symptomAnalytics.severeCount > 0) {
@@ -2191,8 +2185,6 @@ function PersonalisedInsights({
         (previousReport ? " · previous period: " + previousSymptomAnalytics.worseningCount + " worsening" : ""),
       action: "Review the symptom timeline. Seek prompt medical advice for severe or worsening symptoms; use emergency services for emergency symptoms.",
       tone: symptomAnalytics.severeCount > 0 ? "high" : "watch",
-      href: "/health-journal",
-      linkLabel: "Review symptom timeline",
     });
   }
   if (symptomAnalytics.sideEffectReports > 0) {
@@ -2201,8 +2193,6 @@ function PersonalisedInsights({
       evidence: symptomAnalytics.sideEffectReports + " symptom log(s) include a reported medication side effect.",
       action: "Discuss these reports with the prescriber or pharmacist before changing a medicine.",
       tone: "watch",
-      href: "/health-journal",
-      linkLabel: "Review symptom and medication notes",
     });
   }
   const latestGoalIssues = goals.filter((goal) => ["DECLINING", "STAGNANT"].includes(String(goal.progress?.[0]?.status ?? "").toUpperCase()));
@@ -2212,8 +2202,6 @@ function PersonalisedInsights({
       evidence: latestGoalIssues.length + " active goal(s) have a latest saved status of declining or stagnant.",
       action: "Check the latest recorded values against each goal’s saved target; adjust the plan with your care team where needed.",
       tone: "watch",
-      href: "/health-goals",
-      linkLabel: "Review goals",
     });
   }
   const stressAverage = mean(stressCurrent.map((item) => item.value));
@@ -2224,8 +2212,6 @@ function PersonalisedInsights({
       evidence: "Average stress rating " + formatNumber(stressAverage, 1) + "/10" + (priorStressAverage === null ? "" : " · previous " + formatNumber(priorStressAverage, 1) + "/10"),
       action: "Prioritise a wellbeing check-in and seek support if this level persists or feels difficult to manage.",
       tone: "watch",
-      href: "#full-report-data",
-      linkLabel: "Open check-in",
     });
   }
   const moodAverage = mean(moodRatingsCurrent.map((item) => item.value));
@@ -2236,8 +2222,6 @@ function PersonalisedInsights({
       evidence: "Current average " + formatNumber(moodAverage, 1) + "/5" + (previousMoodAverage === null ? "" : " · previous " + formatNumber(previousMoodAverage, 1) + "/5"),
       action: "Check in with yourself and reach out to someone you trust or a health professional if low mood persists or feels hard to manage.",
       tone: "watch",
-      href: "#full-report-data",
-      linkLabel: "Review wellbeing check-in",
     });
   }
   const energyAverage = mean(energyCurrent.map((item) => item.value));
@@ -2247,8 +2231,6 @@ function PersonalisedInsights({
       evidence: "Average energy rating " + formatNumber(energyAverage, 1) + "/5 on days with entries.",
       action: "Review this alongside sleep and symptoms; discuss persistent or unexplained fatigue with a healthcare professional.",
       tone: "watch",
-      href: "/health-journal",
-      linkLabel: "Review daily logs",
     });
   }
   const sleepQualityAverage = mean(sleepQualityCurrent.map((item) => item.value));
@@ -2258,8 +2240,6 @@ function PersonalisedInsights({
       evidence: "Average sleep-quality rating " + formatNumber(sleepQualityAverage, 1) + "/5.",
       action: "Compare sleep-quality ratings with logged sleep duration and stress; seek support if problems persist.",
       tone: "watch",
-      href: "#full-report-data",
-      linkLabel: "Review sleep check-in",
     });
   }
   const sleepAverage = mean((sleepChecksCurrent.length ? sleepChecksCurrent : sleepSessionsCurrent).map((item) => item.value));
@@ -2269,8 +2249,6 @@ function PersonalisedInsights({
       evidence: "Average recorded sleep " + formatNumber(sleepAverage, 1) + " hours on days with entries.",
       action: "Review sleep consistency and consider discussing persistent sleep difficulties with a healthcare professional.",
       tone: "watch",
-      href: "#full-report-data",
-      linkLabel: "Review check-in",
     });
   }
   const medicineGoal = goals.find((goal) => /MEDICATION/.test(String(goal.category ?? "").toUpperCase()));
@@ -2284,8 +2262,6 @@ function PersonalisedInsights({
         : doseCurrent.legacyTotal + " older dated status entries · " + doseCurrent.legacyTaken + " marked taken · " + doseCurrent.legacySkipped + " marked skipped",
       action: "Review skipped or difficult-to-log doses with your care team; do not change a prescription based on this report.",
       tone: "watch",
-      href: "#full-report-data",
-      linkLabel: "Review medication logs",
     });
   }
 
@@ -3626,7 +3602,7 @@ function ContextualHealthInsights({ report }: { report: Report }) {
     ...ledgerArray(report.tracking?.goalProgress).map((item) => String(ledgerObject(ledgerObject(item).healthGoal).id ?? "" )).filter(Boolean),
   ]);
   const trackedGoals = goals.filter((goal) => goal.id && trackedGoalIds.has(String(goal.id)));
-  const insights: Array<{ title: string; headline: string; detail: string; href?: string }> = [];
+  const insights: Array<{ title: string; headline: string; detail: string }> = [];
   if (/diabet|prediabet/.test(conditionNames)) {
     insights.push({
       title: "Diabetes-related tracking",
@@ -3634,7 +3610,6 @@ function ContextualHealthInsights({ report }: { report: Report }) {
       detail: glucoseEvents.length || glucoseLabs
         ? "Review the dated glucose and laboratory records alongside your saved medication routine and your clinician's targets."
         : "No dated glucose tracker entries or numeric glucose/HbA1c lab values were returned for this period. They will not be inferred from other measurements.",
-      href: "#full-report-data",
     });
   }
   if (/hypertension|high blood pressure/.test(conditionNames)) {
@@ -3644,7 +3619,6 @@ function ContextualHealthInsights({ report }: { report: Report }) {
       detail: systolic.length && diastolic.length
         ? "The full record includes the dated pressure values. Compare repeated pairs with your saved target and clinician's advice."
         : "Blood-pressure measurements were sparse or not recorded in this period. Check the full record for readings saved through other sources.",
-      href: "#full-report-data",
     });
   }
   if (/asthma|copd|chronic obstructive|respiratory condition/.test(conditionNames)) {
@@ -3652,7 +3626,6 @@ function ContextualHealthInsights({ report }: { report: Report }) {
       title: "Breathing and respiratory context",
       headline: oxygen.length + " oxygen readings · " + breathing.length + " breathing-rate readings · " + respiratorySymptoms.length + " related symptom logs",
       detail: "Readings, symptom follow-ups and any verification flags are kept together in this report so you can review the dates and source records.",
-      href: "#full-report-data",
     });
   }
   if (goals.length) {
@@ -3662,7 +3635,6 @@ function ContextualHealthInsights({ report }: { report: Report }) {
       detail: trackedGoals.length
         ? "The goal history below keeps each dated entry visible; goals without a linked event are not treated as zero progress."
         : "No linked goal-progress events were returned for active goals in this period. Daily check-ins and measurements are shown separately and are not counted as goal completion.",
-      href: "/health-goals",
     });
   }
   const distinctContext = new Set(conditions.map((item) => item.name.toLowerCase()));
@@ -3671,7 +3643,6 @@ function ContextualHealthInsights({ report }: { report: Report }) {
       title: "Your recorded health activity",
       headline: events.length + " health-goal tracker entries across " + distinctContext.size + " named condition(s) on file",
       detail: "The report compares dated tracker entries with check-ins, connected readings and clinical records. Expand the record groups below to review each entry.",
-      href: "/health-goals",
     });
   }
   if (!insights.length) return null;
