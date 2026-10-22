@@ -1136,8 +1136,8 @@ export default function TodayBloodGlucoseGoal({ goal, patientId = "", currentWei
                   <div className="min-w-0">
                     <p className="text-xs font-black text-[#0b2d54]">{formatNumber(event.loggedValue)} mmol/L <span className="text-[9px] font-semibold text-[#74859a]">· {contextLabel(event)}</span></p>
                     <p className="mt-1 text-[9px] text-[#8a99a6]">{formatDate(event.occurredAt, true)} · {sourceLabel(event)}</p>
-                    {event.metadata?.linkedMedicationName && <p className="mt-1 text-[9px] leading-4 text-[#0b7b80]">Linked medication · {String(event.metadata.linkedMedicationName)}</p>}
-                    {event.metadata?.note && <p className="mt-1 text-[9px] leading-4 text-[#74859a]">{String(event.metadata.note)}</p>}
+                    {event.metadata?.linkedMedicationName != null && String(event.metadata.linkedMedicationName).trim() !== "" && <p className="mt-1 text-[9px] leading-4 text-[#0b7b80]">Linked medication · {String(event.metadata.linkedMedicationName)}</p>}
+                    {event.metadata?.note != null && String(event.metadata.note).trim() !== "" && <p className="mt-1 text-[9px] leading-4 text-[#74859a]">{String(event.metadata.note)}</p>}
                   </div>
                   <span className={"shrink-0 rounded-full px-2 py-1 text-[8px] font-black " + (event.loggedValue < 3.0 ? "bg-red-50 text-red-800" : event.loggedValue < 3.9 ? "bg-amber-50 text-amber-800" : "bg-[#eef5f6] text-[#647b8c]")}>{event.loggedValue < 3.0 ? "Very low" : event.loggedValue < 3.9 ? "Low" : "Recorded"}</span>
                 </div>
