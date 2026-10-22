@@ -1025,7 +1025,7 @@ export class HealthReportIntelligenceService {
 
     const activeAllergenNames = allergies.map((item) =>
       stringValue(row(item.allergy).name ?? item.name ?? item.allergenName),
-    ).filter((name): name is string => Boolean(name) && name.length >= 3);
+    ).filter((name): name is string => typeof name === 'string' && name.length >= 3);
     for (const allergen of activeAllergenNames) {
       const matchedSymptoms = symptomRows.filter((symptom) => symptomText(symptom).includes(allergen.toLowerCase()));
       if (!matchedSymptoms.length) continue;
