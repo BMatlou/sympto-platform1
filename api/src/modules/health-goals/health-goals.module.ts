@@ -28,6 +28,7 @@ import { MedicationClinicalIntelligenceEngine } from './medication-clinical-inte
     GoalsEngineService,
     HealthGoalsService,
     HealthGoalIntelligenceService,
+    MedicationInsightService,
   ],
 })
 export class HealthGoalsModule {}
