@@ -302,6 +302,56 @@ describe('HealthReportIntelligenceService', () => {
     expect(baselineInsight?.detail).toContain('-0.9 kg');
   });
 
+  it('synthesises routine changes and diabetes-specific context instead of leaving the readings as a data dump', () => {
+    const base = fixture();
+    const days = [
+      { day: '13', sleep: 4.8, stress: 5, water: 2100, exercise: 100, cigarettes: 7, glucose: 5.1 },
+      { day: '14', sleep: 5.0, stress: 6, water: 2200, exercise: 120, cigarettes: 6, glucose: 5.4 },
+      { day: '15', sleep: 4.5, stress: 5, water: 2300, exercise: 150, cigarettes: 5, glucose: 5.6 },
+      { day: '16', sleep: 5.0, stress: 4, water: 2150, exercise: 170, cigarettes: 6, glucose: 5.3 },
+    ];
+    const goalMetricEvents = days.flatMap((item) => {
+      const at = (value: string) => '2026-10-' + item.day + 'T08:00:00.000Z';
+      return [
+        { metricType: 'SLEEP_DURATION', metricKey: 'sleep.duration', loggedValue: item.sleep, unit: 'hours', occurredAt: at(item.day), source: 'patient-health-goal', sourceId: 'sleep-' + item.day },
+        { metricType: 'STRESS', metricKey: 'stress.score', loggedValue: item.stress, unit: '/10', occurredAt: at(item.day), source: 'patient-health-goal', sourceId: 'stress-' + item.day },
+        { metricType: 'HYDRATION', metricKey: 'hydration.volume', loggedValue: item.water, unit: 'mL', occurredAt: at(item.day), source: 'patient-health-goal', sourceId: 'water-' + item.day },
+        { metricType: 'EXERCISE_DURATION', metricKey: 'exercise.duration', loggedValue: item.exercise, unit: 'minutes', occurredAt: at(item.day), source: 'patient-health-goal', sourceId: 'exercise-' + item.day },
+        { metricType: 'SMOKING_CIGARETTE_COUNT', metricKey: 'smoking.cigarettes', loggedValue: item.cigarettes, unit: 'cigarettes', occurredAt: at(item.day), source: 'patient-health-goal', sourceId: 'smoking-' + item.day },
+        { metricType: 'BLOOD_GLUCOSE', metricKey: 'blood_glucose', loggedValue: item.glucose, unit: 'mmol/L', occurredAt: at(item.day), source: 'patient-health-goal', sourceId: 'glucose-' + item.day },
+      ];
+    });
+    const report = fixture({
+      currentSnapshot: {
+        ...base.currentSnapshot,
+        conditions: [{ id: 'condition-diabetes', name: 'Diabetes', status: 'ACTIVE' }],
+        activeGoals: [
+          { id: 'sleep-goal', title: 'Sleep goal', category: 'SLEEP', status: 'ACTIVE', targetValue: 8, unit: 'hours/night' },
+          { id: 'water-goal', title: 'Drink more water', category: 'HYDRATION', status: 'ACTIVE', targetValue: 2500, unit: 'mL/day' },
+          { id: 'exercise-goal', title: 'Exercise', category: 'EXERCISE', status: 'ACTIVE', targetValue: 2500, unit: 'minutes/week' },
+          { id: 'smoking-goal', title: 'Stop smoking', category: 'SMOKING', status: 'ACTIVE', targetValue: 7, unit: 'cigarettes/day' },
+        ],
+      },
+      goalMetricEvents,
+    });
+
+    const result = service.analyze(report, 'patient-1');
+    const routine = result.findings.find((item) => item.key === 'routine:combined-weekly-pattern');
+    const diabetes = result.findings.find((item) => item.key === 'condition-context:diabetes-glucose');
+
+    expect(routine).toBeDefined();
+    expect(routine?.title).toContain('mixed pattern');
+    expect(routine?.pattern).toContain('Sleep');
+    expect(routine?.pattern).toContain('Water intake');
+    expect(routine?.personalContext).toContain('Drink more water');
+    expect(routine?.nextStep).toContain('saved goals');
+    expect(diabetes).toBeDefined();
+    expect(diabetes?.title).toContain('no numeric HbA1c result');
+    expect(diabetes?.change).toContain('4 dated glucose');
+    expect(diabetes?.whyItMatters).toContain('cannot infer longer-term diabetes control');
+    expect(diabetes?.nextStep).toContain('HbA1c test is due');
+  });
+
   it('does not calculate a trend from safety-flagged readings', () => {
     const base = fixture();
     const report = fixture({
