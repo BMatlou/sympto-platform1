@@ -1145,11 +1145,56 @@ export class HealthReportNotificationSchedulerService
     }
 
     const intelligence = this.reportIntelligence.analyze(reportPayload, patientId);
+    const narrativeFindings = [...intelligence.findings];
+    if (medicationAdherence && (medicationAdherence.skippedDoses > 0 || medicationAdherence.unrecordedDoses > 0)) {
+      const medicinesNeedingContext = medicationAdherence.medications
+        .filter((item) => item.skippedDoses > 0 || item.unrecordedDoses > 0)
+        .slice(0, 4);
+      const hasExplicitSkips = medicationAdherence.skippedDoses > 0;
+      const isReliablyObserved = medicationAdherence.explicitActionCount > 0;
+      const evidence = medicinesNeedingContext.map((item) =>
+        item.name + ': ' + item.takenDoses + ' marked taken, ' + item.skippedDoses +
+        ' marked skipped, ' + item.unrecordedDoses + ' scheduled dose(s) without a recorded outcome, from ' +
+        item.expectedDoses + ' expected dose(s).',
+      );
+      if (medicationAdherence.unrecordedDoses > 0 && !evidence.some((item) => /scheduled dose\(s\) without a recorded outcome/.test(item))) {
+        evidence.push(medicationAdherence.unrecordedDoses + ' scheduled dose(s) have no recorded outcome; absence of an entry does not establish whether a dose was taken.');
+      }
+      narrativeFindings.push({
+        key: hasExplicitSkips ? 'medication:explicit-skipped-doses' : 'medication:incomplete-outcome-recording',
+        priority: hasExplicitSkips ? 'WATCH' : 'INSIGHT',
+        title: hasExplicitSkips ? 'Some scheduled medication doses were marked skipped' : 'Some scheduled medication outcomes are not recorded',
+        change: hasExplicitSkips
+          ? medicationAdherence.skippedDoses + ' dose(s) were explicitly marked skipped in this period.'
+          : medicationAdherence.unrecordedDoses + ' scheduled dose(s) have no recorded taken/skipped outcome.',
+        pattern: medicationAdherence.takenDoses + ' marked taken · ' +
+          medicationAdherence.skippedDoses + ' marked skipped · ' +
+          medicationAdherence.unrecordedDoses + ' with no recorded outcome' +
+          (medicationAdherence.adherencePercent !== null
+            ? ' · ' + medicationAdherence.adherencePercent + '% of explicitly recorded outcomes were marked taken.'
+            : '.'),
+        personalContext: medicinesNeedingContext.length
+          ? 'The schedule-based calculation identifies: ' + medicinesNeedingContext.map((item) => item.name).join(', ') + '. Dose counts are based on the available schedule and explicit actions, not inferred from symptom changes.'
+          : 'The schedule-based summary has incomplete dose outcome recording; unrecorded outcomes remain unknown.',
+        whyItMatters: hasExplicitSkips
+          ? 'A skipped dose may matter depending on the specific medicine and prescribed instructions. This report cannot determine clinical impact or explain why a dose was skipped.'
+          : 'Without a recorded outcome, Sympto cannot tell whether a scheduled dose was taken or skipped. Missing entries must not be interpreted as missed doses.',
+        nextStep: hasExplicitSkips
+          ? 'Follow the medicine-specific instructions for a missed dose and ask your prescriber or pharmacist if unsure. Do not double a dose or change treatment based on this report.'
+          : 'Record dose outcomes as they actually occur, according to your prescribed schedule. Do not backfill an uncertain outcome as taken or skipped.',
+        confidence: isReliablyObserved ? 'HIGH' : 'LIMITED',
+        evidence,
+        sourceRecordIds: [],
+      });
+    }
+    const priorityRank: Record<string, number> = { SAFETY: 0, REVIEW: 1, WATCH: 2, INSIGHT: 3 };
+    narrativeFindings.sort((a, b) => (priorityRank[a.priority] ?? 4) - (priorityRank[b.priority] ?? 4));
     delete (reportPayload as Record<string, unknown>).longitudinal;
     return {
       ...reportPayload,
       intelligence: {
         ...intelligence,
+        findings: narrativeFindings.slice(0, 8),
         ...(medicationAdherence ? { medicationAdherence } : {}),
       },
     };
