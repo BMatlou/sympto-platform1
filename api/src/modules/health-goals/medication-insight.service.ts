@@ -150,6 +150,46 @@ export interface MedicationInsightResult {
   };
 }
 
+export interface MedicationReportDailyBucket {
+  day: string;
+  expectedDoses: number;
+  takenDoses: number;
+  skippedDoses: number;
+  unrecordedDoses: number;
+  adherencePercent: number | null;
+}
+
+export interface MedicationReportMedicationResult {
+  patientMedicationId: string;
+  name: string;
+  frequency: string | null;
+  status: 'CALCULATED' | 'AS_NEEDED_NO_FIXED_DENOMINATOR' | 'NO_FIXED_SCHEDULE' | 'STOP_DATE_MISSING';
+  scheduleSource: 'REMINDER_SCHEDULE' | 'FREQUENCY_FALLBACK' | null;
+  startDateBasis: 'STARTED_AT' | 'CREATED_AT_FALLBACK' | 'UNKNOWN';
+  expectedDoses: number;
+  takenDoses: number;
+  skippedDoses: number;
+  unrecordedDoses: number;
+  explicitActionCount: number;
+  legacyEventsNotUsed: number;
+  adherencePercent: number | null;
+  daily: MedicationReportDailyBucket[];
+}
+
+export interface MedicationReportAdherenceSummary {
+  status: 'CALCULATED' | 'PARTIAL' | 'INSUFFICIENT_DATA';
+  expectedDoses: number;
+  takenDoses: number;
+  skippedDoses: number;
+  unrecordedDoses: number;
+  explicitActionCount: number;
+  legacyEventsNotUsed: number;
+  adherencePercent: number | null;
+  calculatedMedicationCount: number;
+  medications: MedicationReportMedicationResult[];
+  policy: string;
+}
+
 type GoalRow = {
   healthGoalId: string;
   patientId: string;
@@ -213,6 +253,259 @@ export class MedicationInsightService {
     private readonly medicationGoalIntelligenceEngine: MedicationGoalIntelligenceEngine,
     private readonly medicationClinicalIntelligenceEngine: MedicationClinicalIntelligenceEngine,
   ) {}
+
+  /**
+   * Read-only medication adherence for a report period.
+   * Only explicit metadata actions TAKEN/SKIPPED count as dose outcomes.
+   * Legacy percentage/day-status events are disclosed but never inferred as actions.
+   */
+  async buildReportAdherence(
+    patientId: string,
+    periodStart: Date,
+    periodEnd: Date,
+  ): Promise<MedicationReportAdherenceSummary> {
+    const empty = (policy: string): MedicationReportAdherenceSummary => ({
+      status: 'INSUFFICIENT_DATA',
+      expectedDoses: 0,
+      takenDoses: 0,
+      skippedDoses: 0,
+      unrecordedDoses: 0,
+      explicitActionCount: 0,
+      legacyEventsNotUsed: 0,
+      adherencePercent: null,
+      calculatedMedicationCount: 0,
+      medications: [],
+      policy,
+    });
+
+    if (!patientId || !Number.isFinite(periodStart.getTime()) ||
+        !Number.isFinite(periodEnd.getTime()) || periodEnd.getTime() <= periodStart.getTime()) {
+      return empty('The report period is invalid; no dose denominator was calculated.');
+    }
+
+    const now = new Date();
+    const analysisEnd = new Date(Math.min(periodEnd.getTime(), now.getTime()));
+    if (analysisEnd.getTime() <= periodStart.getTime()) {
+      return empty('The report period is in the future; no future doses are predicted.');
+    }
+    const finalDay = new Date(analysisEnd.getTime() - 1);
+
+    const medicationRecords = await this.prisma.patientMedication.findMany({
+      where: {
+        healthPassport: { patientId },
+        AND: [
+          {
+            OR: [
+              { startedAt: { lt: analysisEnd } },
+              { startedAt: null, createdAt: { lt: analysisEnd } },
+            ],
+          },
+          { OR: [{ endedAt: null }, { endedAt: { gte: periodStart } }] },
+        ],
+      },
+      include: {
+        medication: true,
+        reminderSchedule: {
+          include: { slots: { orderBy: { doseIndex: 'asc' } } },
+        },
+      },
+      orderBy: { createdAt: 'asc' },
+    });
+
+    if (!medicationRecords.length) {
+      return empty('No medicine records overlapped this report period.');
+    }
+
+    const medicationIds = new Set(medicationRecords.map((item) => String(item.id)));
+    const eventRows = await this.prisma.$queryRawUnsafe<Array<{
+      occurredAt: Date;
+      sourceId: string | null;
+      loggedValue: unknown;
+      metadata: unknown;
+    }>>(
+      'SELECT "occurredAt", "sourceId", "loggedValue", "metadata" ' +
+      'FROM "HealthGoalMetricEvent" ' +
+      'WHERE "patientId" = $1 AND UPPER("metricType") = $2 ' +
+      'AND "metricKey" = $3 AND "source" = $4 ' +
+      'AND "occurredAt" >= $5 AND "occurredAt" < $6 ' +
+      'ORDER BY "occurredAt" ASC',
+      patientId, 'MEDICATION', 'medication.adherence', 'medication-adherence',
+      periodStart, analysisEnd,
+    );
+
+    const explicitByMedication = new Map<string, DoseRow[]>();
+    const legacyByMedication = new Map<string, number>();
+    const parseMetadata = (value: unknown): Record<string, unknown> => {
+      if (value && typeof value === 'object' && !Array.isArray(value)) {
+        return value as Record<string, unknown>;
+      }
+      if (typeof value === 'string') {
+        try {
+          const parsed = JSON.parse(value) as unknown;
+          return parsed && typeof parsed === 'object' && !Array.isArray(parsed)
+            ? parsed as Record<string, unknown>
+            : {};
+        } catch {
+          return {};
+        }
+      }
+      return {};
+    };
+
+    for (const event of eventRows) {
+      const metadata = parseMetadata(event.metadata);
+      const sourceMedicationId = String(event.sourceId ?? '').split(':')[0];
+      const fromMetadata = String(metadata.patientMedicationId ?? '');
+      const medicationId = medicationIds.has(fromMetadata)
+        ? fromMetadata
+        : medicationIds.has(sourceMedicationId) ? sourceMedicationId : '';
+      if (!medicationId) continue;
+
+      const action = String(metadata.action ?? '').trim().toUpperCase();
+      if (action === 'TAKEN' || action === 'SKIPPED') {
+        const actions = explicitByMedication.get(medicationId) ?? [];
+        actions.push({
+          occurredAt: event.occurredAt,
+          action,
+          sourceId: event.sourceId,
+        });
+        explicitByMedication.set(medicationId, actions);
+      } else {
+        legacyByMedication.set(medicationId, (legacyByMedication.get(medicationId) ?? 0) + 1);
+      }
+    }
+
+    const results: MedicationReportMedicationResult[] = [];
+    for (const medication of medicationRecords) {
+      const id = String(medication.id);
+      const medicationName = String((medication as any).medication?.name ??
+        (medication as any).medication?.genericName ?? 'Medication');
+      const frequency = medication.frequency ? String(medication.frequency).trim() : null;
+      const normalizedFrequency = String(frequency ?? '').toUpperCase();
+      const medicationStatus = String(medication.status ?? '').toUpperCase();
+      const startDate = medication.startedAt ?? medication.createdAt ?? null;
+      const startDateBasis: MedicationReportMedicationResult['startDateBasis'] =
+        medication.startedAt ? 'STARTED_AT' : medication.createdAt ? 'CREATED_AT_FALLBACK' : 'UNKNOWN';
+      const actions = explicitByMedication.get(id) ?? [];
+      const legacyEventsNotUsed = legacyByMedication.get(id) ?? 0;
+      const common = {
+        patientMedicationId: id,
+        name: medicationName,
+        frequency,
+        startDateBasis,
+        explicitActionCount: actions.length,
+        legacyEventsNotUsed,
+      };
+
+      if (!medication.endedAt &&
+          /STOPPED|DISCONTINUED|CANCELLED|COMPLETED|EXPIRED|INACTIVE/.test(medicationStatus)) {
+        results.push({
+          ...common, status: 'STOP_DATE_MISSING', scheduleSource: null,
+          expectedDoses: 0, takenDoses: 0, skippedDoses: 0, unrecordedDoses: 0,
+          adherencePercent: null, daily: [],
+        });
+        continue;
+      }
+
+      if (normalizedFrequency === 'AS_NEEDED' || normalizedFrequency === 'PRN') {
+        results.push({
+          ...common, status: 'AS_NEEDED_NO_FIXED_DENOMINATOR', scheduleSource: null,
+          expectedDoses: 0, takenDoses: 0, skippedDoses: 0, unrecordedDoses: 0,
+          adherencePercent: null, daily: [],
+        });
+        continue;
+      }
+
+      const reminder = (medication as any).reminderSchedule;
+      const slots = Array.isArray(reminder?.slots) ? reminder.slots : [];
+      const slotCount = slots.length;
+      const frequencyDoses = fixedDailyDoses(normalizedFrequency);
+      const useReminderSlots = Boolean(reminder?.enabled && slotCount > 0);
+      const dosesPerDay = useReminderSlots ? slotCount : frequencyDoses;
+      if (dosesPerDay <= 0 || !startDate) {
+        results.push({
+          ...common, status: 'NO_FIXED_SCHEDULE', scheduleSource: null,
+          expectedDoses: 0, takenDoses: 0, skippedDoses: 0, unrecordedDoses: 0,
+          adherencePercent: null, daily: [],
+        });
+        continue;
+      }
+
+      const schedule: MedicationSchedule = {
+        patientMedicationId: id,
+        medicationId: medication.medicationId ? String(medication.medicationId) : null,
+        name: medicationName,
+        dosage: medication.dosage ? String(medication.dosage) : null,
+        frequency,
+        instructions: medication.instructions ? String(medication.instructions) : null,
+        startedAt: startDate.toISOString(),
+        endedAt: medication.endedAt?.toISOString() ?? null,
+        status: medicationStatus,
+        timezone: String(reminder?.timezone ?? '').trim() || TZ,
+        dosesPerDay,
+        activeDaysOfWeek: Array.isArray(reminder?.daysOfWeek)
+          ? reminder.daysOfWeek.map(Number).filter(Number.isInteger)
+          : null,
+        reminderSlots: slots.map((slot: { time: string }) => String(slot.time)),
+        scheduleSource: useReminderSlots ? 'REMINDER_SCHEDULE' : 'FREQUENCY_FALLBACK',
+      };
+
+      const buckets = buildDailyBuckets(
+        periodStart,
+        finalDay,
+        schedule,
+        actions,
+      );
+      const expectedDoses = buckets.reduce((sum, day) => sum + day.expectedDoses, 0);
+      const takenDoses = buckets.reduce((sum, day) => sum + day.takenDoses, 0);
+      const skippedDoses = buckets.reduce((sum, day) => sum + day.skippedDoses, 0);
+      const unrecordedDoses = buckets.reduce((sum, day) => sum + day.unrecordedDoses, 0);
+      const status: MedicationReportMedicationResult['status'] =
+        expectedDoses > 0 ? 'CALCULATED' : 'NO_FIXED_SCHEDULE';
+      results.push({
+        ...common,
+        status,
+        scheduleSource: expectedDoses > 0 ? schedule.scheduleSource : null,
+        expectedDoses,
+        takenDoses,
+        skippedDoses,
+        unrecordedDoses,
+        adherencePercent: expectedDoses > 0
+          ? Number((takenDoses / expectedDoses * 100).toFixed(2))
+          : null,
+        daily: buckets.map((day) => ({
+          day: day.day,
+          expectedDoses: day.expectedDoses,
+          takenDoses: day.takenDoses,
+          skippedDoses: day.skippedDoses,
+          unrecordedDoses: day.unrecordedDoses,
+          adherencePercent: day.expectedDoses > 0 ? day.adherencePercent : null,
+        })),
+      });
+    }
+
+    const calculated = results.filter((item) => item.status === 'CALCULATED');
+    const expectedDoses = calculated.reduce((sum, item) => sum + item.expectedDoses, 0);
+    const takenDoses = calculated.reduce((sum, item) => sum + item.takenDoses, 0);
+    const skippedDoses = calculated.reduce((sum, item) => sum + item.skippedDoses, 0);
+    const unrecordedDoses = calculated.reduce((sum, item) => sum + item.unrecordedDoses, 0);
+    const explicitActionCount = results.reduce((sum, item) => sum + item.explicitActionCount, 0);
+    const legacyEventsNotUsed = results.reduce((sum, item) => sum + item.legacyEventsNotUsed, 0);
+    const status: MedicationReportAdherenceSummary['status'] =
+      expectedDoses <= 0 ? 'INSUFFICIENT_DATA'
+        : calculated.length === results.length ? 'CALCULATED' : 'PARTIAL';
+
+    return {
+      status, expectedDoses, takenDoses, skippedDoses, unrecordedDoses,
+      explicitActionCount, legacyEventsNotUsed,
+      adherencePercent: expectedDoses > 0
+        ? Number((takenDoses / expectedDoses * 100).toFixed(2))
+        : null,
+      calculatedMedicationCount: calculated.length,
+      medications: results,
+      policy: 'Expected doses use the saved reminder slots or supported fixed-frequency fallback, bounded by prescription dates and active schedule days. Only explicit TAKEN/SKIPPED metadata counts as dose outcomes. Legacy or inferred events are disclosed separately. PRN and unknown schedules do not receive an invented denominator.',
+    };
+  }
 
   async buildForGoal(goalId: string): Promise<MedicationInsightResult> {
     const goal = await this.loadGoal(goalId);
