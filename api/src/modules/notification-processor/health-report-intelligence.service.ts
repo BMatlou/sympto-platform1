@@ -446,8 +446,15 @@ export class HealthReportIntelligenceService {
       const sourceType: ObservationSourceType =
         /today.s measurements/i.test(title) ? 'MANUAL_VITAL' : 'DAILY_CHECK_IN';
       const actor: ObservationActor = item.practitionerId || item.encounterId ? 'CLINICIAN' : 'PATIENT';
-      const observedAt = item.observedAt ?? item.recordedAt ?? item.createdAt;
-      const basis = item.observedAt || item.recordedAt ? 'SOURCE_EVENT_TIME' : item.createdAt ? 'RECORD_TIME_FALLBACK' : 'UNKNOWN';
+      // The existing manual-vitals writer uses updatedAt to store the measuredAt
+      // value when it reuses today's single journal row. Only that known source gets
+      // this compatibility rule; ordinary journal edits do not become new observations.
+      const isManualVitals = /today.s measurements/i.test(title);
+      const observedAt = item.observedAt ?? item.recordedAt ??
+        (isManualVitals ? item.updatedAt ?? item.createdAt : item.createdAt);
+      const basis = item.observedAt || item.recordedAt || (isManualVitals && item.updatedAt)
+        ? 'SOURCE_EVENT_TIME'
+        : item.createdAt ? 'RECORD_TIME_FALLBACK' : 'UNKNOWN';
       const capturedAt = item.createdAt;
       const journalMetrics: Array<[string, string, unknown, string | null]> = [
         ['sleepHours', 'sleep.duration', item.sleepHours, 'hours'],
@@ -596,7 +603,15 @@ export class HealthReportIntelligenceService {
         sourceName: event.source, observedAtBasis: at ? 'SOURCE_EVENT_TIME' : 'UNKNOWN' });
     }
 
-    return sources.filter((item) => periodIncludes(report, item.observedAt));
+    const seen = new Set<string>();
+    return sources.filter((item) => periodIncludes(report, item.observedAt)).filter((item) => {
+      // Goal-event projections can mirror their source measurement. Collapse only
+      // exact metric/time/value duplicates here; the original records remain in report data.
+      const key = [item.metric, item.observedAt, item.value, item.secondaryValue, item.valueCode].join('|');
+      if (item.observedAt && seen.has(key)) return false;
+      if (item.observedAt) seen.add(key);
+      return true;
+    });
   }
 
   analyze(reportInput: unknown, patientId?: string): HealthReportIntelligence {
@@ -676,7 +691,9 @@ export class HealthReportIntelligenceService {
     // as evidence of a new patient log.
     for (const journal of rows(activity.journalEntries)) {
       if (journal.practitionerId || journal.encounterId) continue;
-      addPatientDay(journal.observedAt ?? journal.recordedAt ?? journal.createdAt);
+      const isManualVitals = /today.s measurements/i.test(String(journal.title ?? ''));
+      addPatientDay(journal.observedAt ?? journal.recordedAt ??
+        (isManualVitals ? journal.updatedAt ?? journal.createdAt : journal.createdAt));
     }
     for (const symptom of rows(activity.symptoms)) {
       if (String(symptom.source ?? '').toUpperCase() !== 'PATIENT') continue;
@@ -707,6 +724,9 @@ export class HealthReportIntelligenceService {
     const sleepStressDays = new Map<string, { sleepTotal: number; sleepCount: number; stressTotal: number; stressCount: number }>();
     for (const journal of rows(activity.journalEntries)) {
       if (journal.practitionerId || journal.encounterId) continue;
+      // Sleep/stress are daily check-in values; do not treat edits to manual-vital
+      // rows as health-check-in evidence.
+      if (/today.s measurements/i.test(String(journal.title ?? ''))) continue;
       const at = journal.observedAt ?? journal.recordedAt ?? journal.createdAt;
       if (!periodIncludes(report, at)) continue;
       const day = localDay(at);
