@@ -246,11 +246,25 @@ describe('HealthReportIntelligenceService', () => {
           status: 'ACTIVE',
           targetValue: 71,
           unit: 'kg',
+        }, {
+          id: 'goal-mental-health',
+          title: 'Mental health',
+          category: 'MENTAL_HEALTH',
+          status: 'ACTIVE',
+          targetValue: 2,
+          unit: '/10',
         }],
         baseline: { weightKg: 71, establishedAt: '2026-10-01T08:00:00.000Z' },
       },
       activity: {
         ...base.activity,
+        journalEntries: [{
+          id: 'journal-mood-1',
+          title: 'Daily Health Check-in',
+          createdAt: '2026-10-15T08:00:00.000Z',
+          mood: 'LOW',
+          energyLevel: 'LOW',
+        }],
         patientVitals: [{
           id: 'vitals-weight-1',
           source: 'PATIENT',
@@ -281,6 +295,9 @@ describe('HealthReportIntelligenceService', () => {
     expect(conditionInsight?.headline).toContain('5.5 mmol/L');
     expect(goalInsight?.title).toContain('Maintain weight');
     expect(goalInsight?.headline).toContain('70.1 kg');
+    const mentalGoalInsight = result.personalisedContext.insights.find((item) =>
+      item.group === 'GOAL' && item.title === 'Mental health');
+    expect(mentalGoalInsight?.headline.toLowerCase()).toContain('latest low');
     expect(baselineInsight?.headline).toContain('saved baseline 71 kg');
     expect(baselineInsight?.detail).toContain('-0.9 kg');
   });
