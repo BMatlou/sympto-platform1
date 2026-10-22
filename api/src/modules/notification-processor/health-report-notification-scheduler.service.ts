@@ -765,6 +765,7 @@ export class HealthReportNotificationSchedulerService
     const goalMetricEvents = await this.prisma.$queryRaw<Array<{
       goalId: string | null;
       goalTitle: string | null;
+      goalAssociations: unknown;
       goalCategory: string | null;
       unit: string | null;
       targetValue: unknown;
@@ -786,6 +787,7 @@ export class HealthReportNotificationSchedulerService
         goal."targetValue" AS "targetValue",
         goal."aggregation" AS "aggregation",
         goal."frequency" AS "frequency",
+        COALESCE(goal."goalAssociations", '[]'::jsonb) AS "goalAssociations",
         e."metricType" AS "metricType",
         e."metricKey" AS "metricKey",
         e."loggedValue" AS "loggedValue",
@@ -807,7 +809,17 @@ export class HealthReportNotificationSchedulerService
           hg."unit" AS "unit",
           hg."targetValue" AS "targetValue",
           hgm."aggregation"::text AS "aggregation",
-          hgm."frequency"::text AS "frequency"
+          hgm."frequency"::text AS "frequency",
+          jsonb_agg(jsonb_build_object(
+            'goalId', hg."id",
+            'goalTitle', hg."title",
+            'goalCategory', hg."category"::text,
+            'unit', hg."unit",
+            'targetValue', hg."targetValue",
+            'aggregation', hgm."aggregation"::text,
+            'frequency', hgm."frequency"::text,
+            'status', hg."status"::text
+          )) OVER () AS "goalAssociations"
         FROM "HealthGoalMetricConfig" hgm
         INNER JOIN "HealthGoal" hg ON hg."id" = hgm."healthGoalId"
         WHERE hg."patientId" = e."patientId"
@@ -936,6 +948,7 @@ export class HealthReportNotificationSchedulerService
         ...event,
         targetValue: event.targetValue == null ? null : Number(event.targetValue),
         loggedValue: Number(event.loggedValue),
+        goalAssociations: Array.isArray(event.goalAssociations) ? event.goalAssociations : [],
         occurredAt: event.occurredAt,
       })),
       tracking: {
