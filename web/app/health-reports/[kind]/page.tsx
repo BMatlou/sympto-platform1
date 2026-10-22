@@ -1980,13 +1980,13 @@ function PersonalisedInsights({
   const allLabCurrent = clinicalLabSeries(report, /.+/i).filter((point) => !knownLabAnalyte.test(point.testName));
   const allLabPrevious = clinicalLabSeries(previousReport, /.+/i).filter((point) => !knownLabAnalyte.test(point.testName));
   const genericLabKeys = Array.from(new Set([
-    ...allLabCurrent.map((point) => point.testName.trim().toLowerCase() + "|" + point.unit.trim().toLowerCase()),
-    ...allLabPrevious.map((point) => point.testName.trim().toLowerCase() + "|" + point.unit.trim().toLowerCase()),
+    ...allLabCurrent.map((point) => point.testName.trim().toLowerCase() + "|" + (point.unit ?? "").trim().toLowerCase()),
+    ...allLabPrevious.map((point) => point.testName.trim().toLowerCase() + "|" + (point.unit ?? "").trim().toLowerCase()),
   ]));
   const genericLabSignals = genericLabKeys.map((key) => {
     const [name, unit] = key.split("|");
-    const current = allLabCurrent.filter((point) => point.testName.trim().toLowerCase() + "|" + point.unit.trim().toLowerCase() === key);
-    const previous = allLabPrevious.filter((point) => point.testName.trim().toLowerCase() + "|" + point.unit.trim().toLowerCase() === key);
+    const current = allLabCurrent.filter((point) => point.testName.trim().toLowerCase() + "|" + (point.unit ?? "").trim().toLowerCase() === key);
+    const previous = allLabPrevious.filter((point) => point.testName.trim().toLowerCase() + "|" + (point.unit ?? "").trim().toLowerCase() === key);
     const label = current[0]?.testName || previous[0]?.testName || human(name);
     return signal("lab:" + key, label, current, previous, unit);
   }).filter((item) => item.current.length > 0 || item.previous.length > 0);
@@ -2784,7 +2784,6 @@ function VitalTrendCard({
   rawCurrent,
 }: {
   label: string;
-  description: string;
   unit: string;
   digits: number;
   current: SeriesPoint[];
@@ -2907,14 +2906,15 @@ function HealthReportInsights({
   const symptomDifference = previousReport
     ? symptomCount - previousSymptomCount
     : null;
+  const symptomDelta = symptomDifference ?? 0;
   const symptomComparison = previousReport
     ? symptomCount === 0 && previousSymptomCount === 0
       ? "No symptom logs in either period."
       : symptomCount === 0
         ? "No symptoms were logged this period; " + previousSymptomCount + " in the previous period."
-        : symptomDifference === 0
+        : symptomDelta === 0
           ? "Same number as the previous period: " + symptomCount + "."
-          : String(Math.abs(symptomDifference)) + " " + (symptomDifference > 0 ? "more" : "fewer") + " symptom " + (Math.abs(symptomDifference) === 1 ? "record" : "records") + " than the previous period."
+          : String(Math.abs(symptomDelta)) + " " + (symptomDelta > 0 ? "more" : "fewer") + " symptom " + (Math.abs(symptomDelta) === 1 ? "record" : "records") + " than the previous period."
     : symptomCount === 0
       ? "No symptom logs were found for this period."
       : "The previous period is not available for comparison.";
@@ -3059,7 +3059,7 @@ function HealthReportInsights({
               <div className="grid gap-1 py-3 first:pt-0 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center">
                 <div>
                   <p className="text-sm font-bold text-[#0b2d54]">Symptoms</p>
-                  <p className="mt-1 text-xs leading-5 text-slate-600">{symptomCount} record{symptomCount === 1 ? "" : "s"} this period{previousReport ? (symptomDifference === 0 ? " · unchanged from the previous period" : " · " + Math.abs(symptomDifference ?? 0) + (symptomDifference > 0 ? " more than" : " fewer than") + " the previous period") : " · no previous-period comparison"}.</p>
+                  <p className="mt-1 text-xs leading-5 text-slate-600">{symptomCount} record{symptomCount === 1 ? "" : "s"} this period{previousReport ? (symptomDelta === 0 ? " · unchanged from the previous period" : " · " + Math.abs(symptomDelta) + (symptomDelta > 0 ? " more than" : " fewer than") + " the previous period") : " · no previous-period comparison"}.</p>
                 </div>
                 {symptomPattern && <p className="text-xs font-semibold text-slate-600">Most repeated: {symptomPattern.label} ({symptomPattern.count})</p>}
               </div>
