@@ -84,7 +84,10 @@ describe('MedicationInsightService report adherence', () => {
     expect(result.unrecordedDoses).toBe(25);
     expect(result.explicitActionCount).toBe(3);
     expect(result.legacyEventsNotUsed).toBe(1);
-    expect(result.adherencePercent).toBe(7.14);
+    expect(result.adherencePercent).toBeNull();
+    expect(result.outcomeRecordingPercent).toBe(10.71);
+    expect(result.medications[0].adherencePercent).toBeNull();
+    expect(result.medications[0].outcomeRecordingPercent).toBe(10.71);
     expect(result.medications[0].scheduleSource).toBe('FREQUENCY_FALLBACK');
     expect(result.medications[0].daily).toHaveLength(7);
   });
@@ -106,7 +109,9 @@ describe('MedicationInsightService report adherence', () => {
     expect(result.explicitActionCount).toBe(0);
     expect(result.legacyEventsNotUsed).toBe(1);
     expect(result.adherencePercent).toBeNull();
+    expect(result.outcomeRecordingPercent).toBe(0);
     expect(result.medications[0].adherencePercent).toBeNull();
+    expect(result.medications[0].outcomeRecordingPercent).toBe(0);
   });
 
   it('does not invent a denominator for as-needed medicine', async () => {
