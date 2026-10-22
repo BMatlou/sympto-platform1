@@ -419,7 +419,7 @@ type Report = {
     personalisedContext?: {
       insights?: Array<{
         key: string;
-        group: "CONDITION" | "GOAL" | "BASELINE";
+        group: "CONDITION" | "GOAL" | "BASELINE" | "ALLERGY" | "TREATMENT";
         title: string;
         headline: string;
         detail: string;
@@ -3563,8 +3563,11 @@ function ContextualHealthInsights({ report }: { report: Report }) {
   const insights = report.intelligence?.personalisedContext?.insights ?? [];
   if (!insights.length) return null;
 
-  const groupLabel = (group: "CONDITION" | "GOAL" | "BASELINE") =>
-    group === "CONDITION" ? "Saved condition" : group === "GOAL" ? "Your saved goal" : "Your baseline";
+  const groupLabel = (group: "CONDITION" | "GOAL" | "BASELINE" | "ALLERGY" | "TREATMENT") =>
+    group === "CONDITION" ? "Saved condition"
+      : group === "GOAL" ? "Your saved goal"
+        : group === "BASELINE" ? "Your baseline"
+          : group === "ALLERGY" ? "Allergy context" : "Medication context";
   const statusLabel = (status: "INFO" | "WATCH" | "REVIEW") =>
     status === "REVIEW" ? "Verify readings" : status === "WATCH" ? "Worth monitoring" : "";
 
