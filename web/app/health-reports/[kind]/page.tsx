@@ -419,7 +419,7 @@ type Report = {
     personalisedContext?: {
       insights?: Array<{
         key: string;
-        group: "CONDITION" | "GOAL" | "BASELINE" | "ALLERGY" | "TREATMENT";
+        group: "CONDITION" | "GOAL" | "BASELINE" | "ALLERGY" | "TREATMENT" | "PROFILE" | "PREVENTIVE_CARE";
         title: string;
         headline: string;
         detail: string;
@@ -3563,13 +3563,15 @@ function ContextualHealthInsights({ report }: { report: Report }) {
   const insights = report.intelligence?.personalisedContext?.insights ?? [];
   if (!insights.length) return null;
 
-  const groupLabel = (group: "CONDITION" | "GOAL" | "BASELINE" | "ALLERGY" | "TREATMENT") =>
+  const groupLabel = (group: "CONDITION" | "GOAL" | "BASELINE" | "ALLERGY" | "TREATMENT" | "PROFILE" | "PREVENTIVE_CARE") =>
     group === "CONDITION" ? "Saved condition"
       : group === "GOAL" ? "Your saved goal"
         : group === "BASELINE" ? "Your baseline"
-          : group === "ALLERGY" ? "Allergy context" : "Medication context";
-  const statusLabel = (status: "INFO" | "WATCH" | "REVIEW") =>
-    status === "REVIEW" ? "Verify readings" : status === "WATCH" ? "Worth monitoring" : "";
+          : group === "ALLERGY" ? "Allergy context"
+            : group === "TREATMENT" ? "Medication context"
+              : group === "PROFILE" ? "Saved profile context" : "Preventive-care context";
+  const statusLabel = (status: "INFO" | "WATCH" | "REVIEW", group: "CONDITION" | "GOAL" | "BASELINE" | "ALLERGY" | "TREATMENT" | "PROFILE" | "PREVENTIVE_CARE") =>
+    status === "REVIEW" ? (group === "PREVENTIVE_CARE" ? "Check record" : "Verify readings") : status === "WATCH" ? "Worth monitoring" : "";
 
   return (
     <section aria-label="Personalised health context" className="mt-4 space-y-3">
@@ -3587,8 +3589,8 @@ function ContextualHealthInsights({ report }: { report: Report }) {
               <p className="mt-1 text-xs font-semibold leading-5 text-[#0b5a62]">{item.headline}</p>
               <p className="mt-1 text-xs leading-5 text-slate-600">{item.detail}</p>
             </div>
-            {statusLabel(item.status) && (
-              <span className={"inline-flex w-fit rounded-full px-2.5 py-1 text-[10px] font-bold " + (item.status === "REVIEW" ? "bg-amber-50 text-amber-800" : "bg-slate-100 text-slate-600")}>{statusLabel(item.status)}</span>
+            {statusLabel(item.status, item.group) && (
+              <span className={"inline-flex w-fit rounded-full px-2.5 py-1 text-[10px] font-bold " + (item.status === "REVIEW" ? "bg-amber-50 text-amber-800" : "bg-slate-100 text-slate-600")}>{statusLabel(item.status, item.group)}</span>
             )}
           </article>
         ))}
