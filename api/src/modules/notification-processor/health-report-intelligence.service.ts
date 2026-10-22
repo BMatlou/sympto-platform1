@@ -1085,7 +1085,7 @@ export class HealthReportIntelligenceService {
       const summary = summarizeMetrics(signal.metrics);
       if (!summary.matching.length) continue;
       const hasPositiveEvidence = summary.accepted.some((item) => (item.value ?? 0) > 0);
-      const profileSaysNone = /(^|\\b)(none|never|no|non[- ]?smoker|not active)(\\b|$)/i.test(savedValue);
+      const profileSaysNone = /(^|\b)(none|never|no|non[- ]?smoker|not active)(\b|$)/i.test(savedValue);
       const mayHaveChanged = profileSaysNone && hasPositiveEvidence;
       personalisedInsights.push({
         key: 'profile:' + signal.field,
