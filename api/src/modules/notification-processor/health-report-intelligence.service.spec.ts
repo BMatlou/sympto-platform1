@@ -359,6 +359,50 @@ describe('HealthReportIntelligenceService', () => {
       item.group === 'PREVENTIVE_CARE' && item.headline.toLowerCase().includes('missed'))).toBe(true);
   });
 
+  it('detects a meaningful within-period change and relates it to saved diabetes and glucose-goal context', () => {
+    const base = fixture();
+    const glucoseEvents = [
+      { day: '2026-10-13', value: 5.0 },
+      { day: '2026-10-14', value: 5.2 },
+      { day: '2026-10-16', value: 6.0 },
+      { day: '2026-10-17', value: 6.2 },
+    ].map((item) => ({
+      metricType: 'BLOOD_GLUCOSE',
+      metricKey: 'blood_glucose',
+      loggedValue: item.value,
+      unit: 'mmol/L',
+      occurredAt: item.day + 'T08:00:00.000Z',
+      source: 'patient-health-goal',
+      sourceId: 'glucose-' + item.day,
+    }));
+    const report = fixture({
+      currentSnapshot: {
+        ...base.currentSnapshot,
+        conditions: [{ id: 'condition-diabetes', name: 'Diabetes', status: 'ACTIVE' }],
+        activeGoals: [{
+          id: 'goal-glucose',
+          title: 'Blood glucose goal',
+          category: 'BLOOD_GLUCOSE',
+          status: 'ACTIVE',
+          targetValue: 6,
+          unit: 'mmol/L',
+        }],
+      },
+      goalMetricEvents: glucoseEvents,
+    });
+
+    const result = service.analyze(report, 'patient-1');
+    const trend = result.withinPeriodTrends.find((item) => item.metric === 'blood_glucose');
+
+    expect(trend).toBeDefined();
+    expect(trend?.direction).toBe('RISING');
+    expect(trend?.earlierAverage).toBe(5.1);
+    expect(trend?.laterAverage).toBe(6.1);
+    expect(trend?.relatedConditions).toContain('Diabetes');
+    expect(trend?.relatedGoals).toContain('Blood glucose goal');
+    expect(trend?.interpretation).toContain('clinician-set targets');
+  });
+
   it('does not emit a sleep/stress pattern with insufficient paired days', () => {
     const report = fixture({
       activity: {
