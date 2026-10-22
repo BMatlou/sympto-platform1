@@ -2234,6 +2234,8 @@ function PersonalisedInsights({
                 const targetUnit = String(signal.targetUnit || signal.unit || "");
                 const movement = previousLoading ? null : periodMovement(signal.current.map((item) => item.value), signal.previous.map((item) => item.value), signal.unit, digits);
                 const comparisonScale = Math.max(Math.abs(currentAverage ?? 0), Math.abs(previousAverage ?? 0), 0.000001);
+                const dailyBars = signal.current.slice().sort((a, b) => a.date.localeCompare(b.date)).slice(-7);
+                const dailyBarMax = Math.max(0.000001, ...dailyBars.map((point) => Math.abs(point.value)));
                 const isDailyHydrationGoal = signal.key === "hydration" && targetValue !== null && targetValue > 0 &&
                   /^(ml|millilit(er|re)s?)$/i.test(signal.unit.trim()) &&
                   (/^(ml|millilit(er|re)s?)$/i.test(targetUnit.trim()) || /^glasses?(\s*\/\s*day)?$/i.test(targetUnit.trim()));
@@ -2262,6 +2264,15 @@ function PersonalisedInsights({
                         <p className="text-lg font-black tracking-tight text-[#0b2d54]">{currentAverage === null ? "—" : formatNumber(currentAverage, digits)}{unitSuffix}</p>
                       </div>
                       <p className="mt-1 text-[11px] text-slate-500">Average across {signal.current.length} logged day{signal.current.length === 1 ? "" : "s"}</p>
+                      {dailyBars.length >= 2 && <div className="mt-3 rounded-xl border border-[#e3f0f1] bg-[#f7fbfb] px-3 py-2.5">
+                        <div className="flex items-center justify-between gap-2"><p className="text-[10px] font-bold uppercase tracking-wide text-slate-500">Daily pattern</p><p className="text-[9px] text-slate-400">Logged days only</p></div>
+                        <div className="mt-2 flex h-[66px] items-end gap-2">
+                          {dailyBars.map((point, pointIndex) => <div key={point.date + "-" + pointIndex} className="flex min-w-0 flex-1 flex-col items-center justify-end gap-1" title={point.date + ": " + formatNumber(point.value, digits) + unitSuffix}>
+                            <div className="flex h-11 w-full items-end overflow-hidden rounded-t-md bg-[#e7f0f2]"><div className="w-full rounded-t-md bg-[#24c1c4]" style={{ height: String(Math.max(8, Math.min(100, Math.abs(point.value) / dailyBarMax * 100))) + "%" }} /></div>
+                            <span className="text-[8px] font-medium text-slate-400">{new Date(point.date + "T12:00:00").toLocaleDateString("en-ZA", { weekday: "short" })}</span>
+                          </div>)}
+                        </div>
+                      </div>}
                     </div>
                     <div className="min-w-0 sm:text-right">
                       <span className={"inline-flex rounded-full border px-2.5 py-1 text-[10px] font-bold " + pillTone}>{movement?.label ?? (previousLoading ? "Comparing…" : "No comparison")}</span>
