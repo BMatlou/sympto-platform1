@@ -426,6 +426,25 @@ type Report = {
         status: "INFO" | "WATCH" | "REVIEW";
       }>;
     };
+    withinPeriodTrends?: Array<{
+      key: string;
+      metric: string;
+      label: string;
+      unit: string;
+      direction: "RISING" | "FALLING";
+      earlierAverage: number;
+      laterAverage: number;
+      change: number;
+      changePercent: number | null;
+      daysCompared: number;
+      readingCount: number;
+      firstDay: string;
+      lastDay: string;
+      usesFallbackTime: boolean;
+      relatedGoals: string[];
+      relatedConditions: string[];
+      interpretation: string;
+    }>;
     clinicalContext?: {
       ageAtReport: number | null;
       gender: string | null;
@@ -3380,6 +3399,62 @@ function ReportDataCoverage({ report }: { report: Report }) {
     </div>
     <p className="mt-2 text-[10px] leading-4 text-slate-400">Counts are grouped by source; a clinical event and its linked note may appear in separate groups.</p>
   </section>;
+}
+
+function WithinPeriodTrendSummary({ report }: { report: Report }) {
+  const intelligence = report.intelligence;
+  const trends = intelligence?.withinPeriodTrends ?? [];
+  const hasObservationData = (intelligence?.coverage?.observationCandidateCount ?? 0) > 0;
+
+  return (
+    <section aria-label="Changes within this report period" className="mt-4 space-y-3">
+      <div className="px-1 pb-2 sm:px-0">
+        <p className="text-[10px] font-black uppercase tracking-[0.16em] text-[#0b7b80]">Within-period analysis</p>
+        <h2 className="mt-1 text-lg font-black text-[#0b2d54]">Patterns and changes in your records</h2>
+        <p className="mt-1 text-xs leading-5 text-slate-500">Compares the average of earlier logged days with later logged days. It highlights material shifts only; missing days are excluded, and a rise or fall is not automatically good or bad.</p>
+      </div>
+      {trends.length ? (
+        <div className="divide-y divide-slate-200">
+          {trends.slice(0, 6).map((trend) => {
+            const changeText = (trend.change > 0 ? "+" : "") + formatNumber(trend.change, Math.abs(trend.change) < 1 ? 2 : 1);
+            return (
+              <article key={trend.key} className="grid gap-2 py-3.5 sm:grid-cols-[minmax(0,1.1fr)_minmax(0,1fr)] sm:items-start">
+                <div className="min-w-0">
+                  <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+                    <h3 className="text-sm font-bold text-[#0b2d54]">{trend.label}</h3>
+                    <span className={"text-[10px] font-extrabold " + (trend.direction === "RISING" ? "text-[#0b5a62]" : "text-slate-600")}>
+                      {trend.direction === "RISING" ? "↑ Rising" : "↓ Falling"}
+                    </span>
+                  </div>
+                  <p className="mt-1 text-xs font-semibold text-slate-700">
+                    {formatNumber(trend.earlierAverage, 1)} {trend.unit} → {formatNumber(trend.laterAverage, 1)} {trend.unit}
+                    <span className="ml-2 font-bold text-[#0b5a62]">({changeText} {trend.unit})</span>
+                  </p>
+                  <p className="mt-1 text-[10px] leading-4 text-slate-400">
+                    {trend.daysCompared} recorded days · {trend.firstDay} to {trend.lastDay}
+                  </p>
+                </div>
+                <div className="min-w-0">
+                  <p className="text-xs leading-5 text-slate-600">{trend.interpretation}</p>
+                  {(trend.relatedConditions.length > 0 || trend.relatedGoals.length > 0) && (
+                    <p className="mt-1 text-[10px] leading-4 text-[#0b7b80]">
+                      Personal context: {[...trend.relatedConditions, ...trend.relatedGoals].join(" · ")}
+                    </p>
+                  )}
+                </div>
+              </article>
+            );
+          })}
+        </div>
+      ) : (
+        <p className="px-1 py-3 text-xs leading-5 text-slate-500">
+          {hasObservationData
+            ? "There are dated observations, but no within-period shift met the minimum evidence rule. This avoids presenting normal variation or sparse entries as a trend; comparison with the previous period appears below."
+            : "There are not enough dated measurements in this period to identify a reliable within-period trend. Missing entries are not interpreted as zero or as evidence of improvement."}
+        </p>
+      )}
+    </section>
+  );
 }
 
 function ServerHealthIntelligenceSummary({ report }: { report: Report }) {
