@@ -1,4 +1,5 @@
 import { Injectable } from '@nestjs/common';
+import type { MedicationReportAdherenceSummary } from '../health-goals/medication-insight.service';
 
 /**
  * Read-only report normalisation and deterministic analysis.
@@ -55,6 +56,7 @@ export interface HealthObservation {
 export interface HealthReportIntelligence {
   version: 'shadow-v1';
   generatedAt: string;
+  medicationAdherence?: MedicationReportAdherenceSummary | null;
   coverage: {
     sourceCounts: Record<string, number>;
     observationCandidateCount: number;
