@@ -1564,6 +1564,142 @@ export class HealthReportIntelligenceService {
     const confidenceFor = (items: HealthObservation[]): 'HIGH' | 'MODERATE' | 'LIMITED' =>
       items.some((item) => item.observedAtBasis !== 'SOURCE_EVENT_TIME') ? 'MODERATE' : 'HIGH';
 
+    // The narrative needs to synthesise related routine measures, not repeat every
+    // individual comparison already shown later in the report.
+    const routineMetricKeys = [
+      'sleep.duration',
+      'stress.score',
+      'hydration.volume',
+      'exercise.duration',
+      'smoking.cigarettes',
+    ];
+    const routineSignals = routineMetricKeys.flatMap((metric) => {
+      const current = dailyMetricValues(observations, metric);
+      if (current.length < 2) return [];
+      const previous = dailyMetricValues(priorObservations, metric);
+      const currentAverage = meanOf(current.map((item) => item.value));
+      const previousAverage = meanOf(previous.map((item) => item.value));
+      if (currentAverage === null) return [];
+      const definition = TREND_DEFINITIONS.find((item) => item.metric === metric);
+      return [{
+        metric,
+        label: definition?.label ?? metric,
+        unit: definition?.unit ?? '',
+        current,
+        previous,
+        currentAverage,
+        previousAverage,
+        digits: definition?.digits ?? 1,
+      }];
+    });
+    if (routineSignals.length >= 3) {
+      const routineDetails = routineSignals.map((item) =>
+        item.label + ': ' + formatNumber(item.currentAverage, item.digits) + (item.unit ? ' ' + item.unit : '') +
+        ' average across ' + item.current.length + ' recorded day(s)' +
+        (item.previousAverage === null
+          ? '; no comparable previous-period average'
+          : '; previous period ' + formatNumber(item.previousAverage, item.digits) + (item.unit ? ' ' + item.unit : '')),
+      );
+      const routineMetricCategories: Record<string, string[]> = {
+        'sleep.duration': ['SLEEP'],
+        'stress.score': ['STRESS', 'MENTAL_HEALTH'],
+        'hydration.volume': ['HYDRATION', 'WATER'],
+        'exercise.duration': ['EXERCISE', 'PHYSICAL_ACTIVITY'],
+        'smoking.cigarettes': ['SMOKING'],
+      };
+      const routineGoalRows = activeGoalRows.filter((goal) => {
+        const category = String(goal.category ?? '').toUpperCase().replace(/[\s-]+/g, '_');
+        const title = String(goal.title ?? '').toLowerCase();
+        return routineSignals.some((item) =>
+          (routineMetricCategories[item.metric] ?? []).includes(category),
+        ) || routineSignals.some((item) =>
+          (item.metric === 'sleep.duration' && /sleep/.test(title)) ||
+          (item.metric === 'stress.score' && /stress|mental health|mood/.test(title)) ||
+          (item.metric === 'hydration.volume' && /water|hydration/.test(title)) ||
+          (item.metric === 'exercise.duration' && /exercise|activity|workout/.test(title)) ||
+          (item.metric === 'smoking.cigarettes' && /smok|cigarette/.test(title)),
+        );
+      });
+      const routineGoalContext = routineGoalRows.slice(0, 5).map((goal) => {
+        const title = stringValue(goal.title) ?? 'Saved goal';
+        const target = numericValue(goal.targetValue);
+        const unit = stringValue(goal.unit);
+        return title + (target === null ? '' : ' (saved target ' + formatNumber(target, Number.isInteger(target) ? 0 : 1) + (unit ? ' ' + unit : '') + ')');
+      });
+      const routineSourceIds = Array.from(new Set([
+        ...observations.filter((item) => routineMetricKeys.includes(item.metric)).map((item) => item.source.recordId),
+        ...priorObservations.filter((item) => routineMetricKeys.includes(item.metric)).map((item) => item.source.recordId),
+      ].filter((id): id is string => Boolean(id)))).slice(0, 30);
+      addFinding({
+        key: 'routine:combined-weekly-pattern',
+        priority: routineSignals.some((item) => ['sleep.duration', 'stress.score'].includes(item.metric)) ? 'WATCH' : 'INSIGHT',
+        title: 'Your tracked routine shows a mixed pattern',
+        change: routineSignals.length + ' routine measures have enough dated observations to compare; the changes do not all move in the same direction.',
+        pattern: routineDetails.join(' · ') + '.',
+        personalContext: [
+          currentConditionRows.length ? 'Saved active condition(s): ' + currentConditionRows.slice(0, 4).map((item) => item.name).join(', ') + '.' : '',
+          routineGoalContext.length ? 'Relevant saved goal(s): ' + routineGoalContext.join('; ') + '.' : '',
+          'Daily averages use recorded days only; days without entries are not treated as zero.',
+        ].filter(Boolean).join(' '),
+        whyItMatters: 'This combined view helps distinguish a change in one routine from a broader pattern. A higher or lower number is not automatically better, and same-period changes do not establish that one behaviour caused another.',
+        nextStep: 'Start with the routine measures that are furthest from your own saved goals, and keep logging them on comparable days. If short sleep or stress remains difficult, discuss the pattern with a healthcare professional; use your saved care plan for condition-specific targets.',
+        confidence: routineSignals.filter((item) => item.previous.length >= 4 && item.current.length >= 4).length >= 3 ? 'MODERATE' : 'LIMITED',
+        evidence: routineDetails,
+        sourceRecordIds: routineSourceIds,
+      });
+    }
+
+    // Condition-specific synthesis: surface what the report can and cannot say
+    // about a saved diagnosis rather than leaving its readings in a separate list.
+    for (const condition of currentConditionRows) {
+      if (!/diabet|prediabet/i.test(condition.name)) continue;
+      const glucoseEvidence = observations.filter((item) =>
+        ['blood_glucose', 'lab.hba1c'].includes(item.metric) && (item.value !== null || item.valueCode !== null),
+      );
+      if (!glucoseEvidence.length) continue;
+      const numericGlucose = glucoseEvidence.filter((item) => item.value !== null && item.quality.status === 'ACCEPTED' && item.quality.safetySignals.length === 0);
+      const numericLabEvidence = numericGlucose.filter((item) => item.metric === 'lab.hba1c');
+      const glucoseRecords = glucoseEvidence.filter((item) => item.metric === 'blood_glucose');
+      const glucoseAverage = meanOf(glucoseRecords.filter((item) => item.value !== null && item.quality.status === 'ACCEPTED' && item.quality.safetySignals.length === 0).map((item) => item.value as number));
+      const latestGlucose = glucoseEvidence.slice().sort((a, b) => String(a.observedAt ?? '').localeCompare(String(b.observedAt ?? ''))).at(-1);
+      const savedGlucoseGoals = activeGoalRows.filter((goal) =>
+        /BLOOD_GLUCOSE|GLUCOSE|DIABET/i.test(String(goal.category ?? '') + ' ' + String(goal.title ?? '')),
+      ).map((goal) => {
+        const target = numericValue(goal.targetValue);
+        return (stringValue(goal.title) ?? 'Glucose goal') +
+          (target === null ? '' : ' (saved target ' + formatNumber(target, Number.isInteger(target) ? 0 : 1) +
+            (stringValue(goal.unit) ? ' ' + stringValue(goal.unit) : '') + ')');
+      });
+      const glucoseSummary = glucoseAverage === null
+        ? glucoseRecords.length + ' glucose record(s); no reliable numeric average because entries require review'
+        : formatNumber(glucoseAverage, 1) + ' ' + (glucoseRecords.find((item) => item.unit)?.unit ?? 'saved unit') +
+          ' average across accepted recorded values';
+      addFinding({
+        key: 'condition-context:diabetes-glucose',
+        priority: numericGlucose.length < glucoseRecords.length ? 'REVIEW' : 'WATCH',
+        title: numericLabEvidence.length
+          ? 'Diabetes tracking includes glucose and laboratory context'
+          : 'Diabetes tracking has glucose readings but no numeric HbA1c result in this period',
+        change: glucoseRecords.length + ' dated glucose tracker/measurement record(s); ' + numericLabEvidence.length + ' accepted numeric HbA1c/laboratory observation(s).',
+        pattern: glucoseSummary + (latestGlucose ? '; latest recorded item ' + formatObservation(latestGlucose) : '') + '.',
+        personalContext: 'Diabetes is a saved active condition.' +
+          (savedGlucoseGoals.length ? ' Related saved goal(s): ' + savedGlucoseGoals.join('; ') + '.' : '') +
+          ' The report uses available dated records and does not infer control from missing tests or readings.',
+        whyItMatters: numericLabEvidence.length
+          ? 'Tracker values and laboratory results answer different questions and need to be interpreted against the clinician-set target and the timing of the test.'
+          : 'The report can summarise the recorded glucose values but cannot infer longer-term diabetes control without appropriate clinical context. Absence of a numeric HbA1c result here does not mean the result is normal or that a test was not done elsewhere.',
+        nextStep: numericLabEvidence.length
+          ? 'Compare the dated results with the target in your care plan and review unusual or uncertain readings with your clinician.'
+          : 'Compare the recorded glucose readings with your clinician-set target and ask your care team whether an HbA1c test is due. Do not change medication based on this report alone.',
+        confidence: glucoseRecords.length >= 3 && numericGlucose.length === glucoseEvidence.length ? 'MODERATE' : 'LIMITED',
+        evidence: [
+          ...glucoseEvidence.slice(0, 5).map(formatObservation),
+          numericLabEvidence.length ? numericLabEvidence.length + ' accepted numeric HbA1c/laboratory observation(s).' : 'No accepted numeric HbA1c observation was found in this report period.',
+        ],
+        sourceRecordIds: Array.from(new Set(glucoseEvidence.map((item) => item.source.recordId).filter((id): id is string => Boolean(id)))).slice(0, 20),
+      });
+    }
+
     // Match only an explicitly saved medication indication to a saved condition label.
     // Unmatched/free-text indications are not guessed from a drug name.
     for (const medication of activeMedications) {
