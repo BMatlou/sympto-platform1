@@ -13,6 +13,7 @@ import {
 } from '@prisma/client';
 
 import { PrismaService } from '../../database/prisma.service';
+import { HealthReportIntelligenceService } from './health-report-intelligence.service';
 
 const REPORT_TIMEZONE = 'Africa/Johannesburg';
 const REPORT_HOUR = 9;
@@ -34,7 +35,10 @@ export class HealthReportNotificationSchedulerService
   );
   private timer?: NodeJS.Timeout;
 
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly reportIntelligence: HealthReportIntelligenceService,
+  ) {}
 
   onModuleInit() {
     void this.syncAll(new Date());
@@ -882,7 +886,7 @@ export class HealthReportNotificationSchedulerService
           activeGoals: [],
         };
 
-    return {
+    const reportPayload = {
       type: kind,
       period: {
         start: period.start,
@@ -946,6 +950,13 @@ export class HealthReportNotificationSchedulerService
         },
       },
       generatedAt: new Date(),
+    };
+
+    // Additive, read-only intelligence: existing source records and report fields
+    // remain unchanged while the new deterministic pipeline runs alongside them.
+    return {
+      ...reportPayload,
+      intelligence: this.reportIntelligence.analyze(reportPayload, patientId),
     };
   }
 
