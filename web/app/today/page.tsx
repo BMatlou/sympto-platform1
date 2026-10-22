@@ -47,6 +47,13 @@ function dayKey(value: unknown) {
   }).format(date);
 }
 
+function numericOrNull(value: unknown): number | null {
+  if (typeof value !== "number" && typeof value !== "string") return null;
+  if (String(value).trim() === "") return null;
+  const number = Number(value);
+  return Number.isFinite(number) ? number : null;
+}
+
 function normalizeVitals(data: any): DashboardVital[] {
   const deviceVitals = Array.isArray(data?.healthSnapshot?.latestMeasurements)
     ? data.healthSnapshot.latestMeasurements.map((item: any) => ({ type: item.type ?? item.measurementType, name: item.name, value: item.value, unit: item.unit, measuredAt: item.measuredAt, source: item.source }))
@@ -541,8 +548,8 @@ export default function TodayPage() {
                 if (category === "BLOOD_GLUCOSE") return (
                   <TodayGoalCardSlot key={cardKey} cardKey={cardKey} expandedGoalCard={expandedGoalCard} onToggle={toggleExpandedGoalCard}>
                     <TodayBloodGlucoseGoal goal={goal} patientId={String(data.patient?.id ?? "")}
-                      currentWeightKg={data.patient?.weightKg ?? data.healthSnapshot?.baseline?.weightKg ?? null}
-                      currentHeightCm={data.patient?.heightCm ?? data.healthSnapshot?.baseline?.heightCm ?? null}
+                      currentWeightKg={numericOrNull(data.patient?.weightKg ?? data.healthSnapshot?.baseline?.weightKg)}
+                      currentHeightCm={numericOrNull(data.patient?.heightCm ?? data.healthSnapshot?.baseline?.heightCm)}
                       measurements={healthVitals} onUpdated={reload}
                       conditions={Array.isArray(data.conditions) ? data.conditions : Array.isArray(data.healthSnapshot?.activeConditions) ? data.healthSnapshot.activeConditions : []}
                       diagnoses={Array.isArray(data.clinicalDiagnoses) ? data.clinicalDiagnoses : []}
