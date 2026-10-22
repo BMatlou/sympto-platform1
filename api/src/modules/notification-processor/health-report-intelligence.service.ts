@@ -974,9 +974,31 @@ export class HealthReportIntelligenceService {
             ? 'Period measurements are matched to this goal by category as well as explicit goal links. A measurement is not automatically counted as goal completion unless the goal tracker records it.'
             : 'No matching period evidence was returned. Missing evidence is unknown, not zero progress.'),
         status: metricSummary.matching.some((item) => item.quality.status !== 'ACCEPTED' || item.quality.safetySignals.length > 0) ? 'REVIEW' : 'INFO',
+        hasData,
       };
     });
-    personalisedInsights.push(...activeGoalSummaries);
+    if (activeGoalSummaries.length) {
+      const goalsWithEvidence = activeGoalSummaries.filter((item) => item.hasData);
+      const goalsWithoutEvidence = activeGoalSummaries.filter((item) => !item.hasData);
+      const namesForSummary = (items: typeof activeGoalSummaries) => {
+        const names = items.slice(0, 5).map((item) => item.title);
+        return names.join(', ') + (items.length > names.length ? ' +' + (items.length - names.length) + ' more' : '');
+      };
+      personalisedInsights.push({
+        key: 'goals:period-summary',
+        group: 'GOAL',
+        title: 'Progress against your saved goals',
+        headline: goalsWithEvidence.length + ' of ' + activeGoalSummaries.length + ' active goals have relevant period records',
+        detail: (goalsWithEvidence.length
+          ? 'Matched period evidence: ' + namesForSummary(goalsWithEvidence) + '. '
+          : 'No period measurements or explicitly linked tracker records matched the active goals. ') +
+          (goalsWithoutEvidence.length
+            ? 'No direct evidence matched: ' + namesForSummary(goalsWithoutEvidence) + '. Missing evidence is not zero progress; daily check-ins and vital readings are shown as evidence, not automatically treated as goal completion.'
+            : 'Each matched measure is evidence for context, not automatic goal completion.'),
+        status: 'INFO',
+      });
+      personalisedInsights.push(...goalsWithEvidence.slice(0, 8).map(({ hasData: _hasData, ...insight }) => insight));
+    }
 
     // Surface allergy and medication context only when a dated symptom/side-effect
     // record actually references a saved allergen or medicine label. A name match
