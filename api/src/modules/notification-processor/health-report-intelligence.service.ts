@@ -2086,6 +2086,9 @@ export class HealthReportIntelligenceService {
     }
 
     for (const comparison of periodComparisons) {
+      // Generic movements already appear in the period-comparison section. Keep
+      // the top narrative for changes that connect to a saved condition or goal.
+      if (!comparison.relatedConditions.length && !comparison.relatedGoals.length) continue;
       addFinding({
         key: 'comparison:' + comparison.metric,
         priority: comparison.relatedConditions.length ? 'WATCH' : 'INSIGHT',
@@ -2113,6 +2116,9 @@ export class HealthReportIntelligenceService {
     }
 
     for (const trend of withinPeriodTrends) {
+      // Do not repeat uncontextualised readings in the story; those remain visible
+      // in the trend/measurement sections below.
+      if (!trend.relatedConditions.length && !trend.relatedGoals.length) continue;
       addFinding({
         key: 'trend:' + trend.metric,
         priority: trend.relatedConditions.length ? 'WATCH' : 'INSIGHT',
