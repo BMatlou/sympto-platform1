@@ -2789,7 +2789,6 @@ function VitalTrendCard({
   rawCurrent,
 }: {
   label: string;
-  description: string;
   unit: string;
   digits: number;
   current: SeriesPoint[];
@@ -2865,7 +2864,7 @@ function VitalTrendCard({
               <polyline points={chartPolyline} fill="none" stroke="#24c1c4" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" vectorEffect="non-scaling-stroke" />
               {chartPoints.map((point, index) => <circle key={point.date + "-" + index} cx={chartPoints.length <= 1 ? 50 : index / (chartPoints.length - 1) * 100} cy={30 - ((point.value - chartMin) / chartSpan) * 23} r="1.8" fill="#0b2d54" />)}
             </svg>
-            <div className="mt-1 flex justify-between gap-1 text-[9px] text-slate-400"><span>{dateLabel(new Date(chartPoints[0].timestamp).toISOString())}</span><span>{dateLabel(new Date(chartPoints[chartPoints.length - 1].timestamp).toISOString())}</span></div>
+            <div className="mt-1 flex justify-between gap-1 text-[9px] text-slate-400"><span>{dateLabel(new Date(chartPoints[0].timestamp).toISOString())}</span><span>{dateLabel(new Date(chartPoints[chartPoints.length - 1].timestamp).toISOString())}</span></div><p className="mt-1 text-[9px] leading-4 text-slate-400">Shape shows movement across saved readings; values above retain the measurement units.</p>
           </div>}
           <div className="mt-3 border-t border-slate-100 pt-3">
             <div className="flex flex-wrap items-center justify-between gap-2">
@@ -3549,7 +3548,7 @@ export default function HealthReportPage() {
   const title = useMemo(() => kind === "weekly" ? "Weekly Health Insights" : kind === "monthly" ? "Monthly Health Insights" : "Health Insights", [kind]);
 
   if (loading) {
-    return <ProtectedRoute><main className="min-h-screen bg-[#f5f8fb] p-5"><div className="mx-auto max-w-6xl space-y-4"><div className="h-44 animate-pulse rounded-[30px] bg-white" /><div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">{[1, 2, 3, 4].map((value) => <div key={value} className="h-32 animate-pulse rounded-2xl bg-white" />)}</div><div className="h-72 animate-pulse rounded-[28px] bg-white" /></div></main></ProtectedRoute>;
+    return <ProtectedRoute><main className="min-h-screen bg-[#c3d9d7] p-5"><div className="mx-auto max-w-6xl space-y-4"><div className="h-44 animate-pulse rounded-[30px] bg-white" /><div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">{[1, 2, 3, 4].map((value) => <div key={value} className="h-32 animate-pulse rounded-2xl bg-white" />)}</div><div className="h-72 animate-pulse rounded-[28px] bg-white" /></div></main></ProtectedRoute>;
   }
 
   if (error || !report) {
