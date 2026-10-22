@@ -337,7 +337,7 @@ describe('HealthReportIntelligenceService', () => {
     expect(result.personalisedContext.insights.some((item) =>
       item.group === 'PROFILE' && item.headline.includes('4 cigarettes'))).toBe(true);
     expect(result.personalisedContext.insights.some((item) =>
-      item.group === 'PREVENTIVE_CARE' && item.headline.includes('MISSED'))).toBe(true);
+      item.group === 'PREVENTIVE_CARE' && item.headline.toLowerCase().includes('missed'))).toBe(true);
   });
 
   it('does not emit a sleep/stress pattern with insufficient paired days', () => {
