@@ -2829,7 +2829,7 @@ function MedicationPeriodInsights({
                     </div>
                     <div className="max-w-[180px]">
                       <span className={"inline-flex rounded-full px-2 py-1 text-[10px] font-bold " + movementTone}>{movement}</span>
-                      {row.target !== null && <p className="mt-1 text-[10px] font-semibold text-[#0b7b80]">Target {formatNumber(row.target, 0)}%</p>}
+                      {row.target !== null && <p className="mt-1 text-[10px] font-semibold text-[#0b7b80]">Saved taken-dose target {formatNumber(row.target, 0)}%{row.source === "schedule" && row.current?.unrecordedDoses ? " · evaluation waits for complete dose outcomes" : ""}</p>}
                     </div>
                   </div>
                 </div>
