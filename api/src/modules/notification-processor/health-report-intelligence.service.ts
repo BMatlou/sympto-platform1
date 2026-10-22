@@ -1506,6 +1506,62 @@ export class HealthReportIntelligenceService {
     const confidenceFor = (items: HealthObservation[]): 'HIGH' | 'MODERATE' | 'LIMITED' =>
       items.some((item) => item.observedAtBasis !== 'SOURCE_EVENT_TIME') ? 'MODERATE' : 'HIGH';
 
+    // Elevate explicit allergy/medicine-to-symptom text matches into the health story.
+    // These are contextual review signals only, never causal conclusions.
+    for (const allergen of activeAllergenNames) {
+      const matched = symptomRows.filter((symptom) => containsSavedLabel(symptomText(symptom), allergen));
+      if (!matched.length) continue;
+      const evidence = matched.slice(0, 4).map((symptom) => {
+        const at = isoDate(symptom.startedAt ?? symptom.createdAt);
+        return (stringValue(symptom.title) ?? 'Symptom record') +
+          (at ? ' (' + (localDay(at) ?? at.slice(0, 10)) + ')' : '') +
+          ' — wording overlaps with saved allergy: ' + allergen;
+      });
+      addFinding({
+        key: 'allergy-context:' + allergen.toLowerCase().replace(/[^a-z0-9]+/g, '-'),
+        priority: 'WATCH',
+        title: 'A saved allergy is mentioned in symptom records',
+        change: allergen + ' appears in ' + matched.length + ' dated symptom record(s).',
+        pattern: 'Saved allergen wording was matched against the symptom description, trigger and reported-effect text.',
+        personalContext: 'The allergy is present in your saved health record. The matched text does not confirm exposure, the severity of a reaction or a medication interaction.',
+        whyItMatters: 'An allergy mention is worth checking in context, but a text match alone cannot verify an allergic reaction or its cause.',
+        nextStep: 'Confirm the details and timing of any suspected reaction with your clinician. Seek urgent help for severe or rapidly worsening allergic symptoms.',
+        confidence: 'LIMITED',
+        evidence,
+        sourceRecordIds: matched.slice(0, 4).map((symptom) => stringValue(symptom.id)).filter((id): id is string => Boolean(id)),
+      });
+    }
+
+    for (const medication of medicationEffectMatches) {
+      const evidence = medication.symptoms.slice(0, 4).flatMap((symptom) => {
+        const at = isoDate(symptom.startedAt ?? symptom.createdAt);
+        return rows(symptom.medicationEffects).filter((effect) => {
+          const name = stringValue(effect.reportedMedicationName ?? row(effect.medication).name ?? row(effect.medication).genericName);
+          return Boolean(name && name.toLowerCase() === medication.name.toLowerCase());
+        }).map((effect) => {
+          const effectText = stringValue(effect.sideEffects) ??
+            (effect.improved !== undefined ? 'reported improvement: ' + String(effect.improved) :
+              effect.effectiveness !== undefined ? 'reported effectiveness: ' + String(effect.effectiveness) : 'effect noted');
+          return (stringValue(symptom.title) ?? 'Symptom record') +
+            (at ? ' (' + (localDay(at) ?? at.slice(0, 10)) + ')' : '') +
+            ' — ' + effectText;
+        });
+      });
+      addFinding({
+        key: 'medication-effect:' + medication.name.toLowerCase().replace(/[^a-z0-9]+/g, '-'),
+        priority: 'WATCH',
+        title: 'Patient-reported effects are recorded alongside a saved medicine',
+        change: medication.name + ' is explicitly referenced in ' + medication.symptoms.length + ' symptom record(s).',
+        pattern: evidence.length ? evidence.join('; ') : 'The medicine label is explicitly linked to a symptom-effect entry.',
+        personalContext: 'This is based on the medicine label and patient-recorded effect fields saved in Sympto, not a verified pharmacological assessment.',
+        whyItMatters: 'The notes may capture reported relief or side effects, but they do not establish that the medicine caused the symptom or outcome.',
+        nextStep: 'Discuss persistent side effects, lack of relief or concerns with your prescriber or pharmacist. Do not stop or change a prescribed medicine based only on this report.',
+        confidence: 'LIMITED',
+        evidence,
+        sourceRecordIds: Array.from(new Set(medication.symptoms.map((symptom) => stringValue(symptom.id)).filter((id): id is string => Boolean(id)))),
+      });
+    }
+
     // Surface observations carrying explicit safety signals before general trends.
     const urgentSignals = new Map<string, HealthObservation[]>();
     for (const item of observations.filter((observation) => observation.quality.safetySignals.length)) {
