@@ -1816,6 +1816,72 @@ export class HealthReportIntelligenceService {
       });
     }
 
+    // Interpret repeated low mood as a patient-reported wellbeing pattern rather than
+    // leaving the user with only a raw tally in the legacy report panel.
+    const moodObservations = observations.filter((item) =>
+      item.metric === 'mood' &&
+      item.valueCode !== null &&
+      item.observedAt !== null &&
+      item.quality.status === 'ACCEPTED' &&
+      periodIncludes(report, item.observedAt),
+    );
+    const lowMoodCodes = new Set<string>([
+      'VERY_BAD', 'BAD', 'LOW', 'VERY_LOW', 'VERY_POOR', 'POOR',
+      'VERY_SAD', 'SAD', 'NEGATIVE',
+    ]);
+    const lowMoodObservations = moodObservations.filter((item) => {
+      const code = String(item.valueCode ?? '').toUpperCase().replace(/[\s-]+/g, '_');
+      return lowMoodCodes.has(code);
+    });
+    const moodDays = Array.from(new Set(moodObservations.flatMap((item) => {
+      const day = item.observedAt ? localDay(item.observedAt) : null;
+      return day ? [day] : [];
+    }))).sort();
+    if (
+      moodObservations.length >= 2 &&
+      lowMoodObservations.length >= 2 &&
+      lowMoodObservations.length / moodObservations.length >= 0.5
+    ) {
+      const lowMoodPercent = Math.round(lowMoodObservations.length / moodObservations.length * 100);
+      const mentalHealthConditions = currentConditionRows
+        .filter((condition) => /mental|depress|anxiet|mood|bipolar/i.test(condition.name))
+        .map((condition) => condition.name);
+      const mentalHealthGoals = activeGoalRows
+        .filter((goal) => /MENTAL_HEALTH|MOOD|STRESS/.test(String(goal.category ?? '').toUpperCase().replace(/[\s-]+/g, '_')))
+        .map((goal) => stringValue(goal.title))
+        .filter((title): title is string => Boolean(title));
+      const moodContext = [
+        mentalHealthConditions.length
+          ? 'Your saved health context includes ' + mentalHealthConditions.join(', ') + '.'
+          : '',
+        mentalHealthGoals.length
+          ? 'This may also be relevant to your active goal' + (mentalHealthGoals.length > 1 ? 's' : '') + ': ' + mentalHealthGoals.join(', ') + '.'
+          : '',
+      ].filter(Boolean).join(' ');
+      addFinding({
+        key: 'wellbeing:repeated-low-mood',
+        priority: 'WATCH',
+        title: 'Lower mood ratings were recorded repeatedly',
+        change: lowMoodObservations.length + ' of ' + moodObservations.length +
+          ' mood check-ins (' + lowMoodPercent + '%) were marked low or very low across ' +
+          moodDays.length + ' recorded day(s).',
+        pattern: 'This summarises the mood ratings you recorded during this reporting period; it does not infer mood on days without a check-in.',
+        personalContext: moodContext ||
+          'This pattern comes from your own dated mood check-ins. Sleep, stress, symptoms and life circumstances can provide useful context, but the records do not establish a cause.',
+        whyItMatters: 'Repeated low mood can be worth paying attention to, especially when it overlaps with changes in sleep, stress, symptoms or daily functioning. These entries do not diagnose a mental health condition.',
+        nextStep: 'Review what was happening on the days marked low and note whether sleep, stress or symptoms were also different. If low mood persists, affects daily life or worries you, talk with someone you trust or a health professional.',
+        confidence: moodObservations.length >= 4 && moodDays.length >= 3 ? 'MODERATE' : 'LIMITED',
+        evidence: [
+          lowMoodObservations.length + ' low/very-low rating(s) out of ' + moodObservations.length + ' mood check-in(s).',
+          'Mood was recorded on ' + moodDays.length + ' distinct day(s)' +
+            (moodDays.length ? ', from ' + moodDays[0] + ' to ' + moodDays[moodDays.length - 1] + '.' : '.'),
+        ],
+        sourceRecordIds: Array.from(new Set(
+          lowMoodObservations.map((item) => item.source.recordId).filter((id): id is string => Boolean(id)),
+        )),
+      });
+    }
+
     if (sleepStress.status === 'SUPPORTED_PATTERN') {
       addFinding({
         key: 'cross:sleep-stress',
