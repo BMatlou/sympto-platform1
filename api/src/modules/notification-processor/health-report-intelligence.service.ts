@@ -1003,6 +1003,25 @@ export class HealthReportIntelligenceService {
       }),
     ].filter((item): item is { name: string; status: string } => Boolean(item.name))
       .filter((item, index, all) => all.findIndex((other) => other.name.toLowerCase() === item.name.toLowerCase()) === index);
+    const resolvedConditionRows = [
+      ...rows(context.conditions).filter((item) =>
+        Boolean(item.resolvedAt) || /RESOLVED/.test(String(item.status ?? row(item.condition).status ?? '').toUpperCase()),
+      ).map((item) => {
+        const relation = row(item.condition);
+        return { name: stringValue(relation.name ?? item.name), status: 'RESOLVED' };
+      }),
+      ...rows(context.diagnoses).filter((item) =>
+        Boolean(item.resolvedAt) || /RESOLVED/.test(String(item.status ?? row(item.diagnosis).status ?? '').toUpperCase()),
+      ).map((item) => {
+        const relation = row(item.diagnosis);
+        return { name: stringValue(relation.name ?? item.name), status: 'RESOLVED' };
+      }),
+    ].filter((item): item is { name: string; status: string } => Boolean(item.name))
+      .filter((item, index, all) =>
+        !currentConditionRows.some((active) => active.name.toLowerCase() === item.name.toLowerCase()) &&
+        all.findIndex((other) => other.name.toLowerCase() === item.name.toLowerCase()) === index,
+      );
+    const contextualConditionRows = [...currentConditionRows, ...resolvedConditionRows];
     const conditionNames = currentConditionRows.map((item) => item.name);
     const activeMedications = rows(context.medications).filter((item) =>
       !isInactive(item) && item.ongoing !== false && !item.endedAt);
@@ -1355,9 +1374,10 @@ export class HealthReportIntelligenceService {
         const category = String(goal.category ?? '').toUpperCase().replace(/[\\s-]+/g, '_');
         return (goalMetricMap[category] ?? []).includes(trend.metric);
       }).map((goal) => stringValue(goal.title)).filter((title): title is string => Boolean(title));
-      const relatedConditions = currentConditionRows.filter((condition) =>
+      const relatedConditions = contextualConditionRows.filter((condition) =>
         conditionMetricRules.some((rule) => rule.pattern.test(condition.name) && rule.metrics.includes(trend.metric)),
-      ).map((condition) => condition.name);
+      ).map((condition) => condition.status === 'RESOLVED'
+        ? condition.name + ' (recorded as resolved)' : condition.name);
       const formatValue = (value: number) => formatNumber(value, TREND_DEFINITIONS.find((item) => item.metric === trend.metric)?.digits ?? 1);
       const deltaText = (trend.change > 0 ? '+' : '') + formatValue(trend.change) + ' ' + trend.unit;
       const contextLines: string[] = [];
@@ -1460,9 +1480,10 @@ export class HealthReportIntelligenceService {
         };
         return (metricMap[category] ?? []).includes(definition.metric);
       }).map((goal) => stringValue(goal.title)).filter((title): title is string => Boolean(title));
-      const relatedConditions = currentConditionRows.filter((condition) =>
+      const relatedConditions = contextualConditionRows.filter((condition) =>
         conditionMetricRules.some((rule) => rule.pattern.test(condition.name) && rule.metrics.includes(definition.metric)),
-      ).map((condition) => condition.name);
+      ).map((condition) => condition.status === 'RESOLVED'
+        ? condition.name + ' (recorded as resolved)' : condition.name);
       const digits = definition.digits;
       const deltaText = (change > 0 ? '+' : '') + formatNumber(change, digits) + ' ' + definition.unit;
       periodComparisons.push({
@@ -1785,9 +1806,10 @@ export class HealthReportIntelligenceService {
           };
           return (metricMap[category] ?? []).includes(definition.metric);
         }).map((goal) => stringValue(goal.title)).filter((title): title is string => Boolean(title));
-        const relatedConditions = currentConditionRows.filter((condition) =>
+        const relatedConditions = contextualConditionRows.filter((condition) =>
           conditionMetricRules.some((rule) => rule.pattern.test(condition.name) && rule.metrics.includes(definition.metric)),
-        ).map((condition) => condition.name);
+        ).map((condition) => condition.status === 'RESOLVED'
+          ? condition.name + ' (recorded as resolved)' : condition.name);
         const reportPeriodValues = dailyMetricValues(observations, definition.metric);
         const reportPeriodAverage = meanOf(reportPeriodValues.map((item) => item.value));
         const digits = definition.digits;
