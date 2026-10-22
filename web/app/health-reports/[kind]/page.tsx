@@ -346,6 +346,7 @@ type Report = {
       takenDoses: number;
       skippedDoses: number;
       unrecordedDoses: number;
+      outcomeRecordingPercent: number | null;
       explicitActionCount: number;
       legacyEventsNotUsed: number;
       adherencePercent: number | null;
@@ -361,6 +362,7 @@ type Report = {
         takenDoses: number;
         skippedDoses: number;
         unrecordedDoses: number;
+        outcomeRecordingPercent: number | null;
         explicitActionCount: number;
         legacyEventsNotUsed: number;
         adherencePercent: number | null;
@@ -370,6 +372,7 @@ type Report = {
           takenDoses: number;
           skippedDoses: number;
           unrecordedDoses: number;
+          outcomeRecordingPercent: number | null;
           adherencePercent: number | null;
         }>;
       }>;
@@ -3448,7 +3451,7 @@ function MedicationAdherenceSummary({ report }: { report: Report }) {
   const data = report.intelligence?.medicationAdherence;
   if (!data) return null;
   const hasEvidence = data.medications.length > 0 || data.expectedDoses > 0 || data.legacyEventsNotUsed > 0 || data.explicitActionCount > 0;
-  const statusLabel = data.status === "CALCULATED" ? "Calculated from schedules"
+  const statusLabel = data.status === "CALCULATED" ? "Schedule denominator available"
     : data.status === "PARTIAL" ? "Partial schedule coverage"
     : "Insufficient schedule data";
 
@@ -3466,8 +3469,8 @@ function MedicationAdherenceSummary({ report }: { report: Report }) {
         <>
           <div className="grid grid-cols-2 gap-2 p-3 sm:grid-cols-4 sm:p-4">
             <div className="rounded-xl bg-[#f5fafb] p-3">
-              <p className="text-[10px] font-bold uppercase tracking-wide text-slate-500">Adherence</p>
-              <p className="mt-1 text-xl font-black tabular-nums text-[#0b2d54]">{data.adherencePercent == null ? "—" : data.adherencePercent + "%"}</p>
+              <p className="text-[10px] font-bold uppercase tracking-wide text-slate-500">Confirmed adherence</p>
+              <p className="mt-1 text-xl font-black tabular-nums text-[#0b2d54]">{data.adherencePercent == null ? (data.expectedDoses > 0 ? "Incomplete" : "—") : data.adherencePercent + "%"}</p>
             </div>
             <div className="rounded-xl bg-[#f5fafb] p-3">
               <p className="text-[10px] font-bold uppercase tracking-wide text-slate-500">Taken / expected</p>
@@ -3483,7 +3486,7 @@ function MedicationAdherenceSummary({ report }: { report: Report }) {
             </div>
           </div>
           <div className="px-4 pb-3 text-[10px] leading-4 text-slate-500 sm:px-5">
-            {data.explicitActionCount} explicit taken/skipped action{data.explicitActionCount === 1 ? "" : "s"} · {data.calculatedMedicationCount} medicine{data.calculatedMedicationCount === 1 ? "" : "s"} with a calculable schedule · {data.legacyEventsNotUsed} older inferred record{data.legacyEventsNotUsed === 1 ? "" : "s"} disclosed separately and excluded from explicit action counts.
+            {data.outcomeRecordingPercent == null ? "No scheduled-dose denominator available" : data.outcomeRecordingPercent + "% of scheduled dose outcomes have an explicit taken/skipped status"} · {data.explicitActionCount} explicit taken/skipped action{data.explicitActionCount === 1 ? "" : "s"} · {data.calculatedMedicationCount} medicine{data.calculatedMedicationCount === 1 ? "" : "s"} with a calculable schedule · {data.legacyEventsNotUsed} older inferred record{data.legacyEventsNotUsed === 1 ? "" : "s"} disclosed separately and excluded from explicit action counts.
           </div>
           <details className="border-t border-slate-100">
             <summary className="cursor-pointer px-4 py-3 text-xs font-extrabold text-[#0b2d54]">Review each medicine ({data.medications.length})</summary>
@@ -3495,10 +3498,10 @@ function MedicationAdherenceSummary({ report }: { report: Report }) {
                       <p className="text-xs font-bold text-[#0b2d54]">{item.name}</p>
                       <p className="mt-1 text-[10px] text-slate-500">{item.frequency || "Frequency not saved"} · {item.scheduleSource === "REMINDER_SCHEDULE" ? "Reminder slots" : item.scheduleSource === "FREQUENCY_FALLBACK" ? "Frequency fallback" : "No fixed denominator"}</p>
                     </div>
-                    <p className="text-xs font-black tabular-nums text-[#0b2d54]">{item.adherencePercent == null ? "—" : item.adherencePercent + "%"}</p>
+                    <p className="text-xs font-black tabular-nums text-[#0b2d54]">{item.adherencePercent == null ? (item.expectedDoses > 0 ? "Incomplete logs" : "—") : item.adherencePercent + "%"}</p>
                   </div>
                   {item.status === "CALCULATED" ? (
-                    <p className="mt-1 text-[10px] leading-4 text-slate-600">{item.takenDoses} taken · {item.skippedDoses} skipped · {item.unrecordedDoses} without recorded outcome of {item.expectedDoses} expected dose{item.expectedDoses === 1 ? "" : "s"}.</p>
+                    <p className="mt-1 text-[10px] leading-4 text-slate-600">{item.takenDoses} marked taken · {item.skippedDoses} marked skipped · {item.unrecordedDoses} without recorded outcome of {item.expectedDoses} expected dose{item.expectedDoses === 1 ? "" : "s"} ({item.outcomeRecordingPercent ?? 0}% of outcomes recorded).</p>
                   ) : (
                     <p className="mt-1 text-[10px] leading-4 text-amber-800">{item.status === "AS_NEEDED_NO_FIXED_DENOMINATOR" ? "As-needed medicine: a fixed adherence denominator is not appropriate." : item.status === "STOP_DATE_MISSING" ? "This medicine appears stopped, but no stop date is recorded. The denominator was withheld." : "A reliable fixed schedule was not available; adherence was not calculated."}</p>
                   )}
@@ -3511,7 +3514,7 @@ function MedicationAdherenceSummary({ report }: { report: Report }) {
       ) : (
         <p className="px-4 py-4 text-xs leading-5 text-slate-500">No explicit dose actions were found and no reliable scheduled-dose denominator could be calculated for this period. That is not treated as proof that doses were missed.</p>
       )}
-      <p className="border-t border-slate-100 px-4 py-3 text-[10px] leading-4 text-slate-500 sm:px-5">{data.policy}</p>
+      <p className="border-t border-slate-100 px-4 py-3 text-[10px] leading-4 text-slate-500 sm:px-5">Adherence is only confirmed when each expected scheduled dose has an explicit taken/skipped outcome. Unrecorded doses remain unknown—not automatically missed. {data.policy}</p>
     </section>
   );
 }
