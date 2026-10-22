@@ -1111,10 +1111,6 @@ export class HealthReportIntelligenceService {
     if (activeGoalSummaries.length) {
       const goalsWithEvidence = activeGoalSummaries.filter((item) => item.hasData);
       const goalsWithoutEvidence = activeGoalSummaries.filter((item) => !item.hasData);
-      const namesForSummary = (items: typeof activeGoalSummaries) => {
-        const names = items.slice(0, 5).map((item) => item.title);
-        return names.join(', ') + (items.length > names.length ? ' +' + (items.length - names.length) + ' more' : '');
-      };
       personalisedInsights.push({
         key: 'goals:period-summary',
         group: 'GOAL',
