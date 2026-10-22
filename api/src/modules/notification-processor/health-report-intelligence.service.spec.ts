@@ -273,7 +273,7 @@ describe('HealthReportIntelligenceService', () => {
 
     const result = service.analyze(report, 'patient-1');
     const conditionInsight = result.personalisedContext.insights.find((item) => item.group === 'CONDITION');
-    const goalInsight = result.personalisedContext.insights.find((item) => item.group === 'GOAL');
+    const goalInsight = result.personalisedContext.insights.find((item) => item.group === 'GOAL' && item.title === 'Maintain weight');
     const baselineInsight = result.personalisedContext.insights.find((item) =>
       item.group === 'BASELINE' && item.title.startsWith('Weight'));
 
@@ -283,6 +283,41 @@ describe('HealthReportIntelligenceService', () => {
     expect(goalInsight?.headline).toContain('70.1 kg');
     expect(baselineInsight?.headline).toContain('saved baseline 71 kg');
     expect(baselineInsight?.detail).toContain('-0.9 kg');
+  });
+
+  it('connects saved allergy and medicine context only to explicit symptom-record mentions', () => {
+    const base = fixture();
+    const report = fixture({
+      currentSnapshot: {
+        ...base.currentSnapshot,
+        allergies: [{ id: 'allergy-1', status: 'ACTIVE', allergy: { name: 'Penicillin' } }],
+        medications: [{
+          id: 'medicine-1',
+          status: 'ACTIVE',
+          ongoing: true,
+          medication: { name: 'Amoxicillin' },
+        }],
+      },
+      activity: {
+        ...base.activity,
+        symptoms: [{
+          id: 'symptom-1',
+          title: 'Rash after medicine',
+          startedAt: '2026-10-14T08:00:00.000Z',
+          triggers: [{ trigger: 'Penicillin exposure' }],
+          medicationEffects: [{
+            reportedMedicationName: 'Amoxicillin',
+            sideEffects: 'Rash reported',
+          }],
+        }],
+      },
+    });
+
+    const result = service.analyze(report, 'patient-1');
+    expect(result.personalisedContext.insights.some((item) =>
+      item.group === 'ALLERGY' && item.headline.includes('Penicillin'))).toBe(true);
+    expect(result.personalisedContext.insights.some((item) =>
+      item.group === 'TREATMENT' && item.headline.includes('Amoxicillin'))).toBe(true);
   });
 
   it('does not emit a sleep/stress pattern with insufficient paired days', () => {
