@@ -327,6 +327,59 @@ type Report = {
       immunizations?: unknown[];
     };
   };
+  intelligence?: {
+    version?: string;
+    generatedAt?: string;
+    coverage?: {
+      sourceCounts?: Record<string, number>;
+      observationCandidateCount?: number;
+      metricCounts?: Record<string, number>;
+      unmappedMetricCount?: number;
+      timestampFallbackCount?: number;
+      qualityAcceptedCount?: number;
+      qualityNeedsReviewCount?: number;
+      qualityInvalidCount?: number;
+      safetySignalCount?: number;
+      qualityFlags?: Array<{
+        metric: string;
+        code: string;
+        status: 'ACCEPTED' | 'NEEDS_REVIEW' | 'INVALID';
+        sourceType: string;
+        sourceRecordId: string | null;
+        observedAt: string | null;
+        value: number | null;
+        unit: string | null;
+      }>;
+    };
+    loggingConsistency?: {
+      loggedDays: number;
+      eligibleDays: number;
+      percentage: number;
+      days: string[];
+      policy: string;
+    };
+    crossSignals?: {
+      sleepStress?: {
+        windowDays: 7;
+        status: 'SUPPORTED_PATTERN' | 'NO_CLEAR_PATTERN' | 'INSUFFICIENT_DATA';
+        overlappingDays: number;
+        shorterSleepDays: number;
+        longerSleepDays: number;
+        meanStressOnShorterSleepDays: number | null;
+        meanStressOnLongerSleepDays: number | null;
+        difference: number | null;
+        statement: string;
+      };
+    };
+    clinicalContext?: {
+      ageAtReport: number | null;
+      gender: string | null;
+      conditions: string[];
+      activeMedicationCount: number;
+      allergiesOnFile: number;
+      note: string;
+    };
+  };
   generatedAt: string;
 };
 
@@ -3287,6 +3340,60 @@ function ReportDataCoverage({ report }: { report: Report }) {
   </section>;
 }
 
+function ServerHealthIntelligenceSummary({ report }: { report: Report }) {
+  const intelligence = report.intelligence;
+  if (!intelligence) return null;
+  const coverage = intelligence.coverage;
+  const logging = intelligence.loggingConsistency;
+  const sleepStress = intelligence.crossSignals?.sleepStress;
+  const needsReview = (coverage?.qualityNeedsReviewCount ?? 0) + (coverage?.qualityInvalidCount ?? 0);
+  const knownSources = Object.values(coverage?.sourceCounts ?? {}).filter((count) => count > 0).length;
+  const metricKinds = Object.keys(coverage?.metricCounts ?? {}).length;
+  const showSleepStress = Boolean(sleepStress && (
+    sleepStress.overlappingDays > 0 || sleepStress.status === "SUPPORTED_PATTERN"
+  ));
+
+  return (
+    <section aria-label="Server-side health report intelligence" className="mt-4 overflow-hidden rounded-2xl border border-[#dcebed] bg-white shadow-sm">
+      <div className="border-b border-slate-100 px-4 py-4 sm:px-5">
+        <p className="text-[10px] font-black uppercase tracking-[0.16em] text-[#0b7b80]">Deterministic analysis</p>
+        <h2 className="mt-1 text-lg font-black text-[#0b2d54]">Report intelligence checks</h2>
+        <p className="mt-1 text-xs leading-5 text-slate-500">Server-calculated from dated records returned for this period. Quality checks and pattern associations do not diagnose a condition.</p>
+      </div>
+      <div className="grid gap-2 p-3 sm:grid-cols-2 xl:grid-cols-4 sm:p-4">
+        <div className="rounded-xl bg-[#f5fafb] p-3">
+          <p className="text-[10px] font-bold uppercase tracking-wide text-slate-500">Normalized observations</p>
+          <p className="mt-1 text-xl font-black tabular-nums text-[#0b2d54]">{coverage?.observationCandidateCount ?? 0}</p>
+          <p className="mt-1 text-[10px] leading-4 text-slate-500">{metricKinds} metric types across {knownSources} populated source groups</p>
+        </div>
+        <div className="rounded-xl bg-[#f5fafb] p-3">
+          <p className="text-[10px] font-bold uppercase tracking-wide text-slate-500">Readings to verify</p>
+          <p className="mt-1 text-xl font-black tabular-nums text-[#0b2d54]">{needsReview}</p>
+          <p className="mt-1 text-[10px] leading-4 text-slate-500">{coverage?.qualityInvalidCount ?? 0} invalid · {coverage?.qualityNeedsReviewCount ?? 0} require review</p>
+        </div>
+        <div className="rounded-xl bg-[#f5fafb] p-3">
+          <p className="text-[10px] font-bold uppercase tracking-wide text-slate-500">Safety signals</p>
+          <p className="mt-1 text-xl font-black tabular-nums text-[#0b2d54]">{coverage?.safetySignalCount ?? 0}</p>
+          <p className="mt-1 text-[10px] leading-4 text-slate-500">Kept separate from data-entry quality</p>
+        </div>
+        <div className="rounded-xl bg-[#f5fafb] p-3">
+          <p className="text-[10px] font-bold uppercase tracking-wide text-slate-500">Metric mapping gaps</p>
+          <p className="mt-1 text-xl font-black tabular-nums text-[#0b2d54]">{coverage?.unmappedMetricCount ?? 0}</p>
+          <p className="mt-1 text-[10px] leading-4 text-slate-500">{coverage?.timestampFallbackCount ?? 0} use record-time fallback rather than a dedicated observation time</p>
+        </div>
+      </div>
+      {logging && <p className="px-4 pb-3 text-[10px] leading-4 text-slate-500 sm:px-5">Patient logging score uses {logging.loggedDays} unique patient-driven days out of {logging.eligibleDays} eligible days ({logging.percentage}%). Appointments, clinical-only activity, profile edits and device syncs are excluded.</p>}
+      {showSleepStress && sleepStress && (
+        <div className="border-t border-slate-100 px-4 py-3 sm:px-5">
+          <p className="text-xs font-extrabold text-[#0b2d54]">Sleep and stress · 7-day paired analysis</p>
+          <p className="mt-1 text-xs leading-5 text-slate-600">{sleepStress.statement}</p>
+          <p className="mt-1 text-[10px] text-slate-500">{sleepStress.overlappingDays} overlapping days · {sleepStress.status === "SUPPORTED_PATTERN" ? "pattern met the configured evidence rule" : sleepStress.status === "NO_CLEAR_PATTERN" ? "no clear difference in these records" : "evidence is still limited"}</p>
+        </div>
+      )}
+    </section>
+  );
+}
+
 function CompleteReportData({ report }: { report: Report }) {
   const activity = report.activity as unknown as ReportLedgerObject;
   const clinical = report.clinical as unknown as ReportLedgerObject;
@@ -3536,6 +3643,11 @@ export default function HealthReportPage() {
 
   const title = useMemo(() => kind === "weekly" ? "Weekly Health Insights" : kind === "monthly" ? "Monthly Health Insights" : "Health Insights", [kind]);
 
+  const legacyLoggedDays = report ? recordedDays(report).size : 0;
+  const loggingEligibleDays = report?.intelligence?.loggingConsistency?.eligibleDays ?? (report ? periodDays(report) : 0);
+  const loggingDays = report?.intelligence?.loggingConsistency?.loggedDays ?? legacyLoggedDays;
+  const loggingPercentage = report?.intelligence?.loggingConsistency?.percentage ?? (loggingEligibleDays ? Math.round(loggingDays / loggingEligibleDays * 100) : 0);
+
   if (loading) {
     return <ProtectedRoute><main className="min-h-screen bg-[#f5f8fb] p-5"><div className="mx-auto max-w-6xl space-y-4"><div className="h-44 animate-pulse rounded-[30px] bg-white" /><div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">{[1, 2, 3, 4].map((value) => <div key={value} className="h-32 animate-pulse rounded-2xl bg-white" />)}</div><div className="h-72 animate-pulse rounded-[28px] bg-white" /></div></main></ProtectedRoute>;
   }
@@ -3555,14 +3667,14 @@ export default function HealthReportPage() {
               <div><div className="flex items-center gap-2 text-[10px] font-black uppercase tracking-[0.18em] text-[#24c1c4]"><ShieldCheck className="h-4 w-4" />Sympto · Health intelligence</div><h1 className="mt-3 text-3xl font-black tracking-tight sm:text-4xl">{title}</h1><p className="mt-2 text-sm leading-6 text-white/75">{report.period.label}</p><p className="mt-3 text-sm leading-5 text-white/80">Your health, at a glance.</p></div>
               <div className="flex shrink-0 flex-wrap items-center gap-3 rounded-2xl border border-white/15 bg-white/10 p-3 sm:gap-4 sm:p-4">
                 <ScoreRing
-                  percent={Math.round(recordedDays(report).size / periodDays(report) * 100)}
+                  percent={loggingPercentage}
                   label="Logging consistency"
-                  tone={recordedDays(report).size / periodDays(report) >= 0.75 ? "good" : recordedDays(report).size / periodDays(report) >= 0.4 ? "watch" : "high"}
+                  tone={loggingEligibleDays > 0 && loggingPercentage / 100 >= 0.75 ? "good" : loggingEligibleDays > 0 && loggingPercentage / 100 >= 0.4 ? "watch" : "high"}
                   size={68}
                 />
                 <div>
                   <p className="text-[10px] font-bold uppercase tracking-wide text-white/60">Logging consistency</p>
-                  <p className="mt-1 text-base font-black text-white">{recordedDays(report).size}/{periodDays(report)} days logged</p>
+                  <p className="mt-1 text-base font-black text-white">{loggingDays}/{loggingEligibleDays} days logged</p>
                   <p className="mt-1 flex items-center gap-1.5 text-[11px] text-white/70"><CalendarDays className="h-3.5 w-3.5 text-[#24c1c4]" />{report.type === "WEEKLY" ? "7-day report" : "Monthly report"}</p>
                 </div>
               </div>
@@ -3571,6 +3683,7 @@ export default function HealthReportPage() {
           </section>
 
           <ReportDataCoverage report={report} />
+          <ServerHealthIntelligenceSummary report={report} />
 
           {previousFailed && <div className="mt-4 flex items-start gap-2 rounded-2xl border border-amber-200 bg-amber-50 p-4 text-xs leading-5 text-amber-900"><Info className="mt-0.5 h-4 w-4 shrink-0" />The current report is available, but the prior-period comparison could not be loaded. Current-period trends remain available; comparison labels will appear when historical data is accessible.</div>}
 
