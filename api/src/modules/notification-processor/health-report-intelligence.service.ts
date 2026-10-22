@@ -206,6 +206,15 @@ function normalizeMetric(value: unknown, metricKey?: unknown): string | null {
   }
   if (/STEPS|step_count|daily_steps/.test(token)) return 'activity.steps';
   if (/SLEEP|sleep_hours|sleep\.duration/.test(token)) return 'sleep.duration';
+  if (/smoking/.test(token)) return /cigarette|tobacco.count|smoking.count/.test(token) ? 'smoking.cigarettes' : 'smoking.frequency';
+  if (/alcohol/.test(token)) return /unit|drink|quantity|amount/.test(token) ? 'alcohol.units' : 'alcohol.frequency';
+  if (/nutrition|calorie|protein|carbohydrate|carbs|fat|meal|food/.test(token)) {
+    if (/calorie/.test(token)) return 'nutrition.calories';
+    if (/protein/.test(token)) return 'nutrition.protein';
+    if (/carbohydrate|carbs/.test(token)) return 'nutrition.carbohydrates';
+    if (/fat/.test(token)) return 'nutrition.fat';
+    return 'nutrition.intake';
+  }
   if (/stress|mental\.stress/.test(token)) return 'stress.score';
   if (/mood/.test(token)) return 'mood';
   if (/energy/.test(token)) return 'energy.level';
@@ -229,6 +238,9 @@ function unitFor(metric: string): string | null {
     'stress.score': '/10', mood: null as any, 'energy.level': null as any,
     'hydration.volume': 'mL', 'exercise.duration': 'minutes',
     'medication.dose_action': 'dose action',
+    'smoking.cigarettes': 'cigarettes', 'alcohol.units': 'standard drinks',
+    'nutrition.calories': 'kcal', 'nutrition.protein': 'g',
+    'nutrition.carbohydrates': 'g', 'nutrition.fat': 'g', 'nutrition.intake': null as any,
     'symptom.severity': 'rank/4', 'symptom.pain_score': '/10',
   };
   return Object.prototype.hasOwnProperty.call(units, metric) ? units[metric] : null;
@@ -566,7 +578,11 @@ export class HealthReportIntelligenceService {
     }
 
     for (const event of rows(report.goalMetricEvents)) {
-      const metric = normalizeMetric(event.metricType, event.metricKey);
+      const knownMetric = normalizeMetric(event.metricType, event.metricKey);
+      const rawKey = stringValue(event.metricKey);
+      const metric = knownMetric ?? (rawKey
+        ? 'custom.' + rawKey.toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '')
+        : null);
       if (!metric) continue;
       const meta = row(event.metadata);
       const medicationAction = event.source === 'medication-adherence';
@@ -625,6 +641,14 @@ export class HealthReportIntelligenceService {
       workouts: rows(activity.workouts).length,
       medicationMetricEvents: rows(report.goalMetricEvents).filter((item) =>
         /medication|adherence/i.test([item.metricType, item.metricKey, item.source].map(String).join(' '))).length,
+      smokingLogs: rows(report.goalMetricEvents).filter((item) =>
+        String(item.source ?? '') === 'patient-smoking-log' || /smoking|cigarette|tobacco/i.test(String(item.metricKey ?? ''))).length,
+      alcoholLogs: rows(report.goalMetricEvents).filter((item) =>
+        /alcohol|drink.units/i.test([item.metricType, item.metricKey, item.source].map(String).join(' '))).length,
+      nutritionLogs: rows(report.goalMetricEvents).filter((item) =>
+        /nutrition|calorie|protein|carbohydrate|meal|food/i.test([item.metricType, item.metricKey, item.source].map(String).join(' '))).length,
+      hydrationLogs: rows(report.goalMetricEvents).filter((item) =>
+        /hydration|water/i.test([item.metricType, item.metricKey, item.source].map(String).join(' '))).length,
       goalMetricEvents: rows(report.goalMetricEvents).length,
       clinicalEncounters: rows(clinical.encounters).length,
       clinicalDiagnoses: rows(clinical.diagnoses).length,
@@ -761,7 +785,8 @@ export class HealthReportIntelligenceService {
           const isBloodPressure = String(rawType ?? '').toUpperCase().includes('BLOOD_PRESSURE') ||
             String(item.metricKey ?? '').toLowerCase().includes('blood_pressure');
           return !isBloodPressure && !normalizeMetric(rawType, item.metricKey);
-        }).length + rows(activity.wellnessMetrics).filter((item) => !normalizeMetric(item.metricKey, item.metricKey)).length,
+        }).length + rows(activity.wellnessMetrics).filter((item) => !normalizeMetric(item.metricKey, item.metricKey)).length +
+          rows(report.goalMetricEvents).filter((item) => !normalizeMetric(item.metricType, item.metricKey)).length,
         timestampFallbackCount,
         qualityAcceptedCount,
         qualityNeedsReviewCount,
