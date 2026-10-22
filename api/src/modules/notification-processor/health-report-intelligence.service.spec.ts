@@ -511,6 +511,10 @@ describe('HealthReportIntelligenceService', () => {
     expect(comparison?.currentAverage).toBe(5.1);
     expect(comparison?.relatedConditions).toContain('Diabetes');
     expect(comparison?.relatedGoals).toContain('Blood glucose goal');
+    expect(comparison?.relatedGoalTargets).toContain(
+      'Blood glucose goal: saved target 6 mmol/L; current average 5.1 mmol/L is 0.9 mmol/L below the saved target value; previous-period average 4.1 mmol/L was 1.9 mmol/L below the saved target value. This is a numeric comparison only, not a pass/fail judgement.',
+    );
+    expect(comparison?.interpretation).toContain('does not supply a universal pass/fail rule');
     expect(finding).toBeDefined();
     expect(finding?.priority).toBe('WATCH');
     expect(finding?.personalContext).toContain('Diabetes');
