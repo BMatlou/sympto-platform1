@@ -1509,7 +1509,6 @@ export class HealthReportIntelligenceService {
       ).map((condition) => condition.status === 'RESOLVED'
         ? condition.name + ' (recorded as resolved)' : condition.name);
       const digits = definition.digits;
-      const deltaText = (change > 0 ? '+' : '') + formatNumber(change, digits) + ' ' + definition.unit;
       periodComparisons.push({
         key: 'period:' + definition.metric,
         metric: definition.metric,
