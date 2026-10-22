@@ -1856,7 +1856,7 @@ export class HealthReportIntelligenceService {
           'Previous window: ' + comparison.previousStart + ' to ' + comparison.previousEnd + '; ' + comparison.previousReadings + ' accepted reading(s).',
           'Current window: ' + comparison.currentStart + ' to ' + comparison.currentEnd + '; ' + comparison.currentReadings + ' accepted reading(s).',
         ],
-        sourceRecordIds: [],
+        sourceRecordIds: comparison.sourceRecordIds,
       });
     }
 
