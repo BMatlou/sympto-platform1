@@ -1,13 +1,11 @@
 "use client";
 
-import Link from "next/link";
+import from "next/link";
 import { useParams, useSearchParams } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 import {
   Activity,
   AlertTriangle,
-  ArrowLeft,
-  ArrowRight,
   CalendarDays,
   ClipboardList,
   FileText,
@@ -2450,7 +2448,7 @@ function PersonalisedInsights({
                   <h3 className="text-sm font-bold text-[#0b2d54]">{item.title}</h3>
                   <p className="mt-1 text-xs font-semibold text-slate-600">{item.evidence}</p>
                   <p className="mt-1 text-xs leading-5 text-slate-500">{item.action}</p>
-                  <Link href={item.href} className="mt-2 inline-flex min-h-8 items-center gap-1 text-[11px] font-bold text-[#0b7b80]">{item.linkLabel} <ArrowRight className="h-3 w-3" /></Link>
+                  
                 </div>
               </div>
             ))}
@@ -3109,8 +3107,8 @@ function HealthReportInsights({
   return (
     <div className="mt-4 space-y-4">
       {measurementReviews.length > 0 && (
-        <section aria-label="Critical alerts and data checks" className="overflow-hidden rounded-[24px] border border-slate-200 bg-white shadow-sm">
-          <div className="flex items-center justify-between gap-3 border-b border-slate-100 px-4 py-4 sm:px-5">
+        <section aria-label="Critical alerts and data checks" className="space-y-3">
+          <div className="flex items-center justify-between gap-3 px-1 py-2 sm:px-0">
             <div className="flex min-w-0 items-center gap-3">
               <span className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-amber-50 text-amber-700"><AlertTriangle className="h-4 w-4" /></span>
               <div className="min-w-0">
@@ -3119,7 +3117,7 @@ function HealthReportInsights({
             </div>
             <span className="shrink-0 rounded-full bg-slate-100 px-2.5 py-1 text-[11px] font-bold text-slate-600">{measurementReviews.length} flagged</span>
           </div>
-          <div className="grid gap-3 p-3 sm:grid-cols-2 sm:p-4 xl:grid-cols-3">
+          <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
             {measurementReviews.map((item) => {
               const criticalOxygen = item.key === "oxygen" && item.value > 0 && item.value <= 92;
               const urgentBreathing = item.key === "respiratory" && item.value > 30;
@@ -3196,7 +3194,7 @@ function HealthReportInsights({
                   <p className="text-sm font-bold text-[#0b2d54]">Severity and progression</p>
                   <p className="mt-1 text-xs leading-5 text-slate-600">{symptomAnalytics.averageSeverityRank === null ? "No severity scale was available." : "Average severity rank " + formatNumber(symptomAnalytics.averageSeverityRank, 1) + "/4"} · {symptomAnalytics.worseningCount} worsening · {symptomAnalytics.severeCount} severe or very severe.</p>
                 </div>
-                <Link href="/health-journal" className="text-xs font-bold text-[#0b7b80]">Review symptom history <ArrowRight className="ml-1 inline h-3 w-3" /></Link>
+                
               </div>
             )}
             {lowMood.total > 0 && (
@@ -3244,7 +3242,7 @@ function HealthReportInsights({
               <div className="sm:pl-4"><p className="text-[10px] font-bold uppercase tracking-wide text-slate-400">Other updates</p><p className="mt-1 text-lg font-black text-[#0b2d54]">{report.clinical.diagnoses.length + report.clinical.prescriptions.length + report.clinical.referrals.length + report.clinical.procedures.length}</p></div>
             </div>
           </div>
-          {flaggedLabs.length > 0 && <div className="mt-3 rounded-2xl border border-amber-200 bg-amber-50 p-5"><div className="flex items-start gap-3"><AlertTriangle className="mt-0.5 h-5 w-5 shrink-0 text-amber-700" /><div className="min-w-0"><h3 className="font-bold text-amber-950">Results marked for review in the clinical record</h3><p className="mt-1 text-xs leading-5 text-amber-900">These items were marked abnormal or critical by the source record. Sympto is not re-interpreting them here; review the report with your clinician.</p><div className="mt-3 space-y-2">{flaggedLabs.slice(0, 4).map((item) => <div key={item.id} className="flex flex-wrap items-start justify-between gap-2 rounded-xl bg-white/80 p-3"><div><p className="text-sm font-bold text-[#0b2d54]">{item.name}</p><p className="mt-1 text-[11px] text-slate-500">{dateLabel(item.date)}</p></div><div className="flex items-center gap-2"><span className="text-sm font-bold text-[#0b2d54]">{String(item.value)}</span>{item.critical && <span className="rounded-full bg-rose-100 px-2 py-1 text-[9px] font-black uppercase text-rose-800">Critical</span>}{!item.critical && <span className="rounded-full bg-amber-100 px-2 py-1 text-[9px] font-black uppercase text-amber-800">Abnormal</span>}</div></div>)}</div><Link href="/health-records" className="mt-4 inline-flex min-h-10 items-center gap-2 rounded-xl bg-[#0b2d54] px-4 py-2 text-xs font-bold text-white">Review clinical records <ArrowRight className="h-4 w-4" /></Link></div></div></div>}
+          {flaggedLabs.length > 0 && <div className="mt-3 rounded-2xl border border-amber-200 bg-amber-50 p-5"><div className="flex items-start gap-3"><AlertTriangle className="mt-0.5 h-5 w-5 shrink-0 text-amber-700" /><div className="min-w-0"><h3 className="font-bold text-amber-950">Results marked for review in the clinical record</h3><p className="mt-1 text-xs leading-5 text-amber-900">These items were marked abnormal or critical by the source record. Sympto is not re-interpreting them here; review the report with your clinician.</p><div className="mt-3 space-y-2">{flaggedLabs.slice(0, 4).map((item) => <div key={item.id} className="flex flex-wrap items-start justify-between gap-2 rounded-xl bg-white/80 p-3"><div><p className="text-sm font-bold text-[#0b2d54]">{item.name}</p><p className="mt-1 text-[11px] text-slate-500">{dateLabel(item.date)}</p></div><div className="flex items-center gap-2"><span className="text-sm font-bold text-[#0b2d54]">{String(item.value)}</span>{item.critical && <span className="rounded-full bg-rose-100 px-2 py-1 text-[9px] font-black uppercase text-rose-800">Critical</span>}{!item.critical && <span className="rounded-full bg-amber-100 px-2 py-1 text-[9px] font-black uppercase text-amber-800">Abnormal</span>}</div></div>)}</div></div></div></div>}
         </section>
       )}
 
@@ -3358,9 +3356,9 @@ function LedgerGroup({ group }: { group: ReportLedgerGroup }) {
         const identity = String(record.id ?? record.externalRecordId ?? record.sourceId ?? record.createdAt ?? record.measuredAt ?? "record");
         // IDs/timestamps can legitimately repeat across merged sources; scope every rendered row to its group and position.
         const key = group.key + "-" + identity + "-" + index;
-        return <article key={key} className="overflow-hidden rounded-xl border border-slate-200 bg-white"><details>
+        return <article key={key} className="border-b border-slate-200 last:border-0"><details>
           <summary className="flex cursor-pointer list-none items-start gap-3 px-3 py-3"><span className="mt-1 h-2 w-2 shrink-0 rounded-full bg-[#24c1c4]" /><span className="min-w-0 flex-1"><span className="block text-xs font-bold text-[#0b2d54]">{title}</span><span className="mt-1 block text-[10px] text-slate-500">{date}</span>{summary && <span className="mt-1 block break-words text-[11px] leading-4 text-slate-600">{summary}</span>}</span><span className="shrink-0 text-[10px] font-semibold text-slate-400">Details</span></summary>
-          <div className="border-t border-slate-100 bg-[#fbfdfd] p-3"><LedgerFieldTree value={record} /></div>
+          <div className="border-t border-slate-100 px-3 py-3"><LedgerFieldTree value={record} /></div>
         </details></article>;
       })}
     </div>
@@ -3384,10 +3382,10 @@ function ReportDataCoverage({ report }: { report: Report }) {
     { title: "Health-profile changes", count: ledgerArray(report.tracking?.healthPassportChanges?.conditions).length + ledgerArray(report.tracking?.healthPassportChanges?.allergies).length + ledgerArray(report.tracking?.healthPassportChanges?.medications).length + ledgerArray(report.tracking?.healthPassportChanges?.immunizations).length },
   ].filter((item) => item.count > 0);
   if (!counts.length) return null;
-  return <section aria-label="Data coverage for this report" className="mt-3 rounded-2xl border border-[#dcebed] bg-white px-4 py-3 shadow-sm sm:px-5">
-    <div className="flex flex-wrap items-baseline justify-between gap-2"><h2 className="text-xs font-extrabold text-[#0b2d54]">Data included in this report</h2><div className="flex items-center gap-3"><span className="text-[10px] font-semibold text-slate-500">{counts.length} data groups with records</span><a href="#full-report-data" className="inline-flex items-center gap-1 text-[11px] font-bold text-[#0b7b80]">Browse all records <ArrowRight className="h-3 w-3" /></a></div></div>
-    <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-4">
-      {counts.map((item) => <div key={item.title} className="flex min-w-0 items-center justify-between gap-2 rounded-xl bg-[#f5fafb] px-3 py-2"><span className="min-w-0 text-[11px] font-semibold text-slate-600">{item.title}</span><span className="shrink-0 text-sm font-black tabular-nums text-[#0b2d54]">{item.count}</span></div>)}
+  return <section aria-label="Data coverage for this report" className="mt-3 px-1 sm:px-0">
+    <div className="flex flex-wrap items-baseline justify-between gap-2"><h2 className="text-xs font-extrabold text-[#0b2d54]">Data included in this report</h2><span className="text-[10px] font-semibold text-slate-500">{counts.length} data groups with records</span></div>
+    <div className="mt-2 grid grid-cols-1 gap-x-5 sm:grid-cols-2">
+      {counts.map((item) => <div key={item.title} className="flex min-w-0 items-center justify-between gap-2 border-b border-slate-100 px-1 py-2"><span className="min-w-0 text-[11px] font-semibold text-slate-600">{item.title}</span><span className="shrink-0 text-sm font-black tabular-nums text-[#0b2d54]">{item.count}</span></div>)}
     </div>
     <p className="mt-2 text-[10px] leading-4 text-slate-400">Counts are grouped by source; a clinical event and its linked note may appear in separate groups.</p>
   </section>;
@@ -3407,13 +3405,13 @@ function ServerHealthIntelligenceSummary({ report }: { report: Report }) {
   ));
 
   return (
-    <section aria-label="Server-side health report intelligence" className="mt-4 overflow-hidden rounded-2xl border border-[#dcebed] bg-white shadow-sm">
-      <div className="border-b border-slate-100 px-4 py-4 sm:px-5">
+    <section aria-label="Server-side health report intelligence" className="mt-4 space-y-3">
+      <div className="px-1 pb-2 sm:px-0">
         <p className="text-[10px] font-black uppercase tracking-[0.16em] text-[#0b7b80]">Deterministic analysis</p>
         <h2 className="mt-1 text-lg font-black text-[#0b2d54]">Report intelligence checks</h2>
         <p className="mt-1 text-xs leading-5 text-slate-500">Server-calculated from dated records returned for this period. Quality checks and pattern associations do not diagnose a condition.</p>
       </div>
-      <div className="grid gap-2 p-3 sm:grid-cols-2 xl:grid-cols-4 sm:p-4">
+      <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-4">
         <div className="rounded-xl bg-[#f5fafb] p-3">
           <p className="text-[10px] font-bold uppercase tracking-wide text-slate-500">Normalized observations</p>
           <p className="mt-1 text-xl font-black tabular-nums text-[#0b2d54]">{coverage?.observationCandidateCount ?? 0}</p>
@@ -3437,7 +3435,7 @@ function ServerHealthIntelligenceSummary({ report }: { report: Report }) {
       </div>
       {logging && <p className="px-4 pb-3 text-[10px] leading-4 text-slate-500 sm:px-5">Patient logging score uses {logging.loggedDays} unique patient-driven days out of {logging.eligibleDays} eligible days ({logging.percentage}%). Appointments, clinical-only activity, profile edits and device syncs are excluded.</p>}
       {showSleepStress && sleepStress && (
-        <div className="border-t border-slate-100 px-4 py-3 sm:px-5">
+        <div className="rounded-xl border border-[#dcebed] bg-white px-3 py-3 sm:px-4">
           <p className="text-xs font-extrabold text-[#0b2d54]">Sleep and stress · 7-day paired analysis</p>
           <p className="mt-1 text-xs leading-5 text-slate-600">{sleepStress.statement}</p>
           <p className="mt-1 text-[10px] text-slate-500">{sleepStress.overlappingDays} overlapping days · {sleepStress.status === "SUPPORTED_PATTERN" ? "pattern met the configured evidence rule" : sleepStress.status === "NO_CLEAR_PATTERN" ? "no clear difference in these records" : "evidence is still limited"}</p>
@@ -3456,8 +3454,8 @@ function MedicationAdherenceSummary({ report }: { report: Report }) {
     : "Insufficient schedule data";
 
   return (
-    <section aria-label="Schedule-aware medication adherence" className="mt-4 overflow-hidden rounded-2xl border border-[#dcebed] bg-white shadow-sm">
-      <div className="border-b border-slate-100 px-4 py-4 sm:px-5">
+    <section aria-label="Schedule-aware medication adherence" className="mt-4 space-y-3">
+      <div className="px-1 pb-2 sm:px-0">
         <p className="text-[10px] font-black uppercase tracking-[0.16em] text-[#0b7b80]">Medication safety and routine</p>
         <div className="mt-1 flex flex-wrap items-center justify-between gap-2">
           <h2 className="text-lg font-black text-[#0b2d54]">Medication adherence</h2>
@@ -3467,7 +3465,7 @@ function MedicationAdherenceSummary({ report }: { report: Report }) {
       </div>
       {hasEvidence ? (
         <>
-          <div className="grid grid-cols-2 gap-2 p-3 sm:grid-cols-4 sm:p-4">
+          <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
             <div className="rounded-xl bg-[#f5fafb] p-3">
               <p className="text-[10px] font-bold uppercase tracking-wide text-slate-500">Confirmed adherence</p>
               <p className="mt-1 text-xl font-black tabular-nums text-[#0b2d54]">{data.adherencePercent == null ? (data.expectedDoses > 0 ? "Incomplete" : "—") : data.adherencePercent + "%"}</p>
@@ -3488,7 +3486,7 @@ function MedicationAdherenceSummary({ report }: { report: Report }) {
           <div className="px-4 pb-3 text-[10px] leading-4 text-slate-500 sm:px-5">
             {data.outcomeRecordingPercent == null ? "No scheduled-dose denominator available" : data.outcomeRecordingPercent + "% of scheduled dose outcomes have an explicit taken/skipped status"} · {data.explicitActionCount} explicit taken/skipped action{data.explicitActionCount === 1 ? "" : "s"} · {data.calculatedMedicationCount} medicine{data.calculatedMedicationCount === 1 ? "" : "s"} with a calculable schedule · {data.legacyEventsNotUsed} older inferred record{data.legacyEventsNotUsed === 1 ? "" : "s"} disclosed separately and excluded from explicit action counts.
           </div>
-          <details className="border-t border-slate-100">
+          <details className="rounded-xl border border-slate-200 bg-white">
             <summary className="cursor-pointer px-4 py-3 text-xs font-extrabold text-[#0b2d54]">Review each medicine ({data.medications.length})</summary>
             <div className="divide-y divide-slate-100">
               {data.medications.map((item) => (
@@ -3576,16 +3574,16 @@ function CompleteReportData({ report }: { report: Report }) {
   const total = groups.reduce((sum, group) => sum + group.rows.length, 0);
   if (!total && !context.length) return null;
   return <section id="full-report-data" aria-label="All health data in the report period" className="space-y-4">
-    <div className="overflow-hidden rounded-[24px] border border-[#cfe5e8] bg-white shadow-sm">
-      <div className="bg-gradient-to-r from-[#f0fbfb] to-white p-4 sm:p-5">
+    <div className="space-y-3">
+      <div className="px-1 pb-2 sm:px-0">
         <p className="text-[10px] font-extrabold uppercase tracking-[0.16em] text-[#0b7b80]">Supporting records · {report.period.label}</p>
         <div className="mt-1 flex flex-wrap items-end justify-between gap-3"><div><h2 className="text-xl font-black tracking-tight text-[#0b2d54]">Browse underlying records</h2><p className="mt-1 text-xs leading-5 text-slate-600">Your trends, patterns, flags and next steps are summarised above. Open a category only when you need to inspect the source records.</p></div>
           <div className="flex gap-2"><div className="rounded-xl border border-[#dcebed] bg-white px-3 py-2"><p className="text-xl font-black tabular-nums text-[#0b2d54]">{total}</p><p className="text-[10px] font-semibold text-slate-500">records available</p></div><div className="rounded-xl border border-[#dcebed] bg-white px-3 py-2"><p className="text-xl font-black tabular-nums text-[#0b2d54]">{groups.length}</p><p className="text-[10px] font-semibold text-slate-500">data categories</p></div></div>
         </div>
       </div>
-      <div className="space-y-2 p-3 sm:p-4">{groups.length ? groups.map((group) => <LedgerGroup key={group.key} group={group} />) : <p className="rounded-xl border border-dashed border-slate-300 p-4 text-sm text-slate-500">No dated activity records were returned for this period.</p>}</div>
+      <div className="space-y-2">{groups.length ? groups.map((group) => <LedgerGroup key={group.key} group={group} />) : <p className="rounded-xl border border-dashed border-slate-300 p-4 text-sm text-slate-500">No dated activity records were returned for this period.</p>}</div>
     </div>
-    {context.length > 0 && <div className="overflow-hidden rounded-[24px] border border-slate-200 bg-white shadow-sm"><div className="border-b border-slate-100 px-4 py-4 sm:px-5"><p className="text-[10px] font-extrabold uppercase tracking-[0.16em] text-[#0b7b80]">Personalisation context</p><h2 className="mt-1 text-lg font-black tracking-tight text-[#0b2d54]">Your health context</h2><p className="mt-1 text-xs leading-5 text-slate-500">Saved context can pre-date the selected period and is shown separately from that period’s activity.</p></div><div className="space-y-2 p-3 sm:p-4">{context.map((group) => <LedgerGroup key={group.key} group={group} />)}</div></div>}
+    {context.length > 0 && <div className="space-y-3"><div className="px-1 pb-2 sm:px-0"><p className="text-[10px] font-extrabold uppercase tracking-[0.16em] text-[#0b7b80]">Personalisation context</p><h2 className="mt-1 text-lg font-black tracking-tight text-[#0b2d54]">Your health context</h2><p className="mt-1 text-xs leading-5 text-slate-500">Saved context can pre-date the selected period and is shown separately from that period’s activity.</p></div><div className="space-y-2">{context.map((group) => <LedgerGroup key={group.key} group={group} />)}</div></div>}
   </section>;
 }
 
@@ -3687,7 +3685,7 @@ function ContextualHealthInsights({ report }: { report: Report }) {
               <p className="mt-1 text-xs font-semibold text-[#0b5a62]">{item.headline}</p>
               <p className="mt-1 text-xs leading-5 text-slate-600">{item.detail}</p>
             </div>
-            {item.href && <Link href={item.href} className="inline-flex min-h-8 items-center gap-1 self-start text-[11px] font-bold text-[#0b7b80]">Review records <ArrowRight className="h-3 w-3" /></Link>}
+            {item.href && }
           </article>
         ))}
       </div>
@@ -3778,14 +3776,14 @@ export default function HealthReportPage() {
   }
 
   if (error || !report) {
-    return <ProtectedRoute><main className="min-h-screen bg-[#f5f8fb] p-5"><div className="mx-auto max-w-xl rounded-3xl border border-slate-200 bg-white p-8 text-center shadow-sm"><FileText className="mx-auto h-10 w-10 text-slate-300" /><h1 className="mt-4 text-xl font-bold text-[#0b2d54]">Health report unavailable</h1><p className="mt-2 text-sm leading-6 text-slate-500">{error || "We could not load this report."}</p><Link href="/notifications" className="mt-5 inline-flex min-h-11 items-center gap-2 rounded-xl bg-[#0b2d54] px-5 py-3 text-sm font-bold text-white"><ArrowLeft className="h-4 w-4" />Back to notifications</Link></div></main></ProtectedRoute>;
+    return <ProtectedRoute><main className="min-h-screen bg-[#f5f8fb] p-5"><div className="mx-auto max-w-xl rounded-3xl border border-slate-200 bg-white p-8 text-center shadow-sm"><FileText className="mx-auto h-10 w-10 text-slate-300" /><h1 className="mt-4 text-xl font-bold text-[#0b2d54]">Health report unavailable</h1><p className="mt-2 text-sm leading-6 text-slate-500">{error || "We could not load this report."}</p></div></main></ProtectedRoute>;
   }
 
   return (
     <ProtectedRoute>
       <main className="min-h-screen bg-[#f5f8fb] pb-10 text-slate-800">
         <div className="mx-auto max-w-6xl px-4 py-6 sm:px-6 sm:py-8">
-          <Link href="/notifications" className="inline-flex min-h-10 items-center gap-2 rounded-xl px-2 text-sm font-semibold text-[#0b2d54] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#24c1c4]"><ArrowLeft className="h-4 w-4" />Back to notifications</Link>
+          
 
           <section className="mt-4 overflow-hidden rounded-[28px] bg-gradient-to-br from-[#0b2d54] via-[#0b3e60] to-[#0f5a62] p-5 text-white shadow-[0_18px_55px_-30px_rgba(11,45,84,0.55)] sm:p-7">
             <div className="flex flex-col gap-5 sm:flex-row sm:items-center sm:justify-between">
