@@ -880,7 +880,12 @@ function vitalSeries(report: Report | null, metric: string): SeriesPoint[] {
   const aliases = (journalVitalFields[metric] ?? []).map((field) => field.toLowerCase());
   report.activity.journalEntries.forEach((item) => {
     const record = item as Record<string, unknown>;
-    const at = item.recordedAt || item.createdAt || item.updatedAt;
+    // Manual-vitals rows are reused each time a patient records measurements;
+    // this writer stores the measurement's time in updatedAt for that one title.
+    const isManualVitals = /today.s measurements/i.test(String(item.title ?? ""));
+    const at = isManualVitals
+      ? item.updatedAt || item.recordedAt || item.createdAt
+      : item.recordedAt || item.createdAt || item.updatedAt;
     const matchingKey = Object.keys(record).find((key) =>
       aliases.includes(key.toLowerCase()),
     );
@@ -893,7 +898,7 @@ function vitalSeries(report: Report | null, metric: string): SeriesPoint[] {
       metric === "respiratory" ? "respiratoryRateUnit" :
       "heartRateUnit";
     const standard = standardiseMeasurementValue(metric, record[matchingKey], record[unitKey]);
-    if (standard) addVital(points, standard.value, at, "Daily health check-in", standard.convertedFrom);
+    if (standard) addVital(points, standard.value, at, isManualVitals ? "Manual vitals" : "Daily health check-in", standard.convertedFrom);
   });
 
   report.activity.patientVitals.forEach((item) => {
