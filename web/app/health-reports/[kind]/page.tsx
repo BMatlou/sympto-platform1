@@ -416,6 +416,16 @@ type Report = {
         statement: string;
       };
     };
+    personalisedContext?: {
+      insights?: Array<{
+        key: string;
+        group: "CONDITION" | "GOAL" | "BASELINE";
+        title: string;
+        headline: string;
+        detail: string;
+        status: "INFO" | "WATCH" | "REVIEW";
+      }>;
+    };
     clinicalContext?: {
       ageAtReport: number | null;
       gender: string | null;
@@ -3504,24 +3514,6 @@ function CompleteReportData({ report }: { report: Report }) {
   const events = report.goalMetricEvents ?? [];
   const medicationEvents = events.filter((event) => /MEDICATION|medication|adherence/i.test([event.metricType, event.metricKey, event.source, event.goalCategory, event.goalTitle].filter(Boolean).join(" ")));
   const otherGoalEvents = events.filter((event) => !medicationEvents.includes(event));
-  const snapshot: HealthContextSnapshot = report.currentSnapshot ?? {};
-  const contextRows = (title: string, record: unknown) => ledgerHasValue(record) ? [{ title, record }] : [];
-  const contextGroups: ReportLedgerGroup[] = [
-    { key: "conditions", title: "Current conditions", description: "Saved conditions used to personalize this report", rows: ledgerArray(snapshot.conditions) },
-    { key: "diagnoses-on-file", title: "Diagnoses on file", description: "Patient diagnosis history", rows: ledgerArray(snapshot.diagnoses) },
-    { key: "allergies", title: "Allergies", description: "Saved allergens and reactions", rows: ledgerArray(snapshot.allergies) },
-    { key: "medicines-on-file", title: "Current medicines", description: "Saved medicines and instructions", rows: ledgerArray(snapshot.medications) },
-    { key: "immunizations", title: "Immunisations", description: "Immunisation history on file", rows: ledgerArray(snapshot.immunizations) },
-    { key: "goals-on-file", title: "Active health goals", description: "Saved targets and latest goal progress", rows: ledgerArray(snapshot.activeGoals) },
-    { key: "risk-context", title: "Risk assessments on file", description: "Available risk-assessment context", rows: ledgerArray(snapshot.riskAssessments) },
-    { key: "baseline-context", title: "Baseline and profile", description: "Profile and baseline values used when interpreting trends", rows: [
-      ...contextRows("Personal information", snapshot.person),
-      ...contextRows("Profile details", snapshot.profile),
-      ...contextRows("Baseline values", snapshot.baseline),
-      ...contextRows("Medical history", snapshot.medicalRecord),
-      ...contextRows("Blood group", { bloodType: snapshot.bloodType, rhesusFactor: snapshot.rhesusFactor }),
-    ] },
-  ];
   const groups: ReportLedgerGroup[] = [
     { key: "check-ins", title: "Daily health check-ins", description: "Mood, stress, sleep, energy, water, exercise, notes and patient-recorded vitals", rows: ledgerArray(activity.journalEntries) },
     { key: "symptoms", title: "Symptoms and follow-ups", description: "Severity, progression, observations, triggers, attachments and medicine effects", rows: ledgerArray(activity.symptoms) },
@@ -3551,9 +3543,8 @@ function CompleteReportData({ report }: { report: Report }) {
     { key: "medication-record-changes", title: "Medication records changed", description: "Prescription profile details and status changes, separate from dose outcomes", rows: ledgerArray(report.tracking?.healthPassportChanges?.medications) },
     { key: "immunization-changes", title: "Immunisations added or updated", description: "Administration, next-due and status changes during this period", rows: ledgerArray(report.tracking?.healthPassportChanges?.immunizations) },
   ].filter((group) => group.rows.length > 0);
-  const context = contextGroups.filter((group) => group.rows.length > 0);
   const total = groups.reduce((sum, group) => sum + group.rows.length, 0);
-  if (!total && !context.length) return null;
+  if (!total) return null;
   return <section id="full-report-data" aria-label="All health data in the report period" className="space-y-4">
     <div className="space-y-3">
       <div className="px-1 pb-2 sm:px-0">
@@ -3564,107 +3555,42 @@ function CompleteReportData({ report }: { report: Report }) {
       </div>
       <div className="space-y-2">{groups.length ? groups.map((group) => <LedgerGroup key={group.key} group={group} />) : <p className="rounded-xl border border-dashed border-slate-300 p-4 text-sm text-slate-500">No dated activity records were returned for this period.</p>}</div>
     </div>
-    {context.length > 0 && <div className="space-y-3"><div className="px-1 pb-2 sm:px-0"><p className="text-[10px] font-extrabold uppercase tracking-[0.16em] text-[#0b7b80]">Personalisation context</p><h2 className="mt-1 text-lg font-black tracking-tight text-[#0b2d54]">Your health context</h2><p className="mt-1 text-xs leading-5 text-slate-500">Saved context can pre-date the selected period and is shown separately from that period’s activity.</p></div><div className="space-y-2">{context.map((group) => <LedgerGroup key={group.key} group={group} />)}</div></div>}
   </section>;
 }
 
 
 function ContextualHealthInsights({ report }: { report: Report }) {
-  const snapshot: HealthContextSnapshot = report.currentSnapshot ?? {};
-  const conditions = [
-    ...ledgerArray(snapshot.conditions),
-    ...ledgerArray(snapshot.diagnoses),
-  ].map((item) => {
-    const record = ledgerObject(item);
-    const relation = ledgerObject(record.condition ?? record.diagnosis);
-    return {
-      name: ledgerScalar(relation.name ?? record.name, "name"),
-      status: String(record.status ?? "ACTIVE").toUpperCase(),
-      resolved: Boolean(record.resolvedAt),
-    };
-  }).filter((item) => item.name && !item.resolved && !/RESOLVED|INACTIVE|CANCELLED/.test(item.status));
-  const conditionNames = conditions.map((item) => item.name.toLowerCase()).join(" ");
-  const events = report.goalMetricEvents ?? [];
-  const medicationEvents = events.filter((item) => /MEDICATION|medication|adherence/i.test([item.metricType, item.metricKey, item.source, item.goalTitle].filter(Boolean).join(" ")));
-  const glucoseEvents = events.filter((item) => /glucose|blood.sugar|glycaemia|glycemia|hba1c|a1c/i.test([item.metricType, item.metricKey, item.goalTitle].filter(Boolean).join(" ")));
-  const glucoseLabs = clinicalLabSeries(report, /glucose|hba1c|\ba1c\b|glycat|glycosylat/i).length;
-  const systolic = vitalSeries(report, "systolic");
-  const diastolic = vitalSeries(report, "diastolic");
-  const oxygen = vitalSeries(report, "oxygen");
-  const breathing = vitalSeries(report, "respiratory");
-  const symptoms = report.activity.symptoms ?? [];
-  const respiratorySymptoms = symptoms.filter((item) => /asthma|breath|wheez|cough|chest|respirat|shortness of breath/i.test([
-    item.title, item.description, ...(item.symptoms ?? []).map((entry) => entry.name ?? entry.symptom?.name),
-  ].filter(Boolean).join(" ")));
-  const goals = snapshot.activeGoals ?? [];
-  const trackedGoalIds = new Set<string>([
-    ...events.flatMap((event) => [String(event.goalId ?? ""), ...(event.goalAssociations ?? []).map((association) => String(association.goalId ?? ""))]).filter(Boolean),
-    ...ledgerArray(report.tracking?.goalProgress).map((item) => String(ledgerObject(ledgerObject(item).healthGoal).id ?? "" )).filter(Boolean),
-  ]);
-  const trackedGoals = goals.filter((goal) => goal.id && trackedGoalIds.has(String(goal.id)));
-  const insights: Array<{ title: string; headline: string; detail: string }> = [];
-  if (/diabet|prediabet/.test(conditionNames)) {
-    insights.push({
-      title: "Diabetes-related tracking",
-      headline: glucoseEvents.length + " glucose tracker entries · " + glucoseLabs + " numeric glucose/HbA1c lab values",
-      detail: glucoseEvents.length || glucoseLabs
-        ? "Review the dated glucose and laboratory records alongside your saved medication routine and your clinician's targets."
-        : "No dated glucose tracker entries or numeric glucose/HbA1c lab values were returned for this period. They will not be inferred from other measurements.",
-    });
-  }
-  if (/hypertension|high blood pressure/.test(conditionNames)) {
-    insights.push({
-      title: "Blood-pressure context",
-      headline: systolic.length + " systolic · " + diastolic.length + " diastolic readings",
-      detail: systolic.length && diastolic.length
-        ? "The full record includes the dated pressure values. Compare repeated pairs with your saved target and clinician's advice."
-        : "Blood-pressure measurements were sparse or not recorded in this period. Check the full record for readings saved through other sources.",
-    });
-  }
-  if (/asthma|copd|chronic obstructive|respiratory condition/.test(conditionNames)) {
-    insights.push({
-      title: "Breathing and respiratory context",
-      headline: oxygen.length + " oxygen readings · " + breathing.length + " breathing-rate readings · " + respiratorySymptoms.length + " related symptom logs",
-      detail: "Readings, symptom follow-ups and any verification flags are kept together in this report so you can review the dates and source records.",
-    });
-  }
-  if (goals.length) {
-    insights.push({
-      title: "Progress against your saved goals",
-      headline: trackedGoals.length + " of " + goals.length + " active goals have linked tracker entries in this period",
-      detail: trackedGoals.length
-        ? "The goal history below keeps each dated entry visible; goals without a linked event are not treated as zero progress."
-        : "No linked goal-progress events were returned for active goals in this period. Daily check-ins and measurements are shown separately and are not counted as goal completion.",
-    });
-  }
-  const distinctContext = new Set(conditions.map((item) => item.name.toLowerCase()));
-  if (!insights.length && events.length) {
-    insights.push({
-      title: "Your recorded health activity",
-      headline: events.length + " health-goal tracker entries across " + distinctContext.size + " named condition(s) on file",
-      detail: "The report compares dated tracker entries with check-ins, connected readings and clinical records. Expand the record groups below to review each entry.",
-    });
-  }
+  const insights = report.intelligence?.personalisedContext?.insights ?? [];
   if (!insights.length) return null;
+
+  const groupLabel = (group: "CONDITION" | "GOAL" | "BASELINE") =>
+    group === "CONDITION" ? "Saved condition" : group === "GOAL" ? "Your saved goal" : "Your baseline";
+  const statusLabel = (status: "INFO" | "WATCH" | "REVIEW") =>
+    status === "REVIEW" ? "Verify readings" : status === "WATCH" ? "Worth monitoring" : "";
+
   return (
-    <section aria-label="Insights personalised to saved health context" className="overflow-hidden rounded-[24px] border border-[#dcebed] bg-white shadow-sm">
-      <div className="border-b border-slate-100 px-4 py-4 sm:px-5">
+    <section aria-label="Personalised health context" className="mt-4 space-y-3">
+      <div className="px-1 pb-2 sm:px-0">
         <p className="text-[10px] font-extrabold uppercase tracking-[0.15em] text-[#0b7b80]">Personalised context</p>
-        <h2 className="mt-1 text-lg font-black tracking-tight text-[#0b2d54]">How this period relates to your health</h2>
-        <p className="mt-1 text-xs leading-5 text-slate-500">Based on saved conditions, goals and dated records—not assumptions about missing data.</p>
+        <h2 className="mt-1 text-lg font-black tracking-tight text-[#0b2d54]">What this period means for your health</h2>
+        <p className="mt-1 text-xs leading-5 text-slate-500">Saved conditions, goals and baseline measurements are connected to the actual readings and logs in this period. Missing data is never treated as zero or proof that a condition is controlled.</p>
       </div>
-      <div className="divide-y divide-slate-100">
+      <div className="divide-y divide-slate-200">
         {insights.map((item) => (
-          <article key={item.title} className="grid gap-2 px-4 py-3.5 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center sm:px-5">
+          <article key={item.key} className="grid gap-2 py-3.5 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-start">
             <div className="min-w-0">
-              <h3 className="text-sm font-bold text-[#0b2d54]">{item.title}</h3>
-              <p className="mt-1 text-xs font-semibold text-[#0b5a62]">{item.headline}</p>
+              <p className="text-[9px] font-bold uppercase tracking-[0.12em] text-slate-400">{groupLabel(item.group)}</p>
+              <h3 className="mt-1 text-sm font-bold text-[#0b2d54]">{item.title}</h3>
+              <p className="mt-1 text-xs font-semibold leading-5 text-[#0b5a62]">{item.headline}</p>
               <p className="mt-1 text-xs leading-5 text-slate-600">{item.detail}</p>
             </div>
-            
+            {statusLabel(item.status) && (
+              <span className={"inline-flex w-fit rounded-full px-2.5 py-1 text-[10px] font-bold " + (item.status === "REVIEW" ? "bg-amber-50 text-amber-800" : "bg-slate-100 text-slate-600")}>{statusLabel(item.status)}</span>
+            )}
           </article>
         ))}
       </div>
+      <p className="px-1 text-[10px] leading-4 text-slate-400">These are record-based associations and comparisons, not a diagnosis or proof of cause. Use clinician-set targets to interpret clinical measurements.</p>
     </section>
   );
 }
