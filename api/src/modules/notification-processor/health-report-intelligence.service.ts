@@ -1072,7 +1072,7 @@ export class HealthReportIntelligenceService {
     };
     const eventRows = rows(report.goalMetricEvents);
     const progressRows = rows(tracking.goalProgress);
-    const activeGoalSummaries: Array<PersonalisedHealthInsight & { hasData: boolean; hasExplicitLinks: boolean }> = activeGoals.map((goal, index) => {
+    const activeGoalSummaries: Array<PersonalisedHealthInsight & { hasData: boolean; hasExplicitLinks: boolean; hasCategoricalEvidence: boolean }> = activeGoals.map((goal, index) => {
       const id = stringValue(goal.id);
       const category = String(goal.category ?? '').toUpperCase().replace(/[\s-]+/g, '_');
       const metrics = goalMetricMap[category] ?? [];
@@ -1091,6 +1091,7 @@ export class HealthReportIntelligenceService {
       const summaryText = metricSummary.summaries.length ? metricSummary.summaries.join(' · ') : '';
       const linkedCount = directEvents.length + goalProgress.length;
       const hasExplicitLinks = linkedCount > 0;
+      const hasCategoricalEvidence = metricSummary.matching.some((item) => item.valueCode !== null);
       const hasData = evidenceCount > 0 || hasExplicitLinks;
       return {
         key: 'goal:' + (id ?? String(index)),
@@ -1106,6 +1107,7 @@ export class HealthReportIntelligenceService {
         status: metricSummary.matching.some((item) => item.quality.status !== 'ACCEPTED' || item.quality.safetySignals.length > 0) ? 'REVIEW' : 'INFO',
         hasData,
         hasExplicitLinks,
+        hasCategoricalEvidence,
       };
     });
     if (activeGoalSummaries.length) {
@@ -1125,7 +1127,7 @@ export class HealthReportIntelligenceService {
       });
       // Category-matched measurements are surfaced in trend/measurement analysis;
       // this section only expands goals that have explicitly linked tracker events or progress.
-      personalisedInsights.push(...goalsWithEvidence.filter((item) => item.hasExplicitLinks).slice(0, 5).map((item) => ({
+      personalisedInsights.push(...goalsWithEvidence.filter((item) => item.hasExplicitLinks || item.hasCategoricalEvidence).slice(0, 5).map((item) => ({
         key: item.key,
         group: item.group,
         title: item.title,
