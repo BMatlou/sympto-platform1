@@ -92,6 +92,32 @@ describe('MedicationInsightService report adherence', () => {
     expect(result.medications[0].daily).toHaveLength(7);
   });
 
+  it('confirms adherence when every expected scheduled outcome is explicit', async () => {
+    const start = new Date('2026-10-11T22:00:00.000Z');
+    const end = new Date('2026-10-12T22:00:00.000Z');
+    const actions = [
+      ['07:00:00.000Z', 'TAKEN'],
+      ['10:00:00.000Z', 'TAKEN'],
+      ['13:00:00.000Z', 'TAKEN'],
+      ['16:00:00.000Z', 'SKIPPED'],
+    ].map(([time, action], index) => ({
+      occurredAt: new Date('2026-10-12T' + time),
+      sourceId: 'pm-1:2026-10-12:' + index,
+      loggedValue: action === 'TAKEN' ? 100 : 0,
+      metadata: { patientMedicationId: 'pm-1', action },
+    }));
+    const { service } = makeService([medicine({ startedAt: start })], actions);
+
+    const result = await service.buildReportAdherence(patientId, start, end);
+    expect(result.expectedDoses).toBe(4);
+    expect(result.takenDoses).toBe(3);
+    expect(result.skippedDoses).toBe(1);
+    expect(result.unrecordedDoses).toBe(0);
+    expect(result.outcomeRecordingPercent).toBe(100);
+    expect(result.adherencePercent).toBe(75);
+    expect(result.medications[0].adherencePercent).toBe(75);
+  });
+
   it('does not turn legacy inferred entries into explicit dose actions or zero-percent adherence', async () => {
     const { service } = makeService([medicine()], [
       {
