@@ -544,4 +544,70 @@ describe('HealthReportIntelligenceService', () => {
     expect(finding?.change).toContain('mild to severe');
     expect(finding?.evidence).toHaveLength(2);
   });
+
+  it('compares newly started recurring symptoms without treating follow-up edits as new symptoms', () => {
+    const base = fixture();
+    const currentSymptoms = [
+      { id: 'headache-current-1', title: 'Headache', startedAt: '2026-10-13T08:00:00.000Z', overallSeverity: 'MILD', monitorings: [] },
+      { id: 'headache-current-2', title: 'Headache', startedAt: '2026-10-16T08:00:00.000Z', overallSeverity: 'MODERATE', monitorings: [] },
+    ];
+    const report = fixture({
+      activity: { ...base.activity, symptoms: currentSymptoms },
+      longitudinal: {
+        period: { start: '2026-10-05T22:00:00.000Z', end: '2026-10-12T22:00:00.000Z' },
+        activity: {
+          journalEntries: [],
+          symptoms: [{ id: 'headache-prior-1', title: 'Headache', startedAt: '2026-10-07T08:00:00.000Z', overallSeverity: 'MILD', monitorings: [] }],
+          deviceMeasurements: [],
+          wellnessMetrics: [],
+          sleepSessions: [],
+          workouts: [],
+        },
+        clinical: { vitals: [], labResults: [] },
+        goalMetricEvents: [],
+      },
+    });
+
+    const result = service.analyze(report, 'patient-1');
+    const finding = result.findings.find((item) => item.key === 'symptom-frequency:headache');
+
+    expect(finding).toBeDefined();
+    expect(finding?.change).toContain('2 newly-started symptom record(s)');
+    expect(finding?.change).toContain('versus 1');
+    expect(finding?.personalContext).toContain('increased symptoms or more consistent logging');
+  });
+
+  it('explains explicitly dated Health Passport changes without treating them as proof of clinical resolution', () => {
+    const base = fixture();
+    const report = fixture({
+      tracking: {
+        ...base.tracking,
+        healthPassportChanges: {
+          conditions: [{
+            id: 'condition-change-1',
+            name: 'Asthma',
+            status: 'RESOLVED',
+            resolvedAt: '2026-10-15T08:00:00.000Z',
+            createdAt: '2026-10-15T08:00:00.000Z',
+          }],
+          medications: [{
+            id: 'med-change-1',
+            medication: { name: 'Example medicine' },
+            status: 'DISCONTINUED',
+            endedAt: '2026-10-16T08:00:00.000Z',
+            createdAt: '2026-10-10T08:00:00.000Z',
+          }],
+        },
+      },
+    });
+
+    const result = service.analyze(report, 'patient-1');
+    const finding = result.findings.find((item) => item.key === 'context:health-record-changes');
+
+    expect(finding).toBeDefined();
+    expect(finding?.pattern).toContain('Asthma — marked resolved');
+    expect(finding?.pattern).toContain('Example medicine — end date recorded');
+    expect(finding?.whyItMatters).toContain('not proof that all symptoms have ended');
+  });
+
 });
