@@ -2233,9 +2233,6 @@ function PersonalisedInsights({
                 const targetValue = finite(signal.targetValue);
                 const targetUnit = String(signal.targetUnit || signal.unit || "");
                 const movement = previousLoading ? null : periodMovement(signal.current.map((item) => item.value), signal.previous.map((item) => item.value), signal.unit, digits);
-                const comparisonScale = Math.max(Math.abs(currentAverage ?? 0), Math.abs(previousAverage ?? 0), 0.000001);
-                const dailyBars = signal.current.slice().sort((a, b) => a.date.localeCompare(b.date)).slice(-7);
-                const dailyBarMax = Math.max(0.000001, ...dailyBars.map((point) => Math.abs(point.value)));
                 const isDailyHydrationGoal = signal.key === "hydration" && targetValue !== null && targetValue > 0 &&
                   /^(ml|millilit(er|re)s?)$/i.test(signal.unit.trim()) &&
                   (/^(ml|millilit(er|re)s?)$/i.test(targetUnit.trim()) || /^glasses?(\s*\/\s*day)?$/i.test(targetUnit.trim()));
@@ -2264,24 +2261,11 @@ function PersonalisedInsights({
                         <p className="text-lg font-black tracking-tight text-[#0b2d54]">{currentAverage === null ? "—" : formatNumber(currentAverage, digits)}{unitSuffix}</p>
                       </div>
                       <p className="mt-1 text-[11px] text-slate-500">Average across {signal.current.length} logged day{signal.current.length === 1 ? "" : "s"}</p>
-                      {dailyBars.length >= 2 && <div className="mt-3 rounded-xl border border-[#e3f0f1] bg-[#f7fbfb] px-3 py-2.5">
-                        <div className="flex items-center justify-between gap-2"><p className="text-[10px] font-bold uppercase tracking-wide text-slate-500">Daily pattern</p><p className="text-[9px] text-slate-400">Logged days only</p></div>
-                        <div className="mt-2 flex h-[66px] items-end gap-2">
-                          {dailyBars.map((point, pointIndex) => <div key={point.date + "-" + pointIndex} className="flex min-w-0 flex-1 flex-col items-center justify-end gap-1" title={point.date + ": " + formatNumber(point.value, digits) + unitSuffix}>
-                            <div className="flex h-11 w-full items-end overflow-hidden rounded-t-md bg-[#e7f0f2]"><div className="w-full rounded-t-md bg-[#24c1c4]" style={{ height: String(Math.max(8, Math.min(100, Math.abs(point.value) / dailyBarMax * 100))) + "%" }} /></div>
-                            <span className="text-[8px] font-medium text-slate-400">{new Date(point.date + "T12:00:00").toLocaleDateString("en-ZA", { weekday: "short" })}</span>
-                          </div>)}
-                        </div>
-                      </div>}
                     </div>
                     <div className="min-w-0 sm:text-right">
                       <span className={"inline-flex rounded-full border px-2.5 py-1 text-[10px] font-bold " + pillTone}>{movement?.label ?? (previousLoading ? "Comparing…" : "No comparison")}</span>
                       <p className="mt-1 text-[11px] leading-5 text-slate-500">{previousAverage === null ? "No comparable previous-period average." : "Previous average " + formatNumber(previousAverage, digits) + unitSuffix + "."}</p>
                       {targetValue !== null && <p className="mt-1 text-[11px] font-semibold leading-5 text-[#0b7b80]">{isDailyHydrationGoal ? "Drink more water · target " + formatNumber(targetValue / 1000, 1) + " L/day" : (signal.targetTitle || "Saved goal") + " · target " + formatNumber(targetValue, Number.isInteger(targetValue) ? 0 : signalDigits(signal.key, targetUnit)) + (targetUnit ? (targetUnit.startsWith("/") ? targetUnit : " " + targetUnit) : "")}</p>}
-                      {previousAverage !== null && currentAverage !== null && <div className="mt-3 space-y-2" aria-label={signal.label + " period comparison bars"}>
-                        <div className="flex items-center gap-2"><span className="w-[72px] shrink-0 text-left text-[9px] font-semibold text-slate-500">This period</span><div className="h-2 min-w-0 flex-1 overflow-hidden rounded-full bg-slate-100"><div className="h-full rounded-full bg-[#24c1c4]" style={{ width: String(Math.max(3, Math.min(100, Math.abs(currentAverage) / comparisonScale * 100))) + "%" }} /></div></div>
-                        <div className="flex items-center gap-2"><span className="w-[72px] shrink-0 text-left text-[9px] font-semibold text-slate-500">Previous</span><div className="h-2 min-w-0 flex-1 overflow-hidden rounded-full bg-slate-100"><div className="h-full rounded-full bg-[#0b2d54]/65" style={{ width: String(Math.max(3, Math.min(100, Math.abs(previousAverage) / comparisonScale * 100))) + "%" }} /></div></div>
-                      </div>}
                       {isDailyHydrationGoal && hydrationPercent !== null && currentAverage !== null && (
                         <div className="mt-2 sm:ml-auto sm:max-w-xs">
                           <div className="flex items-center justify-between gap-2 text-[10px] font-semibold text-slate-600">
@@ -2800,6 +2784,7 @@ function VitalTrendCard({
   rawCurrent,
 }: {
   label: string;
+  description: string;
   unit: string;
   digits: number;
   current: SeriesPoint[];
@@ -2815,19 +2800,7 @@ function VitalTrendCard({
   const average = verificationSensitive ? null : mean(currentValues);
   const latest = rawCurrent[rawCurrent.length - 1] ?? current[current.length - 1];
   const excludedCount = Math.max(0, rawCurrent.length - current.length);
-  const previousAverage = mean(previousValues);
-  const comparisonScale = Math.max(Math.abs(average ?? 0), Math.abs(previousAverage ?? 0), 0.000001);
   const movement = verificationSensitive || previousLoading ? null : periodMovement(currentValues, previousValues, unit, digits);
-  const chartPoints = verificationSensitive ? [] : current.slice(-7);
-  const chartValues = chartPoints.map((item) => item.value);
-  const chartMin = chartValues.length ? Math.min(...chartValues) : 0;
-  const chartMax = chartValues.length ? Math.max(...chartValues) : 0;
-  const chartSpan = chartMax - chartMin || 1;
-  const chartPolyline = chartPoints.map((item, index) => {
-    const x = chartPoints.length <= 1 ? 50 : index / (chartPoints.length - 1) * 100;
-    const y = 30 - ((item.value - chartMin) / chartSpan) * 23;
-    return x.toFixed(1) + "," + y.toFixed(1);
-  }).join(" ");
 
   return (
     <article className="min-w-0 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:p-5">
@@ -2864,19 +2837,6 @@ function VitalTrendCard({
             </div>
           </div>
           {latest?.convertedFrom && <p className="mt-2 text-[10px] leading-4 text-slate-500">Converted from {formatNumber(latest.convertedFrom.value, 1)} {latest.convertedFrom.unit} for consistent reporting.</p>}
-          {previousAverage !== null && average !== null && <div className="mt-3 space-y-2 rounded-xl bg-[#f5fafb] p-3" aria-label={label + " period comparison bars"}>
-            <div className="flex items-center gap-2"><span className="w-[72px] shrink-0 text-[9px] font-bold text-slate-500">This period</span><div className="h-2 min-w-0 flex-1 overflow-hidden rounded-full bg-slate-200"><div className="h-full rounded-full bg-[#24c1c4]" style={{ width: String(Math.max(3, Math.min(100, Math.abs(average) / comparisonScale * 100))) + "%" }} /></div><span className="w-14 text-right text-[10px] font-bold text-[#0b2d54]">{formatNumber(average, digits)}</span></div>
-            <div className="flex items-center gap-2"><span className="w-[72px] shrink-0 text-[9px] font-bold text-slate-500">Previous</span><div className="h-2 min-w-0 flex-1 overflow-hidden rounded-full bg-slate-200"><div className="h-full rounded-full bg-[#0b2d54]/65" style={{ width: String(Math.max(3, Math.min(100, Math.abs(previousAverage) / comparisonScale * 100))) + "%" }} /></div><span className="w-14 text-right text-[10px] font-bold text-[#0b2d54]">{formatNumber(previousAverage, digits)}</span></div>
-          </div>}
-          {chartPoints.length >= 2 && <div className="mt-3 rounded-xl border border-[#e3f0f1] bg-[#f7fbfb] px-3 py-2.5">
-            <div className="flex items-center justify-between gap-2"><p className="text-[10px] font-bold uppercase tracking-wide text-slate-500">Reading trend</p><p className="text-[9px] font-medium text-slate-400">Last {chartPoints.length} valid readings</p></div>
-            <svg viewBox="0 0 100 34" preserveAspectRatio="none" role="img" aria-label={label + " trend across " + chartPoints.length + " valid readings"} className="mt-2 h-12 w-full overflow-visible">
-              <line x1="0" y1="31" x2="100" y2="31" stroke="#dcebed" strokeWidth="0.8" />
-              <polyline points={chartPolyline} fill="none" stroke="#24c1c4" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" vectorEffect="non-scaling-stroke" />
-              {chartPoints.map((point, index) => <circle key={point.date + "-" + index} cx={chartPoints.length <= 1 ? 50 : index / (chartPoints.length - 1) * 100} cy={30 - ((point.value - chartMin) / chartSpan) * 23} r="1.8" fill="#0b2d54" />)}
-            </svg>
-            <div className="mt-1 flex justify-between gap-1 text-[9px] text-slate-400"><span>{dateLabel(new Date(chartPoints[0].timestamp).toISOString())}</span><span>{dateLabel(new Date(chartPoints[chartPoints.length - 1].timestamp).toISOString())}</span></div><p className="mt-1 text-[9px] leading-4 text-slate-400">Shape shows movement across saved readings; values above retain the measurement units.</p>
-          </div>}
           <div className="mt-3 border-t border-slate-100 pt-3">
             <div className="flex flex-wrap items-center justify-between gap-2">
               <p className="text-[10px] font-bold uppercase tracking-wide text-slate-400">Compared with previous period</p>
@@ -3082,10 +3042,8 @@ function HealthReportInsights({
         </section>
       )}
 
-      <div className="grid items-start gap-4 xl:grid-cols-2">
-        <ContextualHealthInsights report={report} />
-        <MedicationPeriodInsights report={report} previousReport={previousReport} previousLoading={previousLoading} />
-      </div>
+      <ContextualHealthInsights report={report} />
+      <MedicationPeriodInsights report={report} previousReport={previousReport} previousLoading={previousLoading} />
       <PersonalisedInsights report={report} previousReport={previousReport} previousLoading={previousLoading} />
       <section>
         <div className="mb-3"><p className="text-[10px] font-black uppercase tracking-[0.16em] text-[#24c1c4]">Reading history</p><h2 className="mt-1 text-xl font-black text-[#0b2d54]">Your measurements</h2><p className="mt-1 text-sm leading-6 text-slate-500">Period average, latest reading and change from last period.</p></div>
@@ -3093,7 +3051,7 @@ function HealthReportInsights({
       </section>
 
       {(symptomCount > 0 || lowMood.total > 0 || association !== null || repeated.some((item) => item.count > 1) || symptomAnalytics.repeatedTriggers.length > 0 || symptomAnalytics.medicationEffects > 0 || symptomAnalytics.averageSeverityRank !== null || symptomAnalytics.worseningCount > 0 || symptomAnalytics.severeCount > 0) && (
-        <section id="report-patterns" className="rounded-2xl border border-[#dcebed] bg-white p-4 sm:p-5" aria-label="Health patterns">
+        <section className="rounded-2xl border border-[#dcebed] bg-white p-4 sm:p-5" aria-label="Health patterns">
           <p className="text-[10px] font-black uppercase tracking-[0.16em] text-[#0b7b80]">Patterns</p>
           <h2 className="mt-1 text-lg font-black text-[#0b2d54]">Patterns across your logs</h2>
           <div className="mt-3 divide-y divide-slate-100">
@@ -3559,7 +3517,7 @@ export default function HealthReportPage() {
   const title = useMemo(() => kind === "weekly" ? "Weekly Health Insights" : kind === "monthly" ? "Monthly Health Insights" : "Health Insights", [kind]);
 
   if (loading) {
-    return <ProtectedRoute><main className="min-h-screen bg-[#c3d9d7] p-5"><div className="mx-auto max-w-6xl space-y-4"><div className="h-44 animate-pulse rounded-[30px] bg-white" /><div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">{[1, 2, 3, 4].map((value) => <div key={value} className="h-32 animate-pulse rounded-2xl bg-white" />)}</div><div className="h-72 animate-pulse rounded-[28px] bg-white" /></div></main></ProtectedRoute>;
+    return <ProtectedRoute><main className="min-h-screen bg-[#f5f8fb] p-5"><div className="mx-auto max-w-6xl space-y-4"><div className="h-44 animate-pulse rounded-[30px] bg-white" /><div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">{[1, 2, 3, 4].map((value) => <div key={value} className="h-32 animate-pulse rounded-2xl bg-white" />)}</div><div className="h-72 animate-pulse rounded-[28px] bg-white" /></div></main></ProtectedRoute>;
   }
 
   if (error || !report) {
@@ -3568,14 +3526,14 @@ export default function HealthReportPage() {
 
   return (
     <ProtectedRoute>
-      <main className="min-h-screen bg-[#c3d9d7] px-2 pb-8 text-slate-800 sm:px-4">
-        <div className="mx-auto my-4 max-w-[1500px] overflow-hidden rounded-[30px] border border-white/80 bg-white px-4 py-5 shadow-[0_30px_80px_-38px_rgba(11,45,84,0.28)] sm:my-7 sm:px-7 sm:py-7 lg:px-9">
+      <main className="min-h-screen bg-[#f5f8fb] pb-10 text-slate-800">
+        <div className="mx-auto max-w-6xl px-4 py-6 sm:px-6 sm:py-8">
           <Link href="/notifications" className="inline-flex min-h-10 items-center gap-2 rounded-xl px-2 text-sm font-semibold text-[#0b2d54] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#24c1c4]"><ArrowLeft className="h-4 w-4" />Back to notifications</Link>
 
-          <section className="mt-4 overflow-hidden rounded-[24px] border border-[#dcebed] border-l-4 border-l-[#24c1c4] bg-white p-5 text-[#0b2d54] shadow-sm sm:p-7">
+          <section className="mt-4 overflow-hidden rounded-[28px] bg-gradient-to-br from-[#0b2d54] via-[#0b3e60] to-[#0f5a62] p-5 text-white shadow-[0_18px_55px_-30px_rgba(11,45,84,0.55)] sm:p-7">
             <div className="flex flex-col gap-5 sm:flex-row sm:items-center sm:justify-between">
-              <div><div className="flex items-center gap-2 text-[10px] font-black uppercase tracking-[0.18em] text-[#0b7b80]"><ShieldCheck className="h-4 w-4" />Sympto · Health intelligence</div><h1 className="mt-3 text-3xl font-black tracking-tight sm:text-4xl">{title}</h1><p className="mt-2 text-sm leading-6 text-slate-500">{report.period.label}</p><p className="mt-3 text-sm leading-5 text-slate-500">Your health, at a glance.</p></div>
-              <div className="flex shrink-0 flex-wrap items-center gap-3 rounded-2xl border border-[#dcebed] bg-[#f5fafb] p-3 sm:gap-4 sm:p-4">
+              <div><div className="flex items-center gap-2 text-[10px] font-black uppercase tracking-[0.18em] text-[#24c1c4]"><ShieldCheck className="h-4 w-4" />Sympto · Health intelligence</div><h1 className="mt-3 text-3xl font-black tracking-tight sm:text-4xl">{title}</h1><p className="mt-2 text-sm leading-6 text-white/75">{report.period.label}</p><p className="mt-3 text-sm leading-5 text-white/80">Your health, at a glance.</p></div>
+              <div className="flex shrink-0 flex-wrap items-center gap-3 rounded-2xl border border-white/15 bg-white/10 p-3 sm:gap-4 sm:p-4">
                 <ScoreRing
                   percent={Math.round(recordedDays(report).size / periodDays(report) * 100)}
                   label="Logging consistency"
@@ -3583,13 +3541,13 @@ export default function HealthReportPage() {
                   size={68}
                 />
                 <div>
-                  <p className="text-[10px] font-bold uppercase tracking-wide text-slate-400">Logging consistency</p>
-                  <p className="mt-1 text-base font-black text-[#0b2d54]">{recordedDays(report).size}/{periodDays(report)} days logged</p>
-                  <p className="mt-1 flex items-center gap-1.5 text-[11px] text-slate-500"><CalendarDays className="h-3.5 w-3.5 text-[#24c1c4]" />{report.type === "WEEKLY" ? "7-day report" : "Monthly report"}</p>
+                  <p className="text-[10px] font-bold uppercase tracking-wide text-white/60">Logging consistency</p>
+                  <p className="mt-1 text-base font-black text-white">{recordedDays(report).size}/{periodDays(report)} days logged</p>
+                  <p className="mt-1 flex items-center gap-1.5 text-[11px] text-white/70"><CalendarDays className="h-3.5 w-3.5 text-[#24c1c4]" />{report.type === "WEEKLY" ? "7-day report" : "Monthly report"}</p>
                 </div>
               </div>
             </div>
-            <div className="mt-6 flex flex-wrap items-center gap-2"><span className="rounded-full border border-[#dcebed] bg-[#f5fafb] px-3 py-1.5 text-xs font-bold text-slate-600">Generated {dateLabel(report.generatedAt)}</span><span className="rounded-full border border-[#dcebed] bg-[#f5fafb] px-3 py-1.5 text-xs font-bold text-slate-600">{previousLoading ? "Comparing with prior period…" : previousReport ? "Compared with previous period" : previousFailed ? "Prior-period data unavailable" : "Current-period insights"}</span></div>
+            <div className="mt-6 flex flex-wrap items-center gap-2"><span className="rounded-full bg-white/10 px-3 py-1.5 text-xs font-bold">Generated {dateLabel(report.generatedAt)}</span><span className="rounded-full bg-white/10 px-3 py-1.5 text-xs font-bold">{previousLoading ? "Comparing with prior period…" : previousReport ? "Compared with previous period" : previousFailed ? "Prior-period data unavailable" : "Current-period insights"}</span></div>
           </section>
 
           <ReportDataCoverage report={report} />
