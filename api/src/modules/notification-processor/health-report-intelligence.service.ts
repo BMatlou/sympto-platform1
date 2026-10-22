@@ -1569,7 +1569,6 @@ export class HealthReportIntelligenceService {
 
     // Compare symptom severity with the latest dated follow-up, retaining symptom-level identity.
     const severityName = (rank: number) => Object.keys(SEVERITY_RANK).find((name) => SEVERITY_RANK[name] === rank) ?? 'UNKNOWN';
-    const symptomRows = rows(activity.symptoms);
     for (const symptom of symptomRows) {
       const title = stringValue(symptom.title) ??
         rows(symptom.symptoms).map((entry) => stringValue(row(entry.symptom).name ?? entry.name)).filter(Boolean).join(', ') ??
