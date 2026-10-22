@@ -3034,7 +3034,7 @@ function HealthReportInsights({
                   </div>
                   {item.originalValue !== undefined && item.originalUnit && <p className="mt-2 text-[10px] text-slate-500">Source: {formatNumber(item.originalValue, 1)} {item.originalUnit}</p>}
                   <p className="mt-3 flex-1 text-xs leading-5 text-slate-700">{guidance}</p>
-                  <Link href="/today" className="mt-3 inline-flex min-h-9 items-center gap-1.5 self-start rounded-lg px-2 text-[11px] font-bold text-[#0b2d54] hover:bg-white/80 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#24c1c4]">Review reading <ArrowRight className="h-3.5 w-3.5 text-[#0b7b80]" /></Link>
+                  <p className="mt-3 text-[11px] font-semibold text-slate-500">Source reading flagged for review in this report.</p>
                 </article>
               );
             })}
@@ -3080,7 +3080,7 @@ function HealthReportInsights({
                   <p className="mt-1 text-xs leading-5 text-slate-600">{lowMood.low} of {lowMood.total} mood check-ins ({Math.round(lowMood.low / lowMood.total * 100)}%) were marked low or very low.</p>
                 {lowMood.low > 0 && <p className="mt-1 text-xs leading-5 text-slate-500">If low mood continues or feels difficult to manage, consider reaching out to someone you trust or a health professional.</p>}
                 </div>
-                <Link href="/today" className="text-xs font-bold text-[#0b7b80]">Open check-in <ArrowRight className="ml-1 inline h-3 w-3" /></Link>
+                <span className="text-xs font-semibold text-slate-500">Based on saved check-ins</span>
               </div>
             )}
             {association && (
@@ -3122,7 +3122,7 @@ function HealthReportInsights({
         </section>
       )}
 
-      {noAnalysisData && <section className="rounded-2xl border border-dashed border-slate-300 bg-white p-6"><div className="flex items-start gap-3"><Info className="mt-0.5 h-5 w-5 shrink-0 text-[#24c1c4]" /><div><h2 className="font-bold text-[#0b2d54]">More records are needed to uncover patterns</h2><p className="mt-1 text-sm leading-6 text-slate-500">As you record Health Vitals, daily check-ins, symptoms or connected-device sessions, future reports can compare these values across periods. This report intentionally avoids repeating individual journal entries.</p><Link href="/today" className="mt-4 inline-flex min-h-10 items-center gap-2 rounded-xl bg-[#0b2d54] px-4 py-2 text-xs font-bold text-white">Record today’s health <ArrowRight className="h-4 w-4" /></Link></div></div></section>}
+      {noAnalysisData && <section className="rounded-2xl border border-dashed border-slate-300 bg-white p-6"><div className="flex items-start gap-3"><Info className="mt-0.5 h-5 w-5 shrink-0 text-[#24c1c4]" /><div><h2 className="font-bold text-[#0b2d54]">More records are needed to uncover patterns</h2><p className="mt-1 text-sm leading-6 text-slate-500">As you record Health Vitals, daily check-ins, symptoms or connected-device sessions, future reports can compare these values across periods. This report intentionally avoids repeating individual journal entries.</p><p className="mt-4 text-xs leading-5 text-slate-500">This report will analyse new entries when they are saved; missing values are not treated as zero.</p></div></div></section>}
 
       <CompleteReportData report={report} />
 
