@@ -255,10 +255,18 @@ function normalizeUnitValue(metric: string, value: number, originalUnit: unknown
     result = value / 18.0182;
   } else if (metric.startsWith('cholesterol.') && /(mg\/dl|mg per dl|mgdl)/.test(unit)) {
     result = value / 38.67;
+  } else if (metric === 'height' && !/cm|centimeter/.test(unit) && /(^m$|metre|meter)/.test(unit)) {
+    result = value * 100;
+  } else if (metric === 'sleep.duration' && /second|seconds|^s$/.test(unit)) {
+    result = value / 3600;
   } else if (metric === 'sleep.duration' && /minute|min$|minutes/.test(unit)) {
     result = value / 60;
   } else if (metric === 'exercise.duration' && /second|seconds|^s$/.test(unit)) {
     result = value / 60;
+  } else if (metric === 'exercise.duration' && /hour|hours|^h$/.test(unit)) {
+    result = value * 60;
+  } else if (metric === 'hydration.volume' && /^(l|liter|litre|liters|litres)$/.test(unit)) {
+    result = value * 1000;
   } else if (expected && rawUnit && !unitsCompatible(metric, unit)) {
     flags.push('UNIT_REQUIRES_REVIEW');
   } else if (!rawUnit && expected) {
