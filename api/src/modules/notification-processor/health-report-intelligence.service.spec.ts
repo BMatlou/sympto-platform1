@@ -660,4 +660,55 @@ describe('HealthReportIntelligenceService', () => {
     expect(finding?.evidence.length).toBeGreaterThanOrEqual(2);
   });
 
+
+  it('connects saved medication indications, reported medicine effects and allergy mentions without claiming causation', () => {
+    const base = fixture();
+    const report = fixture({
+      currentSnapshot: {
+        ...base.currentSnapshot,
+        conditions: [{ id: 'condition-diabetes', name: 'Diabetes', status: 'ACTIVE' }],
+        medications: [{
+          id: 'patient-med-metformin',
+          status: 'ACTIVE',
+          ongoing: true,
+          indication: 'Type 2 diabetes management',
+          medication: { name: 'Metformin', genericName: 'Metformin' },
+        }],
+        allergies: [{
+          id: 'patient-allergy-penicillin',
+          status: 'ACTIVE',
+          allergy: { name: 'Penicillin' },
+        }],
+      },
+      activity: {
+        ...base.activity,
+        symptoms: [{
+          id: 'symptom-rash-nausea',
+          title: 'Rash and nausea',
+          startedAt: '2026-10-14T08:00:00.000Z',
+          overallSeverity: 'MILD',
+          triggers: [{ trigger: 'Possible Penicillin exposure' }],
+          medicationEffects: [{
+            id: 'effect-metformin-1',
+            reportedMedicationName: 'Metformin',
+            sideEffects: 'Nausea reported after dose',
+          }],
+        }],
+      },
+    });
+
+    const result = service.analyze(report, 'patient-1');
+    const indication = result.findings.find((item) => item.key === 'medication-indication:patient-med-metformin');
+    const medicineEffect = result.findings.find((item) => item.key === 'medication-effect:metformin');
+    const allergy = result.findings.find((item) => item.key === 'allergy-context:penicillin');
+
+    expect(indication).toBeDefined();
+    expect(indication?.personalContext).toContain('Diabetes');
+    expect(medicineEffect).toBeDefined();
+    expect(medicineEffect?.pattern).toContain('Nausea reported after dose');
+    expect(medicineEffect?.whyItMatters).toContain('do not establish that the medicine caused');
+    expect(allergy).toBeDefined();
+    expect(allergy?.whyItMatters).toContain('cannot verify an allergic reaction or its cause');
+  });
+
 });
