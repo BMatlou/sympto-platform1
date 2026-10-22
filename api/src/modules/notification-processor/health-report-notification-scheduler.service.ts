@@ -856,6 +856,922 @@ export class HealthReportNotificationSchedulerService
       ORDER BY "occurredAt" ASC
     `;
 
+    // Read the immediately preceding matched-length window for longitudinal analysis.
+    // These source rows are kept out of the visible period ledger and are passed only
+    // to the read-only intelligence pipeline, so prior activity is not double-counted
+    // in the selected report's totals or record browser.
+    const periodDurationMs = Math.max(1, period.end.getTime() - period.start.getTime());
+    const historyStart = new Date(period.start.getTime() - periodDurationMs);
+    const [
+      historyJournalEntries,
+      historySymptoms,
+      historyDeviceMeasurements,
+      historyWellnessMetrics,
+      historySleepSessions,
+      historyWorkouts,
+      historyClinicalVitals,
+      historyLabResults,
+      historyGoalMetricEvents,
+    ] = await Promise.all([
+      this.prisma.healthJournal.findMany({
+        where: { patientId, OR: [
+          { createdAt: { gte: historyStart, lt: period.start } },
+          { updatedAt: { gte: historyStart, lt: period.start } },
+        ] },
+        orderBy: [{ createdAt: 'asc' }, { updatedAt: 'asc' }],
+        include: { practitioner: { include: { person: true } }, encounter: true },
+      }),
+      this.prisma.symptomLog.findMany({
+        where: { clinicalEpisode: { patientId }, OR: [
+          { startedAt: { gte: historyStart, lt: period.start } },
+          { createdAt: { gte: historyStart, lt: period.start } },
+          { updatedAt: { gte: historyStart, lt: period.start } },
+          { observations: { some: { createdAt: { gte: historyStart, lt: period.start } } } },
+          { monitorings: { some: { observedAt: { gte: historyStart, lt: period.start } } },
+        ] },
+        orderBy: { startedAt: 'asc' },
+        include: {
+          clinicalEpisode: { include: { practitioner: { include: { person: true } } } },
+          symptoms: { include: { symptom: true } },
+          triggers: true,
+          observations: true,
+          monitorings: true,
+          attachments: { include: { attachment: true } },
+          medicationEffects: { include: { medication: true } },
+        },
+      }),
+      this.prisma.deviceMeasurement.findMany({
+        where: { device: { patientId }, OR: [
+          { measuredAt: { gte: historyStart, lt: period.start } },
+          { receivedAt: { gte: historyStart, lt: period.start } },
+        ] },
+        orderBy: { measuredAt: 'asc' },
+        include: {
+          device: { select: { manufacturer: true, model: true, deviceType: true } },
+          deviceAlerts: true,
+        },
+      }),
+      this.prisma.wearableWellnessMetric.findMany({
+        where: { patientId, OR: [
+          { measuredAt: { gte: historyStart, lt: period.start } },
+          { createdAt: { gte: historyStart, lt: period.start } },
+        ] },
+        orderBy: { measuredAt: 'asc' },
+      }),
+      this.prisma.sleepSession.findMany({
+        where: { patientId, OR: [
+          { startedAt: { gte: historyStart, lt: period.start } },
+          { endedAt: { gte: historyStart, lt: period.start } },
+          { AND: [{ startedAt: { lt: historyStart } }, { endedAt: { gte: historyStart } }] },
+          { createdAt: { gte: historyStart, lt: period.start } },
+          { updatedAt: { gte: historyStart, lt: period.start } },
+        ] },
+        orderBy: { startedAt: 'asc' },
+        include: { stages: { orderBy: { startedAt: 'asc' } } },
+      }),
+      this.prisma.workoutSession.findMany({
+        where: { patientId, OR: [
+          { startedAt: { gte: historyStart, lt: period.start } },
+          { endedAt: { gte: historyStart, lt: period.start } },
+          { AND: [{ startedAt: { lt: historyStart } }, { endedAt: { gte: historyStart } }] },
+          { createdAt: { gte: historyStart, lt: period.start } },
+          { updatedAt: { gte: historyStart, lt: period.start } },
+        ] },
+        orderBy: { startedAt: 'asc' },
+      }),
+      this.prisma.clinicalVital.findMany({
+        where: { encounter: { medicalRecord: { patientId } }, OR: [
+          { measuredAt: { gte: historyStart, lt: period.start } },
+          { encounter: { startedAt: { gte: historyStart, lt: period.start } } },
+        ] },
+        orderBy: { measuredAt: 'asc' },
+        include: { vitalType: true, encounter: { select: { startedAt: true } } },
+      }),
+      this.prisma.labResult.findMany({
+        where: {
+          OR: [
+            { reportedAt: { gte: historyStart, lt: period.start } },
+            { releasedAt: { gte: historyStart, lt: period.start } },
+            { createdAt: { gte: historyStart, lt: period.start } },
+          ],
+          orderItem: { order: { patientId } },
+        },
+        orderBy: { reportedAt: 'asc' },
+        include: {
+          orderItem: {
+            include: {
+              test: { include: { unit: true } },
+              order: {
+                include: {
+                  laboratory: true,
+                  practitioner: { include: { person: true } },
+                },
+              },
+            },
+          },
+          items: { include: { test: { include: { unit: true } } } },
+          specimen: true,
+          criticalResults: true,
+        },
+      }),
+      this.prisma.$queryRaw<Array<{
+        unit: string | null;
+        metricType: string;
+        metricKey: string;
+        loggedValue: unknown;
+        occurredAt: Date;
+        source: string;
+        sourceId: string | null;
+        metadata: unknown;
+      }>>`
+        SELECT
+          goal."unit" AS "unit",
+          e."metricType" AS "metricType",
+          e."metricKey" AS "metricKey",
+          e."loggedValue" AS "loggedValue",
+          CASE
+            WHEN e."source" = 'patient-smoking-log'
+              AND e."sourceId" ~ '^[0-9a-fA-F-]{36}:[0-9]{4}-[0-9]{2}-[0-9]{2}      ? {
+          person: {
+            firstName: currentRecord.person.firstName,
+            preferredName: currentRecord.person.preferredName,
+            dateOfBirth: currentRecord.person.dateOfBirth,
+            gender: currentRecord.person.gender,
+          },
+          profile: {
+            heightCm: currentRecord.heightCm,
+            weightKg: currentRecord.weightKg,
+            smokingStatus: currentRecord.smokingStatus,
+            alcoholConsumption: currentRecord.alcoholConsumption,
+            exerciseFrequency: currentRecord.exerciseFrequency,
+            occupation: currentRecord.occupation,
+          },
+          baseline: currentRecord.baseline,
+          medicalRecord: currentRecord.medicalRecord,
+          bloodType: currentRecord.healthPassport?.bloodType ?? null,
+          rhesusFactor: currentRecord.healthPassport?.rhesusFactor ?? null,
+          riskAssessments: currentRecord.riskAssessments ?? [],
+          conditions: currentRecord.healthPassport?.conditions ?? [],
+          diagnoses: currentRecord.healthPassport?.patientDiagnoses ?? [],
+          allergies: currentRecord.healthPassport?.allergies ?? [],
+          medications: currentRecord.healthPassport?.medications ?? [],
+          immunizations: currentRecord.healthPassport?.immunizations ?? [],
+          activeGoals: currentRecord.healthGoals ?? [],
+        }
+      : {
+          person: null,
+          profile: null,
+          baseline: null,
+          medicalRecord: null,
+          bloodType: null,
+          rhesusFactor: null,
+          riskAssessments: [],
+          conditions: [],
+          diagnoses: [],
+          allergies: [],
+          medications: [],
+          immunizations: [],
+          activeGoals: [],
+        };
+
+    const reportPayload = {
+      longitudinal: {
+        period: { start: historyStart, end: period.start },
+        activity: {
+          journalEntries: historyJournalEntries,
+          symptoms: historySymptoms.map((item) => ({
+            ...item,
+            source: item.clinicalEpisode?.practitionerId ? 'CLINICAL' : 'PATIENT',
+          })),
+          deviceMeasurements: historyDeviceMeasurements,
+          wellnessMetrics: historyWellnessMetrics,
+          sleepSessions: historySleepSessions,
+          workouts: historyWorkouts,
+        },
+        clinical: {
+          vitals: historyClinicalVitals,
+          labResults: historyLabResults,
+        },
+        goalMetricEvents: historyGoalMetricEvents.map((event) => ({
+          ...event,
+          loggedValue: Number(event.loggedValue),
+          occurredAt: event.occurredAt,
+        })),
+      },
+      type: kind,
+      period: {
+        start: period.start,
+        end: period.end,
+        label: period.label,
+        scheduledFor: period.scheduledFor,
+      },
+      activity: {
+        journalEntries: healthJournalEntries,
+        symptoms: symptomLogs.map((item) => ({
+          ...item,
+          source: item.clinicalEpisode?.practitionerId ? 'CLINICAL' : 'PATIENT',
+        })),
+        clinicalEpisodes,
+        appointments,
+        patientVitals: patientVitals.map((entry) => ({
+          id: entry.id,
+          // The manual-vitals writer reuses one journal row and stores the
+          // measurement time in updatedAt for this dedicated title only.
+          recordedAt: /today.s measurements/i.test(String(entry.title ?? ''))
+            ? entry.updatedAt
+            : entry.createdAt,
+          source: entry.practitionerId ? 'CLINICAL' : 'PATIENT',
+          temperature: entry.temperature,
+          bloodPressureSystolic: entry.bloodPressureSystolic,
+          bloodPressureDiastolic: entry.bloodPressureDiastolic,
+          heartRate: entry.heartRate,
+          oxygenSaturation: entry.oxygenSaturation,
+          respiratoryRate: entry.respiratoryRate,
+          weightKg: entry.weightKg,
+        })),
+        deviceMeasurements,
+        wellnessMetrics,
+        sleepSessions,
+        workouts,
+      },
+      clinical: {
+        encounters,
+        diagnoses,
+        prescriptions,
+        notes: clinicalNotes,
+        vitals: clinicalVitals,
+        labResults,
+        imaging,
+        procedures,
+        carePlans,
+        referrals,
+      },
+      currentSnapshot,
+      goalMetricEvents: goalMetricEvents.map((event) => ({
+        ...event,
+        targetValue: event.targetValue == null ? null : Number(event.targetValue),
+        loggedValue: Number(event.loggedValue),
+        goalAssociations: Array.isArray(event.goalAssociations) ? event.goalAssociations : [],
+        occurredAt: event.occurredAt,
+      })),
+      tracking: {
+        goalProgress: goalProgressEntries,
+        goalHistory: goalHistoryEntries,
+        riskAssessments: periodRiskAssessments,
+        healthPassportChanges: {
+          conditions: periodConditions,
+          allergies: periodAllergies,
+          medications: periodMedications,
+          immunizations: periodImmunizations,
+        },
+      },
+      generatedAt: new Date(),
+    };
+
+    // Additive, read-only intelligence. Medication analysis is isolated so an
+    // incomplete/legacy medicine schedule cannot make the health report unavailable.
+    let medicationAdherence: MedicationReportAdherenceSummary | null = null;
+    try {
+      medicationAdherence = await this.medicationInsight.buildReportAdherence(
+        patientId,
+        period.start,
+        period.end,
+      );
+    } catch (error) {
+      this.logger.warn(
+        'Medication adherence analysis is unavailable for this report period: ' +
+          (error instanceof Error ? error.message : String(error)),
+      );
+    }
+
+    const intelligence = this.reportIntelligence.analyze(reportPayload, patientId);
+    delete (reportPayload as Record<string, unknown>).longitudinal;
+    return {
+      ...reportPayload,
+      intelligence: {
+        ...intelligence,
+        ...(medicationAdherence ? { medicationAdherence } : {}),
+      },
+    };
+  }
+
+  private async buildSummary(
+    patientId: string,
+    kind: ReportKind,
+    period: Period,
+  ) {
+    const [
+      journalEntries,
+      symptomLogs,
+      appointments,
+      measurements,
+      sleepSessions,
+      workouts,
+      activeMedications,
+      activeGoals,
+    ] = await this.prisma.$transaction([
+      this.prisma.healthJournal.count({
+        where: {
+          patientId,
+          createdAt: { gte: period.start, lt: period.end },
+        },
+      }),
+      this.prisma.symptomLog.count({
+        where: {
+          clinicalEpisode: { patientId },
+          startedAt: { gte: period.start, lt: period.end },
+        },
+      }),
+      this.prisma.appointment.count({
+        where: {
+          patientId,
+          scheduledStart: { gte: period.start, lt: period.end },
+          status: { notIn: ['CANCELLED', 'NO_SHOW'] as const },
+        },
+      }),
+      this.prisma.deviceMeasurement.count({
+        where: {
+          device: { patientId },
+          measuredAt: { gte: period.start, lt: period.end },
+        },
+      }),
+      this.prisma.sleepSession.count({
+        where: {
+          patientId,
+          startedAt: { gte: period.start, lt: period.end },
+        },
+      }),
+      this.prisma.workoutSession.count({
+        where: {
+          patientId,
+          startedAt: { gte: period.start, lt: period.end },
+        },
+      }),
+      this.prisma.patientMedication.count({
+        where: {
+          healthPassport: { patientId },
+          status: 'ACTIVE' as any,
+        },
+      }),
+      this.prisma.healthGoal.count({
+        where: {
+          patientId,
+          status: 'ACTIVE' as any,
+        },
+      }),
+    ]);
+
+    const activity = `${journalEntries} journal ${journalEntries === 1 ? 'entry' : 'entries'}, ${symptomLogs} symptom ${symptomLogs === 1 ? 'record' : 'records'}, ${appointments} appointment${appointments === 1 ? '' : 's'}, and ${measurements} health measurement${measurements === 1 ? '' : 's'}`;
+
+    const connectedData =
+      `${sleepSessions} sleep record${sleepSessions === 1 ? '' : 's'}, ${workouts} workout${workouts === 1 ? '' : 's'}, ${activeMedications} active medication${activeMedications === 1 ? '' : 's'}, and ${activeGoals} active health goal${activeGoals === 1 ? '' : 's'}`;
+
+    return kind === 'WEEKLY'
+      ? `This week you recorded ${activity}; ${connectedData} are also available in your health record.`
+      : `This month you recorded ${activity}; ${connectedData} are also available in your health record.`;
+  }
+
+  private withJhbTime(
+    year: number,
+    month: number,
+    day: number,
+    hour: number,
+  ) {
+    const monthText = String(month).padStart(2, '0');
+    const dayText = String(day).padStart(2, '0');
+    const hourText = String(hour).padStart(2, '0');
+
+    return new Date(
+      `${year}-${monthText}-${dayText}T${hourText}:00:00+02:00`,
+    );
+  }
+
+  private formatDay(date: Date) {
+    return date.toLocaleDateString('en-ZA', {
+      day: 'numeric',
+      month: 'short',
+    });
+  }
+}
+
+            THEN (split_part(e."sourceId", ':', 2)::date + TIME '12:00:00') AT TIME ZONE 'Africa/Johannesburg'
+            ELSE e."occurredAt"
+          END AS "occurredAt",
+          e."source" AS "source",
+          e."sourceId" AS "sourceId",
+          e."metadata" AS "metadata"
+        FROM "HealthGoalMetricEvent" e
+        LEFT JOIN LATERAL (
+          SELECT hg."unit" AS "unit"
+          FROM "HealthGoalMetricConfig" hgm
+          INNER JOIN "HealthGoal" hg ON hg."id" = hgm."healthGoalId"
+          WHERE hg."patientId" = e."patientId"
+            AND UPPER(hgm."metricType") = UPPER(e."metricType")
+            AND hgm."metricKey" = e."metricKey"
+          ORDER BY
+            CASE
+              WHEN UPPER(hg."status"::text) = 'ACTIVE' THEN 0
+              WHEN UPPER(hg."status"::text) = 'ON_HOLD' THEN 1
+              ELSE 2
+            END,
+            hg."updatedAt" DESC
+          LIMIT 1
+        ) goal ON TRUE
+        WHERE e."patientId" = ${patientId}
+          AND (
+            CASE
+              WHEN e."source" = 'patient-smoking-log'
+                AND e."sourceId" ~ '^[0-9a-fA-F-]{36}:[0-9]{4}-[0-9]{2}-[0-9]{2}      ? {
+          person: {
+            firstName: currentRecord.person.firstName,
+            preferredName: currentRecord.person.preferredName,
+            dateOfBirth: currentRecord.person.dateOfBirth,
+            gender: currentRecord.person.gender,
+          },
+          profile: {
+            heightCm: currentRecord.heightCm,
+            weightKg: currentRecord.weightKg,
+            smokingStatus: currentRecord.smokingStatus,
+            alcoholConsumption: currentRecord.alcoholConsumption,
+            exerciseFrequency: currentRecord.exerciseFrequency,
+            occupation: currentRecord.occupation,
+          },
+          baseline: currentRecord.baseline,
+          medicalRecord: currentRecord.medicalRecord,
+          bloodType: currentRecord.healthPassport?.bloodType ?? null,
+          rhesusFactor: currentRecord.healthPassport?.rhesusFactor ?? null,
+          riskAssessments: currentRecord.riskAssessments ?? [],
+          conditions: currentRecord.healthPassport?.conditions ?? [],
+          diagnoses: currentRecord.healthPassport?.patientDiagnoses ?? [],
+          allergies: currentRecord.healthPassport?.allergies ?? [],
+          medications: currentRecord.healthPassport?.medications ?? [],
+          immunizations: currentRecord.healthPassport?.immunizations ?? [],
+          activeGoals: currentRecord.healthGoals ?? [],
+        }
+      : {
+          person: null,
+          profile: null,
+          baseline: null,
+          medicalRecord: null,
+          bloodType: null,
+          rhesusFactor: null,
+          riskAssessments: [],
+          conditions: [],
+          diagnoses: [],
+          allergies: [],
+          medications: [],
+          immunizations: [],
+          activeGoals: [],
+        };
+
+    const reportPayload = {
+      type: kind,
+      period: {
+        start: period.start,
+        end: period.end,
+        label: period.label,
+        scheduledFor: period.scheduledFor,
+      },
+      activity: {
+        journalEntries: healthJournalEntries,
+        symptoms: symptomLogs.map((item) => ({
+          ...item,
+          source: item.clinicalEpisode?.practitionerId ? 'CLINICAL' : 'PATIENT',
+        })),
+        clinicalEpisodes,
+        appointments,
+        patientVitals: patientVitals.map((entry) => ({
+          id: entry.id,
+          // The manual-vitals writer reuses one journal row and stores the
+          // measurement time in updatedAt for this dedicated title only.
+          recordedAt: /today.s measurements/i.test(String(entry.title ?? ''))
+            ? entry.updatedAt
+            : entry.createdAt,
+          source: entry.practitionerId ? 'CLINICAL' : 'PATIENT',
+          temperature: entry.temperature,
+          bloodPressureSystolic: entry.bloodPressureSystolic,
+          bloodPressureDiastolic: entry.bloodPressureDiastolic,
+          heartRate: entry.heartRate,
+          oxygenSaturation: entry.oxygenSaturation,
+          respiratoryRate: entry.respiratoryRate,
+          weightKg: entry.weightKg,
+        })),
+        deviceMeasurements,
+        wellnessMetrics,
+        sleepSessions,
+        workouts,
+      },
+      clinical: {
+        encounters,
+        diagnoses,
+        prescriptions,
+        notes: clinicalNotes,
+        vitals: clinicalVitals,
+        labResults,
+        imaging,
+        procedures,
+        carePlans,
+        referrals,
+      },
+      currentSnapshot,
+      goalMetricEvents: goalMetricEvents.map((event) => ({
+        ...event,
+        targetValue: event.targetValue == null ? null : Number(event.targetValue),
+        loggedValue: Number(event.loggedValue),
+        goalAssociations: Array.isArray(event.goalAssociations) ? event.goalAssociations : [],
+        occurredAt: event.occurredAt,
+      })),
+      tracking: {
+        goalProgress: goalProgressEntries,
+        goalHistory: goalHistoryEntries,
+        riskAssessments: periodRiskAssessments,
+        healthPassportChanges: {
+          conditions: periodConditions,
+          allergies: periodAllergies,
+          medications: periodMedications,
+          immunizations: periodImmunizations,
+        },
+      },
+      generatedAt: new Date(),
+    };
+
+    // Additive, read-only intelligence. Medication analysis is isolated so an
+    // incomplete/legacy medicine schedule cannot make the health report unavailable.
+    let medicationAdherence: MedicationReportAdherenceSummary | null = null;
+    try {
+      medicationAdherence = await this.medicationInsight.buildReportAdherence(
+        patientId,
+        period.start,
+        period.end,
+      );
+    } catch (error) {
+      this.logger.warn(
+        'Medication adherence analysis is unavailable for this report period: ' +
+          (error instanceof Error ? error.message : String(error)),
+      );
+    }
+
+    return {
+      ...reportPayload,
+      intelligence: {
+        ...this.reportIntelligence.analyze(reportPayload, patientId),
+        ...(medicationAdherence ? { medicationAdherence } : {}),
+      },
+    };
+  }
+
+  private async buildSummary(
+    patientId: string,
+    kind: ReportKind,
+    period: Period,
+  ) {
+    const [
+      journalEntries,
+      symptomLogs,
+      appointments,
+      measurements,
+      sleepSessions,
+      workouts,
+      activeMedications,
+      activeGoals,
+    ] = await this.prisma.$transaction([
+      this.prisma.healthJournal.count({
+        where: {
+          patientId,
+          createdAt: { gte: period.start, lt: period.end },
+        },
+      }),
+      this.prisma.symptomLog.count({
+        where: {
+          clinicalEpisode: { patientId },
+          startedAt: { gte: period.start, lt: period.end },
+        },
+      }),
+      this.prisma.appointment.count({
+        where: {
+          patientId,
+          scheduledStart: { gte: period.start, lt: period.end },
+          status: { notIn: ['CANCELLED', 'NO_SHOW'] as const },
+        },
+      }),
+      this.prisma.deviceMeasurement.count({
+        where: {
+          device: { patientId },
+          measuredAt: { gte: period.start, lt: period.end },
+        },
+      }),
+      this.prisma.sleepSession.count({
+        where: {
+          patientId,
+          startedAt: { gte: period.start, lt: period.end },
+        },
+      }),
+      this.prisma.workoutSession.count({
+        where: {
+          patientId,
+          startedAt: { gte: period.start, lt: period.end },
+        },
+      }),
+      this.prisma.patientMedication.count({
+        where: {
+          healthPassport: { patientId },
+          status: 'ACTIVE' as any,
+        },
+      }),
+      this.prisma.healthGoal.count({
+        where: {
+          patientId,
+          status: 'ACTIVE' as any,
+        },
+      }),
+    ]);
+
+    const activity = `${journalEntries} journal ${journalEntries === 1 ? 'entry' : 'entries'}, ${symptomLogs} symptom ${symptomLogs === 1 ? 'record' : 'records'}, ${appointments} appointment${appointments === 1 ? '' : 's'}, and ${measurements} health measurement${measurements === 1 ? '' : 's'}`;
+
+    const connectedData =
+      `${sleepSessions} sleep record${sleepSessions === 1 ? '' : 's'}, ${workouts} workout${workouts === 1 ? '' : 's'}, ${activeMedications} active medication${activeMedications === 1 ? '' : 's'}, and ${activeGoals} active health goal${activeGoals === 1 ? '' : 's'}`;
+
+    return kind === 'WEEKLY'
+      ? `This week you recorded ${activity}; ${connectedData} are also available in your health record.`
+      : `This month you recorded ${activity}; ${connectedData} are also available in your health record.`;
+  }
+
+  private withJhbTime(
+    year: number,
+    month: number,
+    day: number,
+    hour: number,
+  ) {
+    const monthText = String(month).padStart(2, '0');
+    const dayText = String(day).padStart(2, '0');
+    const hourText = String(hour).padStart(2, '0');
+
+    return new Date(
+      `${year}-${monthText}-${dayText}T${hourText}:00:00+02:00`,
+    );
+  }
+
+  private formatDay(date: Date) {
+    return date.toLocaleDateString('en-ZA', {
+      day: 'numeric',
+      month: 'short',
+    });
+  }
+}
+
+              THEN (split_part(e."sourceId", ':', 2)::date + TIME '12:00:00') AT TIME ZONE 'Africa/Johannesburg'
+              ELSE e."occurredAt"
+            END
+          ) >= ${historyStart}
+          AND (
+            CASE
+              WHEN e."source" = 'patient-smoking-log'
+                AND e."sourceId" ~ '^[0-9a-fA-F-]{36}:[0-9]{4}-[0-9]{2}-[0-9]{2}      ? {
+          person: {
+            firstName: currentRecord.person.firstName,
+            preferredName: currentRecord.person.preferredName,
+            dateOfBirth: currentRecord.person.dateOfBirth,
+            gender: currentRecord.person.gender,
+          },
+          profile: {
+            heightCm: currentRecord.heightCm,
+            weightKg: currentRecord.weightKg,
+            smokingStatus: currentRecord.smokingStatus,
+            alcoholConsumption: currentRecord.alcoholConsumption,
+            exerciseFrequency: currentRecord.exerciseFrequency,
+            occupation: currentRecord.occupation,
+          },
+          baseline: currentRecord.baseline,
+          medicalRecord: currentRecord.medicalRecord,
+          bloodType: currentRecord.healthPassport?.bloodType ?? null,
+          rhesusFactor: currentRecord.healthPassport?.rhesusFactor ?? null,
+          riskAssessments: currentRecord.riskAssessments ?? [],
+          conditions: currentRecord.healthPassport?.conditions ?? [],
+          diagnoses: currentRecord.healthPassport?.patientDiagnoses ?? [],
+          allergies: currentRecord.healthPassport?.allergies ?? [],
+          medications: currentRecord.healthPassport?.medications ?? [],
+          immunizations: currentRecord.healthPassport?.immunizations ?? [],
+          activeGoals: currentRecord.healthGoals ?? [],
+        }
+      : {
+          person: null,
+          profile: null,
+          baseline: null,
+          medicalRecord: null,
+          bloodType: null,
+          rhesusFactor: null,
+          riskAssessments: [],
+          conditions: [],
+          diagnoses: [],
+          allergies: [],
+          medications: [],
+          immunizations: [],
+          activeGoals: [],
+        };
+
+    const reportPayload = {
+      type: kind,
+      period: {
+        start: period.start,
+        end: period.end,
+        label: period.label,
+        scheduledFor: period.scheduledFor,
+      },
+      activity: {
+        journalEntries: healthJournalEntries,
+        symptoms: symptomLogs.map((item) => ({
+          ...item,
+          source: item.clinicalEpisode?.practitionerId ? 'CLINICAL' : 'PATIENT',
+        })),
+        clinicalEpisodes,
+        appointments,
+        patientVitals: patientVitals.map((entry) => ({
+          id: entry.id,
+          // The manual-vitals writer reuses one journal row and stores the
+          // measurement time in updatedAt for this dedicated title only.
+          recordedAt: /today.s measurements/i.test(String(entry.title ?? ''))
+            ? entry.updatedAt
+            : entry.createdAt,
+          source: entry.practitionerId ? 'CLINICAL' : 'PATIENT',
+          temperature: entry.temperature,
+          bloodPressureSystolic: entry.bloodPressureSystolic,
+          bloodPressureDiastolic: entry.bloodPressureDiastolic,
+          heartRate: entry.heartRate,
+          oxygenSaturation: entry.oxygenSaturation,
+          respiratoryRate: entry.respiratoryRate,
+          weightKg: entry.weightKg,
+        })),
+        deviceMeasurements,
+        wellnessMetrics,
+        sleepSessions,
+        workouts,
+      },
+      clinical: {
+        encounters,
+        diagnoses,
+        prescriptions,
+        notes: clinicalNotes,
+        vitals: clinicalVitals,
+        labResults,
+        imaging,
+        procedures,
+        carePlans,
+        referrals,
+      },
+      currentSnapshot,
+      goalMetricEvents: goalMetricEvents.map((event) => ({
+        ...event,
+        targetValue: event.targetValue == null ? null : Number(event.targetValue),
+        loggedValue: Number(event.loggedValue),
+        goalAssociations: Array.isArray(event.goalAssociations) ? event.goalAssociations : [],
+        occurredAt: event.occurredAt,
+      })),
+      tracking: {
+        goalProgress: goalProgressEntries,
+        goalHistory: goalHistoryEntries,
+        riskAssessments: periodRiskAssessments,
+        healthPassportChanges: {
+          conditions: periodConditions,
+          allergies: periodAllergies,
+          medications: periodMedications,
+          immunizations: periodImmunizations,
+        },
+      },
+      generatedAt: new Date(),
+    };
+
+    // Additive, read-only intelligence. Medication analysis is isolated so an
+    // incomplete/legacy medicine schedule cannot make the health report unavailable.
+    let medicationAdherence: MedicationReportAdherenceSummary | null = null;
+    try {
+      medicationAdherence = await this.medicationInsight.buildReportAdherence(
+        patientId,
+        period.start,
+        period.end,
+      );
+    } catch (error) {
+      this.logger.warn(
+        'Medication adherence analysis is unavailable for this report period: ' +
+          (error instanceof Error ? error.message : String(error)),
+      );
+    }
+
+    return {
+      ...reportPayload,
+      intelligence: {
+        ...this.reportIntelligence.analyze(reportPayload, patientId),
+        ...(medicationAdherence ? { medicationAdherence } : {}),
+      },
+    };
+  }
+
+  private async buildSummary(
+    patientId: string,
+    kind: ReportKind,
+    period: Period,
+  ) {
+    const [
+      journalEntries,
+      symptomLogs,
+      appointments,
+      measurements,
+      sleepSessions,
+      workouts,
+      activeMedications,
+      activeGoals,
+    ] = await this.prisma.$transaction([
+      this.prisma.healthJournal.count({
+        where: {
+          patientId,
+          createdAt: { gte: period.start, lt: period.end },
+        },
+      }),
+      this.prisma.symptomLog.count({
+        where: {
+          clinicalEpisode: { patientId },
+          startedAt: { gte: period.start, lt: period.end },
+        },
+      }),
+      this.prisma.appointment.count({
+        where: {
+          patientId,
+          scheduledStart: { gte: period.start, lt: period.end },
+          status: { notIn: ['CANCELLED', 'NO_SHOW'] as const },
+        },
+      }),
+      this.prisma.deviceMeasurement.count({
+        where: {
+          device: { patientId },
+          measuredAt: { gte: period.start, lt: period.end },
+        },
+      }),
+      this.prisma.sleepSession.count({
+        where: {
+          patientId,
+          startedAt: { gte: period.start, lt: period.end },
+        },
+      }),
+      this.prisma.workoutSession.count({
+        where: {
+          patientId,
+          startedAt: { gte: period.start, lt: period.end },
+        },
+      }),
+      this.prisma.patientMedication.count({
+        where: {
+          healthPassport: { patientId },
+          status: 'ACTIVE' as any,
+        },
+      }),
+      this.prisma.healthGoal.count({
+        where: {
+          patientId,
+          status: 'ACTIVE' as any,
+        },
+      }),
+    ]);
+
+    const activity = `${journalEntries} journal ${journalEntries === 1 ? 'entry' : 'entries'}, ${symptomLogs} symptom ${symptomLogs === 1 ? 'record' : 'records'}, ${appointments} appointment${appointments === 1 ? '' : 's'}, and ${measurements} health measurement${measurements === 1 ? '' : 's'}`;
+
+    const connectedData =
+      `${sleepSessions} sleep record${sleepSessions === 1 ? '' : 's'}, ${workouts} workout${workouts === 1 ? '' : 's'}, ${activeMedications} active medication${activeMedications === 1 ? '' : 's'}, and ${activeGoals} active health goal${activeGoals === 1 ? '' : 's'}`;
+
+    return kind === 'WEEKLY'
+      ? `This week you recorded ${activity}; ${connectedData} are also available in your health record.`
+      : `This month you recorded ${activity}; ${connectedData} are also available in your health record.`;
+  }
+
+  private withJhbTime(
+    year: number,
+    month: number,
+    day: number,
+    hour: number,
+  ) {
+    const monthText = String(month).padStart(2, '0');
+    const dayText = String(day).padStart(2, '0');
+    const hourText = String(hour).padStart(2, '0');
+
+    return new Date(
+      `${year}-${monthText}-${dayText}T${hourText}:00:00+02:00`,
+    );
+  }
+
+  private formatDay(date: Date) {
+    return date.toLocaleDateString('en-ZA', {
+      day: 'numeric',
+      month: 'short',
+    });
+  }
+}
+
+              THEN (split_part(e."sourceId", ':', 2)::date + TIME '12:00:00') AT TIME ZONE 'Africa/Johannesburg'
+              ELSE e."occurredAt"
+            END
+          ) < ${period.start}
+        ORDER BY "occurredAt" ASC
+      `,
+    ]);
+
     const currentSnapshot = currentRecord
       ? {
           person: {
