@@ -375,6 +375,40 @@ type Report = {
       }>;
       policy: string;
     };
+    findings?: Array<{
+      key: string;
+      priority: "SAFETY" | "REVIEW" | "WATCH" | "INSIGHT";
+      title: string;
+      change: string;
+      pattern: string;
+      personalContext: string;
+      whyItMatters: string;
+      nextStep: string;
+      confidence: "HIGH" | "MODERATE" | "LIMITED";
+      evidence: string[];
+      sourceRecordIds: string[];
+    }>;
+    periodComparisons?: Array<{
+      key: string;
+      metric: string;
+      label: string;
+      unit: string;
+      previousAverage: number;
+      currentAverage: number;
+      change: number;
+      changePercent: number | null;
+      previousDays: number;
+      currentDays: number;
+      previousReadings: number;
+      currentReadings: number;
+      previousStart: string;
+      previousEnd: string;
+      currentStart: string;
+      currentEnd: string;
+      relatedGoals: string[];
+      relatedConditions: string[];
+      interpretation: string;
+    }>;
     coverage?: {
       sourceCounts?: Record<string, number>;
       observationCandidateCount?: number;
@@ -3372,6 +3406,94 @@ function ReportDataCoverage({ report }: { report: Report }) {
   </section>;
 }
 
+function NarrativeFindingsSummary({ report }: { report: Report }) {
+  const findings = report.intelligence?.findings ?? [];
+  const priorityLabel: Record<NonNullable<Report["intelligence"]>["findings"] extends Array<infer T> ? T extends { priority: infer P } ? P & string : never : never, string> = {
+    SAFETY: "Safety review",
+    REVIEW: "Verify",
+    WATCH: "Monitor",
+    INSIGHT: "Insight",
+  };
+  const priorityStyle: Record<string, string> = {
+    SAFETY: "border-rose-200 bg-rose-50 text-rose-800",
+    REVIEW: "border-amber-200 bg-amber-50 text-amber-800",
+    WATCH: "border-[#b9e4e2] bg-[#f0fbfa] text-[#0b5a62]",
+    INSIGHT: "border-slate-200 bg-slate-50 text-slate-600",
+  };
+  const confidenceLabel: Record<string, string> = {
+    HIGH: "Strongly dated evidence",
+    MODERATE: "Some timing uncertainty",
+    LIMITED: "Limited evidence",
+  };
+
+  return (
+    <section aria-label="Personalised health narrative" className="mt-5 rounded-2xl border border-[#dcebed] bg-white p-4 sm:p-6">
+      <div className="border-b border-slate-100 pb-4">
+        <p className="text-[10px] font-black uppercase tracking-[0.16em] text-[#0b7b80]">Your health story</p>
+        <h2 className="mt-1 text-xl font-black tracking-tight text-[#0b2d54]">What changed, what it may mean, and what deserves attention</h2>
+        <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-600">
+          Findings are prioritised from dated observations, reporting-period comparisons and your saved health context. Relationships are described as associations unless the records establish more; missing data is not treated as zero or proof of improvement.
+        </p>
+      </div>
+      {findings.length ? (
+        <div className="divide-y divide-slate-200">
+          {findings.map((finding) => (
+            <article key={finding.key} className="py-4 first:pt-4 last:pb-0">
+              <div className="flex flex-wrap items-start justify-between gap-2">
+                <h3 className="max-w-3xl text-base font-black leading-6 text-[#0b2d54]">{finding.title}</h3>
+                <span className={"shrink-0 rounded-full border px-2.5 py-1 text-[10px] font-extrabold " + (priorityStyle[finding.priority] ?? priorityStyle.INSIGHT)}>
+                  {priorityLabel[finding.priority] ?? "Finding"}
+                </span>
+              </div>
+              <p className="mt-2 text-sm font-semibold leading-6 text-[#0b5a62]">{finding.change}</p>
+              <div className="mt-3 grid gap-x-6 gap-y-3 md:grid-cols-2">
+                <div>
+                  <p className="text-[10px] font-black uppercase tracking-[0.12em] text-slate-400">Pattern detected</p>
+                  <p className="mt-1 text-sm leading-6 text-slate-700">{finding.pattern}</p>
+                </div>
+                <div>
+                  <p className="text-[10px] font-black uppercase tracking-[0.12em] text-slate-400">Your health context</p>
+                  <p className="mt-1 text-sm leading-6 text-slate-700">{finding.personalContext}</p>
+                </div>
+                <div>
+                  <p className="text-[10px] font-black uppercase tracking-[0.12em] text-slate-400">Why it matters</p>
+                  <p className="mt-1 text-sm leading-6 text-slate-700">{finding.whyItMatters}</p>
+                </div>
+                <div>
+                  <p className="text-[10px] font-black uppercase tracking-[0.12em] text-slate-400">What to do next</p>
+                  <p className="mt-1 text-sm leading-6 text-slate-700">{finding.nextStep}</p>
+                </div>
+              </div>
+              <div className="mt-3 flex flex-wrap items-center justify-between gap-2 border-t border-slate-100 pt-3">
+                <p className="text-[10px] font-semibold text-slate-400">{confidenceLabel[finding.confidence] ?? "Evidence reviewed"} · Evidence-linked, read-only interpretation</p>
+                {finding.evidence.length > 0 && (
+                  <details className="text-xs">
+                    <summary className="cursor-pointer font-bold text-[#0b5a62]">Inspect supporting evidence ({finding.evidence.length})</summary>
+                    <ul className="mt-2 list-disc space-y-1 pl-5 text-xs leading-5 text-slate-600">
+                      {finding.evidence.map((item, index) => <li key={finding.key + "-evidence-" + index}>{item}</li>)}
+                    </ul>
+                    {finding.sourceRecordIds.length > 0 && <p className="mt-2 break-words text-[10px] text-slate-400">Source record references: {finding.sourceRecordIds.join(", ")}</p>}
+                  </details>
+                )}
+              </div>
+            </article>
+          ))}
+        </div>
+      ) : (
+        <div className="py-5">
+          <p className="text-sm font-bold text-[#0b2d54]">No findings met the current evidence rules.</p>
+          <p className="mt-1 max-w-3xl text-sm leading-6 text-slate-600">
+            This does not mean your health is unchanged or that everything is well. There may be too few comparable dated readings, no meaningful change, or no sufficiently supported relationship. Continue using your care plan and keep relevant records up to date.
+          </p>
+        </div>
+      )}
+      <p className="mt-4 border-t border-slate-100 pt-3 text-[10px] leading-5 text-slate-400">
+        Sympto reports interpret saved records; they do not diagnose conditions or establish cause from timing alone. Verify concerning or uncertain readings and discuss persistent concerns with your clinician.
+      </p>
+    </section>
+  );
+}
+
 function WithinPeriodTrendSummary({ report }: { report: Report }) {
   const intelligence = report.intelligence;
   const trends = intelligence?.withinPeriodTrends ?? [];
@@ -3759,6 +3881,8 @@ export default function HealthReportPage() {
             </div>
             <div className="mt-6 flex flex-wrap items-center gap-2"><span className="rounded-full bg-white/10 px-3 py-1.5 text-xs font-bold">Generated {dateLabel(report.generatedAt)}</span><span className="rounded-full bg-white/10 px-3 py-1.5 text-xs font-bold">{previousLoading ? "Comparing with prior period…" : previousReport ? "Compared with previous period" : previousFailed ? "Prior-period data unavailable" : "Current-period insights"}</span></div>
           </section>
+
+          <NarrativeFindingsSummary report={report} />
 
           <WithinPeriodTrendSummary report={report} />
 
