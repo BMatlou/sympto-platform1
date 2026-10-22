@@ -233,6 +233,58 @@ describe('HealthReportIntelligenceService', () => {
     expect(result.crossSignals.sleepStress.statement).toContain('not evidence that one caused the other');
   });
 
+  it('uses saved condition, goal and baseline context to interpret dated period readings', () => {
+    const base = fixture();
+    const report = fixture({
+      currentSnapshot: {
+        ...base.currentSnapshot,
+        conditions: [{ id: 'condition-diabetes', name: 'Diabetes', status: 'ACTIVE' }],
+        activeGoals: [{
+          id: 'goal-weight',
+          title: 'Maintain weight',
+          category: 'WEIGHT',
+          status: 'ACTIVE',
+          targetValue: 71,
+          unit: 'kg',
+        }],
+        baseline: { weightKg: 71, establishedAt: '2026-10-01T08:00:00.000Z' },
+      },
+      activity: {
+        ...base.activity,
+        patientVitals: [{
+          id: 'vitals-weight-1',
+          source: 'PATIENT',
+          recordedAt: '2026-10-14T08:00:00.000Z',
+          weightKg: 70.1,
+        }],
+      },
+      goalMetricEvents: [{
+        goalId: null,
+        goalTitle: 'Blood glucose',
+        metricType: 'BLOOD_GLUCOSE',
+        metricKey: 'blood_glucose',
+        loggedValue: 5.5,
+        unit: 'mmol/L',
+        occurredAt: '2026-10-14T08:00:00.000Z',
+        source: 'patient-health-goal',
+        sourceId: 'glucose-event-1',
+      }],
+    });
+
+    const result = service.analyze(report, 'patient-1');
+    const conditionInsight = result.personalisedContext.insights.find((item) => item.group === 'CONDITION');
+    const goalInsight = result.personalisedContext.insights.find((item) => item.group === 'GOAL');
+    const baselineInsight = result.personalisedContext.insights.find((item) =>
+      item.group === 'BASELINE' && item.title.startsWith('Weight'));
+
+    expect(conditionInsight?.title).toContain('Diabetes');
+    expect(conditionInsight?.headline).toContain('5.5 mmol/L');
+    expect(goalInsight?.headline).toContain('Maintain weight');
+    expect(goalInsight?.headline).toContain('70.1 kg');
+    expect(baselineInsight?.headline).toContain('saved baseline 71 kg');
+    expect(baselineInsight?.detail).toContain('-0.9 kg');
+  });
+
   it('does not emit a sleep/stress pattern with insufficient paired days', () => {
     const report = fixture({
       activity: {
