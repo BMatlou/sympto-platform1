@@ -1022,12 +1022,17 @@ export class HealthReportIntelligenceService {
         row(effect.medication).genericName, effect.sideEffects,
       ]),
     ].map((value) => stringValue(value) ?? '').join(' ').toLowerCase();
+    const containsSavedLabel = (text: string, label: string) => {
+      const normalizedText = ' ' + text.replace(/[^a-z0-9]+/g, ' ').trim() + ' ';
+      const normalizedLabel = label.toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
+      return normalizedLabel.length >= 3 && normalizedText.includes(' ' + normalizedLabel + ' ');
+    };
 
     const activeAllergenNames = allergies.map((item) =>
       stringValue(row(item.allergy).name ?? item.name ?? item.allergenName),
     ).filter((name): name is string => typeof name === 'string' && name.length >= 3);
     for (const allergen of activeAllergenNames) {
-      const matchedSymptoms = symptomRows.filter((symptom) => symptomText(symptom).includes(allergen.toLowerCase()));
+      const matchedSymptoms = symptomRows.filter((symptom) => containsSavedLabel(symptomText(symptom), allergen));
       if (!matchedSymptoms.length) continue;
       personalisedInsights.push({
         key: 'allergy:' + allergen.toLowerCase().replace(/[^a-z0-9]+/g, '-'),
