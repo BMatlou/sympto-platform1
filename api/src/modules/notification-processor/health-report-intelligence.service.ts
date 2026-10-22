@@ -1506,6 +1506,31 @@ export class HealthReportIntelligenceService {
     const confidenceFor = (items: HealthObservation[]): 'HIGH' | 'MODERATE' | 'LIMITED' =>
       items.some((item) => item.observedAtBasis !== 'SOURCE_EVENT_TIME') ? 'MODERATE' : 'HIGH';
 
+    // Match only an explicitly saved medication indication to a saved condition label.
+    // Unmatched/free-text indications are not guessed from a drug name.
+    for (const medication of activeMedications) {
+      const medicineName = stringValue(row(medication.medication).name ?? medication.name);
+      const indication = stringValue(medication.indication);
+      if (!medicineName || !indication) continue;
+      const matchingConditions = currentConditionRows.filter((condition) =>
+        containsSavedLabel(indication, condition.name),
+      );
+      if (!matchingConditions.length) continue;
+      addFinding({
+        key: 'medication-indication:' + String(medication.id ?? medicineName).toLowerCase(),
+        priority: 'INSIGHT',
+        title: 'A saved medication indication matches your health context',
+        change: medicineName + ' has a saved indication that mentions ' + matchingConditions.map((item) => item.name).join(', ') + '.',
+        pattern: 'The indication text saved with this medication explicitly overlaps with the label of an active condition or diagnosis.',
+        personalContext: 'Medicine: ' + medicineName + '. Saved indication: ' + indication + '. Matching saved condition(s): ' + matchingConditions.map((item) => item.name).join(', ') + '.',
+        whyItMatters: 'The indication helps contextualise the treatment record, but saved text may be incomplete or outdated and is not independent proof of the current clinical indication.',
+        nextStep: 'Confirm the medicine, indication and instructions against your current prescription or care plan. Do not change treatment based on this text match.',
+        confidence: 'MODERATE',
+        evidence: ['Saved medicine indication: ' + indication, 'Matching saved condition(s): ' + matchingConditions.map((item) => item.name).join(', ')],
+        sourceRecordIds: [stringValue(medication.id)].filter((id): id is string => Boolean(id)),
+      });
+    }
+
     // Elevate explicit allergy/medicine-to-symptom text matches into the health story.
     // These are contextual review signals only, never causal conclusions.
     for (const allergen of activeAllergenNames) {
