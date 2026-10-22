@@ -69,9 +69,20 @@ export class HealthHomeService {
 
     await this.prisma.patient.update({ where: { id: patient.id }, data: { weightKg, ...(heightCm !== undefined ? { heightCm } : {}) } });
 
-    // Routine weight/profile updates keep the live Patient values current.
-    // PatientBaseline is a reference snapshot and is changed only by an explicit
-    // baseline-establishment workflow, never as a side effect of logging a value.
+    // Preserve an established reference snapshot. For a patient without any
+    // baseline row, seed it once so existing baseline-dependent screens retain their
+    // initial reference data; later weight changes never rewrite that snapshot.
+    if (!patient.baseline) {
+      await this.prisma.patientBaseline.create({
+        data: {
+          patientId: patient.id,
+          weightKg: String(weightKg),
+          ...(nextHeightCm != null ? { heightCm: String(nextHeightCm) } : {}),
+          ...(bmi != null ? { bmi: String(bmi) } : {}),
+          establishedAt: recordedAt,
+        },
+      });
+    }
 
     await this.goalsEngine.recordMetricEvent({
       patientId: patient.id,
@@ -109,10 +120,24 @@ export class HealthHomeService {
     const bmiCategory = getBmiCategory(bmi);
 
     await this.prisma.patient.update({ where: { id: patient.id }, data: { ...(input.weightKg !== undefined ? { weightKg: input.weightKg } : {}), ...(input.heightCm !== undefined ? { heightCm: input.heightCm } : {}) } });
-    // Return the established reference unchanged. The dated observation is saved
-    // to HealthJournal below and current profile weight/height remain on Patient.
-    // No implicit baseline creation or update occurs during ordinary measurement logging.
-    const baseline = patient.baseline ?? null;
+    // Preserve an established reference. If the patient has never had a baseline,
+    // seed one once from the first available values for compatibility with screens
+    // that expect a baseline row; subsequent manual readings never rewrite it.
+    const baseline = patient.baseline ?? await this.prisma.patientBaseline.create({
+      data: {
+        patientId: patient.id,
+        ...(currentWeight != null ? { weightKg: String(currentWeight) } : {}),
+        ...(currentHeight != null ? { heightCm: String(currentHeight) } : {}),
+        ...(bmi != null ? { bmi: String(bmi) } : {}),
+        ...(input.systolicPressure !== undefined ? { systolicPressure: input.systolicPressure } : {}),
+        ...(input.diastolicPressure !== undefined ? { diastolicPressure: input.diastolicPressure } : {}),
+        ...(input.restingHeartRate !== undefined ? { restingHeartRate: input.restingHeartRate } : {}),
+        ...(input.respiratoryRate !== undefined ? { respiratoryRate: input.respiratoryRate } : {}),
+        ...(input.oxygenSaturation !== undefined ? { oxygenSaturation: String(input.oxygenSaturation) } : {}),
+        ...(input.bodyTemperature !== undefined ? { bodyTemperature: String(input.bodyTemperature) } : {}),
+        establishedAt: measuredAt,
+      },
+    });
 
     if (input.weightKg !== undefined) {
       await this.goalsEngine.recordMetricEvent({
