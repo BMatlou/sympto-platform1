@@ -370,7 +370,6 @@ export class HealthReportIntelligenceService {
     const currentSnapshot = row(report.currentSnapshot);
     const sources: HealthObservation[] = [];
     const period = row(report.period);
-    const generatedAt = isoDate(report.generatedAt) ?? new Date().toISOString();
 
     const add = (input: {
       metric: string;
