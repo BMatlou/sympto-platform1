@@ -69,11 +69,9 @@ export class HealthHomeService {
 
     await this.prisma.patient.update({ where: { id: patient.id }, data: { weightKg, ...(heightCm !== undefined ? { heightCm } : {}) } });
 
-    await this.prisma.patientBaseline.upsert({
-      where: { patientId: patient.id },
-      update: { weightKg: String(weightKg), ...(heightCm !== undefined ? { heightCm: String(heightCm) } : {}), ...(bmi != null ? { bmi: String(bmi) } : {}), establishedAt: recordedAt },
-      create: { patientId: patient.id, weightKg: String(weightKg), ...(heightCm !== undefined ? { heightCm: String(heightCm) } : nextHeightCm != null ? { heightCm: String(nextHeightCm) } : {}), ...(bmi != null ? { bmi: String(bmi) } : {}), establishedAt: recordedAt },
-    });
+    // Routine weight/profile updates keep the live Patient values current.
+    // PatientBaseline is a reference snapshot and is changed only by an explicit
+    // baseline-establishment workflow, never as a side effect of logging a value.
 
     await this.goalsEngine.recordMetricEvent({
       patientId: patient.id,
@@ -111,18 +109,10 @@ export class HealthHomeService {
     const bmiCategory = getBmiCategory(bmi);
 
     await this.prisma.patient.update({ where: { id: patient.id }, data: { ...(input.weightKg !== undefined ? { weightKg: input.weightKg } : {}), ...(input.heightCm !== undefined ? { heightCm: input.heightCm } : {}) } });
-    const baseline = await this.prisma.patientBaseline.upsert({
-      where: { patientId: patient.id },
-      update: {
-        ...(input.weightKg !== undefined ? { weightKg: String(input.weightKg) } : {}), ...(input.heightCm !== undefined ? { heightCm: String(input.heightCm) } : {}), ...(bmi != null ? { bmi: String(bmi) } : {}),
-        ...(input.systolicPressure !== undefined ? { systolicPressure: input.systolicPressure } : {}), ...(input.diastolicPressure !== undefined ? { diastolicPressure: input.diastolicPressure } : {}), ...(input.restingHeartRate !== undefined ? { restingHeartRate: input.restingHeartRate } : {}), ...(input.respiratoryRate !== undefined ? { respiratoryRate: input.respiratoryRate } : {}), ...(input.oxygenSaturation !== undefined ? { oxygenSaturation: String(input.oxygenSaturation) } : {}), ...(input.bodyTemperature !== undefined ? { bodyTemperature: String(input.bodyTemperature) } : {}), establishedAt: measuredAt,
-      },
-      create: {
-        patientId: patient.id,
-        ...(input.weightKg !== undefined ? { weightKg: String(input.weightKg) } : currentWeight != null ? { weightKg: String(currentWeight) } : {}), ...(input.heightCm !== undefined ? { heightCm: String(input.heightCm) } : currentHeight != null ? { heightCm: String(currentHeight) } : {}), ...(bmi != null ? { bmi: String(bmi) } : {}),
-        ...(input.systolicPressure !== undefined ? { systolicPressure: input.systolicPressure } : {}), ...(input.diastolicPressure !== undefined ? { diastolicPressure: input.diastolicPressure } : {}), ...(input.restingHeartRate !== undefined ? { restingHeartRate: input.restingHeartRate } : {}), ...(input.respiratoryRate !== undefined ? { respiratoryRate: input.respiratoryRate } : {}), ...(input.oxygenSaturation !== undefined ? { oxygenSaturation: String(input.oxygenSaturation) } : {}), ...(input.bodyTemperature !== undefined ? { bodyTemperature: String(input.bodyTemperature) } : {}), establishedAt: measuredAt,
-      },
-    });
+    // Return the established reference unchanged. The dated observation is saved
+    // to HealthJournal below and current profile weight/height remain on Patient.
+    // No implicit baseline creation or update occurs during ordinary measurement logging.
+    const baseline = patient.baseline ?? null;
 
     if (input.weightKg !== undefined) {
       await this.goalsEngine.recordMetricEvent({
