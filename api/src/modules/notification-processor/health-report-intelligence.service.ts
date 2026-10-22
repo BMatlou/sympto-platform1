@@ -62,11 +62,32 @@ export interface PersonalisedHealthInsight {
   status: 'INFO' | 'WATCH' | 'REVIEW';
 }
 
+export interface PersonalisedHealthTrend {
+  key: string;
+  metric: string;
+  label: string;
+  unit: string;
+  direction: 'RISING' | 'FALLING';
+  earlierAverage: number;
+  laterAverage: number;
+  change: number;
+  changePercent: number | null;
+  daysCompared: number;
+  readingCount: number;
+  firstDay: string;
+  lastDay: string;
+  usesFallbackTime: boolean;
+  relatedGoals: string[];
+  relatedConditions: string[];
+  interpretation: string;
+}
+
 export interface HealthReportIntelligence {
   version: 'shadow-v1';
   personalisedContext: {
     insights: PersonalisedHealthInsight[];
   };
+  withinPeriodTrends: PersonalisedHealthTrend[];
   generatedAt: string;
   medicationAdherence?: MedicationReportAdherenceSummary | null;
   coverage: {
@@ -394,6 +415,94 @@ function ageAt(dobValue: unknown, referenceValue: unknown): number | null {
   if (at.getUTCMonth() < birth.getUTCMonth() ||
       (at.getUTCMonth() === birth.getUTCMonth() && at.getUTCDate() < birth.getUTCDate())) age -= 1;
   return age >= 0 && age < 125 ? age : null;
+}
+
+type TrendDefinition = { metric: string; label: string; unit: string; minimumChange: number; digits: number };
+
+const TREND_DEFINITIONS: TrendDefinition[] = [
+  { metric: 'bp.systolic', label: 'Systolic blood pressure', unit: 'mmHg', minimumChange: 3, digits: 0 },
+  { metric: 'bp.diastolic', label: 'Diastolic blood pressure', unit: 'mmHg', minimumChange: 3, digits: 0 },
+  { metric: 'heart_rate', label: 'Heart rate', unit: 'bpm', minimumChange: 3, digits: 0 },
+  { metric: 'oxygen_saturation', label: 'Oxygen saturation', unit: '%', minimumChange: 2, digits: 1 },
+  { metric: 'respiratory_rate', label: 'Breathing rate', unit: 'breaths/min', minimumChange: 2, digits: 0 },
+  { metric: 'body_temperature', label: 'Body temperature', unit: '°C', minimumChange: 0.3, digits: 1 },
+  { metric: 'weight', label: 'Weight', unit: 'kg', minimumChange: 0.5, digits: 1 },
+  { metric: 'blood_glucose', label: 'Blood glucose', unit: 'mmol/L', minimumChange: 0.4, digits: 1 },
+  { metric: 'lab.hba1c', label: 'HbA1c', unit: '%', minimumChange: 0.2, digits: 1 },
+  { metric: 'cholesterol.total', label: 'Total cholesterol', unit: 'mmol/L', minimumChange: 0.3, digits: 1 },
+  { metric: 'cholesterol.ldl', label: 'LDL cholesterol', unit: 'mmol/L', minimumChange: 0.3, digits: 1 },
+  { metric: 'sleep.duration', label: 'Sleep duration', unit: 'hours', minimumChange: 1, digits: 1 },
+  { metric: 'stress.score', label: 'Stress rating', unit: '/10', minimumChange: 1, digits: 1 },
+  { metric: 'hydration.volume', label: 'Water intake', unit: 'mL', minimumChange: 250, digits: 0 },
+  { metric: 'exercise.duration', label: 'Exercise time', unit: 'minutes', minimumChange: 15, digits: 0 },
+  { metric: 'smoking.cigarettes', label: 'Cigarettes logged', unit: 'cigarettes', minimumChange: 2, digits: 0 },
+  { metric: 'alcohol.units', label: 'Alcohol logged', unit: 'standard drinks', minimumChange: 1, digits: 1 },
+  { metric: 'nutrition.calories', label: 'Calories logged', unit: 'kcal', minimumChange: 150, digits: 0 },
+  { metric: 'symptom.pain_score', label: 'Symptom pain score', unit: '/10', minimumChange: 1, digits: 1 },
+];
+
+function detectWithinPeriodTrends(observations: HealthObservation[]): Array<Omit<PersonalisedHealthTrend, 'relatedGoals' | 'relatedConditions' | 'interpretation'>> {
+  const trends: Array<Omit<PersonalisedHealthTrend, 'relatedGoals' | 'relatedConditions' | 'interpretation'>> = [];
+  for (const definition of TREND_DEFINITIONS) {
+    const dailyValues = new Map<string, { sum: number; count: number; hasFallback: boolean }>();
+    const matching = observations.filter((item) =>
+      item.metric === definition.metric &&
+      item.value !== null &&
+      item.observedAt !== null &&
+      item.quality.status === 'ACCEPTED',
+    );
+    for (const observation of matching) {
+      const day = localDay(observation.observedAt);
+      if (!day) continue;
+      const bucket = dailyValues.get(day) ?? { sum: 0, count: 0, hasFallback: false };
+      bucket.sum += observation.value as number;
+      bucket.count += 1;
+      if (observation.observedAtBasis !== 'SOURCE_EVENT_TIME') bucket.hasFallback = true;
+      dailyValues.set(day, bucket);
+    }
+    const series = Array.from(dailyValues.entries())
+      .map(([day, bucket]) => ({
+        day,
+        value: bucket.sum / bucket.count,
+        count: bucket.count,
+        hasFallback: bucket.hasFallback,
+      }))
+      .sort((a, b) => a.day.localeCompare(b.day));
+    // Four separately dated days support comparing two days (or more) against two days (or more).
+    if (series.length < 4) continue;
+    const midpoint = Math.floor(series.length / 2);
+    const earlier = series.slice(0, midpoint);
+    const later = series.slice(midpoint);
+    if (earlier.length < 2 || later.length < 2) continue;
+    const average = (items: typeof series) => items.reduce((sum, item) => sum + item.value, 0) / items.length;
+    const earlierAverage = average(earlier);
+    const laterAverage = average(later);
+    const change = laterAverage - earlierAverage;
+    if (Math.abs(change) < definition.minimumChange) continue;
+    trends.push({
+      key: 'trend:' + definition.metric,
+      metric: definition.metric,
+      label: definition.label,
+      unit: definition.unit,
+      direction: change > 0 ? 'RISING' : 'FALLING',
+      earlierAverage: Number(earlierAverage.toFixed(definition.digits)),
+      laterAverage: Number(laterAverage.toFixed(definition.digits)),
+      change: Number(change.toFixed(definition.digits)),
+      changePercent: Math.abs(earlierAverage) > 0.000001
+        ? Number((change / Math.abs(earlierAverage) * 100).toFixed(1))
+        : null,
+      daysCompared: series.length,
+      readingCount: matching.length,
+      firstDay: series[0].day,
+      lastDay: series[series.length - 1].day,
+      usesFallbackTime: series.some((item) => item.hasFallback),
+    });
+  }
+  return trends.sort((a, b) => {
+    const left = Math.abs(a.change) / (TREND_DEFINITIONS.find((item) => item.metric === a.metric)?.minimumChange ?? 1);
+    const right = Math.abs(b.change) / (TREND_DEFINITIONS.find((item) => item.metric === b.metric)?.minimumChange ?? 1);
+    return right - left;
+  });
 }
 
 @Injectable()
@@ -1182,6 +1291,43 @@ export class HealthReportIntelligenceService {
       });
     }
 
+    const conditionMetricRules: Array<{ pattern: RegExp; metrics: string[] }> = [
+      { pattern: /diabet|prediabet/i, metrics: ['blood_glucose', 'lab.hba1c'] },
+      { pattern: /hypertension|high blood pressure/i, metrics: ['bp.systolic', 'bp.diastolic'] },
+      { pattern: /asthma|copd|chronic obstructive|respiratory condition/i, metrics: ['oxygen_saturation', 'respiratory_rate'] },
+      { pattern: /cardiovascular|heart failure|coronary|ischaemic heart|ischemic heart/i, metrics: ['bp.systolic', 'bp.diastolic', 'heart_rate'] },
+    ];
+    const withinPeriodTrends: PersonalisedHealthTrend[] = detectWithinPeriodTrends(observations).map((trend) => {
+      const relatedGoals = activeGoals.filter((goal) => {
+        const category = String(goal.category ?? '').toUpperCase().replace(/[\\s-]+/g, '_');
+        return (goalMetricMap[category] ?? []).includes(trend.metric);
+      }).map((goal) => stringValue(goal.title)).filter((title): title is string => Boolean(title));
+      const relatedConditions = currentConditionRows.filter((condition) =>
+        conditionMetricRules.some((rule) => rule.pattern.test(condition.name) && rule.metrics.includes(trend.metric)),
+      ).map((condition) => condition.name);
+      const formatValue = (value: number) => formatNumber(value, TREND_DEFINITIONS.find((item) => item.metric === trend.metric)?.digits ?? 1);
+      const deltaText = (trend.change > 0 ? '+' : '') + formatValue(trend.change) + ' ' + trend.unit;
+      const contextLines: string[] = [];
+      if (relatedConditions.length) {
+        contextLines.push('Relevant to your saved condition' + (relatedConditions.length > 1 ? 's' : '') + ': ' + relatedConditions.join(', ') + '. Compare this pattern with your clinician-set targets and care plan.');
+      }
+      if (relatedGoals.length) {
+        contextLines.push('Related saved goal' + (relatedGoals.length > 1 ? 's' : '') + ': ' + relatedGoals.join(', ') + '. The direction of change does not by itself establish goal success or failure.');
+      }
+      if (!contextLines.length) {
+        contextLines.push('The direction alone does not mean improvement or deterioration. Interpret it against your own target, symptoms and relevant clinical advice.');
+      }
+      if (trend.usesFallbackTime) {
+        contextLines.push('At least one contributing reading uses record-time fallback rather than a dedicated measurement timestamp, so timing may be approximate.');
+      }
+      return {
+        ...trend,
+        interpretation: contextLines.join(' '),
+        relatedGoals,
+        relatedConditions,
+      };
+    });
+
     const start = isoDate(row(report.period).start);
     const end = isoDate(row(report.period).end);
     const eligibleDays = eligibleDayCount(start, end);
@@ -1189,6 +1335,10 @@ export class HealthReportIntelligenceService {
 
     return {
       version: 'shadow-v1',
+      personalisedContext: {
+        insights: personalisedInsights,
+      },
+      withinPeriodTrends,
       generatedAt: new Date().toISOString(),
       coverage: {
         sourceCounts,
