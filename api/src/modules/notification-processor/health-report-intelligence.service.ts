@@ -55,7 +55,7 @@ export interface HealthObservation {
 
 export interface PersonalisedHealthInsight {
   key: string;
-  group: 'CONDITION' | 'GOAL' | 'BASELINE';
+  group: 'CONDITION' | 'GOAL' | 'BASELINE' | 'ALLERGY' | 'TREATMENT';
   title: string;
   headline: string;
   detail: string;
@@ -978,6 +978,67 @@ export class HealthReportIntelligenceService {
     });
     personalisedInsights.push(...activeGoalSummaries);
 
+    // Surface allergy and medication context only when a dated symptom/side-effect
+    // record actually references a saved allergen or medicine label. A name match
+    // is a review prompt, never a claim of causation or an interaction check.
+    const symptomRows = rows(activity.symptoms);
+    const symptomText = (symptom: Row) => [
+      symptom.title, symptom.description, symptom.notes, symptom.suspectedTrigger,
+      symptom.aggravatingFactors, symptom.relievingFactors,
+      ...rows(symptom.triggers).flatMap((trigger) => [
+        trigger.trigger, trigger.name, trigger.description, trigger.type,
+      ]),
+      ...rows(symptom.medicationEffects).flatMap((effect) => [
+        effect.reportedMedicationName, row(effect.medication).name,
+        row(effect.medication).genericName, effect.sideEffects,
+      ]),
+    ].map((value) => stringValue(value) ?? '').join(' ').toLowerCase();
+
+    const activeAllergenNames = allergies.map((item) =>
+      stringValue(row(item.allergy).name ?? item.name ?? item.allergenName),
+    ).filter((name): name is string => Boolean(name) && name.length >= 3);
+    for (const allergen of activeAllergenNames) {
+      const matchedSymptoms = symptomRows.filter((symptom) => symptomText(symptom).includes(allergen.toLowerCase()));
+      if (!matchedSymptoms.length) continue;
+      personalisedInsights.push({
+        key: 'allergy:' + allergen.toLowerCase().replace(/[^a-z0-9]+/g, '-'),
+        group: 'ALLERGY',
+        title: 'Saved allergy mentioned in symptom records',
+        headline: '“' + allergen + '” appears in ' + matchedSymptoms.length + ' dated symptom record(s)',
+        detail: 'The wording overlaps with an allergen saved in your health record. This is a possible record connection, not proof of exposure or cause. A text match does not assess allergy severity or medication interactions.',
+        status: 'WATCH',
+      });
+    }
+
+    const savedMedicationNames = activeMedications.flatMap((item) => [
+      stringValue(row(item.medication).name),
+      stringValue(row(item.medication).genericName),
+      stringValue(row(item.medication).brandName),
+    ].filter((name): name is string => Boolean(name) && name.length >= 3));
+    const medicationEffectMatches = savedMedicationNames.map((name) => ({
+      name,
+      symptoms: symptomRows.filter((symptom) =>
+        rows(symptom.medicationEffects).some((effect) => {
+          const effectName = stringValue(effect.reportedMedicationName ??
+            row(effect.medication).name ?? row(effect.medication).genericName);
+          return Boolean(effectName && effectName.toLowerCase() === name.toLowerCase() &&
+            (stringValue(effect.sideEffects) || effect.improved !== undefined || effect.effectiveness !== undefined));
+        }),
+      ),
+    })).filter((item) => item.symptoms.length > 0)
+      .filter((item, index, all) => all.findIndex((other) =>
+        other.name.toLowerCase() === item.name.toLowerCase()) === index);
+    for (const medication of medicationEffectMatches) {
+      personalisedInsights.push({
+        key: 'treatment-effect:' + medication.name.toLowerCase().replace(/[^a-z0-9]+/g, '-'),
+        group: 'TREATMENT',
+        title: 'Saved medicine appears in reported effects',
+        headline: medication.name + ' is referenced in ' + medication.symptoms.length + ' symptom record(s)',
+        detail: 'These are patient-recorded medication-effect notes. They do not establish that the medicine caused the symptom. Discuss persistent side effects or concerns with the prescriber or pharmacist; do not change a prescription based only on this report.',
+        status: 'WATCH',
+      });
+    }
+
     const baseline = row(context.baseline);
     const baselineFields: Array<{ key: string; metric: string; label: string; field: string; unit: string }> = [
       { key: 'weight', metric: 'weight', label: 'Weight', field: 'weightKg', unit: 'kg' },
@@ -1065,7 +1126,7 @@ export class HealthReportIntelligenceService {
         conditions: Array.from(new Set(conditionNames)),
         activeMedicationCount: activeMedications.length,
         allergiesOnFile: allergies.length,
-        note: 'Context is descriptive in shadow-v1. Condition- and demographic-specific clinical thresholds are not overridden until an approved, versioned clinical policy is configured.',
+        note: 'Saved conditions, goals and baselines contextualise dated observations. Condition- and demographic-specific clinical thresholds are not overridden until an approved, versioned clinical policy is configured.',
       },
     };
   }
