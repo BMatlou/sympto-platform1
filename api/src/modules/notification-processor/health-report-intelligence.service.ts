@@ -116,6 +116,7 @@ export interface HealthReportPeriodComparison {
   relatedGoals: string[];
   relatedGoalTargets: string[];
   relatedConditions: string[];
+  sourceRecordIds: string[];
   interpretation: string;
 }
 
@@ -1520,8 +1521,10 @@ export class HealthReportIntelligenceService {
         changePercent: previousAverage !== 0 ? Number((change / Math.abs(previousAverage) * 100).toFixed(1)) : null,
         previousDays: before.length,
         currentDays: current.length,
-        previousReadings: priorObservations.filter((item) => item.metric === definition.metric && item.quality.status === 'ACCEPTED').length,
-        currentReadings: observations.filter((item) => item.metric === definition.metric && item.quality.status === 'ACCEPTED').length,
+        previousReadings: priorObservations.filter((item) => item.metric === definition.metric &&
+          item.value !== null && item.quality.status === 'ACCEPTED' && item.quality.safetySignals.length === 0).length,
+        currentReadings: observations.filter((item) => item.metric === definition.metric &&
+          item.value !== null && item.quality.status === 'ACCEPTED' && item.quality.safetySignals.length === 0).length,
         previousStart: before[0].day,
         previousEnd: before[before.length - 1].day,
         currentStart: current[0].day,
@@ -1529,6 +1532,14 @@ export class HealthReportIntelligenceService {
         relatedGoals,
         relatedGoalTargets,
         relatedConditions,
+        sourceRecordIds: Array.from(new Set([
+          ...priorObservations.filter((item) => item.metric === definition.metric && item.value !== null &&
+            item.quality.status === 'ACCEPTED' && item.quality.safetySignals.length === 0)
+            .map((item) => item.source.recordId),
+          ...observations.filter((item) => item.metric === definition.metric && item.value !== null &&
+            item.quality.status === 'ACCEPTED' && item.quality.safetySignals.length === 0)
+            .map((item) => item.source.recordId),
+        ].filter((id): id is string => Boolean(id)))).slice(0, 20),
         interpretation: (relatedConditions.length
           ? 'Relevant to your saved condition' + (relatedConditions.length > 1 ? 's' : '') + ': ' + relatedConditions.join(', ') + '. '
           : '') +
