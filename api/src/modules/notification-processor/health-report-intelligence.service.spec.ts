@@ -297,6 +297,13 @@ describe('HealthReportIntelligenceService', () => {
           ongoing: true,
           medication: { name: 'Amoxicillin' },
         }],
+        profile: { smokingStatus: 'NEVER' },
+        immunizations: [{
+          id: 'immunization-1',
+          status: 'MISSED',
+          nextDueDate: '2026-10-18T08:00:00.000Z',
+          immunization: { name: 'Flu vaccine' },
+        }],
       },
       activity: {
         ...base.activity,
@@ -311,6 +318,15 @@ describe('HealthReportIntelligenceService', () => {
           }],
         }],
       },
+      goalMetricEvents: [{
+        metricType: 'SMOKING',
+        metricKey: 'smoking.cigarettes',
+        loggedValue: 4,
+        unit: 'cigarettes',
+        occurredAt: '2026-10-14T08:00:00.000Z',
+        source: 'patient-smoking-log',
+        sourceId: 'smoking-event-1',
+      }],
     });
 
     const result = service.analyze(report, 'patient-1');
@@ -318,6 +334,10 @@ describe('HealthReportIntelligenceService', () => {
       item.group === 'ALLERGY' && item.headline.includes('Penicillin'))).toBe(true);
     expect(result.personalisedContext.insights.some((item) =>
       item.group === 'TREATMENT' && item.headline.includes('Amoxicillin'))).toBe(true);
+    expect(result.personalisedContext.insights.some((item) =>
+      item.group === 'PROFILE' && item.headline.includes('4 cigarettes'))).toBe(true);
+    expect(result.personalisedContext.insights.some((item) =>
+      item.group === 'PREVENTIVE_CARE' && item.headline.includes('MISSED'))).toBe(true);
   });
 
   it('does not emit a sleep/stress pattern with insufficient paired days', () => {
