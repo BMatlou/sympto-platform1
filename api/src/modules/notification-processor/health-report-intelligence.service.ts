@@ -526,7 +526,7 @@ export class HealthReportIntelligenceService {
           add({ ...common, metric: 'bp.diastolic', value: item.secondaryValue, unit: item.secondaryUnit ?? item.unit ?? 'mmHg', metricPath: 'secondaryValue' });
         }
       } else if (metric) {
-        const unit = item.unit ?? unitFor(metric);
+        const unit = item.unit;
         const value = numericValue(item.value);
         // Sleep device records are commonly represented as seconds or minutes; keep
         // device values as provided unless the unit explicitly identifies a conversion.
@@ -564,7 +564,7 @@ export class HealthReportIntelligenceService {
       const vitalType = row(item.vitalType);
       const metric = normalizeMetric(vitalType.code ?? vitalType.name, vitalType.code);
       if (!metric || numericValue(item.value) === null) continue;
-      add({ metric, value: item.value, unit: vitalType.unit ?? unitFor(metric), observedAt: item.measuredAt ?? item.recordedAt,
+      add({ metric, value: item.value, unit: vitalType.unit, observedAt: item.measuredAt ?? item.recordedAt,
         capturedAt: item.createdAt, sourceType: 'CLINICAL_VITAL', sourceId: item.id,
         metricPath: 'value', actor: 'CLINICIAN', sourceName: vitalType.name ?? vitalType.code,
         observedAtBasis: item.measuredAt || item.recordedAt ? 'SOURCE_EVENT_TIME' : item.createdAt ? 'RECORD_TIME_FALLBACK' : 'UNKNOWN' });
@@ -599,7 +599,7 @@ export class HealthReportIntelligenceService {
       if (medicationAction && action !== 'TAKEN' && action !== 'SKIPPED') continue;
       const at = event.occurredAt;
       add({ metric: medicationAction ? 'medication.dose_action' : metric, value: event.loggedValue,
-        valueCode: medicationAction ? action : undefined, unit: event.unit ?? unitFor(metric),
+        valueCode: medicationAction ? action : undefined, unit: event.unit,
         observedAt: at, capturedAt: event.createdAt, sourceType: medicationAction ? 'MEDICATION_ACTION' : 'GOAL_METRIC',
         sourceId: event.sourceId, metricPath: event.metricKey, actor: event.source === 'wearable' ? 'DEVICE' : 'PATIENT',
         sourceName: event.source, observedAtBasis: at ? 'SOURCE_EVENT_TIME' : 'UNKNOWN' });
