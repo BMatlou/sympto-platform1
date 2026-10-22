@@ -943,7 +943,7 @@ export class HealthReportIntelligenceService {
     };
     const eventRows = rows(report.goalMetricEvents);
     const progressRows = rows(tracking.goalProgress);
-    const activeGoalSummaries: PersonalisedHealthInsight[] = activeGoals.slice(0, 12).map((goal, index) => {
+    const activeGoalSummaries: Array<PersonalisedHealthInsight & { hasData: boolean }> = activeGoals.slice(0, 12).map((goal, index) => {
       const id = stringValue(goal.id);
       const category = String(goal.category ?? '').toUpperCase().replace(/[\s-]+/g, '_');
       const metrics = goalMetricMap[category] ?? [];
@@ -997,7 +997,14 @@ export class HealthReportIntelligenceService {
             : 'Each matched measure is evidence for context, not automatic goal completion.'),
         status: 'INFO',
       });
-      personalisedInsights.push(...goalsWithEvidence.slice(0, 8).map(({ hasData: _hasData, ...insight }) => insight));
+      personalisedInsights.push(...goalsWithEvidence.slice(0, 8).map((item) => ({
+        key: item.key,
+        group: item.group,
+        title: item.title,
+        headline: item.headline,
+        detail: item.detail,
+        status: item.status,
+      })));
     }
 
     // Surface allergy and medication context only when a dated symptom/side-effect
