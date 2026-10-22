@@ -13,6 +13,7 @@ import {
 } from '@prisma/client';
 
 import { PrismaService } from '../../database/prisma.service';
+import { MedicationInsightService, type MedicationReportAdherenceSummary } from '../health-goals/medication-insight.service';
 import { HealthReportIntelligenceService } from './health-report-intelligence.service';
 
 const REPORT_TIMEZONE = 'Africa/Johannesburg';
@@ -38,6 +39,7 @@ export class HealthReportNotificationSchedulerService
   constructor(
     private readonly prisma: PrismaService,
     private readonly reportIntelligence: HealthReportIntelligenceService,
+    private readonly medicationInsight: MedicationInsightService,
   ) {}
 
   onModuleInit() {
@@ -965,11 +967,28 @@ export class HealthReportNotificationSchedulerService
       generatedAt: new Date(),
     };
 
-    // Additive, read-only intelligence: existing source records and report fields
-    // remain unchanged while the new deterministic pipeline runs alongside them.
+    // Additive, read-only intelligence. Medication analysis is isolated so an
+    // incomplete/legacy medicine schedule cannot make the health report unavailable.
+    let medicationAdherence: MedicationReportAdherenceSummary | null = null;
+    try {
+      medicationAdherence = await this.medicationInsight.buildReportAdherence(
+        patientId,
+        period.start,
+        period.end,
+      );
+    } catch (error) {
+      this.logger.warn(
+        'Medication adherence analysis is unavailable for this report period: ' +
+          (error instanceof Error ? error.message : String(error)),
+      );
+    }
+
     return {
       ...reportPayload,
-      intelligence: this.reportIntelligence.analyze(reportPayload, patientId),
+      intelligence: {
+        ...this.reportIntelligence.analyze(reportPayload, patientId),
+        ...(medicationAdherence ? { medicationAdherence } : {}),
+      },
     };
   }
 
