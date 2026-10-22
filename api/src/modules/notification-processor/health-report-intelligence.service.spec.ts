@@ -759,4 +759,28 @@ describe('HealthReportIntelligenceService', () => {
     expect(finding?.nextStep).toContain('do not change or double a dose');
   });
 
+
+  it('turns repeated low mood check-ins into a contextual finding with a next step', () => {
+    const report = fixture({
+      activity: {
+        ...fixture().activity,
+        journalEntries: [
+          { id: 'mood-1', title: 'Daily Health Check-in', createdAt: '2026-10-13T08:00:00.000Z', mood: 'BAD' },
+          { id: 'mood-2', title: 'Daily Health Check-in', createdAt: '2026-10-14T08:00:00.000Z', mood: 'VERY_BAD' },
+          { id: 'mood-3', title: 'Daily Health Check-in', createdAt: '2026-10-15T08:00:00.000Z', mood: 'NEUTRAL' },
+          { id: 'mood-4', title: 'Daily Health Check-in', createdAt: '2026-10-16T08:00:00.000Z', mood: 'GOOD' },
+        ],
+      },
+    });
+
+    const result = service.analyze(report, 'patient-1');
+    const finding = result.findings.find((item) => item.key === 'wellbeing:repeated-low-mood');
+    expect(finding).toBeDefined();
+    expect(finding?.priority).toBe('WATCH');
+    expect(finding?.change).toContain('2 of 4 mood check-ins (50%)');
+    expect(finding?.personalContext).toContain('own dated mood check-ins');
+    expect(finding?.nextStep).toContain('talk with someone you trust or a health professional');
+    expect(finding?.sourceRecordIds).toEqual(['mood-1', 'mood-2']);
+  });
+
 });
