@@ -3744,10 +3744,14 @@ function ContextualHealthInsights({ report }: { report: Report }) {
     status === "REVIEW" ? (group === "PREVENTIVE_CARE" ? "Check record" : "Verify readings") : status === "WATCH" ? "Worth monitoring" : "";
 
   return (
-    <section aria-label="Personalised health context" className="mt-4 space-y-3">
+    <details aria-label="Supporting personal health context" className="mt-4 rounded-2xl border border-[#dcebed] bg-white p-4 sm:p-5">
+      <summary className="cursor-pointer list-none text-sm font-black text-[#0b2d54]">
+        Supporting personal context and record matches <span className="ml-1 text-xs font-semibold text-slate-400">({insights.length})</span>
+      </summary>
+      <section aria-label="Personalised health context" className="mt-3 space-y-3 border-t border-slate-100 pt-3">
       <div className="px-1 pb-2 sm:px-0">
-        <p className="text-[10px] font-extrabold uppercase tracking-[0.15em] text-[#0b7b80]">Personalised context</p>
-        <h2 className="mt-1 text-lg font-black tracking-tight text-[#0b2d54]">What this period means for your health</h2>
+        <p className="text-[10px] font-extrabold uppercase tracking-[0.15em] text-[#0b7b80]">Context behind the findings</p>
+        <h2 className="mt-1 text-lg font-black tracking-tight text-[#0b2d54]">Supporting personal health context</h2>
         <p className="mt-1 text-xs leading-5 text-slate-500">Saved conditions, goals, profile patterns, allergy notes and baseline values are compared with dated readings, reported effects and follow-up dates available to this report. Missing data is never treated as zero or proof that a condition is controlled.</p>
       </div>
       <div className="divide-y divide-slate-200">
@@ -3766,7 +3770,8 @@ function ContextualHealthInsights({ report }: { report: Report }) {
         ))}
       </div>
       <p className="px-1 text-[10px] leading-4 text-slate-400">These are record-based associations and comparisons, not a diagnosis or proof of cause. Use clinician-set targets to interpret clinical measurements.</p>
-    </section>
+      </section>
+    </details>
   );
 }
 
