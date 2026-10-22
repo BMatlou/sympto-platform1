@@ -279,7 +279,7 @@ describe('HealthReportIntelligenceService', () => {
 
     expect(conditionInsight?.title).toContain('Diabetes');
     expect(conditionInsight?.headline).toContain('5.5 mmol/L');
-    expect(goalInsight?.headline).toContain('Maintain weight');
+    expect(goalInsight?.title).toContain('Maintain weight');
     expect(goalInsight?.headline).toContain('70.1 kg');
     expect(baselineInsight?.headline).toContain('saved baseline 71 kg');
     expect(baselineInsight?.detail).toContain('-0.9 kg');
