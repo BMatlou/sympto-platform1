@@ -2332,7 +2332,7 @@ function PersonalisedInsights({
 
   return (
     <section aria-label="Health trends and recommendations" className="space-y-5">
-      <section className="rounded-2xl border border-[#dcebed] bg-white p-4 shadow-sm sm:p-5">
+      <section className="space-y-3">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
           <div className="min-w-0 flex-1">
             <p className="text-[10px] font-black uppercase tracking-[0.15em] text-[#0b7b80]">Period comparison</p>
@@ -2341,13 +2341,13 @@ function PersonalisedInsights({
           </div>
         </div>
         {previousLoading ? (
-          <p className="mt-3 rounded-xl bg-[#f5fafb] px-3 py-2.5 text-xs font-semibold text-slate-600">Comparing this period with the previous one…</p>
+          <p className="mt-3 px-1 py-2.5 text-xs font-semibold text-slate-600">Comparing this period with the previous one…</p>
         ) : hasComparableSignals ? (
           <div className="mt-3 flex flex-wrap items-center gap-2 text-[11px] font-semibold text-slate-600"><span className="rounded-full bg-[#e8f8f8] px-2.5 py-1 text-[#0b5a62]">{movementCounts.up} up</span><span className="rounded-full bg-amber-50 px-2.5 py-1 text-amber-800">{movementCounts.down} down</span><span className="rounded-full bg-slate-100 px-2.5 py-1 text-slate-600">{movementCounts.steady} steady</span></div>
         ) : null}
         {featuredSignals.length ? (
           <>
-            <div className="mt-4 overflow-hidden rounded-2xl border border-slate-200 bg-white">
+            <div className="mt-4 divide-y divide-slate-200">
               {featuredSignals.map((signal, index) => {
                 const currentAverage = mean(signal.current.map((item) => item.value));
                 const previousAverage = mean(signal.previous.map((item) => item.value));
@@ -2407,7 +2407,7 @@ function PersonalisedInsights({
               })}
             </div>
             {remainingSignals.length > 0 && (
-              <details className="mt-3 rounded-xl border border-slate-200 bg-white px-4 py-3">
+              <details className="mt-3 border-t border-slate-200 px-1 py-3">
                 <summary className="flex cursor-pointer list-none items-center justify-between gap-3 text-xs font-bold text-[#0b2d54]">
                   <span>Other tracked measures</span><span className="text-[10px] font-semibold text-slate-500">{remainingSignals.length} more</span>
                 </summary>
@@ -2431,7 +2431,7 @@ function PersonalisedInsights({
             )}
           </>
         ) : (
-          <p className="mt-4 rounded-xl bg-slate-50 p-3 text-sm text-slate-500">No comparable numeric logs were returned for this period.</p>
+          <p className="mt-4 px-1 py-3 text-sm text-slate-500">No comparable numeric logs were returned for this period.</p>
         )}
       </section>
 
@@ -2715,8 +2715,8 @@ function MedicationPeriodInsights({
   if (!hasReportContent) return null;
 
   return (
-    <section aria-label="Medication trends and patterns" className="overflow-hidden rounded-2xl border border-[#dcebed] bg-white shadow-sm">
-      <div className="border-b border-slate-100 px-4 py-4 sm:px-5">
+    <section aria-label="Medication trends and patterns" className="space-y-3">
+      <div className="px-1 pb-2 sm:px-0">
         <p className="text-[10px] font-black uppercase tracking-[0.16em] text-[#0b7b80]">Treatment routine</p>
         <div className="mt-1 flex flex-wrap items-baseline justify-between gap-3">
           <h2 className="text-lg font-black text-[#0b2d54]">Medication trends and patterns</h2>
@@ -2727,6 +2727,12 @@ function MedicationPeriodInsights({
       {loading && (
         <p className="border-b border-slate-100 px-4 py-3 text-xs font-semibold text-slate-500 sm:px-5">
           Reading your saved medication schedules and adherence history…
+        </p>
+      )}
+
+      {currentTotals.eventTotal === 0 && currentTotals.legacyTotal > 0 && (
+        <p className="px-1 text-xs leading-5 text-amber-800">
+          {currentTotals.legacyTotal} older inferred or daily-status record{currentTotals.legacyTotal === 1 ? "" : "s"} are available, but this period has no explicit dose-level taken/skipped actions. Any schedule-based percentage below is a historical estimate, not confirmed dose adherence.
         </p>
       )}
 
@@ -2781,7 +2787,7 @@ function MedicationPeriodInsights({
                   </div>
                   <div className="flex flex-wrap items-end gap-x-5 gap-y-2">
                     <div>
-                      <p className="text-[10px] font-bold uppercase tracking-wide text-slate-400">{row.source === "schedule" ? "Period adherence" : row.source === "events" ? "Recorded outcomes taken" : row.source === "legacy" ? "Older daily statuses" : "Adherence"}</p>
+                      <p className="text-[10px] font-bold uppercase tracking-wide text-slate-400">{row.source === "schedule" ? (currentTotals.eventTotal === 0 && currentTotals.legacyTotal > 0 ? "Historical estimate" : "Period adherence") : row.source === "events" ? "Recorded outcomes taken" : row.source === "legacy" ? "Older daily statuses" : "Adherence"}</p>
                       <p className="mt-0.5 text-xl font-black text-[#0b2d54]">
                         {currentRate === null ? "—" : formatNumber(currentRate, 1) + "%"}
                       </p>
@@ -2829,7 +2835,7 @@ function MedicationPeriodInsights({
                 )}
                 {row.source === "empty" && (
                   <p className="mt-2 text-[11px] leading-5 text-slate-500">
-                    No scheduled outcomes found. Check the saved medication schedule link.
+                    No scheduled outcomes were linked to this period, so adherence is not estimated.
                   </p>
                 )}
                 {row.currentDayInProgress && <p className="mt-2 text-[10px] leading-4 text-slate-400">Today is still in progress and is excluded from the period adherence rate.</p>}
@@ -2848,7 +2854,7 @@ function MedicationPeriodInsights({
       )}
 
       {patternNotes.length > 0 && (
-        <details className="border-t border-slate-100 bg-[#f4fbfb] px-4 py-3 sm:px-5">
+        <details className="rounded-xl border border-slate-200 bg-white px-3 py-3">
           <summary className="flex cursor-pointer list-none items-center justify-between gap-3 text-xs font-bold text-[#0b2d54]">
             <span className="flex items-center gap-2"><Activity className="h-4 w-4 text-[#0b7b80]" /> Longer-term patterns</span>
             <span className="text-[10px] font-semibold text-[#0b7b80]">View {Math.min(patternNotes.length, 2)} signals</span>
@@ -2936,7 +2942,7 @@ function VitalTrendCard({
       <div className="mt-2"><StatusCircle label={verificationSensitive ? "Review flagged entries" : status.label} detail={verificationSensitive ? "" : /within your saved goal/i.test(status.label) ? (label.toLowerCase().includes("blood pressure") ? "Systolic target only; review both numbers." : "Latest reading is within your saved target.") : /elevated/i.test(status.label) ? "Discuss repeated readings with your clinician." : label === "Weight" ? "Shown against your saved measurements and goals." : status.detail} tone={verificationSensitive ? "watch" : status.tone} /></div>
       {excludedCount > 0 && <p className="mt-2 text-[11px] font-semibold text-amber-800">{excludedCount} {excludedCount === 1 ? "reading needs" : "readings need"} review and {excludedCount === 1 ? "is" : "are"} excluded from averages.</p>}
       {verificationSensitive ? (
-        <div className="mt-3 flex items-center justify-between gap-3 rounded-xl border border-slate-200 bg-slate-50 px-3 py-3">
+        <div className="mt-3 flex items-center justify-between gap-3 border-t border-slate-100 py-3">
           <div className="min-w-0">
             <p className="text-xs font-extrabold text-slate-700">Average withheld</p>
             <p className="mt-0.5 text-[11px] text-slate-500">Review flagged readings first.</p>
@@ -2948,11 +2954,11 @@ function VitalTrendCard({
       ) : (
         <>
           <div className="mt-3 grid grid-cols-2 gap-3">
-            <div className="rounded-xl bg-[#f5fafb] p-3">
+            <div className="min-w-0">
               <p className="text-[10px] font-bold uppercase tracking-wide text-slate-400">Period average</p>
               <p className="mt-1 text-xl font-black tabular-nums text-[#0b2d54]">{formatNumber(average, digits)} <span className="text-xs font-bold text-slate-500">{unit}</span></p>
             </div>
-            <div className="rounded-xl bg-[#f5fafb] p-3">
+            <div className="min-w-0">
               <p className="text-[10px] font-bold uppercase tracking-wide text-slate-400">Latest reading</p>
               <p className="mt-1 text-xl font-black tabular-nums text-[#0b2d54]">{latest ? formatNumber(latest.value, digits) : "—"} <span className="text-xs font-bold text-slate-500">{unit}</span></p>
               {latest && <p className="mt-1 text-[10px] text-slate-500">{dateLabel(new Date(latest.timestamp).toISOString())}</p>}
@@ -3241,7 +3247,7 @@ function HealthReportInsights({
               <div className="sm:pl-4"><p className="text-[10px] font-bold uppercase tracking-wide text-slate-400">Other updates</p><p className="mt-1 text-lg font-black text-[#0b2d54]">{report.clinical.diagnoses.length + report.clinical.prescriptions.length + report.clinical.referrals.length + report.clinical.procedures.length}</p></div>
             </div>
           </div>
-          {flaggedLabs.length > 0 && <div className="mt-3 rounded-2xl border border-amber-200 bg-amber-50 p-5"><div className="flex items-start gap-3"><AlertTriangle className="mt-0.5 h-5 w-5 shrink-0 text-amber-700" /><div className="min-w-0"><h3 className="font-bold text-amber-950">Results marked for review in the clinical record</h3><p className="mt-1 text-xs leading-5 text-amber-900">These items were marked abnormal or critical by the source record. Sympto is not re-interpreting them here; review the report with your clinician.</p><div className="mt-3 space-y-2">{flaggedLabs.slice(0, 4).map((item) => <div key={item.id} className="flex flex-wrap items-start justify-between gap-2 rounded-xl bg-white/80 p-3"><div><p className="text-sm font-bold text-[#0b2d54]">{item.name}</p><p className="mt-1 text-[11px] text-slate-500">{dateLabel(item.date)}</p></div><div className="flex items-center gap-2"><span className="text-sm font-bold text-[#0b2d54]">{String(item.value)}</span>{item.critical && <span className="rounded-full bg-rose-100 px-2 py-1 text-[9px] font-black uppercase text-rose-800">Critical</span>}{!item.critical && <span className="rounded-full bg-amber-100 px-2 py-1 text-[9px] font-black uppercase text-amber-800">Abnormal</span>}</div></div>)}</div></div></div></div>}
+          {flaggedLabs.length > 0 && <div className="mt-3 border-t border-amber-200 pt-3"><div className="flex items-start gap-3"><AlertTriangle className="mt-0.5 h-5 w-5 shrink-0 text-amber-700" /><div className="min-w-0"><h3 className="font-bold text-amber-950">Results marked for review in the clinical record</h3><p className="mt-1 text-xs leading-5 text-amber-900">These items were marked abnormal or critical by the source record. Sympto is not re-interpreting them here; review the report with your clinician.</p><div className="mt-3 space-y-2">{flaggedLabs.slice(0, 4).map((item) => <div key={item.id} className="flex flex-wrap items-start justify-between gap-2 border-b border-amber-200 py-3"><div><p className="text-sm font-bold text-[#0b2d54]">{item.name}</p><p className="mt-1 text-[11px] text-slate-500">{dateLabel(item.date)}</p></div><div className="flex items-center gap-2"><span className="text-sm font-bold text-[#0b2d54]">{String(item.value)}</span>{item.critical && <span className="rounded-full bg-rose-100 px-2 py-1 text-[9px] font-black uppercase text-rose-800">Critical</span>}{!item.critical && <span className="rounded-full bg-amber-100 px-2 py-1 text-[9px] font-black uppercase text-amber-800">Abnormal</span>}</div></div>)}</div></div></div></div>}
         </section>
       )}
 
