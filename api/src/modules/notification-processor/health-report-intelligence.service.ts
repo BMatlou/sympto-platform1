@@ -299,8 +299,10 @@ function observationQuality(metric: string, value: number | null, unitFlags: str
   switch (metric) {
     case 'body_temperature':
       if (value < 25 || value > 45) markInvalid('TEMPERATURE_OUTSIDE_PLAUSIBILITY_RANGE');
-      else if (value < 32 || value >= 43) markReview('TEMPERATURE_VERIFY_ENTRY');
-      else if (value >= 40) safetySignals.push('HIGH_TEMPERATURE_REQUIRES_URGENT_REVIEW');
+      else {
+        if (value < 32 || value >= 43) markReview('TEMPERATURE_VERIFY_ENTRY');
+        if (value >= 40) safetySignals.push('HIGH_TEMPERATURE_REQUIRES_URGENT_REVIEW');
+      }
       break;
     case 'oxygen_saturation':
       if (value <= 0 || value > 100) markInvalid('OXYGEN_OUTSIDE_PERCENT_SCALE');
@@ -361,7 +363,7 @@ function ageAt(dobValue: unknown, referenceValue: unknown): number | null {
 
 @Injectable()
 export class HealthReportIntelligenceService {
-  normalize(reportInput: unknown): HealthObservation[] {
+  normalize(reportInput: unknown, patientId?: string): HealthObservation[] {
     const report = row(reportInput);
     const activity = row(report.activity);
     const clinical = row(report.clinical);
@@ -399,7 +401,7 @@ export class HealthReportIntelligenceService {
       if (basis === 'RECORD_TIME_FALLBACK') quality.flags.push('LEGACY_TIMESTAMP_FALLBACK');
       if (!observedAt) quality.flags.push('OBSERVATION_TIME_UNKNOWN');
       sources.push({
-        patientId: stringValue(report.patientId),
+        patientId: patientId ?? stringValue(report.patientId),
         metric: input.metric,
         value: normalized.value,
         secondaryValue: numericValue(input.secondaryValue),
@@ -407,7 +409,7 @@ export class HealthReportIntelligenceService {
         unit: normalized.unit,
         observedAt,
         observedAtBasis: observedAt ? basis : 'UNKNOWN',
-        capturedAt: isoDate(input.capturedAt) ?? generatedAt,
+        capturedAt: isoDate(input.capturedAt),
         source: {
           type: input.sourceType,
           recordId: stringValue(input.sourceId),
@@ -573,13 +575,13 @@ export class HealthReportIntelligenceService {
     return sources.filter((item) => periodIncludes(report, item.observedAt));
   }
 
-  analyze(reportInput: unknown): HealthReportIntelligence {
+  analyze(reportInput: unknown, patientId?: string): HealthReportIntelligence {
     const report = row(reportInput);
     const activity = row(report.activity);
     const clinical = row(report.clinical);
     const tracking = row(report.tracking);
     const snapshot = row(report.currentSnapshot);
-    const observations = this.normalize(reportInput);
+    const observations = this.normalize(reportInput, patientId);
     const metricCounts: Record<string, number> = {};
     let timestampFallbackCount = 0;
     let qualityAcceptedCount = 0;
@@ -744,9 +746,12 @@ export class HealthReportIntelligenceService {
         sourceCounts,
         observationCandidateCount: observations.length,
         metricCounts,
-        unmappedMetricCount: Math.max(0,
-          rows(activity.deviceMeasurements).length + rows(activity.wellnessMetrics).length -
-          observations.filter((item) => item.source.type === 'WEARABLE_DEVICE' || item.source.type === 'WELLNESS_METRIC').length),
+        unmappedMetricCount: rows(activity.deviceMeasurements).filter((item) => {
+          const rawType = item.measurementType ?? item.metricKey ?? row(item.vitalType).name;
+          const isBloodPressure = String(rawType ?? '').toUpperCase().includes('BLOOD_PRESSURE') ||
+            String(item.metricKey ?? '').toLowerCase().includes('blood_pressure');
+          return !isBloodPressure && !normalizeMetric(rawType, item.metricKey);
+        }).length + rows(activity.wellnessMetrics).filter((item) => !normalizeMetric(item.metricKey, item.metricKey)).length,
         timestampFallbackCount,
         qualityAcceptedCount,
         qualityNeedsReviewCount,
