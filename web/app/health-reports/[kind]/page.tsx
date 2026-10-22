@@ -1361,27 +1361,6 @@ function recurringSymptoms(report: Report | null) {
   return Array.from(counts.values()).sort((a, b) => b.count - a.count);
 }
 
-function routineAssociation(report: Report | null) {
-  if (!report) return null;
-  const sleep = dailyMetric(report, "sleepHours");
-  const stress = dailyMetric(report, "stressLevel");
-  const stressByDay = new Map(stress.map((item) => [item.date, item.value]));
-  const matched = sleep
-    .filter((item) => stressByDay.has(item.date))
-    .map((item) => ({ sleep: item.value, stress: stressByDay.get(item.date)! }));
-  if (matched.length < 4) return null;
-
-  const sortedSleep = matched.map((item) => item.sleep).sort((a, b) => a - b);
-  const median = sortedSleep[Math.floor(sortedSleep.length / 2)];
-  const shorter = matched.filter((item) => item.sleep < median);
-  const longer = matched.filter((item) => item.sleep >= median);
-  if (shorter.length < 2 || longer.length < 2) return null;
-  const shortStress = mean(shorter.map((item) => item.stress));
-  const longStress = mean(longer.map((item) => item.stress));
-  if (shortStress === null || longStress === null) return null;
-  return { shorterDays: shorter.length, longerDays: longer.length, shortStress, longStress, delta: shortStress - longStress };
-}
-
 function compareText(
   currentValues: number[],
   previousValues: number[],
@@ -3033,7 +3012,6 @@ function HealthReportInsights({
   const repeated = recurringSymptoms(report);
   const symptomAnalytics = symptomLogAnalytics(report);
   const previousSymptomAnalytics = symptomLogAnalytics(previousReport);
-  const association = routineAssociation(report);
   const flaggedLabs = flaggedLabItems(report);
   const clinicalCount = clinicalEvents(report);
   const previousSymptomCount = previousReport?.activity.symptoms.length ?? 0;
@@ -3184,7 +3162,7 @@ function HealthReportInsights({
         {activeVitals.length ? <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">{activeVitals.map((item) => <VitalTrendCard key={item.key} label={item.label} unit={item.unit} digits={item.digits} current={item.current} previous={item.previous} previousLoading={previousLoading} review={item.review} status={item.status} rawCurrent={item.rawCurrent} />)}</div> : <div className="rounded-2xl border border-dashed border-slate-300 bg-white p-5 text-sm leading-6 text-slate-500">No dated vital readings were found for this period. Once you save blood pressure, heart rate, weight or other measurements, they will appear here.</div>}
       </section>
 
-      {(symptomCount > 0 || lowMood.total > 0 || association !== null || repeated.some((item) => item.count > 1) || symptomAnalytics.repeatedTriggers.length > 0 || symptomAnalytics.medicationEffects > 0 || symptomAnalytics.averageSeverityRank !== null || symptomAnalytics.worseningCount > 0 || symptomAnalytics.severeCount > 0) && (
+      {(symptomCount > 0 || lowMood.total > 0 || repeated.some((item) => item.count > 1) || symptomAnalytics.repeatedTriggers.length > 0 || symptomAnalytics.medicationEffects > 0 || symptomAnalytics.averageSeverityRank !== null || symptomAnalytics.worseningCount > 0 || symptomAnalytics.severeCount > 0) && (
         <section className="rounded-2xl border border-[#dcebed] bg-white p-4 sm:p-5" aria-label="Health patterns">
           <p className="text-[10px] font-black uppercase tracking-[0.16em] text-[#0b7b80]">Patterns</p>
           <h2 className="mt-1 text-lg font-black text-[#0b2d54]">Patterns across your logs</h2>
@@ -3215,13 +3193,6 @@ function HealthReportInsights({
                 {lowMood.low > 0 && <p className="mt-1 text-xs leading-5 text-slate-500">If low mood continues or feels difficult to manage, consider reaching out to someone you trust or a health professional.</p>}
                 </div>
                 <span className="text-xs font-semibold text-slate-500">Based on saved check-ins</span>
-              </div>
-            )}
-            {association && (
-              <div className="py-3">
-                <p className="text-sm font-bold text-[#0b2d54]">Sleep and stress on the same days</p>
-                <p className="mt-1 text-xs leading-5 text-slate-600">On {association.shorterDays} shorter-sleep day{association.shorterDays === 1 ? "" : "s"}, stress averaged {formatNumber(association.shortStress, 1)}/10; on {association.longerDays} longer-sleep day{association.longerDays === 1 ? "" : "s"}, it averaged {formatNumber(association.longStress, 1)}/10.</p>
-                <p className="mt-1 text-xs leading-5 text-slate-500">Worth monitoring: keep logging sleep and stress to see whether this repeats. A small same-day pattern cannot show that one caused the other.</p>
               </div>
             )}
             {symptomAnalytics.repeatedTriggers.length > 0 && (
