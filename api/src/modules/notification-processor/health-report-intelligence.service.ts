@@ -1564,6 +1564,56 @@ export class HealthReportIntelligenceService {
     const confidenceFor = (items: HealthObservation[]): 'HIGH' | 'MODERATE' | 'LIMITED' =>
       items.some((item) => item.observedAtBasis !== 'SOURCE_EVENT_TIME') ? 'MODERATE' : 'HIGH';
 
+    // Surface source-calculated risk results without inventing a universal score
+    // or applying one assessment's thresholds to another instrument.
+    for (const assessmentInput of rows(tracking.riskAssessments)) {
+      const assessment = row(assessmentInput);
+      const assessmentName = stringValue(assessment.assessmentType ?? assessment.title ?? assessment.name) ??
+        'Health risk assessment';
+      const riskLabel = stringValue(assessment.overallRisk);
+      const score = numericValue(assessment.score);
+      if (!riskLabel && score === null) continue;
+      const riskCode = String(riskLabel ?? '').toUpperCase().replace(/[\s-]+/g, '_');
+      const elevated = /CRITICAL|HIGH|SEVERE|VERY_HIGH|ELEVATED/.test(riskCode);
+      const moderate = /MODERATE|MEDIUM|INTERMEDIATE|WATCH/.test(riskCode);
+      const assessedAt = isoDate(assessment.assessedAt ?? assessment.createdAt ?? assessment.updatedAt);
+      const resultEvidence = rows(assessment.results).slice(0, 3).map((resultInput) => {
+        const result = row(resultInput);
+        const factor = stringValue(result.factor ?? result.name ?? result.label) ?? 'Assessment factor';
+        const value = stringValue(result.value);
+        const recommendation = stringValue(result.recommendation);
+        return factor + (value ? ': ' + value : '') + (recommendation ? ' — ' + recommendation : '');
+      });
+      const scoreText = score === null ? '' : 'Recorded score: ' + formatNumber(score, 2) + '.';
+      const riskText = riskLabel ? 'Source risk classification: ' + riskLabel + '.' : '';
+      addFinding({
+        key: 'risk-assessment:' + String(assessment.id ?? assessmentName + ':' + (assessedAt ?? 'undated')),
+        priority: elevated ? 'REVIEW' : moderate ? 'WATCH' : 'INSIGHT',
+        title: elevated
+          ? assessmentName + ' recorded an elevated risk classification'
+          : assessmentName + ' result recorded',
+        change: [riskText, scoreText, assessedAt ? 'Assessed ' + (localDay(assessedAt) ?? assessedAt.slice(0, 10)) + '.' : ''].filter(Boolean).join(' '),
+        pattern: 'This preserves the classification and score saved by the original assessment. Sympto does not recalculate the score or apply a universal threshold across different assessment tools.',
+        personalContext: stringValue(assessment.notes) ??
+          'The recorded result belongs to your ' + assessmentName.toLowerCase() + ' assessment; its meaning depends on the instrument, the information entered and the recommendations that accompanied it.',
+        whyItMatters: elevated
+          ? 'The source assessment labels this result as higher risk. It deserves review against the original assessment guidance and your clinical context; this summary is not an independent diagnosis.'
+          : moderate
+            ? 'The source assessment labels this result as moderate or intermediate. Follow the assessment-specific recommendations and review plan.'
+            : 'The numeric score is not interpreted on its own because different assessments use different scales and cut-offs.',
+        nextStep: elevated || moderate
+          ? 'Open the original assessment and review its stated recommendations and follow-up timing with your clinician.'
+          : 'Keep the original assessment and its instructions for interpretation and repeat assessment; do not compare this score with an unrelated scale.',
+        confidence: assessedAt ? 'HIGH' : 'LIMITED',
+        evidence: [
+          ...[riskText, scoreText].filter(Boolean),
+          ...(assessedAt ? ['Assessment date: ' + (localDay(assessedAt) ?? assessedAt.slice(0, 10)) + '.'] : []),
+          ...resultEvidence,
+        ],
+        sourceRecordIds: [stringValue(assessment.id)].filter((id): id is string => Boolean(id)),
+      });
+    }
+
     // The narrative needs to synthesise related routine measures, not repeat every
     // individual comparison already shown later in the report.
     const routineMetricKeys = [
