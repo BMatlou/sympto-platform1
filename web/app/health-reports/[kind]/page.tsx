@@ -2035,7 +2035,7 @@ function PersonalisedInsights({
       evidence: review.label + ": " + formatNumber(review.value, review.key === "temperature" || review.key === "oxygen" ? 1 : 0) + " " + review.unit + " · " + dateLabel(new Date(review.timestamp).toISOString()),
       action: review.key === "oxygen" ? "Recheck immediately and seek emergency help if it remains low; do not delay if unwell." : review.key === "temperature" ? "Verify the unit and measurement; seek urgent medical help if the reading is current and accurate." : review.key === "respiratory" ? "If this is your current resting rate, seek urgent medical advice; severe breathing difficulty needs emergency help." : "Repeat the measurement after resting; get urgent help for severe symptoms.",
       tone: "critical",
-      href: "#report-patterns",
+      href: "#full-report-data",
       linkLabel: "Review measurement",
     });
   }
@@ -2101,7 +2101,7 @@ function PersonalisedInsights({
       evidence: "Average stress rating " + formatNumber(stressAverage, 1) + "/10" + (priorStressAverage === null ? "" : " · previous " + formatNumber(priorStressAverage, 1) + "/10"),
       action: "Prioritise a wellbeing check-in and seek support if this level persists or feels difficult to manage.",
       tone: "watch",
-      href: "#report-patterns",
+      href: "#full-report-data",
       linkLabel: "Open check-in",
     });
   }
@@ -2113,7 +2113,7 @@ function PersonalisedInsights({
       evidence: "Current average " + formatNumber(moodAverage, 1) + "/5" + (previousMoodAverage === null ? "" : " · previous " + formatNumber(previousMoodAverage, 1) + "/5"),
       action: "Check in with yourself and reach out to someone you trust or a health professional if low mood persists or feels hard to manage.",
       tone: "watch",
-      href: "#report-patterns",
+      href: "#full-report-data",
       linkLabel: "Review wellbeing check-in",
     });
   }
@@ -2135,7 +2135,7 @@ function PersonalisedInsights({
       evidence: "Average sleep-quality rating " + formatNumber(sleepQualityAverage, 1) + "/5.",
       action: "Compare sleep-quality ratings with logged sleep duration and stress; seek support if problems persist.",
       tone: "watch",
-      href: "#report-patterns",
+      href: "#full-report-data",
       linkLabel: "Review sleep check-in",
     });
   }
@@ -2146,7 +2146,7 @@ function PersonalisedInsights({
       evidence: "Average recorded sleep " + formatNumber(sleepAverage, 1) + " hours on days with entries.",
       action: "Review sleep consistency and consider discussing persistent sleep difficulties with a healthcare professional.",
       tone: "watch",
-      href: "#report-patterns",
+      href: "#full-report-data",
       linkLabel: "Review check-in",
     });
   }
@@ -2161,7 +2161,7 @@ function PersonalisedInsights({
         : doseCurrent.legacyTotal + " older dated status entries · " + doseCurrent.legacyTaken + " marked taken · " + doseCurrent.legacySkipped + " marked skipped",
       action: "Review skipped or difficult-to-log doses with your care team; do not change a prescription based on this report.",
       tone: "watch",
-      href: "#report-patterns",
+      href: "#full-report-data",
       linkLabel: "Review medication logs",
     });
   }
@@ -3379,7 +3379,7 @@ function ContextualHealthInsights({ report }: { report: Report }) {
       detail: glucoseEvents.length || glucoseLabs
         ? "Review the dated glucose and laboratory records alongside your saved medication routine and your clinician's targets."
         : "No dated glucose tracker entries or numeric glucose/HbA1c lab values were returned for this period. They will not be inferred from other measurements.",
-      href: "#report-patterns",
+      href: "#full-report-data",
     });
   }
   if (/hypertension|high blood pressure/.test(conditionNames)) {
@@ -3389,7 +3389,7 @@ function ContextualHealthInsights({ report }: { report: Report }) {
       detail: systolic.length && diastolic.length
         ? "The full record includes the dated pressure values. Compare repeated pairs with your saved target and clinician's advice."
         : "Blood-pressure measurements were sparse or not recorded in this period. Check the full record for readings saved through other sources.",
-      href: "#report-patterns",
+      href: "#full-report-data",
     });
   }
   if (/asthma|copd|chronic obstructive|respiratory condition/.test(conditionNames)) {
@@ -3397,7 +3397,7 @@ function ContextualHealthInsights({ report }: { report: Report }) {
       title: "Breathing and respiratory context",
       headline: oxygen.length + " oxygen readings · " + breathing.length + " breathing-rate readings · " + respiratorySymptoms.length + " related symptom logs",
       detail: "Readings, symptom follow-ups and any verification flags are kept together in this report so you can review the dates and source records.",
-      href: "#report-patterns",
+      href: "#full-report-data",
     });
   }
   if (goals.length) {
