@@ -1607,6 +1607,81 @@ export class HealthReportIntelligenceService {
       });
     }
 
+    // Test for repeated same-day co-occurrence between symptom records and explicit
+    // medication dose actions. This is a chronology signal, not proof the medicine
+    // treats the symptom or that a skipped dose caused an outcome.
+    const daySymptoms = new Map<string, Set<string>>();
+    for (const symptom of symptomRows) {
+      const label = stringValue(symptom.title) ??
+        rows(symptom.symptoms).map((entry) => stringValue(row(entry.symptom).name ?? entry.name)).filter(Boolean).join(', ') ??
+        'Symptom record';
+      const times = [symptom.startedAt ?? symptom.createdAt, ...rows(symptom.monitorings).map((monitor) => monitor.observedAt ?? monitor.createdAt)];
+      for (const at of times) {
+        if (!at || !periodIncludes(report, at)) continue;
+        const day = localDay(at);
+        if (!day) continue;
+        const labels = daySymptoms.get(day) ?? new Set<string>();
+        labels.add(label);
+        daySymptoms.set(day, labels);
+      }
+    }
+    const doseActionsByDay = new Map<string, { taken: Set<string>; skipped: Set<string> }>();
+    for (const event of rows(report.goalMetricEvents)) {
+      if (event.source !== 'medication-adherence' || !event.occurredAt || !periodIncludes(report, event.occurredAt)) continue;
+      const meta = row(event.metadata);
+      const action = stringValue(meta.action)?.toUpperCase();
+      if (action !== 'TAKEN' && action !== 'SKIPPED') continue;
+      const day = localDay(event.occurredAt);
+      if (!day || !daySymptoms.has(day)) continue;
+      const medicationId = stringValue(meta.patientMedicationId) ??
+        stringValue(event.sourceId)?.split(':')[0] ??
+        '';
+      const medication = activeMedications.find((item) => String(item.id ?? '') === medicationId);
+      const medicationName = stringValue(row(medication?.medication).name ?? medication?.name) ?? 'A saved medication';
+      const actions = doseActionsByDay.get(day) ?? { taken: new Set<string>(), skipped: new Set<string>() };
+      (action === 'TAKEN' ? actions.taken : actions.skipped).add(medicationName);
+      doseActionsByDay.set(day, actions);
+    }
+    const skippedSymptomDays = Array.from(doseActionsByDay.entries()).filter(([, actions]) => actions.skipped.size > 0);
+    const takenSymptomDays = Array.from(doseActionsByDay.entries()).filter(([, actions]) => actions.taken.size > 0);
+    if (skippedSymptomDays.length >= 2) {
+      const skippedNames = Array.from(new Set(skippedSymptomDays.flatMap(([, actions]) => Array.from(actions.skipped))));
+      const takenNames = Array.from(new Set(takenSymptomDays.flatMap(([, actions]) => Array.from(actions.taken))));
+      const evidence = [
+        ...skippedSymptomDays.slice(0, 4).map(([day, actions]) =>
+          day + ': symptom record(s) ' + Array.from(daySymptoms.get(day) ?? []).join(', ') +
+          '; explicitly skipped: ' + Array.from(actions.skipped).join(', ')),
+        ...takenSymptomDays.slice(0, 2).map(([day, actions]) =>
+          day + ': symptom record(s) ' + Array.from(daySymptoms.get(day) ?? []).join(', ') +
+          '; explicitly taken: ' + Array.from(actions.taken).join(', ')),
+      ];
+      addFinding({
+        key: 'cross:symptoms-medication-actions',
+        priority: 'WATCH',
+        title: 'Symptom entries overlapped with explicitly skipped medication doses',
+        change: 'Symptoms and skipped-dose actions were recorded on ' + skippedSymptomDays.length +
+          ' separate day(s)' + (takenSymptomDays.length
+            ? '; symptoms and taken-dose actions also overlapped on ' + takenSymptomDays.length + ' day(s).' : '.'),
+        pattern: 'The overlap is based on the local calendar date of symptom starts/follow-ups and explicit TAKEN/SKIPPED medication actions. ' +
+          (skippedNames.length ? 'Medicines marked skipped on overlap days: ' + skippedNames.join(', ') + '. ' : '') +
+          (takenNames.length ? 'Medicines marked taken on overlap days: ' + takenNames.join(', ') + '. ' : ''),
+        personalContext: 'Only dose actions explicitly saved in the medication log were used. Unrecorded scheduled doses are not treated as skipped, and the records do not establish that a medicine was prescribed for the symptom.',
+        whyItMatters: 'This chronology may be worth reviewing with the actual prescription instructions and symptom timeline, but same-day co-occurrence does not show that skipped doses caused symptoms or that taken doses relieved them.',
+        nextStep: 'Check the specific medicine instructions and note why a dose was skipped, if known. Discuss recurring symptoms or difficulty taking medication as prescribed with your prescriber or pharmacist; do not change or double a dose based on this pattern.',
+        confidence: skippedSymptomDays.length >= 4 && takenSymptomDays.length >= 2 ? 'MODERATE' : 'LIMITED',
+        evidence,
+        sourceRecordIds: Array.from(new Set([
+          ...skippedSymptomDays.flatMap(([day]) => symptomRows.filter((symptom) =>
+            [symptom.startedAt ?? symptom.createdAt, ...rows(symptom.monitorings).map((monitor) => monitor.observedAt ?? monitor.createdAt)]
+              .some((at) => at && localDay(at) === day)).map((symptom) => stringValue(symptom.id))),
+          ...rows(report.goalMetricEvents).filter((event) =>
+            event.source === 'medication-adherence' && event.occurredAt && skippedSymptomDays.some(([day]) => day === localDay(event.occurredAt)) &&
+            String(row(event.metadata).action ?? '').toUpperCase() === 'SKIPPED',
+          ).map((event) => stringValue(event.sourceId)),
+        ].filter((id): id is string => Boolean(id)))),
+      });
+    }
+
     // Surface observations carrying explicit safety signals before general trends.
     const urgentSignals = new Map<string, HealthObservation[]>();
     for (const item of observations.filter((observation) => observation.quality.safetySignals.length)) {
