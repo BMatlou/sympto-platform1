@@ -918,7 +918,11 @@ export class HealthReportNotificationSchedulerService
         appointments,
         patientVitals: patientVitals.map((entry) => ({
           id: entry.id,
-          recordedAt: entry.createdAt,
+          // The manual-vitals writer reuses one journal row and stores the
+          // measurement time in updatedAt for this dedicated title only.
+          recordedAt: /today.s measurements/i.test(String(entry.title ?? ''))
+            ? entry.updatedAt
+            : entry.createdAt,
           source: entry.practitionerId ? 'CLINICAL' : 'PATIENT',
           temperature: entry.temperature,
           bloodPressureSystolic: entry.bloodPressureSystolic,
