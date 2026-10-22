@@ -275,6 +275,16 @@ type GoalMetricEventRecord = {
   goalId?: string | null;
   goalTitle?: string | null;
   goalCategory?: string | null;
+  goalAssociations?: Array<{
+    goalId?: string | null;
+    goalTitle?: string | null;
+    goalCategory?: string | null;
+    unit?: string | null;
+    targetValue?: number | string | null;
+    aggregation?: string | null;
+    frequency?: string | null;
+    status?: string | null;
+  }>;
   unit?: string | null;
   targetValue?: number | string | null;
   aggregation?: string | null;
@@ -625,7 +635,7 @@ function goalProgressTrendItems(report: Report, previousReport: Report | null): 
     if (!targetReport) return [];
     const byDate = new Map<string, Array<{ date: string; timestamp: number; value: number; unit: string; aggregation: string }>>();
     (targetReport.goalMetricEvents ?? [])
-      .filter((event) => event.goalId === goalId && event.source !== "goal-baseline")
+      .filter((event) => (event.goalId === goalId || (event.goalAssociations ?? []).some((association) => association.goalId === goalId)) && event.source !== "goal-baseline")
       .forEach((event) => {
         const timestamp = new Date(event.occurredAt).getTime();
         const value = finite(event.loggedValue);
@@ -703,7 +713,7 @@ function goalProgressTrendItems(report: Report, previousReport: Report | null): 
       key: String(goal.id ?? goal.category ?? goal.title ?? "goal"),
       title: String(goal.title || human(goal.category) || "Health goal"),
       category: String(goal.category ?? ""),
-      unit: current[0].valueKind === "percent" ? "%" : String(goal.unit ?? (eventPoints.length ? (report.goalMetricEvents ?? []).find((event) => event.goalId === goal.id)?.unit : "") ?? ""),
+      unit: current[0].valueKind === "percent" ? "%" : String(goal.unit ?? (eventPoints.length ? (report.goalMetricEvents ?? []).find((event) => event.goalId === goal.id || (event.goalAssociations ?? []).some((association) => association.goalId === goal.id))?.unit : "") ?? ""),
       valueKind: current[0].valueKind,
       current: current.map(({ date, value }) => ({ date, value })),
       previous: previousEvents.length ? previousEvents.map(({ date, value }) => ({ date, value })) : previousProgress,
@@ -3494,7 +3504,7 @@ function ContextualHealthInsights({ report }: { report: Report }) {
   ].filter(Boolean).join(" ")));
   const goals = snapshot.activeGoals ?? [];
   const trackedGoalIds = new Set<string>([
-    ...events.map((event) => String(event.goalId ?? "")).filter(Boolean),
+    ...events.flatMap((event) => [String(event.goalId ?? ""), ...(event.goalAssociations ?? []).map((association) => String(association.goalId ?? ""))]).filter(Boolean),
     ...ledgerArray(report.tracking?.goalProgress).map((item) => String(ledgerObject(ledgerObject(item).healthGoal).id ?? "" )).filter(Boolean),
   ]);
   const trackedGoals = goals.filter((goal) => goal.id && trackedGoalIds.has(String(goal.id)));
