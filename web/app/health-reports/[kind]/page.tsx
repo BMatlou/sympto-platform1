@@ -406,6 +406,7 @@ type Report = {
       currentStart: string;
       currentEnd: string;
       relatedGoals: string[];
+      relatedGoalTargets: string[];
       relatedConditions: string[];
       interpretation: string;
     }>;
