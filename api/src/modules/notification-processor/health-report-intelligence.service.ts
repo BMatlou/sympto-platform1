@@ -114,6 +114,7 @@ export interface HealthReportPeriodComparison {
   currentStart: string;
   currentEnd: string;
   relatedGoals: string[];
+  relatedGoalTargets: string[];
   relatedConditions: string[];
   interpretation: string;
 }
@@ -1463,23 +1464,31 @@ export class HealthReportIntelligenceService {
       if (previousAverage === null || currentAverage === null) continue;
       const change = currentAverage - previousAverage;
       if (Math.abs(change) < definition.minimumChange) continue;
-      const relatedGoals = activeGoalRows.filter((goal) => {
+      const metricMap: Record<string, string[]> = {
+        WEIGHT: ['weight'], BODY_WEIGHT: ['weight'],
+        BLOOD_PRESSURE: ['bp.systolic', 'bp.diastolic'], BP: ['bp.systolic', 'bp.diastolic'],
+        HEART_RATE: ['heart_rate'], RESTING_HEART_RATE: ['heart_rate'],
+        BLOOD_GLUCOSE: ['blood_glucose', 'lab.hba1c'], GLUCOSE: ['blood_glucose', 'lab.hba1c'],
+        CHOLESTEROL: ['cholesterol.total', 'cholesterol.ldl', 'cholesterol.hdl', 'cholesterol.triglycerides'],
+        EXERCISE: ['exercise.duration', 'activity.steps'], PHYSICAL_ACTIVITY: ['exercise.duration', 'activity.steps'],
+        HYDRATION: ['hydration.volume'], WATER: ['hydration.volume'],
+        SLEEP: ['sleep.duration', 'sleep.quality'], MENTAL_HEALTH: ['stress.score', 'mood', 'energy.level'],
+        STRESS: ['stress.score'], MOOD: ['mood'],
+        SMOKING: ['smoking.cigarettes', 'smoking.frequency'], ALCOHOL: ['alcohol.units', 'alcohol.frequency'],
+        MEDICATION: ['medication.dose_action'],
+      };
+      const matchingGoalRows = activeGoalRows.filter((goal) => {
         const category = String(goal.category ?? '').toUpperCase().replace(/[\s-]+/g, '_');
-        const metricMap: Record<string, string[]> = {
-          WEIGHT: ['weight'], BODY_WEIGHT: ['weight'],
-          BLOOD_PRESSURE: ['bp.systolic', 'bp.diastolic'], BP: ['bp.systolic', 'bp.diastolic'],
-          HEART_RATE: ['heart_rate'], RESTING_HEART_RATE: ['heart_rate'],
-          BLOOD_GLUCOSE: ['blood_glucose', 'lab.hba1c'], GLUCOSE: ['blood_glucose', 'lab.hba1c'],
-          CHOLESTEROL: ['cholesterol.total', 'cholesterol.ldl', 'cholesterol.hdl', 'cholesterol.triglycerides'],
-          EXERCISE: ['exercise.duration', 'activity.steps'], PHYSICAL_ACTIVITY: ['exercise.duration', 'activity.steps'],
-          HYDRATION: ['hydration.volume'], WATER: ['hydration.volume'],
-          SLEEP: ['sleep.duration', 'sleep.quality'], MENTAL_HEALTH: ['stress.score', 'mood', 'energy.level'],
-          STRESS: ['stress.score'], MOOD: ['mood'],
-          SMOKING: ['smoking.cigarettes', 'smoking.frequency'], ALCOHOL: ['alcohol.units', 'alcohol.frequency'],
-          MEDICATION: ['medication.dose_action'],
-        };
         return (metricMap[category] ?? []).includes(definition.metric);
-      }).map((goal) => stringValue(goal.title)).filter((title): title is string => Boolean(title));
+      });
+      const relatedGoals = matchingGoalRows.map((goal) => stringValue(goal.title)).filter((title): title is string => Boolean(title));
+      const relatedGoalTargets = matchingGoalRows.flatMap((goal) => {
+        const title = stringValue(goal.title);
+        const target = numericValue(goal.targetValue);
+        if (!title || target === null) return [];
+        const unit = stringValue(goal.unit) ?? definition.unit;
+        return [title + ': ' + formatNumber(target, Number.isInteger(target) ? 0 : 1) + (unit ? ' ' + unit : '')];
+      });
       const relatedConditions = contextualConditionRows.filter((condition) =>
         conditionMetricRules.some((rule) => rule.pattern.test(condition.name) && rule.metrics.includes(definition.metric)),
       ).map((condition) => condition.status === 'RESOLVED'
@@ -1504,12 +1513,16 @@ export class HealthReportIntelligenceService {
         currentStart: current[0].day,
         currentEnd: current[current.length - 1].day,
         relatedGoals,
+        relatedGoalTargets,
         relatedConditions,
         interpretation: (relatedConditions.length
           ? 'Relevant to your saved condition' + (relatedConditions.length > 1 ? 's' : '') + ': ' + relatedConditions.join(', ') + '. '
           : '') +
           (relatedGoals.length
             ? 'Related saved goal' + (relatedGoals.length > 1 ? 's' : '') + ': ' + relatedGoals.join(', ') + '. '
+            : '') +
+          (relatedGoalTargets.length
+            ? 'Saved numeric target(s) for reference: ' + relatedGoalTargets.join('; ') + '. The goal record does not supply a universal pass/fail rule for this measure, so the target is shown for context rather than assigning success or failure. '
             : '') +
           'This comparison uses accepted dated readings and daily averages across matched reporting windows. A rise or fall is not automatically better or worse; compare it with your saved target, baseline, symptoms and care plan.',
       });
