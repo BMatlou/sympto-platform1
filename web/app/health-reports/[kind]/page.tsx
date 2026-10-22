@@ -3578,7 +3578,7 @@ function ContextualHealthInsights({ report }: { report: Report }) {
       <div className="px-1 pb-2 sm:px-0">
         <p className="text-[10px] font-extrabold uppercase tracking-[0.15em] text-[#0b7b80]">Personalised context</p>
         <h2 className="mt-1 text-lg font-black tracking-tight text-[#0b2d54]">What this period means for your health</h2>
-        <p className="mt-1 text-xs leading-5 text-slate-500">Saved conditions, goals and baseline measurements are connected to the actual readings and logs in this period. Missing data is never treated as zero or proof that a condition is controlled.</p>
+        <p className="mt-1 text-xs leading-5 text-slate-500">Saved conditions, goals, profile patterns, allergy notes and baseline values are compared with dated readings, reported effects and follow-up dates available to this report. Missing data is never treated as zero or proof that a condition is controlled.</p>
       </div>
       <div className="divide-y divide-slate-200">
         {insights.map((item) => (
