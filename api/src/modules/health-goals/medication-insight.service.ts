@@ -470,7 +470,7 @@ export class MedicationInsightService {
         takenDoses,
         skippedDoses,
         unrecordedDoses,
-        adherencePercent: expectedDoses > 0
+        adherencePercent: expectedDoses > 0 && actions.length > 0
           ? Number((takenDoses / expectedDoses * 100).toFixed(2))
           : null,
         daily: buckets.map((day) => ({
@@ -498,7 +498,7 @@ export class MedicationInsightService {
     return {
       status, expectedDoses, takenDoses, skippedDoses, unrecordedDoses,
       explicitActionCount, legacyEventsNotUsed,
-      adherencePercent: expectedDoses > 0
+      adherencePercent: expectedDoses > 0 && explicitActionCount > 0
         ? Number((takenDoses / expectedDoses * 100).toFixed(2))
         : null,
       calculatedMedicationCount: calculated.length,
