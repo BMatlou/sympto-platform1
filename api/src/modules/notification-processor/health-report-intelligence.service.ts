@@ -1747,14 +1747,17 @@ export class HealthReportIntelligenceService {
       if (!name) return [];
       const resolved = isoDate(item.resolvedAt);
       const diagnosed = isoDate(item.diagnosedAt);
+      const updated = isoDate(item.updatedAt);
       const created = isoDate(item.createdAt);
-      const relevant = resolved ?? diagnosed ?? created;
-      if (!relevant || !periodIncludes(report, relevant)) return [];
+      const relevant = [resolved, diagnosed, updated, created].find((at) => Boolean(at && periodIncludes(report, at)));
+      if (!relevant) return [];
       return [{
         id: stringValue(item.id),
-        label: name + ' — ' + (resolved ? 'marked resolved' : diagnosed ? 'diagnosis date recorded' : 'record added'),
+        label: name + ' — ' + (resolved && periodIncludes(report, resolved) ? 'marked resolved'
+          : diagnosed && periodIncludes(report, diagnosed) ? 'diagnosis date recorded'
+            : updated && periodIncludes(report, updated) ? 'record updated' : 'record added'),
         date: localDay(relevant) ?? relevant.slice(0, 10),
-        resolved: Boolean(resolved),
+        resolved: Boolean(resolved && periodIncludes(report, resolved)),
       }];
     });
     const medicationChanges = rows(healthChanges.medications).flatMap((item) => {
@@ -1762,14 +1765,17 @@ export class HealthReportIntelligenceService {
       if (!name) return [];
       const ended = isoDate(item.endedAt);
       const started = isoDate(item.startedAt);
+      const updated = isoDate(item.updatedAt);
       const created = isoDate(item.createdAt);
-      const relevant = ended ?? started ?? created;
-      if (!relevant || !periodIncludes(report, relevant)) return [];
+      const relevant = [ended, started, updated, created].find((at) => Boolean(at && periodIncludes(report, at)));
+      if (!relevant) return [];
       return [{
         id: stringValue(item.id),
-        label: name + ' — ' + (ended ? 'end date recorded' : started ? 'start date recorded' : 'record added'),
+        label: name + ' — ' + (ended && periodIncludes(report, ended) ? 'end date recorded'
+          : started && periodIncludes(report, started) ? 'start date recorded'
+            : updated && periodIncludes(report, updated) ? 'record updated' : 'record added'),
         date: localDay(relevant) ?? relevant.slice(0, 10),
-        ended: Boolean(ended),
+        ended: Boolean(ended && periodIncludes(report, ended)),
       }];
     });
     if (conditionChanges.length || medicationChanges.length) {
