@@ -302,6 +302,38 @@ describe('HealthReportIntelligenceService', () => {
     expect(baselineInsight?.detail).toContain('-0.9 kg');
   });
 
+  it('does not calculate a trend from safety-flagged readings', () => {
+    const base = fixture();
+    const report = fixture({
+      activity: {
+        ...base.activity,
+        patientVitals: [
+          { id: 'o2-1', source: 'PATIENT', recordedAt: '2026-10-13T08:00:00.000Z', oxygenSaturation: 99 },
+          { id: 'o2-2', source: 'PATIENT', recordedAt: '2026-10-14T08:00:00.000Z', oxygenSaturation: 98 },
+          { id: 'o2-3', source: 'PATIENT', recordedAt: '2026-10-16T08:00:00.000Z', oxygenSaturation: 70 },
+          { id: 'o2-4', source: 'PATIENT', recordedAt: '2026-10-17T08:00:00.000Z', oxygenSaturation: 70 },
+        ],
+      },
+    });
+    const result = service.analyze(report, 'patient-1');
+    expect(result.coverage.safetySignalCount).toBeGreaterThan(0);
+    expect(result.withinPeriodTrends.some((item) => item.metric === 'oxygen_saturation')).toBe(false);
+  });
+
+  it('does not infer a within-period trend from fewer than four dated days', () => {
+    const base = fixture();
+    const report = fixture({
+      goalMetricEvents: [
+        { metricType: 'BLOOD_GLUCOSE', metricKey: 'blood_glucose', loggedValue: 5.0, unit: 'mmol/L', occurredAt: '2026-10-13T08:00:00.000Z', source: 'patient-health-goal', sourceId: 'glucose-a' },
+        { metricType: 'BLOOD_GLUCOSE', metricKey: 'blood_glucose', loggedValue: 5.2, unit: 'mmol/L', occurredAt: '2026-10-14T08:00:00.000Z', source: 'patient-health-goal', sourceId: 'glucose-b' },
+        { metricType: 'BLOOD_GLUCOSE', metricKey: 'blood_glucose', loggedValue: 6.2, unit: 'mmol/L', occurredAt: '2026-10-17T08:00:00.000Z', source: 'patient-health-goal', sourceId: 'glucose-c' },
+      ],
+      currentSnapshot: { ...base.currentSnapshot, conditions: [{ id: 'diabetes', name: 'Diabetes', status: 'ACTIVE' }] },
+    });
+    const result = service.analyze(report, 'patient-1');
+    expect(result.withinPeriodTrends.some((item) => item.metric === 'blood_glucose')).toBe(false);
+  });
+
   it('connects saved allergy and medicine context only to explicit symptom-record mentions', () => {
     const base = fixture();
     const report = fixture({
