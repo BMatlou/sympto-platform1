@@ -444,31 +444,45 @@ const TREND_DEFINITIONS: TrendDefinition[] = [
 function detectWithinPeriodTrends(observations: HealthObservation[]): Array<Omit<PersonalisedHealthTrend, 'relatedGoals' | 'relatedConditions' | 'interpretation'>> {
   const trends: Array<Omit<PersonalisedHealthTrend, 'relatedGoals' | 'relatedConditions' | 'interpretation'>> = [];
   for (const definition of TREND_DEFINITIONS) {
-    const dailyValues = new Map<string, { sum: number; count: number; hasFallback: boolean }>();
     const matching = observations.filter((item) =>
-      item.metric === definition.metric &&
-      item.value !== null &&
-      item.observedAt !== null &&
-      item.quality.status === 'ACCEPTED',
+      item.metric === definition.metric && item.value !== null && item.observedAt !== null &&
+      item.quality.status === 'ACCEPTED' && item.quality.safetySignals.length === 0,
     );
+    const observationsByDay = new Map<string, HealthObservation[]>();
     for (const observation of matching) {
       const day = localDay(observation.observedAt);
       if (!day) continue;
-      const bucket = dailyValues.get(day) ?? { sum: 0, count: 0, hasFallback: false };
-      bucket.sum += observation.value as number;
-      bucket.count += 1;
-      if (observation.observedAtBasis !== 'SOURCE_EVENT_TIME') bucket.hasFallback = true;
-      dailyValues.set(day, bucket);
+      const items = observationsByDay.get(day) ?? [];
+      items.push(observation);
+      observationsByDay.set(day, items);
     }
-    const series = Array.from(dailyValues.entries())
-      .map(([day, bucket]) => ({
+
+    const series: Array<{ day: string; value: number; count: number; hasFallback: boolean }> = [];
+    let contributingReadings = 0;
+    const sourcePreference: ObservationSourceType[] =
+      definition.metric === 'sleep.duration'
+        ? ['DAILY_CHECK_IN', 'SLEEP_SESSION', 'WELLNESS_METRIC', 'WEARABLE_DEVICE', 'GOAL_METRIC']
+        : definition.metric === 'exercise.duration'
+          ? ['DAILY_CHECK_IN', 'GOAL_METRIC', 'WORKOUT_SESSION', 'WELLNESS_METRIC', 'WEARABLE_DEVICE']
+          : definition.metric === 'hydration.volume'
+            ? ['DAILY_CHECK_IN', 'GOAL_METRIC', 'WELLNESS_METRIC', 'WEARABLE_DEVICE']
+            : [];
+    for (const [day, dayItems] of observationsByDay.entries()) {
+      // Prefer the primary daily source used by the report so check-ins and
+      // connected sessions on one day are not averaged together.
+      const selectedType = sourcePreference.find((type) => dayItems.some((item) => item.source.type === type));
+      const selected = selectedType ? dayItems.filter((item) => item.source.type === selectedType) : dayItems;
+      const numeric = selected.flatMap((item) => item.value === null ? [] : [item.value]);
+      if (!numeric.length) continue;
+      series.push({
         day,
-        value: bucket.sum / bucket.count,
-        count: bucket.count,
-        hasFallback: bucket.hasFallback,
-      }))
-      .sort((a, b) => a.day.localeCompare(b.day));
-    // Four separately dated days support comparing two days (or more) against two days (or more).
+        value: numeric.reduce((sum, value) => sum + value, 0) / numeric.length,
+        count: selected.length,
+        hasFallback: selected.some((item) => item.observedAtBasis !== 'SOURCE_EVENT_TIME'),
+      });
+      contributingReadings += selected.length;
+    }
+    series.sort((a, b) => a.day.localeCompare(b.day));
     if (series.length < 4) continue;
     const midpoint = Math.floor(series.length / 2);
     const earlier = series.slice(0, midpoint);
@@ -492,7 +506,7 @@ function detectWithinPeriodTrends(observations: HealthObservation[]): Array<Omit
         ? Number((change / Math.abs(earlierAverage) * 100).toFixed(1))
         : null,
       daysCompared: series.length,
-      readingCount: matching.length,
+      readingCount: contributingReadings,
       firstDay: series[0].day,
       lastDay: series[series.length - 1].day,
       usesFallbackTime: series.some((item) => item.hasFallback),
