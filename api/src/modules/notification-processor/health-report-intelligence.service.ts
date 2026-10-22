@@ -1382,7 +1382,6 @@ export class HealthReportIntelligenceService {
     });
 
     const periodStart = isoDate(row(report.period).start);
-    const periodEnd = isoDate(row(report.period).end);
     const longitudinal = row(report.longitudinal);
     const priorPeriod = row(longitudinal.period);
     const hasPriorWindow = Boolean(isoDate(priorPeriod.start) && isoDate(priorPeriod.end));
