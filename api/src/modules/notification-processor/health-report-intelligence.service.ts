@@ -1371,7 +1371,7 @@ export class HealthReportIntelligenceService {
     ];
     const withinPeriodTrends: PersonalisedHealthTrend[] = detectWithinPeriodTrends(observations).map((trend) => {
       const relatedGoals = activeGoals.filter((goal) => {
-        const category = String(goal.category ?? '').toUpperCase().replace(/[\\s-]+/g, '_');
+        const category = String(goal.category ?? '').toUpperCase().replace(/[\s-]+/g, '_');
         return (goalMetricMap[category] ?? []).includes(trend.metric);
       }).map((goal) => stringValue(goal.title)).filter((title): title is string => Boolean(title));
       const relatedConditions = contextualConditionRows.filter((condition) =>
@@ -1464,7 +1464,7 @@ export class HealthReportIntelligenceService {
       const change = currentAverage - previousAverage;
       if (Math.abs(change) < definition.minimumChange) continue;
       const relatedGoals = activeGoalRows.filter((goal) => {
-        const category = String(goal.category ?? '').toUpperCase().replace(/[\\s-]+/g, '_');
+        const category = String(goal.category ?? '').toUpperCase().replace(/[\s-]+/g, '_');
         const metricMap: Record<string, string[]> = {
           WEIGHT: ['weight'], BODY_WEIGHT: ['weight'],
           BLOOD_PRESSURE: ['bp.systolic', 'bp.diastolic'], BP: ['bp.systolic', 'bp.diastolic'],
@@ -1790,7 +1790,7 @@ export class HealthReportIntelligenceService {
         const change = recentAverage - olderAverage;
         if (Math.abs(change) < definition.minimumChange) continue;
         const relatedGoals = activeGoalRows.filter((goal) => {
-          const category = String(goal.category ?? '').toUpperCase().replace(/[\\s-]+/g, '_');
+          const category = String(goal.category ?? '').toUpperCase().replace(/[\s-]+/g, '_');
           const metricMap: Record<string, string[]> = {
             WEIGHT: ['weight'], BODY_WEIGHT: ['weight'],
             BLOOD_PRESSURE: ['bp.systolic', 'bp.diastolic'], BP: ['bp.systolic', 'bp.diastolic'],
