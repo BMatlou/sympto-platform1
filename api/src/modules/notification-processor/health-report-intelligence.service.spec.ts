@@ -783,4 +783,36 @@ describe('HealthReportIntelligenceService', () => {
     expect(finding?.sourceRecordIds).toEqual(['mood-1', 'mood-2']);
   });
 
+
+  it('surfaces saved risk-assessment classifications and scores without inventing a universal score', () => {
+    const report = fixture({
+      tracking: {
+        ...fixture().tracking,
+        riskAssessments: [{
+          id: 'risk-assessment-1',
+          assessmentType: 'Cardiovascular risk assessment',
+          overallRisk: 'HIGH',
+          score: 18,
+          assessedAt: '2026-10-15T08:00:00.000Z',
+          notes: 'Source assessment notes',
+          results: [{
+            factor: 'Blood pressure',
+            value: 'Elevated',
+            recommendation: 'Review with clinician',
+          }],
+        }],
+      },
+    });
+
+    const result = service.analyze(report, 'patient-1');
+    const finding = result.findings.find((item) => item.key === 'risk-assessment:risk-assessment-1');
+    expect(finding).toBeDefined();
+    expect(finding?.priority).toBe('REVIEW');
+    expect(finding?.change).toContain('Source risk classification: HIGH.');
+    expect(finding?.change).toContain('Recorded score: 18.');
+    expect(finding?.personalContext).toBe('Source assessment notes');
+    expect(finding?.nextStep).toContain('original assessment');
+    expect(finding?.sourceRecordIds).toEqual(['risk-assessment-1']);
+  });
+
 });
