@@ -1394,6 +1394,15 @@ export class HealthReportIntelligenceService {
       goalMetricEvents: rows(longitudinal.goalMetricEvents),
     } : null;
     const priorObservations = priorReport ? this.normalize(priorReport, patientId) : [];
+    const longTermStart = isoDate(longitudinal.historyStart);
+    const longTermReport = longTermStart && periodStart ? {
+      ...report,
+      period: { start: longTermStart, end: periodStart },
+      activity: row(longitudinal.activity),
+      clinical: row(longitudinal.clinical),
+      goalMetricEvents: rows(longitudinal.goalMetricEvents),
+    } : null;
+    const longTermObservations = longTermReport ? this.normalize(longTermReport, patientId) : [];
     const meanOf = (values: number[]) => values.length
       ? values.reduce((sum, value) => sum + value, 0) / values.length
       : null;
@@ -1662,6 +1671,73 @@ export class HealthReportIntelligenceService {
       });
     }
 
+
+    // Compare the older and newer halves of the preceding 90-day record window.
+    // This supplies a longer-term anchor without treating unrecorded days as measurements.
+    if (longTermStart && periodStart) {
+      const midpoint = (new Date(longTermStart).getTime() + new Date(periodStart).getTime()) / 2;
+      for (const definition of TREND_DEFINITIONS) {
+        const longSeries = dailyMetricValues(longTermObservations, definition.metric);
+        if (longSeries.length < 6) continue;
+        const older = longSeries.filter((item) => new Date(item.day).getTime() < midpoint);
+        const recent = longSeries.filter((item) => new Date(item.day).getTime() >= midpoint);
+        if (older.length < 2 || recent.length < 2) continue;
+        const olderAverage = meanOf(older.map((item) => item.value));
+        const recentAverage = meanOf(recent.map((item) => item.value));
+        if (olderAverage === null || recentAverage === null) continue;
+        const change = recentAverage - olderAverage;
+        if (Math.abs(change) < definition.minimumChange) continue;
+        const relatedGoals = activeGoalRows.filter((goal) => {
+          const category = String(goal.category ?? '').toUpperCase().replace(/[\\s-]+/g, '_');
+          const metricMap: Record<string, string[]> = {
+            WEIGHT: ['weight'], BODY_WEIGHT: ['weight'],
+            BLOOD_PRESSURE: ['bp.systolic', 'bp.diastolic'], BP: ['bp.systolic', 'bp.diastolic'],
+            HEART_RATE: ['heart_rate'], RESTING_HEART_RATE: ['heart_rate'],
+            BLOOD_GLUCOSE: ['blood_glucose', 'lab.hba1c'], GLUCOSE: ['blood_glucose', 'lab.hba1c'],
+            CHOLESTEROL: ['cholesterol.total', 'cholesterol.ldl', 'cholesterol.hdl', 'cholesterol.triglycerides'],
+            EXERCISE: ['exercise.duration', 'activity.steps'], PHYSICAL_ACTIVITY: ['exercise.duration', 'activity.steps'],
+            HYDRATION: ['hydration.volume'], WATER: ['hydration.volume'],
+            SLEEP: ['sleep.duration', 'sleep.quality'], MENTAL_HEALTH: ['stress.score', 'mood', 'energy.level'],
+            STRESS: ['stress.score'], MOOD: ['mood'],
+            SMOKING: ['smoking.cigarettes', 'smoking.frequency'], ALCOHOL: ['alcohol.units', 'alcohol.frequency'],
+            MEDICATION: ['medication.dose_action'],
+          };
+          return (metricMap[category] ?? []).includes(definition.metric);
+        }).map((goal) => stringValue(goal.title)).filter((title): title is string => Boolean(title));
+        const relatedConditions = currentConditionRows.filter((condition) =>
+          conditionMetricRules.some((rule) => rule.pattern.test(condition.name) && rule.metrics.includes(definition.metric)),
+        ).map((condition) => condition.name);
+        const reportPeriodValues = dailyMetricValues(observations, definition.metric);
+        const reportPeriodAverage = meanOf(reportPeriodValues.map((item) => item.value));
+        const digits = definition.digits;
+        const valueText = (value: number) => formatNumber(value, digits) + ' ' + definition.unit;
+        addFinding({
+          key: 'long-term:' + definition.metric,
+          priority: relatedConditions.length ? 'WATCH' : 'INSIGHT',
+          title: definition.label + ' showed a longer-term shift',
+          change: valueText(olderAverage) + ' in the older part of the 90-day record window → ' +
+            valueText(recentAverage) + ' in the more recent part' +
+            (reportPeriodAverage === null ? '.' : '; current report-period average ' + valueText(reportPeriodAverage) + '.'),
+          pattern: 'Accepted daily averages from ' + older[0].day + ' to ' + older[older.length - 1].day +
+            ' (' + older.length + ' recorded day(s)) were compared with ' + recent[0].day + ' to ' +
+            recent[recent.length - 1].day + ' (' + recent.length + ' recorded day(s)). Days without a reading were excluded.',
+          personalContext: [
+            relatedConditions.length ? 'Relevant saved condition(s): ' + relatedConditions.join(', ') + '.' : '',
+            relatedGoals.length ? 'Related active goal(s): ' + relatedGoals.join(', ') + '.' : '',
+          ].filter(Boolean).join(' ') || 'This is a comparison with the person’s own dated record, not a universal clinical assessment.',
+          whyItMatters: 'The measure changed over a longer span rather than only between adjacent reports. Whether that direction is beneficial or concerning depends on this measure, saved baseline, applicable clinician-set targets, symptoms and care plan.',
+          nextStep: relatedConditions.length || relatedGoals.length
+            ? 'Review this longer-term movement alongside the current period, your saved target and care plan. Seek clinical advice for persistent or concerning changes.'
+            : 'Continue recording comparable measurements. Do not infer improvement or deterioration from direction alone.',
+          confidence: older.length >= 5 && recent.length >= 5 ? 'MODERATE' : 'LIMITED',
+          evidence: [
+            'Older window: ' + older[0].day + ' to ' + older[older.length - 1].day + '; ' + older.length + ' accepted recorded day(s).',
+            'More recent window: ' + recent[0].day + ' to ' + recent[recent.length - 1].day + '; ' + recent.length + ' accepted recorded day(s).',
+          ],
+          sourceRecordIds: [],
+        });
+      }
+    }
 
     // Record explicit condition and medication updates as contextual evidence.
     // Dates help explain chronology, but are never treated as proof of causation.
