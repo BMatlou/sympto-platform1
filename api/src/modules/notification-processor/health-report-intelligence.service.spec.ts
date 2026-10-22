@@ -610,4 +610,54 @@ describe('HealthReportIntelligenceService', () => {
     expect(finding?.whyItMatters).toContain('not proof that all symptoms have ended');
   });
 
+
+  it('finds a supported longer-term shift within the 90-day evidence window', () => {
+    const base = fixture();
+    const longTermEvents = [
+      { day: '2026-07-20', value: 4.0 },
+      { day: '2026-08-01', value: 4.1 },
+      { day: '2026-08-14', value: 4.2 },
+      { day: '2026-09-05', value: 6.0 },
+      { day: '2026-09-21', value: 6.1 },
+      { day: '2026-10-03', value: 6.2 },
+    ].map((item) => ({
+      metricType: 'BLOOD_GLUCOSE',
+      metricKey: 'blood_glucose',
+      loggedValue: item.value,
+      unit: 'mmol/L',
+      occurredAt: item.day + 'T08:00:00.000Z',
+      source: 'patient-health-goal',
+      sourceId: 'long-term-glucose-' + item.day,
+    }));
+    const report = fixture({
+      currentSnapshot: {
+        ...base.currentSnapshot,
+        conditions: [{ id: 'condition-diabetes', name: 'Diabetes', status: 'ACTIVE' }],
+      },
+      longitudinal: {
+        historyStart: '2026-07-14T22:00:00.000Z',
+        period: {
+          start: '2026-10-05T22:00:00.000Z',
+          end: '2026-10-12T22:00:00.000Z',
+        },
+        activity: {
+          journalEntries: [], symptoms: [], deviceMeasurements: [],
+          wellnessMetrics: [], sleepSessions: [], workouts: [],
+        },
+        clinical: { vitals: [], labResults: [] },
+        goalMetricEvents: longTermEvents,
+      },
+    });
+
+    const result = service.analyze(report, 'patient-1');
+    const finding = result.findings.find((item) => item.key === 'long-term:blood_glucose');
+
+    expect(finding).toBeDefined();
+    expect(finding?.title).toContain('longer-term shift');
+    expect(finding?.change).toContain('4.1 mmol/L');
+    expect(finding?.change).toContain('6.1 mmol/L');
+    expect(finding?.personalContext).toContain('Diabetes');
+    expect(finding?.evidence.length).toBeGreaterThanOrEqual(2);
+  });
+
 });
