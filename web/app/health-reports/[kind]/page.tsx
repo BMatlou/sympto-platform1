@@ -3566,7 +3566,7 @@ function WithinPeriodTrendSummary({ report }: { report: Report }) {
             : "There are not enough dated measurements in this period to identify a reliable within-period trend. Missing entries are not interpreted as zero or as evidence of improvement."}
         </p>
       )}
-      {sleepStress && sleepStress.overlappingDays > 0 && sleepStress.status !== "INSUFFICIENT_DATA" && (
+      {sleepStress && sleepStress.overlappingDays > 0 && sleepStress.status !== "INSUFFICIENT_DATA" && sleepStress.status !== "SUPPORTED_PATTERN" && (
         <div className="border-t border-slate-200 py-3.5">
           <h3 className="text-sm font-bold text-[#0b2d54]">Sleep and stress on the same days</h3>
           <p className="mt-1 text-xs leading-5 text-slate-600">{sleepStress.statement}</p>
