@@ -1486,8 +1486,23 @@ export class HealthReportIntelligenceService {
         const title = stringValue(goal.title);
         const target = numericValue(goal.targetValue);
         if (!title || target === null) return [];
-        const unit = stringValue(goal.unit) ?? definition.unit;
-        return [title + ': ' + formatNumber(target, Number.isInteger(target) ? 0 : 1) + (unit ? ' ' + unit : '')];
+        const savedUnit = stringValue(goal.unit);
+        const targetText = formatNumber(target, Number.isInteger(target) ? 0 : 1) + (savedUnit ? ' ' + savedUnit : '');
+        if (!savedUnit) {
+          return [title + ': saved target ' + targetText + '; the goal does not record a unit, so a numerical difference was not calculated.'];
+        }
+        const comparableUnit = (value: string) => value.toLowerCase().replace(/[^a-z0-9]+/g, '');
+        if (comparableUnit(savedUnit) !== comparableUnit(definition.unit)) {
+          return [title + ': saved target ' + targetText + '; observed unit is ' + definition.unit + ', so a numerical difference was not calculated because the units do not match.'];
+        }
+        const digits = definition.digits;
+        const formatDelta = (value: number) => formatNumber(Math.abs(value), digits) + ' ' + definition.unit + (value > 0 ? ' above' : value < 0 ? ' below' : ' equal to') + ' the saved target value';
+        const currentDelta = currentAverage - target;
+        const previousDelta = previousAverage - target;
+        return [title + ': saved target ' + targetText + '; current average ' +
+          formatNumber(currentAverage, digits) + ' ' + definition.unit + ' is ' + formatDelta(currentDelta) +
+          '; previous-period average ' + formatNumber(previousAverage, digits) + ' ' + definition.unit +
+          ' was ' + formatDelta(previousDelta) + '. This is a numeric comparison only, not a pass/fail judgement.'];
       });
       const relatedConditions = contextualConditionRows.filter((condition) =>
         conditionMetricRules.some((rule) => rule.pattern.test(condition.name) && rule.metrics.includes(definition.metric)),
