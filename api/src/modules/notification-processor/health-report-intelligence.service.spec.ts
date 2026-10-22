@@ -447,4 +447,101 @@ describe('HealthReportIntelligenceService', () => {
 
     expect(service.analyze(report).crossSignals.sleepStress.status).toBe('INSUFFICIENT_DATA');
   });
+
+  it('compares matched prior-period evidence and turns a supported change into a narrative finding', () => {
+    const base = fixture();
+    const glucoseEvents = [
+      { day: '2026-10-13', value: 5.0 },
+      { day: '2026-10-14', value: 5.2 },
+    ].map((item) => ({
+      metricType: 'BLOOD_GLUCOSE',
+      metricKey: 'blood_glucose',
+      loggedValue: item.value,
+      unit: 'mmol/L',
+      occurredAt: item.day + 'T08:00:00.000Z',
+      source: 'patient-health-goal',
+      sourceId: 'current-glucose-' + item.day,
+    }));
+    const priorEvents = [
+      { day: '2026-10-06', value: 4.0 },
+      { day: '2026-10-08', value: 4.2 },
+    ].map((item) => ({
+      metricType: 'BLOOD_GLUCOSE',
+      metricKey: 'blood_glucose',
+      loggedValue: item.value,
+      unit: 'mmol/L',
+      occurredAt: item.day + 'T08:00:00.000Z',
+      source: 'patient-health-goal',
+      sourceId: 'prior-glucose-' + item.day,
+    }));
+    const report = fixture({
+      currentSnapshot: {
+        ...base.currentSnapshot,
+        conditions: [{ id: 'condition-diabetes', name: 'Diabetes', status: 'ACTIVE' }],
+        activeGoals: [{
+          id: 'goal-glucose',
+          title: 'Blood glucose goal',
+          category: 'BLOOD_GLUCOSE',
+          status: 'ACTIVE',
+          targetValue: 6,
+          unit: 'mmol/L',
+        }],
+      },
+      goalMetricEvents: glucoseEvents,
+      longitudinal: {
+        period: {
+          start: '2026-10-05T22:00:00.000Z',
+          end: '2026-10-12T22:00:00.000Z',
+        },
+        activity: {
+          journalEntries: [], symptoms: [], deviceMeasurements: [],
+          wellnessMetrics: [], sleepSessions: [], workouts: [],
+        },
+        clinical: { vitals: [], labResults: [] },
+        goalMetricEvents: priorEvents,
+      },
+    });
+
+    const result = service.analyze(report, 'patient-1');
+    const comparison = result.periodComparisons.find((item) => item.metric === 'blood_glucose');
+    const finding = result.findings.find((item) => item.key === 'comparison:blood_glucose');
+
+    expect(comparison).toBeDefined();
+    expect(comparison?.previousAverage).toBe(4.1);
+    expect(comparison?.currentAverage).toBe(5.1);
+    expect(comparison?.relatedConditions).toContain('Diabetes');
+    expect(comparison?.relatedGoals).toContain('Blood glucose goal');
+    expect(finding).toBeDefined();
+    expect(finding?.priority).toBe('WATCH');
+    expect(finding?.personalContext).toContain('Diabetes');
+    expect(finding?.evidence).toHaveLength(2);
+  });
+
+  it('puts same-record symptom worsening into the prioritised narrative', () => {
+    const base = fixture();
+    const report = fixture({
+      activity: {
+        ...base.activity,
+        symptoms: [{
+          id: 'symptom-headache',
+          title: 'Headache',
+          startedAt: '2026-10-13T08:00:00.000Z',
+          overallSeverity: 'MILD',
+          monitorings: [{
+            id: 'headache-follow-up',
+            severity: 'SEVERE',
+            observedAt: '2026-10-17T08:00:00.000Z',
+          }],
+        }],
+      },
+    });
+
+    const result = service.analyze(report, 'patient-1');
+    const finding = result.findings.find((item) => item.key === 'symptom-worsening:symptom-headache');
+
+    expect(finding).toBeDefined();
+    expect(finding?.priority).toBe('REVIEW');
+    expect(finding?.change).toContain('mild to severe');
+    expect(finding?.evidence).toHaveLength(2);
+  });
 });
