@@ -867,7 +867,8 @@ export class HealthReportIntelligenceService {
       items.find((item) => item.unit)?.unit ?? unitFor(metric) ?? '';
     const formatNumber = (value: number, digits = 1) => Number(value.toFixed(digits)).toString();
     const summarizeMetrics = (metrics: string[]) => {
-      const matching = observations.filter((item) => metrics.includes(item.metric) && item.value !== null);
+      const matching = observations.filter((item) =>
+        metrics.includes(item.metric) && (item.value !== null || item.valueCode !== null));
       const summaries = metrics.map((metric) => {
         const values = matching.filter((item) => item.metric === metric);
         if (!values.length) return null;
@@ -876,9 +877,14 @@ export class HealthReportIntelligenceService {
           String(a.observedAt ?? '').localeCompare(String(b.observedAt ?? ''))).at(-1);
         const flagged = values.length - accepted.length;
         const unit = metricUnits(metric, values);
-        const latestText = latest?.value === null || latest?.value === undefined
-          ? '' : '; latest ' + formatNumber(latest.value, metric === 'heart_rate' || metric.startsWith('bp.') || metric === 'respiratory_rate' ? 0 : 1) + (unit ? ' ' + unit : '') +
-            (latest.observedAt ? ' on ' + String(latest.observedAt).slice(0, 10) : '');
+        const latestValue = latest?.value !== null && latest?.value !== undefined
+          ? formatNumber(latest.value, metric === 'heart_rate' || metric.startsWith('bp.') || metric === 'respiratory_rate' ? 0 : 1) + (unit ? ' ' + unit : '')
+          : latest?.valueCode
+            ? String(latest.valueCode).replace(/[_-]+/g, ' ').toLowerCase()
+            : '';
+        const latestText = latestValue
+          ? '; latest ' + latestValue + (latest?.observedAt ? ' on ' + String(latest.observedAt).slice(0, 10) : '')
+          : '';
         return (metricLabel[metric] ?? metric) + ': ' + values.length + ' dated value(s)' + latestText +
           (flagged ? '; ' + flagged + ' require verification and are not treated as reliable trend evidence' : '');
       }).filter((item): item is string => Boolean(item));
