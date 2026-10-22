@@ -479,7 +479,7 @@ export class MedicationInsightService {
           takenDoses: day.takenDoses,
           skippedDoses: day.skippedDoses,
           unrecordedDoses: day.unrecordedDoses,
-          adherencePercent: day.expectedDoses > 0 ? day.adherencePercent : null,
+          adherencePercent: day.expectedDoses > 0 && day.recordedActions > 0 ? day.adherencePercent : null,
         })),
       });
     }
