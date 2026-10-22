@@ -1398,19 +1398,29 @@ export class HealthReportIntelligenceService {
       ? values.reduce((sum, value) => sum + value, 0) / values.length
       : null;
     const dailyMetricValues = (source: HealthObservation[], metric: string) => {
-      const daily = new Map<string, number[]>();
+      const daily = new Map<string, HealthObservation[]>();
       for (const item of source) {
         if (item.metric !== metric || item.value === null || !item.observedAt ||
             item.quality.status !== 'ACCEPTED' || item.quality.safetySignals.length) continue;
         const day = localDay(item.observedAt);
         if (!day) continue;
         const values = daily.get(day) ?? [];
-        values.push(item.value);
+        values.push(item);
         daily.set(day, values);
       }
-      return Array.from(daily.entries())
-        .map(([day, values]) => ({ day, value: meanOf(values) as number }))
-        .sort((a, b) => a.day.localeCompare(b.day));
+      // Prefer one source family per day for cumulative metrics so a check-in and
+      // its mirrored wearable or goal event are not treated as independent evidence.
+      const sourcePreference: Record<string, ObservationSourceType[]> = {
+        'sleep.duration': ['DAILY_CHECK_IN', 'SLEEP_SESSION', 'WELLNESS_METRIC', 'WEARABLE_DEVICE', 'GOAL_METRIC'],
+        'exercise.duration': ['DAILY_CHECK_IN', 'GOAL_METRIC', 'WORKOUT_SESSION', 'WELLNESS_METRIC', 'WEARABLE_DEVICE'],
+        'hydration.volume': ['DAILY_CHECK_IN', 'GOAL_METRIC', 'WELLNESS_METRIC', 'WEARABLE_DEVICE'],
+      };
+      return Array.from(daily.entries()).flatMap(([day, items]) => {
+        const preferred = sourcePreference[metric]?.find((type) => items.some((item) => item.source.type === type));
+        const selected = preferred ? items.filter((item) => item.source.type === preferred) : items;
+        const average = meanOf(selected.flatMap((item) => item.value === null ? [] : [item.value]));
+        return average === null ? [] : [{ day, value: average }];
+      }).sort((a, b) => a.day.localeCompare(b.day));
     };
     const periodComparisons: HealthReportPeriodComparison[] = [];
     const activeGoalRows = rows(snapshot.activeGoals).filter((goal) =>
