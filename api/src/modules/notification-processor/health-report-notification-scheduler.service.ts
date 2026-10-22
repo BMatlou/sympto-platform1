@@ -856,12 +856,12 @@ export class HealthReportNotificationSchedulerService
       ORDER BY "occurredAt" ASC
     `;
 
-    // Read the immediately preceding matched-length window for longitudinal analysis.
-    // These source rows are kept out of the visible period ledger and are passed only
-    // to the read-only intelligence pipeline, so prior activity is not double-counted
-    // in the selected report's totals or record browser.
+    // Load a 90-day lookback for longitudinal analysis, while preserving the immediately
+    // preceding matched-length window for fair week-to-week or month-to-month comparison.
+    // Historical rows are internal analysis inputs only and never enter the visible period ledger.
     const periodDurationMs = Math.max(1, period.end.getTime() - period.start.getTime());
-    const historyStart = new Date(period.start.getTime() - periodDurationMs);
+    const matchedPreviousStart = new Date(period.start.getTime() - periodDurationMs);
+    const historyStart = new Date(period.start.getTime() - 90 * 24 * 60 * 60 * 1000);
     const [
       historyJournalEntries,
       historySymptoms,
@@ -1036,7 +1036,8 @@ export class HealthReportNotificationSchedulerService
 
     const reportPayload = {
       longitudinal: {
-        period: { start: historyStart, end: period.start },
+        historyStart,
+        period: { start: matchedPreviousStart, end: period.start },
         activity: {
           journalEntries: historyJournalEntries,
           symptoms: historySymptoms.map((item) => ({
