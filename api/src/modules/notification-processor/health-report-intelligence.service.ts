@@ -64,6 +64,7 @@ export interface HealthReportIntelligence {
     qualityAcceptedCount: number;
     qualityNeedsReviewCount: number;
     qualityInvalidCount: number;
+    safetySignalCount: number;
     qualityFlags: Array<{
       metric: string;
       code: string;
@@ -586,6 +587,7 @@ export class HealthReportIntelligenceService {
     let qualityAcceptedCount = 0;
     let qualityNeedsReviewCount = 0;
     let qualityInvalidCount = 0;
+    let safetySignalCount = 0;
     const qualityFlags: HealthReportIntelligence['coverage']['qualityFlags'] = [];
 
     for (const observation of observations) {
@@ -594,6 +596,7 @@ export class HealthReportIntelligenceService {
       if (observation.quality.status === 'ACCEPTED') qualityAcceptedCount += 1;
       else if (observation.quality.status === 'NEEDS_REVIEW') qualityNeedsReviewCount += 1;
       else qualityInvalidCount += 1;
+      safetySignalCount += observation.quality.safetySignals.length;
       for (const code of [...observation.quality.flags, ...observation.quality.safetySignals]) {
         qualityFlags.push({
           metric: observation.metric, code, status: observation.quality.status,
@@ -755,6 +758,7 @@ export class HealthReportIntelligenceService {
         qualityAcceptedCount,
         qualityNeedsReviewCount,
         qualityInvalidCount,
+        safetySignalCount,
         qualityFlags: qualityFlags.slice(0, 50),
       },
       loggingConsistency: {
