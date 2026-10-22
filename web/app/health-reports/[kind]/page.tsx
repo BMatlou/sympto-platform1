@@ -340,6 +340,41 @@ type Report = {
   intelligence?: {
     version?: string;
     generatedAt?: string;
+    medicationAdherence?: {
+      status: "CALCULATED" | "PARTIAL" | "INSUFFICIENT_DATA";
+      expectedDoses: number;
+      takenDoses: number;
+      skippedDoses: number;
+      unrecordedDoses: number;
+      explicitActionCount: number;
+      legacyEventsNotUsed: number;
+      adherencePercent: number | null;
+      calculatedMedicationCount: number;
+      medications: Array<{
+        patientMedicationId: string;
+        name: string;
+        frequency: string | null;
+        status: "CALCULATED" | "AS_NEEDED_NO_FIXED_DENOMINATOR" | "NO_FIXED_SCHEDULE" | "STOP_DATE_MISSING";
+        scheduleSource: "REMINDER_SCHEDULE" | "FREQUENCY_FALLBACK" | null;
+        startDateBasis: "STARTED_AT" | "CREATED_AT_FALLBACK" | "UNKNOWN";
+        expectedDoses: number;
+        takenDoses: number;
+        skippedDoses: number;
+        unrecordedDoses: number;
+        explicitActionCount: number;
+        legacyEventsNotUsed: number;
+        adherencePercent: number | null;
+        daily: Array<{
+          day: string;
+          expectedDoses: number;
+          takenDoses: number;
+          skippedDoses: number;
+          unrecordedDoses: number;
+          adherencePercent: number | null;
+        }>;
+      }>;
+      policy: string;
+    };
     coverage?: {
       sourceCounts?: Record<string, number>;
       observationCandidateCount?: number;
@@ -3409,6 +3444,78 @@ function ServerHealthIntelligenceSummary({ report }: { report: Report }) {
   );
 }
 
+function MedicationAdherenceSummary({ report }: { report: Report }) {
+  const data = report.intelligence?.medicationAdherence;
+  if (!data) return null;
+  const hasEvidence = data.expectedDoses > 0 || data.legacyEventsNotUsed > 0 || data.explicitActionCount > 0;
+  const statusLabel = data.status === "CALCULATED" ? "Calculated from schedules"
+    : data.status === "PARTIAL" ? "Partial schedule coverage"
+    : "Insufficient schedule data";
+
+  return (
+    <section aria-label="Schedule-aware medication adherence" className="mt-4 overflow-hidden rounded-2xl border border-[#dcebed] bg-white shadow-sm">
+      <div className="border-b border-slate-100 px-4 py-4 sm:px-5">
+        <p className="text-[10px] font-black uppercase tracking-[0.16em] text-[#0b7b80]">Medication safety and routine</p>
+        <div className="mt-1 flex flex-wrap items-center justify-between gap-2">
+          <h2 className="text-lg font-black text-[#0b2d54]">Medication adherence</h2>
+          <span className="rounded-full bg-[#f5fafb] px-2.5 py-1 text-[10px] font-bold text-slate-600">{statusLabel}</span>
+        </div>
+        <p className="mt-1 text-xs leading-5 text-slate-500">Scheduled-dose denominator from saved reminder slots or a supported fixed-frequency fallback. Unknown and as-needed schedules are not assigned an invented denominator.</p>
+      </div>
+      {hasEvidence ? (
+        <>
+          <div className="grid grid-cols-2 gap-2 p-3 sm:grid-cols-4 sm:p-4">
+            <div className="rounded-xl bg-[#f5fafb] p-3">
+              <p className="text-[10px] font-bold uppercase tracking-wide text-slate-500">Adherence</p>
+              <p className="mt-1 text-xl font-black tabular-nums text-[#0b2d54]">{data.adherencePercent == null ? "—" : data.adherencePercent + "%"}</p>
+            </div>
+            <div className="rounded-xl bg-[#f5fafb] p-3">
+              <p className="text-[10px] font-bold uppercase tracking-wide text-slate-500">Taken / expected</p>
+              <p className="mt-1 text-xl font-black tabular-nums text-[#0b2d54]">{data.takenDoses} / {data.expectedDoses}</p>
+            </div>
+            <div className="rounded-xl bg-[#f5fafb] p-3">
+              <p className="text-[10px] font-bold uppercase tracking-wide text-slate-500">Skipped explicitly</p>
+              <p className="mt-1 text-xl font-black tabular-nums text-[#0b2d54]">{data.skippedDoses}</p>
+            </div>
+            <div className="rounded-xl bg-[#f5fafb] p-3">
+              <p className="text-[10px] font-bold uppercase tracking-wide text-slate-500">No recorded outcome</p>
+              <p className="mt-1 text-xl font-black tabular-nums text-[#0b2d54]">{data.unrecordedDoses}</p>
+            </div>
+          </div>
+          <div className="px-4 pb-3 text-[10px] leading-4 text-slate-500 sm:px-5">
+            {data.explicitActionCount} explicit taken/skipped action{data.explicitActionCount === 1 ? "" : "s"} · {data.calculatedMedicationCount} medicine{data.calculatedMedicationCount === 1 ? "" : "s"} with a calculable schedule · {data.legacyEventsNotUsed} older inferred record{data.legacyEventsNotUsed === 1 ? "" : "s"} disclosed separately and excluded from explicit action counts.
+          </div>
+          <details className="border-t border-slate-100">
+            <summary className="cursor-pointer px-4 py-3 text-xs font-extrabold text-[#0b2d54]">Review each medicine ({data.medications.length})</summary>
+            <div className="divide-y divide-slate-100">
+              {data.medications.map((item) => (
+                <div key={item.patientMedicationId} className="px-4 py-3 sm:px-5">
+                  <div className="flex flex-wrap items-start justify-between gap-2">
+                    <div className="min-w-0">
+                      <p className="text-xs font-bold text-[#0b2d54]">{item.name}</p>
+                      <p className="mt-1 text-[10px] text-slate-500">{item.frequency || "Frequency not saved"} · {item.scheduleSource === "REMINDER_SCHEDULE" ? "Reminder slots" : item.scheduleSource === "FREQUENCY_FALLBACK" ? "Frequency fallback" : "No fixed denominator"}</p>
+                    </div>
+                    <p className="text-xs font-black tabular-nums text-[#0b2d54]">{item.adherencePercent == null ? "—" : item.adherencePercent + "%"}</p>
+                  </div>
+                  {item.status === "CALCULATED" ? (
+                    <p className="mt-1 text-[10px] leading-4 text-slate-600">{item.takenDoses} taken · {item.skippedDoses} skipped · {item.unrecordedDoses} without recorded outcome of {item.expectedDoses} expected dose{item.expectedDoses === 1 ? "" : "s"}.</p>
+                  ) : (
+                    <p className="mt-1 text-[10px] leading-4 text-amber-800">{item.status === "AS_NEEDED_NO_FIXED_DENOMINATOR" ? "As-needed medicine: a fixed adherence denominator is not appropriate." : item.status === "STOP_DATE_MISSING" ? "This medicine appears stopped, but no stop date is recorded. The denominator was withheld." : "A reliable fixed schedule was not available; adherence was not calculated."}</p>
+                  )}
+                  {item.legacyEventsNotUsed > 0 && <p className="mt-1 text-[10px] text-slate-500">{item.legacyEventsNotUsed} legacy/inferred record{item.legacyEventsNotUsed === 1 ? "" : "s"} not used as dose actions.</p>}
+                </div>
+              ))}
+            </div>
+          </details>
+        </>
+      ) : (
+        <p className="px-4 py-4 text-xs leading-5 text-slate-500">No explicit dose actions were found and no reliable scheduled-dose denominator could be calculated for this period. That is not treated as proof that doses were missed.</p>
+      )}
+      <p className="border-t border-slate-100 px-4 py-3 text-[10px] leading-4 text-slate-500 sm:px-5">{data.policy}</p>
+    </section>
+  );
+}
+
 function CompleteReportData({ report }: { report: Report }) {
   const activity = report.activity as unknown as ReportLedgerObject;
   const clinical = report.clinical as unknown as ReportLedgerObject;
@@ -3699,6 +3806,7 @@ export default function HealthReportPage() {
 
           <ReportDataCoverage report={report} />
           <ServerHealthIntelligenceSummary report={report} />
+          <MedicationAdherenceSummary report={report} />
 
           {previousFailed && <div className="mt-4 flex items-start gap-2 rounded-2xl border border-amber-200 bg-amber-50 p-4 text-xs leading-5 text-amber-900"><Info className="mt-0.5 h-4 w-4 shrink-0" />The current report is available, but the prior-period comparison could not be loaded. Current-period trends remain available; comparison labels will appear when historical data is accessible.</div>}
 
