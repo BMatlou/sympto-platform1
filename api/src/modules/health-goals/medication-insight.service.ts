@@ -156,6 +156,7 @@ export interface MedicationReportDailyBucket {
   takenDoses: number;
   skippedDoses: number;
   unrecordedDoses: number;
+  outcomeRecordingPercent: number | null;
   adherencePercent: number | null;
 }
 
@@ -172,6 +173,7 @@ export interface MedicationReportMedicationResult {
   unrecordedDoses: number;
   explicitActionCount: number;
   legacyEventsNotUsed: number;
+  outcomeRecordingPercent: number | null;
   adherencePercent: number | null;
   daily: MedicationReportDailyBucket[];
 }
@@ -184,6 +186,7 @@ export interface MedicationReportAdherenceSummary {
   unrecordedDoses: number;
   explicitActionCount: number;
   legacyEventsNotUsed: number;
+  outcomeRecordingPercent: number | null;
   adherencePercent: number | null;
   calculatedMedicationCount: number;
   medications: MedicationReportMedicationResult[];
@@ -272,6 +275,7 @@ export class MedicationInsightService {
       unrecordedDoses: 0,
       explicitActionCount: 0,
       legacyEventsNotUsed: 0,
+      outcomeRecordingPercent: null,
       adherencePercent: null,
       calculatedMedicationCount: 0,
       medications: [],
@@ -402,7 +406,7 @@ export class MedicationInsightService {
         results.push({
           ...common, status: 'STOP_DATE_MISSING', scheduleSource: null,
           expectedDoses: 0, takenDoses: 0, skippedDoses: 0, unrecordedDoses: 0,
-          adherencePercent: null, daily: [],
+          outcomeRecordingPercent: null, adherencePercent: null, daily: [],
         });
         continue;
       }
@@ -411,7 +415,7 @@ export class MedicationInsightService {
         results.push({
           ...common, status: 'AS_NEEDED_NO_FIXED_DENOMINATOR', scheduleSource: null,
           expectedDoses: 0, takenDoses: 0, skippedDoses: 0, unrecordedDoses: 0,
-          adherencePercent: null, daily: [],
+          outcomeRecordingPercent: null, adherencePercent: null, daily: [],
         });
         continue;
       }
@@ -426,7 +430,7 @@ export class MedicationInsightService {
         results.push({
           ...common, status: 'NO_FIXED_SCHEDULE', scheduleSource: null,
           expectedDoses: 0, takenDoses: 0, skippedDoses: 0, unrecordedDoses: 0,
-          adherencePercent: null, daily: [],
+          outcomeRecordingPercent: null, adherencePercent: null, daily: [],
         });
         continue;
       }
@@ -470,7 +474,10 @@ export class MedicationInsightService {
         takenDoses,
         skippedDoses,
         unrecordedDoses,
-        adherencePercent: expectedDoses > 0 && actions.length > 0
+        outcomeRecordingPercent: expectedDoses > 0
+          ? Number(((takenDoses + skippedDoses) / expectedDoses * 100).toFixed(2))
+          : null,
+        adherencePercent: expectedDoses > 0 && unrecordedDoses === 0
           ? Number((takenDoses / expectedDoses * 100).toFixed(2))
           : null,
         daily: buckets.map((day) => ({
@@ -479,7 +486,12 @@ export class MedicationInsightService {
           takenDoses: day.takenDoses,
           skippedDoses: day.skippedDoses,
           unrecordedDoses: day.unrecordedDoses,
-          adherencePercent: day.expectedDoses > 0 && day.recordedActions > 0 ? day.adherencePercent : null,
+          outcomeRecordingPercent: day.expectedDoses > 0
+            ? Number((day.recordedActions / day.expectedDoses * 100).toFixed(2))
+            : null,
+          adherencePercent: day.expectedDoses > 0 && day.unrecordedDoses === 0
+            ? day.adherencePercent
+            : null,
         })),
       });
     }
@@ -498,7 +510,10 @@ export class MedicationInsightService {
     return {
       status, expectedDoses, takenDoses, skippedDoses, unrecordedDoses,
       explicitActionCount, legacyEventsNotUsed,
-      adherencePercent: expectedDoses > 0 && explicitActionCount > 0
+      outcomeRecordingPercent: expectedDoses > 0
+        ? Number(((takenDoses + skippedDoses) / expectedDoses * 100).toFixed(2))
+        : null,
+      adherencePercent: expectedDoses > 0 && unrecordedDoses === 0
         ? Number((takenDoses / expectedDoses * 100).toFixed(2))
         : null,
       calculatedMedicationCount: calculated.length,
