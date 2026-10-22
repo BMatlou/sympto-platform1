@@ -2556,7 +2556,6 @@ function medicationPeriodSummary(
   const skippedDoses = sumField(scheduled, "skippedDoses");
   const unrecordedDoses = sumField(scheduled, "unrecordedDoses");
   const daysWithActions = scheduled.filter((item) => (finite(item.recordedActions) ?? 0) > 0).length;
-  const daysAtTarget = scheduled.filter((item) => (finite(item.adherencePercent) ?? 0) >= targetAdherence).length;
   const completeDays = scheduled.filter((item) =>
     (finite(item.recordedActions) ?? ((finite(item.takenDoses) ?? 0) + (finite(item.skippedDoses) ?? 0))) >= (finite(item.expectedDoses) ?? 0),
   ).length;
