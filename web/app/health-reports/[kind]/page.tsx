@@ -3690,7 +3690,7 @@ function ContextualHealthInsights({ report }: { report: Report }) {
               <p className="mt-1 text-xs font-semibold text-[#0b5a62]">{item.headline}</p>
               <p className="mt-1 text-xs leading-5 text-slate-600">{item.detail}</p>
             </div>
-            {item.href && }
+            
           </article>
         ))}
       </div>
