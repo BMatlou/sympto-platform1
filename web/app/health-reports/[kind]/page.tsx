@@ -3405,6 +3405,7 @@ function WithinPeriodTrendSummary({ report }: { report: Report }) {
   const intelligence = report.intelligence;
   const trends = intelligence?.withinPeriodTrends ?? [];
   const hasObservationData = (intelligence?.coverage?.observationCandidateCount ?? 0) > 0;
+  const sleepStress = intelligence?.crossSignals?.sleepStress;
 
   return (
     <section aria-label="Changes within this report period" className="mt-4 space-y-3">
@@ -3453,6 +3454,19 @@ function WithinPeriodTrendSummary({ report }: { report: Report }) {
             : "There are not enough dated measurements in this period to identify a reliable within-period trend. Missing entries are not interpreted as zero or as evidence of improvement."}
         </p>
       )}
+      {sleepStress && sleepStress.overlappingDays > 0 && sleepStress.status !== "INSUFFICIENT_DATA" && (
+        <div className="border-t border-slate-200 py-3.5">
+          <h3 className="text-sm font-bold text-[#0b2d54]">Sleep and stress on the same days</h3>
+          <p className="mt-1 text-xs leading-5 text-slate-600">{sleepStress.statement}</p>
+          <p className="mt-1 text-[10px] leading-4 text-slate-400">
+            {sleepStress.overlappingDays} overlapping days · {sleepStress.shorterSleepDays} shorter-sleep days · {sleepStress.longerSleepDays} longer-sleep days
+            {sleepStress.meanStressOnShorterSleepDays !== null && sleepStress.meanStressOnLongerSleepDays !== null
+              ? " · Average stress: " + formatNumber(sleepStress.meanStressOnShorterSleepDays, 1) + "/10 on shorter-sleep days versus " + formatNumber(sleepStress.meanStressOnLongerSleepDays, 1) + "/10 on longer-sleep days."
+              : "."}
+            {" "}This is an association, not evidence that one caused the other.
+          </p>
+        </div>
+      )}
     </section>
   );
 }
@@ -3462,14 +3476,9 @@ function ServerHealthIntelligenceSummary({ report }: { report: Report }) {
   if (!intelligence) return null;
   const coverage = intelligence.coverage;
   const logging = intelligence.loggingConsistency;
-  const sleepStress = intelligence.crossSignals?.sleepStress;
   const needsReview = (coverage?.qualityNeedsReviewCount ?? 0) + (coverage?.qualityInvalidCount ?? 0);
   const knownSources = Object.values(coverage?.sourceCounts ?? {}).filter((count) => count > 0).length;
   const metricKinds = Object.keys(coverage?.metricCounts ?? {}).length;
-  const showSleepStress = Boolean(sleepStress && (
-    sleepStress.overlappingDays > 0 || sleepStress.status === "SUPPORTED_PATTERN"
-  ));
-
   return (
     <section aria-label="Server-side health report intelligence" className="mt-4 space-y-3">
       <div className="px-1 pb-2 sm:px-0">
@@ -3500,13 +3509,6 @@ function ServerHealthIntelligenceSummary({ report }: { report: Report }) {
         </div>
       </div>
       {logging && <p className="px-4 pb-3 text-[10px] leading-4 text-slate-500 sm:px-5">Patient logging score uses {logging.loggedDays} unique patient-driven days out of {logging.eligibleDays} eligible days ({logging.percentage}%). Appointments, clinical-only activity, profile edits and device syncs are excluded.</p>}
-      {showSleepStress && sleepStress && (
-        <div className="rounded-xl border border-[#dcebed] bg-white px-3 py-3 sm:px-4">
-          <p className="text-xs font-extrabold text-[#0b2d54]">Sleep and stress · 7-day paired analysis</p>
-          <p className="mt-1 text-xs leading-5 text-slate-600">{sleepStress.statement}</p>
-          <p className="mt-1 text-[10px] text-slate-500">{sleepStress.overlappingDays} overlapping days · {sleepStress.status === "SUPPORTED_PATTERN" ? "pattern met the configured evidence rule" : sleepStress.status === "NO_CLEAR_PATTERN" ? "no clear difference in these records" : "evidence is still limited"}</p>
-        </div>
-      )}
     </section>
   );
 }
@@ -3787,14 +3789,21 @@ export default function HealthReportPage() {
             <div className="mt-6 flex flex-wrap items-center gap-2"><span className="rounded-full bg-white/10 px-3 py-1.5 text-xs font-bold">Generated {dateLabel(report.generatedAt)}</span><span className="rounded-full bg-white/10 px-3 py-1.5 text-xs font-bold">{previousLoading ? "Comparing with prior period…" : previousReport ? "Compared with previous period" : previousFailed ? "Prior-period data unavailable" : "Current-period insights"}</span></div>
           </section>
 
-          <ReportDataCoverage report={report} />
-          <ServerHealthIntelligenceSummary report={report} />
-          <MedicationAdherenceSummary report={report} />
+          <WithinPeriodTrendSummary report={report} />
 
-          {previousFailed && <div className="mt-4 flex items-start gap-2 rounded-2xl border border-amber-200 bg-amber-50 p-4 text-xs leading-5 text-amber-900"><Info className="mt-0.5 h-4 w-4 shrink-0" />The current report is available, but the prior-period comparison could not be loaded. Current-period trends remain available; comparison labels will appear when historical data is accessible.</div>}
-
+          {previousFailed && <div className="mt-4 flex items-start gap-2 rounded-2xl border border-amber-200 bg-amber-50 p-4 text-xs leading-5 text-amber-900"><Info className="mt-0.5 h-4 w-4 shrink-0" />The current report is available, but the prior-period comparison could not be loaded. Current-period comparisons use records returned for each period.</div>}
 
           <HealthReportInsights report={report} previousReport={previousReport} previousLoading={previousLoading} />
+
+          <MedicationAdherenceSummary report={report} />
+
+          <details aria-label="Data quality and source coverage" className="mt-5 border-t border-slate-200 py-3">
+            <summary className="cursor-pointer list-none text-sm font-bold text-[#0b2d54]">Data quality checks and source counts</summary>
+            <div className="mt-3 space-y-4">
+              <ServerHealthIntelligenceSummary report={report} />
+              <ReportDataCoverage report={report} />
+            </div>
+          </details>
 
           <details aria-label="How to read this report" className="mt-4 rounded-2xl border border-[#dcebed] bg-white p-4 sm:p-5">
             <summary className="flex cursor-pointer list-none items-center justify-between gap-3 text-sm font-black text-[#0b2d54]">
