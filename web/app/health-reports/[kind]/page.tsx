@@ -2035,7 +2035,7 @@ function PersonalisedInsights({
       evidence: review.label + ": " + formatNumber(review.value, review.key === "temperature" || review.key === "oxygen" ? 1 : 0) + " " + review.unit + " · " + dateLabel(new Date(review.timestamp).toISOString()),
       action: review.key === "oxygen" ? "Recheck immediately and seek emergency help if it remains low; do not delay if unwell." : review.key === "temperature" ? "Verify the unit and measurement; seek urgent medical help if the reading is current and accurate." : review.key === "respiratory" ? "If this is your current resting rate, seek urgent medical advice; severe breathing difficulty needs emergency help." : "Repeat the measurement after resting; get urgent help for severe symptoms.",
       tone: "critical",
-      href: "/today",
+      href: "#report-patterns",
       linkLabel: "Review measurement",
     });
   }
@@ -2101,7 +2101,7 @@ function PersonalisedInsights({
       evidence: "Average stress rating " + formatNumber(stressAverage, 1) + "/10" + (priorStressAverage === null ? "" : " · previous " + formatNumber(priorStressAverage, 1) + "/10"),
       action: "Prioritise a wellbeing check-in and seek support if this level persists or feels difficult to manage.",
       tone: "watch",
-      href: "/today",
+      href: "#report-patterns",
       linkLabel: "Open check-in",
     });
   }
@@ -2113,7 +2113,7 @@ function PersonalisedInsights({
       evidence: "Current average " + formatNumber(moodAverage, 1) + "/5" + (previousMoodAverage === null ? "" : " · previous " + formatNumber(previousMoodAverage, 1) + "/5"),
       action: "Check in with yourself and reach out to someone you trust or a health professional if low mood persists or feels hard to manage.",
       tone: "watch",
-      href: "/today",
+      href: "#report-patterns",
       linkLabel: "Review wellbeing check-in",
     });
   }
@@ -2135,7 +2135,7 @@ function PersonalisedInsights({
       evidence: "Average sleep-quality rating " + formatNumber(sleepQualityAverage, 1) + "/5.",
       action: "Compare sleep-quality ratings with logged sleep duration and stress; seek support if problems persist.",
       tone: "watch",
-      href: "/today",
+      href: "#report-patterns",
       linkLabel: "Review sleep check-in",
     });
   }
@@ -2146,7 +2146,7 @@ function PersonalisedInsights({
       evidence: "Average recorded sleep " + formatNumber(sleepAverage, 1) + " hours on days with entries.",
       action: "Review sleep consistency and consider discussing persistent sleep difficulties with a healthcare professional.",
       tone: "watch",
-      href: "/today",
+      href: "#report-patterns",
       linkLabel: "Review check-in",
     });
   }
@@ -2161,7 +2161,7 @@ function PersonalisedInsights({
         : doseCurrent.legacyTotal + " older dated status entries · " + doseCurrent.legacyTaken + " marked taken · " + doseCurrent.legacySkipped + " marked skipped",
       action: "Review skipped or difficult-to-log doses with your care team; do not change a prescription based on this report.",
       tone: "watch",
-      href: "/today",
+      href: "#report-patterns",
       linkLabel: "Review medication logs",
     });
   }
@@ -2233,6 +2233,7 @@ function PersonalisedInsights({
                 const targetValue = finite(signal.targetValue);
                 const targetUnit = String(signal.targetUnit || signal.unit || "");
                 const movement = previousLoading ? null : periodMovement(signal.current.map((item) => item.value), signal.previous.map((item) => item.value), signal.unit, digits);
+                const comparisonScale = Math.max(Math.abs(currentAverage ?? 0), Math.abs(previousAverage ?? 0), 0.000001);
                 const isDailyHydrationGoal = signal.key === "hydration" && targetValue !== null && targetValue > 0 &&
                   /^(ml|millilit(er|re)s?)$/i.test(signal.unit.trim()) &&
                   (/^(ml|millilit(er|re)s?)$/i.test(targetUnit.trim()) || /^glasses?(\s*\/\s*day)?$/i.test(targetUnit.trim()));
@@ -2266,6 +2267,10 @@ function PersonalisedInsights({
                       <span className={"inline-flex rounded-full border px-2.5 py-1 text-[10px] font-bold " + pillTone}>{movement?.label ?? (previousLoading ? "Comparing…" : "No comparison")}</span>
                       <p className="mt-1 text-[11px] leading-5 text-slate-500">{previousAverage === null ? "No comparable previous-period average." : "Previous average " + formatNumber(previousAverage, digits) + unitSuffix + "."}</p>
                       {targetValue !== null && <p className="mt-1 text-[11px] font-semibold leading-5 text-[#0b7b80]">{isDailyHydrationGoal ? "Drink more water · target " + formatNumber(targetValue / 1000, 1) + " L/day" : (signal.targetTitle || "Saved goal") + " · target " + formatNumber(targetValue, Number.isInteger(targetValue) ? 0 : signalDigits(signal.key, targetUnit)) + (targetUnit ? (targetUnit.startsWith("/") ? targetUnit : " " + targetUnit) : "")}</p>}
+                      {previousAverage !== null && currentAverage !== null && <div className="mt-3 space-y-2" aria-label={signal.label + " period comparison bars"}>
+                        <div className="flex items-center gap-2"><span className="w-[72px] shrink-0 text-left text-[9px] font-semibold text-slate-500">This period</span><div className="h-2 min-w-0 flex-1 overflow-hidden rounded-full bg-slate-100"><div className="h-full rounded-full bg-[#24c1c4]" style={{ width: String(Math.max(3, Math.min(100, Math.abs(currentAverage) / comparisonScale * 100))) + "%" }} /></div></div>
+                        <div className="flex items-center gap-2"><span className="w-[72px] shrink-0 text-left text-[9px] font-semibold text-slate-500">Previous</span><div className="h-2 min-w-0 flex-1 overflow-hidden rounded-full bg-slate-100"><div className="h-full rounded-full bg-[#0b2d54]/65" style={{ width: String(Math.max(3, Math.min(100, Math.abs(previousAverage) / comparisonScale * 100))) + "%" }} /></div></div>
+                      </div>}
                       {isDailyHydrationGoal && hydrationPercent !== null && currentAverage !== null && (
                         <div className="mt-2 sm:ml-auto sm:max-w-xs">
                           <div className="flex items-center justify-between gap-2 text-[10px] font-semibold text-slate-600">
@@ -2800,6 +2805,8 @@ function VitalTrendCard({
   const average = verificationSensitive ? null : mean(currentValues);
   const latest = rawCurrent[rawCurrent.length - 1] ?? current[current.length - 1];
   const excludedCount = Math.max(0, rawCurrent.length - current.length);
+  const previousAverage = mean(previousValues);
+  const comparisonScale = Math.max(Math.abs(average ?? 0), Math.abs(previousAverage ?? 0), 0.000001);
   const movement = verificationSensitive || previousLoading ? null : periodMovement(currentValues, previousValues, unit, digits);
 
   return (
@@ -2819,7 +2826,7 @@ function VitalTrendCard({
             <p className="text-xs font-extrabold text-slate-700">Average withheld</p>
             <p className="mt-0.5 text-[11px] text-slate-500">Review flagged readings first.</p>
           </div>
-          <Link href="/today" className="inline-flex min-h-9 shrink-0 items-center gap-1.5 rounded-lg bg-[#0b2d54] px-3 py-2 text-[11px] font-bold text-white">Review <ArrowRight className="h-3.5 w-3.5 text-[#24c1c4]" /></Link>
+          <span className="text-[10px] font-semibold text-slate-500">Safety review needed before interpreting an average</span>
         </div>
       ) : average === null ? (
         <p className="mt-3 text-sm text-slate-500">{rawCurrent.length > 0 ? "Review flagged entries before interpreting an average." : "No readings were saved for this period."}</p>
@@ -2837,6 +2844,10 @@ function VitalTrendCard({
             </div>
           </div>
           {latest?.convertedFrom && <p className="mt-2 text-[10px] leading-4 text-slate-500">Converted from {formatNumber(latest.convertedFrom.value, 1)} {latest.convertedFrom.unit} for consistent reporting.</p>}
+          {previousAverage !== null && average !== null && <div className="mt-3 space-y-2 rounded-xl bg-[#f5fafb] p-3" aria-label={label + " period comparison bars"}>
+            <div className="flex items-center gap-2"><span className="w-[72px] shrink-0 text-[9px] font-bold text-slate-500">This period</span><div className="h-2 min-w-0 flex-1 overflow-hidden rounded-full bg-slate-200"><div className="h-full rounded-full bg-[#24c1c4]" style={{ width: String(Math.max(3, Math.min(100, Math.abs(average) / comparisonScale * 100))) + "%" }} /></div><span className="w-14 text-right text-[10px] font-bold text-[#0b2d54]">{formatNumber(average, digits)}</span></div>
+            <div className="flex items-center gap-2"><span className="w-[72px] shrink-0 text-[9px] font-bold text-slate-500">Previous</span><div className="h-2 min-w-0 flex-1 overflow-hidden rounded-full bg-slate-200"><div className="h-full rounded-full bg-[#0b2d54]/65" style={{ width: String(Math.max(3, Math.min(100, Math.abs(previousAverage) / comparisonScale * 100))) + "%" }} /></div><span className="w-14 text-right text-[10px] font-bold text-[#0b2d54]">{formatNumber(previousAverage, digits)}</span></div>
+          </div>}
           <div className="mt-3 border-t border-slate-100 pt-3">
             <div className="flex flex-wrap items-center justify-between gap-2">
               <p className="text-[10px] font-bold uppercase tracking-wide text-slate-400">Compared with previous period</p>
@@ -3042,8 +3053,10 @@ function HealthReportInsights({
         </section>
       )}
 
-      <ContextualHealthInsights report={report} />
-      <MedicationPeriodInsights report={report} previousReport={previousReport} previousLoading={previousLoading} />
+      <div className="grid items-start gap-4 xl:grid-cols-2">
+        <ContextualHealthInsights report={report} />
+        <MedicationPeriodInsights report={report} previousReport={previousReport} previousLoading={previousLoading} />
+      </div>
       <PersonalisedInsights report={report} previousReport={previousReport} previousLoading={previousLoading} />
       <section>
         <div className="mb-3"><p className="text-[10px] font-black uppercase tracking-[0.16em] text-[#24c1c4]">Reading history</p><h2 className="mt-1 text-xl font-black text-[#0b2d54]">Your measurements</h2><p className="mt-1 text-sm leading-6 text-slate-500">Period average, latest reading and change from last period.</p></div>
@@ -3051,7 +3064,7 @@ function HealthReportInsights({
       </section>
 
       {(symptomCount > 0 || lowMood.total > 0 || association !== null || repeated.some((item) => item.count > 1) || symptomAnalytics.repeatedTriggers.length > 0 || symptomAnalytics.medicationEffects > 0 || symptomAnalytics.averageSeverityRank !== null || symptomAnalytics.worseningCount > 0 || symptomAnalytics.severeCount > 0) && (
-        <section className="rounded-2xl border border-[#dcebed] bg-white p-4 sm:p-5" aria-label="Health patterns">
+        <section id="report-patterns" className="rounded-2xl border border-[#dcebed] bg-white p-4 sm:p-5" aria-label="Health patterns">
           <p className="text-[10px] font-black uppercase tracking-[0.16em] text-[#0b7b80]">Patterns</p>
           <h2 className="mt-1 text-lg font-black text-[#0b2d54]">Patterns across your logs</h2>
           <div className="mt-3 divide-y divide-slate-100">
@@ -3379,7 +3392,7 @@ function ContextualHealthInsights({ report }: { report: Report }) {
       detail: glucoseEvents.length || glucoseLabs
         ? "Review the dated glucose and laboratory records alongside your saved medication routine and your clinician's targets."
         : "No dated glucose tracker entries or numeric glucose/HbA1c lab values were returned for this period. They will not be inferred from other measurements.",
-      href: "/today",
+      href: "#report-patterns",
     });
   }
   if (/hypertension|high blood pressure/.test(conditionNames)) {
@@ -3389,7 +3402,7 @@ function ContextualHealthInsights({ report }: { report: Report }) {
       detail: systolic.length && diastolic.length
         ? "The full record includes the dated pressure values. Compare repeated pairs with your saved target and clinician's advice."
         : "Blood-pressure measurements were sparse or not recorded in this period. Check the full record for readings saved through other sources.",
-      href: "/today",
+      href: "#report-patterns",
     });
   }
   if (/asthma|copd|chronic obstructive|respiratory condition/.test(conditionNames)) {
@@ -3397,7 +3410,7 @@ function ContextualHealthInsights({ report }: { report: Report }) {
       title: "Breathing and respiratory context",
       headline: oxygen.length + " oxygen readings · " + breathing.length + " breathing-rate readings · " + respiratorySymptoms.length + " related symptom logs",
       detail: "Readings, symptom follow-ups and any verification flags are kept together in this report so you can review the dates and source records.",
-      href: "/today",
+      href: "#report-patterns",
     });
   }
   if (goals.length) {
@@ -3526,14 +3539,14 @@ export default function HealthReportPage() {
 
   return (
     <ProtectedRoute>
-      <main className="min-h-screen bg-[#f5f8fb] pb-10 text-slate-800">
-        <div className="mx-auto max-w-6xl px-4 py-6 sm:px-6 sm:py-8">
+      <main className="min-h-screen bg-[#c3d9d7] px-2 pb-8 text-slate-800 sm:px-4">
+        <div className="mx-auto my-4 max-w-[1500px] overflow-hidden rounded-[30px] border border-white/80 bg-white px-4 py-5 shadow-[0_30px_80px_-38px_rgba(11,45,84,0.28)] sm:my-7 sm:px-7 sm:py-7 lg:px-9">
           <Link href="/notifications" className="inline-flex min-h-10 items-center gap-2 rounded-xl px-2 text-sm font-semibold text-[#0b2d54] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#24c1c4]"><ArrowLeft className="h-4 w-4" />Back to notifications</Link>
 
-          <section className="mt-4 overflow-hidden rounded-[28px] bg-gradient-to-br from-[#0b2d54] via-[#0b3e60] to-[#0f5a62] p-5 text-white shadow-[0_18px_55px_-30px_rgba(11,45,84,0.55)] sm:p-7">
+          <section className="mt-4 overflow-hidden rounded-[24px] border border-[#dcebed] border-l-4 border-l-[#24c1c4] bg-white p-5 text-[#0b2d54] shadow-sm sm:p-7">
             <div className="flex flex-col gap-5 sm:flex-row sm:items-center sm:justify-between">
-              <div><div className="flex items-center gap-2 text-[10px] font-black uppercase tracking-[0.18em] text-[#24c1c4]"><ShieldCheck className="h-4 w-4" />Sympto · Health intelligence</div><h1 className="mt-3 text-3xl font-black tracking-tight sm:text-4xl">{title}</h1><p className="mt-2 text-sm leading-6 text-white/75">{report.period.label}</p><p className="mt-3 text-sm leading-5 text-white/80">Your health, at a glance.</p></div>
-              <div className="flex shrink-0 flex-wrap items-center gap-3 rounded-2xl border border-white/15 bg-white/10 p-3 sm:gap-4 sm:p-4">
+              <div><div className="flex items-center gap-2 text-[10px] font-black uppercase tracking-[0.18em] text-[#0b7b80]"><ShieldCheck className="h-4 w-4" />Sympto · Health intelligence</div><h1 className="mt-3 text-3xl font-black tracking-tight sm:text-4xl">{title}</h1><p className="mt-2 text-sm leading-6 text-slate-500">{report.period.label}</p><p className="mt-3 text-sm leading-5 text-slate-500">Your health, at a glance.</p></div>
+              <div className="flex shrink-0 flex-wrap items-center gap-3 rounded-2xl border border-[#dcebed] bg-[#f5fafb] p-3 sm:gap-4 sm:p-4">
                 <ScoreRing
                   percent={Math.round(recordedDays(report).size / periodDays(report) * 100)}
                   label="Logging consistency"
@@ -3541,13 +3554,13 @@ export default function HealthReportPage() {
                   size={68}
                 />
                 <div>
-                  <p className="text-[10px] font-bold uppercase tracking-wide text-white/60">Logging consistency</p>
-                  <p className="mt-1 text-base font-black text-white">{recordedDays(report).size}/{periodDays(report)} days logged</p>
-                  <p className="mt-1 flex items-center gap-1.5 text-[11px] text-white/70"><CalendarDays className="h-3.5 w-3.5 text-[#24c1c4]" />{report.type === "WEEKLY" ? "7-day report" : "Monthly report"}</p>
+                  <p className="text-[10px] font-bold uppercase tracking-wide text-slate-400">Logging consistency</p>
+                  <p className="mt-1 text-base font-black text-[#0b2d54]">{recordedDays(report).size}/{periodDays(report)} days logged</p>
+                  <p className="mt-1 flex items-center gap-1.5 text-[11px] text-slate-500"><CalendarDays className="h-3.5 w-3.5 text-[#24c1c4]" />{report.type === "WEEKLY" ? "7-day report" : "Monthly report"}</p>
                 </div>
               </div>
             </div>
-            <div className="mt-6 flex flex-wrap items-center gap-2"><span className="rounded-full bg-white/10 px-3 py-1.5 text-xs font-bold">Generated {dateLabel(report.generatedAt)}</span><span className="rounded-full bg-white/10 px-3 py-1.5 text-xs font-bold">{previousLoading ? "Comparing with prior period…" : previousReport ? "Compared with previous period" : previousFailed ? "Prior-period data unavailable" : "Current-period insights"}</span></div>
+            <div className="mt-6 flex flex-wrap items-center gap-2"><span className="rounded-full border border-[#dcebed] bg-[#f5fafb] px-3 py-1.5 text-xs font-bold text-slate-600">Generated {dateLabel(report.generatedAt)}</span><span className="rounded-full bg-white/10 px-3 py-1.5 text-xs font-bold">{previousLoading ? "Comparing with prior period…" : previousReport ? "Compared with previous period" : previousFailed ? "Prior-period data unavailable" : "Current-period insights"}</span></div>
           </section>
 
           <ReportDataCoverage report={report} />
