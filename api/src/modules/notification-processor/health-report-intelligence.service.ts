@@ -82,8 +82,46 @@ export interface PersonalisedHealthTrend {
   interpretation: string;
 }
 
+export interface HealthReportNarrativeFinding {
+  key: string;
+  priority: 'SAFETY' | 'REVIEW' | 'WATCH' | 'INSIGHT';
+  title: string;
+  change: string;
+  pattern: string;
+  personalContext: string;
+  whyItMatters: string;
+  nextStep: string;
+  confidence: 'HIGH' | 'MODERATE' | 'LIMITED';
+  evidence: string[];
+  sourceRecordIds: string[];
+}
+
+export interface HealthReportPeriodComparison {
+  key: string;
+  metric: string;
+  label: string;
+  unit: string;
+  previousAverage: number;
+  currentAverage: number;
+  change: number;
+  changePercent: number | null;
+  previousDays: number;
+  currentDays: number;
+  previousReadings: number;
+  currentReadings: number;
+  previousStart: string;
+  previousEnd: string;
+  currentStart: string;
+  currentEnd: string;
+  relatedGoals: string[];
+  relatedConditions: string[];
+  interpretation: string;
+}
+
 export interface HealthReportIntelligence {
-  version: 'shadow-v1';
+  version: 'shadow-v2';
+  findings: HealthReportNarrativeFinding[];
+  periodComparisons: HealthReportPeriodComparison[];
   personalisedContext: {
     insights: PersonalisedHealthInsight[];
   };
@@ -1343,13 +1381,291 @@ export class HealthReportIntelligenceService {
       };
     });
 
+    const periodStart = isoDate(row(report.period).start);
+    const periodEnd = isoDate(row(report.period).end);
+    const longitudinal = row(report.longitudinal);
+    const priorPeriod = row(longitudinal.period);
+    const hasPriorWindow = Boolean(isoDate(priorPeriod.start) && isoDate(priorPeriod.end));
+    const priorReport = hasPriorWindow ? {
+      ...report,
+      period: { start: priorPeriod.start, end: priorPeriod.end },
+      activity: row(longitudinal.activity),
+      clinical: row(longitudinal.clinical),
+      goalMetricEvents: rows(longitudinal.goalMetricEvents),
+    } : null;
+    const priorObservations = priorReport ? this.normalize(priorReport, patientId) : [];
+    const meanOf = (values: number[]) => values.length
+      ? values.reduce((sum, value) => sum + value, 0) / values.length
+      : null;
+    const dailyMetricValues = (source: HealthObservation[], metric: string) => {
+      const daily = new Map<string, number[]>();
+      for (const item of source) {
+        if (item.metric !== metric || item.value === null || !item.observedAt ||
+            item.quality.status !== 'ACCEPTED' || item.quality.safetySignals.length) continue;
+        const day = localDay(item.observedAt);
+        if (!day) continue;
+        const values = daily.get(day) ?? [];
+        values.push(item.value);
+        daily.set(day, values);
+      }
+      return Array.from(daily.entries())
+        .map(([day, values]) => ({ day, value: meanOf(values) as number }))
+        .sort((a, b) => a.day.localeCompare(b.day));
+    };
+    const periodComparisons: HealthReportPeriodComparison[] = [];
+    const activeGoalRows = rows(snapshot.activeGoals).filter((goal) =>
+      !Boolean(goal.resolvedAt) && !/RESOLVED|INACTIVE|CANCELLED|DISCONTINUED|STOPPED|ARCHIVED|COMPLETED/.test(String(goal.status ?? '').toUpperCase()),
+    );
+    for (const definition of TREND_DEFINITIONS) {
+      const before = dailyMetricValues(priorObservations, definition.metric);
+      const current = dailyMetricValues(observations, definition.metric);
+      if (before.length < 2 || current.length < 2) continue;
+      const previousAverage = meanOf(before.map((item) => item.value));
+      const currentAverage = meanOf(current.map((item) => item.value));
+      if (previousAverage === null || currentAverage === null) continue;
+      const change = currentAverage - previousAverage;
+      if (Math.abs(change) < definition.minimumChange) continue;
+      const relatedGoals = activeGoalRows.filter((goal) => {
+        const category = String(goal.category ?? '').toUpperCase().replace(/[\\s-]+/g, '_');
+        const metricMap: Record<string, string[]> = {
+          WEIGHT: ['weight'], BODY_WEIGHT: ['weight'],
+          BLOOD_PRESSURE: ['bp.systolic', 'bp.diastolic'], BP: ['bp.systolic', 'bp.diastolic'],
+          HEART_RATE: ['heart_rate'], RESTING_HEART_RATE: ['heart_rate'],
+          BLOOD_GLUCOSE: ['blood_glucose', 'lab.hba1c'], GLUCOSE: ['blood_glucose', 'lab.hba1c'],
+          CHOLESTEROL: ['cholesterol.total', 'cholesterol.ldl', 'cholesterol.hdl', 'cholesterol.triglycerides'],
+          EXERCISE: ['exercise.duration', 'activity.steps'], PHYSICAL_ACTIVITY: ['exercise.duration', 'activity.steps'],
+          HYDRATION: ['hydration.volume'], WATER: ['hydration.volume'],
+          SLEEP: ['sleep.duration', 'sleep.quality'], MENTAL_HEALTH: ['stress.score', 'mood', 'energy.level'],
+          STRESS: ['stress.score'], MOOD: ['mood'],
+          SMOKING: ['smoking.cigarettes', 'smoking.frequency'], ALCOHOL: ['alcohol.units', 'alcohol.frequency'],
+          MEDICATION: ['medication.dose_action'],
+        };
+        return (metricMap[category] ?? []).includes(definition.metric);
+      }).map((goal) => stringValue(goal.title)).filter((title): title is string => Boolean(title));
+      const relatedConditions = currentConditionRows.filter((condition) =>
+        conditionMetricRules.some((rule) => rule.pattern.test(condition.name) && rule.metrics.includes(definition.metric)),
+      ).map((condition) => condition.name);
+      const digits = definition.digits;
+      const deltaText = (change > 0 ? '+' : '') + formatNumber(change, digits) + ' ' + definition.unit;
+      periodComparisons.push({
+        key: 'period:' + definition.metric,
+        metric: definition.metric,
+        label: definition.label,
+        unit: definition.unit,
+        previousAverage: Number(previousAverage.toFixed(digits + 2)),
+        currentAverage: Number(currentAverage.toFixed(digits + 2)),
+        change: Number(change.toFixed(digits + 2)),
+        changePercent: previousAverage !== 0 ? Number((change / Math.abs(previousAverage) * 100).toFixed(1)) : null,
+        previousDays: before.length,
+        currentDays: current.length,
+        previousReadings: priorObservations.filter((item) => item.metric === definition.metric && item.quality.status === 'ACCEPTED').length,
+        currentReadings: observations.filter((item) => item.metric === definition.metric && item.quality.status === 'ACCEPTED').length,
+        previousStart: before[0].day,
+        previousEnd: before[before.length - 1].day,
+        currentStart: current[0].day,
+        currentEnd: current[current.length - 1].day,
+        relatedGoals,
+        relatedConditions,
+        interpretation: (relatedConditions.length
+          ? 'Relevant to your saved condition' + (relatedConditions.length > 1 ? 's' : '') + ': ' + relatedConditions.join(', ') + '. '
+          : '') +
+          (relatedGoals.length
+            ? 'Related saved goal' + (relatedGoals.length > 1 ? 's' : '') + ': ' + relatedGoals.join(', ') + '. '
+            : '') +
+          'This comparison uses accepted dated readings and daily averages across matched reporting windows. A rise or fall is not automatically better or worse; compare it with your saved target, baseline, symptoms and care plan.',
+      });
+    }
+
+    const findings: HealthReportNarrativeFinding[] = [];
+    const addFinding = (finding: HealthReportNarrativeFinding) => {
+      if (findings.some((item) => item.key === finding.key)) return;
+      findings.push(finding);
+    };
+    const formatObservation = (item: HealthObservation) =>
+      (item.value === null ? (item.valueCode ?? 'Categorical entry') : formatNumber(item.value, 1) + (item.unit ? ' ' + item.unit : '')) +
+      (item.observedAt ? ' on ' + (localDay(item.observedAt) ?? item.observedAt.slice(0, 10)) : ' (date unavailable)');
+    const confidenceFor = (items: HealthObservation[]): 'HIGH' | 'MODERATE' | 'LIMITED' =>
+      items.some((item) => item.observedAtBasis !== 'SOURCE_EVENT_TIME') ? 'MODERATE' : 'HIGH';
+
+    // Surface observations carrying explicit safety signals before general trends.
+    const urgentSignals = new Map<string, HealthObservation[]>();
+    for (const item of observations.filter((observation) => observation.quality.safetySignals.length)) {
+      for (const signal of item.quality.safetySignals) {
+        const key = item.metric + ':' + signal;
+        const group = urgentSignals.get(key) ?? [];
+        group.push(item);
+        urgentSignals.set(key, group);
+      }
+    }
+    for (const [key, items] of urgentSignals) {
+      const latest = items.slice().sort((a, b) => String(a.observedAt ?? '').localeCompare(String(b.observedAt ?? ''))).at(-1);
+      if (!latest) continue;
+      const signal = latest.quality.safetySignals[0];
+      const title = latest.metric === 'oxygen_saturation' ? 'Low oxygen reading needs prompt verification'
+        : latest.metric === 'body_temperature' ? 'High temperature reading needs prompt review'
+          : latest.metric === 'heart_rate' ? 'Heart-rate reading needs prompt review'
+            : latest.metric === 'respiratory_rate' ? 'Breathing-rate reading needs prompt review'
+              : 'A reading carries a safety flag';
+      const nextStep = signal === 'LOW_OXYGEN_REQUIRES_URGENT_RECHECK'
+        ? 'If this reading is current, recheck promptly. If it remains low, or you have breathing difficulty or feel seriously unwell, seek urgent medical assessment.'
+        : signal === 'HIGH_TEMPERATURE_REQUIRES_URGENT_REVIEW'
+          ? 'Verify promptly with a reliable thermometer. If this is current and accurate, or you feel seriously unwell, seek urgent medical assessment.'
+          : 'Verify the measurement, timestamp and unit. If it is current and you have concerning symptoms, seek prompt clinical advice.';
+      addFinding({
+        key: 'safety:' + key,
+        priority: 'SAFETY',
+        title,
+        change: 'A dated observation triggered a predefined safety-review rule.',
+        pattern: items.length > 1 ? items.length + ' flagged observations were recorded; the latest was ' + formatObservation(latest) + '.' : 'The flagged observation was ' + formatObservation(latest) + '.',
+        personalContext: currentConditionRows.length
+          ? 'Saved health context includes ' + currentConditionRows.map((item) => item.name).slice(0, 3).join(', ') + '.'
+          : 'No matching active condition was needed to trigger this data-quality/safety check.',
+        whyItMatters: 'This is a prompt to verify a potentially important reading, not a diagnosis. Its meaning depends on whether it is current, the measurement method, symptoms and clinical history.',
+        nextStep,
+        confidence: confidenceFor(items),
+        evidence: items.slice(-3).map(formatObservation),
+        sourceRecordIds: Array.from(new Set(items.map((item) => item.source.recordId).filter((id): id is string => Boolean(id)))),
+      });
+    }
+
+    const reviewObservations = observations.filter((item) =>
+      item.quality.status !== 'ACCEPTED' || item.quality.flags.length > 0,
+    );
+    if (reviewObservations.length) {
+      const preview = reviewObservations.slice(0, 3);
+      addFinding({
+        key: 'quality:readings-to-verify',
+        priority: 'REVIEW',
+        title: 'Some readings need verification before interpretation',
+        change: reviewObservations.length + ' observation(s) carry unit, timestamp or plausibility flags.',
+        pattern: preview.map((item) => item.metric + ': ' + formatObservation(item)).join('; '),
+        personalContext: 'These readings are kept separate from accepted evidence and are not used to calculate reliable trends when flagged.',
+        whyItMatters: 'A unit mismatch, uncertain timestamp or implausible value can make an apparent health change misleading.',
+        nextStep: 'Check the original record, unit and measurement time. Keep the source entry unchanged until it has been verified.',
+        confidence: 'HIGH',
+        evidence: preview.flatMap((item) => item.quality.flags.slice(0, 2)),
+        sourceRecordIds: Array.from(new Set(preview.map((item) => item.source.recordId).filter((id): id is string => Boolean(id)))),
+      });
+    }
+
+    // Compare symptom severity with the latest dated follow-up, retaining symptom-level identity.
+    const severityName = (rank: number) => Object.keys(SEVERITY_RANK).find((name) => SEVERITY_RANK[name] === rank) ?? 'UNKNOWN';
+    const symptomRows = rows(activity.symptoms);
+    for (const symptom of symptomRows) {
+      const title = stringValue(symptom.title) ??
+        rows(symptom.symptoms).map((entry) => stringValue(row(entry.symptom).name ?? entry.name)).filter(Boolean).join(', ') ??
+        'Recorded symptom';
+      const initialRank = SEVERITY_RANK[String(symptom.overallSeverity ?? '').toUpperCase()];
+      if (initialRank === undefined) continue;
+      const followUps = rows(symptom.monitorings).flatMap((monitor) => {
+        const rank = SEVERITY_RANK[String(monitor.severity ?? '').toUpperCase()];
+        const at = isoDate(monitor.observedAt ?? monitor.createdAt);
+        return rank === undefined || !at || !periodIncludes(report, at) ? [] : [{ rank, at, recordId: stringValue(monitor.id) }];
+      }).sort((a, b) => a.at.localeCompare(b.at));
+      const latest = followUps.at(-1);
+      if (!latest || latest.rank <= initialRank) continue;
+      const initialAt = isoDate(symptom.startedAt ?? symptom.createdAt);
+      const evidence = ['Initial severity ' + severityName(initialRank).toLowerCase() +
+        (initialAt ? ' on ' + (localDay(initialAt) ?? initialAt.slice(0, 10)) : ''),
+      'Latest follow-up severity ' + severityName(latest.rank).toLowerCase() +
+        ' on ' + (localDay(latest.at) ?? latest.at.slice(0, 10))];
+      addFinding({
+        key: 'symptom-worsening:' + String(symptom.id ?? title),
+        priority: latest.rank >= SEVERITY_RANK.SEVERE ? 'REVIEW' : 'WATCH',
+        title: title + ' worsened in a recorded follow-up',
+        change: 'Recorded severity increased from ' + severityName(initialRank).toLowerCase() + ' to ' + severityName(latest.rank).toLowerCase() + '.',
+        pattern: 'The change is based on the same symptom record, comparing its initial severity with the latest dated follow-up in this reporting period.',
+        personalContext: 'This finding uses the symptom-specific timeline rather than averaging different symptoms together.',
+        whyItMatters: 'A worsening symptom may warrant attention, but this record alone does not establish the cause or whether a medicine or behaviour contributed.',
+        nextStep: 'Continue any monitoring specified in your care plan and seek clinical advice if the symptom is persistent, worsening or concerning.',
+        confidence: initialAt && symptom.startedAt ? 'HIGH' : 'MODERATE',
+        evidence,
+        sourceRecordIds: [stringValue(symptom.id), latest.recordId].filter((id): id is string => Boolean(id)),
+      });
+    }
+
+    if (sleepStress.status === 'SUPPORTED_PATTERN') {
+      addFinding({
+        key: 'cross:sleep-stress',
+        priority: 'WATCH',
+        title: 'Sleep duration and stress ratings differed across recorded days',
+        change: 'Average stress was ' + formatNumber(sleepStress.meanStressOnShorterSleepDays, 1) +
+          '/10 on shorter-sleep days versus ' + formatNumber(sleepStress.meanStressOnLongerSleepDays, 1) + '/10 on longer-sleep days.',
+        pattern: sleepStress.statement,
+        personalContext: 'This pattern comes from ' + sleepStress.overlappingDays + ' overlapping days in your daily records.',
+        whyItMatters: 'Repeated co-occurrence may be useful context for your wellbeing, but the observations do not establish cause and effect.',
+        nextStep: 'Track sleep and stress together over additional days and discuss a persistent or distressing pattern with a clinician.',
+        confidence: sleepStress.overlappingDays >= 6 ? 'MODERATE' : 'LIMITED',
+        evidence: [sleepStress.shorterSleepDays + ' shorter-sleep days; ' + sleepStress.longerSleepDays + ' longer-sleep days'],
+        sourceRecordIds: [],
+      });
+    }
+
+    for (const comparison of periodComparisons) {
+      addFinding({
+        key: 'comparison:' + comparison.metric,
+        priority: comparison.relatedConditions.length ? 'WATCH' : 'INSIGHT',
+        title: comparison.label + ' changed versus the previous reporting window',
+        change: formatNumber(comparison.previousAverage, TREND_DEFINITIONS.find((item) => item.metric === comparison.metric)?.digits ?? 1) +
+          ' ' + comparison.unit + ' previously → ' +
+          formatNumber(comparison.currentAverage, TREND_DEFINITIONS.find((item) => item.metric === comparison.metric)?.digits ?? 1) +
+          ' ' + comparison.unit + ' now (' + (comparison.change > 0 ? '+' : '') + formatNumber(comparison.change, TREND_DEFINITIONS.find((item) => item.metric === comparison.metric)?.digits ?? 1) + ' ' + comparison.unit + ').',
+        pattern: 'The comparison uses daily averages from ' + comparison.previousDays + ' previous recorded day(s) and ' + comparison.currentDays + ' current recorded day(s), not missing days treated as zero.',
+        personalContext: [
+          comparison.relatedConditions.length ? 'Relevant saved condition(s): ' + comparison.relatedConditions.join(', ') + '.' : '',
+          comparison.relatedGoals.length ? 'Related active goal(s): ' + comparison.relatedGoals.join(', ') + '.' : '',
+        ].filter(Boolean).join(' ') || 'No direct active-condition or goal mapping was found for this measure.',
+        whyItMatters: comparison.interpretation,
+        nextStep: comparison.relatedConditions.length || comparison.relatedGoals.length
+          ? 'Compare this change with your saved baseline, applicable clinician-set target and care plan; continue recording comparable measurements.'
+          : 'Continue recording comparable measurements. A change in either direction is not, by itself, evidence of improvement or deterioration.',
+        confidence: comparison.previousDays >= 4 && comparison.currentDays >= 4 ? 'MODERATE' : 'LIMITED',
+        evidence: [
+          'Previous window: ' + comparison.previousStart + ' to ' + comparison.previousEnd + '; ' + comparison.previousReadings + ' accepted reading(s).',
+          'Current window: ' + comparison.currentStart + ' to ' + comparison.currentEnd + '; ' + comparison.currentReadings + ' accepted reading(s).',
+        ],
+        sourceRecordIds: [],
+      });
+    }
+
+    for (const trend of withinPeriodTrends) {
+      addFinding({
+        key: 'trend:' + trend.metric,
+        priority: trend.relatedConditions.length ? 'WATCH' : 'INSIGHT',
+        title: trend.label + ' shifted within this reporting period',
+        change: formatNumber(trend.earlierAverage, TREND_DEFINITIONS.find((item) => item.metric === trend.metric)?.digits ?? 1) +
+          ' ' + trend.unit + ' → ' +
+          formatNumber(trend.laterAverage, TREND_DEFINITIONS.find((item) => item.metric === trend.metric)?.digits ?? 1) +
+          ' ' + trend.unit + ' across ' + trend.daysCompared + ' recorded days.',
+        pattern: trend.direction === 'RISING' ? 'Later daily averages were higher than earlier daily averages.' : 'Later daily averages were lower than earlier daily averages.',
+        personalContext: [
+          trend.relatedConditions.length ? 'Relevant saved condition(s): ' + trend.relatedConditions.join(', ') + '.' : '',
+          trend.relatedGoals.length ? 'Related active goal(s): ' + trend.relatedGoals.join(', ') + '.' : '',
+        ].filter(Boolean).join(' ') || 'No direct active-condition or active-goal mapping was found.',
+        whyItMatters: trend.interpretation,
+        nextStep: trend.relatedConditions.length || trend.relatedGoals.length
+          ? 'Review the direction against your actual saved target and care plan; do not infer treatment failure or success from direction alone.'
+          : 'Keep recording comparable measurements so future reports can distinguish a lasting shift from normal variation.',
+        confidence: trend.daysCompared >= 5 && trend.readingCount >= 5 ? 'MODERATE' : 'LIMITED',
+        evidence: [trend.firstDay + ' to ' + trend.lastDay + '; ' + trend.readingCount + ' accepted dated reading(s).'],
+        sourceRecordIds: [],
+      });
+    }
+
+    findings.sort((a, b) => {
+      const rank: Record<HealthReportNarrativeFinding['priority'], number> = { SAFETY: 0, REVIEW: 1, WATCH: 2, INSIGHT: 3 };
+      return rank[a.priority] - rank[b.priority];
+    });
+
     const start = isoDate(row(report.period).start);
     const end = isoDate(row(report.period).end);
     const eligibleDays = eligibleDayCount(start, end);
     const loggedDays = Array.from(loggingDays).sort();
 
     return {
-      version: 'shadow-v1',
+      version: 'shadow-v2',
+      findings: findings.slice(0, 8),
+      periodComparisons,
       personalisedContext: {
         insights: personalisedInsights,
       },
