@@ -2792,7 +2792,7 @@ function MedicationPeriodInsights({
             const scheduleHasUnknownOutcomes = row.source === "schedule" && Boolean(row.current && row.current.unrecordedDoses > 0);
             const takenRate = row.current?.adherencePercent ?? null;
             const meetsTarget = row.target !== null && takenRate !== null &&
-              row.current?.scheduledDoses !== undefined && row.current.scheduledDoses > 0 &&
+              row.current !== null && row.current.scheduledDoses > 0 &&
               row.current.unrecordedDoses === 0 && takenRate >= row.target;
             const adherenceTone = scheduleHasUnknownOutcomes
               ? "border-slate-200 bg-slate-50 text-slate-700"
