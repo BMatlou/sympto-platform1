@@ -2532,6 +2532,7 @@ type MedicationPeriodSummary = {
   daysAtTarget: number;
   completeDays: number;
   adherencePercent: number | null;
+  outcomeRecordingPercent: number | null;
   todayExcluded: boolean;
 };
 
@@ -2556,7 +2557,13 @@ function medicationPeriodSummary(
   const unrecordedDoses = sumField(scheduled, "unrecordedDoses");
   const daysWithActions = scheduled.filter((item) => (finite(item.recordedActions) ?? 0) > 0).length;
   const daysAtTarget = scheduled.filter((item) => (finite(item.adherencePercent) ?? 0) >= targetAdherence).length;
-  const completeDays = scheduled.filter((item) => (finite(item.takenDoses) ?? 0) >= (finite(item.expectedDoses) ?? 0)).length;
+  const completeDays = scheduled.filter((item) =>
+    (finite(item.recordedActions) ?? ((finite(item.takenDoses) ?? 0) + (finite(item.skippedDoses) ?? 0))) >= (finite(item.expectedDoses) ?? 0),
+  ).length;
+  const verifiedDaysAtTarget = scheduled.filter((item) =>
+    (finite(item.recordedActions) ?? ((finite(item.takenDoses) ?? 0) + (finite(item.skippedDoses) ?? 0))) >= (finite(item.expectedDoses) ?? 0) &&
+    (finite(item.adherencePercent) ?? 0) >= targetAdherence,
+  ).length;
   return {
     scheduledDoses,
     takenDoses,
@@ -2564,9 +2571,12 @@ function medicationPeriodSummary(
     unrecordedDoses,
     scheduledDays: scheduled.length,
     daysWithActions,
-    daysAtTarget,
+    daysAtTarget: verifiedDaysAtTarget,
     completeDays,
     adherencePercent: scheduledDoses > 0 ? Number(((takenDoses / scheduledDoses) * 100).toFixed(1)) : null,
+    outcomeRecordingPercent: scheduledDoses > 0
+      ? Number((((takenDoses + skippedDoses) / scheduledDoses) * 100).toFixed(1))
+      : null,
     todayExcluded,
   };
 }
@@ -2758,18 +2768,18 @@ function MedicationPeriodInsights({
       {displayRows.length > 0 && (
         <div className="divide-y divide-slate-100">
           {displayRows.map((row) => {
-            const currentRate = row.current?.adherencePercent ?? (
-              row.source === "events" && row.currentGroup?.total
+            const currentRate = row.source === "schedule"
+              ? row.current?.outcomeRecordingPercent ?? null
+              : row.source === "events" && row.currentGroup?.total
                 ? row.currentGroup.taken / row.currentGroup.total * 100
-                : null
-            );
+                : null;
             const comparableActionSources = row.currentGroup && row.previousGroup &&
               row.currentGroup.source === "event" && row.previousGroup.source === "event";
-            const previousRate = row.previous?.adherencePercent ?? (
-              row.source === "events" && comparableActionSources && row.previousGroup?.total
+            const previousRate = row.source === "schedule"
+              ? row.previous?.outcomeRecordingPercent ?? null
+              : row.source === "events" && comparableActionSources && row.previousGroup?.total
                 ? row.previousGroup.taken / row.previousGroup.total * 100
-                : null
-            );
+                : null;
             const currentActionsTotal = row.currentGroup?.total ?? 0;
             const previousActionsTotal = row.previousGroup?.total ?? 0;
             const delta = currentRate !== null && previousRate !== null ? currentRate - previousRate : null;
@@ -2780,11 +2790,17 @@ function MedicationPeriodInsights({
               : delta > 1 ? "↑ " + formatNumber(delta, 1) + " percentage points"
                 : delta < -1 ? "↓ " + formatNumber(Math.abs(delta), 1) + " percentage points"
                   : "Stable";
-            const meetsTarget = row.target !== null && currentRate !== null && currentRate >= row.target;
-            const adherenceTone = meetsTarget
-              ? "border-emerald-200 bg-emerald-50 text-emerald-800"
-              : currentRate === null ? "border-slate-200 bg-slate-50 text-slate-600"
-                : "border-amber-200 bg-amber-50 text-amber-900";
+            const scheduleHasUnknownOutcomes = row.source === "schedule" && Boolean(row.current && row.current.unrecordedDoses > 0);
+            const takenRate = row.current?.adherencePercent ?? null;
+            const meetsTarget = row.target !== null && takenRate !== null &&
+              row.current?.scheduledDoses !== undefined && row.current.scheduledDoses > 0 &&
+              row.current.unrecordedDoses === 0 && takenRate >= row.target;
+            const adherenceTone = scheduleHasUnknownOutcomes
+              ? "border-slate-200 bg-slate-50 text-slate-700"
+              : meetsTarget
+                ? "border-emerald-200 bg-emerald-50 text-emerald-800"
+                : currentRate === null ? "border-slate-200 bg-slate-50 text-slate-600"
+                  : "border-amber-200 bg-amber-50 text-amber-900";
             const movementTone = delta !== null && delta > 1
               ? "bg-emerald-50 text-emerald-800"
               : delta !== null && delta < -1
@@ -2798,7 +2814,7 @@ function MedicationPeriodInsights({
                       <h3 className="text-sm font-extrabold text-[#0b2d54]">{row.name}</h3>
                       {row.source === "schedule" && row.target !== null && (
                         <span className={"rounded-full border px-2 py-0.5 text-[10px] font-bold " + adherenceTone}>
-                          {currentRate === null ? "No completed days" : meetsTarget ? "Within goal" : "Below saved goal"}
+                          {scheduleHasUnknownOutcomes ? "Dose log incomplete" : currentRate === null ? "No outcomes recorded" : meetsTarget ? "Within saved goal" : "Review dose outcomes"}
                         </span>
                       )}
                     </div>
@@ -2806,7 +2822,7 @@ function MedicationPeriodInsights({
                   </div>
                   <div className="flex flex-wrap items-end gap-x-5 gap-y-2">
                     <div>
-                      <p className="text-[10px] font-bold uppercase tracking-wide text-slate-400">{row.source === "schedule" ? (currentTotals.eventTotal === 0 && currentTotals.legacyTotal > 0 ? "Historical estimate" : "Period adherence") : row.source === "events" ? "Recorded outcomes taken" : row.source === "legacy" ? "Older daily statuses" : "Adherence"}</p>
+                      <p className="text-[10px] font-bold uppercase tracking-wide text-slate-400">{row.source === "schedule" ? (currentTotals.eventTotal === 0 && currentTotals.legacyTotal > 0 ? "Historical estimate · outcomes recorded" : "Dose outcomes recorded") : row.source === "events" ? "Recorded outcomes taken" : row.source === "legacy" ? "Older daily statuses" : "Adherence"}</p>
                       <p className="mt-0.5 text-xl font-black text-[#0b2d54]">
                         {currentRate === null ? "—" : formatNumber(currentRate, 1) + "%"}
                       </p>
@@ -2821,7 +2837,7 @@ function MedicationPeriodInsights({
                 {row.source === "schedule" && row.current && (
                   <>
                     <div className="mt-3 h-1.5 overflow-hidden rounded-full bg-slate-100">
-                      <div className={"h-full rounded-full " + (meetsTarget ? "bg-emerald-500" : "bg-amber-400")} style={{ width: String(Math.max(0, Math.min(100, currentRate ?? 0))) + "%" }} />
+                      <div className={"h-full rounded-full " + (row.current.unrecordedDoses === 0 && row.current.scheduledDoses > 0 ? "bg-emerald-500" : "bg-[#24c1c4]")} style={{ width: String(Math.max(0, Math.min(100, currentRate ?? 0))) + "%" }} />
                     </div>
                     <div className="mt-3 grid grid-cols-2 gap-x-4 gap-y-2 text-xs sm:grid-cols-4">
                       <div><p className="text-slate-400">Taken</p><p className="mt-0.5 font-bold text-[#0b2d54]">{row.current.takenDoses}/{row.current.scheduledDoses} scheduled</p></div>
@@ -3647,8 +3663,8 @@ function MedicationAdherenceSummary({ report }: { report: Report }) {
         <>
           <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
             <div className="rounded-xl bg-[#f5fafb] p-3">
-              <p className="text-[10px] font-bold uppercase tracking-wide text-slate-500">Confirmed adherence</p>
-              <p className="mt-1 text-xl font-black tabular-nums text-[#0b2d54]">{data.adherencePercent == null ? (data.expectedDoses > 0 ? "Incomplete" : "—") : data.adherencePercent + "%"}</p>
+              <p className="text-[10px] font-bold uppercase tracking-wide text-slate-500">Dose outcome coverage</p>
+              <p className="mt-1 text-xl font-black tabular-nums text-[#0b2d54]">{data.outcomeRecordingPercent == null ? (data.expectedDoses > 0 ? "Incomplete" : "—") : data.outcomeRecordingPercent + "%"}</p>
             </div>
             <div className="rounded-xl bg-[#f5fafb] p-3">
               <p className="text-[10px] font-bold uppercase tracking-wide text-slate-500">Taken / expected</p>
@@ -3888,7 +3904,7 @@ export default function HealthReportPage() {
 
           <section className="mt-4 overflow-hidden rounded-[28px] bg-gradient-to-br from-[#0b2d54] via-[#0b3e60] to-[#0f5a62] p-5 text-white shadow-[0_18px_55px_-30px_rgba(11,45,84,0.55)] sm:p-7">
             <div className="flex flex-col gap-5 sm:flex-row sm:items-center sm:justify-between">
-              <div><div className="flex items-center gap-2 text-[10px] font-black uppercase tracking-[0.18em] text-[#24c1c4]"><ShieldCheck className="h-4 w-4" />Sympto · Health intelligence</div><h1 className="mt-3 text-3xl font-black tracking-tight sm:text-4xl">{title}</h1><p className="mt-2 text-sm leading-6 text-white/75">{report.period.label}</p><p className="mt-3 text-sm leading-5 text-white/80">Your health, at a glance.</p></div>
+              <div><div className="flex items-center gap-2 text-[10px] font-black uppercase tracking-[0.18em] text-[#24c1c4]"><ShieldCheck className="h-4 w-4" />Sympto · Health intelligence</div><h1 className="mt-3 text-3xl font-black tracking-tight sm:text-4xl">{title}</h1><p className="mt-2 text-sm leading-6 text-white/75">{report.period.label}</p><p className="mt-3 max-w-2xl text-sm leading-5 text-white/80">Personalised patterns, priorities and next steps, grounded in your saved health records.</p></div>
               <div className="flex shrink-0 flex-wrap items-center gap-3 rounded-2xl border border-white/15 bg-white/10 p-3 sm:gap-4 sm:p-4">
                 <ScoreRing
                   percent={loggingPercentage}
