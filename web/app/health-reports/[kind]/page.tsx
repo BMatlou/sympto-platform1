@@ -2842,7 +2842,7 @@ function MedicationPeriodInsights({
                       <div><p className="text-slate-400">Taken</p><p className="mt-0.5 font-bold text-[#0b2d54]">{row.current.takenDoses}/{row.current.scheduledDoses} scheduled</p></div>
                       <div><p className="text-slate-400">Skipped</p><p className="mt-0.5 font-bold text-[#0b2d54]">{row.current.skippedDoses}</p></div>
                       <div><p className="text-slate-400">Not recorded</p><p className="mt-0.5 font-bold text-[#0b2d54]">{row.current.unrecordedDoses}</p></div>
-                      <div><p className="text-slate-400">Days at target</p><p className="mt-0.5 font-bold text-[#0b2d54]">{row.current.daysAtTarget}/{row.current.scheduledDays}</p></div>
+                      <div><p className="text-slate-400">Days at target (complete logs)</p><p className="mt-0.5 font-bold text-[#0b2d54]">{row.current.daysAtTarget}/{row.current.completeDays}</p></div>
                     </div>
                     {row.previous?.outcomeRecordingPercent !== null && row.previous?.outcomeRecordingPercent !== undefined && (
                       <p className="mt-2 text-[11px] text-slate-500">Previous period: {formatNumber(row.previous.outcomeRecordingPercent, 1)}% of scheduled dose outcomes recorded · {row.previous.takenDoses}/{row.previous.scheduledDoses} marked taken · {row.previous.unrecordedDoses} without an outcome.</p>
