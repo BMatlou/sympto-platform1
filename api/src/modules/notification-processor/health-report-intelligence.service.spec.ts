@@ -311,14 +311,14 @@ describe('HealthReportIntelligenceService', () => {
       { day: '16', sleep: 5.0, stress: 4, water: 2150, exercise: 170, cigarettes: 6, glucose: 5.3 },
     ];
     const goalMetricEvents = days.flatMap((item) => {
-      const at = (value: string) => '2026-10-' + item.day + 'T08:00:00.000Z';
+      const at = () => '2026-10-' + item.day + 'T08:00:00.000Z';
       return [
-        { metricType: 'SLEEP_DURATION', metricKey: 'sleep.duration', loggedValue: item.sleep, unit: 'hours', occurredAt: at(item.day), source: 'patient-health-goal', sourceId: 'sleep-' + item.day },
-        { metricType: 'STRESS', metricKey: 'stress.score', loggedValue: item.stress, unit: '/10', occurredAt: at(item.day), source: 'patient-health-goal', sourceId: 'stress-' + item.day },
-        { metricType: 'HYDRATION', metricKey: 'hydration.volume', loggedValue: item.water, unit: 'mL', occurredAt: at(item.day), source: 'patient-health-goal', sourceId: 'water-' + item.day },
-        { metricType: 'EXERCISE_DURATION', metricKey: 'exercise.duration', loggedValue: item.exercise, unit: 'minutes', occurredAt: at(item.day), source: 'patient-health-goal', sourceId: 'exercise-' + item.day },
-        { metricType: 'SMOKING_CIGARETTE_COUNT', metricKey: 'smoking.cigarettes', loggedValue: item.cigarettes, unit: 'cigarettes', occurredAt: at(item.day), source: 'patient-health-goal', sourceId: 'smoking-' + item.day },
-        { metricType: 'BLOOD_GLUCOSE', metricKey: 'blood_glucose', loggedValue: item.glucose, unit: 'mmol/L', occurredAt: at(item.day), source: 'patient-health-goal', sourceId: 'glucose-' + item.day },
+        { metricType: 'SLEEP_DURATION', metricKey: 'sleep.duration', loggedValue: item.sleep, unit: 'hours', occurredAt: at(), source: 'patient-health-goal', sourceId: 'sleep-' + item.day },
+        { metricType: 'STRESS', metricKey: 'stress.score', loggedValue: item.stress, unit: '/10', occurredAt: at(), source: 'patient-health-goal', sourceId: 'stress-' + item.day },
+        { metricType: 'HYDRATION', metricKey: 'hydration.volume', loggedValue: item.water, unit: 'mL', occurredAt: at(), source: 'patient-health-goal', sourceId: 'water-' + item.day },
+        { metricType: 'EXERCISE_DURATION', metricKey: 'exercise.duration', loggedValue: item.exercise, unit: 'minutes', occurredAt: at(), source: 'patient-health-goal', sourceId: 'exercise-' + item.day },
+        { metricType: 'SMOKING_CIGARETTE_COUNT', metricKey: 'smoking.cigarettes', loggedValue: item.cigarettes, unit: 'cigarettes', occurredAt: at(), source: 'patient-health-goal', sourceId: 'smoking-' + item.day },
+        { metricType: 'BLOOD_GLUCOSE', metricKey: 'blood_glucose', loggedValue: item.glucose, unit: 'mmol/L', occurredAt: at(), source: 'patient-health-goal', sourceId: 'glucose-' + item.day },
       ];
     });
     const report = fixture({
