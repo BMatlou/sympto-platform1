@@ -55,7 +55,7 @@ export interface HealthObservation {
 
 export interface PersonalisedHealthInsight {
   key: string;
-  group: 'CONDITION' | 'GOAL' | 'BASELINE' | 'ALLERGY' | 'TREATMENT';
+  group: 'CONDITION' | 'GOAL' | 'BASELINE' | 'ALLERGY' | 'TREATMENT' | 'PROFILE' | 'PREVENTIVE_CARE';
   title: string;
   headline: string;
   detail: string;
@@ -1070,6 +1070,65 @@ export class HealthReportIntelligenceService {
         headline: medication.name + ' is referenced in ' + medication.symptoms.length + ' symptom record(s)',
         detail: 'These are patient-recorded medication-effect notes. They do not establish that the medicine caused the symptom. Discuss persistent side effects or concerns with the prescriber or pharmacist; do not change a prescription based only on this report.',
         status: 'WATCH',
+      });
+    }
+
+    const profile = row(context.profile);
+    const profileSignals: Array<{ field: string; label: string; metrics: string[]; activityLabel: string }> = [
+      { field: 'smokingStatus', label: 'Usual smoking pattern', metrics: ['smoking.cigarettes', 'smoking.frequency'], activityLabel: 'smoking' },
+      { field: 'alcoholConsumption', label: 'Usual alcohol pattern', metrics: ['alcohol.units', 'alcohol.frequency'], activityLabel: 'alcohol' },
+      { field: 'exerciseFrequency', label: 'Usual exercise pattern', metrics: ['exercise.duration', 'activity.steps'], activityLabel: 'exercise' },
+    ];
+    for (const signal of profileSignals) {
+      const savedValue = stringValue(profile[signal.field]);
+      if (!savedValue) continue;
+      const summary = summarizeMetrics(signal.metrics);
+      if (!summary.matching.length) continue;
+      const hasPositiveEvidence = summary.accepted.some((item) => (item.value ?? 0) > 0);
+      const profileSaysNone = /(^|\\b)(none|never|no|non[- ]?smoker|not active)(\\b|$)/i.test(savedValue);
+      const mayHaveChanged = profileSaysNone && hasPositiveEvidence;
+      personalisedInsights.push({
+        key: 'profile:' + signal.field,
+        group: 'PROFILE',
+        title: signal.label,
+        headline: 'Saved profile: ' + savedValue + ' · ' + summary.summaries.join(' · '),
+        detail: mayHaveChanged
+          ? 'Your saved profile describes ' + signal.activityLabel + ' as absent, while dated logs contain a recorded value. This may reflect a change or an older profile answer; review the difference rather than treating either source as proof of a usual pattern.'
+          : 'The profile describes your usual pattern, while the dated values describe activity recorded during this report period. The profile may pre-date these entries and is not substituted for the period data.',
+        status: mayHaveChanged ? 'WATCH' : 'INFO',
+      });
+    }
+
+    const reportReference = isoDate(report.generatedAt) ?? referenceDate;
+    const reportReferenceTime = reportReference ? new Date(reportReference).getTime() : Number.NaN;
+    const immunisationFollowUps = rows(context.immunizations).flatMap((item) => {
+      const status = String(item.status ?? '').toUpperCase();
+      const dueDate = isoDate(item.nextDueDate);
+      const dueTime = dueDate ? new Date(dueDate).getTime() : Number.NaN;
+      const datePassed = Number.isFinite(reportReferenceTime) && Number.isFinite(dueTime) && dueTime <= reportReferenceTime;
+      const explicitlyMissed = status === 'MISSED';
+      const pastFollowUpDate = datePassed && ['SCHEDULED', 'COMPLETED'].includes(status);
+      if (!explicitlyMissed && !pastFollowUpDate) return [];
+      const vaccineName = stringValue(row(item.immunization).name ?? item.name) ?? 'Immunisation';
+      return [{
+        name: vaccineName,
+        status,
+        dueDate,
+        explicitlyMissed,
+      }];
+    });
+    if (immunisationFollowUps.length) {
+      const followUpNames = immunisationFollowUps.slice(0, 4).map((item) =>
+        item.name + (item.explicitlyMissed ? ' (marked missed)' : item.dueDate ? ' (next due ' + item.dueDate.slice(0, 10) + ')' : ''),
+      );
+      personalisedInsights.push({
+        key: 'preventive-care:immunisation-follow-up',
+        group: 'PREVENTIVE_CARE',
+        title: 'Immunisation follow-up in your saved record',
+        headline: immunisationFollowUps.length + ' saved immunisation record(s) are marked missed or have a past next-due date',
+        detail: followUpNames.join(' · ') + (immunisationFollowUps.length > followUpNames.length ? ' · +' + (immunisationFollowUps.length - followUpNames.length) + ' more' : '') +
+          '. This is based on saved status and dates, not an assessment of protection or whether another dose is needed. Confirm the record and next step with your clinic.',
+        status: 'REVIEW',
       });
     }
 
