@@ -1366,9 +1366,6 @@ export class HealthReportIntelligenceService {
         policy: 'Counts unique Africa/Johannesburg calendar days with patient-owned check-ins, symptom entries/follow-ups, patient vitals, manual-vital logs, explicit medication actions or patient smoking logs. Excludes updatedAt-only changes, clinician/administrative activity, profile edits and device-only syncs.',
       },
       crossSignals: { sleepStress },
-      personalisedContext: {
-        insights: personalisedInsights,
-      },
       clinicalContext: {
         ageAtReport: ageAt(person.dateOfBirth, referenceDate),
         gender: stringValue(person.gender),
