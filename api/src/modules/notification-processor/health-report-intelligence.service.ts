@@ -1755,11 +1755,13 @@ export class HealthReportIntelligenceService {
     // This supplies a longer-term anchor without treating unrecorded days as measurements.
     if (longTermStart && periodStart) {
       const midpoint = (new Date(longTermStart).getTime() + new Date(periodStart).getTime()) / 2;
+      const midpointDay = localDay(new Date(midpoint));
+      const midpointOrdinal = midpointDay ? dayOrdinal(midpointDay) : Number.NaN;
       for (const definition of TREND_DEFINITIONS) {
         const longSeries = dailyMetricValues(longTermObservations, definition.metric);
-        if (longSeries.length < 6) continue;
-        const older = longSeries.filter((item) => new Date(item.day).getTime() < midpoint);
-        const recent = longSeries.filter((item) => new Date(item.day).getTime() >= midpoint);
+        if (longSeries.length < 6 || !Number.isFinite(midpointOrdinal)) continue;
+        const older = longSeries.filter((item) => dayOrdinal(item.day) < midpointOrdinal);
+        const recent = longSeries.filter((item) => dayOrdinal(item.day) >= midpointOrdinal);
         if (older.length < 2 || recent.length < 2) continue;
         const olderAverage = meanOf(older.map((item) => item.value));
         const recentAverage = meanOf(recent.map((item) => item.value));
