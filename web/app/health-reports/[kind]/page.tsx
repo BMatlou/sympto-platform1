@@ -31,11 +31,29 @@ type JournalEntry = {
 
 type SymptomName = { name?: string | null; symptom?: { name?: string | null } | null };
 type SymptomObservationRecord = {
+  id?: string;
   observedAt?: string | null;
+  createdAt?: string | null;
   severity?: string | null;
   progression?: string | null;
+  frequency?: string | null;
+  durationMinutes?: number | string | null;
   stillPresent?: boolean | null;
   painScore?: number | string | null;
+  suspectedTrigger?: string | null;
+  aggravatingFactors?: string | null;
+  relievingFactors?: string | null;
+  notes?: string | null;
+  source?: string | null;
+};
+type SymptomAIObservationRecord = {
+  id?: string;
+  observation?: string | null;
+  confidenceScore?: number | string | null;
+  recommendation?: string | null;
+  requiresAttention?: boolean | null;
+  reviewed?: boolean | null;
+  createdAt?: string | null;
 };
 type SymptomTriggerRecord = {
   trigger?: string | null;
@@ -60,7 +78,9 @@ type SymptomRecord = {
   overallSeverity?: string | null;
   progression?: string | null;
   symptoms?: SymptomName[] | null;
-  observations?: SymptomObservationRecord[] | null;
+  // observations are AIObservation metadata; monitorings are actual dated patient follow-ups.
+  observations?: SymptomAIObservationRecord[] | null;
+  monitorings?: SymptomObservationRecord[] | null;
   triggers?: SymptomTriggerRecord[] | null;
   medicationEffects?: SymptomMedicationEffectRecord[] | null;
 };
@@ -1584,16 +1604,16 @@ function symptomLogAnalytics(report: Report | null) {
   const severityValues = logs.flatMap((log) => {
     const recorded = [
       log.overallSeverity,
-      ...(log.observations ?? []).map((item) => item.severity),
+      ...(log.monitorings ?? []).map((item) => item.severity),
     ].map((value) => rank[String(value ?? "").toUpperCase()]).filter((value): value is number => value !== undefined);
     return recorded.length ? [Math.max(...recorded)] : [];
   });
   const worseningCount = logs.filter((log) =>
     String(log.progression ?? "").toUpperCase() === "WORSENING" ||
-    (log.observations ?? []).some((item) => String(item.progression ?? "").toUpperCase() === "WORSENING"),
+    (log.monitorings ?? []).some((item) => String(item.progression ?? "").toUpperCase() === "WORSENING"),
   ).length;
   const severeCount = logs.filter((log) => {
-    const all = [log.overallSeverity, ...(log.observations ?? []).map((item) => item.severity)]
+    const all = [log.overallSeverity, ...(log.monitorings ?? []).map((item) => item.severity)]
       .map((value) => String(value ?? "").toUpperCase());
     return all.some((value) => value === "SEVERE" || value === "VERY_SEVERE");
   }).length;
@@ -1634,7 +1654,7 @@ function symptomSeverityTimeline(report: Report | null): DailyValue[] {
 
   report.activity.symptoms.forEach((log) => {
     const perLogDate = new Map<string, number>();
-    (log.observations ?? []).forEach((observation) => {
+    (log.monitorings ?? []).forEach((observation) => {
       if (!withinReportPeriod(report, observation.observedAt)) return;
       const date = dateKey(observation.observedAt);
       const severity = rank[String(observation.severity ?? "").toUpperCase()];
