@@ -6,6 +6,7 @@ import { NotificationsModule } from '../notifications/notifications.module';
 import { NotificationProcessorService } from './notification-processor.service';
 import { MedicationReminderSchedulerService } from './medication-reminder-scheduler.service';
 import { HealthReportNotificationSchedulerService } from './health-report-notification-scheduler.service';
+import { HealthReportIntelligenceService } from './health-report-intelligence.service';
 import { HealthReportController } from './health-report.controller';
 
 @Module({
@@ -15,6 +16,7 @@ import { HealthReportController } from './health-report.controller';
     NotificationProcessorService,
     MedicationReminderSchedulerService,
     HealthReportNotificationSchedulerService,
+    HealthReportIntelligenceService,
   ],
   exports: [MedicationReminderSchedulerService],
 })
