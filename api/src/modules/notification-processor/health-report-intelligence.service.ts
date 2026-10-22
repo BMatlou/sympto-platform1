@@ -1662,6 +1662,64 @@ export class HealthReportIntelligenceService {
       });
     }
 
+
+    // Record explicit condition and medication updates as contextual evidence.
+    // Dates help explain chronology, but are never treated as proof of causation.
+    const healthChanges = row(tracking.healthPassportChanges);
+    const conditionChanges = rows(healthChanges.conditions).flatMap((item) => {
+      const name = stringValue(row(item.condition).name ?? item.name);
+      if (!name) return [];
+      const resolved = isoDate(item.resolvedAt);
+      const diagnosed = isoDate(item.diagnosedAt);
+      const created = isoDate(item.createdAt);
+      const relevant = resolved ?? diagnosed ?? created;
+      if (!relevant || !periodIncludes(report, relevant)) return [];
+      return [{
+        id: stringValue(item.id),
+        label: name + ' — ' + (resolved ? 'marked resolved' : diagnosed ? 'diagnosis date recorded' : 'record added'),
+        date: localDay(relevant) ?? relevant.slice(0, 10),
+        resolved: Boolean(resolved),
+      }];
+    });
+    const medicationChanges = rows(healthChanges.medications).flatMap((item) => {
+      const name = stringValue(row(item.medication).name ?? item.name);
+      if (!name) return [];
+      const ended = isoDate(item.endedAt);
+      const started = isoDate(item.startedAt);
+      const created = isoDate(item.createdAt);
+      const relevant = ended ?? started ?? created;
+      if (!relevant || !periodIncludes(report, relevant)) return [];
+      return [{
+        id: stringValue(item.id),
+        label: name + ' — ' + (ended ? 'end date recorded' : started ? 'start date recorded' : 'record added'),
+        date: localDay(relevant) ?? relevant.slice(0, 10),
+        ended: Boolean(ended),
+      }];
+    });
+    if (conditionChanges.length || medicationChanges.length) {
+      const evidence = [
+        ...conditionChanges.slice(0, 3).map((item) => item.label + ' (' + item.date + ')'),
+        ...medicationChanges.slice(0, 3).map((item) => item.label + ' (' + item.date + ')'),
+      ];
+      addFinding({
+        key: 'context:health-record-changes',
+        priority: 'INSIGHT',
+        title: 'Saved health-record changes provide context for this period',
+        change: conditionChanges.length + ' condition record change(s) and ' + medicationChanges.length + ' medication record change(s) have relevant dates in this period.',
+        pattern: evidence.join('; '),
+        personalContext: 'These changes come from your saved Health Passport and medication records and are interpreted alongside dated symptoms and measurements.',
+        whyItMatters: 'A condition or treatment record change may affect interpretation of later observations, but chronology alone does not show that it caused a symptom or measurement change. A resolved status is a record status, not proof that all symptoms have ended.',
+        nextStep: conditionChanges.some((item) => item.resolved) || medicationChanges.some((item) => item.ended)
+          ? 'Check that the saved resolution and medication end dates reflect your clinician’s plan. Discuss uncertainty about ongoing symptoms or treatment with your care team.'
+          : 'Keep the records aligned with your current care plan and continue recording comparable symptoms and measurements.',
+        confidence: 'MODERATE',
+        evidence,
+        sourceRecordIds: [
+          ...conditionChanges.map((item) => item.id),
+          ...medicationChanges.map((item) => item.id),
+        ].filter((id): id is string => Boolean(id)),
+      });
+    }
     findings.sort((a, b) => {
       const rank: Record<HealthReportNarrativeFinding['priority'], number> = { SAFETY: 0, REVIEW: 1, WATCH: 2, INSIGHT: 3 };
       return rank[a.priority] - rank[b.priority];
