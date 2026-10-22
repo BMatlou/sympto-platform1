@@ -454,9 +454,13 @@ export class HealthReportIntelligenceService {
       const isManualVitals = /today.s measurements/i.test(title);
       const observedAt = item.observedAt ?? item.recordedAt ??
         (isManualVitals ? item.updatedAt ?? item.createdAt : item.createdAt);
-      const basis = item.observedAt || item.recordedAt || (isManualVitals && item.updatedAt)
+      // HealthJournal has no immutable observedAt column. Even when this known
+      // manual-vitals writer puts measuredAt into updatedAt, that field is mutable
+      // and may represent the latest update to several measurements; report it only
+      // as a fallback until each measurement stores its own event time.
+      const basis = item.observedAt || item.recordedAt
         ? 'SOURCE_EVENT_TIME'
-        : item.createdAt ? 'RECORD_TIME_FALLBACK' : 'UNKNOWN';
+        : (isManualVitals && item.updatedAt) || item.createdAt ? 'RECORD_TIME_FALLBACK' : 'UNKNOWN';
       const capturedAt = item.createdAt;
       const journalMetrics: Array<[string, string, unknown, string | null]> = [
         ['sleepHours', 'sleep.duration', item.sleepHours, 'hours'],
@@ -516,7 +520,12 @@ export class HealthReportIntelligenceService {
     // counting them in the report's source ledger.
     for (const item of rows(activity.patientVitals)) {
       const at = item.recordedAt ?? item.createdAt;
-      const basis = item.recordedAt ? 'SOURCE_EVENT_TIME' : item.createdAt ? 'RECORD_TIME_FALLBACK' : 'UNKNOWN';
+      // The report facade currently derives patientVitals.recordedAt from the
+      // source row's createdAt, so it is record-time evidence, not a guaranteed
+      // clinical measurement time.
+      const basis = item.recordedAtBasis === 'SOURCE_EVENT_TIME'
+        ? 'SOURCE_EVENT_TIME'
+        : at ? 'RECORD_TIME_FALLBACK' : 'UNKNOWN';
       const actor: ObservationActor = String(item.source ?? 'PATIENT').toUpperCase() === 'CLINICAL' ? 'CLINICIAN' : 'PATIENT';
       const fields: Array<[string, unknown, string | null]> = [
         ['bp.systolic', item.bloodPressureSystolic, 'mmHg'],
