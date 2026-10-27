@@ -707,6 +707,11 @@ export default function TodaySupportedGoalCard({ goal, activeGoals = [], healthC
 
           if (!latestKnown || at.getTime() > latestKnown.at.getTime()) latestKnown = { value, at };
 
+          // A profile baseline is historical context, not a daily check-in.
+          // Keep it as a fallback for the latest known value, but never let it
+          // populate or override a calendar day's recorded resting-rate value.
+          if (sourceName === "patient-baseline") continue;
+
           const dayKey = southAfricaDayKey(at);
           const existing = latestByDay.get(dayKey);
           if (!existing || at.getTime() >= existing.at.getTime()) {
