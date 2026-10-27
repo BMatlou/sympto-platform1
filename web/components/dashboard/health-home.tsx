@@ -359,23 +359,48 @@ async function countTodayGoalNeeds(
       goal?.metricConfig?.metricKey ?? "",
     ).trim();
 
-    if (["NUTRITION", "BLOOD_GLUCOSE", "CHOLESTEROL", "OTHER"].includes(category)) {
+    if (category === "OTHER") {
+      // Custom goals write HealthGoalProgress records, not goal-manual metric events.
+      // Count the task as complete when its latest progress was measured today.
+      const progressRecords = [
+        ...(Array.isArray(goal?.progress) ? goal.progress : []),
+        goal?.latestProgress,
+      ].filter(Boolean);
+      const progressRecordedToday = progressRecords.some((progress: any) =>
+        localDayKey(progress?.measuredAt ?? progress?.createdAt) === todayKey,
+      );
+      if (progressRecordedToday) continue;
+
       if (!metricKey) {
-        if (hasTodayCheckIn && category === "OTHER") continue;
+        if (hasTodayCheckIn) continue;
+        count += 1;
+        continue;
+      }
+
+      count += 1;
+      continue;
+    }
+
+    if (["NUTRITION", "BLOOD_GLUCOSE", "CHOLESTEROL"].includes(category)) {
+      if (!metricKey) {
         count += 1;
         continue;
       }
 
       const { start, end } = todayBoundsInSouthAfrica();
       try {
+        // Nutrition meals use goal-manual; glucose uses patient-glucose-log,
+        // and cholesterol can be recorded from a manual entry or a lab result.
+        // Only nutrition should be source-restricted here.
         const response = await healthGoalsService.getMetricEvents(
           metricType,
           metricKey,
           start,
           end,
-          "goal-manual",
+          category === "NUTRITION" ? "goal-manual" : undefined,
         );
-        const events = Array.isArray(response?.events) ? response.events : [];
+        const events = (Array.isArray(response?.events) ? response.events : [])
+          .filter((event: any) => !/baseline|onboarding|patient-profile/i.test(String(event?.source ?? "")));
 
         if (category === "NUTRITION") {
           const todayTotal = events.reduce(
@@ -569,10 +594,17 @@ export default function HealthHome({ patientId }: { patientId?: string }) {
 
     refreshTodayRecords();
 
-    window.addEventListener("sympto:today-action-updated", refreshTodayRecords);
+    const refreshEvents = [
+      "sympto:today-action-updated",
+      "sympto:health-checkin-updated",
+      "sympto:vitals-updated",
+      "sympto:weight-updated",
+      "sympto:health-goal-updated",
+    ] as const;
+    refreshEvents.forEach((eventName) => window.addEventListener(eventName, refreshTodayRecords));
     return () => {
       active = false;
-      window.removeEventListener("sympto:today-action-updated", refreshTodayRecords);
+      refreshEvents.forEach((eventName) => window.removeEventListener(eventName, refreshTodayRecords));
     };
   }, [data?.patient?.id, data?.generatedAt]);
 
