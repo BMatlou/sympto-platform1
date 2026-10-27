@@ -223,10 +223,47 @@ export class HealthGoalsService {
       `;
     }
 
-    // Older manual vital entries may exist in HealthJournal without a corresponding
-    // metric event (the metric stream was introduced later). Backfill this patient's
-    // heart-rate journal events on demand, without rewriting other metrics.
+    // Today's Current health vitals are also saved as a dedicated Sympto journal.
+    // Older records may pre-date metric-event syncing, so mirror only that app-managed
+    // journal into the manual-vitals stream. Generic Health Journal pulse notes must
+    // not be treated as resting heart-rate measurements.
     if (metricType === 'HEART_RATE' && metricKey === 'heart_rate.bpm') {
+      await this.prisma.$executeRaw`
+        UPDATE "HealthGoalMetricEvent" existing
+        SET "loggedValue" = journal."heartRate",
+            "occurredAt" = COALESCE(journal."updatedAt", journal."createdAt")
+        FROM "HealthJournal" journal
+        WHERE journal."patientId" = ${patient.id}
+          AND journal."title" = '[Sympto] Today''s measurements'
+          AND journal."heartRate" IS NOT NULL
+          AND existing."patientId" = journal."patientId"
+          AND existing."metricType" = 'HEART_RATE'
+          AND existing."metricKey" = 'heart_rate.bpm'
+          AND existing."source" = 'manual-vitals'
+          AND existing."sourceId" = journal."id"
+      `;
+      await this.prisma.$executeRaw`
+        INSERT INTO "HealthGoalMetricEvent"
+          ("id", "patientId", "metricType", "metricKey", "loggedValue", "occurredAt", "source", "sourceId")
+        SELECT
+          gen_random_uuid(), journal."patientId", 'HEART_RATE', 'heart_rate.bpm',
+          journal."heartRate", COALESCE(journal."updatedAt", journal."createdAt"),
+          'manual-vitals', journal."id"
+        FROM "HealthJournal" journal
+        WHERE journal."patientId" = ${patient.id}
+          AND journal."title" = '[Sympto] Today''s measurements'
+          AND journal."heartRate" IS NOT NULL
+          AND NOT EXISTS (
+            SELECT 1
+            FROM "HealthGoalMetricEvent" existing
+            WHERE existing."patientId" = journal."patientId"
+              AND existing."metricType" = 'HEART_RATE'
+              AND existing."metricKey" = 'heart_rate.bpm'
+              AND existing."source" = 'manual-vitals'
+              AND existing."sourceId" = journal."id"
+          )
+      `;
+
       await this.prisma.$executeRaw`
         INSERT INTO "HealthGoalMetricEvent"
           ("id", "patientId", "metricType", "metricKey", "loggedValue", "occurredAt", "source", "sourceId")
