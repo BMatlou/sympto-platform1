@@ -197,6 +197,41 @@ export function useDashboard(patientIdOverride?: string) {
       return !["CANCELLED", "DELETED", "ARCHIVED"].includes(status) && !goal?.deletedAt;
     });
     const linkedMedications = mergeMedicationGoalLinksWithGoals(hydratedMedications, fullGoals); const normalizedGoals = normalizeGoals({ ...result, medications: linkedMedications }, fullGoals); if (requestId !== loadSequence.current) return; setData({ ...result, medications: linkedMedications, goals: normalizedGoals, healthGoals: normalizedGoals, activeGoalsArray: normalizedGoals.filter((goal: any) => ["ACTIVE", "IN_PROGRESS", "ON_TRACK", "IMPROVING", "STAGNANT", "DECLINING"].includes(String(goal?.status ?? "").toUpperCase())), today: { ...result.today, activeMedications: linkedMedications, activeGoalCount: normalizedGoals.filter((goal: any) => ["ACTIVE", "IN_PROGRESS"].includes(String(goal?.status ?? "").toUpperCase())).length } }); firstLoad.current = false; } catch (requestError) { if (requestId !== loadSequence.current) return; console.error("Failed to load Health Home:", requestError); const message = requestError instanceof Error ? requestError.message : typeof requestError === "string" ? requestError : "We could not load your Health Home."; setError(message); } finally { if (requestId === loadSequence.current) setLoading(false); } }, [patientId]);
-  useEffect(() => { const initialLoad = window.setTimeout(() => { firstLoad.current = true; void loadDashboard(); }, 0); const handleNavigation = () => void loadDashboard(); const handleGoalChange = () => void loadDashboard(); const handleFocus = () => void loadDashboard(); const handleVisibility = () => { if (document.visibilityState === "visible") void loadDashboard(); }; window.addEventListener("popstate", handleNavigation); window.addEventListener("sympto:health-goal-updated", handleGoalChange); window.addEventListener("focus", handleFocus); document.addEventListener("visibilitychange", handleVisibility); const refresh = window.setInterval(() => { if (document.visibilityState === "visible") void loadDashboard(); }, REFRESH_INTERVAL_MS); return () => { window.clearTimeout(initialLoad); window.removeEventListener("popstate", handleNavigation); window.removeEventListener("sympto:health-goal-updated", handleGoalChange); window.removeEventListener("focus", handleFocus); document.removeEventListener("visibilitychange", handleVisibility); window.clearInterval(refresh); }; }, [loadDashboard]);
+  useEffect(() => {
+    const initialLoad = window.setTimeout(() => {
+      firstLoad.current = true;
+      void loadDashboard();
+    }, 0);
+    const handleNavigation = () => void loadDashboard();
+    const handleGoalChange = () => void loadDashboard();
+    const handleFocus = () => void loadDashboard();
+    const handleVisibility = () => {
+      if (document.visibilityState === "visible") void loadDashboard();
+    };
+    const refreshEvents = [
+      "sympto:health-goal-updated",
+      "sympto:health-checkin-updated",
+      "sympto:today-action-updated",
+      "sympto:vitals-updated",
+      "sympto:weight-updated",
+    ] as const;
+
+    window.addEventListener("popstate", handleNavigation);
+    refreshEvents.forEach((eventName) => window.addEventListener(eventName, handleGoalChange));
+    window.addEventListener("focus", handleFocus);
+    document.addEventListener("visibilitychange", handleVisibility);
+    const refresh = window.setInterval(() => {
+      if (document.visibilityState === "visible") void loadDashboard();
+    }, REFRESH_INTERVAL_MS);
+
+    return () => {
+      window.clearTimeout(initialLoad);
+      window.removeEventListener("popstate", handleNavigation);
+      refreshEvents.forEach((eventName) => window.removeEventListener(eventName, handleGoalChange));
+      window.removeEventListener("focus", handleFocus);
+      document.removeEventListener("visibilitychange", handleVisibility);
+      window.clearInterval(refresh);
+    };
+  }, [loadDashboard]);
   return { data, loading, error, reload: loadDashboard };
 }
