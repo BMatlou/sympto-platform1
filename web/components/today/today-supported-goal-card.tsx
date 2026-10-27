@@ -165,10 +165,7 @@ function latestContextMetricReading(
     "manual-entry",
     "manual-vital",
     "patient-baseline",
-    "clinical-vital",
-    "clinical-record",
     "wearable-resting",
-    "health-journal",
   ]);
 
   const candidates = measurements.flatMap((item: any) => {
@@ -693,7 +690,7 @@ export default function TodaySupportedGoalCard({ goal, activeGoals = [], healthC
     // Health Vitals can be saved long before a goal is created. Fetch the
     // goal-eligible source history so the latest known reading remains visible.
     const from = new Date(0);
-    const eligibleSources = new Set(["manual-vitals", "patient-baseline", "clinical-vital", "wearable-resting", "health-journal"]);
+    const eligibleSources = new Set(["manual-vitals", "patient-baseline", "clinical-vital", "wearable-resting"]);
 
     healthGoalsService
       .getMetricEvents(metricType, metricKey, from, now)
