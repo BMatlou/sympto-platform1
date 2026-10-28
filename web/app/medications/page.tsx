@@ -303,7 +303,7 @@ function MedicationsPageContent() {
         {error && !loading && (
           <div className="mb-6 rounded-2xl border border-red-200 bg-white p-6">
             <h2 className="font-semibold text-[#0b2d54]">
-              We couldn't load your medications
+              We couldn&apos;t load your medications
             </h2>
             <button
               onClick={reload}
@@ -533,7 +533,7 @@ function MedicationsPageContent() {
                             )}
                             {m?.indication && (
                               <p>
-                                <b>What it's for:</b> {m.indication}
+                                <b>What it&apos;s for:</b> {m.indication}
                               </p>
                             )}
                             {m?.instructions && (
