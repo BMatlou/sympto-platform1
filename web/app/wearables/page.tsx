@@ -96,8 +96,11 @@ export default function WearablesPage() {
   };
 
   useEffect(() => {
-    void loadDevices();
-    void loadProviders();
+    const timer = window.setTimeout(() => {
+      void loadDevices();
+      void loadProviders();
+    }, 0);
+    return () => window.clearTimeout(timer);
   }, []);
 
   const connect = async () => {
