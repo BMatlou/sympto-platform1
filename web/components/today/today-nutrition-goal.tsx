@@ -423,6 +423,8 @@ export default function TodayNutritionGoal({ goal, onUpdated, detailsExpanded, o
       });
 
       setDraftItems([]);
+      window.dispatchEvent(new Event("sympto:health-goal-updated"));
+      window.dispatchEvent(new Event("sympto:today-action-updated"));
       toast.success("Meal added to today's nutrition log.");
       await loadToday();
       await onUpdated?.();
