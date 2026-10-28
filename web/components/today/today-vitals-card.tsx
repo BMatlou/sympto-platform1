@@ -147,6 +147,11 @@ export default function TodayVitalsCard({ data, onUpdated }: Props) {
       if (input.weightKg != null && input.heightCm != null) {
         await healthHomeService.updateWeight(input.weightKg, input.heightCm);
       }
+      // The dashboard count reads the same dated journal and vital records.
+      // Tell all dashboard/TODAY listeners to reload immediately after a save.
+      window.dispatchEvent(new Event("sympto:vitals-updated"));
+      window.dispatchEvent(new Event("sympto:weight-updated"));
+      window.dispatchEvent(new Event("sympto:today-action-updated"));
       setMessage("Today’s measurements saved.");
       setOpen(false);
       await onUpdated?.();
