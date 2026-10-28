@@ -168,6 +168,7 @@ export default function WearablesPage() {
       setConnectedName("");
       setHeartRate(null);
       backendDeviceIdRef.current = null;
+      setBackendDeviceId(null);
       deviceRef.current = null;
       await loadDevices();
     } catch {
