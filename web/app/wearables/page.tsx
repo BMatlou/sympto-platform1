@@ -127,6 +127,7 @@ export default function WearablesPage() {
       });
       const backendDevice = backendResponse.data?.data ?? backendResponse.data;
       backendDeviceIdRef.current = backendDevice.id;
+      setBackendDeviceId(backendDevice.id ?? null);
       deviceRef.current = device;
       setConnectedName(device.name || "Heart-rate wearable");
       setStatus("Connected · waiting for heart rate");
