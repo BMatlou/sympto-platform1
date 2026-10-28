@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { ArrowLeft, MessageCircle, Send, UserRound } from "lucide-react";
-import { FormEvent, useEffect, useMemo, useState } from "react";
+import { FormEvent, useEffect, useState } from "react";
 import ProtectedRoute from "@/components/auth/protected-route";
 import { useAuth } from "@/hooks/use-auth";
 import { api } from "@/lib/api";
@@ -102,10 +102,9 @@ export default function MessagesPage() {
     void loadConversations();
   }, [user?.id]);
 
-  const otherParticipant = useMemo(() => {
-    if (!selected || !user?.id) return undefined;
-    return selected.participants.find((participant) => participant.userId !== user.id);
-  }, [selected, user?.id]);
+  const otherParticipant = selected && user?.id
+    ? selected.participants.find((participant) => participant.userId !== user.id)
+    : undefined;
 
   const openConversation = async (conversationId: string) => {
     setSelectedId(conversationId);
