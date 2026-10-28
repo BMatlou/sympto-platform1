@@ -90,7 +90,6 @@ export default function SymptomLogDetailPage({ params }: { params: Promise<{ id:
   const currentSeverity = latestMonitoring?.severity || record.overallSeverity || "MILD";
   const isResolved = record.status === "COMPLETED";
   const intelligence = record.intelligence ?? null;
-  const medicationEffects = Array.isArray(record.medicationEffects) ? record.medicationEffects : [];
   const observations = Array.isArray(record.monitorings) ? record.monitorings.filter((entry: any) => entry.suspectedTrigger || entry.aggravatingFactors || entry.relievingFactors || entry.notes) : [];
 
   return (
