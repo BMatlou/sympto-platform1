@@ -23,10 +23,6 @@ type HealthGoal = {
   metricConfig?: { metricType?: string | null; metricKey?: string | null } | null;
 };
 
-function normalise(value: unknown) {
-  return String(value ?? "").trim().toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
-}
-
 function getPatientMedicationId(medication: PrescribedMedication) {
   const source = String(medication.source ?? "").trim().toUpperCase();
   const syntheticPrescriptionId = String(medication.id ?? "").startsWith("prescription-item-");
