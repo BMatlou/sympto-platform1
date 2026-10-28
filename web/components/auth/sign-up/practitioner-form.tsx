@@ -65,6 +65,7 @@ export default function PractitionerForm(props: PractitionerFormProps) {
   const password = useWatch({ control, name: "password" });
 
   const countryOptions = useMemo(() => getCountries(), []);
+  const selectedCountry = countryOptions.find((c) => c.code === country);
   const filteredCountries = useMemo(
     () =>
       countryOptions.filter((country) =>
@@ -117,12 +118,6 @@ export default function PractitionerForm(props: PractitionerFormProps) {
   setValue("medicalAuthority", "");
   setValue("profession", "");
 }, [country, setValue]);
-
-// keep input label in sync when country code changes
-useEffect(() => {
-  const selected = countryOptions.find((c) => c.code === country);
-  if (selected) setCountrySearch(selected.name);
-}, [country, countryOptions]);
 
 useEffect(() => {
   setValue("city", "");
@@ -206,7 +201,7 @@ useEffect(() => {
         <div ref={containerRef} className="relative">
           <input
             ref={inputRef}
-            value={countrySearch}
+            value={countrySearch || selectedCountry?.name || ""}
             onChange={(e) => {
               setCountrySearch(e.target.value);
               setIsCountryListOpen(true);
