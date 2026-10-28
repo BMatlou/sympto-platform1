@@ -326,7 +326,7 @@ export default function TodayBloodGlucoseGoal({ goal, patientId = "", currentWei
       day: elapsed == null ? 1 : Math.max(1, elapsed + 1),
       daysLeft: remaining == null ? null : Math.max(0, remaining),
     };
-  }, [goal?.createdAt, goal?.targetDate]);
+  }, [goal]);
 
   const loadEvents = useCallback(async () => {
     if (!goalId) {
@@ -444,8 +444,10 @@ export default function TodayBloodGlucoseGoal({ goal, patientId = "", currentWei
   }, [hasActiveNutritionGoal]);
 
   useEffect(() => {
-    void loadEvents();
-    void loadDailyContext();
+    const initialLoad = window.setTimeout(() => {
+      void loadEvents();
+      void loadDailyContext();
+    }, 0);
     const refresh = () => {
       void loadEvents();
       void loadDailyContext();
@@ -457,6 +459,7 @@ export default function TodayBloodGlucoseGoal({ goal, patientId = "", currentWei
     window.addEventListener("sympto:weight-updated", refresh);
     const interval = window.setInterval(refresh, 60000);
     return () => {
+      window.clearTimeout(initialLoad);
       window.removeEventListener("sympto:health-goal-updated", refresh);
       window.removeEventListener("sympto:today-action-updated", refresh);
       window.removeEventListener("sympto:health-checkin-updated", refresh);
