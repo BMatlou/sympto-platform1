@@ -139,7 +139,7 @@ export default function IndividualForm(props: IndividualFormProps) {
         <div ref={containerRef} className="relative">
           <input
             ref={inputRef}
-            value={countrySearch}
+            value={countrySearch || selectedCountry?.name || ""}
             onChange={(e) => {
               setCountrySearch(e.target.value);
               setIsCountryListOpen(true);
