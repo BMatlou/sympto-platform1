@@ -54,6 +54,7 @@ export default function IndividualForm(props: IndividualFormProps) {
 
   const languageOptions = useMemo(() => (country ? getLanguagesByCountry(country) : []), [country]);
   const countryOptions = useMemo(() => getCountries(), []);
+  const selectedCountry = countryOptions.find((c) => c.code === country);
   const filteredCountries = useMemo(
     () =>
       countryFilter.trim()
