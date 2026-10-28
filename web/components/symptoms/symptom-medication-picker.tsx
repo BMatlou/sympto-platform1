@@ -134,9 +134,11 @@ export default function SymptomMedicationPicker({
 
     const term = query.trim();
     if (term.length < 2) {
-      setResults([]);
-      setSearching(false);
-      return;
+      const clearTimer = window.setTimeout(() => {
+        setResults([]);
+        setSearching(false);
+      }, 0);
+      return () => window.clearTimeout(clearTimer);
     }
 
     timer.current = setTimeout(async () => {
