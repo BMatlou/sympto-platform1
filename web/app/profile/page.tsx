@@ -37,7 +37,6 @@ function label(value: string): string { return value.replaceAll("_", " ").toLowe
 export default function ProfilePage() {
   const [account, setAccount] = useState<ProfileData | null>(null);
   const [patient, setPatient] = useState<ProfileData | null>(null);
-  const [passport, setPassport] = useState<ProfileData | null>(null);
   const [loading, setLoading] = useState(true);
   const [editing, setEditing] = useState<"identity" | "address" | "health" | null>(null);
   const [saving, setSaving] = useState(false);
@@ -60,7 +59,6 @@ export default function ProfilePage() {
 
       setAccount(me as ProfileData);
       setPatient(p);
-      setPassport(hp);
       setProfileImageUrl(field(person, "profileImageUrl"));
       setIdentity({ firstName: field(person, "firstName"), middleName: field(person, "middleName"), lastName: field(person, "lastName"), preferredName: field(person, "preferredName"), email: field(me as ProfileData, "email"), phoneNumber: field(me as ProfileData, "phoneNumber") });
       setAddress({ addressLine1: field(addr, "line1"), addressLine2: field(addr, "line2"), suburb: field(addr, "suburb"), city: field(addr, "city"), province: field(addr, "province"), postalCode: field(addr, "postalCode"), country: selectedCountry?.code || rawCountry });
@@ -116,7 +114,6 @@ export default function ProfilePage() {
     finally { setSaving(false); }
   }
 
-  const person = account?.person as ProfileData | null;
   const addressText = [address.addressLine1, address.addressLine2, address.suburb, address.city, address.province, address.postalCode, address.country ? countryOptions.find(c => c.code === address.country)?.name || address.country : ""].filter(Boolean).join(", ");
   const displayName = identity.preferredName || [identity.firstName, identity.lastName].filter(Boolean).join(" ") || "Your profile";
   const patientNumber = field(patient, "patientNumber");
