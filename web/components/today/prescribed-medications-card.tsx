@@ -27,33 +27,6 @@ function normalise(value: unknown) {
   return String(value ?? "").trim().toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
 }
 
-function goalPatientMedicationId(goal: HealthGoal | null | undefined) {
-  return goal?.patientMedicationId ??
-    goal?.patientMedication?.id ??
-    goal?.associatedPatientMedicationId ??
-    goal?.associatedPatientMedication?.id ??
-    null;
-}
-
-function goalCatalogMedicationId(goal: HealthGoal | null | undefined) {
-  return goal?.associatedMedicationId ??
-    goal?.medicationId ??
-    goal?.associatedMedication?.id ??
-    goal?.medication?.id ??
-    null;
-}
-
-function goalMedicationName(goal: HealthGoal | null | undefined) {
-  return normalise(
-    goal?.medication?.name ??
-    goal?.medication?.genericName ??
-    goal?.medication?.brandName ??
-    goal?.title ??
-    goal?.description ??
-    "",
-  );
-}
-
 function getPatientMedicationId(medication: PrescribedMedication) {
   const source = String(medication.source ?? "").trim().toUpperCase();
   const syntheticPrescriptionId = String(medication.id ?? "").startsWith("prescription-item-");
@@ -168,8 +141,6 @@ export default function PrescribedMedicationsCard({
                 })
               : [];
             const directHealthGoalId = directlyLinkedGoals[0]?.id ?? medication.healthGoalId ?? null;
-            const currentPatientMedicationId = getPatientMedicationId(medication);
-            const currentMedicationId = medication.medicationId || medication.medication?.id || null;
 
             const medicationGoalForThisMed = activeGoalsArray.find((goal: any) => {
               const targetPatientMedId = getPatientMedicationId(medication);
