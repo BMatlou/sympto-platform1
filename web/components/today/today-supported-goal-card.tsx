@@ -919,6 +919,8 @@ export default function TodaySupportedGoalCard({ goal, activeGoals = [], healthC
 
       setValue("");
       if (category === "OTHER") setMeasurementNote("");
+      window.dispatchEvent(new Event("sympto:health-goal-updated"));
+      window.dispatchEvent(new Event("sympto:today-action-updated"));
       toast.success(meta.label + " value recorded.");
       await onUpdated?.();
     } catch (error: any) {
