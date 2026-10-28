@@ -286,9 +286,9 @@ async function countTodayNeeds(
     }
   }
 
-  // Only goals with a distinct unfinished Today action contribute here.
-  // Goal cards that are already satisfied or backed by shared check-in/vitals
-  // actions do not create duplicate hero items.
+  // Each active goal contributes one unfinished action until its own
+  // category-specific reading or check-in field is recorded for the right period.
+  // Medication goals are covered by the remaining-dose count above.
   count += await countTodayGoalNeeds(data, todayJournalEntries);
 
   // Current Health / Vitals is one shared Today action.
