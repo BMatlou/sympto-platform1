@@ -97,7 +97,6 @@ export default function ClinicalSmartFileActions({ consentId, file, onSaved }: P
 
   const set = (key: string, value: any) => setData((current) => ({ ...current, [key]: value }));
 
-  const currentAction = ACTIONS.find((item) => item.value === action) ?? ACTIONS[0];
   const existingOptions: ExistingOption[] = useMemo(() => {
     switch (action) {
       case "ENCOUNTER": return (file?.encounters ?? []).map((x: any) => ({ id: x.id, label: `${x.encounterType?.name || "Encounter"} · ${new Date(x.startedAt).toLocaleDateString("en-ZA")}` }));
