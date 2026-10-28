@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { Bluetooth, ChevronLeft, Link2Off, Watch } from "lucide-react";
 import { api } from "@/lib/api";
 
@@ -77,23 +77,23 @@ export default function WearablesPage() {
   const deviceRef = useRef<BluetoothDeviceLike | null>(null);
   const backendDeviceIdRef = useRef<string | null>(null);
 
-  const loadDevices = async () => {
+  const loadDevices = useCallback(async () => {
     try {
       const response = await api.get("/patient-wearables");
       setDevices(response.data?.data ?? response.data ?? []);
     } catch {
       setDevices([]);
     }
-  };
+  }, []);
 
-  const loadProviders = async () => {
+  const loadProviders = useCallback(async () => {
     try {
       const response = await api.get("/patient-wearables/providers");
       setProviders(response.data?.data ?? response.data ?? []);
     } catch {
       setProviders([]);
     }
-  };
+  }, []);
 
   useEffect(() => {
     const timer = window.setTimeout(() => {
@@ -101,7 +101,7 @@ export default function WearablesPage() {
       void loadProviders();
     }, 0);
     return () => window.clearTimeout(timer);
-  }, []);
+  }, [loadDevices, loadProviders]);
 
   const connect = async () => {
     setError("");
