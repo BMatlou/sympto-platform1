@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useMemo, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
 import { Activity, ArrowLeft, CalendarDays, Check, ChevronRight, Edit3, HeartPulse, Phone, ShieldCheck, Syringe, UserRound, X } from "lucide-react";
 import ProtectedRoute from "@/components/auth/protected-route";
 import { useDashboard } from "@/hooks/use-dashboard";
@@ -69,7 +69,7 @@ export default function HealthPassportPremium() {
   const [historyError, setHistoryError] = useState("");
   const [historyForm, setHistoryForm] = useState({ pastMedicalHistory: "", surgicalHistory: "", familyHistory: "", socialHistory: "" });
 
-  const loadCard = async () => {
+  const loadCard = useCallback(async () => {
     setCardLoading(true);
     setCardError("");
     try {
@@ -83,21 +83,43 @@ export default function HealthPassportPremium() {
     } finally {
       setCardLoading(false);
     }
-  };
-  useEffect(() => { void loadCard(); }, []);
-  useEffect(() => { if (!card) return; setForm({ preferredName: text(card.patient?.preferredName, ""), dateOfBirth: card.patient?.dateOfBirth ? String(card.patient.dateOfBirth).slice(0, 10) : "", gender: text(card.patient?.gender, ""), heightCm: card.vitals?.heightCm != null ? String(card.vitals.heightCm) : "", weightKg: card.vitals?.weightKg != null ? String(card.vitals.weightKg) : "", bloodType: text(card.emergency?.bloodType, ""), rhesusFactor: text(card.emergency?.rhesusFactor, ""), organDonor: card.emergency?.organDonorRecorded ? (card.emergency?.organDonor ? "true" : "false") : "", emergencyNotes: text(card.emergency?.emergencyNotes, "") }); }, [card]);
+  }, []);
   useEffect(() => {
-    if (!card?.medicalHistory?.medicalRecord) {
-      setHistoryForm({ pastMedicalHistory: "", surgicalHistory: "", familyHistory: "", socialHistory: "" });
-      return;
-    }
-    const record = card.medicalHistory.medicalRecord;
-    setHistoryForm({
-      pastMedicalHistory: text(record.pastMedicalHistory, ""),
-      surgicalHistory: text(record.surgicalHistory, ""),
-      familyHistory: text(record.familyHistory, ""),
-      socialHistory: text(record.socialHistory, ""),
-    });
+    const timer = window.setTimeout(() => { void loadCard(); }, 0);
+    return () => window.clearTimeout(timer);
+  }, [loadCard]);
+  useEffect(() => {
+    if (!card) return;
+    const timer = window.setTimeout(() => {
+      setForm({
+        preferredName: text(card.patient?.preferredName, ""),
+        dateOfBirth: card.patient?.dateOfBirth ? String(card.patient.dateOfBirth).slice(0, 10) : "",
+        gender: text(card.patient?.gender, ""),
+        heightCm: card.vitals?.heightCm != null ? String(card.vitals.heightCm) : "",
+        weightKg: card.vitals?.weightKg != null ? String(card.vitals.weightKg) : "",
+        bloodType: text(card.emergency?.bloodType, ""),
+        rhesusFactor: text(card.emergency?.rhesusFactor, ""),
+        organDonor: card.emergency?.organDonorRecorded ? (card.emergency?.organDonor ? "true" : "false") : "",
+        emergencyNotes: text(card.emergency?.emergencyNotes, ""),
+      });
+    }, 0);
+    return () => window.clearTimeout(timer);
+  }, [card]);
+  useEffect(() => {
+    const timer = window.setTimeout(() => {
+      if (!card?.medicalHistory?.medicalRecord) {
+        setHistoryForm({ pastMedicalHistory: "", surgicalHistory: "", familyHistory: "", socialHistory: "" });
+        return;
+      }
+      const record = card.medicalHistory.medicalRecord;
+      setHistoryForm({
+        pastMedicalHistory: text(record.pastMedicalHistory, ""),
+        surgicalHistory: text(record.surgicalHistory, ""),
+        familyHistory: text(record.familyHistory, ""),
+        socialHistory: text(record.socialHistory, ""),
+      });
+    }, 0);
+    return () => window.clearTimeout(timer);
   }, [card]);
 
   const saveMedicalHistory = async () => {
@@ -135,7 +157,7 @@ export default function HealthPassportPremium() {
   const clinicalLocks = computed?.clinicalLocks ?? { bloodType: false, rhesusFactor: false, organDonor: false, emergencyNotes: false };
 
   if (loading && !computed) return <ProtectedRoute><main className="min-h-screen bg-[#f5f8fb] p-5"><div className="mx-auto max-w-5xl space-y-4"><div className="h-60 animate-pulse rounded-[30px] bg-slate-200" /><div className="grid gap-4 md:grid-cols-2"><div className="h-52 animate-pulse rounded-[26px] bg-slate-200" /><div className="h-52 animate-pulse rounded-[26px] bg-slate-200" /></div></div></main></ProtectedRoute>;
-  if (error || !computed) return <ProtectedRoute><main className="min-h-screen bg-[#f5f8fb] p-5"><div className="mx-auto max-w-lg rounded-[26px] bg-white p-7 shadow-sm"><h1 className="text-xl font-bold text-[#0b2d54]">We couldn't load your Clinic Card</h1><p className="mt-2 text-sm text-slate-500">{text(error, "Please try again.")}</p><button onClick={() => { void loadCard(); void reloadDashboard(); }} className="mt-5 rounded-xl bg-[#0b2d54] px-5 py-2.5 text-sm font-bold text-white">Try again</button></div></main></ProtectedRoute>;
+  if (error || !computed) return <ProtectedRoute><main className="min-h-screen bg-[#f5f8fb] p-5"><div className="mx-auto max-w-lg rounded-[26px] bg-white p-7 shadow-sm"><h1 className="text-xl font-bold text-[#0b2d54]">We couldn&apos;t load your Clinic Card</h1><p className="mt-2 text-sm text-slate-500">{text(error, "Please try again.")}</p><button onClick={() => { void loadCard(); void reloadDashboard(); }} className="mt-5 rounded-xl bg-[#0b2d54] px-5 py-2.5 text-sm font-bold text-white">Try again</button></div></main></ProtectedRoute>;
 
   return <ProtectedRoute><main className="min-h-screen bg-[#f5f8fb] pb-10 text-slate-800"><div className="mx-auto max-w-5xl px-4 py-5 sm:px-6 sm:py-7">
     <div className="mb-4 flex items-center justify-between gap-3"><Link href="/dashboard" className="inline-flex items-center gap-2 text-sm font-semibold text-[#0b2d54]"><ArrowLeft className="h-4 w-4" />Back to My Health</Link><Link href="/health-conditions" className="text-xs font-bold text-[#0b2d54] hover:underline">Manage health records</Link></div>
