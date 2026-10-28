@@ -63,7 +63,7 @@ export default function TodaysHealthSignals() {
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div className="flex items-center gap-3">
             <span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-[#e8f9fa] text-[#0b7b80]"><Sparkles className="h-4 w-4" /></span>
-            <div><p className="text-xs font-black text-[#0b2d54]">Today's health signals</p><p className="mt-0.5 text-[10px] text-[#71839a]">Your mood, sleep, stress, exercise and water appear here after your daily check-in.</p></div>
+            <div><p className="text-xs font-black text-[#0b2d54]">Today&apos;s health signals</p><p className="mt-0.5 text-[10px] text-[#71839a]">Your mood, sleep, stress, exercise and water appear here after your daily check-in.</p></div>
           </div>
           <Link href="/today/check-in" className="inline-flex min-h-10 items-center justify-center rounded-xl bg-[#0b2d54] px-4 py-2 text-[10px] font-black text-white transition hover:bg-[#123d66]">Complete check-in</Link>
         </div>
@@ -84,7 +84,7 @@ export default function TodaysHealthSignals() {
       <div className="flex flex-col gap-4 px-5 py-4 sm:px-6 lg:flex-row lg:items-center lg:justify-between">
         <div className="flex items-center gap-3">
           <span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-[#e8f9fa] text-[#0b7b80]"><Sparkles className="h-4 w-4" /></span>
-          <div><p className="text-xs font-black text-[#0b2d54]">Today's health signals</p><p className="mt-0.5 text-[10px] text-[#71839a]">Automatically summarised from your daily check-in.</p></div>
+          <div><p className="text-xs font-black text-[#0b2d54]">Today&apos;s health signals</p><p className="mt-0.5 text-[10px] text-[#71839a]">Automatically summarised from your daily check-in.</p></div>
         </div>
         <div className="flex flex-wrap gap-2">
           {signals.map(({ label, value, icon: Icon }) => <span key={label} className="inline-flex items-center gap-1.5 rounded-full bg-[#f4f8fa] px-3 py-2 text-[10px] font-bold text-[#0b2d54]"><Icon className="h-3.5 w-3.5 text-[#0b7b80]" />{label} · {value}</span>)}
