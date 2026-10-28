@@ -187,7 +187,7 @@ export default function TodayMentalHealthGoal({
     return relations
       .map((relation: any) => relation?.goal)
       .find((related: any) => String(related?.category ?? "").toUpperCase() === "SLEEP") ?? null;
-  }, [goal?.connectedGoals]);
+  }, [goal]);
   const connectedSleepTarget = numberOrNull(connectedSleepGoal?.targetValue ?? connectedSleepGoal?.metricConfig?.frequencyTarget);
   const sleepComparisonTarget = connectedSleepTarget != null && connectedSleepTarget > 0 && connectedSleepTarget <= 24
     ? connectedSleepTarget
@@ -201,7 +201,7 @@ export default function TodayMentalHealthGoal({
       day: Number.isFinite(startOrdinal) ? Math.max(1, todayOrdinal - startOrdinal + 1) : 1,
       daysLeft: Number.isFinite(endOrdinal) ? Math.max(0, endOrdinal - todayOrdinal) : null,
     };
-  }, [goal?.createdAt, goal?.targetDate]);
+  }, [goal]);
 
   const loadCheckIns = useCallback(async () => {
     setLoading(true);
@@ -347,7 +347,7 @@ export default function TodayMentalHealthGoal({
   }, [entries, target]);
 
   const latestWithMood = [...entries].reverse().find((entry) => entry.mood && dayOrdinal(todayKey) - dayOrdinal(entry.day) <= 6) ?? null;
-  const sleepStressPattern = useMemo(() => {
+  const sleepStressPattern = (() => {
     const cutoff = dayOrdinal(todayKey) - 29;
     const paired = entries.filter((entry) =>
       entry.stress != null &&
@@ -371,9 +371,9 @@ export default function TodayMentalHealthGoal({
       usesSavedTarget: connectedSleepTarget != null && connectedSleepTarget > 0 && connectedSleepTarget <= 24,
       direction: shorterAverage > longerAverage ? "HIGHER" as const : "LOWER" as const,
     };
-  }, [connectedSleepTarget, entries, sleepComparisonTarget, todayKey]);
+  })();
 
-  const moodStressPattern = useMemo(() => {
+  const moodStressPattern = (() => {
     const cutoff = dayOrdinal(todayKey) - 29;
     const paired = entries.filter((entry) =>
       entry.stress != null &&
@@ -401,9 +401,9 @@ export default function TodayMentalHealthGoal({
       otherMoodDays: neutralOrPositiveMood.length,
       direction: lowerMoodAverage > otherMoodAverage ? "HIGHER" as const : "LOWER" as const,
     };
-  }, [entries, todayKey]);
+  })();
 
-  const personalRecommendation = useMemo(() => {
+  const personalRecommendation = (() => {
     const todayIsMissing = !todayEntry?.stress && todayEntry?.stress !== 0;
     if (recent.recentSeven.length < 3) {
       return {
@@ -442,7 +442,7 @@ export default function TodayMentalHealthGoal({
       href: "#daily-health-check-in",
       evidence: recent.recentSeven.length + " recorded days",
     };
-  }, [todayEntry, recent, target]);
+  })();
 
   const recentCheckIns = entries.filter((entry) => {
     const offset = dayOrdinal(todayKey) - dayOrdinal(entry.day);
@@ -452,7 +452,7 @@ export default function TodayMentalHealthGoal({
   const averageExercise = mean(recentCheckIns.map((entry) => entry.exerciseMinutes).filter((value): value is number => value != null && value >= 0));
   const averageWater = mean(recentCheckIns.map((entry) => entry.waterIntakeMl).filter((value): value is number => value != null && value >= 0));
 
-  const connectedGoalRelations = useMemo(() => {
+  const connectedGoalRelations = (() => {
     const relations = Array.isArray(goal?.connectedGoals) ? goal.connectedGoals : [];
     const byGoalId = new Map<string, any>();
     for (const relation of relations) {
@@ -465,9 +465,9 @@ export default function TodayMentalHealthGoal({
       if (!previous || (relationType === "SUPPORTS" && previousType !== "SUPPORTS")) byGoalId.set(relatedId, relation);
     }
     return Array.from(byGoalId.values());
-  }, [goal?.connectedGoals, goalId]);
+  })();
 
-  const activeConditions = useMemo(() => {
+  const activeConditions = (() => {
     const source = conditions.length > 0
       ? conditions
       : Array.isArray(healthPassport?.conditions)
@@ -476,9 +476,9 @@ export default function TodayMentalHealthGoal({
           ? medicalRecord.conditions
           : [];
     return source.filter((record: any) => activeRecord(record) && conditionName(record)).slice(0, 6);
-  }, [conditions, healthPassport?.conditions, medicalRecord?.conditions]);
+  })();
 
-  const activeMedications = useMemo(() => {
+  const activeMedications = (() => {
     const source = medications.length > 0
       ? medications
       : Array.isArray(healthPassport?.medications)
@@ -487,7 +487,7 @@ export default function TodayMentalHealthGoal({
           ? medicalRecord.medications
           : [];
     return source.filter((record: any) => activeRecord(record) && medicationName(record)).slice(0, 6);
-  }, [medications, healthPassport?.medications, medicalRecord?.medications]);
+  })();
 
   const activeSymptoms = useMemo(() => {
     return symptoms.filter((record) => {
@@ -642,7 +642,7 @@ export default function TodayMentalHealthGoal({
         <section className="overflow-hidden rounded-[23px] bg-[#0b2d54] p-4 text-white sm:p-5">
           <div className="flex items-start justify-between gap-4">
             <div className="min-w-0">
-              <p className="text-[8px] font-black uppercase tracking-[.17em] text-white/50">Today's self-reported stress</p>
+              <p className="text-[8px] font-black uppercase tracking-[.17em] text-white/50">Today&apos;s self-reported stress</p>
               <div className="mt-2 flex items-baseline gap-2">
                 <span className="text-[42px] font-black leading-none tracking-[-.06em]">{todayStress == null ? "—" : formatNumber(todayStress, 0)}</span>
                 <span className="text-[11px] font-bold text-white/60">/ 10</span>
@@ -659,7 +659,7 @@ export default function TodayMentalHealthGoal({
           </div>
           <div className="mt-4">
             <div className="flex items-center justify-between gap-2">
-              <p className="text-[8px] font-black uppercase tracking-[.14em] text-white/45">Today's goal progress</p>
+              <p className="text-[8px] font-black uppercase tracking-[.14em] text-white/45">Today&apos;s goal progress</p>
               <span className="text-[10px] font-black text-[#a5ffff]">{progressPercent}%</span>
             </div>
             <div className="mt-2 h-2 overflow-hidden rounded-full bg-white/10">
