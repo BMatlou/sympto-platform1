@@ -125,7 +125,7 @@ function groupDaily(values: Array<{ day: string; value: number }>) {
   return new Map([...map.entries()].map(([day, items]) => [day, mean(items) ?? 0] as const));
 }
 
-function sumDaily(values: Array<{ day: string; value: number }>) {
+>) {
   const map = new Map<string, number>();
   for (const item of values) {
     if (!item.day || !Number.isFinite(item.value)) continue;
@@ -249,15 +249,12 @@ export function buildBloodPressureInsights({
 
   const ordered7 = days7.filter((day) => dailySevenDay.has(day));
   const ordered30 = days30.filter((day) => dailyThirtyDay.has(day));
-  let trendWindowLabel = "historical";
   let trendDays = [...dailyAll.keys()].sort();
   let trendDaily = dailyAll;
   if (ordered7.length >= 5) {
-    trendWindowLabel = "7-day";
     trendDays = ordered7;
     trendDaily = dailySevenDay;
   } else if (ordered30.length >= 5) {
-    trendWindowLabel = "30-day";
     trendDays = ordered30;
     trendDaily = dailyThirtyDay;
   }
@@ -269,7 +266,6 @@ export function buildBloodPressureInsights({
 
     const recordedDays = dailyValues.length;
     const averageSystolic = mean(dailyValues) ?? 0;
-    const overallAverage = round(averageSystolic) ?? 0;
 
     const midpoint = Math.floor(trendDays.length / 2);
     const earlyValues = trendDays
