@@ -484,8 +484,11 @@ async function countTodayGoalNeeds(
     if (goalHasProgressRecordedToday(goal)) continue;
 
     const defaultsForCategory = defaults[category];
-    const metricType = String(goal?.metricConfig?.metricType ?? defaultsForCategory?.type ?? category).toUpperCase();
-    const metricKey = String(goal?.metricConfig?.metricKey ?? defaultsForCategory?.key ?? "").trim();
+    // Dashboard completion must query the same canonical metric stream as the
+    // Today cards. Older goals can carry legacy/custom metric-config keys even
+    // though their category-specific card writes to the canonical key.
+    const metricType = String(defaultsForCategory?.type ?? goal?.metricConfig?.metricType ?? category).toUpperCase();
+    const metricKey = String(defaultsForCategory?.key ?? goal?.metricConfig?.metricKey ?? "").trim();
 
     let complete = false;
 
