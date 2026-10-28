@@ -65,7 +65,13 @@ export default function PractitionerForm(props: PractitionerFormProps) {
   const password = useWatch({ control, name: "password" });
 
   const countryOptions = useMemo(() => getCountries(), []);
-  const selectedCountry = countryOptions.find((c) => c.code === country);
+
+  useEffect(() => {
+    const selected = countryOptions.find((c) => c.code === country);
+    if (!selected) return;
+    const timer = window.setTimeout(() => setCountrySearch(selected.name), 0);
+    return () => window.clearTimeout(timer);
+  }, [country, countryOptions]);
   const filteredCountries = useMemo(
     () =>
       countryOptions.filter((country) =>
@@ -201,7 +207,7 @@ useEffect(() => {
         <div ref={containerRef} className="relative">
           <input
             ref={inputRef}
-            value={countrySearch || selectedCountry?.name || ""}
+            value={countrySearch}
             onChange={(e) => {
               setCountrySearch(e.target.value);
               setIsCountryListOpen(true);
