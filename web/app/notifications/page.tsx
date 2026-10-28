@@ -205,14 +205,16 @@ export default function NotificationsPage() {
   }, []);
 
   useEffect(() => {
-    void load();
-
+    const initialLoadTimer = window.setTimeout(() => {
+      void load();
+    }, 0);
     const timer = window.setInterval(() => void load(), 15_000);
     const refreshOnFocus = () => void load();
 
     window.addEventListener("focus", refreshOnFocus);
 
     return () => {
+      window.clearTimeout(initialLoadTimer);
       window.clearInterval(timer);
       window.removeEventListener("focus", refreshOnFocus);
     };
