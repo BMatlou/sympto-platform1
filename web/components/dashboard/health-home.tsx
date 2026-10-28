@@ -820,8 +820,8 @@ export default function HealthHome({ patientId }: { patientId?: string }) {
 
   useEffect(() => {
     if (!data?.patient?.id || hasTodayCheckIn === null) {
-      setTodayActionCount(null);
-      return;
+      const clearCountTimer = window.setTimeout(() => setTodayActionCount(null), 0);
+      return () => window.clearTimeout(clearCountTimer);
     }
 
     let active = true;
@@ -837,7 +837,7 @@ export default function HealthHome({ patientId }: { patientId?: string }) {
     return () => {
       active = false;
     };
-  }, [data?.patient?.id, data?.generatedAt, hasTodayCheckIn, symptomFeed, todayJournalEntries]);
+  }, [data, hasTodayCheckIn, symptomFeed, todayJournalEntries]);
 
   useEffect(() => {
     const refreshDashboard = () => void reload();
@@ -961,12 +961,6 @@ export default function HealthHome({ patientId }: { patientId?: string }) {
     : [];
 
   const activeGoalCount = countActiveGoals(data);
-  const dashboardNotifications = Array.isArray(data?.today?.notifications)
-    ? data.today.notifications
-    : [];
-  const attentionItems = Array.isArray(data?.attention) ? data.attention : [];
-  const priorityItem = attentionItems[0] ?? null;
-  const nextAppointment = (appointments[0] ?? null) as any;
 
   const recentSymptom = recentSymptomFrom(data, symptomFeed);
   const recentSymptomStatus = String(recentSymptom?.status ?? "").toUpperCase();
