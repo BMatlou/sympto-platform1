@@ -499,6 +499,8 @@ function buildHeartRateInsight(
 }
 
 const DEFAULT_METRICS: Record<string, { metricType: string; metricKey: string }> = {
+  WEIGHT: { metricType: "WEIGHT", metricKey: "weight.kg" },
+  EXERCISE: { metricType: "EXERCISE", metricKey: "exercise.minutes" },
   NUTRITION: { metricType: "NUTRITION", metricKey: "nutrition.calories" },
   BLOOD_PRESSURE: { metricType: "BLOOD_PRESSURE", metricKey: "blood_pressure.systolic" },
   BLOOD_GLUCOSE: { metricType: "BLOOD_GLUCOSE", metricKey: "blood_glucose.value" },
@@ -506,6 +508,8 @@ const DEFAULT_METRICS: Record<string, { metricType: string; metricKey: string }>
   SLEEP: { metricType: "SLEEP", metricKey: "sleep.hours" },
   MENTAL_HEALTH: { metricType: "MENTAL_HEALTH", metricKey: "mental.stress" },
   HYDRATION: { metricType: "HYDRATION", metricKey: "hydration.ml" },
+  SMOKING: { metricType: "SMOKING", metricKey: "smoking.cigarettes" },
+  ALCOHOL: { metricType: "ALCOHOL", metricKey: "alcohol.drinks" },
   HEART_RATE: { metricType: "HEART_RATE", metricKey: "heart_rate.bpm" },
   OTHER: { metricType: "OTHER", metricKey: "other.value" },
 };
