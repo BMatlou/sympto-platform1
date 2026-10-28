@@ -392,7 +392,7 @@ if (!valid) {
             </h2>
 
             <p className="mt-2 text-slate-500">
-              Select how you'll use Sympto.
+              Select how you&apos;ll use Sympto.
             </p>
           </div>
 
@@ -656,7 +656,7 @@ if (!valid) {
           </h4>
 
           <p className="mt-1 text-sm text-slate-500">
-            Read how Sympto complies with South Africa's Protection of Personal
+            Read how Sympto complies with South Africa&apos;s Protection of Personal
             Information Act.
           </p>
         </div>
