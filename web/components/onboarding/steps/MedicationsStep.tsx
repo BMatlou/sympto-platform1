@@ -57,16 +57,21 @@ export function MedicationsStep({
   const searchContainerRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    setShowSearch(initialShowSearch);
+    const timer = window.setTimeout(() => {
+      setShowSearch(initialShowSearch);
+    }, 0);
+    return () => window.clearTimeout(timer);
   }, [initialShowSearch]);
 
   useEffect(() => {
     const trimmedSearch = search.trim();
     if (!trimmedSearch) {
-      setResults([]);
-      setLoading(false);
-      setError("");
-      return;
+      const clearTimer = window.setTimeout(() => {
+        setResults([]);
+        setLoading(false);
+        setError("");
+      }, 0);
+      return () => window.clearTimeout(clearTimer);
     }
 
     const timeout = window.setTimeout(async () => {
@@ -76,8 +81,14 @@ export function MedicationsStep({
         const { data } = await api.get("/medications", {
           params: { search: trimmedSearch, limit: 10, page: 1 },
         });
-        const medicationResults = data?.data?.data;
-        setResults(Array.isArray(medicationResults) ? medicationResults : []);
+        const rawResults = data?.data?.data;
+        const medicationResults: MedicationOption[] = Array.isArray(rawResults) ? rawResults : [];
+        setResults(medicationResults);
+        setSelectedMedicationNames((previous) => {
+          const next = { ...previous };
+          for (const medication of medicationResults) next[medication.id] = medication.name;
+          return next;
+        });
       } catch (requestError) {
         console.error("[browser] MEDICATION SEARCH FAILED", requestError);
         setResults([]);
@@ -89,15 +100,6 @@ export function MedicationsStep({
 
     return () => window.clearTimeout(timeout);
   }, [search]);
-
-  useEffect(() => {
-    if (results.length === 0) return;
-    setSelectedMedicationNames((previous) => {
-      const next = { ...previous };
-      for (const medication of results) next[medication.id] = medication.name;
-      return next;
-    });
-  }, [results]);
 
   useEffect(() => {
     const selectedIds = values.medications.map((medication) => medication.medicationId).filter(Boolean);
