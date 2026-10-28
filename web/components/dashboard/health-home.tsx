@@ -236,9 +236,8 @@ async function countTodayNeeds(
 
   let count = appointmentsToday.length + activeSymptoms.length;
 
-  // The daily check-in is one shared Today action. Exercise, sleep,
-  // hydration and mental-health goal data are intentionally not counted
-  // separately because they are completed through this same check-in UI.
+  // The daily check-in is its own Today action. Goal-specific tasks are
+  // evaluated separately below and use their actual saved check-in fields.
   if (hasTodayCheckIn === false) {
     count += 1;
   }
