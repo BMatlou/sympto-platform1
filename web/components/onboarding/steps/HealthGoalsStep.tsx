@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import {
   Activity,
   Apple,
@@ -17,7 +17,6 @@ import {
   Moon,
   Pill,
   Weight,
-  ShieldAlert,
   Target,
   Wine,
 } from "lucide-react";
@@ -200,24 +199,6 @@ function getGoalConfig(
   }
 
   return GOAL_CATEGORIES[category];
-}
-
-function getPriorityClasses(
-  priority?: HealthGoalPriority,
-) {
-  switch (priority) {
-    case "HIGH":
-      return "bg-red-50 text-red-600 border-red-100";
-
-    case "MEDIUM":
-      return "bg-amber-50 text-amber-600 border-amber-100";
-
-    case "LOW":
-      return "bg-slate-100 text-slate-600 border-slate-200";
-
-    default:
-      return "bg-slate-100 text-slate-500 border-slate-200";
-  }
 }
 
 function formatTargetDate(date?: string) {
@@ -419,21 +400,7 @@ export function HealthGoalsStep({
   const isQualitative =
     !!selectedConfig && !selectedConfig.unit;
 
-  useEffect(() => {
-    if (!isModalOpen || !form.category) {
-      return;
-    }
 
-    const config = getGoalConfig(form.category);
-
-    setForm((current) => ({
-      ...current,
-      unit: config.unit,
-      targetValue: config.unit
-        ? current.targetValue
-        : undefined,
-    }));
-  }, [form.category, isModalOpen]);
 
   function openAddModal(
     category?: HealthGoalCategory,
@@ -477,10 +444,19 @@ export function HealthGoalsStep({
     field: keyof HealthGoalItem,
     value: unknown,
   ) {
-    setForm((current) => ({
-      ...current,
-      [field]: value,
-    }));
+    setForm((current) => {
+      if (field === "category") {
+        const category = value as HealthGoalCategory | "";
+        const config = getGoalConfig(category);
+        return {
+          ...current,
+          category,
+          unit: config.unit,
+          targetValue: config.unit ? current.targetValue : undefined,
+        };
+      }
+      return { ...current, [field]: value };
+    });
   }
 
   function handleSaveGoal() {
@@ -708,7 +684,7 @@ export function HealthGoalsStep({
 
     <div className="px-4 py-3.5">
       <p className="mb-2 text-[9px] font-bold uppercase tracking-[0.12em] text-slate-400">
-        You're focusing on
+        You&apos;re focusing on
       </p>
 
       <div className="flex flex-wrap gap-2">
@@ -982,8 +958,8 @@ export function HealthGoalsStep({
                       </h3>
 
                       <p className="mt-0.5 text-[11px] leading-4 text-slate-400">
-                        You don't need a number for this goal.
-                        Add a target date if you'd like.
+                        You don&apos;t need a number for this goal.
+                        Add a target date if you&apos;d like.
                       </p>
                     </div>
 
@@ -1009,7 +985,7 @@ export function HealthGoalsStep({
                   <div className="mb-2.5">
                     <div className="flex items-center justify-between gap-3">
                       <h3 className="text-xs font-semibold text-slate-800">
-                        Anything you'd like to add?
+                        Anything you&apos;d like to add?
                       </h3>
 
                       <span className="text-[10px] font-medium text-slate-400">
