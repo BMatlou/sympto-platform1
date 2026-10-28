@@ -54,7 +54,13 @@ export default function IndividualForm(props: IndividualFormProps) {
 
   const languageOptions = useMemo(() => (country ? getLanguagesByCountry(country) : []), [country]);
   const countryOptions = useMemo(() => getCountries(), []);
-  const selectedCountry = countryOptions.find((c) => c.code === country);
+
+  useEffect(() => {
+    const selected = countryOptions.find((c) => c.code === country);
+    if (!selected) return;
+    const timer = window.setTimeout(() => setCountrySearch(selected.name), 0);
+    return () => window.clearTimeout(timer);
+  }, [country, countryOptions]);
   const filteredCountries = useMemo(
     () =>
       countryFilter.trim()
@@ -139,7 +145,7 @@ export default function IndividualForm(props: IndividualFormProps) {
         <div ref={containerRef} className="relative">
           <input
             ref={inputRef}
-            value={countrySearch || selectedCountry?.name || ""}
+            value={countrySearch}
             onChange={(e) => {
               setCountrySearch(e.target.value);
               setIsCountryListOpen(true);
