@@ -69,7 +69,10 @@ export default function ClinicalSmartFilePage() {
   }, [params.consentId]);
 
   useEffect(() => {
-    void loadFile();
+    const timer = window.setTimeout(() => {
+      void loadFile();
+    }, 0);
+    return () => window.clearTimeout(timer);
   }, [loadFile]);
 
   return <ProtectedRoute><main className="min-h-screen bg-[#f5f8fb] text-slate-800"><div className="mx-auto max-w-5xl px-4 py-6 sm:px-6 sm:py-8">
