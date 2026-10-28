@@ -216,7 +216,7 @@ async function countTodayNeeds(
         measurement?.vitalType?.name ??
         measurement?.name ??
         "",
-      ).trim().toUpperCase().replace(/[\\s-]+/g, "_");
+      ).trim().toUpperCase().replace(/[\s-]+/g, "_");
       return /WEIGHT|BLOOD_PRESSURE|SYSTOLIC_PRESSURE|DIASTOLIC_PRESSURE|HEART_RATE|HEARTRATE|PULSE_RATE|OXYGEN_SATURATION|OXYGENSATURATION|BODY_TEMPERATURE|TEMPERATURE|RESPIRATORY_RATE|RESPIRATORYRATE|HEIGHT|BMI/.test(type);
     }) ||
     todayJournalEntries.some((entry: any) => {
@@ -450,6 +450,26 @@ async function countTodayGoalNeeds(
   const now = new Date();
   let count = 0;
 
+  // A dated goal-progress record is an authoritative sign that the user logged
+  // that goal today. Use it before probing category-specific metric streams,
+  // because those streams may not exist for older goals or every save path.
+  const goalHasProgressRecordedToday = (goal: any) => {
+    const progressRecords = [
+      ...(Array.isArray(goal?.progress) ? goal.progress : []),
+      goal?.latestProgress,
+    ].filter(Boolean);
+    return progressRecords.some((progress: any) => {
+      const recordedAt = progress?.measuredAt ?? progress?.occurredAt ??
+        progress?.recordedAt ?? progress?.createdAt;
+      if (localDayKey(recordedAt) !== todayKey) return false;
+      return [
+        progress?.currentValue,
+        progress?.loggedValue,
+        progress?.value,
+      ].some(hasValue);
+    });
+  };
+
   for (const goal of goals) {
     let category = String(goal?.category ?? goal?.metricConfig?.metricType ?? "")
       .trim().toUpperCase().replace(/[\s-]+/g, "_");
@@ -458,6 +478,10 @@ async function countTodayGoalNeeds(
     // Scheduled medication doses are counted above by medication and time of day.
     // A medication goal must not add a second, duplicate outstanding item.
     if (category === "MEDICATION") continue;
+
+    // A successful goal save can update its progress record even if the legacy
+    // metric-event stream has no event for this category/key combination.
+    if (goalHasProgressRecordedToday(goal)) continue;
 
     const defaultsForCategory = defaults[category];
     const metricType = String(goal?.metricConfig?.metricType ?? defaultsForCategory?.type ?? category).toUpperCase();
