@@ -56,8 +56,6 @@ export function AllergiesStep({
     AllergyOption[]
   >([]);
   const [loading, setLoading] = useState(false);
-  const [loadingSelected, setLoadingSelected] =
-    useState(false);
   const [error, setError] = useState("");
   const [showSearch, setShowSearch] =
     useState(false);
@@ -94,14 +92,13 @@ export function AllergiesStep({
         .filter(Boolean);
 
     if (selectedIds.length === 0) {
-      setSelectedAllergyNames({});
-      return;
+      const resetTimer = window.setTimeout(() => setSelectedAllergyNames({}), 0);
+      return () => window.clearTimeout(resetTimer);
     }
 
     let cancelled = false;
 
     async function loadSelectedAllergyNames() {
-      setLoadingSelected(true);
 
       try {
         const entries =
@@ -158,9 +155,6 @@ export function AllergiesStep({
           },
         );
       } finally {
-        if (!cancelled) {
-          setLoadingSelected(false);
-        }
       }
     }
 
@@ -178,10 +172,12 @@ export function AllergiesStep({
     const trimmedSearch = search.trim();
 
     if (!trimmedSearch) {
-      setResults([]);
-      setLoading(false);
-      setError("");
-      return;
+      const clearTimer = window.setTimeout(() => {
+        setResults([]);
+        setLoading(false);
+        setError("");
+      }, 0);
+      return () => window.clearTimeout(clearTimer);
     }
 
     const timeout =
