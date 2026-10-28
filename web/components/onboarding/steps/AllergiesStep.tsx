@@ -99,9 +99,7 @@ export function AllergiesStep({
     let cancelled = false;
 
     async function loadSelectedAllergyNames() {
-
-      try {
-        const entries =
+      const entries =
           await Promise.all(
             selectedIds.map(
               async (allergyId) => {
@@ -154,8 +152,6 @@ export function AllergiesStep({
             return next;
           },
         );
-      } finally {
-      }
     }
 
     loadSelectedAllergyNames();
