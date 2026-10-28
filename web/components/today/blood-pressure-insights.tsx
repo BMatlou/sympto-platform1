@@ -76,18 +76,6 @@ function mondayKey(value: string | Date) {
   ].join("-");
 }
 
-function shiftWeek(key: string, offset: number) {
-  const [year, month, day] = key.split("-").map(Number);
-  if (![year, month, day].every(Number.isFinite)) return "";
-  const date = new Date(Date.UTC(year, month - 1, day, 12));
-  date.setUTCDate(date.getUTCDate() + offset * 7);
-  return [
-    date.getUTCFullYear(),
-    String(date.getUTCMonth() + 1).padStart(2, "0"),
-    String(date.getUTCDate()).padStart(2, "0"),
-  ].join("-");
-}
-
 function average(values: number[]) {
   return values.length ? values.reduce((sum, value) => sum + value, 0) / values.length : null;
 }
@@ -292,7 +280,6 @@ export default function BloodPressureInsights({
           tone = distance != null && distance > 0 ? "warning" : "info";
         } else if (numericExerciseTarget != null && exerciseFrequency === "WEEKLY") {
           const total = exerciseTotal ?? 0;
-          const remaining = Math.max(0, numericExerciseTarget - total);
 
           if (enoughComparisonData && exerciseDifference != null && Math.abs(exerciseDifference) >= 5) {
             pattern = exerciseDifference < 0 ? "LOWER" : "HIGHER";
