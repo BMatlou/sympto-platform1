@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { ArrowRight, Dumbbell } from "lucide-react";
 import GoalCardDisclosureButton from "@/components/today/goal-card-disclosure-button";
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { healthGoalsService } from "@/services/health-goals.service";
 import { canonicalExerciseDayTotals, canonicalExerciseWeekTotal, type ExerciseMetricEvent } from "@/lib/exercise-metric";
 
