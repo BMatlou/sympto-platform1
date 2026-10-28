@@ -6,7 +6,6 @@ import {
   ArrowLeft,
   Bell,
   CalendarDays,
-  Check,
   FileText,
   Mail,
   MessageCircle,
@@ -75,14 +74,16 @@ export default function NotificationPreferencesPage() {
   }, []);
 
   useEffect(() => {
-    void load();
+    const timer = window.setTimeout(() => {
+      void load();
+    }, 0);
+    return () => window.clearTimeout(timer);
   }, [load]);
 
   async function toggle(type: string, channel: string, supported: boolean) {
     if (!supported) return;
 
     const key = preferenceKey(type, channel);
-    const existingPreference = Object.prototype.hasOwnProperty.call(preferences, key);
     const previous = preferences[key] ?? (channel === "IN_APP");
     const next = !previous;
 
