@@ -129,21 +129,24 @@ export default function ClinicalSmartFileActions({ consentId, file, onSaved }: P
   }, [action, file]);
 
   useEffect(() => {
-    setMode("CREATE");
-    setExistingId("");
-    setData({});
-    setSelectedRefs([]);
-    setReferences([]);
-    setQuery("");
-    setMessage("");
+    const timer = window.setTimeout(() => {
+      setMode("CREATE");
+      setExistingId("");
+      setData({});
+      setSelectedRefs([]);
+      setReferences([]);
+      setQuery("");
+      setMessage("");
+    }, 0);
+    return () => window.clearTimeout(timer);
   }, [action]);
 
   useEffect(() => {
     const type = REF_TYPES[action];
     const q = query.trim();
     if (!type || q.length < 2) {
-      setReferences([]);
-      return;
+      const timer = window.setTimeout(() => setReferences([]), 0);
+      return () => window.clearTimeout(timer);
     }
     let alive = true;
     api.get(`/smart-file/clinical/${consentId}/references`, { params: { type, search: q } })
@@ -153,8 +156,9 @@ export default function ClinicalSmartFileActions({ consentId, file, onSaved }: P
   }, [action, consentId, query]);
 
   useEffect(() => {
-    if (mode !== "UPDATE" || !existingId) return;
-    const lists: any[] = [];
+    const timer = window.setTimeout(() => {
+      if (mode !== "UPDATE" || !existingId) return;
+      const lists: any[] = [];
     switch (action) {
       case "DIAGNOSIS": lists.push(...(file?.diagnoses ?? [])); break;
       case "PROCEDURE": lists.push(...(file?.procedures ?? [])); break;
@@ -211,7 +215,9 @@ export default function ClinicalSmartFileActions({ consentId, file, onSaved }: P
       setData({ bloodType: passport?.bloodType, rhesusFactor: passport?.rhesusFactor, organDonor: passport?.organDonor, emergencyNotes: passport?.emergencyNotes });
     }
     if (action === "MEDICAL_RECORD") setData({ ...file?.medicalRecord });
-    if (action === "CLINICAL_NOTE") setData({ encounterId: existing.encounterId, title: existing.title, note: existing.note });
+      if (action === "CLINICAL_NOTE") setData({ encounterId: existing.encounterId, title: existing.title, note: existing.note });
+    }, 0);
+    return () => window.clearTimeout(timer);
   }, [action, existingId, mode, file]);
 
   const toggleRef = (id: string) => {
