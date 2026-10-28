@@ -54,22 +54,6 @@ export default function ClinicalSmartFilePage() {
   const [file, setFile] = useState<SmartFile | null>(null);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(true);
-  const [message, setMessage] = useState("");
-  const [saving, setSaving] = useState(false);
-  const [form, setForm] = useState({
-    chiefComplaint: "",
-    assessment: "",
-    plan: "",
-    notes: "",
-    medicationQuery: "",
-    medicationId: "",
-    dosage: "",
-    frequency: "ONCE_DAILY",
-    route: "ORAL",
-    instructions: "",
-  });
-  const [medications, setMedications] = useState<any[]>([]);
-
   const loadFile = useCallback(async () => {
     if (!params.consentId) return;
     setLoading(true);
@@ -87,65 +71,6 @@ export default function ClinicalSmartFilePage() {
   useEffect(() => {
     void loadFile();
   }, [loadFile]);
-
-  useEffect(() => {
-    let active = true;
-    const query = form.medicationQuery.trim();
-    if (!file?.clinicalAccess.canUpdate || query.length < 2) {
-      setMedications([]);
-      return;
-    }
-    api.get(`/smart-file/clinical/${params.consentId}/medications`, { params: { search: query } })
-      .then((response) => { if (active) setMedications(unwrap<any[]>(response.data) ?? []); })
-      .catch(() => { if (active) setMedications([]); });
-    return () => { active = false; };
-  }, [file?.clinicalAccess.canUpdate, form.medicationQuery, params.consentId]);
-
-  const saveClinicalUpdate = async () => {
-    if (!file?.clinicalAccess.canUpdate || !params.consentId) return;
-    const hasRecord = [form.chiefComplaint, form.assessment, form.plan, form.notes].some((value) => value.trim());
-    const hasPrescription = Boolean(form.medicationId && form.dosage.trim());
-    if (!hasRecord && !hasPrescription) {
-      setMessage("Add a clinical note, assessment, plan or prescription before saving.");
-      return;
-    }
-    setSaving(true);
-    setMessage("");
-    try {
-      await api.post(`/smart-file/clinical/${params.consentId}/updates`, {
-        chiefComplaint: form.chiefComplaint.trim() || undefined,
-        assessment: form.assessment.trim() || undefined,
-        plan: form.plan.trim() || undefined,
-        notes: form.notes.trim() || undefined,
-        prescription: hasPrescription ? {
-          medicationId: form.medicationId,
-          dosage: form.dosage.trim(),
-          frequency: form.frequency,
-          route: form.route,
-          instructions: form.instructions.trim() || undefined,
-        } : undefined,
-      });
-      setForm({
-        chiefComplaint: "",
-        assessment: "",
-        plan: "",
-        notes: "",
-        medicationQuery: "",
-        medicationId: "",
-        dosage: "",
-        frequency: "ONCE_DAILY",
-        route: "ORAL",
-        instructions: "",
-      });
-      setMedications([]);
-      setMessage("Clinical Smart File updated. The new record is now part of the patient’s longitudinal file.");
-      await loadFile();
-    } catch (err: any) {
-      setMessage(err?.response?.data?.message || "The clinical update could not be saved.");
-    } finally {
-      setSaving(false);
-    }
-  };
 
   return <ProtectedRoute><main className="min-h-screen bg-[#f5f8fb] text-slate-800"><div className="mx-auto max-w-5xl px-4 py-6 sm:px-6 sm:py-8">
     <Link href="/smart-file/authorize" className="mb-5 inline-flex items-center gap-2 text-sm font-semibold text-[#0b2d54]"><ArrowLeft className="h-4 w-4" />Back to Smart File access</Link>
@@ -260,7 +185,7 @@ export default function ClinicalSmartFilePage() {
         <Section icon={FileText} title="Clinical documents & notes" count={file.clinicalDocuments.length}>
           <div className="space-y-2">{file.clinicalDocuments.map((item: any, i: number) => <div key={item.id || i} className="rounded-2xl bg-slate-50 p-4"><div className="flex flex-wrap items-center gap-2"><span className="rounded-full bg-emerald-50 px-2 py-1 text-[9px] font-black uppercase tracking-wide text-emerald-700">Clinical</span><span className="text-xs text-slate-400">{date(item.createdAt || item.uploadedAt || item.date)}</span></div><p className="mt-1 font-semibold text-[#0b2d54]">{text(item.title || item.fileName || item.name, "Clinical document")}</p>{(item.url || item.fileUrl || item.attachment?.url) && <a href={item.url || item.fileUrl || item.attachment?.url} target="_blank" rel="noreferrer" className="mt-2 inline-flex rounded-xl bg-white px-3 py-2 text-xs font-bold text-[#0b2d54] ring-1 ring-slate-200 hover:border-[#24c1c4]/40">Open clinical file</a>}{item.note && <p className="mt-1 whitespace-pre-wrap text-sm leading-5 text-slate-600">{item.note}</p>}{item.documentType && <p className="mt-1 text-xs text-slate-500">{item.documentType}</p>}</div>)}{!file.clinicalDocuments.length && <Empty label="clinical documents or notes"/>}</div>
         </Section>
-      <p className="mt-5 text-center text-xs text-slate-400">Smart File generated {date(file.generatedAt)} · Access is controlled by the patient's consent.</p>
+      <p className="mt-5 text-center text-xs text-slate-400">Smart File generated {date(file.generatedAt)} · Access is controlled by the patient&apos;s consent.</p>
     </>}
   </div></main></ProtectedRoute>;
 }
