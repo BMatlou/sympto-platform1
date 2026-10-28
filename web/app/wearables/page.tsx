@@ -72,6 +72,7 @@ export default function WearablesPage() {
   const [status, setStatus] = useState("Not connected");
   const [error, setError] = useState("");
   const [connecting, setConnecting] = useState(false);
+  const [backendDeviceId, setBackendDeviceId] = useState<string | null>(null);
   const [showSources, setShowSources] = useState(false);
   const deviceRef = useRef<BluetoothDeviceLike | null>(null);
   const backendDeviceIdRef = useRef<string | null>(null);
