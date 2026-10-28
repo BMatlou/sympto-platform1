@@ -127,17 +127,20 @@ export function ConditionsStep({
       search.trim();
 
     if (!trimmedSearch) {
-      setResults([]);
-      setLoading(false);
-      setError("");
-      return;
+      const clearTimer = window.setTimeout(() => {
+        setResults([]);
+        setLoading(false);
+        setError("");
+      }, 0);
+      return () => window.clearTimeout(clearTimer);
     }
 
     let cancelled = false;
 
-    setLoading(true);
-    setError("");
-
+    const loadingTimer = window.setTimeout(() => {
+      setLoading(true);
+      setError("");
+    }, 0);
     const timeout = setTimeout(
       async () => {
         try {
@@ -180,6 +183,7 @@ export function ConditionsStep({
 
     return () => {
       cancelled = true;
+      window.clearTimeout(loadingTimer);
       clearTimeout(timeout);
     };
   }, [search]);
@@ -874,7 +878,7 @@ export function ConditionsStep({
           !showSearch && (
             <p className="text-sm text-slate-500">
               If you have another current or past
-              condition, click "+ Add condition"
+              condition, click &quot;+ Add condition&quot;
               above.
             </p>
           )}
