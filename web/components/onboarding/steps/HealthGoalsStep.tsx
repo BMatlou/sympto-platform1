@@ -425,10 +425,13 @@ export function HealthGoalsStep({
 
   function openEditModal(index: number) {
     const existing = values.goals[index];
+    const config = getGoalConfig(existing.category);
 
     setEditingIndex(index);
     setForm({
       ...existing,
+      unit: config.unit,
+      targetValue: config.unit ? existing.targetValue : undefined,
     });
 
     setIsModalOpen(true);
