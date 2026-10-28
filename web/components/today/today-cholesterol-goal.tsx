@@ -261,7 +261,7 @@ export default function TodayCholesterolGoal({ goal, labOrders = [], activeGoals
       }
     }
     return Array.from(byId.values());
-  }, [goal?.connectedGoals, activeGoals]);
+  }, [goal, activeGoals]);
 
   async function saveReading() {
     const numeric = numberOrNull(value);
