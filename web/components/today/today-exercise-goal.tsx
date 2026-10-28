@@ -47,7 +47,7 @@ export default function TodayExerciseGoal({ goal, detailsExpanded, onToggleDetai
   const journey = useMemo(() => journeyFor(goal), [goal]);
   const weekStart = useMemo(() => startOfLocalWeek(), []);
 
-  async function loadWeekEvents() {
+  const loadWeekEvents = useCallback(async () => {
     try {
       const response = await healthGoalsService.getMetricEvents("EXERCISE", "exercise.minutes", weekStart, new Date());
       setEvents((response.events ?? []).map((event) => ({ loggedValue: Number(event.loggedValue), occurredAt: String(event.occurredAt), source: event.source ?? null, sourceId: event.sourceId ?? null })));
@@ -56,18 +56,21 @@ export default function TodayExerciseGoal({ goal, detailsExpanded, onToggleDetai
     } finally {
       setLoading(false);
     }
-  }
+  }, [weekStart]);
 
   useEffect(() => {
-    void loadWeekEvents();
+    const initialLoad = window.setTimeout(() => {
+      void loadWeekEvents();
+    }, 0);
     const handleUpdated = () => void loadWeekEvents();
     const interval = window.setInterval(() => void loadWeekEvents(), 5000);
     window.addEventListener("sympto:health-checkin-updated", handleUpdated);
     return () => {
+      window.clearTimeout(initialLoad);
       window.clearInterval(interval);
       window.removeEventListener("sympto:health-checkin-updated", handleUpdated);
     };
-  }, [goal?.id, weekStart.getTime()]);
+  }, [loadWeekEvents]);
 
   const dayTotals = canonicalExerciseDayTotals(events);
   const weekTotal = canonicalExerciseWeekTotal(events);
