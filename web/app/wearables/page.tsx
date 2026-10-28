@@ -352,7 +352,7 @@ export default function WearablesPage() {
                         <button
                           type="button"
                           onClick={disconnect}
-                          disabled={!backendDeviceIdRef.current}
+                          disabled={!backendDeviceId}
                           className="flex h-11 w-11 items-center justify-center rounded-full border border-white/10 bg-white/5 text-white/75 transition hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-30"
                           aria-label="Disconnect"
                         >
