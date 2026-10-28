@@ -481,7 +481,6 @@ export default function TodayBloodGlucoseGoal({ goal, patientId = "", currentWei
   const veryLow = latestIsRecent && latest != null && latest.loggedValue < 3.0;
   const carePlanLinked = Boolean(goal?.carePlanId);
   const practitionerLinked = Boolean(goal?.practitionerId);
-  const hasEntryContext = latest != null && Boolean(String(latest.metadata?.readingContext ?? latest.metadata?.glucoseContext ?? ""));
   const currentConditions = conditions.filter(activeRecord);
   const currentClinicalDiagnoses = diagnoses.filter(activeRecord);
   const diabetesDiagnosis = currentClinicalDiagnoses.find(isDiabetesRecord);
