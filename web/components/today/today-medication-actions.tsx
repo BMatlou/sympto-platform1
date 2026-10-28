@@ -2,7 +2,7 @@
 
 import { Check, CircleSlash2, Pill } from "lucide-react";
 import GoalCardDisclosureButton from "@/components/today/goal-card-disclosure-button";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 import { api } from "@/lib/api";
 import { healthGoalsService } from "@/services/health-goals.service";
@@ -145,7 +145,7 @@ export default function TodayMedicationActions({ medications, goal: suppliedGoal
     ? Math.min(100, Math.max(0, Math.round((safeDosesLoggedToday / totalRequiredDosesPerDay) * 100)))
     : 0;
 
-  async function loadAdherenceEvents() {
+  const loadAdherenceEvents = useCallback(async () => {
     if (!medications.length || !medicationId) {
       setDosesLoggedToday(0);
       setTakenDosesForGoal(0);
@@ -206,11 +206,15 @@ export default function TodayMedicationActions({ medications, goal: suppliedGoal
     } catch {
       // Keep the current UI if event history cannot be loaded.
     }
-  }
+  }, [medications.length, totalRequiredDosesPerDay, medicationId, finalGoal?.createdAt]);
 
   useEffect(() => {
-    void loadAdherenceEvents();
-  }, [medications.length, totalRequiredDosesPerDay, medicationId, finalGoal?.id]);
+    // Defer the fetch so its state updates happen after the effect has subscribed.
+    const timer = window.setTimeout(() => {
+      void loadAdherenceEvents();
+    }, 0);
+    return () => window.clearTimeout(timer);
+  }, [loadAdherenceEvents]);
 
   const doseLabel = useMemo(
     () => (totalRequiredDosesPerDay === 1 ? "1 dose" : `${totalRequiredDosesPerDay} doses`),
@@ -230,7 +234,7 @@ export default function TodayMedicationActions({ medications, goal: suppliedGoal
   const [medicationInsight, setMedicationInsight] = useState<any | null>(null);
   const insightSyncRetriedForGoal = useRef<string | null>(null);
 
-  async function loadMedicationInsight() {
+  const loadMedicationInsight = useCallback(async () => {
     if (!finalGoal?.id) {
       setMedicationInsight(null);
       return;
@@ -244,11 +248,15 @@ export default function TodayMedicationActions({ medications, goal: suppliedGoal
     } catch {
       setMedicationInsight(null);
     }
-  }
+  }, [finalGoal?.id]);
 
   useEffect(() => {
-    void loadMedicationInsight();
-  }, [finalGoal?.id]);
+    // Run the asynchronous request outside the synchronous effect body.
+    const timer = window.setTimeout(() => {
+      void loadMedicationInsight();
+    }, 0);
+    return () => window.clearTimeout(timer);
+  }, [loadMedicationInsight]);
 
   const journeyInsight = medicationInsight?.analysis?.journeyAdherence;
   const clinicalIntelligence = medicationInsight?.analysis?.clinicalIntelligence ?? null;
@@ -268,7 +276,7 @@ export default function TodayMedicationActions({ medications, goal: suppliedGoal
       .finally(() => {
         void loadMedicationInsight();
       });
-  }, [finalGoal?.id, journeyInsight?.takenDoses, takenDosesSoFar, onUpdated]);
+  }, [finalGoal?.id, journeyInsight, takenDosesSoFar, onUpdated, loadMedicationInsight]);
 
   // Keep the medication card's validated cumulative numerator as the single source of truth.
   const insightExpectedScheduledDoses = Number(journeyInsight?.expectedScheduledDoses ?? 0);
