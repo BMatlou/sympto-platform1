@@ -38,7 +38,7 @@ function PrivacyPageContent() {
       setConsents(Array.isArray(payload) ? payload : []);
     } catch (requestError) {
       console.error("Failed to load data access consents:", requestError);
-      setError("We couldn&apos;t load your access permissions. Please try again.");
+      setError("We couldn't load your access permissions. Please try again.");
     } finally {
       setLoading(false);
     }
