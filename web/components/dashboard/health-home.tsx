@@ -473,7 +473,29 @@ async function countTodayGoalNeeds(
   for (const goal of goals) {
     let category = String(goal?.category ?? goal?.metricConfig?.metricType ?? "")
       .trim().toUpperCase().replace(/[\s-]+/g, "_");
-    if (category === "PERSONAL" || category === "PERSONAL_GOAL") category = "OTHER";
+    const categoryAliases: Record<string, string> = {
+      PERSONAL: "OTHER",
+      PERSONAL_GOAL: "OTHER",
+      CUSTOM: "OTHER",
+      WEIGHT_MANAGEMENT: "WEIGHT",
+      BODY_WEIGHT: "WEIGHT",
+      PHYSICAL_ACTIVITY: "EXERCISE",
+      ACTIVITY: "EXERCISE",
+      CALORIES: "NUTRITION",
+      GLUCOSE: "BLOOD_GLUCOSE",
+      BLOOD_SUGAR: "BLOOD_GLUCOSE",
+      LIPIDS: "CHOLESTEROL",
+      SLEEP_DURATION: "SLEEP",
+      STRESS: "MENTAL_HEALTH",
+      WATER: "HYDRATION",
+      CIGARETTES: "SMOKING",
+      SMOKING_CESSATION: "SMOKING",
+      DRINKS: "ALCOHOL",
+      RESTING_HEART_RATE: "HEART_RATE",
+      PULSE: "HEART_RATE",
+      PULSE_RATE: "HEART_RATE",
+    };
+    category = categoryAliases[category] ?? category;
 
     // Scheduled medication doses are counted above by medication and time of day.
     // A medication goal must not add a second, duplicate outstanding item.
@@ -584,8 +606,15 @@ async function countTodayGoalNeeds(
       continue;
     }
 
-    // Unknown active categories still require a recorded action rather than
-    // silently disappearing from the dashboard's "need attention" count.
+    // For a legacy/custom category, honour its configured metric stream before
+    // treating it as pending. Some older goals use category labels not present
+    // in the current Today-card category list.
+    if (metricKey) {
+      const events = validEvents(await eventsFor(metricType, metricKey, todayStart, todayEnd));
+      if (events?.length) continue;
+    }
+
+    // Unknown categories with no dated progress or matching metric still need attention.
     count += 1;
   }
 
