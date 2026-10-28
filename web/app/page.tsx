@@ -1,4 +1,4 @@
-import { Activity, Stethoscope, CalendarCheck, ShieldCheck, UserCheck } from 'lucide-react';
+import { Activity, CalendarCheck, UserCheck } from 'lucide-react';
 import { FaFacebookF, FaInstagram, FaLinkedinIn, FaXTwitter, } from "react-icons/fa6";
 
 export default function HomePage() {
@@ -20,7 +20,7 @@ export default function HomePage() {
 
   <p className="mx-auto mt-3 max-w-5xl text-center text-lg leading-8 text-slate-600 md:text-xl">
   Making every step of your health journey more connected, confident, and informed.
-  Whether you're managing your wellbeing or navigating life's more complex health moments, Sympto gives you one secure place to stay informed, connected, and in control.
+  Whether you&apos;re managing your wellbeing or navigating life&apos;s more complex health moments, Sympto gives you one secure place to stay informed, connected, and in control.
 </p>
 </div>
 
