@@ -140,7 +140,7 @@ export default function SignInForm() {
       </button>
 
       <p className="text-center text-sm text-slate-500">
-        Don't have an account?{" "}
+        Don&apos;t have an account?{" "}
         <Link
           href="/auth/sign-up"
           className="font-semibold text-[#24C1C4] hover:underline"
