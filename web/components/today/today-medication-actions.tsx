@@ -206,7 +206,7 @@ export default function TodayMedicationActions({ medications, goal: suppliedGoal
     } catch {
       // Keep the current UI if event history cannot be loaded.
     }
-  }, [medications.length, totalRequiredDosesPerDay, medicationId, finalGoal?.createdAt]);
+  }, [medications, totalRequiredDosesPerDay, medicationId, finalGoal]);
 
   useEffect(() => {
     // Defer the fetch so its state updates happen after the effect has subscribed.
@@ -248,7 +248,7 @@ export default function TodayMedicationActions({ medications, goal: suppliedGoal
     } catch {
       setMedicationInsight(null);
     }
-  }, [finalGoal?.id]);
+  }, [finalGoal]);
 
   useEffect(() => {
     // Run the asynchronous request outside the synchronous effect body.
