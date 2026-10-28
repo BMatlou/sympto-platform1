@@ -10,61 +10,6 @@ import { healthGoalsService } from "@/services/health-goals.service";
 import { patientNotificationsService } from "@/services/patient-notifications.service";
 import ProtectedRoute from "@/components/auth/protected-route";
 
-function display(value: unknown, fallback = "Not recorded"): string {
-  return value === null || value === undefined || value === "" ? fallback : String(value);
-}
-
-function normalizeVitals(data: any) {
-  const deviceVitals = Array.isArray(data?.healthSnapshot?.latestMeasurements)
-    ? data.healthSnapshot.latestMeasurements.map((item: any) => ({
-        type: item.type ?? item.measurementType,
-        value: item.value,
-        unit: item.unit,
-        measuredAt: item.measuredAt,
-      }))
-    : [];
-
-  const clinicalVitals = Array.isArray(data?.clinicalVitals)
-    ? data.clinicalVitals.map((item: any) => ({
-        type: item.vitalType?.code ?? item.vitalType?.name,
-        value: item.value,
-        unit: item.vitalType?.unit,
-        measuredAt: item.measuredAt,
-      }))
-    : [];
-
-  const byType = new Map<string, any>();
-
-  for (const vital of [...deviceVitals, ...clinicalVitals]) {
-    const key = String(vital.type ?? "").toUpperCase();
-    if (!key) continue;
-
-    const previous = byType.get(key);
-    if (
-      !previous ||
-      new Date(String(vital.measuredAt ?? 0)).getTime() >
-        new Date(String(previous.measuredAt ?? 0)).getTime()
-    ) {
-      byType.set(key, vital);
-    }
-  }
-
-  return Array.from(byType.values());
-}
-
-function itemNames(
-  items: any[],
-  kind: "allergy" | "condition",
-): string[] {
-  return items
-    .map((item) =>
-      kind === "allergy"
-        ? item?.allergy?.name ?? item?.name
-        : item?.condition?.name ?? item?.name,
-    )
-    .filter(Boolean) as string[];
-}
-
 function requiredMedicationDoses(frequency: unknown): number {
   const normalized = String(frequency ?? "").trim().toUpperCase();
   if (normalized === "TWICE_DAILY") return 2;
@@ -671,18 +616,6 @@ function formatSymptomDate(value: unknown): string {
   return new Intl.DateTimeFormat("en-ZA", {
     day: "numeric",
     month: "short",
-  }).format(date);
-}
-
-function formatAppointmentDate(value: unknown): string {
-  if (!value) return "";
-  const date = new Date(String(value));
-  if (Number.isNaN(date.getTime())) return "";
-  return new Intl.DateTimeFormat("en-ZA", {
-    day: "numeric",
-    month: "short",
-    hour: "2-digit",
-    minute: "2-digit",
   }).format(date);
 }
 
