@@ -159,63 +159,63 @@ export default function ClinicalSmartFileActions({ consentId, file, onSaved }: P
     const timer = window.setTimeout(() => {
       if (mode !== "UPDATE" || !existingId) return;
       const lists: any[] = [];
-    switch (action) {
-      case "DIAGNOSIS": lists.push(...(file?.diagnoses ?? [])); break;
-      case "PROCEDURE": lists.push(...(file?.procedures ?? [])); break;
-      case "CONDITION": lists.push(...(file?.conditions ?? [])); break;
-      case "ALLERGY": lists.push(...(file?.allergies ?? [])); break;
-      case "IMMUNIZATION": lists.push(...(file?.immunisations ?? [])); break;
-      case "PRESCRIPTION": lists.push(...(file?.prescriptions ?? [])); break;
-      case "PATIENT_MEDICATION": lists.push(...(file?.medications ?? [])); break;
-      case "CARE_PLAN": lists.push(...(file?.carePlans ?? [])); break;
-      case "CARE_PLAN_GOAL": lists.push(...(file?.carePlans ?? []).flatMap((p: any) => p.goals ?? [])); break;
-      case "CARE_PLAN_TASK": lists.push(...(file?.carePlans ?? []).flatMap((p: any) => p.tasks ?? [])); break;
-      case "CARE_PLAN_NOTE": lists.push(...(file?.carePlans ?? []).flatMap((p: any) => p.notes ?? [])); break;
-      case "REFERRAL": lists.push(...(file?.referrals ?? [])); break;
-      case "REFERRAL_NOTE": lists.push(...(file?.referrals ?? []).flatMap((p: any) => p.notes ?? [])); break;
-      case "LAB_ORDER": lists.push(...(file?.labOrders ?? [])); break;
-      case "IMAGING_ORDER": lists.push(...(file?.imagingOrders ?? [])); break;
-      case "IMAGING_REPORT": lists.push(...(file?.imaging ?? []).flatMap((s: any) => s.reports ?? [])); break;
-      case "HEALTH_JOURNAL": lists.push(...(file?.healthJournalEntries ?? [])); break;
-      case "VITAL": lists.push(...(file?.vitals ?? [])); break;
-      case "ENCOUNTER": lists.push(...(file?.encounters ?? [])); break;
-      case "SYMPTOM_EPISODE": lists.push(...(file?.episodes ?? [])); break;
-      case "SYMPTOM_LOG": lists.push(...(file?.symptoms ?? [])); break;
-      case "SYMPTOM_ITEM": lists.push(...(file?.symptoms ?? []).flatMap((x: any) => x.symptoms ?? [])); break;
-      default: break;
-    }
-    const existing = lists.find((x) => x.id === existingId);
-    if (!existing) return;
-
-    if (action === "DIAGNOSIS") setData({ diagnosisId: existing.diagnosis?.id || existing.diagnosisId, status: existing.status, severity: existing.severity, stage: existing.stage, primaryDiagnosis: existing.primaryDiagnosis, confirmed: existing.confirmed, diagnosedAt: asDateInput(existing.diagnosedAt), resolvedAt: asDateInput(existing.resolvedAt), treatmentPlan: existing.treatmentPlan, outcome: existing.outcome, notes: existing.notes });
-    if (action === "PROCEDURE") setData({ procedureId: existing.procedure?.id || existing.procedureId, status: existing.status, performedAt: asDateInput(existing.performedAt), outcome: existing.outcome, performer: existing.performer, facility: existing.facility, complications: existing.complications, followUpRequired: existing.followUpRequired, followUpDate: asDateInput(existing.followUpDate), notes: existing.notes });
-    if (action === "CONDITION") setData({ conditionId: existing.condition?.id || existing.conditionId, status: existing.status, chronic: existing.chronic, primaryCondition: existing.primaryCondition, severity: existing.severity, stage: existing.stage, diagnosedAt: asDateInput(existing.diagnosedAt), resolvedAt: asDateInput(existing.resolvedAt), treatmentPlan: existing.treatmentPlan, outcome: existing.outcome, notes: existing.notes });
-    if (action === "ALLERGY") setData({ allergyId: existing.allergy?.id || existing.allergyId, status: existing.status, severity: existing.severity, reaction: existing.reaction, reactionNotes: existing.reactionNotes, onsetDate: asDateInput(existing.onsetDate), lastReaction: asDateInput(existing.lastReaction), verified: existing.verified, notes: existing.notes });
-    if (action === "IMMUNIZATION") setData({ immunizationId: existing.immunization?.id || existing.immunizationId, administeredAt: asDateInput(existing.administeredAt), doseNumber: existing.doseNumber, batchNumber: existing.batchNumber, manufacturer: existing.manufacturer, administeredBy: existing.administeredBy, facility: existing.facility, route: existing.route, site: existing.site, adverseReaction: existing.adverseReaction, adverseReactionNotes: existing.adverseReactionNotes, nextDueDate: asDateInput(existing.nextDueDate), status: existing.status, notes: existing.notes });
-    if (action === "PRESCRIPTION") setData({ status: existing.status, expiresAt: asDateInput(existing.expiresAt), notes: existing.notes });
-    if (action === "PRESCRIPTION_ITEM") setData({ medicationId: existing.medication?.id || existing.medicationId, dosage: existing.dosage, frequency: existing.frequency, route: existing.route, durationDays: existing.durationDays, quantity: existing.quantity, refills: existing.refills, instructions: existing.instructions });
-    if (action === "PATIENT_MEDICATION") setData({ medicationId: existing.medication?.id || existing.medicationId, dosage: existing.dosage, frequency: existing.frequency, route: existing.route, indication: existing.indication, instructions: existing.instructions, prescribedBy: existing.prescribedBy, startedAt: asDateInput(existing.startedAt), endedAt: asDateInput(existing.endedAt), ongoing: existing.ongoing, sideEffects: existing.sideEffects, effectiveness: existing.effectiveness, status: existing.status, notes: existing.notes });
-    if (action === "CARE_PLAN") setData({ title: existing.title, description: existing.description, status: existing.status, startDate: asDateInput(existing.startDate), endDate: asDateInput(existing.endDate), encounterId: existing.encounterId });
-    if (action === "CARE_PLAN_GOAL") setData({ carePlanId: existing.carePlanId, title: existing.title, description: existing.description, targetValue: existing.targetValue, currentValue: existing.currentValue, dueDate: asDateInput(existing.dueDate), status: existing.status });
-    if (action === "CARE_PLAN_TASK") setData({ carePlanId: existing.carePlanId, assignedToId: existing.assignedToId, type: existing.type, title: existing.title, description: existing.description, dueDate: asDateInput(existing.dueDate), completedAt: asDateInput(existing.completedAt), status: existing.status });
-    if (action === "CARE_PLAN_NOTE") setData({ carePlanId: existing.carePlanId, note: existing.note });
-    if (action === "REFERRAL") setData({ receivingPractitionerId: existing.receivingPractitionerId, referringPracticeId: existing.referringPracticeId, receivingPracticeId: existing.receivingPracticeId, encounterId: existing.encounterId, type: existing.type, priority: existing.priority, status: existing.status, specialty: existing.specialty, reason: existing.reason, clinicalSummary: existing.clinicalSummary, requestedDate: asDateInput(existing.requestedDate) });
-    if (action === "REFERRAL_NOTE") setData({ referralId: existing.referralId, note: existing.note });
-    if (action === "LAB_ORDER") { setData({ laboratoryId: existing.laboratoryId, encounterId: existing.encounterId, status: existing.status, clinicalNotes: existing.clinicalNotes, orderedAt: asDateInput(existing.orderedAt) }); setSelectedRefs((existing.items ?? []).map((x: any) => x.test?.id).filter(Boolean)); }
-    if (action === "IMAGING_ORDER") { setData({ imagingCenterId: existing.imagingCenterId, encounterId: existing.encounterId, priority: existing.priority, status: existing.status, clinicalIndication: existing.clinicalIndication }); setSelectedRefs((existing.items ?? []).map((x: any) => x.procedure?.id).filter(Boolean)); }
-    if (action === "IMAGING_REPORT") setData({ studyId: existing.studyId, findings: existing.findings, impression: existing.impression, recommendations: existing.recommendations });
-    if (action === "HEALTH_JOURNAL") setData({ title: existing.title, journal: existing.journal, mood: existing.mood, sleepQuality: existing.sleepQuality, sleepHours: existing.sleepHours, energyLevel: existing.energyLevel, stressLevel: existing.stressLevel, exerciseMinutes: existing.exerciseMinutes, waterIntakeMl: existing.waterIntakeMl, weightKg: existing.weightKg, temperature: existing.temperature, bloodPressureSystolic: existing.bloodPressureSystolic, bloodPressureDiastolic: existing.bloodPressureDiastolic, heartRate: existing.heartRate, oxygenSaturation: existing.oxygenSaturation, respiratoryRate: existing.respiratoryRate, notes: existing.notes });
-    if (action === "VITAL") setData({ vitalTypeId: existing.vitalType?.id || existing.vitalTypeId, value: existing.value, measuredAt: asDateInput(existing.measuredAt) });
-    if (action === "ENCOUNTER") setData({ encounterTypeId: existing.encounterTypeId, startedAt: asDateInput(existing.startedAt), endedAt: asDateInput(existing.endedAt), chiefComplaint: existing.chiefComplaint, assessment: existing.assessment, plan: existing.plan, notes: existing.notes });
-    if (action === "SYMPTOM_EPISODE") setData({ title: existing.title, description: existing.description, type: existing.type, status: existing.status, priority: existing.priority, startedAt: asDateInput(existing.startedAt), endedAt: asDateInput(existing.endedAt), resolvedAt: asDateInput(existing.resolvedAt) });
-    if (action === "SYMPTOM_LOG") setData({ clinicalEpisodeId: existing.clinicalEpisodeId, title: existing.title, notes: existing.notes, status: existing.status, overallSeverity: existing.overallSeverity, progression: existing.progression, startedAt: asDateInput(existing.startedAt), resolvedAt: asDateInput(existing.resolvedAt) });
-    if (action === "SYMPTOM_ITEM") setData({ symptomLogId: existing.symptomLogId, symptomId: existing.symptom?.id || existing.symptomId, severity: existing.severity, progression: existing.progression, frequency: existing.frequency, painCharacter: existing.painCharacter, painScore: existing.painScore, durationMinutes: existing.durationMinutes, onsetAt: asDateInput(existing.onsetAt), resolvedAt: asDateInput(existing.resolvedAt), intermittent: existing.intermittent, recurring: existing.recurring, suspectedTrigger: existing.suspectedTrigger, aggravatingFactors: existing.aggravatingFactors, relievingFactors: existing.relievingFactors, notes: existing.notes });
-    if (action === "HEALTH_PASSPORT") {
-      const passport = file?.healthPassport;
-      setData({ bloodType: passport?.bloodType, rhesusFactor: passport?.rhesusFactor, organDonor: passport?.organDonor, emergencyNotes: passport?.emergencyNotes });
-    }
-    if (action === "MEDICAL_RECORD") setData({ ...file?.medicalRecord });
-      if (action === "CLINICAL_NOTE") setData({ encounterId: existing.encounterId, title: existing.title, note: existing.note });
+      switch (action) {
+        case "DIAGNOSIS": lists.push(...(file?.diagnoses ?? [])); break;
+        case "PROCEDURE": lists.push(...(file?.procedures ?? [])); break;
+        case "CONDITION": lists.push(...(file?.conditions ?? [])); break;
+        case "ALLERGY": lists.push(...(file?.allergies ?? [])); break;
+        case "IMMUNIZATION": lists.push(...(file?.immunisations ?? [])); break;
+        case "PRESCRIPTION": lists.push(...(file?.prescriptions ?? [])); break;
+        case "PATIENT_MEDICATION": lists.push(...(file?.medications ?? [])); break;
+        case "CARE_PLAN": lists.push(...(file?.carePlans ?? [])); break;
+        case "CARE_PLAN_GOAL": lists.push(...(file?.carePlans ?? []).flatMap((p: any) => p.goals ?? [])); break;
+        case "CARE_PLAN_TASK": lists.push(...(file?.carePlans ?? []).flatMap((p: any) => p.tasks ?? [])); break;
+        case "CARE_PLAN_NOTE": lists.push(...(file?.carePlans ?? []).flatMap((p: any) => p.notes ?? [])); break;
+        case "REFERRAL": lists.push(...(file?.referrals ?? [])); break;
+        case "REFERRAL_NOTE": lists.push(...(file?.referrals ?? []).flatMap((p: any) => p.notes ?? [])); break;
+        case "LAB_ORDER": lists.push(...(file?.labOrders ?? [])); break;
+        case "IMAGING_ORDER": lists.push(...(file?.imagingOrders ?? [])); break;
+        case "IMAGING_REPORT": lists.push(...(file?.imaging ?? []).flatMap((s: any) => s.reports ?? [])); break;
+        case "HEALTH_JOURNAL": lists.push(...(file?.healthJournalEntries ?? [])); break;
+        case "VITAL": lists.push(...(file?.vitals ?? [])); break;
+        case "ENCOUNTER": lists.push(...(file?.encounters ?? [])); break;
+        case "SYMPTOM_EPISODE": lists.push(...(file?.episodes ?? [])); break;
+        case "SYMPTOM_LOG": lists.push(...(file?.symptoms ?? [])); break;
+        case "SYMPTOM_ITEM": lists.push(...(file?.symptoms ?? []).flatMap((x: any) => x.symptoms ?? [])); break;
+        default: break;
+      }
+      const existing = lists.find((x) => x.id === existingId);
+      if (!existing) return;
+  
+      if (action === "DIAGNOSIS") setData({ diagnosisId: existing.diagnosis?.id || existing.diagnosisId, status: existing.status, severity: existing.severity, stage: existing.stage, primaryDiagnosis: existing.primaryDiagnosis, confirmed: existing.confirmed, diagnosedAt: asDateInput(existing.diagnosedAt), resolvedAt: asDateInput(existing.resolvedAt), treatmentPlan: existing.treatmentPlan, outcome: existing.outcome, notes: existing.notes });
+      if (action === "PROCEDURE") setData({ procedureId: existing.procedure?.id || existing.procedureId, status: existing.status, performedAt: asDateInput(existing.performedAt), outcome: existing.outcome, performer: existing.performer, facility: existing.facility, complications: existing.complications, followUpRequired: existing.followUpRequired, followUpDate: asDateInput(existing.followUpDate), notes: existing.notes });
+      if (action === "CONDITION") setData({ conditionId: existing.condition?.id || existing.conditionId, status: existing.status, chronic: existing.chronic, primaryCondition: existing.primaryCondition, severity: existing.severity, stage: existing.stage, diagnosedAt: asDateInput(existing.diagnosedAt), resolvedAt: asDateInput(existing.resolvedAt), treatmentPlan: existing.treatmentPlan, outcome: existing.outcome, notes: existing.notes });
+      if (action === "ALLERGY") setData({ allergyId: existing.allergy?.id || existing.allergyId, status: existing.status, severity: existing.severity, reaction: existing.reaction, reactionNotes: existing.reactionNotes, onsetDate: asDateInput(existing.onsetDate), lastReaction: asDateInput(existing.lastReaction), verified: existing.verified, notes: existing.notes });
+      if (action === "IMMUNIZATION") setData({ immunizationId: existing.immunization?.id || existing.immunizationId, administeredAt: asDateInput(existing.administeredAt), doseNumber: existing.doseNumber, batchNumber: existing.batchNumber, manufacturer: existing.manufacturer, administeredBy: existing.administeredBy, facility: existing.facility, route: existing.route, site: existing.site, adverseReaction: existing.adverseReaction, adverseReactionNotes: existing.adverseReactionNotes, nextDueDate: asDateInput(existing.nextDueDate), status: existing.status, notes: existing.notes });
+      if (action === "PRESCRIPTION") setData({ status: existing.status, expiresAt: asDateInput(existing.expiresAt), notes: existing.notes });
+      if (action === "PRESCRIPTION_ITEM") setData({ medicationId: existing.medication?.id || existing.medicationId, dosage: existing.dosage, frequency: existing.frequency, route: existing.route, durationDays: existing.durationDays, quantity: existing.quantity, refills: existing.refills, instructions: existing.instructions });
+      if (action === "PATIENT_MEDICATION") setData({ medicationId: existing.medication?.id || existing.medicationId, dosage: existing.dosage, frequency: existing.frequency, route: existing.route, indication: existing.indication, instructions: existing.instructions, prescribedBy: existing.prescribedBy, startedAt: asDateInput(existing.startedAt), endedAt: asDateInput(existing.endedAt), ongoing: existing.ongoing, sideEffects: existing.sideEffects, effectiveness: existing.effectiveness, status: existing.status, notes: existing.notes });
+      if (action === "CARE_PLAN") setData({ title: existing.title, description: existing.description, status: existing.status, startDate: asDateInput(existing.startDate), endDate: asDateInput(existing.endDate), encounterId: existing.encounterId });
+      if (action === "CARE_PLAN_GOAL") setData({ carePlanId: existing.carePlanId, title: existing.title, description: existing.description, targetValue: existing.targetValue, currentValue: existing.currentValue, dueDate: asDateInput(existing.dueDate), status: existing.status });
+      if (action === "CARE_PLAN_TASK") setData({ carePlanId: existing.carePlanId, assignedToId: existing.assignedToId, type: existing.type, title: existing.title, description: existing.description, dueDate: asDateInput(existing.dueDate), completedAt: asDateInput(existing.completedAt), status: existing.status });
+      if (action === "CARE_PLAN_NOTE") setData({ carePlanId: existing.carePlanId, note: existing.note });
+      if (action === "REFERRAL") setData({ receivingPractitionerId: existing.receivingPractitionerId, referringPracticeId: existing.referringPracticeId, receivingPracticeId: existing.receivingPracticeId, encounterId: existing.encounterId, type: existing.type, priority: existing.priority, status: existing.status, specialty: existing.specialty, reason: existing.reason, clinicalSummary: existing.clinicalSummary, requestedDate: asDateInput(existing.requestedDate) });
+      if (action === "REFERRAL_NOTE") setData({ referralId: existing.referralId, note: existing.note });
+      if (action === "LAB_ORDER") { setData({ laboratoryId: existing.laboratoryId, encounterId: existing.encounterId, status: existing.status, clinicalNotes: existing.clinicalNotes, orderedAt: asDateInput(existing.orderedAt) }); setSelectedRefs((existing.items ?? []).map((x: any) => x.test?.id).filter(Boolean)); }
+      if (action === "IMAGING_ORDER") { setData({ imagingCenterId: existing.imagingCenterId, encounterId: existing.encounterId, priority: existing.priority, status: existing.status, clinicalIndication: existing.clinicalIndication }); setSelectedRefs((existing.items ?? []).map((x: any) => x.procedure?.id).filter(Boolean)); }
+      if (action === "IMAGING_REPORT") setData({ studyId: existing.studyId, findings: existing.findings, impression: existing.impression, recommendations: existing.recommendations });
+      if (action === "HEALTH_JOURNAL") setData({ title: existing.title, journal: existing.journal, mood: existing.mood, sleepQuality: existing.sleepQuality, sleepHours: existing.sleepHours, energyLevel: existing.energyLevel, stressLevel: existing.stressLevel, exerciseMinutes: existing.exerciseMinutes, waterIntakeMl: existing.waterIntakeMl, weightKg: existing.weightKg, temperature: existing.temperature, bloodPressureSystolic: existing.bloodPressureSystolic, bloodPressureDiastolic: existing.bloodPressureDiastolic, heartRate: existing.heartRate, oxygenSaturation: existing.oxygenSaturation, respiratoryRate: existing.respiratoryRate, notes: existing.notes });
+      if (action === "VITAL") setData({ vitalTypeId: existing.vitalType?.id || existing.vitalTypeId, value: existing.value, measuredAt: asDateInput(existing.measuredAt) });
+      if (action === "ENCOUNTER") setData({ encounterTypeId: existing.encounterTypeId, startedAt: asDateInput(existing.startedAt), endedAt: asDateInput(existing.endedAt), chiefComplaint: existing.chiefComplaint, assessment: existing.assessment, plan: existing.plan, notes: existing.notes });
+      if (action === "SYMPTOM_EPISODE") setData({ title: existing.title, description: existing.description, type: existing.type, status: existing.status, priority: existing.priority, startedAt: asDateInput(existing.startedAt), endedAt: asDateInput(existing.endedAt), resolvedAt: asDateInput(existing.resolvedAt) });
+      if (action === "SYMPTOM_LOG") setData({ clinicalEpisodeId: existing.clinicalEpisodeId, title: existing.title, notes: existing.notes, status: existing.status, overallSeverity: existing.overallSeverity, progression: existing.progression, startedAt: asDateInput(existing.startedAt), resolvedAt: asDateInput(existing.resolvedAt) });
+      if (action === "SYMPTOM_ITEM") setData({ symptomLogId: existing.symptomLogId, symptomId: existing.symptom?.id || existing.symptomId, severity: existing.severity, progression: existing.progression, frequency: existing.frequency, painCharacter: existing.painCharacter, painScore: existing.painScore, durationMinutes: existing.durationMinutes, onsetAt: asDateInput(existing.onsetAt), resolvedAt: asDateInput(existing.resolvedAt), intermittent: existing.intermittent, recurring: existing.recurring, suspectedTrigger: existing.suspectedTrigger, aggravatingFactors: existing.aggravatingFactors, relievingFactors: existing.relievingFactors, notes: existing.notes });
+      if (action === "HEALTH_PASSPORT") {
+        const passport = file?.healthPassport;
+        setData({ bloodType: passport?.bloodType, rhesusFactor: passport?.rhesusFactor, organDonor: passport?.organDonor, emergencyNotes: passport?.emergencyNotes });
+      }
+      if (action === "MEDICAL_RECORD") setData({ ...file?.medicalRecord });
+        if (action === "CLINICAL_NOTE") setData({ encounterId: existing.encounterId, title: existing.title, note: existing.note });
     }, 0);
     return () => window.clearTimeout(timer);
   }, [action, existingId, mode, file]);
