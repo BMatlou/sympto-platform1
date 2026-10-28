@@ -89,12 +89,6 @@ export default function IndividualForm(props: IndividualFormProps) {
     setValue("preferredLanguage", "");
   }, [country, setValue]);
 
-  // keep input label in sync when country code changes
-  useEffect(() => {
-    const selected = countryOptions.find((c) => c.code === country);
-    if (selected) setCountrySearch(selected.name);
-  }, [country, countryOptions]);
-
   useEffect(() => {
     setValue("city", "");
   }, [province, setValue]);
