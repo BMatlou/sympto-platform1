@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { Activity, ArrowRight, HeartPulse, Plus, Scale, Thermometer, Wind, X } from "lucide-react";
+import { Activity, ArrowRight, HeartPulse, Plus, Thermometer, Wind, X } from "lucide-react";
 import { healthHomeService, type HealthHomeResponse } from "@/services/health-home.service";
 import Link from "next/link";
 
