@@ -208,7 +208,16 @@ async function countTodayNeeds(
     todayHealthMeasurements.some((measurement: any) => {
       const measuredAt = measurement?.measuredAt ?? measurement?.recordedAt ?? null;
       const value = measurement?.value ?? measurement?.loggedValue;
-      return localDayKey(measuredAt) === todayKey && value !== null && value !== undefined && value !== "";
+      if (localDayKey(measuredAt) !== todayKey || value === null || value === undefined || value === "") return false;
+      const type = String(
+        measurement?.type ??
+        measurement?.measurementType ??
+        measurement?.vitalType?.code ??
+        measurement?.vitalType?.name ??
+        measurement?.name ??
+        "",
+      ).trim().toUpperCase().replace(/[\\s-]+/g, "_");
+      return /WEIGHT|BLOOD_PRESSURE|SYSTOLIC_PRESSURE|DIASTOLIC_PRESSURE|HEART_RATE|HEARTRATE|PULSE_RATE|OXYGEN_SATURATION|OXYGENSATURATION|BODY_TEMPERATURE|TEMPERATURE|RESPIRATORY_RATE|RESPIRATORYRATE|HEIGHT|BMI/.test(type);
     }) ||
     todayJournalEntries.some((entry: any) => {
       const title = String(entry?.title ?? "").trim().toLowerCase();
