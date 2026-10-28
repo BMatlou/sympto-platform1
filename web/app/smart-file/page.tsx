@@ -25,7 +25,7 @@ export default function SmartFilePage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [copied, setCopied] = useState(false);
-  const [now, setNow] = useState(Date.now());
+  const [now, setNow] = useState(0);
   const searchParams = useSearchParams();
   const appointmentId = searchParams.get("appointmentId");
   const isAppointmentShare = kind === "clinical" && Boolean(appointmentId);
@@ -148,7 +148,7 @@ export default function SmartFilePage() {
                     <section className="rounded-[28px] border border-[#24c1c4]/25 bg-[#24c1c4]/5 p-4 text-center sm:p-5">
                       <p className="text-[9px] font-black uppercase tracking-[0.16em] text-[#0b2d54]/60">6-digit code</p>
                       <button type="button" onClick={copyCode} className="mt-2 inline-flex min-h-14 items-center gap-3 rounded-2xl px-3 text-3xl font-black tracking-[0.18em] text-[#0b2d54] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#24c1c4] sm:text-4xl" aria-label="Copy six-digit Smart File code">{share.shortCode.slice(0, 3)} {share.shortCode.slice(3)}{copied ? <Check className="h-5 w-5 text-emerald-700" /> : <Copy className="h-5 w-5" />}</button>
-                      <p className="mx-auto mt-1 max-w-sm text-[11px] font-semibold leading-4 text-slate-500">Use this code if QR scanning isn't available.</p>
+                      <p className="mx-auto mt-1 max-w-sm text-[11px] font-semibold leading-4 text-slate-500">Use this code if QR scanning isn&apos;t available.</p>
                     </section>
 
                     <div className="flex min-h-12 items-center justify-center gap-2 rounded-2xl bg-[#0b2d54]/5 px-4 py-2.5 text-xs font-black text-[#0b2d54]"><Clock3 className="h-4 w-4" />Expires in {formatTime(remaining)}</div>
