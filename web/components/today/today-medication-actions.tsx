@@ -380,6 +380,8 @@ export default function TodayMedicationActions({ medications, goal: suppliedGoal
           description: `${medicationName(medication)}${typeof nextAdherence === "number" ? ` · ${Math.round(nextAdherence)}% overall adherence` : ""}`,
         });
       }
+      window.dispatchEvent(new Event("sympto:health-goal-updated"));
+      window.dispatchEvent(new Event("sympto:today-action-updated"));
       await onUpdated?.();
       await loadMedicationInsight();
     } catch (error) {
