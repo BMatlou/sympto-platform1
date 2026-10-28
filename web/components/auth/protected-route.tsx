@@ -1,8 +1,12 @@
 "use client";
 
-import { ReactNode, useEffect, useState } from "react";
+import { ReactNode, useEffect, useSyncExternalStore } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/hooks/use-auth";
+
+const subscribeToMount = () => () => undefined;
+const getClientMountedSnapshot = () => true;
+const getServerMountedSnapshot = () => false;
 
 export default function ProtectedRoute({
   children,
@@ -12,13 +16,12 @@ export default function ProtectedRoute({
   const { isAuthenticated, isAuthLoaded } = useAuth();
   const router = useRouter();
 
-  const [mounted, setMounted] = useState(false);
-
-  // Wait until the component has mounted in the browser.
-  // This prevents server/client hydration mismatches.
-  useEffect(() => {
-    setMounted(true);
-  }, []);
+  // This snapshot keeps the server render stable and switches to mounted on the client.
+  const mounted = useSyncExternalStore(
+    subscribeToMount,
+    getClientMountedSnapshot,
+    getServerMountedSnapshot,
+  );
 
   // Redirect unauthenticated users after auth state has loaded.
   useEffect(() => {
