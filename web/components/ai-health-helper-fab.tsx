@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ClipboardPlus, Mic, Save, Sparkles, X } from "lucide-react";
 import { useAuth } from "@/hooks/use-auth";
 import { healthJournalService, type TalkToSymptoResult } from "@/services/health-journal.service";
@@ -26,6 +26,13 @@ export default function AIHealthHelperFab() {
   const speechRecognitionRef = useRef<BrowserSpeechRecognition | null>(null);
   const speechBaseRef = useRef("");
 
+  const closeHelper = useCallback(() => {
+    speechRecognitionRef.current?.abort();
+    speechRecognitionRef.current = null;
+    setListening(false);
+    setOpen(false);
+  }, []);
+
   useEffect(() => {
     if (typeof window === "undefined") return;
 
@@ -40,7 +47,7 @@ export default function AIHealthHelperFab() {
       speechRecognitionRef.current?.abort();
       speechRecognitionRef.current = null;
     };
-  }, []);
+  }, [closeHelper]);
 
   useEffect(() => {
     document.body.style.overflow = open ? "hidden" : "";
@@ -48,13 +55,6 @@ export default function AIHealthHelperFab() {
       document.body.style.overflow = "";
     };
   }, [open]);
-
-  const closeHelper = () => {
-    speechRecognitionRef.current?.abort();
-    speechRecognitionRef.current = null;
-    setListening(false);
-    setOpen(false);
-  };
 
   const openHelper = () => {
     setOpen(true);
