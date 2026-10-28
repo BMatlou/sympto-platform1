@@ -125,15 +125,6 @@ function groupDaily(values: Array<{ day: string; value: number }>) {
   return new Map([...map.entries()].map(([day, items]) => [day, mean(items) ?? 0] as const));
 }
 
->) {
-  const map = new Map<string, number>();
-  for (const item of values) {
-    if (!item.day || !Number.isFinite(item.value)) continue;
-    map.set(item.day, (map.get(item.day) ?? 0) + item.value);
-  }
-  return map;
-}
-
 function canonicalExerciseDayTotals(values: Array<{ day: string; value: number; source?: string | null; occurredAt: string }>) {
   const byDay = new Map<string, Array<{ value: number; source?: string | null; occurredAt: string }>>();
 
