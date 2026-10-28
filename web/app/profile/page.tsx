@@ -35,7 +35,6 @@ function field(source: ProfileData | null | undefined, key: string): string { re
 function label(value: string): string { return value.replaceAll("_", " ").toLowerCase().replace(/\\b\\w/g, c => c.toUpperCase()); }
 
 export default function ProfilePage() {
-  const [account, setAccount] = useState<ProfileData | null>(null);
   const [patient, setPatient] = useState<ProfileData | null>(null);
   const [loading, setLoading] = useState(true);
   const [editing, setEditing] = useState<"identity" | "address" | "health" | null>(null);
@@ -57,7 +56,6 @@ export default function ProfilePage() {
       const rawCountry = field(addr?.country as ProfileData | null, "iso2") || field(addr?.country as ProfileData | null, "name");
       const selectedCountry = countryOptions.find(c => c.code === rawCountry || c.name === rawCountry);
 
-      setAccount(me as ProfileData);
       setPatient(p);
       setProfileImageUrl(field(person, "profileImageUrl"));
       setIdentity({ firstName: field(person, "firstName"), middleName: field(person, "middleName"), lastName: field(person, "lastName"), preferredName: field(person, "preferredName"), email: field(me as ProfileData, "email"), phoneNumber: field(me as ProfileData, "phoneNumber") });
