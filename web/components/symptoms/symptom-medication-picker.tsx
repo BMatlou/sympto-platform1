@@ -72,7 +72,6 @@ function medicineOutcome(medicine: any) {
 }
 
 export default function SymptomMedicationPicker({
-  activeMedications: _activeMedications = [],
   recentMedications = [],
   value,
   onChange,
