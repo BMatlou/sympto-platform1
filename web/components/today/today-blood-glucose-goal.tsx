@@ -465,7 +465,7 @@ export default function TodayBloodGlucoseGoal({ goal, patientId = "", currentWei
   // Show a prominent low-reading alert only while the measurement is recent;
   // older low readings remain visible in the history without looking like a
   // current emergency banner.
-  const latestAgeMs = latest ? Date.now() - new Date(latest.occurredAt).getTime() : Number.POSITIVE_INFINITY;
+  const latestAgeMs = latest ? new Date().getTime() - new Date(latest.occurredAt).getTime() : Number.POSITIVE_INFINITY;
   const latestIsRecent = Number.isFinite(latestAgeMs) && latestAgeMs >= 0 && latestAgeMs <= 24 * 60 * 60 * 1000;
   const low = latestIsRecent && latest != null && latest.loggedValue < 3.9;
   const veryLow = latestIsRecent && latest != null && latest.loggedValue < 3.0;
@@ -671,16 +671,16 @@ export default function TodayBloodGlucoseGoal({ goal, patientId = "", currentWei
     setSaving(true);
     try {
       const occurredAt = new Date(measurementTime);
-      if (Number.isNaN(occurredAt.getTime()) || occurredAt.getTime() > Date.now() + 5 * 60 * 1000) {
+      if (Number.isNaN(occurredAt.getTime()) || occurredAt.getTime() > new Date().getTime() + 5 * 60 * 1000) {
         toast.error("Choose a valid measurement time that is not in the future.");
         return;
       }
-      if (occurredAt.getTime() < Date.now() - 90 * 86400000) {
+      if (occurredAt.getTime() < new Date().getTime() - 90 * 86400000) {
         toast.error("This card keeps self-recorded readings from the last 90 days. Older clinical results belong in Tests & Results.");
         return;
       }
       const savedAt = occurredAt.toISOString();
-      const sourceId = "glucose-" + goalId + "-" + Date.now();
+      const sourceId = "glucose-" + goalId + "-" + new Date().getTime();
       await healthGoalsService.syncMetricEvent({
         metricType: "BLOOD_GLUCOSE",
         metricKey: "blood_glucose.value",
@@ -867,7 +867,7 @@ export default function TodayBloodGlucoseGoal({ goal, patientId = "", currentWei
                   <div className="rounded-xl border border-[#e1eaed] bg-white p-3">
                     <p className="text-[8px] font-black uppercase tracking-[.12em] text-[#8a99a6]">Recorded baseline</p>
                     <p className="mt-1 text-sm font-black text-[#0b2d54]">{formatNumber(baselineGlucose)} mmol/L</p>
-                    <p className="mt-1 text-[8px] leading-4 text-[#74859a]">{baselineEstablishedAt ? "Established " + formatDate(baselineEstablishedAt) : "Date not recorded"} · shown separately from today's reading</p>
+                    <p className="mt-1 text-[8px] leading-4 text-[#74859a]">{baselineEstablishedAt ? "Established " + formatDate(baselineEstablishedAt) : "Date not recorded"} · shown separately from today&apos;s reading</p>
                   </div>
                 )}
               </div>
@@ -879,7 +879,7 @@ export default function TodayBloodGlucoseGoal({ goal, patientId = "", currentWei
           </div>
 
           <div className="mt-3 border-t border-[#e8eff1] pt-3">
-            <p className="text-[8px] font-black uppercase tracking-[.14em] text-[#8a99a6]">Today's recorded context</p>
+            <p className="text-[8px] font-black uppercase tracking-[.14em] text-[#8a99a6]">Today&apos;s recorded context</p>
             <div className="mt-2 grid grid-cols-2 gap-2 sm:grid-cols-3">
               <div className="rounded-xl border border-[#e1eaed] bg-white p-2.5">
                 <p className="text-[8px] font-black uppercase tracking-[.1em] text-[#8a99a6]">Meal calories logged</p>
@@ -1103,7 +1103,7 @@ export default function TodayBloodGlucoseGoal({ goal, patientId = "", currentWei
               )}
               <label className="block sm:col-span-2">
                 <span className="text-[8px] font-black uppercase tracking-[.14em] text-[#74859a]">Measurement date and time</span>
-                <input type="datetime-local" min={localDateTimeInput(new Date(Date.now() - 90 * 86400000))} max={localDateTimeInput(new Date())} value={measurementTime} onChange={(event) => setMeasurementTime(event.target.value)} className="mt-1.5 min-h-10 w-full rounded-xl border border-[#d7e4e8] bg-white px-3 text-xs font-bold text-[#0b2d54] outline-none focus:border-[#24c1c4]" />
+                <input type="datetime-local" min={localDateTimeInput(new Date(new Date().getTime() - 90 * 86400000))} max={localDateTimeInput(new Date())} value={measurementTime} onChange={(event) => setMeasurementTime(event.target.value)} className="mt-1.5 min-h-10 w-full rounded-xl border border-[#d7e4e8] bg-white px-3 text-xs font-bold text-[#0b2d54] outline-none focus:border-[#24c1c4]" />
               </label>
               <label className="block sm:col-span-2">
                 <span className="text-[8px] font-black uppercase tracking-[.14em] text-[#74859a]">Note (optional)</span>
