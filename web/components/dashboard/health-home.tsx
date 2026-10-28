@@ -505,6 +505,14 @@ async function countTodayGoalNeeds(
     // metric-event stream has no event for this category/key combination.
     if (goalHasProgressRecordedToday(goal)) continue;
 
+    const frequency = String(goal?.metricConfig?.frequency ?? goal?.frequency ?? "TOTAL").trim().toUpperCase();
+
+    // Cholesterol and custom personal goals are journeys by default, not daily
+    // reminders. Only count them as today's outstanding goal when the goal is
+    // explicitly configured to recur daily or weekly.
+    if (category === "CHOLESTEROL" && frequency !== "DAILY" && frequency !== "WEEKLY") continue;
+    if (category === "OTHER" && frequency !== "DAILY" && frequency !== "WEEKLY") continue;
+
     const defaultsForCategory = defaults[category];
     // Dashboard completion must query the same canonical metric stream as the
     // Today cards. Older goals can carry legacy/custom metric-config keys even
