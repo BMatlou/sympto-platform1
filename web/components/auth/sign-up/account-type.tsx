@@ -1,6 +1,6 @@
 "use client";
 
-import { Building, Network, BriefcaseBusiness, UserRound, Stethoscope } from "lucide-react";
+import { BriefcaseBusiness, UserRound, Stethoscope } from "lucide-react";
 
 interface AccountTypeProps {
   value: "INDIVIDUAL" | "PRACTITIONER" | "ORGANIZATION" | null;
