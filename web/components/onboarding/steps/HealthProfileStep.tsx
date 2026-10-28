@@ -516,7 +516,7 @@ export function HealthProfileStep({
 
         {bloodTypeUnknown && (
           <p className="text-xs leading-5 text-slate-400">
-            That's completely fine. Select A, B,
+            That&apos;s completely fine. Select A, B,
             AB or O above whenever you know your
             blood type.
           </p>
