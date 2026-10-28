@@ -282,6 +282,13 @@ export default function TodayBloodGlucoseGoal({ goal, patientId = "", currentWei
   const [readingContext, setReadingContext] = useState<GlucoseContext | "">("");
   const [note, setNote] = useState("");
   const [measurementTime, setMeasurementTime] = useState(() => localDateTimeInput(new Date()));
+  const [measurementDateBounds, setMeasurementDateBounds] = useState(() => {
+    const now = new Date();
+    return {
+      min: localDateTimeInput(new Date(now.getTime() - 90 * 86400000)),
+      max: localDateTimeInput(now),
+    };
+  });
   const [selectedMedicationId, setSelectedMedicationId] = useState("");
   const [selectedSupportCategory, setSelectedSupportCategory] = useState<SupportingGoalCategory | "">("");
   const [supportGoalTitle, setSupportGoalTitle] = useState("");
@@ -1103,7 +1110,7 @@ export default function TodayBloodGlucoseGoal({ goal, patientId = "", currentWei
               )}
               <label className="block sm:col-span-2">
                 <span className="text-[8px] font-black uppercase tracking-[.14em] text-[#74859a]">Measurement date and time</span>
-                <input type="datetime-local" min={localDateTimeInput(new Date(new Date().getTime() - 90 * 86400000))} max={localDateTimeInput(new Date())} value={measurementTime} onChange={(event) => setMeasurementTime(event.target.value)} className="mt-1.5 min-h-10 w-full rounded-xl border border-[#d7e4e8] bg-white px-3 text-xs font-bold text-[#0b2d54] outline-none focus:border-[#24c1c4]" />
+                <input type="datetime-local" min={measurementDateBounds.min} max={measurementDateBounds.max} value={measurementTime} onChange={(event) => setMeasurementTime(event.target.value)} className="mt-1.5 min-h-10 w-full rounded-xl border border-[#d7e4e8] bg-white px-3 text-xs font-bold text-[#0b2d54] outline-none focus:border-[#24c1c4]" />
               </label>
               <label className="block sm:col-span-2">
                 <span className="text-[8px] font-black uppercase tracking-[.14em] text-[#74859a]">Note (optional)</span>
@@ -1120,7 +1127,16 @@ export default function TodayBloodGlucoseGoal({ goal, patientId = "", currentWei
 
         <div className="mt-3 flex items-center justify-between gap-3 rounded-[18px] border border-[#e2ecef] bg-[#fbfdfd] px-3 py-2.5">
           <p className="min-w-0 text-[9px] font-semibold leading-4 text-[#74859a]">{latest ? "Your glucose history keeps each reading and its context. The saved target is not used to score a reading until a context-specific range is confirmed." : "Start by recording a measured value and when it was taken. You can track readings while arranging a target review."}</p>
-          <button type="button" onClick={() => { setOpen((current) => !current); if (!open) { setMeasurementTime(localDateTimeInput(new Date())); setReadingContext(""); setSelectedMedicationId(""); } }} className="inline-flex shrink-0 items-center gap-1.5 rounded-xl bg-[#0b2d54] px-3 py-2 text-[9px] font-black text-white"><Plus className="h-3 w-3" />{open ? "Close" : "Record"}</button>
+          <button type="button" onClick={() => { setOpen((current) => !current); if (!open) {
+            const now = new Date();
+            setMeasurementTime(localDateTimeInput(now));
+            setMeasurementDateBounds({
+              min: localDateTimeInput(new Date(now.getTime() - 90 * 86400000)),
+              max: localDateTimeInput(now),
+            });
+            setReadingContext("");
+            setSelectedMedicationId("");
+          } }} className="inline-flex shrink-0 items-center gap-1.5 rounded-xl bg-[#0b2d54] px-3 py-2 text-[9px] font-black text-white"><Plus className="h-3 w-3" />{open ? "Close" : "Record"}</button>
         </div>
 
         {detailsExpanded && (
