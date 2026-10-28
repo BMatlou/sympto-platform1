@@ -2,8 +2,8 @@
 "use client";
 
 import Link from "next/link";
-import { ArrowLeft, ArrowRight, Check, ChevronDown, MapPin, Save, Sparkles, TriangleAlert } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
+import { ArrowLeft, ArrowRight, Check, ChevronDown, MapPin, Save, TriangleAlert } from "lucide-react";
+import { useEffect, useState } from "react";
 import ProtectedRoute from "@/components/auth/protected-route";
 import { healthJournalService, type SymptomMonitoringResult } from "@/services/health-journal.service";
 import SymptomMedicationPicker from "@/components/symptoms/symptom-medication-picker";
