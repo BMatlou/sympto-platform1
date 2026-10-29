@@ -367,18 +367,21 @@ function HealthGoalsPageContent() {
   useEffect(() => {
     if (!editorOpen || !editingGoal) return;
     const timer = window.setTimeout(() => {
-    const timer = window.setTimeout(() => {
-    const category = CATEGORIES.find((item) => item.value === String(editingGoal.category ?? "")) ?? CATEGORIES[CATEGORIES.length - 1];
-    setDraft({ title: goalEditorTitle(editingGoal, category.value), description: String(editingGoal.description ?? ""), category: category.value, priority: String(editingGoal.priority ?? "MEDIUM"), targetValue: editingGoal.targetValue == null ? "" : String(editingGoal.targetValue), unit: String(editingGoal.unit ?? category.unit), targetDate: editingGoal.targetDate ? String(editingGoal.targetDate).slice(0, 10) : "", weightDirection: String(editingGoal?.metricConfig?.comparison ?? "DECREASE_TO").toUpperCase() === "INCREASE_TO" ? "GAIN" : String(editingGoal?.metricConfig?.comparison ?? "").toUpperCase() === "CLOSEST" ? "MAINTAIN" : "LOSE", personalComparison: personalComparisonFromGoal(editingGoal) });
+      const category = CATEGORIES.find((item) => item.value === String(editingGoal.category ?? "")) ?? CATEGORIES[CATEGORIES.length - 1];
+      setDraft({
+        title: goalEditorTitle(editingGoal, category.value),
+        description: String(editingGoal.description ?? ""),
+        category: category.value,
+        priority: String(editingGoal.priority ?? "MEDIUM"),
+        targetValue: editingGoal.targetValue == null ? "" : String(editingGoal.targetValue),
+        unit: String(editingGoal.unit ?? category.unit),
+        targetDate: editingGoal.targetDate ? String(editingGoal.targetDate).slice(0, 10) : "",
+        weightDirection: String(editingGoal?.metricConfig?.comparison ?? "DECREASE_TO").toUpperCase() === "INCREASE_TO" ? "GAIN" : String(editingGoal?.metricConfig?.comparison ?? "").toUpperCase() === "CLOSEST" ? "MAINTAIN" : "LOSE",
+        personalComparison: personalComparisonFromGoal(editingGoal),
+        patientMedicationId: String(editingGoal?.patientMedicationId ?? editingGoal?.patientMedication?.id ?? ""),
+      });
     }, 0);
     return () => window.clearTimeout(timer);
-    }, 0);
-    return () => window.clearTimeout(timer);
-  }, [editingGoal, editorOpen]);
-
-  useEffect(() => {
-    if (!editorOpen || !editingGoal) return;
-    setDraft((current) => ({ ...current, patientMedicationId: String(editingGoal?.patientMedicationId ?? editingGoal?.patientMedication?.id ?? current.patientMedicationId ?? "") }));
   }, [editingGoal, editorOpen]);
 
   useEffect(() => {
