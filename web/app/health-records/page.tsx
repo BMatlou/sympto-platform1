@@ -295,7 +295,7 @@ function HealthRecordsContent() {
           ) : error ? (
             <section className="rounded-3xl border border-slate-200 bg-white p-8 text-center shadow-sm">
               <FileText className="mx-auto h-10 w-10 text-slate-300" aria-hidden="true" />
-              <h2 className="mt-4 text-xl font-bold text-[#0b2d54]">We couldn't load your records</h2>
+              <h2 className="mt-4 text-xl font-bold text-[#0b2d54]">We couldn&apos;t load your records</h2>
               <p className="mt-2 text-sm text-slate-500">Your saved health information has not been changed.</p>
               <button type="button" onClick={reload} className="mt-5 min-h-12 rounded-2xl bg-[#0b2d54] px-5 text-sm font-bold text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#24c1c4] focus-visible:ring-offset-2">Try again</button>
             </section>
