@@ -96,7 +96,10 @@ export default function CarePlansPage() {
   }, []);
 
   useEffect(() => {
-    void load();
+    const initialLoad = window.setTimeout(() => {
+      void load();
+    }, 0);
+    return () => window.clearTimeout(initialLoad);
   }, [load]);
 
   const summary = useMemo(() => {
