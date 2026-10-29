@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { Bell, Check, Clock3, X } from "lucide-react";
 import { toast } from "sonner";
 import { api } from "@/lib/api";
@@ -122,14 +122,10 @@ export function MedicationReminderButton({
     timezone: localTimezone(),
   });
 
-  useEffect(() => {
-    void loadSchedule();
-  }, [medicationId]);
-
   const isWeekly = cadence === "WEEKLY";
   const cadenceLabel = useMemo(() => frequencyCopy(doseCount, cadence), [doseCount, cadence]);
 
-  async function loadSchedule() {
+  const loadSchedule = useCallback(async () => {
     setLoading(true);
     try {
       const response = await api.get("/patient-medications/" + medicationId + "/reminder-schedule");
@@ -171,7 +167,11 @@ export function MedicationReminderButton({
     } finally {
       setLoading(false);
     }
-  }
+  }, [medicationId, inferredFrequency.doseCount, inferredFrequency.cadence]);
+
+  useEffect(() => {
+    void loadSchedule();
+  }, [loadSchedule]);
 
   function toggleDay(day: number) {
     setState((current) => {
