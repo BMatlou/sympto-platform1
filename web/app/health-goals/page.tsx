@@ -418,6 +418,7 @@ function HealthGoalsPageContent() {
   }, [dashboard?.patient?.id, loading, searchParams]);
 
   useEffect(() => {
+    const goalEditTimer = window.setTimeout(() => {
     if (goalEditHandled.current || loading || searchParams.get("open") || !dashboard?.goals) return;
     const editId = searchParams.get("edit")?.trim();
     if (!editId) return;
@@ -432,9 +433,12 @@ function HealthGoalsPageContent() {
     setEditingId(String(goal.id));
     setDraft({ title: goalEditorTitle(goal, category.value), description: String(goal.description ?? ""), category: category.value, priority: String(goal.priority ?? "MEDIUM"), targetValue: goal.targetValue == null ? "" : String(goal.targetValue), unit: String(goal.unit ?? category.unit), targetDate: goal.targetDate ? String(goal.targetDate).slice(0, 10) : "", weightDirection: String(goal?.metricConfig?.comparison ?? "DECREASE_TO").toUpperCase() === "INCREASE_TO" ? "GAIN" : String(goal?.metricConfig?.comparison ?? "").toUpperCase() === "CLOSEST" ? "MAINTAIN" : "LOSE", personalComparison: personalComparisonFromGoal(goal) });
     setEditorOpen(true);
+    }, 0);
+    return () => window.clearTimeout(goalEditTimer);
   }, [dashboard?.goals, healthGoals, loading, searchParams]);
 
   useEffect(() => {
+    const medicationPrefillTimer = window.setTimeout(() => {
     if (
       medicationPrefillHandled.current ||
       !dashboard?.patient?.id ||
@@ -545,6 +549,8 @@ function HealthGoalsPageContent() {
     }
 
     setEditorOpen(true);
+    }, 0);
+    return () => window.clearTimeout(medicationPrefillTimer);
   }, [dashboard?.patient?.id, loading, searchParams, availableMedications, dashboard?.goals]);
 
   function openAdd() { setEditingId(null); setDraft(emptyDraft()); setEditorOpen(true); }
