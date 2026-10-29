@@ -121,7 +121,7 @@ export function MedicationAdherenceActions({ medicationId, medicationName, adher
 
   useEffect(() => {
     let cancelled = false;
-    if (!clinicalOpen || clinical || clinicalLoading) return () => { cancelled = true; };
+    if (!clinicalOpen || clinical) return () => { cancelled = true; };
 
     async function loadClinicalReference() {
       try {
