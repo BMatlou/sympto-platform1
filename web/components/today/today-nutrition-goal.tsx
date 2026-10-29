@@ -190,7 +190,7 @@ export default function TodayNutritionGoal({ goal, onUpdated, detailsExpanded, o
 
   const goalId = String(goal?.id ?? "");
   const target = targetFor(goal);
-  const journey = useMemo(() => journeyFor(goal), [goal?.createdAt, goal?.targetDate]);
+  const journey = useMemo(() => journeyFor(goal), [goal]);
 
   const todayTotal = useMemo(
     () => events.reduce((sum, event) => sum + Number(event.loggedValue || 0), 0),
