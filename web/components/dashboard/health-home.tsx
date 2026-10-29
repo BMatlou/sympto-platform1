@@ -685,15 +685,9 @@ export default function HealthHome({ patientId }: { patientId?: string }) {
         .then(([symptoms, journals]) => {
         if (!active) return;
         setSymptomFeed(Array.isArray(symptoms) ? symptoms : []);
-        const journalRows = Array.isArray(journals?.data)
-          ? journals.data
-          : Array.isArray(journals?.data?.data)
-            ? journals.data.data
-            : Array.isArray(journals)
-              ? journals
-              : [];
+        const journalRows = Array.isArray(journals.data) ? journals.data : [];
         setTodayJournalEntries(journalRows);
-        setJournalRecordCount(Number(journals?.pagination?.total ?? journalRows.length));
+        setJournalRecordCount(Number(journals.pagination?.total ?? journalRows.length));
 
         const todayKey = new Intl.DateTimeFormat("en-CA", {
           timeZone: "Africa/Johannesburg",
