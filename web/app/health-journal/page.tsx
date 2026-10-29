@@ -56,16 +56,17 @@ function HealthJournalPageContent() {
   const [filter, setFilter] = useState<"all" | "journal" | "symptom" | "measurement">("all");
 
   useEffect(() => {
-    if (typeof window === "undefined") return;
-    const requested = new URLSearchParams(window.location.search).get("filter");
-    if (requested === "all" || requested === "journal" || requested === "symptom" || requested === "measurement") {
-      setFilter(requested);
-    }
+    const timer = window.setTimeout(() => {
+      const requested = new URLSearchParams(window.location.search).get("filter");
+      if (requested === "all" || requested === "journal" || requested === "symptom" || requested === "measurement") {
+        setFilter(requested);
+      }
+    }, 0);
+    return () => window.clearTimeout(timer);
   }, []);
 
   useEffect(() => {
     let active = true;
-    setJournalError(false);
     healthJournalService.getAll({ page: 1, limit: 100 }).then(r => { if (active) setLogs(r.data ?? []); }).catch(() => { if (active) setJournalError(true); });
     return () => { active = false; };
   }, []);
@@ -229,7 +230,7 @@ function HealthJournalPageContent() {
   useEffect(() => { setVisible(10); setExpanded(null); }, [filter]);
 
   if (loading) return <ProtectedRoute><main className="min-h-screen bg-[#f4f9fb] p-6"><div className="mx-auto max-w-4xl space-y-4"><div className="h-40 animate-pulse rounded-[30px] bg-white"/><div className="h-[220px] animate-pulse rounded-[28px] bg-white"/><div className="h-[600px] animate-pulse rounded-[30px] bg-white"/></div></main></ProtectedRoute>;
-  if (error || !data) return <ProtectedRoute><main className="min-h-screen bg-[#f4f9fb] p-6"><div className="mx-auto max-w-xl rounded-[28px] bg-white p-6"><h1 className="text-xl font-black text-[#0b2d54]">We couldn't load your Health Journal</h1><p className="mt-2 text-sm text-slate-500">Your health history could not be loaded right now.</p><button onClick={reload} className="mt-5 rounded-xl bg-[#0b2d54] px-5 py-3 text-sm font-black text-white">Try again</button></div></main></ProtectedRoute>;
+  if (error || !data) return <ProtectedRoute><main className="min-h-screen bg-[#f4f9fb] p-6"><div className="mx-auto max-w-xl rounded-[28px] bg-white p-6"><h1 className="text-xl font-black text-[#0b2d54]">We couldn&apos;t load your Health Journal</h1><p className="mt-2 text-sm text-slate-500">Your health history could not be loaded right now.</p><button onClick={reload} className="mt-5 rounded-xl bg-[#0b2d54] px-5 py-3 text-sm font-black text-white">Try again</button></div></main></ProtectedRoute>;
 
   return <ProtectedRoute><main className="min-h-screen bg-[#f4f9fb] text-[#14304d]"><div className="mx-auto max-w-4xl px-4 py-6 sm:px-6 sm:py-8">
     <Link href="/dashboard" className="inline-flex items-center gap-2 text-sm font-bold text-[#0b2d54]"><ArrowLeft className="h-4 w-4"/>Back to My Health</Link>
