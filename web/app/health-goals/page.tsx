@@ -299,7 +299,7 @@ function HealthGoalsPageContent() {
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [search, setSearch] = useState("");
 
-  const healthGoals = useMemo(() => (Array.isArray(dashboard?.goals) ? dashboard.goals : []).filter((goal: any) => ["ACTIVE", "ACHIEVED", "ON_HOLD", "ON_TRACK", "IMPROVING", "STAGNANT", "DECLINING"].includes(String(goal?.status ?? "").toUpperCase())), [dashboard?.goals]);
+  const healthGoals = useMemo(() => (Array.isArray(dashboard?.goals) ? dashboard.goals : []).filter((goal: any) => ["ACTIVE", "ACHIEVED", "ON_HOLD", "ON_TRACK", "IMPROVING", "STAGNANT", "DECLINING"].includes(String(goal?.status ?? "").toUpperCase())), [dashboard]);
   const filteredGoals = useMemo(() => { const query = search.trim().toLowerCase(); if (!query) return healthGoals; return healthGoals.filter((goal: any) => `${goal?.title ?? ""} ${goal?.category ?? ""} ${goal?.description ?? ""}`.toLowerCase().includes(query)); }, [healthGoals, search]);
   const editingGoal = editingId ? healthGoals.find((goal: any) => String(goal.id) === editingId) : null;
   const selectedCategory = CATEGORIES.find((item) => item.value === draft.category);
@@ -312,7 +312,7 @@ function HealthGoalsPageContent() {
       const status = String(medication?.status ?? "ACTIVE").toUpperCase();
       return !["ENDED", "INACTIVE", "DISCONTINUED", "CANCELLED"].includes(status);
     });
-  }, [dashboard?.medications, dashboard?.today?.activeMedications]);
+  }, [dashboard]);
   const selectedMedication = useMemo(
     () =>
       availableMedications.find(
