@@ -57,9 +57,11 @@ export default function LogSymptomPage() {
   useEffect(() => {
     const term = symptom.trim();
     if (term.length < 2 || selectedReference?.name === term) {
-      setSymptomResults([]);
-      setSymptomSearching(false);
-      return;
+      const resetTimer = window.setTimeout(() => {
+        setSymptomResults([]);
+        setSymptomSearching(false);
+      }, 0);
+      return () => window.clearTimeout(resetTimer);
     }
 
     let active = true;
@@ -82,6 +84,7 @@ export default function LogSymptomPage() {
   }, [symptom, selectedReference]);
 
   useEffect(() => {
+    const prefillTimer = window.setTimeout(() => {
     if (typeof window === "undefined") return;
     const params = new URLSearchParams(window.location.search);
     const symptomParam = params.get("symptom")?.trim();
@@ -105,6 +108,8 @@ export default function LogSymptomPage() {
         if (match) setSelectedReference(match);
       });
     }
+    }, 0);
+    return () => window.clearTimeout(prefillTimer);
   }, []);
 
   const locationOptions: string[] = Array.isArray(selectedReference?.suggestedLocations) ? selectedReference.suggestedLocations : [];
