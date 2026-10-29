@@ -24,8 +24,8 @@ export default function HealthConditionsPage() {
   const [notice, setNotice] = useState("");
   const [clinicRecords, setClinicRecords] = useState<Record<string, any>>({});
 
-  const allergies = useMemo(() => Array.isArray(data?.allergies) ? data.allergies.filter((x: any) => x?.status === "ACTIVE" || !x?.status) : [], [data?.allergies]);
-  const conditions = useMemo(() => Array.isArray(data?.conditions) ? data.conditions.filter((x: any) => x?.status === "ACTIVE" && !x?.resolvedAt) : [], [data?.conditions]);
+  const allergies = useMemo(() => Array.isArray(data?.allergies) ? data.allergies.filter((x: any) => x?.status === "ACTIVE" || !x?.status) : [], [data]);
+  const conditions = useMemo(() => Array.isArray(data?.conditions) ? data.conditions.filter((x: any) => x?.status === "ACTIVE" && !x?.resolvedAt) : [], [data]);
 
   useEffect(() => {
     let cancelled = false;
