@@ -318,6 +318,13 @@ if (!valid) {
       values.profession,
       values.licenseNumber,
       values.practiceName,
+      values.addressLine1,
+      values.organizationEmail,
+      values.organizationName,
+      values.organizationPhone,
+      values.organizationType,
+      values.postalCode,
+      values.registrationNumber,
     ]
   );
 
