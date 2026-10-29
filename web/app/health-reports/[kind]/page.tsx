@@ -2601,6 +2601,7 @@ function MedicationPeriodInsights({
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
+    const medicationInsightsTimer = window.setTimeout(() => {
     let active = true;
     if (!medicationGoals.length) {
       setInsights([]);
@@ -2623,6 +2624,11 @@ function MedicationPeriodInsights({
       if (active) setLoading(false);
     });
     return () => { active = false; };
+    }, 0);
+    return () => {
+      window.clearTimeout(medicationInsightsTimer);
+      active = false;
+    };
   }, [medicationGoals]);
 
   const currentTotals = medicationDoseTotals(report);
@@ -3822,6 +3828,7 @@ export default function HealthReportPage() {
   const [previousFailed, setPreviousFailed] = useState(false);
 
   useEffect(() => {
+    const reportLoadTimer = window.setTimeout(() => {
     let active = true;
     setLoading(true);
     setError("");
@@ -3848,9 +3855,15 @@ export default function HealthReportPage() {
       });
 
     return () => { active = false; };
+    }, 0);
+    return () => {
+      window.clearTimeout(reportLoadTimer);
+      active = false;
+    };
   }, [kind, requestedDate]);
 
   useEffect(() => {
+    const previousReportTimer = window.setTimeout(() => {
     if (!report) return;
     let active = true;
     setPreviousLoading(true);
@@ -3878,6 +3891,11 @@ export default function HealthReportPage() {
       });
 
     return () => { active = false; };
+    }, 0);
+    return () => {
+      window.clearTimeout(previousReportTimer);
+      active = false;
+    };
   }, [report?.type, report?.period.start]);
 
   const title = useMemo(() => kind === "weekly" ? "Weekly Health Insights" : kind === "monthly" ? "Monthly Health Insights" : "Health Insights", [kind]);
