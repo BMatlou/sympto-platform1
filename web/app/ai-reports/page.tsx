@@ -23,8 +23,9 @@ function AIReportsPageContent() {
   useEffect(() => {
     const patientId = dashboard?.patient?.id;
     if (!patientId) {
-      if (!dashboardLoading) setLoading(false);
-      return;
+      if (dashboardLoading) return;
+      const emptyStateTimer = window.setTimeout(() => setLoading(false), 0);
+      return () => window.clearTimeout(emptyStateTimer);
     }
     const load = async () => {
       setLoading(true);
