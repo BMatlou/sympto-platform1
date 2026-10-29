@@ -151,7 +151,7 @@ function HealthVitalsPageContent() {
   }
 
   if (loading) return <ProtectedRoute><main className="min-h-screen bg-[#f5f8fb] p-6"><div className="mx-auto max-w-5xl space-y-4"><div className="h-14 w-40 animate-pulse rounded-2xl bg-white"/><div className="h-44 animate-pulse rounded-[28px] bg-white"/><div className="h-72 animate-pulse rounded-[28px] bg-white"/></div></main></ProtectedRoute>;
-  if (error || !data) return <ProtectedRoute><main className="min-h-screen bg-[#f5f8fb] p-6"><div className="mx-auto max-w-xl rounded-[28px] bg-white p-7 shadow-sm"><h1 className="text-xl font-black text-[#0b2d54]">We couldn't load your measurements</h1><p className="mt-2 text-sm leading-6 text-slate-500">Your saved health information has not been changed.</p><button onClick={reload} className="mt-5 rounded-xl bg-[#0b2d54] px-5 py-2.5 text-sm font-bold text-white">Try again</button></div></main></ProtectedRoute>;
+  if (error || !data) return <ProtectedRoute><main className="min-h-screen bg-[#f5f8fb] p-6"><div className="mx-auto max-w-xl rounded-[28px] bg-white p-7 shadow-sm"><h1 className="text-xl font-black text-[#0b2d54]">We couldn&apos;t load your measurements</h1><p className="mt-2 text-sm leading-6 text-slate-500">Your saved health information has not been changed.</p><button onClick={reload} className="mt-5 rounded-xl bg-[#0b2d54] px-5 py-2.5 text-sm font-bold text-white">Try again</button></div></main></ProtectedRoute>;
 
   const bloodPressure = find(vitals, ["BLOOD_PRESSURE", "BLOODPRESSURE"]);
   const heartRate = find(vitals, ["HEART_RATE", "HEARTRATE"]);
