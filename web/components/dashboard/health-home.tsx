@@ -834,9 +834,9 @@ export default function HealthHome({ patientId }: { patientId?: string }) {
   if (loading) {
     return (
       <ProtectedRoute>
-        <main className="min-h-screen bg-[#f7fbfb] p-4 pt-[72px] sm:p-8 sm:pt-[88px] lg:pt-8">
-          <div className="mx-auto max-w-[1240px] space-y-4" aria-busy="true">
-            <div className="h-[360px] animate-pulse rounded-b-[42px] rounded-t-[30px] bg-white" />
+        <main className="min-h-screen bg-[#f7fbfb] p-4 pt-18 sm:p-8 sm:pt-22 lg:pt-8">
+          <div className="mx-auto max-w-310 space-y-4" aria-busy="true">
+            <div className="h-90 animate-pulse rounded-b-[42px] rounded-t-[30px] bg-white" />
             <div className="h-10 animate-pulse rounded-2xl bg-white" />
             {Array.from({ length: 3 }).map((_, index) => (
               <div
@@ -936,7 +936,7 @@ export default function HealthHome({ patientId }: { patientId?: string }) {
       <ActionLink
         href="/smart-file"
         ariaLabel="Share Smart File"
-        className="group fixed right-4 top-4 z-[60] inline-flex min-h-10 items-center gap-2 overflow-visible rounded-2xl bg-[#0B2D54] px-4 py-2.5 text-[9px] font-black uppercase tracking-[0.08em] text-white shadow-[0_12px_28px_rgba(11,45,84,0.18)] transition-all duration-300 hover:-translate-y-1 hover:bg-[#092544] hover:shadow-[0_18px_38px_rgba(11,45,84,0.28),0_0_28px_rgba(36,193,196,0.22)] sm:right-6 sm:top-5"
+        className="group fixed right-4 top-4 z-60 inline-flex min-h-10 items-center gap-2 overflow-visible rounded-2xl bg-[#0B2D54] px-4 py-2.5 text-[9px] font-black uppercase tracking-[0.08em] text-white shadow-[0_12px_28px_rgba(11,45,84,0.18)] transition-all duration-300 hover:-translate-y-1 hover:bg-[#092544] hover:shadow-[0_18px_38px_rgba(11,45,84,0.28),0_0_28px_rgba(36,193,196,0.22)] sm:right-6 sm:top-5"
       >
         <span
           aria-hidden="true"
@@ -948,13 +948,13 @@ export default function HealthHome({ patientId }: { patientId?: string }) {
         <span className="hidden sm:inline">Share Smart File</span>
         <span className="sm:hidden">Share</span>
       </ActionLink>
-      <main className="min-h-screen bg-[#EAF0F7] px-2 pb-2 pt-[72px] text-[#0B2D54] sm:px-4 sm:pb-4 sm:pt-[72px] lg:pl-[104px] lg:pt-4">
-        <div className="mx-auto max-w-[1480px] pb-2">
+      <main className="min-h-screen bg-[#EAF0F7] px-2 pb-2 pt-18 text-[#0B2D54] sm:px-4 sm:pb-4 sm:pt-18 lg:pl-26 lg:pt-4">
+        <div className="mx-auto max-w-370 pb-2">
           <section className="min-w-0">
             <div className="px-4 pb-1 pt-3 sm:px-5 lg:px-7">
               <div className="mt-3 grid gap-3 xl:grid-cols-[minmax(0,1.55fr)_minmax(320px,0.85fr)]">
-                <section id="dashboard-overview-card" className="group relative min-h-[220px] overflow-hidden rounded-[28px] bg-[#0B2D54] p-6 text-white sm:p-7">
-                  <div className="relative flex min-h-[166px] items-center justify-between gap-8">
+                <section id="dashboard-overview-card" className="group relative min-h-55 overflow-hidden rounded-[28px] bg-[#0B2D54] p-6 text-white sm:p-7">
+                  <div className="relative flex min-h-41.5 items-center justify-between gap-8">
                     <div className="min-w-0 pr-1 sm:pr-10">
                       <div className="flex items-center justify-between gap-4">
                         <p className="text-[9px] font-black uppercase tracking-[0.18em] text-white/50">Overview</p>
@@ -971,15 +971,15 @@ export default function HealthHome({ patientId }: { patientId?: string }) {
                           )}
                         </ActionLink>
                       </div>
-                      <h2 className="mt-2 text-[30px] font-black leading-tight tracking-[-0.05em] sm:text-[38px]">
+                      <h2 className="mt-2 text-[30px] font-black leading-tight tracking-tighter sm:text-[38px]">
                         {greeting}, {firstName}
                       </h2>
-                      <p className="mt-2 max-w-[34rem] text-[11px] font-medium leading-5 text-white/66 sm:text-xs">
+                      <p className="mt-2 max-w-136 text-[11px] font-medium leading-5 text-white/66 sm:text-xs">
                         Your health, organised around what matters today.
                       </p>
                     </div>
 
-                    <div className="flex shrink-0 flex-col items-center text-center sm:min-w-[205px]">
+                    <div className="flex shrink-0 flex-col items-center text-center sm:min-w-51.25">
                       <div className="relative grid h-28 w-28 place-items-center sm:h-32 sm:w-32">
                         <span className="absolute inset-0 rounded-full bg-[#24C1C4] shadow-[0_0_42px_rgba(36,193,196,0.58),0_0_80px_rgba(36,193,196,0.28)] animate-pulse" />
                         <span className="relative grid h-full w-full place-items-center rounded-full bg-[#2BD6D3] text-[#0B2D54] shadow-[inset_0_2px_10px_rgba(255,255,255,0.28)]">
@@ -988,7 +988,7 @@ export default function HealthHome({ patientId }: { patientId?: string }) {
                           </span>
                         </span>
                       </div>
-                      <p className="mt-3 max-w-[15rem] text-center text-[11px] font-semibold leading-5 tracking-[-0.01em] text-white/82 sm:text-xs">
+                      <p className="mt-3 max-w-60 text-center text-[11px] font-semibold leading-5 tracking-[-0.01em] text-white/82 sm:text-xs">
                         <span className="font-black text-white">active items</span>
                         <br />
                         need your attention today
@@ -997,7 +997,7 @@ export default function HealthHome({ patientId }: { patientId?: string }) {
                   </div>
                 </section>
 
-                <section className="group relative min-h-[210px] overflow-hidden rounded-[28px] bg-gradient-to-br from-[#29CFD0] via-[#20BBC0] to-[#0A9DA7] p-5 text-white shadow-[0_24px_60px_rgba(36,193,196,0.20)] ring-1 ring-inset ring-white/25 sm:p-6">
+                <section className="group relative min-h-52.5 overflow-hidden rounded-[28px] bg-linear-to-br from-[#29CFD0] via-[#20BBC0] to-[#0A9DA7] p-5 text-white shadow-[0_24px_60px_rgba(36,193,196,0.20)] ring-1 ring-inset ring-white/25 sm:p-6">
                   <div aria-hidden="true" className="pointer-events-none absolute -right-20 -top-20 h-64 w-64 rounded-full bg-white/45 blur-3xl transition-transform duration-500 group-hover:scale-110" />
                   <div aria-hidden="true" className="pointer-events-none absolute -left-20 -bottom-24 h-56 w-56 rounded-full bg-[#C9FFFF]/35 blur-3xl" />
                   <div aria-hidden="true" className="pointer-events-none absolute inset-x-7 top-0 h-px bg-white/75" />
@@ -1018,7 +1018,7 @@ export default function HealthHome({ patientId }: { patientId?: string }) {
 
                     {recentSymptom ? (
                       <div className="mt-5 min-w-0">
-                        <h2 className="truncate text-[29px] font-black tracking-[-0.05em] sm:text-[32px]">
+                        <h2 className="truncate text-[29px] font-black tracking-tighter sm:text-[32px]">
                           {symptomLabel(recentSymptom)}
                         </h2>
                         <p className="mt-1 text-[11px] font-semibold text-white/76">
@@ -1051,7 +1051,7 @@ export default function HealthHome({ patientId }: { patientId?: string }) {
                       </div>
                     ) : (
                       <div className="mt-5">
-                        <h2 className="text-[27px] font-black tracking-[-0.05em]">Log a symptom</h2>
+                        <h2 className="text-[27px] font-black tracking-tighter">Log a symptom</h2>
                         <p className="mt-1 text-[11px] font-semibold text-white/76">Nothing has been logged yet.</p>
                         <Link
                           href="/log-symptom"
@@ -1074,7 +1074,7 @@ export default function HealthHome({ patientId }: { patientId?: string }) {
                   <ActionLink
                     id="dashboard-today-card"
                     href="/today"
-                    className="group relative min-h-[164px] overflow-hidden rounded-[26px] bg-gradient-to-br from-[#10B7B9] via-[#24C1C4] to-[#79E6E1] p-5 text-white shadow-[0_18px_40px_rgba(36,193,196,0.22)] transition-all duration-300 hover:-translate-y-1 hover:shadow-[0_24px_50px_rgba(36,193,196,0.30)]"
+                    className="group relative min-h-41 overflow-hidden rounded-[26px] bg-linear-to-br from-[#10B7B9] via-[#24C1C4] to-[#79E6E1] p-5 text-white shadow-[0_18px_40px_rgba(36,193,196,0.22)] transition-all duration-300 hover:-translate-y-1 hover:shadow-[0_24px_50px_rgba(36,193,196,0.30)]"
                   >
                     <div aria-hidden="true" className="pointer-events-none absolute -right-10 -top-12 h-32 w-32 rounded-full bg-white/25 blur-2xl transition-transform duration-500 group-hover:scale-125" />
                     <div aria-hidden="true" className="pointer-events-none absolute inset-x-5 top-0 h-px bg-white/45" />
@@ -1087,7 +1087,7 @@ export default function HealthHome({ patientId }: { patientId?: string }) {
                     <div className="relative mt-7">
                       <p className="text-[9px] font-black uppercase tracking-[0.16em] text-white/65">Daily care</p>
                       <div className="mt-1 flex items-end justify-between gap-3">
-                        <h2 className="text-[24px] font-black tracking-[-0.05em] text-white">Today</h2>
+                        <h2 className="text-[24px] font-black tracking-tighter text-white">Today</h2>
                         <div className="flex flex-wrap justify-end gap-1.5">
                           {todayChips.map((chip) => (
                             <RecordedChip key={chip} className="bg-white/16 text-white ring-white/20">{chip}</RecordedChip>
@@ -1099,7 +1099,7 @@ export default function HealthHome({ patientId }: { patientId?: string }) {
 
                   <ActionLink
                     href="/health-passport"
-                    className="group relative min-h-[164px] overflow-hidden rounded-[26px] bg-gradient-to-br from-[#8E1B1B] via-[#C62828] to-[#F05A5A] p-5 text-white shadow-[0_18px_40px_rgba(198,40,40,0.22)] transition-all duration-300 hover:-translate-y-1 hover:shadow-[0_24px_50px_rgba(198,40,40,0.30)]"
+                    className="group relative min-h-41 overflow-hidden rounded-[26px] bg-linear-to-br from-[#8E1B1B] via-[#C62828] to-[#F05A5A] p-5 text-white shadow-[0_18px_40px_rgba(198,40,40,0.22)] transition-all duration-300 hover:-translate-y-1 hover:shadow-[0_24px_50px_rgba(198,40,40,0.30)]"
                   >
                     <div aria-hidden="true" className="pointer-events-none absolute -right-10 -top-12 h-32 w-32 rounded-full bg-white/22 blur-2xl transition-transform duration-500 group-hover:scale-125" />
                     <div aria-hidden="true" className="pointer-events-none absolute inset-x-5 top-0 h-px bg-white/35" />
@@ -1112,7 +1112,7 @@ export default function HealthHome({ patientId }: { patientId?: string }) {
                     <div className="relative mt-7">
                       <p className="text-[9px] font-black uppercase tracking-[0.16em] text-white/65">Clinic Card</p>
                       <div className="mt-1 flex items-end justify-between gap-3">
-                        <h2 className="text-[24px] font-black tracking-[-0.05em] text-white">Essentials</h2>
+                        <h2 className="text-[24px] font-black tracking-tighter text-white">Essentials</h2>
                         <div className="flex flex-wrap justify-end gap-1.5">
                           {clinicChips.map((chip) => (
                             <RecordedChip key={chip} className="bg-white/14 text-white ring-white/18">{chip}</RecordedChip>
@@ -1124,7 +1124,7 @@ export default function HealthHome({ patientId }: { patientId?: string }) {
 
                   <ActionLink
                     href="/health-journal"
-                    className="group relative min-h-[164px] overflow-hidden rounded-[26px] bg-gradient-to-br from-[#0B2D54] via-[#155AC1] to-[#2F6FED] p-5 text-white shadow-[0_18px_40px_rgba(11,45,84,0.24)] transition-all duration-300 hover:-translate-y-1 hover:shadow-[0_24px_50px_rgba(11,45,84,0.32)]"
+                    className="group relative min-h-41 overflow-hidden rounded-[26px] bg-linear-to-br from-[#0B2D54] via-[#155AC1] to-[#2F6FED] p-5 text-white shadow-[0_18px_40px_rgba(11,45,84,0.24)] transition-all duration-300 hover:-translate-y-1 hover:shadow-[0_24px_50px_rgba(11,45,84,0.32)]"
                   >
                     <div aria-hidden="true" className="pointer-events-none absolute -right-10 -top-12 h-32 w-32 rounded-full bg-white/22 blur-2xl transition-transform duration-500 group-hover:scale-125" />
                     <div aria-hidden="true" className="pointer-events-none absolute inset-x-5 top-0 h-px bg-white/35" />
@@ -1137,7 +1137,7 @@ export default function HealthHome({ patientId }: { patientId?: string }) {
                     <div className="relative mt-7">
                       <p className="text-[9px] font-black uppercase tracking-[0.16em] text-white/65">Health Journal</p>
                       <div className="mt-1 flex items-end justify-between gap-3">
-                        <h2 className="text-[24px] font-black tracking-[-0.05em] text-white">Records</h2>
+                        <h2 className="text-[24px] font-black tracking-tighter text-white">Records</h2>
                         <div className="flex flex-wrap justify-end gap-1.5">
                           <RecordedChip className="bg-white/14 text-white ring-white/18">{journalRecordLabel}</RecordedChip>
                           <RecordedChip className="bg-white/14 text-white ring-white/18">{symptomRecordLabel}</RecordedChip>
