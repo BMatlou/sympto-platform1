@@ -256,7 +256,6 @@ export function buildBloodPressureInsights({
       .filter((value): value is number => value != null && Number.isFinite(value));
 
     const recordedDays = dailyValues.length;
-    const averageSystolic = mean(dailyValues) ?? 0;
 
     const midpoint = Math.floor(trendDays.length / 2);
     const earlyValues = trendDays
