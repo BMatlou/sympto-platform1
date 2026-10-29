@@ -2601,8 +2601,8 @@ function MedicationPeriodInsights({
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
-    const medicationInsightsTimer = window.setTimeout(() => {
     let active = true;
+    const medicationInsightsTimer = window.setTimeout(() => {
     if (!medicationGoals.length) {
       setInsights([]);
       setLoading(false);
@@ -3828,8 +3828,8 @@ export default function HealthReportPage() {
   const [previousFailed, setPreviousFailed] = useState(false);
 
   useEffect(() => {
-    const reportLoadTimer = window.setTimeout(() => {
     let active = true;
+    const reportLoadTimer = window.setTimeout(() => {
     setLoading(true);
     setError("");
     setReport(null);
@@ -3863,9 +3863,9 @@ export default function HealthReportPage() {
   }, [kind, requestedDate]);
 
   useEffect(() => {
+    let active = true;
     const previousReportTimer = window.setTimeout(() => {
     if (!report) return;
-    let active = true;
     setPreviousLoading(true);
     setPreviousFailed(false);
     const anchorDate = dateKey(report.period.start);
