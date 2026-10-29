@@ -170,7 +170,10 @@ export function MedicationReminderButton({
   }, [medicationId, inferredFrequency.doseCount, inferredFrequency.cadence]);
 
   useEffect(() => {
-    void loadSchedule();
+    const initialLoad = window.setTimeout(() => {
+      void loadSchedule();
+    }, 0);
+    return () => window.clearTimeout(initialLoad);
   }, [loadSchedule]);
 
   function toggleDay(day: number) {
