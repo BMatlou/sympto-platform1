@@ -213,10 +213,7 @@ export default function DashboardPage() {
   const profile = dashboard?.profile ?? null;
   const patient = dashboard?.patient ?? null;
 
-  const healthPassport =
-    dashboard?.healthPassport ??
-    patient?.healthPassport ??
-    null;
+  const healthPassport = dashboard?.healthPassport ?? null;
 
   const allergies = Array.isArray(dashboard?.allergies)
     ? dashboard.allergies
@@ -258,10 +255,7 @@ export default function DashboardPage() {
     ? dashboard.appointments
     : [];
 
-  const journalSettings =
-    dashboard?.healthJournalSettings ??
-    patient?.healthJournalSettings ??
-    null;
+  const journalSettings = dashboard?.healthJournalSettings ?? null;
 
   /*
    * -------------------------------------------------------
