@@ -73,7 +73,6 @@ function HealthJournalPageContent() {
 
   useEffect(() => {
     let active = true;
-    setSymptomError(false);
     healthJournalService.getSymptoms({ limit: 100 })
       .then(records => { if (active) setSymptoms(Array.isArray(records) ? records : []); })
       .catch(() => { if (active) setSymptomError(true); });
@@ -227,7 +226,13 @@ function HealthJournalPageContent() {
   const grouped = visibleEvents.slice(0, visible).reduce<Record<string, Event[]>>((acc, e) => { (acc[dayKey(e.at)] ||= []).push(e); return acc; }, {});
   const journalCount = events.filter(e => e.type === "journal").length;
   const measurementCount = events.filter(e => e.type === "measurement").length;
-  useEffect(() => { setVisible(10); setExpanded(null); }, [filter]);
+  useEffect(() => {
+    const timer = window.setTimeout(() => {
+      setVisible(10);
+      setExpanded(null);
+    }, 0);
+    return () => window.clearTimeout(timer);
+  }, [filter]);
 
   if (loading) return <ProtectedRoute><main className="min-h-screen bg-[#f4f9fb] p-6"><div className="mx-auto max-w-4xl space-y-4"><div className="h-40 animate-pulse rounded-[30px] bg-white"/><div className="h-[220px] animate-pulse rounded-[28px] bg-white"/><div className="h-[600px] animate-pulse rounded-[30px] bg-white"/></div></main></ProtectedRoute>;
   if (error || !data) return <ProtectedRoute><main className="min-h-screen bg-[#f4f9fb] p-6"><div className="mx-auto max-w-xl rounded-[28px] bg-white p-6"><h1 className="text-xl font-black text-[#0b2d54]">We couldn&apos;t load your Health Journal</h1><p className="mt-2 text-sm text-slate-500">Your health history could not be loaded right now.</p><button onClick={reload} className="mt-5 rounded-xl bg-[#0b2d54] px-5 py-3 text-sm font-black text-white">Try again</button></div></main></ProtectedRoute>;
