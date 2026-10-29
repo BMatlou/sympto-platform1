@@ -1431,7 +1431,7 @@ function ScoreRing({ percent, label, tone, size = 68 }: { percent: number | null
   const ringColour = toneStyles(tone).ring;
   return (
     <div
-      className="relative grid shrink-0 place-items-center rounded-full p-[5px]"
+      className="relative grid shrink-0 place-items-center rounded-full p-1.25"
       style={{
         width: size,
         height: size,
@@ -2832,7 +2832,7 @@ function MedicationPeriodInsights({
                         {currentRate === null ? "—" : formatNumber(currentRate, 1) + "%"}
                       </p>
                     </div>
-                    <div className="max-w-[180px]">
+                    <div className="max-w-45">
                       <span className={"inline-flex rounded-full px-2 py-1 text-[10px] font-bold " + movementTone}>{movement}</span>
                       {row.target !== null && <p className="mt-1 text-[10px] font-semibold text-[#0b7b80]">Saved taken-dose target {formatNumber(row.target, 0)}%{row.source === "schedule" && row.current?.unrecordedDoses ? " · evaluation waits for complete dose outcomes" : ""}</p>}
                     </div>
@@ -3363,7 +3363,7 @@ function LedgerFieldTree({ value }: { value: unknown }) {
       return <div key={String(object.id ?? object.createdAt ?? object.measuredAt ?? "entry") + "-" + index} className="rounded-lg border border-slate-100 bg-white p-3"><LedgerFieldTree value={entry} /></div>;
     })}</div>;
   }
-  if (typeof value !== "object") return <p className="break-words text-xs leading-5 text-slate-700">{ledgerScalar(value)}</p>;
+  if (typeof value !== "object") return <p className="wrap-break-word text-xs leading-5 text-slate-700">{ledgerScalar(value)}</p>;
   const record = ledgerObject(value);
   const internal = /^(id|.*Id|.*Ids|patient|user|healthPassport|medicalRecord|connection|createdByUserId|practitionerId)$/i;
   const entries = Object.entries(record).filter(([key, fieldValue]) => !internal.test(key) && ledgerHasValue(fieldValue));
@@ -3375,7 +3375,7 @@ function LedgerFieldTree({ value }: { value: unknown }) {
       const heading = ledgerScalar(fieldValue);
       return <div key={key} className="min-w-0 rounded-lg border border-slate-100 bg-white px-3 py-2 sm:col-span-2"><details><summary className="cursor-pointer text-xs font-bold text-[#0b2d54]">{label}{count !== null ? " (" + count + ")" : heading ? " · " + heading : ""}</summary><div className="mt-2 border-t border-slate-100 pt-2"><LedgerFieldTree value={fieldValue} /></div></details></div>;
     }
-    return <div key={key} className="min-w-0"><dt className="text-[10px] font-semibold uppercase tracking-wide text-slate-400">{label}</dt><dd className="mt-0.5 break-words text-xs leading-5 text-slate-700">{ledgerScalar(fieldValue, key)}</dd></div>;
+    return <div key={key} className="min-w-0"><dt className="text-[10px] font-semibold uppercase tracking-wide text-slate-400">{label}</dt><dd className="mt-0.5 wrap-break-word text-xs leading-5 text-slate-700">{ledgerScalar(fieldValue, key)}</dd></div>;
   })}</dl>;
 }
 function LedgerGroup({ group }: { group: ReportLedgerGroup }) {
@@ -3397,7 +3397,7 @@ function LedgerGroup({ group }: { group: ReportLedgerGroup }) {
         // IDs/timestamps can legitimately repeat across merged sources; scope every rendered row to its group and position.
         const key = group.key + "-" + identity + "-" + index;
         return <article key={key} className="border-b border-slate-200 last:border-0"><details>
-          <summary className="flex cursor-pointer list-none items-start gap-3 px-3 py-3"><span className="mt-1 h-2 w-2 shrink-0 rounded-full bg-[#24c1c4]" /><span className="min-w-0 flex-1"><span className="block text-xs font-bold text-[#0b2d54]">{title}</span><span className="mt-1 block text-[10px] text-slate-500">{date}</span>{summary && <span className="mt-1 block break-words text-[11px] leading-4 text-slate-600">{summary}</span>}</span><span className="shrink-0 text-[10px] font-semibold text-slate-400">Details</span></summary>
+          <summary className="flex cursor-pointer list-none items-start gap-3 px-3 py-3"><span className="mt-1 h-2 w-2 shrink-0 rounded-full bg-[#24c1c4]" /><span className="min-w-0 flex-1"><span className="block text-xs font-bold text-[#0b2d54]">{title}</span><span className="mt-1 block text-[10px] text-slate-500">{date}</span>{summary && <span className="mt-1 block wrap-break-word text-[11px] leading-4 text-slate-600">{summary}</span>}</span><span className="shrink-0 text-[10px] font-semibold text-slate-400">Details</span></summary>
           <div className="border-t border-slate-100 px-3 py-3"><LedgerFieldTree value={record} /></div>
         </details></article>;
       })}
@@ -3512,7 +3512,7 @@ function NarrativeFindingsSummary({ report }: { report: Report }) {
                     <ul className="mt-2 list-disc space-y-1 pl-5 text-xs leading-5 text-slate-600">
                       {finding.evidence.map((item, index) => <li key={finding.key + "-evidence-" + index}>{item}</li>)}
                     </ul>
-                    {finding.sourceRecordIds.length > 0 && <p className="mt-2 break-words text-[10px] text-slate-400">Source record references: {finding.sourceRecordIds.join(", ")}</p>}
+                    {finding.sourceRecordIds.length > 0 && <p className="mt-2 wrap-break-word text-[10px] text-slate-400">Source record references: {finding.sourceRecordIds.join(", ")}</p>}
                   </details>
                 )}
               </div>
@@ -3919,7 +3919,7 @@ export default function HealthReportPage() {
         <div className="mx-auto max-w-6xl px-4 py-6 sm:px-6 sm:py-8">
           
 
-          <section className="mt-4 overflow-hidden rounded-[28px] bg-gradient-to-br from-[#0b2d54] via-[#0b3e60] to-[#0f5a62] p-5 text-white shadow-[0_18px_55px_-30px_rgba(11,45,84,0.55)] sm:p-7">
+          <section className="mt-4 overflow-hidden rounded-[28px] bg-linear-to-br from-[#0b2d54] via-[#0b3e60] to-[#0f5a62] p-5 text-white shadow-[0_18px_55px_-30px_rgba(11,45,84,0.55)] sm:p-7">
             <div className="flex flex-col gap-5 sm:flex-row sm:items-center sm:justify-between">
               <div><div className="flex items-center gap-2 text-[10px] font-black uppercase tracking-[0.18em] text-[#24c1c4]"><ShieldCheck className="h-4 w-4" />Sympto · Health intelligence</div><h1 className="mt-3 text-3xl font-black tracking-tight sm:text-4xl">{title}</h1><p className="mt-2 text-sm leading-6 text-white/75">{report.period.label}</p><p className="mt-3 max-w-2xl text-sm leading-5 text-white/80">Personalised patterns, priorities and next steps, grounded in your saved health records.</p></div>
               <div className="flex shrink-0 flex-wrap items-center gap-3 rounded-2xl border border-white/15 bg-white/10 p-3 sm:gap-4 sm:p-4">
