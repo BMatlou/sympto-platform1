@@ -4,7 +4,7 @@ The API uses Prisma 7 with the PostgreSQL driver adapter. When you run the NestJ
 
 The repository-root `docker-compose.yml` defines the local development database:
 
-- Host: `127.0.0.1` (or `localhost`)
+- Host: `127.0.0.1`
 - Port: `5432`
 - Database: `sympto`
 - User: `postgres`
@@ -35,10 +35,10 @@ Copy-Item api/.env.example api/.env
 If `api/.env` already exists, do not overwrite it. Open it and confirm that `DATABASE_URL` points to the local Docker database:
 
 ```dotenv
-DATABASE_URL="postgresql://postgres:postgres@localhost:5432/sympto?schema=public"
+DATABASE_URL="postgresql://postgres:postgres@127.0.0.1:5432/sympto?schema=public"
 ```
 
-When the API runs directly on Windows, use `localhost` or `127.0.0.1` as the host. The hostname `postgres` is for containers on the same Docker Compose network.
+Use `127.0.0.1` when the API runs directly on Windows. The hostname `postgres` is for containers on the same Docker Compose network.
 
 ## 3. Verify the port
 
